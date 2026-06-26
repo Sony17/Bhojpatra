@@ -653,7 +653,7 @@ function Step2({
       </div>
 
       {/* Diet segmented filter */}
-      <div className="mt-6 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
+      <div className="mt-6 flex flex-wrap sm:inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
         {dietOptions.map((d) => (
           <button
             key={d.id}
@@ -758,12 +758,12 @@ function Step3({
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <SectionHead
           label={t("STEP 3", "चरण 3")}
           title={t("Compare Vendors", "वेंडर तुलना")}
         />
-        <div className="mb-6 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
+        <div className="mb-6 flex flex-wrap sm:inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
           {(["price", "rating"] as SortBy[]).map((s) => (
             <button
               key={s}
@@ -1130,13 +1130,13 @@ function Step6({
         <h3 className="font-display text-base font-semibold text-ink">
           {t("Apply a coupon", "कूपन लगाएं")}
         </h3>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             type="text"
             value={couponInput}
             onChange={(e) => setCouponInput(e.target.value)}
             placeholder={t("Enter code", "कोड दर्ज करें")}
-            className="flex-1 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink uppercase outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            className="min-w-0 flex-1 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink uppercase outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
           />
           <button
             type="button"
@@ -1203,7 +1203,7 @@ function Step6({
           <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-cream-3 bg-white p-6 shadow-sm">
             <svg
               viewBox="0 0 100 100"
-              className="h-40 w-40 text-ink"
+              className="h-32 w-32 sm:h-40 sm:w-40 text-ink"
               role="img"
               aria-label={t("QR code placeholder", "QR कोड प्लेसहोल्डर")}
             >
@@ -1289,7 +1289,7 @@ function Step7({
       </p>
 
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 text-left shadow-sm">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
+        <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-ink-soft">{t("Occasion", "अवसर")}</dt>
             <dd className="font-semibold text-ink">
@@ -1332,7 +1332,7 @@ function Step7({
         <button
           type="button"
           onClick={onDownload}
-          className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+          className="rounded-full border border-maroon px-4 sm:px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
         >
           ⬇ {t("Download Menu", "मेन्यू डाउनलोड")}
         </button>
@@ -1340,7 +1340,7 @@ function Step7({
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+          className="rounded-full bg-maroon px-4 sm:px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
         >
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>

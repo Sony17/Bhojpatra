@@ -53,7 +53,7 @@ export default function ContactPage() {
         </p>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
         {/* LEFT — enquiry form */}
         <div className="rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:p-8">
           <h2 className="font-display text-xl font-semibold text-ink">

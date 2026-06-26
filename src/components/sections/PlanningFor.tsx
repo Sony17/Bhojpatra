@@ -62,9 +62,9 @@ export default function PlanningFor() {
       />
 
       {/* Content */}
-      <div className="mx-auto flex min-h-[560px] max-w-7xl flex-col justify-between px-5 py-12 sm:min-h-[620px] sm:py-14">
+      <div className="flex min-h-[560px] flex-col justify-between py-12 sm:min-h-[680px] sm:py-14">
         {/* Ribbon — label + stamped occasion pills */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-2.5 px-5 sm:gap-3">
           <span className="eyebrow mr-1 text-xs font-semibold text-cream/80 sm:text-[13px]">
             Planning For
           </span>
@@ -93,30 +93,36 @@ export default function PlanningFor() {
         </div>
 
         {/* Trending dishes — five crowd-favourites for the selected occasion,
-            re-keyed on selection so the whole strip crossfades in. */}
-        <div key={`trending-${selectedOccasion.id}`} className="animate-fade my-10">
-          <p className="eyebrow mb-4 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-cream/70 sm:text-xs">
-            Trending for {selectedOccasion.name}
-          </p>
-          <ul className="flex snap-x gap-3 overflow-x-auto pb-1 sm:flex-wrap sm:justify-center sm:overflow-visible sm:gap-4">
+            re-keyed on selection so the whole strip crossfades in. Full-bleed:
+            the strip spans the entire viewport width, not the content column. */}
+        <div key={`trending-${selectedOccasion.id}`} className="animate-fade my-12 w-full">
+          {/* Legible, decorated label — solid cream with rule lines either side */}
+          <div className="mb-7 flex items-center justify-center gap-4 px-5">
+            <span aria-hidden="true" className="h-px w-10 bg-gradient-to-r from-transparent to-cream/60 sm:w-16" />
+            <p className="eyebrow text-center text-xs font-bold uppercase tracking-[0.28em] text-cream drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-sm">
+              Trending for {selectedOccasion.name}
+            </p>
+            <span aria-hidden="true" className="h-px w-10 bg-gradient-to-l from-transparent to-cream/60 sm:w-16" />
+          </div>
+          <ul className="flex snap-x gap-4 overflow-x-auto px-5 pb-2 sm:gap-6 sm:overflow-visible sm:px-8 lg:px-12">
             {selectedOccasion.trending.map((dish: TrendingDish) => (
               <li
                 key={dish.name}
-                className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/15 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/15 hover:ring-white/40 sm:w-36"
+                className="group flex w-40 shrink-0 snap-start flex-col items-center gap-3 rounded-3xl bg-white/10 p-4 text-center ring-1 ring-white/15 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:bg-white/[0.18] hover:ring-cream/50 sm:w-auto sm:flex-1 sm:p-5"
               >
-                <span className="relative h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/30 sm:h-[72px] sm:w-[72px]">
+                <span className="relative h-24 w-24 overflow-hidden rounded-full ring-2 ring-cream/40 shadow-[0_10px_28px_-10px_rgba(0,0,0,0.85)] transition-shadow duration-300 group-hover:ring-cream/70 sm:h-32 sm:w-32">
                   <Image
                     src={dish.image}
                     alt={dish.name}
                     fill
-                    sizes="72px"
+                    sizes="(min-width: 640px) 128px, 96px"
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                 </span>
-                <span className="line-clamp-2 text-[13px] font-semibold leading-tight text-cream sm:text-sm">
+                <span className="line-clamp-2 text-sm font-semibold leading-tight text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] sm:text-base">
                   {dish.name}
                 </span>
-                <span className="rounded-full bg-maroon/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream">
+                <span className="rounded-full bg-maroon px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream shadow-[0_4px_12px_-4px_rgba(0,0,0,0.7)] sm:text-[11px]">
                   {dish.tag}
                 </span>
               </li>
@@ -127,12 +133,12 @@ export default function PlanningFor() {
         {/* Caption — re-keyed on selection so the text re-animates in */}
         <div
           key={selectedOccasion.id}
-          className="animate-fade mt-10 flex max-w-xl flex-col items-start gap-3 text-cream"
+          className="animate-fade mx-auto mt-10 flex w-full max-w-7xl flex-col items-start gap-3 px-5 text-cream"
         >
           <h2 className="text-2xl font-semibold tracking-wide sm:text-3xl lg:text-4xl">
             {selectedOccasion.name}
           </h2>
-          <p className="text-sm text-cream/85 sm:text-base">
+          <p className="max-w-xl text-sm text-cream/85 sm:text-base">
             {selectedOccasion.tagline}
           </p>
           <Link

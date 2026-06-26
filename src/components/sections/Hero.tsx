@@ -107,17 +107,12 @@ export default function Hero() {
             sits beside a compact row of step boxes, with a divider line on
             top; a highlight border walks from one box to the next on a loop. */}
         <div className="animate-rise delay-5 mt-auto max-w-4xl pt-16 sm:pt-20">
-          <span
-            aria-hidden="true"
-            className="block h-px w-full bg-gradient-to-r from-maroon/40 via-gold/50 to-transparent"
-          />
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
             <h2 className="font-display eyebrow shrink-0 text-[11px] font-semibold text-maroon">
               How It Works
             </h2>
 
-            <ol className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-2.5">
+            <ol className="flex w-full flex-row items-stretch gap-1.5 sm:w-2/5 sm:gap-2">
               {steps.map((step, i) => {
                 const Icon = stepIcons[step.iconKey];
                 return (
@@ -126,15 +121,15 @@ export default function Hero() {
                     style={{
                       animationDelay: `-${((steps.length - i) % steps.length) * (5.6 / steps.length)}s`,
                     }}
-                    className="animate-step-trace group flex flex-1 items-center gap-2 rounded-xl border border-cream-3/70 bg-white/70 px-2.5 py-2 shadow-[0_8px_22px_-18px_rgba(91,18,24,0.6)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-maroon/30 hover:bg-white hover:shadow-[0_14px_28px_-18px_rgba(91,18,24,0.7)]"
+                    className="animate-step-trace group flex flex-1 items-center gap-1.5 rounded-lg border border-cream-3/70 bg-white/70 px-1.5 py-1 shadow-[0_8px_22px_-18px_rgba(91,18,24,0.6)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-maroon/30 hover:bg-white hover:shadow-[0_14px_28px_-18px_rgba(91,18,24,0.7)]"
                   >
-                    <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-maroon/10 text-maroon transition-transform duration-300 group-hover:scale-110">
-                      <Icon className="h-[15px] w-[15px]" />
-                      <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-maroon text-[9px] font-bold leading-none text-cream ring-2 ring-white">
+                    <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-maroon/10 text-maroon transition-transform duration-300 group-hover:scale-110">
+                      <Icon className="h-[11px] w-[11px]" />
+                      <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-maroon text-[8px] font-bold leading-none text-cream ring-2 ring-white">
                         {step.n}
                       </span>
                     </span>
-                    <span className="text-[12px] font-semibold leading-tight text-ink">
+                    <span className="text-[10px] font-semibold leading-tight text-ink">
                       {step.title}
                     </span>
                   </li>

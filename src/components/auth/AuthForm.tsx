@@ -50,7 +50,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="font-display text-3xl text-ink sm:text-4xl">
+        <h1 className="font-display text-2xl text-ink sm:text-3xl lg:text-4xl">
           {isSignup ? "Create your account" : "Welcome back"}
         </h1>
         <p className="mt-2 text-base text-ink-soft">

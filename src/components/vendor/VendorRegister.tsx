@@ -339,7 +339,7 @@ export default function VendorRegister() {
       </div>
 
       {/* Step progress */}
-      <ol className="mt-8 flex flex-wrap gap-2">
+      <ol className="mt-8 flex flex-wrap gap-1 sm:gap-2">
         {STEPS.map((label, i) => {
           const done = i < step;
           const current = i === step;
@@ -359,7 +359,7 @@ export default function VendorRegister() {
               </span>
               <span
                 className={
-                  "text-sm " +
+                  "text-xs sm:text-sm " +
                   (current
                     ? "font-semibold text-ink"
                     : "text-ink-soft")
@@ -379,7 +379,7 @@ export default function VendorRegister() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-8 rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:p-8"
+        className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-6 lg:p-8"
       >
         {/* ── STEP 1 ── */}
         {step === 0 && (
@@ -604,7 +604,7 @@ export default function VendorRegister() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream/40 px-4 py-3">
+            <div className="flex flex-col gap-2 rounded-lg bg-cream/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <p className="text-sm text-ink-soft">
                 Your documents are reviewed by the Bhojpatra admin for
                 verification.
@@ -772,7 +772,7 @@ export default function VendorRegister() {
                   {galleryNames.map((name, i) => (
                     <span
                       key={`${name}-${i}`}
-                      className="inline-flex max-w-[14rem] items-center gap-2 truncate rounded-lg bg-cream-2 px-3 py-1.5 text-xs text-ink"
+                      className="inline-flex max-w-full items-center gap-2 truncate rounded-lg bg-cream-2 px-3 py-1.5 text-xs text-ink sm:max-w-[14rem]"
                     >
                       <span
                         aria-hidden="true"
@@ -868,12 +868,12 @@ export default function VendorRegister() {
         )}
 
         {/* nav */}
-        <div className="mt-8 flex items-center justify-between gap-3 border-t border-cream-3 pt-6">
+        <div className="mt-8 flex flex-col gap-2 border-t border-cream-3 pt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <button
             type="button"
             onClick={back}
             disabled={step === 0}
-            className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
           >
             Back
           </button>
@@ -882,14 +882,14 @@ export default function VendorRegister() {
             <button
               type="button"
               onClick={next}
-              className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
             >
               Next
             </button>
           ) : (
             <button
               type="submit"
-              className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
             >
               Submit Application
             </button>

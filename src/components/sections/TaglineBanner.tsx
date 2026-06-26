@@ -101,7 +101,7 @@ export default function TaglineBanner() {
           <CornerMandala className="pointer-events-none absolute bottom-2 right-2 h-16 w-16 -scale-100 sm:bottom-3 sm:right-3 sm:h-20 sm:w-20" />
 
           {/* Content */}
-          <div className="relative flex flex-col items-center gap-5 px-8 py-12 text-center sm:px-12 sm:py-14">
+          <div className="relative flex flex-col items-center gap-5 px-5 py-8 text-center sm:px-12 sm:py-14">
             {/* Medallion-set handi mark */}
             <span className="animate-float grid h-16 w-16 place-items-center rounded-full border border-cream/50 bg-gradient-to-br from-cream/20 via-cream/5 to-transparent shadow-inner">
               <Pot className="h-9 w-9 text-cream" />
@@ -115,7 +115,7 @@ export default function TaglineBanner() {
             </div>
 
             {/* Two-line tagline */}
-            <h2 className="text-balance text-2xl leading-snug tracking-wide text-cream sm:text-3xl lg:text-[2.1rem]">
+            <h2 className="text-balance text-xl leading-snug tracking-wide text-cream sm:text-3xl lg:text-[2.1rem]">
               <span className="block">Har Celebration Khaas Hai,</span>
               <span className="mt-1.5 block">
                 Bhojpatra Ke Saath Aur Bhi Yaadgaar Hai.

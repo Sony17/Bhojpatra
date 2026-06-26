@@ -53,7 +53,7 @@ export default function MyBookings() {
       </div>
 
       {/* Summary stats */}
-      <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Total Bookings" value={String(counts.total)} />
         <StatCard label="Confirmed" value={String(counts.confirmed)} />
         <StatCard label="Amount Due" value={formatINR(counts.dueAmount)} />

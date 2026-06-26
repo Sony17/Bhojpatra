@@ -56,7 +56,7 @@ export default function VenueExplorer() {
       </div>
 
       {/* Filter bar */}
-      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
         {/* City chips */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
@@ -80,7 +80,7 @@ export default function VenueExplorer() {
         </div>
 
         {/* Location dropdown */}
-        <div className="mt-5 flex flex-col gap-2 sm:max-w-xs">
+        <div className="mt-5 flex w-full flex-col gap-2 sm:max-w-xs">
           <label
             htmlFor="venue-location"
             className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
@@ -122,13 +122,13 @@ export default function VenueExplorer() {
 
       {/* Venue grid */}
       {results.length > 0 ? (
-        <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {results.map((venue) => (
             <VenueCard key={venue.id} venue={venue} />
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
           <p className="font-display text-lg text-ink">No venues found</p>
           <p className="mt-1 text-sm text-ink-soft">
             Try a different city or location.
@@ -154,7 +154,7 @@ function CityChip({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "rounded-full px-5 py-2 text-sm font-medium transition-colors " +
+        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:px-5 sm:py-2 " +
         (active
           ? "bg-maroon text-cream"
           : "bg-cream-2 text-ink-soft hover:bg-cream-3")

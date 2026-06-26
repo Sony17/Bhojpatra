@@ -79,10 +79,10 @@ export default function PartnerLanding() {
             <p className="eyebrow text-xs font-semibold text-gold-soft">
               Partner With Bhojpatra
             </p>
-            <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="font-display mt-4 text-3xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
               Grow your catering business with India&apos;s feast platform
             </h1>
-            <p className="font-script mt-4 text-2xl text-gold-soft sm:text-3xl">
+            <p className="font-script mt-4 text-xl text-gold-soft sm:text-3xl">
               More feasts, more bookings, more growth.
             </p>
             <p className="mt-6 max-w-xl text-base text-cream/85 sm:text-lg">
@@ -145,7 +145,7 @@ export default function PartnerLanding() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => selectType(type.title)}
-                  className={`flex h-full w-full flex-col rounded-2xl border border-cream-3 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
+                  className={`flex h-full w-full flex-col rounded-2xl border border-cream-3 bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-6 ${
                     selected ? "ring-2 ring-maroon" : ""
                   }`}
                 >
@@ -190,7 +190,7 @@ export default function PartnerLanding() {
             {partnerBenefits.map((benefit: PartnerBenefit) => (
               <li
                 key={benefit.title}
-                className="flex flex-col rounded-2xl border border-cream-3 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="flex flex-col rounded-2xl border border-cream-3 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-6"
               >
                 <span
                   aria-hidden="true"
@@ -266,7 +266,7 @@ export default function PartnerLanding() {
               </p>
             </div>
 
-            <div className="mt-10 rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mt-10 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
               {submitted ? (
                 <div className="flex flex-col items-center py-10 text-center">
                   <span

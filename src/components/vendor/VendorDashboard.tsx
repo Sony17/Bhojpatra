@@ -238,7 +238,7 @@ function OverviewPanel({
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-cream text-xl">
               <span aria-hidden="true">{stat.icon}</span>
             </span>
-            <p className="mt-4 font-display text-3xl font-bold text-ink">
+            <p className="mt-4 font-display text-2xl font-bold text-ink sm:text-3xl">
               {stat.value}
             </p>
             <p className="mt-1 text-sm font-medium text-ink">{stat.label}</p>
@@ -266,7 +266,7 @@ function OverviewPanel({
             {recent.map((r) => (
               <li
                 key={r.id}
-                className="flex items-center justify-between gap-3 py-3"
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{r.customer}</p>
@@ -402,18 +402,18 @@ function RequestsPanel({
                 </div>
 
                 {r.status === "New" && (
-                  <div className="flex shrink-0 gap-2.5">
+                  <div className="flex w-full gap-2.5 sm:w-auto sm:shrink-0">
                     <button
                       type="button"
                       onClick={() => onSetStatus(r.id, "Accepted")}
-                      className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+                      className="flex-1 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:flex-none"
                     >
                       Accept
                     </button>
                     <button
                       type="button"
                       onClick={() => onSetStatus(r.id, "Declined")}
-                      className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
+                      className="flex-1 rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition hover:bg-cream-2 sm:flex-none"
                     >
                       Decline
                     </button>
@@ -462,7 +462,7 @@ function CalendarPanel() {
           Your confirmed events at a glance.
         </p>
 
-        <div className="mt-5 grid grid-cols-7 gap-1.5 text-center">
+        <div className="mt-5 grid grid-cols-7 gap-0.5 text-center sm:gap-1.5">
           {WEEKDAYS.map((w) => (
             <div
               key={w}
@@ -496,7 +496,7 @@ function CalendarPanel() {
                       aria-hidden="true"
                       className="mt-1 h-1.5 w-1.5 rounded-full bg-maroon"
                     />
-                    <span className="mt-0.5 hidden truncate px-1 text-[10px] font-medium leading-tight text-maroon sm:block">
+                    <span className="mt-0.5 hidden truncate px-1 text-[8px] font-medium leading-tight text-maroon sm:block sm:text-[10px]">
                       {label}
                     </span>
                   </>
@@ -602,7 +602,7 @@ function EarningsPanel() {
           {vendorEarnings.map((e) => (
             <li
               key={e.id}
-              className="grid grid-cols-2 gap-3 px-5 py-4 sm:grid-cols-12 sm:items-center"
+              className="grid grid-cols-2 gap-2 px-3 py-4 sm:grid-cols-12 sm:items-center sm:gap-3 sm:px-5"
             >
               <div className="col-span-2 sm:col-span-5">
                 <p className="font-medium text-ink">{e.event}</p>

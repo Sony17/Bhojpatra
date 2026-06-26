@@ -1,5 +1,9 @@
-import { heroHighlights } from "@/lib/data";
+import { stats, heroHighlights } from "@/lib/data";
 import {
+  Users,
+  MapPin,
+  UserHeart,
+  StarSolid,
   ShieldCheck,
   PriceTag,
   Compare,
@@ -7,10 +11,14 @@ import {
   Headset,
 } from "@/components/icons";
 
-const highlightIcons: Record<
+const ribbonIcons: Record<
   string,
   (props: React.SVGProps<SVGSVGElement>) => React.ReactElement
 > = {
+  users: Users,
+  pin: MapPin,
+  userHeart: UserHeart,
+  star: StarSolid,
   shield: ShieldCheck,
   tag: PriceTag,
   compare: Compare,
@@ -18,30 +26,47 @@ const highlightIcons: Record<
   headset: Headset,
 };
 
+// One scrolling track carrying the headline stats first, then the trust
+// highlights. Stats keep their value (e.g. "10,000+"); highlights are
+// value-less. No rounded pill — just icon + text on the maroon band.
+const ribbonItems = [
+  ...stats.map((s) => ({ value: s.value, label: s.label, iconKey: s.iconKey })),
+  ...heroHighlights.map((h) => ({ value: "", label: h.title, iconKey: h.iconKey })),
+];
+
 /**
  * The trust band: a single maroon ribbon carrying a continuously moving
- * row of trust highlights. The track holds two identical copies so the
- * -50% shift loops seamlessly; the edge mask fades items in and out at
- * the rails, and hovering the band pauses the scroll.
+ * row of stats and trust highlights. The track holds two identical copies
+ * so the -50% shift loops seamlessly; the edge mask fades items in and out
+ * at the rails, and hovering the band pauses the scroll. A small square dot
+ * separates each item from the next.
  */
 export default function StatsBar() {
   return (
-    <div className="marquee-pause w-full overflow-hidden bg-maroon py-3 [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)]">
-      <div className="animate-marquee flex w-max gap-3 pr-3">
-        {[...heroHighlights, ...heroHighlights].map((h, i) => {
-          const Icon = highlightIcons[h.iconKey];
+    <div className="marquee-pause w-full overflow-hidden bg-maroon py-3.5 [mask-image:linear-gradient(to_right,transparent,#000_5%,#000_95%,transparent)]">
+      <div className="animate-marquee flex w-max items-center gap-5 pr-5">
+        {[...ribbonItems, ...ribbonItems].map((item, i) => {
+          const Icon = ribbonIcons[item.iconKey];
           return (
-            <div
-              key={`${h.title}-${i}`}
-              aria-hidden={i >= heroHighlights.length}
-              className="flex shrink-0 items-center gap-2 rounded-full border border-cream/20 bg-cream/10 px-4 py-2 backdrop-blur-sm"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/15 text-gold-soft">
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="whitespace-nowrap text-[12px] font-medium text-cream">
-                {h.title}
-              </span>
+            <div key={`${item.label}-${i}`} className="flex shrink-0 items-center gap-5">
+              <div className="flex shrink-0 items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream/10 text-gold-soft">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="whitespace-nowrap text-[11px] leading-tight text-cream sm:text-[13px]">
+                  {item.value && (
+                    <span className="font-display font-bold text-gold-soft">
+                      {item.value}{" "}
+                    </span>
+                  )}
+                  <span className="font-medium">{item.label}</span>
+                </span>
+              </div>
+              {/* Square dot separating one item from the next. */}
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rotate-45 bg-gold-soft/70"
+              />
             </div>
           );
         })}

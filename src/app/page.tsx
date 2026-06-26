@@ -8,6 +8,7 @@ import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import Packages from "@/components/sections/Packages";
 import ChooseSpecialists from "@/components/sections/ChooseSpecialists";
+import Gallery from "@/components/sections/Gallery";
 import ReviewSelection from "@/components/sections/ReviewSelection";
 import BookingForm from "@/components/sections/BookingForm";
 import ContactUs from "@/components/sections/ContactUs";
@@ -33,6 +34,7 @@ export default function Home() {
           <Packages />
         </div>
         <ChooseSpecialists />
+        <Gallery />
         <div className="bg-surface-beige-2">
           <ReviewSelection />
         </div>

@@ -984,3 +984,30 @@ export const registrationCounters: string[] = [
   "Pan Counter", "Chaat Station", "Live Counters", "Dessert Counter",
   "Service Staff", "Tableware", "Decoration",
 ];
+
+/* ───────────────────────────────────────────────────────────────────────
+   GALLERY — a stack of real-event / signature-dish photos used by the
+   <Gallery> section. The first seven feed the scroll-driven "fan-out"
+   cluster; the full list feeds the staggered grid below it.
+─────────────────────────────────────────────────────────────────────── */
+
+export interface GalleryItem {
+  /** Stable key + alt text. */
+  title: string;
+  /** Short overline shown in the hover overlay (e.g. "Wedding · 500 pax"). */
+  caption: string;
+  image: string;
+}
+
+export const galleryItems: GalleryItem[] = [
+  { title: "Royal Wedding Feast", caption: "Wedding · 500 pax", image: img("photo-1414235077428-338989a2e8c0", 700) },
+  { title: "Live Chaat Station", caption: "Street-food counter", image: img("photo-1606491956689-2ea866880c84", 700) },
+  { title: "Dum Biryani Handi", caption: "Most loved · main", image: img("photo-1563379091339-03b21ab4a4f8", 700) },
+  { title: "Mandap & Mehndi", caption: "Haldi · Mehndi", image: img("photo-1546069901-ba9599a7e63c", 700) },
+  { title: "Paneer Butter Masala", caption: "Bestseller · main", image: img("photo-1631452180519-c014fe946bc7", 700) },
+  { title: "Corporate Gala", caption: "Corporate · 200 pax", image: img("photo-1517248135467-4c7edcad34c4", 700) },
+  { title: "Gulab Jamun Tray", caption: "Sweet pick · dessert", image: img("photo-1601050690597-df0568f70950", 700) },
+  { title: "Birthday Celebration", caption: "Birthday · 80 pax", image: img("photo-1530103862676-de8c9debad1d", 700) },
+  { title: "Reception Buffet", caption: "Reception · 300 pax", image: img("photo-1565557623262-b51c2513a641", 700) },
+  { title: "Butter Naan Basket", caption: "Trending · breads", image: img("photo-1585937421612-70a008356fbe", 700) },
+];

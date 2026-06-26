@@ -125,7 +125,7 @@ export default function VendorCatalog() {
       </div>
 
       {/* Filter bar */}
-      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
         {/* Search */}
         <div className="flex flex-col gap-2">
           <label
@@ -305,13 +305,13 @@ export default function VendorCatalog() {
 
       {/* Vendor grid */}
       {results.length > 0 ? (
-        <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {results.map((vendor) => (
             <VendorCard key={vendor.id} vendor={vendor} />
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
           <p className="font-display text-lg text-ink">No caterers found</p>
           <p className="mt-1 text-sm text-ink-soft">
             Try a different search or relax your filters.
@@ -346,7 +346,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "rounded-full px-5 py-2 text-sm font-medium transition-colors " +
+        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:px-5 sm:py-2 " +
         (active
           ? "bg-maroon text-cream"
           : "bg-cream-2 text-ink-soft hover:bg-cream-3")
