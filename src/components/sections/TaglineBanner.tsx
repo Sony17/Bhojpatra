@@ -81,7 +81,7 @@ function Flourish({ flip = false }: { flip?: boolean }) {
  */
 export default function TaglineBanner() {
   return (
-    <section aria-label="Bhojpatra tagline" className="bg-surface-beige-2">
+    <section aria-label="Bhojpatra tagline" className="bg-surface-beige">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:py-20">
         <Reveal variant="scale" className="relative overflow-hidden rounded-[1.75rem] bg-maroon shadow-xl">
           {/* Soft radial sheen for depth */}

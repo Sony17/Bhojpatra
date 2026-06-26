@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { planningOccasions, type PlanningOccasion } from "@/lib/data";
+import { planningOccasions, type PlanningOccasion, type TrendingDish } from "@/lib/data";
 import {
   Sparkle,
   Rings,
@@ -90,6 +90,38 @@ export default function PlanningFor() {
               </button>
             );
           })}
+        </div>
+
+        {/* Trending dishes — five crowd-favourites for the selected occasion,
+            re-keyed on selection so the whole strip crossfades in. */}
+        <div key={`trending-${selectedOccasion.id}`} className="animate-fade my-10">
+          <p className="eyebrow mb-4 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-cream/70 sm:text-xs">
+            Trending for {selectedOccasion.name}
+          </p>
+          <ul className="flex snap-x gap-3 overflow-x-auto pb-1 sm:flex-wrap sm:justify-center sm:overflow-visible sm:gap-4">
+            {selectedOccasion.trending.map((dish: TrendingDish) => (
+              <li
+                key={dish.name}
+                className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/15 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/15 hover:ring-white/40 sm:w-36"
+              >
+                <span className="relative h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/30 sm:h-[72px] sm:w-[72px]">
+                  <Image
+                    src={dish.image}
+                    alt={dish.name}
+                    fill
+                    sizes="72px"
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                </span>
+                <span className="line-clamp-2 text-[13px] font-semibold leading-tight text-cream sm:text-sm">
+                  {dish.name}
+                </span>
+                <span className="rounded-full bg-maroon/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream">
+                  {dish.tag}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Caption — re-keyed on selection so the text re-animates in */}

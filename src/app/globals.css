@@ -155,6 +155,18 @@ html {
   }
 }
 
+/* Continuous horizontal scroll for the highlights ribbon.
+   The track holds two identical copies, so shifting by -50%
+   lands seamlessly on the start of the second copy. */
+@keyframes bp-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* Slow "Ken Burns" settle for the hero backdrop. */
 @keyframes bp-kenburns {
   from {
@@ -164,6 +176,28 @@ html {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Traveling highlight for the "How It Works" steps — a red border that
+   lights one step at a time and walks down the rail to the next.
+   Each step shares this keyframe and is offset by a negative
+   animation-delay so the glow appears to move box → box on a loop. */
+@keyframes bp-step-trace {
+  0%,
+  22% {
+    border-color: var(--color-maroon);
+    background-color: #ffffff;
+    box-shadow: 0 0 0 1.5px var(--color-maroon),
+      0 16px 30px -18px rgba(185, 32, 37, 0.65);
+    transform: translateY(-2px);
+  }
+  40%,
+  100% {
+    border-color: rgba(233, 212, 172, 0.7);
+    background-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 22px -18px rgba(91, 18, 24, 0.6);
+    transform: translateY(0);
   }
 }
 
@@ -255,6 +289,18 @@ html {
   .animate-kenburns {
     animation: bp-kenburns 2.4s var(--ease-out-expo) both;
   }
+  /* Walks the red highlight along the steps rail (see bp-step-trace).
+     Pair with an inline negative animation-delay per step. */
+  .animate-step-trace {
+    animation: bp-step-trace 5.6s var(--ease-out-soft) infinite;
+  }
+  /* Highlights ribbon — pair with a doubled track. Hover to pause. */
+  .animate-marquee {
+    animation: bp-marquee 26s linear infinite;
+  }
+  .marquee-pause:hover .animate-marquee {
+    animation-play-state: paused;
+  }
 
   /* Sweeping sheen on primary buttons (apply .btn-sheen). */
   .btn-sheen {
@@ -323,9 +369,14 @@ html {
    inner so it only flips when motion is allowed — under reduced motion the
    front face simply stays put. */
 .flip {
+  /* `.flip` is rendered on a <span>, so force block layout — otherwise the
+     inline default drops the `aspect-square w-full` sizing and the thumbnail
+     collapses to zero height, hiding the category photo. */
+  display: block;
   perspective: 1200px;
 }
 .flip-inner {
+  display: block;
   position: relative;
   height: 100%;
   width: 100%;
@@ -347,16 +398,16 @@ html {
    enter from. The higher attribute specificity overrides the default
    translateY; `.is-visible` still resets every child to its resting spot. */
 @media (prefers-reduced-motion: no-preference) {
-  .reveal-stagger[data-dir="right"] > * {
+  .reveal-stagger[data-dir="right"]:not(.is-visible) > * {
     transform: translateX(52px);
   }
-  .reveal-stagger[data-dir="left"] > * {
+  .reveal-stagger[data-dir="left"]:not(.is-visible) > * {
     transform: translateX(-52px);
   }
-  .reveal-stagger[data-dir="alt"] > *:nth-child(odd) {
+  .reveal-stagger[data-dir="alt"]:not(.is-visible) > *:nth-child(odd) {
     transform: translateX(-48px);
   }
-  .reveal-stagger[data-dir="alt"] > *:nth-child(even) {
+  .reveal-stagger[data-dir="alt"]:not(.is-visible) > *:nth-child(even) {
     transform: translateX(48px);
   }
 }

@@ -36,7 +36,7 @@ const partnerIcons: Record<string, React.ReactNode> = {
 
 function Logo() {
   return (
-    <a href="#home" className="flex flex-col gap-0 leading-none">
+    <Link href="/" className="flex flex-col gap-0 leading-none">
       <Image
         src="/bhojpatra-logo.png"
         alt="Bhojpatra"
@@ -48,7 +48,7 @@ function Logo() {
       <span className="font-script block w-full text-center text-lg leading-none text-black [text-shadow:0_1px_3px_rgba(255,255,255,0.7)] sm:text-xl">
         India&apos;s Feast Booking Platform
       </span>
-    </a>
+    </Link>
   );
 }
 

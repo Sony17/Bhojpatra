@@ -1,14 +1,8 @@
-import { Fragment } from "react";
 import Image from "next/image";
-import { occasions, cities, heroHighlights, steps } from "@/lib/data";
+import { occasions, cities, steps } from "@/lib/data";
 import {
-  ShieldCheck,
-  PriceTag,
-  Compare,
   Calendar,
-  Headset,
   MapPin,
-  ArrowRight,
   Diya,
   ChefHat,
   UserStar,
@@ -16,14 +10,6 @@ import {
 } from "@/components/icons";
 
 type IconComponent = (props: React.SVGProps<SVGSVGElement>) => React.ReactElement;
-
-const highlightIcons: Record<string, IconComponent> = {
-  shield: ShieldCheck,
-  tag: PriceTag,
-  compare: Compare,
-  calendar: Calendar,
-  headset: Headset,
-};
 
 const stepIcons: Record<string, IconComponent> = {
   diya: Diya,
@@ -34,7 +20,7 @@ const stepIcons: Record<string, IconComponent> = {
 
 export default function Hero() {
   return (
-    <section id="home" className="relative isolate overflow-hidden bg-surface-beige">
+    <section id="home" className="relative isolate flex min-h-screen flex-col overflow-hidden bg-surface-beige">
       {/* Full-bleed hero artwork — spans the entire section edge-to-edge.
           A slow scale-settle ("Ken Burns") gives the still image life. */}
       <div className="absolute inset-0 -z-10">
@@ -49,8 +35,8 @@ export default function Hero() {
       </div>
 
       {/* Content */}
-      <div className="relative mx-auto flex max-w-7xl flex-col px-5 pb-16 pt-32 sm:pt-36 lg:pb-20 lg:pt-44">
-        <div className="max-w-xl">
+      <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-5 pb-16 pt-32 sm:pt-36 lg:pb-20 lg:pt-44">
+        <div className="max-w-xl lg:mt-auto">
           <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl">
             <span className="animate-rise block whitespace-nowrap">
               Different Specialists.
@@ -115,66 +101,47 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Highlights */}
-          <div className="animate-rise delay-4 mt-9 flex flex-wrap gap-x-7 gap-y-5">
-            {heroHighlights.map((h) => {
-              const Icon = highlightIcons[h.iconKey];
-              return (
-                <div
-                  key={h.title}
-                  className="group flex w-[84px] flex-col items-center gap-2 text-center"
-                >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-maroon/20 bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(91,18,24,0.35)] backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:border-maroon/40 group-hover:text-maroon-dark group-hover:shadow-[0_8px_18px_-6px_rgba(91,18,24,0.45)]">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="text-[11px] font-medium leading-tight text-ink/70">
-                    {h.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
-        {/* How It Works — a slim connected rail tucked into the hero */}
-        <div className="animate-rise delay-5 mt-12 max-w-3xl sm:mt-14">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display eyebrow text-[11px] font-semibold text-maroon">How It Works</h2>
-            <span
-              aria-hidden="true"
-              className="h-px flex-1 bg-gradient-to-r from-gold/60 to-transparent"
-            />
-          </div>
+        {/* How It Works — tucked at the very bottom of the hero. The label
+            sits beside a compact row of step boxes, with a divider line on
+            top; a highlight border walks from one box to the next on a loop. */}
+        <div className="animate-rise delay-5 mt-auto max-w-4xl pt-16 sm:pt-20">
+          <span
+            aria-hidden="true"
+            className="block h-px w-full bg-gradient-to-r from-maroon/40 via-gold/50 to-transparent"
+          />
 
-          <ol className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-0">
-            {steps.map((step, i) => {
-              const Icon = stepIcons[step.iconKey];
-              return (
-                <Fragment key={step.n}>
-                  <li className="group flex flex-1 items-center gap-2.5 rounded-2xl border border-cream-3/70 bg-white/70 px-3 py-2.5 shadow-[0_8px_22px_-18px_rgba(91,18,24,0.6)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-maroon/30 hover:bg-white hover:shadow-[0_14px_28px_-18px_rgba(91,18,24,0.7)]">
-                    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon/10 text-maroon transition-transform duration-300 group-hover:scale-110">
-                      <Icon className="h-[18px] w-[18px]" />
-                      <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-maroon text-[10px] font-bold leading-none text-cream ring-2 ring-white">
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+            <h2 className="font-display eyebrow shrink-0 text-[11px] font-semibold text-maroon">
+              How It Works
+            </h2>
+
+            <ol className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-2.5">
+              {steps.map((step, i) => {
+                const Icon = stepIcons[step.iconKey];
+                return (
+                  <li
+                    key={step.n}
+                    style={{
+                      animationDelay: `-${((steps.length - i) % steps.length) * (5.6 / steps.length)}s`,
+                    }}
+                    className="animate-step-trace group flex flex-1 items-center gap-2 rounded-xl border border-cream-3/70 bg-white/70 px-2.5 py-2 shadow-[0_8px_22px_-18px_rgba(91,18,24,0.6)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-maroon/30 hover:bg-white hover:shadow-[0_14px_28px_-18px_rgba(91,18,24,0.7)]"
+                  >
+                    <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-maroon/10 text-maroon transition-transform duration-300 group-hover:scale-110">
+                      <Icon className="h-[15px] w-[15px]" />
+                      <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-maroon text-[9px] font-bold leading-none text-cream ring-2 ring-white">
                         {step.n}
                       </span>
                     </span>
-                    <span className="text-[13px] font-semibold leading-tight text-ink">
+                    <span className="text-[12px] font-semibold leading-tight text-ink">
                       {step.title}
                     </span>
                   </li>
-
-                  {i < steps.length - 1 && (
-                    <li
-                      aria-hidden="true"
-                      className="hidden shrink-0 items-center px-1 text-gold/70 sm:flex"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </li>
-                  )}
-                </Fragment>
-              );
-            })}
-          </ol>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       </div>
     </section>

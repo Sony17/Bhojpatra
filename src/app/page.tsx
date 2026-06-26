@@ -10,8 +10,6 @@ import Packages from "@/components/sections/Packages";
 import ChooseSpecialists from "@/components/sections/ChooseSpecialists";
 import ReviewSelection from "@/components/sections/ReviewSelection";
 import BookingForm from "@/components/sections/BookingForm";
-import WhyChoose from "@/components/sections/WhyChoose";
-import CtaBanner from "@/components/sections/CtaBanner";
 import ContactUs from "@/components/sections/ContactUs";
 import TaglineBanner from "@/components/sections/TaglineBanner";
 
@@ -39,8 +37,6 @@ export default function Home() {
           <ReviewSelection />
         </div>
         <BookingForm />
-        <WhyChoose />
-        <CtaBanner />
         <div className="bg-surface-beige-2">
           <ContactUs />
         </div>
