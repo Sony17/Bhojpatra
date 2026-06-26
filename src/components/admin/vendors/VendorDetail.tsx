@@ -11,7 +11,9 @@ import EmptyState from "@/components/admin/shared/EmptyState";
 import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
 import { money } from "@/components/admin/shared/money";
+import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
+import { getBookingsByVendor } from "@/lib/admin/mockData";
 import type {
   AdminVendor,
   VendorDocument,
@@ -187,9 +189,10 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
         />
       )}
       {tab === "bookings" && (
-        <EmptyState
-          title="No bookings to show yet"
-          message="This vendor's bookings will appear here once Booking Management is built."
+        <BookingsMiniTable
+          rows={getBookingsByVendor(vendor.business)}
+          party="customer"
+          emptyMessage="This vendor has no bookings yet."
         />
       )}
 

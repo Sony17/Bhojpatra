@@ -1,10 +1,12 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 
 /**
  * Reusable confirmation modal for destructive / significant actions
  * (suspend, reject, delete…). Controlled via `open`; renders nothing when closed.
- * Closes on backdrop click or Cancel. `tone="danger"` styles the confirm button
- * muted-destructive vs the default maroon.
+ * Closes on backdrop click, Cancel, or the Escape key. `tone="danger"` styles
+ * the confirm button muted-destructive vs the default maroon.
  */
 interface ConfirmDialogProps {
   open: boolean;
@@ -27,6 +29,18 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const confirmCls =
@@ -46,7 +60,11 @@ export default function ConfirmDialog({
         aria-hidden="true"
         className="absolute inset-0 bg-ink/40 backdrop-blur-[1px]"
       />
-      <div className="relative w-full max-w-md rounded-2xl border border-cream-3 bg-white p-6 shadow-xl">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative w-full max-w-md rounded-2xl border border-cream-3 bg-white p-6 shadow-xl focus:outline-none"
+      >
         <h2 className="font-display text-xl text-ink">{title}</h2>
         {message && (
           <div className="mt-2 text-sm text-ink-soft">{message}</div>

@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   empty?: ReactNode;
   /** Min table width before horizontal scroll kicks in. */
   minWidthClass?: string;
+  /** Drop the card chrome (border/bg/shadow) when nested inside a WidgetCard. */
+  bare?: boolean;
 }
 
 export default function DataTable<T>({
@@ -34,13 +36,18 @@ export default function DataTable<T>({
   onRowClick,
   empty,
   minWidthClass = "min-w-[760px]",
+  bare = false,
 }: DataTableProps<T>) {
   if (rows.length === 0 && empty) {
     return <>{empty}</>;
   }
 
+  const wrapperClass = bare
+    ? "overflow-x-auto"
+    : "overflow-x-auto rounded-2xl border border-cream-3 bg-white shadow-sm";
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-cream-3 bg-white shadow-sm">
+    <div className={wrapperClass}>
       <table className={"w-full border-collapse text-left " + minWidthClass}>
         <thead>
           <tr className="border-b border-cream-3 bg-cream-2">
@@ -62,9 +69,23 @@ export default function DataTable<T>({
             <tr
               key={getRowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? "button" : undefined}
               className={
                 "transition-colors " +
-                (onRowClick ? "cursor-pointer hover:bg-cream-2/50" : "")
+                (onRowClick
+                  ? "cursor-pointer hover:bg-cream-2/50 focus:outline-none focus-visible:bg-cream-2"
+                  : "")
               }
             >
               {columns.map((c) => (

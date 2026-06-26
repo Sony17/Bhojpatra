@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 import { Close } from "./icons";
 
 /**
@@ -24,6 +26,18 @@ export default function Modal({
   footer,
   size = "md",
 }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const maxW = size === "lg" ? "max-w-2xl" : "max-w-lg";
@@ -41,8 +55,10 @@ export default function Modal({
         className="absolute inset-0 bg-ink/40 backdrop-blur-[1px]"
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={
-          "relative flex max-h-[85vh] w-full flex-col rounded-2xl border border-cream-3 bg-white shadow-xl " +
+          "relative flex max-h-[85vh] w-full flex-col rounded-2xl border border-cream-3 bg-white shadow-xl focus:outline-none " +
           maxW
         }
       >

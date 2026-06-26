@@ -1,14 +1,17 @@
 import Link from "next/link";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
+import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
+import EmptyState from "@/components/admin/shared/EmptyState";
 import { money } from "@/components/admin/shared/money";
 import { ArrowRight } from "@/components/admin/shared/icons";
 import type { AdminBookingRow } from "@/lib/admin/types";
 
 /**
- * Recent bookings table. Pure presentation — receives typed rows. Responsive:
- * a 12-column grid on sm+, stacked cards on mobile. The WidgetCard `action`
- * slot is the extension point where booking filters / export will live later.
+ * Recent bookings table. Uses the shared <DataTable> (a real table that sizes
+ * columns to content) so Amount and Status never overlap at any zoom level —
+ * `bare` drops the table's own card chrome since it sits inside a WidgetCard.
+ * The WidgetCard `action` slot is the extension point for booking filters/export.
  */
 interface RecentBookingsTableProps {
   rows: AdminBookingRow[];
@@ -21,6 +24,49 @@ export default function RecentBookingsTable({
   seeAllHref,
   className,
 }: RecentBookingsTableProps) {
+  const columns: Column<AdminBookingRow>[] = [
+    {
+      key: "customer",
+      header: "Customer",
+      cell: (b) => (
+        <div className="min-w-0">
+          <p className="font-medium text-ink">{b.customer}</p>
+          <p className="text-xs text-ink-soft">
+            {b.occasion} · {b.id}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "vendor",
+      header: "Vendor",
+      cell: (b) => <span className="text-ink-soft">{b.vendor}</span>,
+    },
+    {
+      key: "date",
+      header: "Date",
+      cell: (b) => <span className="text-ink-soft">{b.date}</span>,
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      cell: (b) => (
+        <span className="font-display font-semibold text-ink">
+          {money(b.amount)}
+        </span>
+      ),
+      className: "whitespace-nowrap text-right",
+      headerClassName: "text-right",
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (b) => <StatusBadge status={b.status} />,
+      className: "whitespace-nowrap text-right",
+      headerClassName: "text-right",
+    },
+  ];
+
   return (
     <WidgetCard
       title="Recent Bookings"
@@ -36,51 +82,19 @@ export default function RecentBookingsTable({
         ) : undefined
       }
     >
-      {/* Column header (sm+) */}
-      <div className="hidden grid-cols-12 gap-3 border-b border-cream-3 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft sm:grid">
-        <span className="col-span-4">Customer</span>
-        <span className="col-span-3">Vendor</span>
-        <span className="col-span-2">Date</span>
-        <span className="col-span-2 text-right">Amount</span>
-        <span className="col-span-1 text-right">Status</span>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-cream-3 bg-white/60 p-8 text-center">
-          <p className="font-display text-base text-ink">No bookings yet</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            New bookings will appear here.
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-cream-3">
-          {rows.map((b) => (
-            <li
-              key={b.id}
-              className="grid grid-cols-2 gap-3 px-1 py-3 sm:grid-cols-12 sm:items-center"
-            >
-              <div className="col-span-2 sm:col-span-4">
-                <p className="font-medium text-ink">{b.customer}</p>
-                <p className="text-xs text-ink-soft">
-                  {b.occasion} · {b.id}
-                </p>
-              </div>
-              <span className="text-sm text-ink-soft sm:col-span-3">
-                {b.vendor}
-              </span>
-              <span className="text-sm text-ink-soft sm:col-span-2">
-                {b.date}
-              </span>
-              <span className="font-display text-sm font-semibold text-ink sm:col-span-2 sm:text-right">
-                {money(b.amount)}
-              </span>
-              <span className="justify-self-start sm:col-span-1 sm:justify-self-end">
-                <StatusBadge status={b.status} />
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <DataTable
+        bare
+        columns={columns}
+        rows={rows}
+        getRowKey={(b) => b.id}
+        minWidthClass="min-w-[640px]"
+        empty={
+          <EmptyState
+            title="No bookings yet"
+            message="New bookings will appear here."
+          />
+        }
+      />
     </WidgetCard>
   );
 }

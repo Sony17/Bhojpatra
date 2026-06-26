@@ -7,6 +7,9 @@
  */
 import type { BookingStatus } from "@/lib/data";
 
+// Re-export so admin components import booking status from a single surface.
+export type { BookingStatus } from "@/lib/data";
+
 /** Admin identity shown in the topbar avatar/welcome. */
 export interface AdminProfile {
   name: string;
@@ -157,4 +160,201 @@ export interface ApprovalQuery {
   status?: VerificationStatus | "All";
   page?: number;
   pageSize?: number;
+}
+
+/* ── Booking Management ──────────────────────────────────────────────────── */
+
+export interface AdminBooking {
+  id: string;
+  customer: string;
+  occasion: string;
+  date: string;
+  guests: number;
+  vendor: string;
+  city: string;
+  amount: number;
+  paid: number;
+  status: BookingStatus;
+}
+
+export interface BookingQuery {
+  q?: string;
+  status?: BookingStatus | "All";
+  city?: string | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Customer Management ─────────────────────────────────────────────────── */
+
+export type CustomerStatus = "Active" | "Inactive";
+
+export interface AdminCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  joined: string;
+  totalBookings: number;
+  activeBookings: number;
+  lifetimeSpend: number;
+  status: CustomerStatus;
+}
+
+export interface CustomerQuery {
+  q?: string;
+  city?: string | "All";
+  status?: CustomerStatus | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Payments ────────────────────────────────────────────────────────────── */
+
+export type PaymentMethod = "UPI" | "QR" | "Card";
+export type PaymentType = "Advance" | "Balance" | "Refund";
+export type PaymentStatus = "Settled" | "Pending" | "Advance Received" | "Refunded";
+
+export interface AdminPayment {
+  id: string;
+  bookingId: string;
+  customer: string;
+  method: PaymentMethod;
+  type: PaymentType;
+  amount: number;
+  status: PaymentStatus;
+  date: string;
+}
+
+export interface VendorSettlement {
+  id: string;
+  vendor: string;
+  bookings: number;
+  amount: number;
+  status: "Settled" | "Pending";
+  period: string;
+}
+
+export interface PaymentQuery {
+  q?: string;
+  status?: PaymentStatus | "All";
+  method?: PaymentMethod | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Coupons ─────────────────────────────────────────────────────────────── */
+
+export type CouponStatus = "Active" | "Scheduled" | "Expired";
+
+export interface AdminCoupon {
+  id: string;
+  code: string;
+  label: string;
+  percent: number;
+  cap: number;
+  eligibility: string;
+  startsAt: string;
+  expiresAt: string;
+  usageLimit: number;
+  usedCount: number;
+  status: CouponStatus;
+}
+
+/* ── Catalog (Menu & Add-Ons) ────────────────────────────────────────────── */
+
+export interface CatalogCuisine {
+  id: string;
+  name: string;
+  nameHi: string;
+  dishes: number;
+  visible: boolean;
+}
+
+export interface CatalogDish {
+  id: string;
+  name: string;
+  course: string;
+  cuisine: string;
+  diet: "veg" | "non-veg";
+  visible: boolean;
+}
+
+export interface CatalogPackage {
+  id: string;
+  name: string;
+  price: string;
+  unit: string;
+  popular: boolean;
+  features: number;
+  visible: boolean;
+}
+
+export interface CatalogAddOn {
+  id: string;
+  name: string;
+  nameHi: string;
+  description: string;
+  price: number;
+  perPlate: boolean;
+  active: boolean;
+}
+
+/* ── Content Management ──────────────────────────────────────────────────── */
+
+export interface ContentBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  placement: string;
+  active: boolean;
+}
+
+export interface ContentTestimonial {
+  id: string;
+  name: string;
+  city: string;
+  rating: number;
+  quote: string;
+  visible: boolean;
+}
+
+export interface ContentFaq {
+  id: string;
+  question: string;
+  answer: string;
+  visible: boolean;
+}
+
+/* ── Reports ─────────────────────────────────────────────────────────────── */
+
+export interface TrendPoint {
+  label: string;
+  value: number;
+}
+
+export interface VendorPerfRow {
+  vendor: string;
+  bookings: number;
+  revenue: number;
+  rating: number;
+}
+
+/* ── Settings ────────────────────────────────────────────────────────────── */
+
+export interface BusinessDetails {
+  name: string;
+  tagline: string;
+  phone: string;
+  email: string;
+  address: string;
+  hours: string;
+  instagram: string;
+}
+
+export interface AdminRoleInfo {
+  name: string;
+  description: string;
+  members: number;
 }
