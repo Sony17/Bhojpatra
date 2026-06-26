@@ -58,13 +58,13 @@ export default function Hero() {
               <select
                 aria-label="Select Occasion"
                 defaultValue=""
-                className="h-full w-full cursor-pointer appearance-none rounded-2xl bg-transparent px-5 py-3.5 pr-11 text-sm text-ink outline-none"
+                className="h-full w-full cursor-pointer appearance-none rounded-2xl bg-transparent px-5 py-3.5 pr-11 text-sm text-ink outline-none [&>option]:bg-cream-2 [&>option]:text-ink [&>option:disabled]:text-ink-soft"
               >
                 <option value="" disabled>
                   Select Occasion
                 </option>
                 {occasions.map((o) => (
-                  <option key={o.id} value={o.id}>
+                  <option key={o.id} value={o.id} className="bg-cream-2 text-ink">
                     {o.name}
                   </option>
                 ))}
@@ -78,13 +78,13 @@ export default function Hero() {
                 <select
                   aria-label="Select Location"
                   defaultValue=""
-                  className="h-full w-full cursor-pointer appearance-none rounded-xl bg-transparent px-3.5 py-2 pr-9 text-sm text-ink outline-none"
+                  className="h-full w-full cursor-pointer appearance-none rounded-xl bg-transparent px-3.5 py-2 pr-9 text-sm text-ink outline-none [&>option]:bg-cream-2 [&>option]:text-ink [&>option:disabled]:text-ink-soft"
                 >
                   <option value="" disabled>
                     Select Location
                   </option>
                   {cities.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option key={c.id} value={c.id} className="bg-cream-2 text-ink">
                       {c.name}
                     </option>
                   ))}
@@ -106,13 +106,13 @@ export default function Hero() {
         {/* How It Works — tucked at the very bottom of the hero. The label
             sits beside a compact row of step boxes, with a divider line on
             top; a highlight border walks from one box to the next on a loop. */}
-        <div className="animate-rise delay-5 mt-auto max-w-4xl pt-16 sm:pt-20">
+        <div className="animate-rise delay-5 mt-auto max-w-xl pt-16 sm:pt-20">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
             <h2 className="font-display eyebrow shrink-0 text-[11px] font-semibold text-maroon">
               How It Works
             </h2>
 
-            <ol className="flex w-full flex-row items-stretch gap-1.5 sm:w-2/5 sm:gap-2">
+            <ol className="flex w-full flex-row items-stretch gap-1.5 sm:gap-2">
               {steps.map((step, i) => {
                 const Icon = stepIcons[step.iconKey];
                 return (

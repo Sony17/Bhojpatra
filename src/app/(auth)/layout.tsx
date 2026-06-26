@@ -17,14 +17,19 @@ export default function AuthLayout({
     <main className="flex min-h-screen flex-col bg-surface-beige lg:flex-row">
       {/* Brand panel */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-maroon px-12 py-12 text-cream lg:flex lg:w-[44%] xl:w-[40%]">
-        {/* Soft decorative glow */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-cream/10 blur-3xl"
+        {/* Background imagery */}
+        <Image
+          src="/login.png"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1280px) 40vw, 44vw"
+          className="pointer-events-none object-cover"
         />
+        {/* Maroon overlay for text legibility */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-maroon-dark/60 blur-3xl"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-maroon/85 via-maroon/70 to-maroon-dark/90"
         />
 
         <Link href="/" className="relative z-10 inline-flex w-fit">
