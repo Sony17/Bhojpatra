@@ -1,26 +1,87 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Bhojpatra design system ──────────────────────────────────────────
+   Strictly aligned to the official brand guidelines.
+   Core palette (the ONLY base colours allowed):
+     Red    #B92025   RGB 185 32 37
+     Cream  #F0D09E   RGB 240 208 158
+     Black  #000000
+     White  #FFFFFF
+   Every working token below is the brand red/cream/black/white or a
+   plain tint/shade of one of them. No off-brand hues.
+─────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Exact brand colours */
+  --color-brand-red: #b92025;
+  --color-brand-cream: #f0d09e;
+  --color-brand-black: #000000;
+  --color-brand-white: #ffffff;
+
+  /* ── Primary (brand red + shades) ───────────────────────── */
+  --color-maroon: #b92025; /* brand red */
+  --color-maroon-soft: #a51d22; /* slightly deeper red */
+  --color-maroon-dark: #8e171b; /* hover / deep sections */
+
+  /* ── Cream (brand cream + tints) ────────────────────────── */
+  --color-cream: #f0d09e; /* brand cream — light-on-red, accents */
+  --color-cream-2: #f7e6c8; /* soft cream surface */
+  --color-cream-3: #e9d4ac; /* cream border / hairline */
+
+  /* ── Section surfaces — light beige tints of the brand cream.
+       Two tones that flow out of the hero beige and alternate down the
+       page so every section reads as a distinct band (never white). ─── */
+  --color-surface-beige: #fbf4e6; /* base page band — lightest beige */
+  --color-surface-beige-2: #f5e8ce; /* alternating band — a touch deeper */
+
+  /* ── Accents previously "gold" → folded into the brand pair ─ */
+  --color-gold: #b92025; /* accent text → brand red */
+  --color-gold-soft: #f0d09e; /* soft accent → brand cream */
+
+  /* ── Ink (near-black brand text) ────────────────────────── */
+  --color-ink: #1a1410; /* near-black body/heading text */
+  --color-ink-soft: #6b5d4e; /* muted secondary text */
+
+  /* Page surface — light beige base, not white, so the whole page flows
+     out of the warm hero. Sections layer the two beige bands on top. */
+  --color-surface: #fbf4e6;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display-stack);
+  --font-sans: var(--font-open-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  /* Display / branding font.
+     Primary: Yatra One — a Devanagari-inspired Latin display face loaded via
+     next/font, approximating the proprietary "Ananda Neptouch 2" logo font.
+     "Ananda Neptouch 2" is kept next so it wins automatically if a viewer has
+     the real logo font installed locally; Open Sans is the final fallback. */
+  --font-display-stack: var(--font-brand-display), "Ananda Neptouch 2",
+    var(--font-open-sans), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-open-sans), system-ui, -apple-system, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display-stack);
+}
+
+/* Subtle section label used throughout (e.g. "01", "TOP CATEGORIES") */
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Brand text-selection colour */
+::selection {
+  background: var(--color-maroon);
+  color: var(--color-cream);
 }
