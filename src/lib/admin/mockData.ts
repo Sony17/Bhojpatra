@@ -10,6 +10,7 @@
  * Figures are illustrative and consistent with the customer/vendor mock data
  * (Lucknow-centric, ₹ INR, same vendor names where sensible).
  */
+import { vendorListings } from "@/lib/data";
 import type {
   AdminProfile,
   AdminKpi,
@@ -18,6 +19,10 @@ import type {
   AdminNotification,
   RevenueSummary,
   QuickAction,
+  AdminVendor,
+  VerificationStatus,
+  Paginated,
+  VendorQuery,
 } from "./types";
 
 export const adminProfile: AdminProfile = {
@@ -73,3 +78,100 @@ export const quickActions: QuickAction[] = [
   { label: "Add-On Manager", href: "/admin/add-ons", iconKey: "addons" },
   { label: "View Reports", href: "/admin/reports", iconKey: "reports" },
 ];
+
+/* ───────────────────────────────────────────────────────────────────────
+   VENDOR MANAGEMENT (Phase 2)
+
+   `adminVendors` is DERIVED from the public `vendorListings` (single source of
+   truth for the overlapping fields: business/tier/city/state/cuisines/diet/
+   rating/reviews/priceFrom/image) and ENRICHED with admin-only fields (owner,
+   contact, KYC documents, verification status, join date, bookings).
+
+   Enrichment is fully deterministic (index-based, no randomness) so the mock is
+   stable across renders/builds. `queryVendors` / `getVendorById` are pure
+   selectors that mirror the future API contract.
+─────────────────────────────────────────────────────────────────────── */
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+const VENDOR_OWNERS = [
+  "Imtiaz Ahmed", "Rehana Begum", "Vikram Sethi", "Aarav Joshi",
+  "Lakshmi Rao", "Anjan Dutta", "Syed Akbar", "Bhanu Pratap",
+  "Karthik Iyer", "Sunil More", "Harpreet Gill", "Ramesh Tiwari",
+];
+
+const VENDOR_JOINED = [
+  "12 Jan 2025", "03 Mar 2025", "21 Apr 2025", "18 May 2025",
+  "09 Jun 2025", "27 Jul 2025", "14 Aug 2025", "02 Sep 2025",
+  "19 Oct 2025", "30 Nov 2025", "15 Dec 2025", "08 Jan 2026",
+];
+
+export const adminVendors: AdminVendor[] = vendorListings.map((v, i) => {
+  // Verification status: verified → Verified; otherwise Pending. One Rejected
+  // and one Suspended example for realistic UI coverage.
+  let status: VerificationStatus = v.verified ? "Verified" : "Pending";
+  if (v.id === "vl-10") status = "Rejected";
+  const suspended = v.id === "vl-7";
+
+  const stateCode = (9 + i).toString().padStart(2, "0");
+  const docStatus: VerificationStatus = status;
+
+  return {
+    id: v.id,
+    business: v.name,
+    owner: VENDOR_OWNERS[i % VENDOR_OWNERS.length],
+    phone: `+91 9${String(100000000 + i * 7654321).slice(0, 9)}`,
+    email: `hello@${slug(v.name)}.in`,
+    city: v.city,
+    state: v.state,
+    tier: v.tier,
+    status,
+    suspended,
+    cuisines: v.cuisines,
+    diet: v.diet,
+    rating: v.rating,
+    reviews: v.reviews,
+    priceFrom: v.priceFrom,
+    joinedDate: VENDOR_JOINED[i % VENDOR_JOINED.length],
+    totalBookings: Math.round(v.reviews * 0.55),
+    image: v.image,
+    documents: [
+      { kind: "GST", number: `${stateCode}ABCDE${1000 + i}F1Z${(i % 9) + 1}`, status: docStatus },
+      { kind: "FSSAI", number: `1${String(10000000000000 + i).slice(0, 13)}`, status: docStatus },
+      { kind: "ID", number: `XXXX XXXX ${1000 + i}`, status: "Verified" },
+    ],
+  };
+});
+
+/** Unique cities present in the vendor set (for the city filter). */
+export const vendorCities: string[] = Array.from(
+  new Set(adminVendors.map((v) => v.city)),
+).sort();
+
+/** Paginated, filtered vendor query. Pure — swap the body for a `fetch` later
+ *  and the `Paginated<AdminVendor>` shape stays identical. */
+export function queryVendors(params: VendorQuery = {}): Paginated<AdminVendor> {
+  const { q = "", tier = "All", status = "All", city = "All", page = 1, pageSize = 8 } = params;
+  const needle = q.trim().toLowerCase();
+
+  const filtered = adminVendors.filter((v) => {
+    const matchesQ =
+      !needle ||
+      v.business.toLowerCase().includes(needle) ||
+      v.owner.toLowerCase().includes(needle) ||
+      v.city.toLowerCase().includes(needle);
+    const matchesTier = tier === "All" || v.tier === tier;
+    const matchesStatus = status === "All" || v.status === status;
+    const matchesCity = city === "All" || v.city === city;
+    return matchesQ && matchesTier && matchesStatus && matchesCity;
+  });
+
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
+}
+
+/** Single vendor lookup. */
+export function getVendorById(id: string): AdminVendor | undefined {
+  return adminVendors.find((v) => v.id === id);
+}

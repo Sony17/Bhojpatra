@@ -31,6 +31,7 @@ const TONE: Record<string, string> = {
   Declined: MUTED,
   Rejected: MUTED,
   Expired: MUTED,
+  Suspended: MUTED,
 };
 
 export default function StatusBadge({ status }: { status: string }) {

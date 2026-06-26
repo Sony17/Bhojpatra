@@ -27,6 +27,7 @@ export {
   ArrowRight,
   ChevronDown,
   Star,
+  StarSolid,
 } from "@/components/icons";
 
 /* ── Dashboard / grid ───────────────────────────────────────────────────── */

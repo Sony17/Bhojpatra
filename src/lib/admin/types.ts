@@ -87,3 +87,56 @@ export interface QuickAction {
   href: string;
   iconKey: AdminIconKey;
 }
+
+/* ── Vendor Management (Phase 2) ─────────────────────────────────────────── */
+
+export type VendorDocKind = "GST" | "FSSAI" | "ID" | "Business Proof";
+
+export interface VendorDocument {
+  kind: VendorDocKind;
+  number: string;
+  status: VerificationStatus;
+}
+
+/** A vendor as the admin manages it. Overlapping fields (business/tier/city/…)
+ *  are derived from the public `vendorListings`; the rest is admin-only. */
+export interface AdminVendor {
+  id: string;
+  business: string;
+  owner: string;
+  phone: string;
+  email: string;
+  city: string;
+  state: string;
+  tier: VendorTier;
+  status: VerificationStatus;
+  suspended: boolean;
+  cuisines: string[];
+  diet: string;
+  rating: number;
+  reviews: number;
+  priceFrom: number;
+  joinedDate: string;
+  totalBookings: number;
+  image: string;
+  documents: VendorDocument[];
+}
+
+/** Generic paginated envelope — matches the future list-API response shape so
+ *  the swap from mock selector to `fetch` needs no component changes. */
+export interface Paginated<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+/** Query params for the vendor list (mirrors future `?q&tier&status&city…`). */
+export interface VendorQuery {
+  q?: string;
+  tier?: VendorTier | "All";
+  status?: VerificationStatus | "All";
+  city?: string | "All";
+  page?: number;
+  pageSize?: number;
+}
