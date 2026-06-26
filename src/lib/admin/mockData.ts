@@ -23,7 +23,13 @@ import type {
   VerificationStatus,
   Paginated,
   VendorQuery,
+  VendorApplication,
+  ApprovalQuery,
 } from "./types";
+
+/** Shared helper — slugify a business name for mock emails. Declared at the top
+ *  so module-level data built below (applications, vendors) can use it safely. */
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 export const adminProfile: AdminProfile = {
   name: "Ankit Srivastva",
@@ -49,13 +55,65 @@ export const recentBookings: AdminBookingRow[] = [
   { id: "BHJ-23541", customer: "Meera Nair", occasion: "Reception", date: "18 Jul 2026", vendor: "Namma Ruchi Caterers", city: "Bengaluru", amount: 179800, status: "Cancelled" },
 ];
 
-export const pendingApprovals: PendingVendorApproval[] = [
+/* Vendor applications power both the dashboard "Pending Approvals" panel and the
+   full Vendor Approvals / KYC console. `pendingApprovals` is DERIVED from this
+   (status === "Pending") so there is one source of truth. */
+const APPLICATIONS_BASE: PendingVendorApproval[] = [
   { id: "AP-2042", business: "Royal Tandoor Caterers", owner: "Faiz Khan", city: "Lucknow", speciality: "Mughlai & Tandoor", requestedTier: "Gold", submitted: "2 hrs ago", status: "Pending" },
   { id: "AP-2039", business: "Green Leaf Pure Veg", owner: "Anita Joshi", city: "Pune", speciality: "Pure Veg / Jain", requestedTier: "Silver", submitted: "5 hrs ago", status: "Pending" },
   { id: "AP-2035", business: "Coastal Spice Co.", owner: "Rohan Pai", city: "Mangalore", speciality: "South Indian / Coastal", requestedTier: "Gold", submitted: "1 day ago", status: "Pending" },
   { id: "AP-2031", business: "Maratha Spice Caterers", owner: "Sunil More", city: "Pune", speciality: "Continental & Chinese", requestedTier: "Silver", submitted: "1 day ago", status: "Pending" },
   { id: "AP-2028", business: "Grand Nawabi Dawat", owner: "Imtiaz Ahmed", city: "Lucknow", speciality: "Awadhi", requestedTier: "Platinum", submitted: "2 days ago", status: "Pending" },
+  { id: "AP-2025", business: "Hyderabadi House", owner: "Mohsin Ali", city: "Hyderabad", speciality: "Hyderabadi Biryani", requestedTier: "Gold", submitted: "3 days ago", status: "Pending" },
+  { id: "AP-2019", business: "Annapurna Bhog", owner: "Deepa Nair", city: "Kochi", speciality: "Kerala Sadya", requestedTier: "Silver", submitted: "5 days ago", status: "Verified" },
+  { id: "AP-2012", business: "Quick Bites Co.", owner: "Rajat Malhotra", city: "Noida", speciality: "Fast Food", requestedTier: "Silver", submitted: "1 week ago", status: "Rejected" },
 ];
+
+export const vendorApplications: VendorApplication[] = APPLICATIONS_BASE.map(
+  (a, i) => {
+    const gst: VerificationStatus =
+      a.status === "Verified" ? "Verified" : a.status === "Rejected" ? "Rejected" : "Pending";
+    const fssai: VerificationStatus = a.status === "Verified" ? "Verified" : "Pending";
+    return {
+      ...a,
+      email: `hello@${slug(a.business)}.in`,
+      phone: `+91 9${String(120000000 + i * 5432109).slice(0, 9)}`,
+      documents: [
+        { kind: "GST", number: `${(20 + i).toString()}ABCDE${2000 + i}F1Z${(i % 9) + 1}`, status: gst },
+        { kind: "FSSAI", number: `2${String(10000000000000 + i).slice(0, 13)}`, status: fssai },
+        { kind: "ID", number: `XXXX XXXX ${2000 + i}`, status: "Verified" },
+      ],
+    };
+  },
+);
+
+export const pendingApprovals: PendingVendorApproval[] = vendorApplications.filter(
+  (a) => a.status === "Pending",
+);
+
+/** Filtered, paginated approvals query. Accepts an optional `source` so a
+ *  component holding locally-mutated state can reuse the same filter logic. */
+export function queryApprovals(
+  params: ApprovalQuery = {},
+  source: VendorApplication[] = vendorApplications,
+): Paginated<VendorApplication> {
+  const { q = "", status = "All", page = 1, pageSize = 6 } = params;
+  const needle = q.trim().toLowerCase();
+
+  const filtered = source.filter((a) => {
+    const matchesQ =
+      !needle ||
+      a.business.toLowerCase().includes(needle) ||
+      a.owner.toLowerCase().includes(needle) ||
+      a.city.toLowerCase().includes(needle);
+    const matchesStatus = status === "All" || a.status === status;
+    return matchesQ && matchesStatus;
+  });
+
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
+}
 
 export const revenueSummary: RevenueSummary = {
   total: 4280000,
@@ -91,8 +149,6 @@ export const quickActions: QuickAction[] = [
    stable across renders/builds. `queryVendors` / `getVendorById` are pure
    selectors that mirror the future API contract.
 ─────────────────────────────────────────────────────────────────────── */
-
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 const VENDOR_OWNERS = [
   "Imtiaz Ahmed", "Rehana Begum", "Vikram Sethi", "Aarav Joshi",

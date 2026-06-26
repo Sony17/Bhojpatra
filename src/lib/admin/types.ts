@@ -44,7 +44,7 @@ export interface AdminKpi {
 export type VerificationStatus = "Pending" | "Verified" | "Rejected";
 export type VendorTier = "Silver" | "Gold" | "Platinum";
 
-/** A vendor awaiting KYC review (approvals panel). */
+/** A vendor awaiting KYC review (compact form used by the dashboard panel). */
 export interface PendingVendorApproval {
   id: string;
   business: string;
@@ -137,6 +137,24 @@ export interface VendorQuery {
   tier?: VendorTier | "All";
   status?: VerificationStatus | "All";
   city?: string | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Vendor Approvals / KYC (Phase 3) ────────────────────────────────────── */
+
+/** A full vendor application for the KYC review console — the compact
+ *  `PendingVendorApproval` plus contact details and uploaded documents. */
+export interface VendorApplication extends PendingVendorApproval {
+  email: string;
+  phone: string;
+  documents: VendorDocument[];
+}
+
+/** Query params for the approvals queue. */
+export interface ApprovalQuery {
+  q?: string;
+  status?: VerificationStatus | "All";
   page?: number;
   pageSize?: number;
 }
