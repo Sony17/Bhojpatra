@@ -1,22 +1,26 @@
 import Image from "next/image";
 import { packages, type PackageTier } from "@/lib/data";
+import Reveal from "@/components/Reveal";
 
 export default function Packages() {
   return (
     <section id="packages" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
-      <div className="mx-auto max-w-2xl text-center">
+      <Reveal className="mx-auto max-w-2xl text-center">
         <p className="eyebrow text-sm font-semibold text-gold">02</p>
         <h2 className="mt-3 text-3xl text-ink sm:text-4xl">Select Your Package</h2>
-        <p className="mt-4 text-base text-ink-soft sm:text-lg">
+        <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
           Choose a package as per your preference.
         </p>
-      </div>
+      </Reveal>
 
-      <div className="mt-12 grid grid-cols-1 gap-6 sm:mt-14 lg:grid-cols-3">
+      <Reveal
+        stagger
+        className="mt-12 grid grid-cols-1 gap-6 sm:mt-14 lg:grid-cols-3"
+      >
         {packages.map((tier) => (
           <PricingCard key={tier.id} tier={tier} />
         ))}
-      </div>
+      </Reveal>
     </section>
   );
 }
@@ -27,9 +31,9 @@ function PricingCard({ tier }: { tier: PackageTier }) {
   return (
     <div
       className={[
-        "relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md",
+        "card-lift group relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm hover:shadow-xl",
         popular
-          ? "border-gold ring-1 ring-gold lg:-translate-y-2"
+          ? "border-gold ring-1 ring-gold lg:-mt-2 lg:mb-2"
           : "border-cream-3",
       ].join(" ")}
     >
@@ -40,7 +44,7 @@ function PricingCard({ tier }: { tier: PackageTier }) {
           alt={`${tier.name} package spread`}
           fill
           sizes="(min-width: 1024px) 33vw, 100vw"
-          className="object-cover"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/35 to-transparent" />
         {popular && (
@@ -75,7 +79,7 @@ function PricingCard({ tier }: { tier: PackageTier }) {
       <button
         type="button"
         className={[
-          "mt-8 w-full rounded-xl px-5 py-3 text-sm font-semibold transition",
+          "btn-sheen mt-8 w-full rounded-xl px-5 py-3 text-sm font-semibold transition-all duration-300 active:scale-[0.98]",
           popular
             ? "bg-maroon text-cream hover:bg-maroon-dark"
             : "border border-maroon text-maroon hover:bg-maroon hover:text-cream",

@@ -51,7 +51,7 @@ export default function BookingForm() {
         <h2 className="mt-2 text-3xl text-ink sm:text-4xl">
           Book Your Celebration
         </h2>
-        <p className="mt-3 text-base text-ink-soft sm:text-lg">
+        <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
           Fill in the details to confirm your booking.
         </p>
       </div>

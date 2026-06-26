@@ -81,6 +81,32 @@ export function MapPin(props: IconProps) {
   );
 }
 
+export function Phone(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6.5 3.5h3l1.5 4-2 1.4a11 11 0 0 0 5 5l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7 2 2 0 0 1 6.5 3.5Z" />
+    </svg>
+  );
+}
+
+export function Mail(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
+    </svg>
+  );
+}
+
+export function Clock(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  );
+}
+
 export function UserHeart(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -129,9 +155,11 @@ export function ArrowRight(props: IconProps) {
 export function Diya(props: IconProps) {
   return (
     <svg {...base} {...props}>
-      <path d="M4 14c1.5 1.5 4.7 2.5 8 2.5s6.5-1 8-2.5c0 2.5-3.6 4-8 4s-8-1.5-8-4Z" />
-      <path d="M12 11c1.6 0 2.6 1 2.6 2.2H9.4C9.4 12 10.4 11 12 11Z" />
-      <path d="M12 11c0-1.4-1.2-1.8-1.2-3 0-.9.7-1.5 1.2-2 .5.5 1.2 1.1 1.2 2 0 1.2-1.2 1.6-1.2 3Z" />
+      {/* flame */}
+      <path d="M12 5.5c1.6 1.8 2.4 3.1 2.4 4.6a2.4 2.4 0 0 1-4.8 0c0-1.5.8-2.8 2.4-4.6Z" />
+      {/* lamp dish */}
+      <path d="M3.5 14h17" />
+      <path d="M5 14c.5 2.6 3.4 4 7 4s6.5-1.4 7-4" />
     </svg>
   );
 }
@@ -165,6 +193,74 @@ export function ClipboardCheck(props: IconProps) {
       <rect x="5" y="5" width="14" height="16" rx="2" />
       <path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
       <path d="m9 13 2 2 4-4" />
+    </svg>
+  );
+}
+
+/* ── "Planning For" ribbon icons ───────────────────────────── */
+
+/* Four-point sparkle — "Any Occasion". */
+export function Sparkle(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3c.6 3.8 1.7 4.9 5.5 5.5C13.7 9.1 12.6 10.2 12 14c-.6-3.8-1.7-4.9-5.5-5.5C10.3 7.9 11.4 6.8 12 3Z" />
+      <path d="M18 14.5c.3 1.7.8 2.2 2.5 2.5-1.7.3-2.2.8-2.5 2.5-.3-1.7-.8-2.2-2.5-2.5 1.7-.3 2.2-.8 2.5-2.5Z" />
+    </svg>
+  );
+}
+
+/* Interlocking rings — "Wedding". */
+export function Rings(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="9" cy="14" r="5" />
+      <circle cx="15" cy="14" r="5" />
+      <path d="M9 4.5 7.5 7h3L9 4.5ZM15 4.5 13.5 7h3L15 4.5Z" />
+    </svg>
+  );
+}
+
+/* Briefcase — "Corporate". */
+export function Briefcase(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="7.5" width="18" height="12" rx="2" />
+      <path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5" />
+      <path d="M3 12.5h18" />
+    </svg>
+  );
+}
+
+/* Gift box — "Birthday". */
+export function Gift(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="4" y="9" width="16" height="11" rx="1.5" />
+      <path d="M2.5 9h19v3.5h-19zM12 9v11" />
+      <path d="M12 9C10.5 5.5 6 5.5 7.5 8.5 8.3 9 10 9 12 9Zm0 0c1.5-3.5 6-3.5 4.5-.5C15.7 9 14 9 12 9Z" />
+    </svg>
+  );
+}
+
+/* Festival lantern — "Festival". */
+export function Lantern(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 4h6M10 4v2M14 4v2" />
+      <path d="M7 9.5C7 7.6 9.2 6 12 6s5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5Z" />
+      <path d="M7.5 13c.6 1.7 2.4 3 4.5 3s3.9-1.3 4.5-3" />
+      <path d="M12 16v3M11 19h2" />
+    </svg>
+  );
+}
+
+/* House — "House Party". */
+export function HomeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 11 12 4l8 7" />
+      <path d="M6 9.8V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.8" />
+      <path d="M10 20v-5h4v5" />
     </svg>
   );
 }

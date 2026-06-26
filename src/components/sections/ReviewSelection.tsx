@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Reveal from "@/components/Reveal";
 
 interface ReviewRow {
   category: string;
@@ -17,7 +18,7 @@ const rows: ReviewRow[] = [
 
 function IconBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-soft/40 text-lg ring-1 ring-cream-3">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-soft/40 text-lg ring-1 ring-cream-3 transition-transform duration-300 group-hover:scale-110">
       {children}
     </span>
   );
@@ -26,17 +27,17 @@ function IconBadge({ children }: { children: ReactNode }) {
 export default function ReviewSelection() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
-      <div className="mb-10 max-w-2xl">
+      <Reveal className="mb-10 max-w-2xl">
         <p className="eyebrow mb-3 text-sm font-semibold text-gold">04</p>
         <h2 className="text-3xl font-semibold text-ink sm:text-4xl">
           Review Your Selection
         </h2>
-        <p className="mt-3 text-base text-ink-soft sm:text-lg">
+        <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
           Review your selected menu &amp; specialists.
         </p>
-      </div>
+      </Reveal>
 
-      <div className="rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Reveal variant="scale" className="rounded-2xl border border-cream-3 bg-white shadow-sm">
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left">
@@ -60,7 +61,7 @@ export default function ReviewSelection() {
               {rows.map((row) => (
                 <tr
                   key={row.category}
-                  className="border-b border-cream-3 last:border-b-0 transition-colors hover:bg-cream/60"
+                  className="group border-b border-cream-3 last:border-b-0 transition-colors hover:bg-cream/60"
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -99,17 +100,20 @@ export default function ReviewSelection() {
             </span>
           </span>
         </div>
-      </div>
+      </Reveal>
 
       {/* Action buttons */}
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <span className="inline-flex items-center justify-center rounded-xl border border-maroon/30 bg-white px-6 py-3 text-sm font-semibold text-maroon shadow-sm transition-colors hover:bg-cream">
+      <Reveal variant="fade" delay={120} className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <span className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-maroon/30 bg-white px-6 py-3 text-sm font-semibold text-maroon shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-cream hover:shadow-md active:scale-95">
           Download Menu
         </span>
-        <span className="inline-flex items-center justify-center rounded-xl bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark">
-          Proceed to Book →
+        <span className="btn-sheen group inline-flex cursor-pointer items-center justify-center rounded-xl bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon-dark hover:shadow-lg active:scale-95">
+          Proceed to Book{" "}
+          <span className="ml-1 inline-block transition-transform duration-300 group-hover:translate-x-1">
+            →
+          </span>
         </span>
-      </div>
+      </Reveal>
     </section>
   );
 }

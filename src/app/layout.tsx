@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Open_Sans, Yatra_One } from "next/font/google";
+import { Open_Sans, Yatra_One, Dancing_Script } from "next/font/google";
 import "./globals.css";
 
 /* Brand body typeface — Open Sans (per Bhojpatra brand guidelines). */
@@ -17,6 +17,15 @@ const yatraOne = Yatra_One({
   subsets: ["latin"],
 });
 
+/* Cursive accent typeface — Dancing Script: a legible flowing script used for
+   celebratory accents (e.g. the hero headline). More readable than a formal
+   calligraphic face at small sizes. Self-hosted via next/font. */
+const dancingScript = Dancing_Script({
+  variable: "--font-script",
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Bhojpatra — India's Feast Booking Platform",
   description:
@@ -31,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${openSans.variable} ${yatraOne.variable} h-full antialiased`}
+      className={`${openSans.variable} ${yatraOne.variable} ${dancingScript.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col overflow-x-hidden bg-white text-ink">
         {children}

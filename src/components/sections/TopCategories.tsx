@@ -1,19 +1,24 @@
 import Image from "next/image";
 import { categories } from "@/lib/data";
+import Reveal from "@/components/Reveal";
 
 export default function TopCategories() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
-      <div className="text-center">
+      <Reveal className="text-center">
         <h2 className="eyebrow text-2xl text-maroon sm:text-3xl">
           Top Categories
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-base text-ink-soft">
+        <p className="font-script mx-auto mt-4 max-w-2xl text-xl text-ink-soft sm:text-2xl">
           Handpicked specialists across every flavour of your celebration.
         </p>
-      </div>
+      </Reveal>
 
-      <ul className="mt-12 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+      <Reveal
+        as="ul"
+        stagger
+        className="mt-12 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
+      >
         {categories.map((category) => (
           <li key={category.id}>
             <button
@@ -35,16 +40,16 @@ export default function TopCategories() {
             </button>
           </li>
         ))}
-      </ul>
+      </Reveal>
 
-      <div className="mt-12 flex justify-center">
+      <Reveal variant="fade" delay={120} className="mt-12 flex justify-center">
         <button
           type="button"
-          className="rounded-full bg-maroon px-8 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+          className="btn-sheen rounded-full bg-maroon px-8 py-3 text-sm font-semibold text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon-dark hover:shadow-lg active:scale-95"
         >
           View All Categories
         </button>
-      </div>
+      </Reveal>
     </section>
   );
 }

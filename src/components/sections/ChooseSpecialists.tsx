@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { specialists, specialistTabs } from "@/lib/data";
+import Reveal from "@/components/Reveal";
 
 export default function ChooseSpecialists() {
   return (
@@ -7,50 +8,51 @@ export default function ChooseSpecialists() {
       id="specialists"
       className="mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
-      <div className="max-w-2xl">
+      <Reveal className="max-w-2xl">
         <p className="eyebrow text-sm font-medium text-gold">03</p>
         <h2 className="mt-2 text-3xl text-ink sm:text-4xl">
           Choose Specialists
         </h2>
-        <p className="mt-3 text-ink-soft">
+        <p className="font-script mt-3 text-xl text-ink-soft">
           Different specialists for every dish — each rated, reviewed, and booked à la carte.
         </p>
-      </div>
+      </Reveal>
 
       {/* Category tabs */}
-      <div className="mt-8 flex flex-wrap gap-3">
+      <Reveal stagger className="mt-8 flex flex-wrap gap-3">
         {specialistTabs.map((tab, i) => (
           <span
             key={tab}
             className={
-              i === 0
-                ? "rounded-full bg-maroon px-5 py-2 text-sm font-medium text-cream"
-                : "rounded-full bg-cream-2 px-5 py-2 text-sm font-medium text-ink-soft"
+              "cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 " +
+              (i === 0
+                ? "bg-maroon text-cream shadow-[0_8px_18px_-8px_rgba(185,32,37,0.6)]"
+                : "bg-cream-2 text-ink-soft hover:bg-cream-3 hover:text-maroon")
             }
           >
             {tab}
           </span>
         ))}
-      </div>
+      </Reveal>
 
       {/* Sub-heading */}
-      <h3 className="mt-10 text-xl text-ink sm:text-2xl">
+      <Reveal as="h3" variant="left" className="mt-10 text-xl text-ink sm:text-2xl">
         Select Chaat Specialist
-      </h3>
+      </Reveal>
 
       {/* Specialist list */}
-      <div className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Reveal stagger className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
         {specialists.map((s, i) => (
           <div
             key={s.id}
             className={
-              "flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" +
+              "group flex flex-col gap-4 p-5 transition-colors duration-300 hover:bg-cream/40 sm:flex-row sm:items-center sm:justify-between sm:p-6" +
               (i > 0 ? " border-t border-cream-3" : "")
             }
           >
             {/* Left: avatar + details */}
             <div className="flex items-center gap-4">
-              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-cream-3 bg-cream-2">
+              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-cream-3 bg-cream-2 transition-transform duration-300 group-hover:scale-105 group-hover:border-maroon/40">
                 <Image
                   src={s.image}
                   alt={s.name}
@@ -88,20 +90,20 @@ export default function ChooseSpecialists() {
                   </span>
                 </p>
               </div>
-              <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow hover:shadow-md">
+              <span className="inline-flex cursor-pointer items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-all duration-300 hover:bg-maroon hover:text-cream hover:shadow-md active:scale-95">
                 View Menu
               </span>
             </div>
           </div>
         ))}
-      </div>
+      </Reveal>
 
       {/* Save & Continue */}
-      <div className="mt-8 flex justify-end">
-        <span className="inline-flex items-center rounded-full bg-maroon px-7 py-3 text-sm font-medium text-cream shadow-sm transition-colors hover:bg-maroon-dark">
+      <Reveal variant="fade" className="mt-8 flex justify-end">
+        <span className="btn-sheen inline-flex cursor-pointer items-center rounded-full bg-maroon px-7 py-3 text-sm font-medium text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon-dark hover:shadow-lg active:scale-95">
           Save &amp; Continue
         </span>
-      </div>
+      </Reveal>
     </section>
   );
 }
