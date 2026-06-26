@@ -1,3 +1,5 @@
+import Reveal from "@/components/Reveal";
+
 export default function BookingForm() {
   const fields = [
     {
@@ -46,7 +48,7 @@ export default function BookingForm() {
 
   return (
     <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
-      <div className="mx-auto max-w-3xl text-center">
+      <Reveal className="mx-auto max-w-3xl text-center">
         <p className="eyebrow text-xs font-semibold text-gold sm:text-sm">05</p>
         <h2 className="mt-2 text-3xl text-ink sm:text-4xl">
           Book Your Celebration
@@ -54,9 +56,9 @@ export default function BookingForm() {
         <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
           Fill in the details to confirm your booking.
         </p>
-      </div>
+      </Reveal>
 
-      <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:mt-12 sm:p-8 lg:p-10">
+      <Reveal variant="scale" className="mx-auto mt-10 max-w-3xl rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:mt-12 sm:p-8 lg:p-10">
         <form className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
           {fields.map((field) => (
             <div key={field.id} className="flex flex-col gap-1.5">
@@ -72,7 +74,7 @@ export default function BookingForm() {
                 type={field.type}
                 placeholder={field.placeholder || undefined}
                 autoComplete={field.autoComplete}
-                className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon"
+                className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
               />
             </div>
           ))}
@@ -80,7 +82,7 @@ export default function BookingForm() {
           <div className="sm:col-span-2">
             <button
               type="button"
-              className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
+              className="btn-sheen w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
             >
               Submit Booking Request
             </button>
@@ -90,7 +92,7 @@ export default function BookingForm() {
             </p>
           </div>
         </form>
-      </div>
+      </Reveal>
     </section>
   );
 }

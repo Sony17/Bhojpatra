@@ -135,26 +135,111 @@ export const occasions: Occasion[] = [
   { id: "corporate", name: "Corporate Event", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4") },
 ];
 
+/** A crowd-favourite dish surfaced in the "Trending" panel per occasion. */
+export interface TrendingDish {
+  name: string;
+  /** Short badge, e.g. "Bestseller", "Most Loved". */
+  tag: string;
+  image: string;
+}
+
 export interface PlanningOccasion {
   id: string;
   name: string;
   iconKey: string;
   image: string;
+  /** One-line descriptor shown over the cinematic showcase for the occasion. */
+  tagline: string;
+  /** Up to 5 crowd-favourite dishes for this occasion. */
+  trending: TrendingDish[];
 }
 
 /**
  * "Planning For" ribbon — the quick occasion selector shown as a row of
- * stamped pills, each with a line icon and a round photo of the celebration
- * below the ribbon.
+ * stamped pills. Selecting a pill reveals a single cinematic showcase image
+ * for that occasion below the ribbon. Images are sized wide for a full-bleed
+ * panel.
  */
+const trendingImg = (id: string) => img(id, 120);
+
 export const planningOccasions: PlanningOccasion[] = [
-  { id: "any", name: "Any Occasion", iconKey: "sparkle", image: img("photo-1565557623262-b51c2513a641", 300) },
-  { id: "wedding", name: "Wedding", iconKey: "rings", image: img("photo-1414235077428-338989a2e8c0", 300) },
-  { id: "corporate", name: "Corporate", iconKey: "briefcase", image: img("photo-1517248135467-4c7edcad34c4", 300) },
-  { id: "birthday", name: "Birthday", iconKey: "gift", image: img("photo-1530103862676-de8c9debad1d", 300) },
-  { id: "festival", name: "Festival", iconKey: "lantern", image: img("photo-1631452180519-c014fe946bc7", 300) },
-  { id: "house-party", name: "House Party", iconKey: "home", image: img("photo-1519225421980-715cb0215aed", 300) },
-  { id: "pooja", name: "Pooja / Bhandara", iconKey: "diya", image: img("photo-1606491956689-2ea866880c84", 300) },
+  {
+    id: "any", name: "Any Occasion", iconKey: "sparkle", image: img("photo-1565557623262-b51c2513a641", 1400),
+    tagline: "Whatever you're celebrating, we cater it beautifully.",
+    trending: [
+      { name: "Paneer Butter Masala", tag: "Bestseller", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+      { name: "Dum Biryani", tag: "Most Loved", image: trendingImg("photo-1563379091339-03b21ab4a4f8") },
+      { name: "Butter Naan", tag: "Trending", image: trendingImg("photo-1585937421612-70a008356fbe") },
+      { name: "Gulab Jamun", tag: "Sweet Pick", image: trendingImg("photo-1601050690597-df0568f70950") },
+      { name: "Chaat Platter", tag: "Crowd Fav", image: trendingImg("photo-1606491956689-2ea866880c84") },
+    ],
+  },
+  {
+    id: "wedding", name: "Wedding", iconKey: "rings", image: img("photo-1414235077428-338989a2e8c0", 1400),
+    tagline: "Grand wedding feasts, flawlessly planned and served.",
+    trending: [
+      { name: "Mutton Rogan Josh", tag: "Bestseller", image: trendingImg("photo-1633945274405-b6c8069047b0") },
+      { name: "Shahi Paneer", tag: "Most Loved", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+      { name: "Hyderabadi Biryani", tag: "Trending", image: trendingImg("photo-1563379091339-03b21ab4a4f8") },
+      { name: "Malai Kofta", tag: "Crowd Fav", image: trendingImg("photo-1585937421612-70a008356fbe") },
+      { name: "Rasmalai", tag: "Sweet Pick", image: trendingImg("photo-1601050690597-df0568f70950") },
+    ],
+  },
+  {
+    id: "corporate", name: "Corporate", iconKey: "briefcase", image: img("photo-1517248135467-4c7edcad34c4", 1400),
+    tagline: "Polished catering that impresses every guest.",
+    trending: [
+      { name: "Veg Manchurian", tag: "Bestseller", image: trendingImg("photo-1585032226651-759b368d7246") },
+      { name: "Pasta Counter", tag: "Trending", image: trendingImg("photo-1473093295043-cdd812d0e601") },
+      { name: "Paneer Tikka", tag: "Most Loved", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+      { name: "Assorted Sandwiches", tag: "Quick Bite", image: trendingImg("photo-1565895405227-31cffbe0cf86") },
+      { name: "Filter Coffee", tag: "Crowd Fav", image: trendingImg("photo-1437418747212-8d9709afab22") },
+    ],
+  },
+  {
+    id: "birthday", name: "Birthday", iconKey: "gift", image: img("photo-1530103862676-de8c9debad1d", 1400),
+    tagline: "Joyful spreads that make the day unforgettable.",
+    trending: [
+      { name: "Cheese Pizza", tag: "Bestseller", image: trendingImg("photo-1565299624946-b28f40a0ae38") },
+      { name: "Chilli Gobi", tag: "Trending", image: trendingImg("photo-1585032226651-759b368d7246") },
+      { name: "Kulfi Falooda", tag: "Sweet Pick", image: trendingImg("photo-1601050690597-df0568f70950") },
+      { name: "Spring Rolls", tag: "Crowd Fav", image: trendingImg("photo-1565895405227-31cffbe0cf86") },
+      { name: "Chocolate Cake", tag: "Most Loved", image: trendingImg("photo-1578985545062-69928b1d9587") },
+    ],
+  },
+  {
+    id: "festival", name: "Festival", iconKey: "lantern", image: img("photo-1631452180519-c014fe946bc7", 1400),
+    tagline: "Festive menus steeped in tradition.",
+    trending: [
+      { name: "Gajar Ka Halwa", tag: "Bestseller", image: trendingImg("photo-1601050690597-df0568f70950") },
+      { name: "Chole Bhature", tag: "Most Loved", image: trendingImg("photo-1585937421612-70a008356fbe") },
+      { name: "Puri Sabzi", tag: "Trending", image: trendingImg("photo-1606491956689-2ea866880c84") },
+      { name: "Boondi Raita", tag: "Crowd Fav", image: trendingImg("photo-1565557623262-b51c2513a641") },
+      { name: "Kaju Katli", tag: "Sweet Pick", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+    ],
+  },
+  {
+    id: "house-party", name: "House Party", iconKey: "home", image: img("photo-1519225421980-715cb0215aed", 1400),
+    tagline: "Effortless feasts for gatherings at home.",
+    trending: [
+      { name: "Tandoori Chicken", tag: "Bestseller", image: trendingImg("photo-1633945274405-b6c8069047b0") },
+      { name: "Veg Biryani", tag: "Most Loved", image: trendingImg("photo-1563379091339-03b21ab4a4f8") },
+      { name: "Hara Bhara Kebab", tag: "Trending", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+      { name: "Pav Bhaji", tag: "Crowd Fav", image: trendingImg("photo-1606491956689-2ea866880c84") },
+      { name: "Jalebi", tag: "Sweet Pick", image: trendingImg("photo-1601050690597-df0568f70950") },
+    ],
+  },
+  {
+    id: "pooja", name: "Pooja / Bhandara", iconKey: "diya", image: img("photo-1606491956689-2ea866880c84", 1400),
+    tagline: "Pure, satvik bhojan for every ritual.",
+    trending: [
+      { name: "Kadhi Chawal", tag: "Bestseller", image: trendingImg("photo-1585937421612-70a008356fbe") },
+      { name: "Aloo Puri", tag: "Most Loved", image: trendingImg("photo-1606491956689-2ea866880c84") },
+      { name: "Sabudana Khichdi", tag: "Trending", image: trendingImg("photo-1630383249896-424e482df921") },
+      { name: "Sooji Halwa", tag: "Sweet Pick", image: trendingImg("photo-1601050690597-df0568f70950") },
+      { name: "Boondi Laddoo", tag: "Crowd Fav", image: trendingImg("photo-1631452180519-c014fe946bc7") },
+    ],
+  },
 ];
 
 export const cities: { id: string; name: string }[] = [

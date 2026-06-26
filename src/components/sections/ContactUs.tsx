@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Phone, Mail, MapPin, Clock } from "@/components/icons";
+import Reveal from "@/components/Reveal";
 
 /** Bhojpatra HQ — used for both the contact card and the embedded map. */
 const office = {
@@ -47,20 +48,20 @@ export default function ContactUs() {
 
   return (
     <section id="contact" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
-      <div className="mx-auto max-w-3xl text-center">
+      <Reveal className="mx-auto max-w-3xl text-center">
         <p className="eyebrow text-xs font-semibold text-gold sm:text-sm">Contact Us</p>
         <h2 className="mt-2 text-3xl text-ink sm:text-4xl">Get in Touch</h2>
         <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
           We&apos;d love to help plan your next celebration.
         </p>
-      </div>
+      </Reveal>
 
       {/* Quick contact tiles */}
-      <div className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <Reveal stagger className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-2.5 lg:grid-cols-4">
         {contactCards.map((card) => {
           const inner = (
-            <div className="flex h-full flex-col items-center gap-1.5 rounded-xl border border-cream-3 bg-white p-2.5 text-center shadow-sm transition-colors hover:border-maroon/40">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-maroon/10 text-maroon">
+            <div className="card-lift group flex h-full flex-col items-center gap-1.5 rounded-xl border border-cream-3 bg-white p-2.5 text-center shadow-sm hover:border-maroon/40 hover:shadow-md">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-maroon/10 text-maroon transition-transform duration-300 group-hover:scale-110">
                 {cardIcons[card.iconKey]}
               </span>
               <span className="text-xs font-semibold text-ink">{card.label}</span>
@@ -75,10 +76,10 @@ export default function ContactUs() {
             <div key={card.label}>{inner}</div>
           );
         })}
-      </div>
+      </Reveal>
 
       {/* Map + form, side by side on large screens */}
-      <div className="mx-auto mt-10 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+      <Reveal variant="fade" delay={100} className="mx-auto mt-10 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
         {/* Google Maps location */}
         <div className="overflow-hidden rounded-2xl border border-cream-3 shadow-sm">
           <iframe
@@ -110,7 +111,7 @@ export default function ContactUs() {
                   type={field.type}
                   placeholder={field.placeholder}
                   autoComplete={field.autoComplete}
-                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon"
+                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
                 />
               </div>
             ))}
@@ -124,14 +125,14 @@ export default function ContactUs() {
                 name="message"
                 rows={4}
                 placeholder="Tell us about your event…"
-                className="resize-y rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon"
+                className="resize-y rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
               />
             </div>
 
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
+                className="btn-sheen w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
               >
                 Send Message
               </button>
@@ -147,7 +148,7 @@ export default function ContactUs() {
             </div>
           </form>
         </div>
-      </div>
+      </Reveal>
     </section>
   );
 }

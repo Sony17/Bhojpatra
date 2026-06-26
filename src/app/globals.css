@@ -316,6 +316,51 @@ html {
   }
 }
 
+/* ── 3D flip card ───────────────────────────────────────────────────
+   `.flip` is the perspective container; `.flip-inner` rotates; the two
+   `.flip-face` children sit back-to-back. Trigger the rotation with a
+   Tailwind `motion-safe:group-hover:[transform:rotateY(180deg)]` on the
+   inner so it only flips when motion is allowed — under reduced motion the
+   front face simply stays put. */
+.flip {
+  perspective: 1200px;
+}
+.flip-inner {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.7s var(--ease-out-expo);
+}
+.flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+/* ── Directional staggered entrances ────────────────────────────────
+   Layer onto a `.reveal-stagger` via data-dir to choose where children
+   enter from. The higher attribute specificity overrides the default
+   translateY; `.is-visible` still resets every child to its resting spot. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-stagger[data-dir="right"] > * {
+    transform: translateX(52px);
+  }
+  .reveal-stagger[data-dir="left"] > * {
+    transform: translateX(-52px);
+  }
+  .reveal-stagger[data-dir="alt"] > *:nth-child(odd) {
+    transform: translateX(-48px);
+  }
+  .reveal-stagger[data-dir="alt"] > *:nth-child(even) {
+    transform: translateX(48px);
+  }
+}
+
 /* Animated underline that grows from the left on hover (nav links). */
 .link-underline {
   position: relative;

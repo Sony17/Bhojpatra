@@ -21,6 +21,11 @@ interface RevealProps {
    * Use on grids/lists so each card cascades in.
    */
   stagger?: boolean;
+  /**
+   * When `stagger` is on, the direction children slide in from:
+   * "up" (default), "left", "right", or "alt" (alternating left/right).
+   */
+  from?: "up" | "left" | "right" | "alt";
   /** Element to render. Default "div". */
   as?: ElementType;
   className?: string;
@@ -37,6 +42,7 @@ export default function Reveal({
   variant = "up",
   delay = 0,
   stagger = false,
+  from = "up",
   as,
   className = "",
 }: RevealProps) {
@@ -83,6 +89,7 @@ export default function Reveal({
     <Tag
       ref={ref}
       data-variant={stagger ? undefined : variant}
+      data-dir={stagger && from !== "up" ? from : undefined}
       className={classes}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >

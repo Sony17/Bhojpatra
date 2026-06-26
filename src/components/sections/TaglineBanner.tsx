@@ -103,7 +103,7 @@ export default function TaglineBanner() {
           {/* Content */}
           <div className="relative flex flex-col items-center gap-5 px-8 py-12 text-center sm:px-12 sm:py-14">
             {/* Medallion-set handi mark */}
-            <span className="grid h-16 w-16 place-items-center rounded-full border border-cream/50 bg-gradient-to-br from-cream/20 via-cream/5 to-transparent shadow-inner">
+            <span className="animate-float grid h-16 w-16 place-items-center rounded-full border border-cream/50 bg-gradient-to-br from-cream/20 via-cream/5 to-transparent shadow-inner">
               <Pot className="h-9 w-9 text-cream" />
             </span>
 
@@ -122,7 +122,7 @@ export default function TaglineBanner() {
               </span>
             </h2>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

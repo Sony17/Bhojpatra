@@ -41,7 +41,7 @@ export default function ChooseSpecialists() {
       </Reveal>
 
       {/* Specialist list */}
-      <Reveal stagger className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Reveal stagger from="right" className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
         {specialists.map((s, i) => (
           <div
             key={s.id}
