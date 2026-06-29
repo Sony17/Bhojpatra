@@ -35,8 +35,8 @@ export default function Footer() {
         </div>
       </section>
       <section className="bg-white text-black">
-        <div className="mx-auto grid max-w-7xl [zoom:0.75] items-center gap-10 px-5 py-7 sm:py-8 lg:grid-cols-2">
-          <div className="text-center lg:text-left">
+        <div className="mx-auto grid max-w-7xl [zoom:0.75] items-center gap-24 px-5 py-7 sm:py-8 lg:grid-cols-2 lg:gap-48">
+          <div className="text-center lg:text-right">
             <span className="inline-flex items-center gap-2 rounded-full bg-maroon px-3 py-1 text-xs font-semibold tracking-wide text-cream">
               <span className="h-1.5 w-1.5 rounded-full bg-cream" />
               {t("Mobile App Coming Soon", "मोबाइल ऐप जल्द आ रहा है")}
@@ -52,7 +52,7 @@ export default function Footer() {
                 "कभी भी, कहीं भी अपने इवेंट बुक करें, मैनेज करें और प्लान करें।",
               )}
             </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-end">
               <span className="inline-flex items-center gap-3 rounded-xl bg-black px-4 py-2.5 text-left text-cream">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6" aria-hidden="true">
                   <path d="M3.6 2.3a1 1 0 0 0-.6.92v17.56a1 1 0 0 0 .6.92L13.4 12 3.6 2.3Zm11.2 8.3 2.5-2.5-9-5.1 6.5 7.6Zm0 2.8-6.5 7.6 9-5.1-2.5-2.5Zm4.2-4.6-2.1 2.1 2.1 2.1 2.4-1.4a1 1 0 0 0 0-1.4l-2.4-1.4Z" />
@@ -73,9 +73,9 @@ export default function Footer() {
               </span>
             </div>
           </div>
-          <div className="flex h-[220px] items-start justify-center overflow-hidden lg:justify-end">
+          <div className="flex h-[260px] items-start justify-center overflow-hidden px-10 pt-10 lg:justify-start">
             {/* tilted phone — cropped to show top half */}
-            <div className="relative h-[420px] w-[210px] -rotate-[8deg] rounded-[2.5rem] bg-black p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
+            <div className="relative h-[420px] w-[210px] -rotate-[8deg] rounded-[2.5rem] bg-black p-1.5 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
               <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
               <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-white px-5 pt-12 text-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -86,7 +86,7 @@ export default function Footer() {
                     height={250}
                     className="h-8 w-auto"
                   />
-                  <p className="mt-3 text-[11px] text-black/60">
+                  <p className="mt-1 text-[11px] text-black/60">
                     {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
                   </p>
                   <div className="mt-5 w-full space-y-2.5">

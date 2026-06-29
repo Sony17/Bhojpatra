@@ -40,6 +40,10 @@ export interface PackageFeature {
   label: string;
   labelHi: string;
   heading?: boolean;
+  /** Closes the preceding course and renders at the top level — used so a
+      trailing item (e.g. "1 Sweet") sits beside Welcome Drink / Starters
+      rather than being nested inside the previous course. */
+  standalone?: boolean;
 }
 
 export interface PackageTier {
@@ -315,17 +319,17 @@ export const packages: PackageTier[] = [
     features: [
       { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
       { label: "2 Starters", labelHi: "2 स्टार्टर" },
-      { label: "Main Course", labelHi: "मेन कोर्स", heading: true },
+      { label: "Fixed Main Course Menu", labelHi: "फिक्स्ड मेन कोर्स मेन्यू", heading: true },
       {
         label:
-          "1 Paneer, Dry Veg, Dal, Chawal, Raita, Salad, Papad, Achar, Puri / Nan",
+          "1 Paneer Delicacy, Dry Veg, Dal, Chawal, Raita, Salad, Papad, Achar, Puri / Naan",
         labelHi:
-          "1 पनीर, ड्राय वेज, दाल, चावल, रायता, सलाद, पापड़, अचार, पूरी / नान",
+          "1 पनीर व्यंजन, ड्राय वेज, दाल, चावल, रायता, सलाद, पापड़, अचार, पूरी / नान",
       },
-      { label: "1 Sweet", labelHi: "1 मिठाई" },
+      { label: "1 Sweet", labelHi: "1 मिठाई", standalone: true },
     ],
-    footnote: ["5 Vendors", "Same Menu", "Same Price"],
-    footnoteHi: ["5 वेंडर", "एक ही मेन्यू", "एक ही कीमत"],
+    footnote: ["Fixed main course menu with up to 5 vendors in your city."],
+    footnoteHi: ["आपके शहर में 5 वेंडर तक के साथ फिक्स्ड मेन कोर्स मेन्यू।"],
   },
   {
     id: "gold",
@@ -337,23 +341,23 @@ export const packages: PackageTier[] = [
     popular: true,
     tagline: "Popular Choice",
     taglineHi: "लोकप्रिय विकल्प",
-    pax: "50 – 10,000 Guests",
-    paxHi: "50 – 10,000 मेहमान",
-    minPax: 50,
+    pax: "150 – 10,000 Guests",
+    paxHi: "150 – 10,000 मेहमान",
+    minPax: 150,
     maxPax: 10_000,
     image: img("photo-1543339308-43e59d6b73a6"),
     features: [
       { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
-      { label: "5 Starters (Select)", labelHi: "5 स्टार्टर (चुनें)" },
-      { label: "Live Stalls (3)", labelHi: "लाइव स्टॉल (3)" },
-      { label: "Chaat (Select)", labelHi: "चाट (चुनें)" },
-      { label: "Chinese (Select)", labelHi: "चाइनीज़ (चुनें)" },
-      { label: "South Indian (Select)", labelHi: "साउथ इंडियन (चुनें)" },
-      { label: "Main Course (Select)", labelHi: "मेन कोर्स (चुनें)" },
-      { label: "Sweet Stall (Select)", labelHi: "स्वीट स्टॉल (चुनें)" },
+      { label: "5 Starters (Pick Any)", labelHi: "5 स्टार्टर (कोई भी चुनें)", heading: true },
+      { label: "3 Live Stalls (Pick Any)", labelHi: "3 लाइव स्टॉल (कोई भी चुनें)" },
+      { label: "Chaat (Pick Any)", labelHi: "चाट (कोई भी चुनें)", heading: true },
+      { label: "Chinese (Pick Any)", labelHi: "चाइनीज़ (कोई भी चुनें)" },
+      { label: "South Indian (Pick Any)", labelHi: "साउथ इंडियन (कोई भी चुनें)", standalone: true },
+      { label: "Main Course (Pick Any)", labelHi: "मेन कोर्स (कोई भी चुनें)", standalone: true },
+      { label: "Sweet Stall (Pick Any)", labelHi: "स्वीट स्टॉल (कोई भी चुनें)", standalone: true },
     ],
-    footnote: ["Multiple Choices", "Build Your Perfect Menu"],
-    footnoteHi: ["कई विकल्प", "अपना परफेक्ट मेन्यू बनाएं"],
+    footnote: ["From 150 guests — multiple choices in your city; choices from multiple vendors for 1,000+ guests"],
+    footnoteHi: ["150 मेहमानों से — आपके शहर में कई विकल्प; 1,000+ मेहमानों के लिए कई वेंडरों से विकल्प"],
   },
   {
     id: "platinum",
@@ -371,14 +375,15 @@ export const packages: PackageTier[] = [
     image: img("photo-1600891964599-f61ba0e24092"),
     features: [
       { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
-      { label: "Premium Starters", labelHi: "प्रीमियम स्टार्टर" },
-      { label: "Live Counters", labelHi: "लाइव काउंटर" },
-      { label: "Best Chaat Vendors", labelHi: "बेहतरीन चाट वेंडर" },
-      { label: "Best Main Course Vendors", labelHi: "बेहतरीन मेन कोर्स वेंडर" },
-      { label: "Premium Sweet Stall — Famous Vendors", labelHi: "प्रीमियम स्वीट स्टॉल — मशहूर वेंडर" },
+      { label: "Premium Starters (Pick Any)", labelHi: "प्रीमियम स्टार्टर (कोई भी चुनें)" },
+      { label: "Live Stalls (Pick Any)", labelHi: "लाइव स्टॉल (कोई भी चुनें)" },
+      { label: "Chaat (Pick Any)", labelHi: "चाट (कोई भी चुनें)" },
+      { label: "Main Course (Pick Any)", labelHi: "मेन कोर्स (कोई भी चुनें)" },
+      { label: "Sweet Stall (Pick Any)", labelHi: "स्वीट स्टॉल (कोई भी चुनें)" },
+      { label: "Premium Famous Vendors", labelHi: "प्रीमियम मशहूर वेंडर" },
     ],
-    footnote: ["City, State &", "Pan India Famous"],
-    footnoteHi: ["शहर, राज्य और", "पैन इंडिया मशहूर"],
+    footnote: ["From just 50 guests — multiple choices & famous vendors across India"],
+    footnoteHi: ["सिर्फ़ 50 मेहमानों से — पूरे भारत में कई विकल्प और मशहूर वेंडर"],
   },
   {
     id: "custom",
@@ -672,7 +677,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "भोजपत्र ने हमारी 600 मेहमानों की शादी की कैटरिंग को बेहद आसान बना दिया। लाइव काउंटर रात की जान थे और हर व्यंजन बिल्कुल समय पर आया।",
     rating: 5,
-    avatar: img("photo-1494790108377-be9c29b29330", 160),
+    avatar: "/avatars/t-1.jpg",
   },
   {
     id: "t-2",
@@ -684,7 +689,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "पारदर्शी कीमत और कोई छिपी बात नहीं। मैंने मिनटों में तीन स्पेशलिस्ट की तुलना की और बिना एक भी कॉल किए हमारे सालाना गाला के लिए सबसे अच्छा बुक किया।",
     rating: 5,
-    avatar: img("photo-1500648767791-00dcc994a43e", 160),
+    avatar: "/avatars/t-2.jpg",
   },
   {
     id: "t-3",
@@ -696,7 +701,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "टीम ने हमें पूरी तरह शाकाहारी मेन्यू बनाने में मदद की जो सबको पसंद आया। पहले क्लिक से आखिरी निवाले तक सहयोग गर्मजोशी भरा और तत्पर रहा।",
     rating: 5,
-    avatar: img("photo-1438761681033-6461ffad8d80", 160),
+    avatar: "/avatars/t-3.jpg",
   },
   {
     id: "t-4",
@@ -708,7 +713,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "बुकिंग वाकई पाँच मिनट का काम था और मिठाई स्टॉल लाजवाब था। अब हम कभी फ़ोन पर केटरर्स के पीछे नहीं भागेंगे।",
     rating: 5,
-    avatar: img("photo-1507003211169-0a1dd7228f2d", 160),
+    avatar: "/avatars/t-4.jpg",
   },
   {
     id: "t-5",
@@ -720,7 +725,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "चुनने से पहले असली समीक्षाएं पढ़ पाना बहुत अच्छा लगा। हमारे स्पेशलिस्ट ने साउथ इंडियन स्प्रेड शानदार बनाया और बच्चों का डेज़र्ट काउंटर हिट रहा।",
     rating: 5,
-    avatar: img("photo-1534528741775-53994a69daeb", 160),
+    avatar: "/avatars/t-5.jpg",
   },
   {
     id: "t-6",
@@ -732,7 +737,7 @@ export const testimonials: Testimonial[] = [
     quoteHi:
       "यहाँ शुरू से अंत तक की मदद असली है। उन्होंने वेंडर का सारा समन्वय संभाला ताकि हम अपनी सगाई का असल में आनंद ले सकें। ज़रूर सुझाऊंगा।",
     rating: 5,
-    avatar: img("photo-1463453091185-61582044d556", 160),
+    avatar: "/avatars/t-6.jpg",
   },
 ];
 
@@ -970,7 +975,9 @@ export const coupons: Coupon[] = [
   { code: "WEDDING25", label: "25% off weddings, up to ₹25,000", percent: 25, cap: 25000 },
 ];
 
-export const guestPresets: number[] = [50, 100, 250, 500, 1000, 2500];
+export const guestPresets: number[] = [
+  50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000,
+];
 
 /* ───────────────────────────────────────────────────────────────────────
    MENU BUILDER — per-category vendor + item selection powering the /book

@@ -86,16 +86,16 @@ export default function BookingForm() {
       >
         <form className="flex flex-col gap-8">
           {/* Occasion & Guests */}
-          <fieldset className="flex flex-col gap-5">
+          <fieldset className="flex min-w-0 flex-col gap-5">
             <legend className="eyebrow text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Occasion & Guests", "अवसर और मेहमान")}
             </legend>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <label htmlFor="occasion" className="text-sm text-ink-soft">
                 {t("Occasion", "अवसर")}
               </label>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="flex min-w-0 max-w-full flex-nowrap gap-2.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
                 {occasions.map((o) => {
                   const active = occasion === o.id;
                   return (
@@ -105,7 +105,7 @@ export default function BookingForm() {
                       onClick={() => setOccasion(o.id)}
                       aria-pressed={active}
                       className={
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
                         (active
                           ? "bg-maroon text-cream"
                           : "bg-cream-2 text-ink-soft hover:bg-cream-3")
@@ -146,8 +146,16 @@ export default function BookingForm() {
                   name="guestCount"
                   type="number"
                   min={1}
+                  max={50000}
                   value={guests}
-                  onChange={(e) => setGuests(e.target.value)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    setGuests(
+                      e.target.value === "" || Number.isNaN(n)
+                        ? e.target.value
+                        : String(Math.min(50000, Math.max(0, n))),
+                    );
+                  }}
                   placeholder={t("e.g. 250", "जैसे 250")}
                   autoComplete="off"
                   className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"

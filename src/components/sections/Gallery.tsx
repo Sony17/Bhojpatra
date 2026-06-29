@@ -8,20 +8,24 @@ import { galleryItems, type GalleryItem } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 
 /**
- * Fan layout for the seven cards in the scroll-driven cluster. Each entry is
- * the card's *fully fanned* offset from centre (px), its tilt (deg) and size.
- * At scroll-progress 0 every card is collapsed onto the centre (a neat stack);
- * as the section scrolls into view the offsets ease to 100%, fanning the cards
- * out into an arc — the signature move from the mockup, rebuilt without GSAP.
+ * Spread layout for the seven cards in the scroll-driven cluster. Each entry is
+ * the card's *fully spread* offset from centre (px) and its size. At
+ * scroll-progress 0 every card is collapsed onto the centre (a neat stack); as
+ * the section scrolls into view the offsets ease to 100%, opening the cards out
+ * into a clean, evenly spaced row — every image sits independently, none
+ * overlapping. Card width/height scale with the same `spread` factor as the
+ * spacing (see render), so the row never collapses into overlap on narrow
+ * screens. The 160px step exceeds the 150px card width, leaving a gap between
+ * neighbours. Flat (no tilt) so corners never clash.
  */
 const FAN = [
-  { x: -360, y: 40, r: -16, w: 150, h: 202, z: 1 },
-  { x: -245, y: -6, r: -10, w: 168, h: 226, z: 2 },
-  { x: -128, y: 30, r: -5, w: 188, h: 250, z: 3 },
-  { x: 0, y: -18, r: 0, w: 212, h: 284, z: 5 },
-  { x: 128, y: 30, r: 5, w: 188, h: 250, z: 3 },
-  { x: 245, y: -6, r: 10, w: 168, h: 226, z: 2 },
-  { x: 360, y: 40, r: 16, w: 150, h: 202, z: 1 },
+  { x: -480, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: -320, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: -160, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: 0, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: 160, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: 320, y: 0, r: 0, w: 150, h: 200, z: 1 },
+  { x: 480, y: 0, r: 0, w: 150, h: 200, z: 1 },
 ];
 
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
@@ -81,7 +85,7 @@ export default function Gallery() {
       const start = vh * 0.88;
       const end = vh * 0.32;
       setProgress(clamp((start - rect.top) / (start - end)));
-      setSpread(clamp(rect.width / 920, 0.34, 1));
+      setSpread(clamp(rect.width / 1120, 0.34, 1));
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -101,19 +105,24 @@ export default function Gallery() {
 
   return (
     <section className="relative overflow-hidden py-20 sm:py-24">
-      {/* Soft maroon glow blooming behind the cluster */}
+      {/* Hairline divider that opens the section */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-24 -z-10 h-[420px] w-[820px] max-w-[120vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(185,32,37,0.16),transparent_62%)] blur-2xl"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto h-px max-w-5xl bg-gradient-to-r from-transparent via-maroon/25 to-transparent"
+      />
+      {/* Whisper-soft maroon bloom behind the cluster — barely there */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-28 -z-10 h-[460px] w-[760px] max-w-[110vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(185,32,37,0.09),transparent_68%)] blur-3xl"
       />
 
       {/* Heading */}
       <Reveal className="mx-auto mb-4 max-w-7xl px-5 text-center" stagger>
-        <p className="eyebrow mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-maroon">
-          <span className="h-1.5 w-1.5 rounded-full bg-maroon shadow-[0_0_0_3px_rgba(185,32,37,0.18)]" />
+        <p className="eyebrow mb-3 inline-flex items-center gap-2.5 text-2xl font-semibold uppercase tracking-[0.2em] text-maroon sm:text-3xl">
+          <span className="h-2 w-2 rounded-full bg-maroon shadow-[0_0_0_3px_rgba(185,32,37,0.18)]" />
           {t("Real Events", "असली इवेंट")}
         </p>
-        <h2 className="font-display text-4xl font-bold tracking-tight text-ink sm:text-5xl lg:text-6xl">
+        <h2 className="font-display text-5xl font-bold tracking-tight text-ink sm:text-6xl lg:text-7xl">
           {t("Feasts we've", "जो भोज हमने")}{" "}
           <em className="not-italic text-maroon">{t("brought to life", "साकार किए")}</em>
         </h2>
@@ -128,24 +137,28 @@ export default function Gallery() {
       {/* ── Scroll-driven fan-out cluster ─────────────────────────────── */}
       <div
         ref={clusterRef}
-        className="relative mx-auto mt-10 h-[320px] w-full max-w-6xl px-5 sm:h-[360px]"
+        className="relative mx-auto mt-6 h-[130px] w-full max-w-7xl px-5 sm:h-[240px]"
         style={{ perspective: "1100px" }}
       >
         {fanCards.map((item: GalleryItem, i: number) => {
           const f = FAN[i];
           const p = progress;
-          // Outer transform: collapse → fan. Intro adds a drop + scale-in.
+          // Outer transform: collapse → spread. Intro adds a drop + scale-in.
+          // Card size scales with the same `spread` as the spacing, so the row
+          // shrinks as one unit on narrow screens and never re-overlaps.
           const tx = f.x * spread * p;
           const ty = f.y * p + (shown ? 0 : -90);
           const rot = f.r * p + (shown ? 0 : 14);
           const scale = shown ? 1 : 0.7;
+          const w = f.w * spread;
+          const h = f.h * spread;
           return (
             <div
               key={item.title}
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
               style={{
-                width: f.w,
-                height: f.h,
+                width: w,
+                height: h,
                 zIndex: f.z,
                 opacity: shown ? 1 : 0,
                 transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${rot}deg) scale(${scale})`,
@@ -169,7 +182,7 @@ export default function Gallery() {
               >
                 {/* Card — hover lift sits on its own layer to avoid clashing
                     with the float animation above it. */}
-                <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_30px_50px_-16px_rgba(185,32,37,0.45),0_10px_22px_-8px_rgba(185,32,37,0.3)] ring-1 ring-cream-3/40 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.05]">
+                <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_22px_44px_-22px_rgba(0,0,0,0.6),0_8px_18px_-12px_rgba(0,0,0,0.4)] ring-1 ring-cream/60 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.04]">
                   <Image
                     src={item.image}
                     alt={item.title}
@@ -179,9 +192,9 @@ export default function Gallery() {
                   />
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-white/15"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
                   />
-                  <span className="absolute inset-x-2 bottom-2 translate-y-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-semibold text-cream opacity-0 backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                  <span className="absolute inset-x-2 bottom-2 translate-y-1.5 rounded-lg bg-maroon/85 px-2.5 py-1.5 text-[11px] font-semibold text-cream opacity-0 backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                     {lang === "hi" ? item.titleHi : item.title}
                   </span>
                 </div>
@@ -192,7 +205,7 @@ export default function Gallery() {
       </div>
 
       {/* CTA pill under the cluster */}
-      <div className="mt-8 flex justify-center px-5">
+      <div className="mt-6 flex justify-center px-5">
         <Link
           href="/book"
           className="btn-sheen group inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream shadow-[0_14px_24px_-8px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:-translate-y-0.5 active:scale-95"
@@ -204,41 +217,55 @@ export default function Gallery() {
         </Link>
       </div>
 
-      {/* ── Staggered gallery grid ────────────────────────────────────── */}
-      <Reveal
-        as="ul"
-        stagger
-        from="up"
-        className="mt-20 grid w-full grid-cols-2 gap-2 px-2 sm:grid-cols-3 sm:gap-3 sm:px-3 lg:grid-cols-5 lg:px-4"
-      >
-        {galleryItems.map((item: GalleryItem) => (
-          <li
-            key={item.title}
-            className="group relative aspect-[3/4] overflow-hidden rounded-2xl ring-1 ring-cream-3/50 shadow-[0_16px_30px_-18px_rgba(185,32,37,0.4)] transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2"
+      {/* ── Two slow auto-scrolling ribbons (top → L-to-R, bottom → R-to-L).
+          Each track holds two copies so the -50% loop is seamless. Runs on
+          every breakpoint; cards scale up on larger screens. */}
+      <div className="mt-16 space-y-3 sm:mt-20 sm:space-y-4">
+        {[
+          { row: galleryItems.slice(0, 5), reverse: false },
+          { row: galleryItems.slice(5), reverse: true },
+        ].map(({ row, reverse }, idx) => (
+          <div
+            key={idx}
+            className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)]"
           >
-            <Image
-              src={item.image}
-              alt={item.title}
-              fill
-              sizes="(min-width:1024px) 19vw, (min-width:640px) 31vw, 46vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-110"
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-100"
-            />
-            {/* Hover meta — slides up like the mockup's .t-meta overlay */}
-            <div className="absolute inset-x-3 bottom-3 translate-y-2 rounded-xl border border-white/15 bg-black/55 px-3 py-2.5 text-cream opacity-0 backdrop-blur-md transition-all duration-300 ease-[cubic-bezier(.16,1,.3,1)] group-hover:translate-y-0 group-hover:opacity-100">
-              <p className="text-sm font-bold leading-tight">
-                {lang === "hi" ? item.titleHi : item.title}
-              </p>
-              <p className="mt-0.5 text-[11px] tracking-wide text-cream/70">
-                {lang === "hi" ? item.captionHi : item.caption}
-              </p>
+            <div
+              className="flex w-max gap-3 motion-reduce:!animate-none sm:gap-4"
+              style={{
+                animation: "bp-marquee 90s linear infinite",
+                animationDirection: reverse ? "reverse" : "normal",
+              }}
+            >
+              {[...row, ...row].map((item: GalleryItem, i: number) => (
+                <div
+                  key={`${item.title}-${i}`}
+                  className="group relative aspect-[4/5] w-36 shrink-0 overflow-hidden rounded-2xl ring-1 ring-cream/50 shadow-[0_14px_30px_-20px_rgba(0,0,0,0.5)] sm:w-44 lg:w-52"
+                >
+                  <Image
+                    src={item.image}
+                    alt={i < row.length ? item.title : ""}
+                    fill
+                    sizes="(min-width:1024px) 208px, (min-width:640px) 176px, 144px"
+                    className="object-cover transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-105"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 p-3 sm:p-3.5">
+                    <p className="text-xs font-semibold leading-snug text-cream drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] sm:text-sm">
+                      {lang === "hi" ? item.titleHi : item.title}
+                    </p>
+                    <p className="mt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-cream/70 sm:text-[10px]">
+                      {lang === "hi" ? item.captionHi : item.caption}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </li>
+          </div>
         ))}
-      </Reveal>
+      </div>
     </section>
   );
 }

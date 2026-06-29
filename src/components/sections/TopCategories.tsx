@@ -8,7 +8,8 @@ import { useLang } from "@/lib/i18n";
 export default function TopCategories() {
   const { lang, t } = useLang();
   return (
-    <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+    <section className="bg-white">
+      <div className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="text-center">
         <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           {t("Services", "सेवाएं")}
@@ -66,6 +67,7 @@ export default function TopCategories() {
           {t("View All Categories", "सभी कैटेगरी देखें")}
         </button>
       </Reveal>
+      </div>
     </section>
   );
 }

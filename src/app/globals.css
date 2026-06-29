@@ -307,8 +307,18 @@ html {
   .animate-marquee {
     animation: bp-marquee 26s linear infinite;
   }
-  .marquee-pause:hover .animate-marquee {
+  /* Testimonials ribbon — very slow, readable continuous scroll. */
+  .animate-marquee-slow {
+    animation: bp-marquee 90s linear infinite;
+  }
+  .marquee-pause:hover .animate-marquee,
+  .marquee-pause:hover .animate-marquee-slow {
     animation-play-state: paused;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee-slow {
+      animation: none;
+    }
   }
 
   /* Sweeping sheen on primary buttons (apply .btn-sheen). */
