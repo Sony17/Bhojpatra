@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import ScrollWatermark from "@/components/ScrollWatermark";
+import SiteLoader from "@/components/SiteLoader";
 
 /* The Bhojpatra brand uses exactly two typefaces (per the brand guidelines):
    - Open Sans          → primary UI / body font
@@ -46,6 +47,7 @@ export default function RootLayout({
           {children}
           <ScrollWatermark />
         </LanguageProvider>
+        <SiteLoader />
       </body>
     </html>
   );

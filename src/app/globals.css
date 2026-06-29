@@ -456,3 +456,89 @@ html {
     max-height: 80vh;
   }
 }
+
+/* ── Brand splash / loader (SiteLoader) ─────────────────────────────────────
+   Full-screen white field with the scroll logo popping in and floating, plus
+   pulsing brand-red dots, then the overlay fades out. */
+.site-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0d09e;
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+.site-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+.site-loader__art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+}
+.site-loader__logo {
+  width: clamp(250px, 60vw, 330px);
+  height: auto;
+  transform-origin: center;
+  animation:
+    loader-pop 0.85s cubic-bezier(0.22, 1, 0.36, 1) both,
+    loader-float 2.4s ease-in-out 0.85s infinite;
+}
+.site-loader__dots {
+  display: flex;
+  gap: 0.5rem;
+}
+.site-loader__dots span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: #b92025;
+  animation: loader-dot 1s ease-in-out infinite;
+}
+.site-loader__dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.site-loader__dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes loader-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes loader-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes loader-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-loader__logo,
+  .site-loader__dots span {
+    animation: none;
+  }
+}
