@@ -117,7 +117,7 @@ export default function Hero() {
   const [eventId, setEventId] = useState<string>(planningOccasions[0].id);
 
   // Hero-look switch — flip between the three treatments.
-  const [variant, setVariant] = useState<VariantId>("vibrant");
+  const [variant, setVariant] = useState<VariantId>("original");
   const v = variantStyles[variant];
 
   const bookParams = new URLSearchParams({ occasion: occasionId, city: cityId });
@@ -258,6 +258,32 @@ export default function Hero() {
                   "rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 " +
                   (active
                     ? "scale-105 bg-maroon text-cream shadow-[0_6px_16px_-6px_rgba(0,0,0,0.7)]"
+                    : "text-cream/85 hover:bg-white/15 hover:text-cream")
+                }
+              >
+                {lang === "hi" ? hv.nameHi : hv.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mobile hero-look switch — a horizontal segmented control tucked under
+          the header, since the vertical right rail is hidden on small screens. */}
+      <div className="absolute left-1/2 top-[5.5rem] z-20 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 sm:hidden">
+        <div className="flex items-stretch gap-1 rounded-full bg-black/45 p-1 ring-1 ring-white/25 backdrop-blur-md shadow-[0_10px_30px_-12px_rgba(0,0,0,0.8)]">
+          {heroVariants.map((hv) => {
+            const active = hv.id === variant;
+            return (
+              <button
+                key={hv.id}
+                type="button"
+                onClick={() => setVariant(hv.id)}
+                aria-pressed={active}
+                className={
+                  "flex-1 rounded-full px-2 py-2 text-[11px] font-semibold transition-all duration-300 " +
+                  (active
+                    ? "bg-maroon text-cream shadow-[0_6px_16px_-6px_rgba(0,0,0,0.7)]"
                     : "text-cream/85 hover:bg-white/15 hover:text-cream")
                 }
               >

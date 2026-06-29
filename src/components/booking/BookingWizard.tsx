@@ -3,11 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
-import { addStoredBooking, downloadReceipt } from "@/lib/bookings";
+import { addStoredBooking } from "@/lib/bookings";
+import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
+import {
+  buildUpiUri,
+  upiTxnRef,
+  DEFAULT_MERCHANT,
+  type UpiPayeeConfig,
+} from "@/lib/upi";
 import {
   occasions,
   cities,
-  guestPresets,
   packages,
   addOns,
   coupons,
@@ -146,6 +152,8 @@ export default function BookingWizard() {
   const [confirming, setConfirming] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string>("");
   const [confirmed, setConfirmed] = useState<boolean>(false);
+  // Amount the guest has settled up front via UPI/QR (0 until they pay in full).
+  const [paidAmount, setPaidAmount] = useState<number>(0);
 
   /* ─── Menu helpers ─────────────────────────────────────────────────── */
   // Short-notice dates can't be sourced for the regular tiers (Silver/Gold/
@@ -327,11 +335,6 @@ export default function BookingWizard() {
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   };
 
-  const clampGuests = (raw: number) => {
-    if (Number.isNaN(raw)) return;
-    setGuests(Math.max(paxMin, Math.min(paxMax, Math.round(raw))));
-  };
-
   const applyCoupon = () => {
     const code = couponInput.trim().toUpperCase();
     const found = coupons.find((c) => c.code.toUpperCase() === code);
@@ -401,9 +404,80 @@ export default function BookingWizard() {
     return lines.join("\n");
   };
 
-  // Download just this order's receipt (not the whole page).
+  // Itemised invoice data for THIS order — drives the PDF invoice download and
+  // is stored on the booking so it can be re-downloaded from My Bookings.
+  const buildInvoice = (): InvoiceData => {
+    const occ = occasions.find((o) => o.id === occasionId);
+    const cityObj = cities.find((c) => c.id === cityId);
+    const pkg = packages.find((p) => p.id === packageId);
+
+    const menu: InvoiceData["menu"] = activeCategories
+      .map((cat) => {
+        const chosen = categoryVendor[cat.id] ?? [];
+        const items = cat.vendors
+          .filter((v) => chosen.includes(v.id))
+          .map((v) => {
+            const picks = v.items
+              .filter((it) => itemsFor(cat.id).includes(it.id))
+              .map((it) => it.name);
+            return picks.length ? `${v.name}: ${picks.join(", ")}` : "";
+          })
+          .filter(Boolean)
+          .join(" · ");
+        return items ? { heading: cat.name, items } : null;
+      })
+      .filter((g): g is InvoiceData["menu"][number] => g !== null);
+
+    const lines: InvoiceData["lines"] = [
+      {
+        label: `${pkg?.name ?? "Package"} base (${money(basePerPlate)}/plate × ${guests})`,
+        amount: basePerPlate * guests,
+      },
+    ];
+    if (categoryAddTotal > 0) {
+      lines.push({
+        label: `Premium vendor add-ons (${money(categoryAddTotal)}/plate × ${guests})`,
+        amount: categoryAddTotal * guests,
+      });
+    }
+    addOns
+      .filter((a) => selectedAddOns.includes(a.id))
+      .forEach((a) => {
+        lines.push({
+          label: a.perPlate
+            ? `${a.name} (${money(a.price)}/plate × ${guests})`
+            : a.name,
+          amount: a.perPlate ? a.price * guests : a.price,
+        });
+      });
+
+    return {
+      id: bookingId,
+      dateLabel: new Date().toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      occasion: occ?.name ?? "Feast",
+      eventDate: eventDate ? formatEventDate(eventDate) : "-",
+      city: cityObj?.name ?? "-",
+      venue: venue || "-",
+      guests,
+      packageName: pkg?.name ?? "-",
+      lines,
+      menu,
+      subtotal,
+      addOnsTotal,
+      discount,
+      gst,
+      grandTotal,
+      paid: paidAmount,
+    };
+  };
+
+  // Download this order as a branded PDF invoice (not the whole page).
   const downloadMenu = () => {
-    downloadReceipt({ id: bookingId, receipt: buildReceipt() });
+    downloadInvoice(buildInvoice());
   };
 
   const buildWhatsAppMessage = (): string => {
@@ -489,9 +563,10 @@ export default function BookingWizard() {
       vendor: vendorNames.join(", ") || (selectedPackage?.name ?? "Bhojpatra"),
       city: cityObj?.name ?? "—",
       amount: Math.round(grandTotal),
-      paid: 0,
+      paid: paidAmount,
       status: "Confirmed",
       receipt: buildReceipt(),
+      invoice: buildInvoice(),
     });
     setConfirmed(true);
     setConfirming(false);
@@ -522,17 +597,24 @@ export default function BookingWizard() {
       </div>
 
       {/* Event bar — occasion / date / city carried from the Hero booking bar,
-          shown up top and editable from any step (mirrors the Step 3 fields). */}
-      <EventBar
-        lang={lang}
-        t={t}
-        occasionId={occasionId}
-        setOccasionId={setOccasionId}
-        eventDate={eventDate}
-        setEventDate={setEventDate}
-        cityId={cityId}
-        setCityId={setCityId}
-      />
+          editable up top on every step except the Add Extras step (3), which is
+          kept to just the add-on counters. */}
+      {step !== 3 && (
+        <EventBar
+          lang={lang}
+          t={t}
+          occasionId={occasionId}
+          setOccasionId={setOccasionId}
+          eventDate={eventDate}
+          setEventDate={setEventDate}
+          cityId={cityId}
+          setCityId={setCityId}
+          guests={guests}
+          setGuests={setGuests}
+          paxMin={paxMin}
+          paxMax={paxMax}
+        />
+      )}
 
       {/* Layout */}
       {step === 2 ? (
@@ -589,20 +671,7 @@ export default function BookingWizard() {
             <StepDetails
               lang={lang}
               t={t}
-              occasionId={occasionId}
-              setOccasionId={setOccasionId}
               guests={guests}
-              setGuests={setGuests}
-              clampGuests={clampGuests}
-              paxMin={paxMin}
-              paxMax={paxMax}
-              packageName={selectedPackage?.name ?? ""}
-              eventDate={eventDate}
-              setEventDate={setEventDate}
-              cityId={cityId}
-              setCityId={setCityId}
-              venue={venue}
-              setVenue={setVenue}
               selectedAddOns={selectedAddOns}
               setSelectedAddOns={setSelectedAddOns}
               toggle={toggle}
@@ -630,6 +699,9 @@ export default function BookingWizard() {
               couponError={couponError}
               discount={discount}
               grandTotal={grandTotal}
+              bookingId={bookingId}
+              paidAmount={paidAmount}
+              onPaid={setPaidAmount}
               confirming={confirming}
               confirmError={confirmError}
               onConfirm={handleConfirm}
@@ -788,6 +860,10 @@ function EventBar({
   setEventDate,
   cityId,
   setCityId,
+  guests,
+  setGuests,
+  paxMin,
+  paxMax,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -797,6 +873,10 @@ function EventBar({
   setEventDate: (v: string) => void;
   cityId: string;
   setCityId: (v: string) => void;
+  guests: number;
+  setGuests: (v: number) => void;
+  paxMin: number;
+  paxMax: number;
 }) {
   const fieldClass =
     "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-maroon";
@@ -806,7 +886,7 @@ function EventBar({
       <p className="eyebrow text-xs font-semibold text-gold">
         {t("YOUR EVENT", "आपका इवेंट")}
       </p>
-      <div className="mt-3 grid gap-4 sm:grid-cols-3">
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block">
           <span className="text-xs font-medium text-ink-soft">
             {t("Occasion", "अवसर")}
@@ -853,6 +933,26 @@ function EventBar({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium text-ink-soft">
+            {t("Guests", "मेहमान")} ({inr.format(paxMin)}–{inr.format(paxMax)})
+          </span>
+          <input
+            type="number"
+            min={paxMin}
+            max={paxMax}
+            value={guests}
+            onChange={(e) => setGuests(Number(e.target.value))}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              setGuests(
+                Math.max(paxMin, Math.min(paxMax, Math.round(v || paxMin))),
+              );
+            }}
+            className={fieldClass}
+          />
         </label>
       </div>
     </div>
@@ -1315,40 +1415,14 @@ function StepMenu({
 function StepDetails({
   lang,
   t,
-  occasionId,
-  setOccasionId,
   guests,
-  setGuests,
-  clampGuests,
-  paxMin,
-  paxMax,
-  packageName,
-  eventDate,
-  setEventDate,
-  cityId,
-  setCityId,
-  venue,
-  setVenue,
   selectedAddOns,
   setSelectedAddOns,
   toggle,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
-  occasionId: string;
-  setOccasionId: (v: string) => void;
   guests: number;
-  setGuests: (v: number) => void;
-  clampGuests: (raw: number) => void;
-  paxMin: number;
-  paxMax: number;
-  packageName: string;
-  eventDate: string;
-  setEventDate: (v: string) => void;
-  cityId: string;
-  setCityId: (v: string) => void;
-  venue: string;
-  setVenue: (v: string) => void;
   selectedAddOns: string[];
   setSelectedAddOns: (v: string[]) => void;
   toggle: (arr: string[], setArr: (v: string[]) => void, id: string) => void;
@@ -1356,146 +1430,13 @@ function StepDetails({
   return (
     <div>
       <SectionHead
-        title={t("Event Details", "इवेंट विवरण")}
+        title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
         sub={t(
-          "Confirm the occasion, date and venue, then the headcount and any add-on counters.",
-          "अवसर, तारीख और वेन्यू की पुष्टि करें, फिर मेहमानों की संख्या और एक्स्ट्रा काउंटर बताएं।",
+          "Optional live counters and add-ons to round out your menu.",
+          "अपने मेन्यू को पूरा करने के लिए वैकल्पिक लाइव काउंटर और ऐड-ऑन।",
         )}
       />
 
-      {/* Occasion */}
-      <h3 className="font-display text-lg font-semibold text-ink">
-        {t("What's the occasion?", "क्या अवसर है?")}
-      </h3>
-      <div className="mt-3 flex flex-wrap gap-2.5">
-        {occasions.map((occasion: Occasion) => {
-          const active = occasion.id === occasionId;
-          return (
-            <button
-              key={occasion.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setOccasionId(occasion.id)}
-              className={
-                "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition " +
-                (active
-                  ? "bg-maroon text-cream"
-                  : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-              }
-            >
-              <span aria-hidden="true">{occasion.icon}</span>
-              {t(occasion.name, occasion.nameHi)}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
-        <div>
-          <h3 className="font-display text-lg font-semibold text-ink">
-            {t("How many guests?", "कितने मेहमान?")}
-          </h3>
-          {/* Presets outside the selected package's guest range are hidden so a
-              tap can't push the headcount out of bounds (e.g. Silver caps 300). */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {guestPresets
-              .filter((g) => g >= paxMin && g <= paxMax)
-              .map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setGuests(g)}
-                  className={
-                    "rounded-full px-5 py-2 text-sm font-medium transition " +
-                    (guests === g
-                      ? "bg-maroon text-cream"
-                      : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-                  }
-                >
-                  {inr.format(g)}
-                </button>
-              ))}
-          </div>
-          <div className="mt-4 max-w-xs">
-            <label className="mb-1.5 block text-sm font-medium text-ink-soft">
-              {t("Exact count", "सटीक संख्या")} ({inr.format(paxMin)}–
-              {inr.format(paxMax)})
-            </label>
-            <input
-              type="number"
-              min={paxMin}
-              max={paxMax}
-              value={guests}
-              onChange={(e) => setGuests(Number(e.target.value))}
-              onBlur={(e) => clampGuests(Number(e.target.value))}
-              className="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-            />
-            {/* Range note + out-of-bounds nudge tied to the active package. */}
-            <p className="mt-1.5 text-xs text-ink-soft">
-              {guests < paxMin || guests > paxMax
-                ? t(
-                    `${packageName} serves ${inr.format(paxMin)}–${inr.format(
-                      paxMax,
-                    )} guests. Adjust the count or switch package.`,
-                    `${packageName} ${inr.format(paxMin)}–${inr.format(
-                      paxMax,
-                    )} मेहमानों के लिए है। संख्या बदलें या पैकेज बदलें।`,
-                  )
-                : t(
-                    `${packageName} package · ${inr.format(paxMin)}–${inr.format(
-                      paxMax,
-                    )} guests`,
-                    `${packageName} पैकेज · ${inr.format(paxMin)}–${inr.format(
-                      paxMax,
-                    )} मेहमान`,
-                  )}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="font-display text-lg font-semibold text-ink">
-            {t("Event date", "इवेंट की तारीख")}
-          </h3>
-          <input
-            type="date"
-            value={eventDate}
-            onChange={(e) => setEventDate(e.target.value)}
-            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-          />
-
-          <h3 className="mt-6 font-display text-lg font-semibold text-ink">
-            {t("City", "शहर")}
-          </h3>
-          <select
-            value={cityId}
-            onChange={(e) => setCityId(e.target.value)}
-            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-          >
-            <option value="">{t("Select a city", "शहर चुनें")}</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {lang === "hi" ? c.nameHi : c.name}
-              </option>
-            ))}
-          </select>
-
-          <h3 className="mt-6 font-display text-lg font-semibold text-ink">
-            {t("Venue / Address", "वेन्यू / पता")}
-          </h3>
-          <input
-            type="text"
-            value={venue}
-            onChange={(e) => setVenue(e.target.value)}
-            placeholder={t("Banquet / Hall / Address", "बैंक्वेट / हॉल / पता")}
-            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-          />
-        </div>
-      </div>
-
-      <h3 className="mt-10 font-display text-lg font-semibold text-ink">
-        {t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
-      </h3>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {addOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
@@ -1549,6 +1490,229 @@ function StepDetails({
   );
 }
 
+/* ─── Full payment via UPI / QR ───────────────────────────────────────
+ * Pays the whole grand total against the merchant's UPI VPA. The QR is a real
+ * NPCI `upi://pay?...` deep-link rendered by our own /api/payments/qr route, so
+ * any UPI app can scan it. There's no gateway callback, so settlement is
+ * customer-confirmed: tapping "I've paid" records the payment via /api/payments
+ * (idempotent on the txn ref) and marks the booking paid-in-full. */
+function PaymentBox({
+  t,
+  bookingId,
+  amount,
+  paid,
+  onPaid,
+}: {
+  t: (en: string, hi: string) => string;
+  bookingId: string;
+  amount: number;
+  paid: boolean;
+  onPaid: () => void;
+}) {
+  const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
+  const [method, setMethod] = useState<"qr" | "upi">("qr");
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const [copied, setCopied] = useState<boolean>(false);
+
+  // Pull the live merchant VPA (admin-configurable); fall back to the default.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/payment-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (active && cfg && typeof cfg.vpa === "string") {
+          setMerchant({
+            vpa: cfg.vpa,
+            payeeName: cfg.payeeName ?? DEFAULT_MERCHANT.payeeName,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const txnRef = upiTxnRef(bookingId, "FULL");
+  const note = `Bhojpatra ${bookingId}`;
+  const upiUri = buildUpiUri({
+    vpa: merchant.vpa,
+    payeeName: merchant.payeeName,
+    amount,
+    note,
+    txnRef,
+  });
+  const qrSrc =
+    `/api/payments/qr?pa=${encodeURIComponent(merchant.vpa)}` +
+    `&pn=${encodeURIComponent(merchant.payeeName)}` +
+    `&am=${amount}&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(txnRef)}`;
+
+  const markPaid = async () => {
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId,
+          amount,
+          method,
+          vpa: merchant.vpa,
+          txnRef,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        setError(
+          data?.error ??
+            t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+        );
+        return;
+      }
+      onPaid();
+    } catch {
+      setError(
+        t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const copyVpa = async () => {
+    try {
+      await navigator.clipboard.writeText(merchant.vpa);
+      setCopied(true);
+    } catch {
+      /* clipboard unavailable — the VPA is shown for manual entry anyway */
+    }
+  };
+
+  if (paid) {
+    return (
+      <div className="mt-6 rounded-2xl border border-maroon bg-white p-5 shadow-sm">
+        <p className="font-display text-lg font-semibold text-maroon">
+          ✓ {t("Payment received", "भुगतान प्राप्त हुआ")}
+        </p>
+        <p className="mt-1 text-sm text-ink-soft">
+          {t("Full payment recorded:", "पूरा भुगतान दर्ज:")}{" "}
+          <span className="font-semibold text-ink">{money(amount)}</span>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-lg font-semibold text-ink">
+          {t("Pay Full Amount", "पूरा भुगतान करें")}
+        </h3>
+        <span className="text-lg font-semibold text-maroon">{money(amount)}</span>
+      </div>
+      <p className="mt-1 text-sm text-ink-soft">
+        {t(
+          "Optional — pay securely now with any UPI app.",
+          "वैकल्पिक — किसी भी UPI ऐप से अभी भुगतान करें।",
+        )}
+      </p>
+
+      {/* Method toggle */}
+      <div className="mt-4 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
+        {(
+          [
+            ["qr", t("Scan QR", "QR स्कैन")],
+            ["upi", t("UPI ID", "UPI आईडी")],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMethod(id)}
+            className={
+              "rounded-full px-4 py-1.5 text-xs font-semibold transition " +
+              (method === id
+                ? "bg-maroon text-cream"
+                : "text-ink-soft hover:text-ink")
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {method === "qr" ? (
+        <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={qrSrc}
+            alt={t("UPI payment QR", "UPI भुगतान QR")}
+            width={176}
+            height={176}
+            className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2"
+          />
+          <div className="text-sm text-ink-soft">
+            <p>
+              {t(
+                "Scan with any UPI app to pay",
+                "भुगतान के लिए किसी भी UPI ऐप से स्कैन करें",
+              )}
+            </p>
+            <p className="mt-1 font-semibold text-ink">{merchant.vpa}</p>
+            <a
+              href={upiUri}
+              className="mt-3 inline-block rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:hidden"
+            >
+              {t("Open UPI app", "UPI ऐप खोलें")}
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <p className="text-sm text-ink-soft">
+            {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
+              {merchant.vpa}
+            </span>
+            <button
+              type="button"
+              onClick={copyVpa}
+              className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+            >
+              {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
+            </button>
+            <a
+              href={upiUri}
+              className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon-dark"
+            >
+              {t("Open UPI app", "UPI ऐप खोलें")}
+            </a>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="mt-3 text-sm font-medium text-maroon">{error}</p>}
+
+      <button
+        type="button"
+        onClick={markPaid}
+        disabled={submitting}
+        className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+      >
+        {submitting
+          ? t("Recording…", "दर्ज हो रहा है…")
+          : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
+      </button>
+    </div>
+  );
+}
+
 /* ─── Step 4 · Confirm (review + coupon + payment) ───────────────────  */
 function StepConfirm({
   t,
@@ -1571,6 +1735,9 @@ function StepConfirm({
   couponError,
   discount,
   grandTotal,
+  bookingId,
+  paidAmount,
+  onPaid,
   confirming,
   confirmError,
   onConfirm,
@@ -1596,6 +1763,9 @@ function StepConfirm({
   couponError: string;
   discount: number;
   grandTotal: number;
+  bookingId: string;
+  paidAmount: number;
+  onPaid: (amount: number) => void;
   confirming: boolean;
   confirmError: string;
   onConfirm: () => void;
@@ -1766,13 +1936,28 @@ function StepConfirm({
             {money(grandTotal)}
           </p>
         </div>
-        <p className="mt-1 text-sm text-ink-soft">
-          {t(
-            "No advance needed to book — our team will reach out to finalise the menu and payment.",
-            "बुकिंग के लिए कोई एडवांस नहीं — मेन्यू और भुगतान तय करने के लिए हमारी टीम आपसे संपर्क करेगी।",
-          )}
-        </p>
+        {paidAmount >= Math.round(grandTotal) ? (
+          <p className="mt-1 text-sm font-semibold text-maroon">
+            ✓ {t("Paid in full", "पूरा भुगतान हो गया")} · {money(paidAmount)}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-ink-soft">
+            {t(
+              "Pay in full now via UPI / QR below, or book without paying — our team will reach out to finalise the menu and payment.",
+              "नीचे UPI / QR से अभी पूरा भुगतान करें, या बिना भुगतान बुक करें — मेन्यू और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।",
+            )}
+          </p>
+        )}
       </div>
+
+      {/* Full payment via UPI / QR (optional). */}
+      <PaymentBox
+        t={t}
+        bookingId={bookingId}
+        amount={Math.round(grandTotal)}
+        paid={paidAmount >= Math.round(grandTotal)}
+        onPaid={() => onPaid(Math.round(grandTotal))}
+      />
 
       {confirmError && (
         <p role="alert" className="mt-4 text-sm font-medium text-maroon">

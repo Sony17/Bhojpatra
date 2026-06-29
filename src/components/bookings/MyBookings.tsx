@@ -8,6 +8,7 @@ import {
   downloadReceipt,
   type StoredBooking,
 } from "@/lib/bookings";
+import { downloadInvoice } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
 
 const ALL = "All" as const;
@@ -213,8 +214,12 @@ function BookingCard({ booking }: { booking: StoredBooking }) {
       ? Math.min(100, Math.round((booking.paid / booking.amount) * 100))
       : 0;
 
-  // Download just this order's receipt — not any other booking.
-  const handleDownloadMenu = () => downloadReceipt(booking);
+  // Download just this order's invoice — not any other booking. Older orders
+  // saved before invoices existed fall back to the plain-text receipt PDF.
+  const handleDownloadMenu = () =>
+    booking.invoice
+      ? downloadInvoice(booking.invoice)
+      : downloadReceipt(booking);
 
   return (
     <li
