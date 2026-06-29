@@ -31,10 +31,10 @@ export default function SiteLoader() {
       <div className="site-loader__art">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/watermark-pot.png"
+          src="/bhojpatra-loader.png"
           alt="bhojpatra"
-          width={421}
-          height={534}
+          width={493}
+          height={506}
           className="site-loader__logo"
         />
         <div className="site-loader__dots">

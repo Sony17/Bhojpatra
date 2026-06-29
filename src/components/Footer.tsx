@@ -7,8 +7,33 @@ export default function Footer() {
   const { lang, t } = useLang();
   return (
     <>
-      <section className="bg-cream text-black">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-14 sm:py-16 lg:grid-cols-2">
+      <section className="bg-maroon-dark">
+        <div className="mx-auto flex max-w-7xl items-center justify-center gap-4 border-y border-cream/10 px-5 py-10 text-center sm:gap-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/bhoj7.png"
+            alt=""
+            width={424}
+            height={538}
+            className="h-12 w-auto shrink-0 sm:h-16"
+          />
+          <p className="font-display text-xl leading-snug text-cream sm:text-2xl">
+            {t("Har Celebration Khaas Hai,", "हर सेलिब्रेशन खास है,")}
+            <br />
+            {t("Bhojpatra Ke Saath Aur Bhi Yaadgaar Hai.", "भोजपत्र के साथ और भी यादगार है।")}
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/bhoj7.png"
+            alt=""
+            width={424}
+            height={538}
+            className="h-12 w-auto shrink-0 sm:h-16"
+          />
+        </div>
+      </section>
+      <section className="bg-white text-black">
+        <div className="mx-auto grid max-w-7xl origin-top scale-75 items-center gap-10 px-5 py-14 sm:py-16 lg:grid-cols-2">
           <div className="text-center lg:text-left">
             <span className="inline-flex items-center gap-2 rounded-full bg-maroon px-3 py-1 text-xs font-semibold tracking-wide text-cream">
               <span className="h-1.5 w-1.5 rounded-full bg-cream" />
@@ -47,26 +72,37 @@ export default function Footer() {
             </div>
           </div>
           <div className="flex justify-center lg:justify-end">
-            <div className="relative h-[420px] w-[210px] rounded-[2.5rem] bg-black p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.45)]">
-              <div className="absolute left-1/2 top-3 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
-              <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-maroon px-5 pt-10 text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/bhoj7.png"
-                  alt=""
-                  width={424}
-                  height={538}
-                  className="h-20 w-auto"
-                />
-                <span className="font-display mt-3 text-2xl leading-none text-cream">bhojpatra</span>
-                <p className="mt-2 text-[11px] text-cream/70">
-                  {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
-                </p>
-                <div className="mt-5 w-full space-y-2.5">
-                  <div className="h-9 rounded-xl bg-cream/15" />
-                  <div className="h-9 rounded-xl bg-cream/15" />
-                  <div className="h-9 rounded-xl bg-cream/15" />
-                  <div className="mt-4 h-10 rounded-xl bg-cream" />
+            <div className="relative h-[460px] w-full max-w-md">
+              {/* sweets backdrop */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/bhoj_Hero_1.png"
+                alt=""
+                className="absolute inset-0 h-full w-full rounded-[2rem] object-cover"
+              />
+              <div className="absolute inset-0 rounded-[2rem] bg-cream/10" />
+              {/* tilted phone */}
+              <div className="absolute left-1/2 top-1/2 h-[420px] w-[210px] -translate-x-1/2 -translate-y-1/2 -rotate-[8deg] rounded-[2.5rem] bg-black p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
+                <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
+                  <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-maroon px-5 pt-10 text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/bhoj7.png"
+                    alt=""
+                    width={424}
+                    height={538}
+                    className="h-20 w-auto"
+                  />
+                  <span className="font-display mt-3 text-2xl leading-none text-cream">bhojpatra</span>
+                  <p className="mt-2 text-[11px] text-cream/70">
+                    {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
+                  </p>
+                  <div className="mt-5 w-full space-y-2.5">
+                    <div className="h-9 rounded-xl bg-cream/15" />
+                    <div className="h-9 rounded-xl bg-cream/15" />
+                    <div className="h-9 rounded-xl bg-cream/15" />
+                    <div className="mt-4 h-10 rounded-xl bg-cream" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -138,30 +174,6 @@ export default function Footer() {
             <p className="mt-1 text-sm text-cream/70">+91 12345 67890</p>
             <p className="mt-1 text-sm text-cream/70">www.bhojpatra.com</p>
           </div>
-        </div>
-
-        <div className="mt-10 flex items-center justify-center gap-4 border-t border-cream/10 pt-8 text-center sm:gap-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/bhoj7.png"
-            alt=""
-            width={424}
-            height={538}
-            className="h-12 w-auto shrink-0 sm:h-16"
-          />
-          <p className="font-display text-xl leading-snug text-cream sm:text-2xl">
-            {t("Har Celebration Khaas Hai,", "हर सेलिब्रेशन खास है,")}
-            <br />
-            {t("Bhojpatra Ke Saath Aur Bhi Yaadgaar Hai.", "भोजपत्र के साथ और भी यादगार है।")}
-          </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/bhoj7.png"
-            alt=""
-            width={424}
-            height={538}
-            className="h-12 w-auto shrink-0 sm:h-16"
-          />
         </div>
 
         <div className="mt-10 border-t border-cream/10 pt-6 text-center text-xs text-cream/50">
