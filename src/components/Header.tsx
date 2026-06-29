@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { clearSession, dashboardPath, useSession } from "@/lib/session";
 import LanguageToggle from "./LanguageToggle";
 import MobileTabBar from "./MobileTabBar";
 
@@ -55,14 +57,98 @@ function Logo() {
   );
 }
 
+/** Signed-in account menu — name + dashboard/logout, shown in place of the
+ *  Log In / Sign Up buttons once a session exists. */
+function AccountMenu() {
+  const { t } = useLang();
+  const router = useRouter();
+  const session = useSession();
+
+  if (!session) {
+    return (
+      <>
+        <Link
+          href="/login"
+          className="rounded-md border border-maroon/40 px-5 py-2 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
+        >
+          {t("Log In", "लॉग इन")}
+        </Link>
+        <Link
+          href="/signup"
+          className="btn-sheen rounded-md bg-maroon px-5 py-2 text-sm font-medium text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
+        >
+          {t("Sign Up", "साइन अप")}
+        </Link>
+      </>
+    );
+  }
+
+  const name = session.name?.trim();
+  const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
+  const initial = (name || label).charAt(0).toUpperCase();
+
+  function handleLogout() {
+    clearSession();
+    router.push("/");
+  }
+
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        className="flex items-center gap-2 rounded-md border border-maroon/40 py-1.5 pl-1.5 pr-3 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-cream">
+          {initial}
+        </span>
+        <span className="max-w-[10rem] truncate">{label}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 12 12"
+          className="h-3 w-3 transition-transform group-hover:-rotate-180"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <path d="M3 4.5 6 7.5 9 4.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      <div className="invisible absolute right-0 top-full z-50 w-52 translate-y-2 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <ul className="overflow-hidden rounded-xl border border-maroon-dark/40 bg-cream shadow-xl shadow-maroon/20">
+          <li className="border-b border-maroon/10">
+            <Link
+              href={dashboardPath(session.type)}
+              className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5 hover:text-maroon"
+            >
+              {t("My Dashboard", "मेरा डैशबोर्ड")}
+            </Link>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="block w-full px-4 py-3 text-left text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
+            >
+              {t("Log Out", "लॉग आउट")}
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export default function Header() {
-  const { lang, t } = useLang();
+  const { lang } = useLang();
   return (
     <header className="absolute inset-x-0 top-0 z-50">
-      {/* Soft scrim so the logo + nav lift off the bright hero artwork */}
+      {/* Light scrim so the maroon logo + dark nav stay legible over the now
+          dark, vibrant hero artwork. Solid cream at the very top, fading to
+          transparent so the photo still breathes below the header. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-32 bg-gradient-to-b from-cream-2/90 via-cream-2/50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-cream-2 via-cream-2/85 to-transparent"
       />
       <div className="animate-fade mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5">
         <Logo />
@@ -133,18 +219,7 @@ export default function Header() {
         {/* Desktop auth buttons + language toggle */}
         <div className="hidden items-center gap-2.5 lg:flex">
           <LanguageToggle />
-          <Link
-            href="/login"
-            className="rounded-md border border-maroon/40 px-5 py-2 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
-          >
-            {t("Log In", "लॉग इन")}
-          </Link>
-          <Link
-            href="/signup"
-            className="btn-sheen rounded-md bg-maroon px-5 py-2 text-sm font-medium text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
-          >
-            {t("Sign Up", "साइन अप")}
-          </Link>
+          <AccountMenu />
         </div>
 
         {/* Mobile language toggle — auth + nav live in the bottom tab bar */}

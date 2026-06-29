@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { occasions, packages, guestPresets } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
@@ -52,6 +53,18 @@ export default function BookingForm() {
   const [selectedPackage, setSelectedPackage] = useState<string>(
     packages.find((p) => p.popular)?.id ?? packages[0].id,
   );
+  const [eventDate, setEventDate] = useState<string>("");
+
+  // Submitting the form carries the chosen package, occasion, date and headcount
+  // into the full booking flow and lands on vendor selection (Step 2 of /book).
+  const bookParams = new URLSearchParams({
+    package: selectedPackage,
+    occasion,
+    guests,
+    step: "menu",
+  });
+  if (eventDate) bookParams.set("date", eventDate);
+  const bookHref = `/book?${bookParams.toString()}`;
 
   return (
     <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
@@ -117,6 +130,8 @@ export default function BookingForm() {
                   id="eventDate"
                   name="eventDate"
                   type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
                   autoComplete="off"
                   className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
                 />
@@ -235,12 +250,12 @@ export default function BookingForm() {
           </fieldset>
 
           <div>
-            <button
-              type="button"
-              className="btn-sheen w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
+            <Link
+              href={bookHref}
+              className="btn-sheen block w-full rounded-lg bg-maroon px-5 py-3 text-center text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
             >
               {t("Submit Booking Request", "बुकिंग अनुरोध भेजें")}
-            </button>
+            </Link>
             <p className="mt-3 text-center text-xs text-ink-soft">
               {t(
                 "Your data is safe with us. We will get back to you shortly to confirm your booking.",

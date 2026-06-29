@@ -2,7 +2,6 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingChat from "@/components/FloatingChat";
 import Hero from "@/components/sections/Hero";
-import PlanningFor from "@/components/sections/PlanningFor";
 import TopCategories from "@/components/sections/TopCategories";
 import Packages from "@/components/sections/Packages";
 import Gallery from "@/components/sections/Gallery";
@@ -16,7 +15,6 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         <Hero />
-        <PlanningFor />
         {/* Beige bands alternate (base ↔ deeper) so each section reads as a
             distinct zone flowing out of the hero — never white. The base
             tone comes from the page body; alt sections sit on a full-bleed

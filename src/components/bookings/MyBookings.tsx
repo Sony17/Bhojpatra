@@ -1,7 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { myBookings, type Booking, type BookingStatus } from "@/lib/data";
+import { useEffect, useMemo, useState } from "react";
+import { type BookingStatus } from "@/lib/data";
+import {
+  getStoredBookings,
+  onStoredBookingsChange,
+  downloadReceipt,
+  type StoredBooking,
+} from "@/lib/bookings";
 import { useLang } from "@/lib/i18n";
 
 const ALL = "All" as const;
@@ -35,28 +41,37 @@ const formatINR = (value: number) => inr.format(value);
 export default function MyBookings() {
   const { t } = useLang();
   const [filter, setFilter] = useState<Filter>(ALL);
+  // Bookings the user has actually made. Empty until they book through the
+  // wizard — loaded client-side from localStorage so the list starts empty.
+  const [bookings, setBookings] = useState<StoredBooking[]>([]);
+
+  useEffect(() => {
+    const load = () => setBookings(getStoredBookings());
+    load();
+    return onStoredBookingsChange(load);
+  }, []);
 
   const counts = useMemo(() => {
-    const confirmed = myBookings.filter((b) => b.status === "Confirmed").length;
-    const completed = myBookings.filter((b) => b.status === "Completed").length;
+    const confirmed = bookings.filter((b) => b.status === "Confirmed").length;
+    const completed = bookings.filter((b) => b.status === "Completed").length;
     // Outstanding balance across Confirmed + Pending bookings.
-    const dueAmount = myBookings
+    const dueAmount = bookings
       .filter((b) => b.status === "Confirmed" || b.status === "Pending")
       .reduce((sum, b) => sum + (b.amount - b.paid), 0);
     return {
-      total: myBookings.length,
+      total: bookings.length,
       confirmed,
       completed,
       dueAmount,
     };
-  }, []);
+  }, [bookings]);
 
   const results = useMemo(
     () =>
       filter === ALL
-        ? myBookings
-        : myBookings.filter((b) => b.status === filter),
-    [filter],
+        ? bookings
+        : bookings.filter((b) => b.status === filter),
+    [filter, bookings],
   );
 
   return (
@@ -189,7 +204,7 @@ function StatusBadge({ status }: { status: BookingStatus }) {
   }
 }
 
-function BookingCard({ booking }: { booking: Booking }) {
+function BookingCard({ booking }: { booking: StoredBooking }) {
   const { t } = useLang();
   const balance = booking.amount - booking.paid;
   const cancelled = booking.status === "Cancelled";
@@ -198,8 +213,8 @@ function BookingCard({ booking }: { booking: Booking }) {
       ? Math.min(100, Math.round((booking.paid / booking.amount) * 100))
       : 0;
 
-  // Stand-in for a real menu PDF — triggers the browser print dialog for now.
-  const handleDownloadMenu = () => window.print();
+  // Download just this order's receipt — not any other booking.
+  const handleDownloadMenu = () => downloadReceipt(booking);
 
   return (
     <li

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { packages, type PackageTier } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
@@ -94,6 +95,7 @@ function PricingCard({
   const popular = tier.popular === true;
   const tierName = lang === "hi" ? tier.nameHi : tier.name;
   const tagline = lang === "hi" ? tier.taglineHi : tier.tagline;
+  const pax = lang === "hi" ? tier.paxHi : tier.pax;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
 
   return (
@@ -130,6 +132,13 @@ function PricingCard({
           <span className="font-semibold text-maroon">@ {tier.price}</span>{" "}
           {lang === "hi" ? tier.unitHi : tier.unit}
         </p>
+
+        {/* Guest-count range this package serves. */}
+        {pax && (
+          <p className="mx-auto mt-3 rounded-full border border-maroon/20 bg-cream/40 px-3 py-1 text-center text-xs font-semibold tracking-wide text-maroon">
+            {pax}
+          </p>
+        )}
 
         {/* Tagline divider — a centred label flanked by hairlines. */}
         {tagline && (
@@ -179,17 +188,19 @@ function PricingCard({
           </div>
         )}
 
-        {/* CTA */}
+        {/* CTA — selecting a package carries it into the booking flow and lands
+            on vendor selection (Step 2 of /book) so the guest continues straight
+            into their order. */}
         <div className="mt-7">
-          <button
-            type="button"
+          <Link
+            href={`/book?package=${tier.id}&step=menu`}
             onClick={onSelect}
-            className="btn-sheen w-full rounded-xl bg-maroon px-5 py-3 text-sm font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+            className="btn-sheen block w-full rounded-xl bg-maroon px-5 py-3 text-center text-sm font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
           >
             {selected
-              ? `${t("Selected", "चयनित")} ✓`
+              ? `${t("Continue", "जारी रखें")} ${tierName} →`
               : `${t("Select", "चुनें")} ${tierName}`}
-          </button>
+          </Link>
         </div>
       </div>
     </div>

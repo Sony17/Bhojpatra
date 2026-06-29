@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
+import {
+  dashboardPath,
+  getSession,
+  setSession,
+  type AccountType,
+} from "@/lib/session";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -40,14 +47,94 @@ function EyeIcon({ off }: { off: boolean }) {
 
 export default function AuthForm({ mode }: { mode: Mode }) {
   const { t } = useLang();
+  const router = useRouter();
   const isSignup = mode === "signup";
   const isForgot = mode === "forgot";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [accountType, setAccountType] = useState<AccountType>("customer");
+  const [submitted, setSubmitted] = useState(false);
+  const [fullName, setFullName] = useState("");
+
+  const isVendor = accountType === "vendor";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // TODO: wire up to your auth backend.
+    if (isSignup) {
+      // Mock registration — persist the chosen role so the rest of the app
+      // can route this user to the right dashboard, then show a confirmation.
+      setSession({ type: accountType, name: fullName.trim() || undefined });
+      setSubmitted(true);
+      return;
+    }
+    // Mock login — no backend. Reuse the persisted role (set at signup) so the
+    // header reflects the signed-in user; default to a customer account.
+    const existing = getSession();
+    setSession(existing ?? { type: "customer" });
+    router.push(dashboardPath(existing?.type));
+  }
+
+  // ── Mock success screen (signup only) ──────────────────────────────────
+  if (isSignup && submitted) {
+    const displayName = fullName.trim();
+    return (
+      <div className="text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
+          ✓
+        </div>
+        <h1 className="font-display mt-6 text-2xl text-ink sm:text-3xl">
+          {isVendor
+            ? t("Vendor account created!", "वेंडर अकाउंट बन गया!")
+            : t("Account created!", "अकाउंट बन गया!")}
+        </h1>
+        <p className="mt-3 text-base text-ink-soft">
+          {displayName
+            ? t(`Welcome, ${displayName}. `, `स्वागत है, ${displayName}। `)
+            : ""}
+          {isVendor
+            ? t(
+                "Next, complete your business profile and KYC to start receiving bookings.",
+                "आगे, बुकिंग प्राप्त करना शुरू करने के लिए अपनी बिज़नेस प्रोफ़ाइल और केवाईसी पूरी करें।"
+              )
+            : t(
+                "You're all set to book your next feast.",
+                "आप अपना अगला भोज बुक करने के लिए तैयार हैं।"
+              )}
+        </p>
+
+        <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-cream-2 px-4 py-2 text-sm text-ink">
+          {t("Account Type", "अकाउंट प्रकार")}
+          <span className="font-semibold text-maroon">
+            {isVendor ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक")}
+          </span>
+        </span>
+
+        <div className="mt-8 flex flex-col gap-3">
+          <Link
+            href={dashboardPath(accountType)}
+            className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
+          >
+            {isVendor
+              ? t("Go to Vendor Dashboard", "वेंडर डैशबोर्ड पर जाएं")
+              : t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
+          </Link>
+          {isVendor && (
+            <Link
+              href="/vendor/register"
+              className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
+            >
+              {t("Complete Vendor Registration", "वेंडर रजिस्ट्रेशन पूरा करें")}
+            </Link>
+          )}
+          <Link
+            href="/login"
+            className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
+          >
+            {t("Go to Log In", "लॉग इन पर जाएं")}
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -62,10 +149,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </h1>
         <p className="mt-2 text-base text-ink-soft">
           {isSignup
-            ? t(
-                "Join Bhojpatra to book your next feast.",
-                "अपना अगला भोज बुक करने के लिए Bhojpatra से जुड़ें।"
-              )
+            ? isVendor
+              ? t(
+                  "Register your catering business on Bhojpatra.",
+                  "अपना कैटरिंग बिज़नेस Bhojpatra पर रजिस्टर करें।"
+                )
+              : t(
+                  "Join Bhojpatra to book your next feast.",
+                  "अपना अगला भोज बुक करने के लिए Bhojpatra से जुड़ें।"
+                )
             : isForgot
               ? t(
                   "Enter your email and we'll send you a reset link.",
@@ -78,11 +170,65 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </p>
       </header>
 
+      {isSignup && (
+        <div className="mb-6">
+          <span className="mb-2 block text-sm text-ink-soft">
+            {t("I want to register as", "मैं रजिस्टर करना चाहता हूं")}
+          </span>
+          <div
+            role="radiogroup"
+            aria-label={t("Registration type", "रजिस्ट्रेशन प्रकार")}
+            className="grid grid-cols-2 gap-2 rounded-xl border border-cream-3 bg-cream/40 p-1.5"
+          >
+            {([
+              {
+                value: "customer" as const,
+                label: t("Customer", "ग्राहक"),
+                hint: t("Book feasts", "भोज बुक करें"),
+              },
+              {
+                value: "vendor" as const,
+                label: t("Vendor", "वेंडर"),
+                hint: t("List catering", "कैटरिंग सूचीबद्ध करें"),
+              },
+            ]).map((opt) => {
+              const active = accountType === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setAccountType(opt.value)}
+                  className={
+                    "flex flex-col items-center rounded-lg px-4 py-2.5 text-center transition-colors " +
+                    (active
+                      ? "bg-maroon text-cream shadow-sm"
+                      : "text-ink-soft hover:bg-cream-2")
+                  }
+                >
+                  <span className="text-sm font-semibold">{opt.label}</span>
+                  <span
+                    className={
+                      "text-xs " + (active ? "text-cream/80" : "text-ink-soft/70")
+                    }
+                  >
+                    {opt.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {isSignup && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="fullName" className="text-sm text-ink-soft">
-              {t("Full Name", "पूरा नाम")}
+              {isVendor
+                ? t("Owner / Contact Name", "मालिक / संपर्क नाम")
+                : t("Full Name", "पूरा नाम")}
             </label>
             <input
               id="fullName"
@@ -90,7 +236,25 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               type="text"
               required
               autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder={t("Enter your full name", "अपना पूरा नाम दर्ज करें")}
+              className={inputClass}
+            />
+          </div>
+        )}
+
+        {isSignup && isVendor && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="businessName" className="text-sm text-ink-soft">
+              {t("Business Name", "बिज़नेस का नाम")}
+            </label>
+            <input
+              id="businessName"
+              name="businessName"
+              type="text"
+              required
+              placeholder={t("e.g. Awadhi Royal Caterers", "उदा. अवधी रॉयल कैटरर्स")}
               className={inputClass}
             />
           </div>
@@ -242,7 +406,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
         >
           {isSignup
-            ? t("Create Account", "अकाउंट बनाएं")
+            ? isVendor
+              ? t("Create Vendor Account", "वेंडर अकाउंट बनाएं")
+              : t("Create Account", "अकाउंट बनाएं")
             : isForgot
               ? t("Send Reset Link", "रीसेट लिंक भेजें")
               : t("Log In", "लॉग इन")}

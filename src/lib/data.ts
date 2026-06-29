@@ -53,6 +53,12 @@ export interface PackageTier {
   /** Short label shown under the price (e.g. "Fixed Menu"). */
   tagline?: string;
   taglineHi?: string;
+  /** Guest-count range the package serves (e.g. "50–300 Guests"). */
+  pax?: string;
+  paxHi?: string;
+  /** Min / max guests this package supports — enforced in the booking flow. */
+  minPax?: number;
+  maxPax?: number;
   features: PackageFeature[];
   /** Closing note above the CTA — one line per entry. */
   footnote?: string[];
@@ -301,6 +307,10 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "Fixed Menu",
     taglineHi: "फिक्स्ड मेन्यू",
+    pax: "50 – 300 Guests",
+    paxHi: "50 – 300 मेहमान",
+    minPax: 50,
+    maxPax: 300,
     image: img("photo-1490645935967-10de6ba17061"),
     features: [
       { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
@@ -327,6 +337,10 @@ export const packages: PackageTier[] = [
     popular: true,
     tagline: "Popular Choice",
     taglineHi: "लोकप्रिय विकल्प",
+    pax: "150 – 10,000 Guests",
+    paxHi: "150 – 10,000 मेहमान",
+    minPax: 150,
+    maxPax: 10_000,
     image: img("photo-1543339308-43e59d6b73a6"),
     features: [
       { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
@@ -350,6 +364,10 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "India's Best Vendors",
     taglineHi: "भारत के बेहतरीन वेंडर",
+    pax: "50 – 50,000 Guests",
+    paxHi: "50 – 50,000 मेहमान",
+    minPax: 50,
+    maxPax: 50_000,
     image: img("photo-1600891964599-f61ba0e24092"),
     features: [
       { label: "Luxury Experience", labelHi: "लग्ज़री अनुभव", heading: true },
@@ -362,7 +380,6 @@ export const packages: PackageTier[] = [
       { label: "Best Main Course Vendors", labelHi: "बेहतरीन मेन कोर्स वेंडर" },
       { label: "Premium Sweet Stalls", labelHi: "प्रीमियम स्वीट स्टॉल" },
       { label: "City, State & Pan-India Famous Names", labelHi: "शहर, राज्य और पैन इंडिया मशहूर नाम" },
-      { label: "50 to 50,000 Guests", labelHi: "50 से 50,000 मेहमान" },
     ],
     footnote: ["Hand-picked luxury vendors", "for an unforgettable feast"],
     footnoteHi: ["चुनिंदा लग्ज़री वेंडर", "एक यादगार भोज के लिए"],
@@ -1062,6 +1079,60 @@ export const menuCategories: MenuCategory[] = [
     ],
   },
   {
+    id: "chaat",
+    name: "Chaat",
+    nameHi: "चाट",
+    icon: "🥘",
+    blurb: "Tangy, street-style chaat counters.",
+    blurbHi: "चटपटे स्ट्रीट-स्टाइल चाट काउंटर।",
+    vendors: [
+      { id: "ch-tuesday", name: "Tuesday Chaat Corner", rating: 4.7, reviews: 150, perPlate: 55, image: vImg("photo-1601050690597-df0568f70950"),
+        items: mkItems("ch-tuesday", [["Golgappa / Pani Puri"], ["Aloo Tikki Chaat"], ["Papdi Chaat"], ["Dahi Bhalla"], ["Samosa Chaat"], ["Raj Kachori"]]) },
+      { id: "ch-royal", name: "Royal Chaat House", rating: 4.9, reviews: 195, perPlate: 65, image: vImg("photo-1606471191009-63994c53433b"),
+        items: mkItems("ch-royal", [["Raj Kachori"], ["Bhel Puri"], ["Sev Puri"], ["Dahi Puri"], ["Tikki Chaat"], ["Palak Chaat"]]) },
+      { id: "ch-lucknow", name: "Lucknow Chaat Bhandar", rating: 4.8, reviews: 142, perPlate: 50, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("ch-lucknow", [["Basket Chaat"], ["Matar Tikki"], ["Pani Puri"], ["Dahi Bhalla"], ["Papdi Chaat"], ["Bhel Counter"]]) },
+      { id: "ch-aradh", name: "Aradh Chaat Point", rating: 4.6, reviews: 118, perPlate: 45, image: vImg("photo-1606491956689-2ea866880c84"),
+        items: mkItems("ch-aradh", [["Pani Puri"], ["Sev Puri"], ["Aloo Tikki Chaat"], ["Dahi Puri"], ["Samosa Chaat"], ["Bhel Puri"]]) },
+    ],
+  },
+  {
+    id: "chinese",
+    name: "Chinese",
+    nameHi: "चाइनीज़",
+    icon: "🥡",
+    blurb: "Wok-fresh Indo-Chinese favourites.",
+    blurbHi: "वोक-फ्रेश इंडो-चाइनीज़ पसंदीदा।",
+    vendors: [
+      { id: "cn-wok", name: "Wok & Roll", rating: 4.7, reviews: 198, perPlate: 75, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("cn-wok", [["Veg Hakka Noodles"], ["Veg Manchurian"], ["Chilli Paneer"], ["Chicken Hakka Noodles", "non-veg"], ["Chilli Chicken", "non-veg"], ["Veg Fried Rice"]]) },
+      { id: "cn-dragon", name: "Dragon Dynasty", rating: 4.8, reviews: 224, perPlate: 85, image: vImg("photo-1473093295043-cdd812d0e601"),
+        items: mkItems("cn-dragon", [["Schezwan Noodles"], ["Chilli Paneer"], ["Veg Spring Roll"], ["Chicken Manchurian", "non-veg"], ["Schezwan Fried Rice"], ["Honey Chilli Potato"]]) },
+      { id: "cn-bamboo", name: "Bamboo House", rating: 4.6, reviews: 165, perPlate: 70, image: vImg("photo-1565895405227-31cffbe0cf86"),
+        items: mkItems("cn-bamboo", [["Veg Fried Rice"], ["Hakka Noodles"], ["Gobi Manchurian"], ["Crispy Chilli Baby Corn"], ["Chilli Chicken", "non-veg"], ["Hot & Sour Soup"]]) },
+      { id: "cn-mandarin", name: "Mandarin Express", rating: 4.7, reviews: 187, perPlate: 80, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("cn-mandarin", [["Chilli Paneer"], ["Schezwan Noodles"], ["Veg Manchurian"], ["Drums of Heaven", "non-veg"], ["Chicken Fried Rice", "non-veg"], ["Spring Roll"]]) },
+    ],
+  },
+  {
+    id: "south-indian",
+    name: "South Indian",
+    nameHi: "साउथ इंडियन",
+    icon: "🥥",
+    blurb: "Dosas, idlis and South Indian classics.",
+    blurbHi: "डोसा, इडली और साउथ इंडियन क्लासिक्स।",
+    vendors: [
+      { id: "si-dakshin", name: "Dakshin Delights", rating: 4.8, reviews: 232, perPlate: 70, image: vImg("photo-1630383249896-424e482df921"),
+        items: mkItems("si-dakshin", [["Masala Dosa"], ["Idli Sambar"], ["Medu Vada"], ["Uttapam"], ["Pongal"], ["Filter Coffee"]]) },
+      { id: "si-chettinad", name: "Chettinad Feast Co.", rating: 4.8, reviews: 212, perPlate: 80, image: vImg("photo-1565557623262-b51c2513a641"),
+        items: mkItems("si-chettinad", [["Ghee Roast Dosa"], ["Rava Dosa"], ["Curd Rice"], ["Sambar & Rasam"], ["Lemon Rice"], ["Mysore Bonda"]]) },
+      { id: "si-namma", name: "Namma Ruchi", rating: 4.7, reviews: 201, perPlate: 65, image: vImg("photo-1630383249896-424e482df921"),
+        items: mkItems("si-namma", [["Idli Sambar"], ["Set Dosa"], ["Vada"], ["Coconut Chutney"], ["Bisi Bele Bath"], ["Pongal"]]) },
+      { id: "si-madras", name: "Madras Tiffin Room", rating: 4.6, reviews: 158, perPlate: 60, image: vImg("photo-1565557623262-b51c2513a641"),
+        items: mkItems("si-madras", [["Plain Dosa"], ["Masala Dosa"], ["Idli"], ["Medu Vada"], ["Upma"], ["Filter Coffee"]]) },
+    ],
+  },
+  {
     id: "main",
     name: "Main Course",
     nameHi: "मेन कोर्स",
@@ -1100,14 +1171,32 @@ export const menuCategories: MenuCategory[] = [
 ];
 
 /**
+ * Which menu categories (and in what order) each package opens up in the
+ * booking builder. This MUST mirror the segments advertised on each package
+ * card in the home page <Packages> section, so the tabs a guest sees on /book
+ * match the package they selected.
+ *   • Silver  — fixed menu: welcome, starters, main course, sweet
+ *   • Gold    — multi-cuisine spread incl. live, chaat, chinese, south indian
+ *   • Platinum— premium curated segments
+ *   • Custom  — everything (build your own)
+ */
+export const packageCategories: Record<string, string[]> = {
+  silver: ["welcome", "starters", "main", "sweets"],
+  gold: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "main", "sweets"],
+  platinum: ["welcome", "starters", "chaat", "live", "main", "sweets"],
+  custom: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "main", "sweets"],
+};
+
+/**
  * How many items each package includes per category id. Drives the
  * "Sweets ×3" allowance strip and the "3/3 picked" counters in Step B.
+ * Keys are kept in step with `packageCategories` above.
  */
 export const packageCategoryItems: Record<string, Record<string, number>> = {
-  silver: { welcome: 1, starters: 2, live: 1, main: 3, sweets: 1 },
-  gold: { welcome: 1, starters: 5, live: 1, main: 5, sweets: 3 },
-  platinum: { welcome: 2, starters: 6, live: 2, main: 6, sweets: 4 },
-  custom: { welcome: 2, starters: 6, live: 2, main: 6, sweets: 4 },
+  silver: { welcome: 1, starters: 2, main: 3, sweets: 1 },
+  gold: { welcome: 1, starters: 5, live: 1, chaat: 2, chinese: 2, "south-indian": 2, main: 5, sweets: 3 },
+  platinum: { welcome: 2, starters: 6, chaat: 3, live: 2, main: 6, sweets: 4 },
+  custom: { welcome: 2, starters: 6, live: 2, chaat: 3, chinese: 3, "south-indian": 3, main: 6, sweets: 4 },
 };
 
 /** Base per-plate price for a package id (₹). Custom bills only what's chosen. */
@@ -1115,6 +1204,19 @@ export const packageBasePerPlate: Record<string, number> = {
   silver: 799,
   gold: 1199,
   platinum: 1599,
+  custom: 0,
+};
+
+/**
+ * Minimum advance-booking lead time (in days) each package needs before the
+ * event date — richer tiers source more vendors, so they need more notice.
+ * A package only appears once the chosen date is at least this many days away.
+ * Custom has no lead-time requirement (always available).
+ */
+export const packageLeadDays: Record<string, number> = {
+  silver: 7,
+  gold: 21,
+  platinum: 45,
   custom: 0,
 };
 
