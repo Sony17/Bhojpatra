@@ -1,8 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { cities, venues, type Venue } from "@/lib/data";
+import Link from "next/link";
+import { cities } from "@/lib/data";
+import {
+  staticBookableVenues,
+  mergeVenues,
+  fetchRegisteredVenues,
+  type BookableVenue,
+} from "@/lib/venues";
 import { useLang, type Lang, type Translate } from "@/lib/i18n";
 import ThemedSelect from "@/components/ThemedSelect";
 
@@ -27,17 +34,31 @@ export default function VenueExplorer() {
   const [city, setCity] = useState<string>(ALL);
   const [location, setLocation] = useState<string>(ALL);
 
+  // Start with the static seed catalogue (available without a round-trip), then
+  // fold in owner-registered venues once they load so a freshly-published venue
+  // shows up here right away.
+  const [venues, setVenues] = useState<BookableVenue[]>(staticBookableVenues);
+  useEffect(() => {
+    let active = true;
+    fetchRegisteredVenues().then((registered) => {
+      if (active && registered.length) setVenues(mergeVenues(registered));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Cities that have at least one venue, in the order defined in `cities`.
   const cityOptions = useMemo(
     () => cities.filter((c) => venues.some((v) => v.city === c.id)),
-    [],
+    [venues],
   );
 
   // Localities available for the chosen city (or across all cities).
   const locationOptions = useMemo(() => {
     const scoped = city === ALL ? venues : venues.filter((v) => v.city === city);
     return Array.from(new Set(scoped.map((v) => v.location))).sort();
-  }, [city]);
+  }, [city, venues]);
 
   const results = useMemo(
     () =>
@@ -46,7 +67,7 @@ export default function VenueExplorer() {
           (city === ALL || v.city === city) &&
           (location === ALL || v.location === location),
       ),
-    [city, location],
+    [city, location, venues],
   );
 
   // Changing city invalidates a previously-picked locality.
@@ -167,7 +188,7 @@ function VenueCard({
   lang,
   t,
 }: {
-  venue: Venue;
+  venue: BookableVenue;
   lang: Lang;
   t: Translate;
 }) {
@@ -178,55 +199,60 @@ function VenueCard({
   const capacityLabel =
     lang === "hi" ? venue.capacity.replace(/Guests/g, "मेहमान") : venue.capacity;
   return (
-    <li className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
-        <Image
-          src={venue.image}
-          alt={venue.name}
-          fill
-          sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
-          {typeLabel}
-        </span>
-      </div>
+    <li className="group flex">
+      <Link
+        href={`/venues/${venue.id}`}
+        className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+      >
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
+          <Image
+            src={venue.image}
+            alt={venue.name}
+            fill
+            sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
+            {typeLabel}
+          </span>
+        </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-display text-lg font-semibold text-ink">
-            {venue.name}
-          </h3>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
-            <span aria-hidden="true" className="text-gold">
-              ⭐
+        <div className="flex flex-1 flex-col p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-display text-lg font-semibold text-ink">
+              {venue.name}
+            </h3>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
+              <span aria-hidden="true" className="text-gold">
+                ⭐
+              </span>
+              {venue.rating}
             </span>
-            {venue.rating}
-          </span>
-        </div>
-
-        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
-          <span aria-hidden="true">📍</span>
-          {venue.location}, {cityName(venue.city)}
-        </p>
-
-        <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-soft">
-          <span aria-hidden="true">👥</span>
-          {capacityLabel}
-        </p>
-
-        <div className="mt-4 flex items-end justify-between border-t border-cream-3 pt-4">
-          <div>
-            <p className="text-xs text-ink-soft">{t("Starts at", "से शुरू")}</p>
-            <p className="font-display text-lg font-semibold text-maroon">
-              {venue.priceFrom}
-            </p>
           </div>
-          <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md">
-            {t("View Details", "विवरण देखें")}
-          </span>
+
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
+            <span aria-hidden="true">📍</span>
+            {venue.location}, {cityName(venue.city)}
+          </p>
+
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-soft">
+            <span aria-hidden="true">👥</span>
+            {capacityLabel}
+          </p>
+
+          <div className="mt-4 flex items-end justify-between border-t border-cream-3 pt-4">
+            <div>
+              <p className="text-xs text-ink-soft">{t("Starts at", "से शुरू")}</p>
+              <p className="font-display text-lg font-semibold text-maroon">
+                {venue.priceFrom}
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md">
+              {t("View & Book", "देखें और बुक करें")}
+            </span>
+          </div>
         </div>
-      </div>
+      </Link>
     </li>
   );
 }

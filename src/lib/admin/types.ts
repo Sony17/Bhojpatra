@@ -174,6 +174,10 @@ export interface AdminBooking {
   amount: number;
   paid: number;
   status: BookingStatus;
+  /** Referral attribution — present when a partner referred the booking. */
+  referralCode?: string;
+  referrerName?: string;
+  referrerType?: string;
 }
 
 export interface BookingQuery {

@@ -73,7 +73,15 @@ export default function BookingManagement() {
       header: "Booking",
       cell: (b) => (
         <div className="min-w-0">
-          <p className="font-medium text-ink">{b.customer}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-ink">{b.customer}</p>
+            {b.referralCode && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-[10px] font-semibold text-cream">
+                <span aria-hidden="true">★</span>
+                {b.referrerName ? `Ref: ${b.referrerName}` : "Referral"}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-ink-soft">{b.occasion} · {b.id}</p>
         </div>
       ),
@@ -140,6 +148,14 @@ export default function BookingManagement() {
               <Field label="City"><p className="text-sm text-ink">{selected.city}</p></Field>
               <Field label="Amount"><p className="font-display text-sm font-semibold text-ink">{money(selected.amount)}</p></Field>
               <Field label="Balance Due"><p className="font-display text-sm font-semibold text-maroon">{money(selected.amount - selected.paid)}</p></Field>
+              {selected.referralCode && (
+                <Field label="Referred By">
+                  <p className="text-sm text-ink">
+                    {selected.referrerName || "—"}{" "}
+                    <span className="text-ink-soft">({selected.referralCode})</span>
+                  </p>
+                </Field>
+              )}
             </dl>
 
             <div className="rounded-xl bg-cream-2 p-4">

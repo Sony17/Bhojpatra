@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
@@ -9,8 +9,10 @@ import {
   getSession,
   setSession,
   type AccountType,
+  type PartnerRole,
 } from "@/lib/session";
 import { setAdminSession, verifyAdmin } from "@/lib/adminAuth";
+import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -54,17 +56,64 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [accountType, setAccountType] = useState<AccountType>("customer");
+  const [partnerRole, setPartnerRole] = useState<PartnerRole>("individual");
   const [submitted, setSubmitted] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   const isVendor = accountType === "vendor";
+  const isPartner = accountType === "partner";
+  // Venue Owners onboard with in-house catering, so we collect their GST number.
+  const isVenuePartner = isPartner && partnerRole === "venue";
+
+  // Preselect the registration type when arriving from a "Become a Partner" /
+  // "List as a Vendor" CTA (e.g. /signup?type=vendor). Read in an effect so the
+  // server and first client render match — no Suspense boundary needed.
+  useEffect(() => {
+    if (!isSignup) return;
+    const type = new URLSearchParams(window.location.search).get("type");
+    if (type === "vendor" || type === "partner") setAccountType(type);
+  }, [isSignup]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isSignup) {
       // Mock registration — persist the chosen role so the rest of the app
       // can route this user to the right dashboard, then show a confirmation.
-      setSession({ type: accountType, name: fullName.trim() || undefined });
+      const name = fullName.trim();
+      if (isPartner) {
+        // Referral partners (Event Planners / Individual Referrers) get a unique
+        // code they share to attribute bookings, and land on the partner
+        // dashboard. Persist the partner so the booking wizard can resolve the
+        // code to a name and the admin can see who's referring.
+        const code = makeReferralCode(name);
+        setReferralCode(code);
+        setSession({
+          type: "partner",
+          name: name || undefined,
+          partnerType: partnerRole,
+          referralCode: code,
+          partnerRoles: [{ type: partnerRole, referralCode: code }],
+        });
+        const form = new FormData(e.currentTarget);
+        void fetch("/api/partners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            name,
+            type: partnerRole,
+            phone: String(form.get("mobile") ?? ""),
+            email: String(form.get("email") ?? ""),
+            gst: String(form.get("gst") ?? ""),
+          }),
+        }).catch(() => {
+          /* offline — session still holds the code; team follows up */
+        });
+        setSubmitted(true);
+        return;
+      }
+      setSession({ type: accountType, name: name || undefined });
       setSubmitted(true);
       return;
     }
@@ -99,7 +148,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <h1 className="font-display mt-6 text-2xl text-ink sm:text-3xl">
           {isVendor
             ? t("Vendor account created!", "वेंडर अकाउंट बन गया!")
-            : t("Account created!", "अकाउंट बन गया!")}
+            : isPartner
+              ? t("Partner account created!", "पार्टनर अकाउंट बन गया!")
+              : t("Account created!", "अकाउंट बन गया!")}
         </h1>
         <p className="mt-3 text-base text-ink-soft">
           {displayName
@@ -110,31 +161,57 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                 "Next, complete your business profile and KYC to start receiving bookings.",
                 "आगे, बुकिंग प्राप्त करना शुरू करने के लिए अपनी बिज़नेस प्रोफ़ाइल और केवाईसी पूरी करें।"
               )
-            : t(
-                "You're all set to book your next feast.",
-                "आप अपना अगला भोज बुक करने के लिए तैयार हैं।"
-              )}
+            : isPartner
+              ? t(
+                  "Share your referral code below. Every feast booked with it is tagged to you.",
+                  "नीचे दिया अपना रेफ़रल कोड साझा करें। इससे बुक हुआ हर भोज आपके नाम टैग होगा।"
+                )
+              : t(
+                  "You're all set to book your next feast.",
+                  "आप अपना अगला भोज बुक करने के लिए तैयार हैं।"
+                )}
         </p>
 
         <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-cream-2 px-4 py-2 text-sm text-ink">
           {t("Account Type", "अकाउंट प्रकार")}
           <span className="font-semibold text-maroon">
-            {isVendor ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक")}
+            {isVendor
+              ? t("Vendor", "वेंडर")
+              : isPartner
+                ? PARTNER_ROLE_LABEL[partnerRole]
+                : t("Customer", "ग्राहक")}
           </span>
         </span>
+
+        {isPartner && referralCode && (
+          <div className="mt-5 rounded-xl border border-maroon/30 bg-maroon-soft px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Your Referral Code", "आपका रेफ़रल कोड")}
+            </p>
+            <p className="font-display mt-1 text-2xl font-bold tracking-wider text-maroon">
+              {referralCode}
+            </p>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-col gap-3">
           <Link
             href={dashboardPath(accountType)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
           >
             {isVendor
               ? t("Go to Vendor Dashboard", "वेंडर डैशबोर्ड पर जाएं")
-              : t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
+              : isPartner
+                ? t("Go to Partner Dashboard", "पार्टनर डैशबोर्ड पर जाएं")
+                : t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
           </Link>
           {isVendor && (
             <Link
               href="/vendor/register"
+              target="_blank"
+              rel="noopener noreferrer"
               className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
             >
               {t("Complete Vendor Registration", "वेंडर रजिस्ट्रेशन पूरा करें")}
@@ -142,6 +219,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           )}
           <Link
             href="/login"
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
           >
             {t("Go to Log In", "लॉग इन पर जाएं")}
@@ -168,10 +247,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   "Register your catering business on Bhojpatra.",
                   "अपना कैटरिंग बिज़नेस Bhojpatra पर रजिस्टर करें।"
                 )
-              : t(
-                  "Join Bhojpatra to book your next feast.",
-                  "अपना अगला भोज बुक करने के लिए Bhojpatra से जुड़ें।"
-                )
+              : isPartner
+                ? t(
+                    "Refer feasts to Bhojpatra and earn on every confirmed booking.",
+                    "Bhojpatra को भोज रेफ़र करें और हर पुष्ट बुकिंग पर कमाएं।"
+                  )
+                : t(
+                    "Join Bhojpatra to book your next feast.",
+                    "अपना अगला भोज बुक करने के लिए Bhojpatra से जुड़ें।"
+                  )
             : isForgot
               ? t(
                   "Enter your email and we'll send you a reset link.",
@@ -192,7 +276,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           <div
             role="radiogroup"
             aria-label={t("Registration type", "रजिस्ट्रेशन प्रकार")}
-            className="grid grid-cols-2 gap-2 rounded-xl border border-cream-3 bg-cream/40 p-1.5"
+            className="grid grid-cols-3 gap-2 rounded-xl border border-cream-3 bg-cream/40 p-1.5"
           >
             {([
               {
@@ -205,6 +289,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                 label: t("Vendor", "वेंडर"),
                 hint: t("List catering", "कैटरिंग सूचीबद्ध करें"),
               },
+              {
+                value: "partner" as const,
+                label: t("Partner", "पार्टनर"),
+                hint: t("Refer & earn", "रेफ़र करें और कमाएं"),
+              },
             ]).map((opt) => {
               const active = accountType === opt.value;
               return (
@@ -215,7 +304,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   aria-checked={active}
                   onClick={() => setAccountType(opt.value)}
                   className={
-                    "flex flex-col items-center rounded-lg px-4 py-2.5 text-center transition-colors " +
+                    "flex flex-col items-center rounded-lg px-3 py-2.5 text-center transition-colors " +
                     (active
                       ? "bg-maroon text-cream shadow-sm"
                       : "text-ink-soft hover:bg-cream-2")
@@ -233,6 +322,73 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               );
             })}
           </div>
+
+          {/* Referral partner sub-types — revealed once "Partner" is chosen. */}
+          {isPartner && (
+            <div className="mt-3">
+              <span className="mb-2 block text-sm text-ink-soft">
+                {t("How will you refer?", "आप कैसे रेफ़र करेंगे?")}
+              </span>
+              <div
+                role="radiogroup"
+                aria-label={t("Partner type", "पार्टनर प्रकार")}
+                className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+              >
+                {([
+                  {
+                    value: "planner" as const,
+                    icon: "📋",
+                    title: t("Event Planner", "इवेंट प्लानर"),
+                    hint: t("Refer client bookings", "क्लाइंट बुकिंग रेफ़र करें"),
+                  },
+                  {
+                    value: "individual" as const,
+                    icon: "🙋",
+                    title: t("Individual Referrer", "व्यक्तिगत रेफ़रर"),
+                    hint: t("Refer & earn", "रेफ़र करें और कमाएं"),
+                  },
+                  {
+                    value: "venue" as const,
+                    icon: "🏛️",
+                    title: t("Venue Owner", "वेन्यू मालिक"),
+                    hint: t("Banquet halls & venues", "बैंक्वेट हॉल और वेन्यू"),
+                  },
+                ]).map((opt) => {
+                  const active = partnerRole === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setPartnerRole(opt.value)}
+                      className={
+                        "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors " +
+                        (active
+                          ? "border-maroon bg-maroon text-cream shadow-sm"
+                          : "border-cream-3 bg-cream/40 text-ink hover:border-maroon/40 hover:bg-cream-2")
+                      }
+                    >
+                      <span aria-hidden="true" className="text-lg leading-none">
+                        {opt.icon}
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="text-sm font-semibold">{opt.title}</span>
+                        <span
+                          className={
+                            "text-xs " +
+                            (active ? "text-cream/80" : "text-ink-soft/70")
+                          }
+                        >
+                          {opt.hint}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -272,6 +428,38 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               className={inputClass}
             />
           </div>
+        )}
+
+        {isSignup && isVenuePartner && (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="venueName" className="text-sm text-ink-soft">
+                {t("Venue Name", "वेन्यू का नाम")}
+              </label>
+              <input
+                id="venueName"
+                name="venueName"
+                type="text"
+                required
+                placeholder={t("e.g. Grand Lawns & Banquet", "उदा. ग्रैंड लॉन्स एंड बैंक्वेट")}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="gst" className="text-sm text-ink-soft">
+                {t("GST Number", "GST नंबर")}
+              </label>
+              <input
+                id="gst"
+                name="gst"
+                type="text"
+                required
+                autoCapitalize="characters"
+                placeholder={t("15-digit GSTIN", "15 अंकों का GSTIN")}
+                className={inputClass}
+              />
+            </div>
+          </>
         )}
 
         <div className="flex flex-col gap-1.5">
@@ -315,6 +503,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             {!isSignup && (
               <Link
                 href="/forgot-password"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm font-medium text-maroon hover:text-maroon-dark"
               >
                 {t("Forgot password?", "पासवर्ड भूल गए?")}
@@ -394,11 +584,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             />
             <span>
               {t("I agree to the", "मैं सहमत हूं")}{" "}
-              <Link href="/terms" className="font-medium text-maroon hover:text-maroon-dark">
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:text-maroon-dark">
                 {t("Terms of Service", "सेवा की शर्तें")}
               </Link>{" "}
               {t("and", "और")}{" "}
-              <Link href="/terms" className="font-medium text-maroon hover:text-maroon-dark">
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:text-maroon-dark">
                 {t("Privacy Policy", "गोपनीयता नीति")}
               </Link>
               {t(".", "से।")}
@@ -422,7 +612,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           {isSignup
             ? isVendor
               ? t("Create Vendor Account", "वेंडर अकाउंट बनाएं")
-              : t("Create Account", "अकाउंट बनाएं")
+              : isPartner
+                ? t("Create Partner Account", "पार्टनर अकाउंट बनाएं")
+                : t("Create Account", "अकाउंट बनाएं")
             : isForgot
               ? t("Send Reset Link", "रीसेट लिंक भेजें")
               : t("Log In", "लॉग इन")}
@@ -433,6 +625,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         {isForgot ? (
           <Link
             href="/login"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-semibold text-maroon hover:text-maroon-dark"
           >
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
@@ -444,6 +638,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
             <Link
               href={isSignup ? "/login" : "/signup"}
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-semibold text-maroon hover:text-maroon-dark"
             >
               {isSignup

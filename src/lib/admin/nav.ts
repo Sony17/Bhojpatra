@@ -12,6 +12,7 @@ export type NavIconKey =
   | "approvals"
   | "customers"
   | "leads"
+  | "referrals"
   | "bookings"
   | "payments"
   | "coupons"
@@ -30,6 +31,7 @@ export const adminNav: AdminNavItem[] = [
   { label: "Vendor Approvals", href: "/admin/vendor-approvals", iconKey: "approvals" },
   { label: "Customers & Bookings", href: "/admin/customers", iconKey: "customers" },
   { label: "Lead Generation", href: "/admin/leads", iconKey: "leads" },
+  { label: "Referrals", href: "/admin/referrals", iconKey: "referrals" },
   { label: "Payments", href: "/admin/payments", iconKey: "payments" },
   { label: "Coupons", href: "/admin/coupons", iconKey: "coupons" },
   { label: "Content Control", href: "/admin/content", iconKey: "content" },

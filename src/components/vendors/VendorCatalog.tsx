@@ -676,6 +676,8 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
           </div>
           <Link
             href="/book"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
             {t("View & Compare", "देखें और तुलना करें")}

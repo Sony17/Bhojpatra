@@ -37,7 +37,7 @@ export default function AuthLayout({
           className="pointer-events-none absolute inset-0 bg-gradient-to-b from-maroon/85 via-maroon/70 to-maroon-dark/90"
         />
 
-        <Link href="/" className="relative z-10 inline-flex w-fit">
+        <Link href="/" target="_blank" rel="noopener noreferrer" className="relative z-10 inline-flex w-fit">
           <CreamLogo className="h-14 w-[222px]" />
         </Link>
 
@@ -67,7 +67,7 @@ export default function AuthLayout({
       {/* Form column */}
       <div className="flex flex-1 flex-col px-5 py-8 sm:px-8 lg:py-12">
         {/* Mobile logo (brand panel is hidden on small screens) */}
-        <Link href="/" className="mb-8 inline-flex w-fit lg:hidden">
+        <Link href="/" target="_blank" rel="noopener noreferrer" className="mb-8 inline-flex w-fit lg:hidden">
           <Image
             src="/bhojpatra-logo.png"
             alt="Bhojpatra"

@@ -1,10 +1,10 @@
 /**
  * Invoice PDF generator.
  *
- * Renders a branded, itemised "TAX INVOICE" as a real PDF — no third-party
- * library. The builder supports text (Helvetica / Helvetica-Bold for labels,
- * Courier for right-aligned amounts so column widths stay exact), filled
- * rectangles (header band, table header, totals band) and rules, with
+ * Renders a branded, boutique "TAX INVOICE" as a real PDF — no third-party
+ * library. The builder supports measured text (Helvetica / Helvetica-Bold via
+ * embedded AFM widths, so proportional text can be centred and right-aligned
+ * exactly), letter-spacing, filled rectangles, stroked frames and rules, with
  * automatic page breaks. The standard-14 fonts only cover Latin-1, so glyphs
  * like ₹ are transliterated (₹ → "Rs ").
  */
@@ -45,9 +45,9 @@ export interface InvoiceData {
 /* ── Geometry & brand palette (RGB 0–1; brand colours only) ──────────────── */
 const PAGE_W = 612;
 const PAGE_H = 792;
-const MX = 40; // left/right margin
+const MX = 44; // left/right content margin
 const RIGHT = PAGE_W - MX;
-const BOTTOM = 56; // bottom margin before a page break
+const BOTTOM = 96; // bottom margin (reserves room for the footer band)
 
 type RGB = [number, number, number];
 const MAROON: RGB = [0.725, 0.125, 0.145]; // #B92025
@@ -57,10 +57,46 @@ const WHITE: RGB = [1, 1, 1];
 
 const F_REG = "F1"; // Helvetica
 const F_BOLD = "F2"; // Helvetica-Bold
-const F_MONO = "F3"; // Courier (monospace → exact right-alignment)
+const F_MONO = "F3"; // Courier (every glyph 600/1000)
 
 const nf = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `Rs ${nf.format(Math.round(n))}`;
+
+/* ── Font metrics (AFM advance widths, units / 1000 em, codes 32–126) ────── */
+// prettier-ignore
+const W_HELV = [
+  278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,
+  278,278,584,584,584,556,1015,
+  667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  278,278,278,469,556,333,
+  556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
+  334,260,334,584,
+];
+// prettier-ignore
+const W_BOLD = [
+  278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,
+  333,333,584,584,584,611,975,
+  722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  333,278,333,584,556,333,
+  556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
+  389,280,389,584,
+];
+
+function charWidth(code: number, font: string): number {
+  if (font === F_MONO) return 600;
+  if (code < 32 || code > 126) return 556;
+  return (font === F_BOLD ? W_BOLD : W_HELV)[code - 32];
+}
+
+/** Width of a (Latin-1 cleaned) string in points, including letter-spacing. */
+function measure(s: string, font: string, size: number, tracking = 0): number {
+  const clean = toLatin1(s);
+  let w = 0;
+  for (let i = 0; i < clean.length; i++) w += charWidth(clean.charCodeAt(i), font);
+  return (w * size) / 1000 + tracking * Math.max(0, clean.length - 1);
+}
 
 function escapePdfText(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -88,21 +124,45 @@ class Pdf {
   }
 
   /** Absolute-positioned text (origin bottom-left; `y` is the baseline). */
-  text(x: number, y: number, s: string, size: number, font: string, color: RGB) {
+  text(
+    x: number,
+    y: number,
+    s: string,
+    size: number,
+    font: string,
+    color: RGB,
+    tracking = 0,
+  ) {
     this.ops +=
-      `BT /${font} ${size} Tf ${this.rgb(color)} ` +
+      `BT /${font} ${size} Tf ${tracking} Tc ${this.rgb(color)} ` +
       `1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm (${escapePdfText(toLatin1(s))}) Tj ET\n`;
   }
 
-  /** Right-aligned monospace text, so numeric columns line up exactly. */
-  textRight(xRight: number, y: number, s: string, size: number, color: RGB) {
-    const clean = toLatin1(s);
-    const w = clean.length * size * 0.6; // Courier advance = 0.6em
-    this.text(xRight - w, y, s, size, F_MONO, color);
+  /** Right-aligned text, measured so numeric columns line up exactly. */
+  textRight(xRight: number, y: number, s: string, size: number, font: string, color: RGB) {
+    this.text(xRight - measure(s, font, size), y, s, size, font, color);
+  }
+
+  /** Horizontally centred text. */
+  textCenter(
+    cx: number,
+    y: number,
+    s: string,
+    size: number,
+    font: string,
+    color: RGB,
+    tracking = 0,
+  ) {
+    this.text(cx - measure(s, font, size, tracking) / 2, y, s, size, font, color, tracking);
   }
 
   rect(x: number, y: number, w: number, h: number, color: RGB) {
     this.ops += `${this.rgb(color)} ${x} ${y} ${w} ${h} re f\n`;
+  }
+
+  /** Stroked (outline-only) rectangle — for cards and decorative frames. */
+  rectS(x: number, y: number, w: number, h: number, color: RGB, width = 0.8) {
+    this.ops += `${this.rgb(color, true)} ${width} w ${x} ${y} ${w} ${h} re S\n`;
   }
 
   line(x1: number, y1: number, x2: number, y2: number, color: RGB, width = 0.6) {
@@ -111,11 +171,13 @@ class Pdf {
 
   /** Break to a fresh page if `space` points won't fit above the bottom margin. */
   ensure(space: number) {
-    if (this.y - space < BOTTOM) {
-      this.pages.push(this.ops);
-      this.ops = "";
-      this.y = PAGE_H - 50;
-    }
+    if (this.y - space < BOTTOM) this.newPage();
+  }
+
+  newPage() {
+    this.pages.push(this.ops);
+    this.ops = "";
+    this.y = PAGE_H - 56;
   }
 
   finish(): Uint8Array<ArrayBuffer> {
@@ -169,103 +231,139 @@ class Pdf {
 export function buildInvoicePdf(data: InvoiceData): Uint8Array<ArrayBuffer> {
   const p = new Pdf();
 
-  // Header band.
-  p.rect(0, PAGE_H - 92, PAGE_W, 92, MAROON);
-  p.text(MX, PAGE_H - 46, "bhojpatra", 24, F_BOLD, WHITE);
-  p.text(MX, PAGE_H - 64, "Premium Catering & Feasts", 9, F_REG, CREAM);
-  p.text(400, PAGE_H - 40, "TAX INVOICE", 15, F_BOLD, WHITE);
-  p.text(400, PAGE_H - 58, `Invoice No: ${data.id}`, 9, F_REG, CREAM);
-  p.text(400, PAGE_H - 72, `Date: ${data.dateLabel}`, 9, F_REG, CREAM);
-  p.y = PAGE_H - 92 - 26;
+  /* Masthead — full-bleed maroon band with an inset cream frame. */
+  const HEAD = 116;
+  p.rect(0, PAGE_H - HEAD, PAGE_W, HEAD, MAROON);
+  p.rectS(14, PAGE_H - HEAD + 12, PAGE_W - 28, HEAD - 24, CREAM, 0.8);
 
-  // Billed-to / event block.
-  p.text(MX, p.y, "BILLED TO / EVENT", 9, F_BOLD, MAROON);
-  p.y -= 15;
-  const details: [string, string][] = [
-    ["Occasion", data.occasion],
-    ["Package", data.packageName],
-    ["Event Date", data.eventDate],
-    ["Guests", nf.format(data.guests)],
-    ["City", data.city],
-    ["Venue", data.venue],
-  ];
-  details.forEach(([label, value]) => {
-    p.text(MX, p.y, `${label}:`, 9, F_REG, BLACK);
-    p.text(MX + 90, p.y, value || "-", 9, F_BOLD, BLACK);
-    p.y -= 14;
-  });
-  p.y -= 8;
+  p.text(MX, PAGE_H - 56, "bhojpatra", 30, F_BOLD, CREAM);
+  p.text(MX + 2, PAGE_H - 74, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.2);
 
-  // Line-item table header.
-  p.rect(MX, p.y - 5, RIGHT - MX, 19, CREAM);
-  p.text(MX + 6, p.y, "DESCRIPTION", 9, F_BOLD, MAROON);
-  p.textRight(RIGHT - 6, p.y, "AMOUNT", 9, MAROON);
-  p.y -= 22;
+  p.textRight(RIGHT, PAGE_H - 50, "TAX INVOICE", 15, F_BOLD, WHITE);
+  p.textRight(RIGHT, PAGE_H - 70, `Invoice No.  ${data.id}`, 9, F_REG, CREAM);
+  p.textRight(RIGHT, PAGE_H - 84, `Date  ${data.dateLabel}`, 9, F_REG, CREAM);
 
-  // Line-item rows.
+  p.y = PAGE_H - HEAD - 34;
+
+  /* Section helper — small-caps maroon label with a short accent rule. */
+  const sectionLabel = (s: string) => {
+    p.text(MX, p.y, s, 9, F_BOLD, MAROON, 1.6);
+    p.line(MX, p.y - 6, MX + 34, p.y - 6, MAROON, 1.4);
+    p.y -= 22;
+  };
+
+  /* Event details — balanced two-column grid. */
+  sectionLabel("EVENT DETAILS");
+  const COL2 = 312;
+  const field = (x: number, label: string, value: string) => {
+    p.text(x, p.y, label, 8.5, F_REG, MAROON);
+    p.text(x, p.y - 12, value || "-", 10, F_BOLD, BLACK);
+  };
+  field(MX, "OCCASION", data.occasion);
+  field(COL2, "PACKAGE", data.packageName);
+  p.y -= 30;
+  field(MX, "EVENT DATE", data.eventDate);
+  field(COL2, "GUESTS", nf.format(data.guests));
+  p.y -= 30;
+  field(MX, "CITY", data.city);
+  field(COL2, "VENUE", data.venue);
+  p.y -= 34;
+
+  /* Itemised charges table. */
+  sectionLabel("CHARGES");
+  p.rect(MX, p.y - 7, RIGHT - MX, 21, CREAM);
+  p.text(MX + 10, p.y, "DESCRIPTION", 8.5, F_BOLD, MAROON, 1);
+  p.textRight(RIGHT - 10, p.y, "AMOUNT", 8.5, F_BOLD, MAROON);
+  p.y -= 25;
+
   data.lines.forEach((ln) => {
     p.ensure(16);
-    p.text(MX + 6, p.y, ln.label, 9, F_REG, BLACK);
-    p.textRight(RIGHT - 6, p.y, money(ln.amount), 9, BLACK);
-    p.y -= 14;
-    p.line(MX, p.y + 4, RIGHT, p.y + 4, CREAM, 0.4);
+    p.text(MX + 10, p.y, ln.label, 9.5, F_REG, BLACK);
+    p.textRight(RIGHT - 10, p.y, money(ln.amount), 9.5, F_REG, BLACK);
+    p.y -= 16;
+    p.line(MX, p.y + 5, RIGHT, p.y + 5, CREAM, 0.4);
   });
-  p.y -= 8;
+  p.y -= 12;
 
-  // Totals (right-hand stack).
-  const labelX = 360;
+  /* Totals stack (right column). */
+  const labelX = 372;
   const totalRow = (label: string, value: string, color: RGB = BLACK) => {
     p.ensure(15);
-    p.text(labelX, p.y, label, 9, F_REG, color);
-    p.textRight(RIGHT - 6, p.y, value, 9, color);
-    p.y -= 15;
+    p.text(labelX, p.y, label, 9.5, F_REG, color);
+    p.textRight(RIGHT - 10, p.y, value, 9.5, F_REG, color);
+    p.y -= 16;
   };
   totalRow("Subtotal", money(data.subtotal));
-  totalRow("Add-ons", money(data.addOnsTotal));
+  if (data.addOnsTotal > 0) totalRow("Add-ons", money(data.addOnsTotal));
   if (data.discount > 0) totalRow("Discount", `- ${money(data.discount)}`, MAROON);
   totalRow("GST (18%)", money(data.gst));
+  p.y -= 8;
 
-  // Grand-total band.
-  p.ensure(24);
-  p.rect(labelX - 6, p.y - 4, RIGHT - (labelX - 6), 21, MAROON);
-  p.text(labelX, p.y, "GRAND TOTAL", 10, F_BOLD, WHITE);
-  p.textRight(RIGHT - 6, p.y, money(data.grandTotal), 11, WHITE);
-  p.y -= 26;
+  /* Grand-total showpiece — full-width maroon band, oversized amount. */
+  p.ensure(70);
+  const bandTop = p.y;
+  const BANDH = 52;
+  p.rect(MX, bandTop - BANDH, RIGHT - MX, BANDH, MAROON);
+  p.text(MX + 18, bandTop - 21, "GRAND TOTAL", 12, F_BOLD, CREAM, 2);
+  p.text(MX + 18, bandTop - 37, "Total amount for your event", 8, F_REG, WHITE);
+  p.textRight(RIGHT - 18, bandTop - 33, money(data.grandTotal), 27, F_BOLD, WHITE);
+  p.y = bandTop - BANDH - 26;
 
-  // Payment status.
-  totalRow("Paid", money(data.paid));
+  /* Payment status — Paid + Balance cards side by side. */
   const balance = Math.max(0, Math.round(data.grandTotal) - Math.round(data.paid));
-  totalRow("Balance Due", money(balance), balance > 0 ? MAROON : BLACK);
-  p.y -= 10;
+  p.ensure(54);
+  const cardTop = p.y;
+  const CARDH = 48;
+  const gap = 16;
+  const cardW = (RIGHT - MX - gap) / 2;
+  const paidX = MX;
+  const balX = MX + cardW + gap;
 
-  // Menu selections.
+  p.rectS(paidX, cardTop - CARDH, cardW, CARDH, CREAM, 1);
+  p.text(paidX + 14, cardTop - 16, "AMOUNT PAID", 8, F_BOLD, MAROON, 1.4);
+  p.text(paidX + 14, cardTop - 36, money(data.paid), 15, F_BOLD, BLACK);
+
+  if (balance > 0) {
+    p.rect(balX, cardTop - CARDH, cardW, CARDH, MAROON);
+    p.text(balX + 14, cardTop - 16, "BALANCE DUE", 8, F_BOLD, CREAM, 1.4);
+    p.text(balX + 14, cardTop - 36, money(balance), 15, F_BOLD, WHITE);
+  } else {
+    p.rectS(balX, cardTop - CARDH, cardW, CARDH, CREAM, 1);
+    p.text(balX + 14, cardTop - 16, "BALANCE DUE", 8, F_BOLD, MAROON, 1.4);
+    p.text(balX + 14, cardTop - 35, "PAID IN FULL", 13, F_BOLD, MAROON, 1);
+  }
+  p.y = cardTop - CARDH - 28;
+
+  /* Menu selections. */
   if (data.menu.length > 0) {
-    p.ensure(24);
-    p.line(MX, p.y + 6, RIGHT, p.y + 6, CREAM, 0.6);
-    p.text(MX, p.y, "MENU SELECTIONS", 9, F_BOLD, MAROON);
-    p.y -= 16;
+    p.ensure(30);
+    sectionLabel("MENU SELECTIONS");
     data.menu.forEach((g) => {
-      p.ensure(14);
-      p.text(MX, p.y, g.heading, 9, F_BOLD, BLACK);
-      p.y -= 12;
-      wrap(g.items, 96).forEach((row) => {
+      p.ensure(16);
+      p.rect(MX, p.y - 1, 3, 10, MAROON);
+      p.text(MX + 12, p.y, g.heading, 9.5, F_BOLD, BLACK);
+      p.y -= 14;
+      wrap(g.items, 92).forEach((row) => {
         p.ensure(12);
-        p.text(MX + 10, p.y, row, 8.5, F_REG, BLACK);
+        p.text(MX + 12, p.y, row, 8.5, F_REG, BLACK);
         p.y -= 11;
       });
-      p.y -= 4;
+      p.y -= 6;
     });
   }
 
-  // Footer note.
-  p.ensure(18);
-  p.text(
-    MX,
-    p.y,
-    "Thank you for choosing Bhojpatra. This is a computer-generated invoice and needs no signature.",
+  /* Footer band — anchored to the bottom of the (last) page. */
+  if (p.y < BOTTOM + 20) p.newPage();
+  p.line(0, 78, PAGE_W, 78, CREAM, 0.8);
+  p.rect(0, 30, PAGE_W, 44, CREAM);
+  p.textCenter(PAGE_W / 2, 56, "Thank you for choosing Bhojpatra", 12, F_BOLD, MAROON);
+  p.textCenter(
+    PAGE_W / 2,
+    41,
+    "Premium Catering & Feasts   -   This is a computer-generated invoice and needs no signature.",
     8,
     F_REG,
-    BLACK,
+    MAROON,
   );
 
   return p.finish();
@@ -286,6 +384,63 @@ function wrap(s: string, max: number): string[] {
   }
   if (cur) out.push(cur);
   return out.length ? out : [""];
+}
+
+/* ── Shareable links ─────────────────────────────────────────────────────── */
+// The whole invoice travels inside a URL-safe token so a link can be opened
+// without any backend (see the public /bookings/invoice viewer). UTF-8 safe so
+// occasion/venue text in any script survives the round-trip.
+
+function bytesToB64url(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const b64 =
+    typeof btoa !== "undefined"
+      ? btoa(bin)
+      : Buffer.from(bin, "binary").toString("base64");
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function b64urlToBytes(s: string): Uint8Array {
+  const b64 =
+    s.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (s.length % 4)) % 4);
+  const bin =
+    typeof atob !== "undefined"
+      ? atob(b64)
+      : Buffer.from(b64, "base64").toString("binary");
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Serialise an invoice to a compact, URL-safe token. */
+export function encodeInvoice(data: InvoiceData): string {
+  return bytesToB64url(new TextEncoder().encode(JSON.stringify(data)));
+}
+
+/** Parse a token back into invoice data, or `null` if it is malformed. */
+export function decodeInvoice(token: string): InvoiceData | null {
+  try {
+    const data = JSON.parse(new TextDecoder().decode(b64urlToBytes(token)));
+    if (
+      !data ||
+      typeof data.id !== "string" ||
+      !Array.isArray(data.lines) ||
+      !Array.isArray(data.menu)
+    ) {
+      return null;
+    }
+    return data as InvoiceData;
+  } catch {
+    return null;
+  }
+}
+
+/** Full, shareable URL that renders this invoice in the public viewer. */
+export function invoiceShareUrl(data: InvoiceData): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}/bookings/invoice?d=${encodeInvoice(data)}`;
 }
 
 /** Trigger a browser download of the invoice as a PDF. */

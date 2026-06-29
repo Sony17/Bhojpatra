@@ -41,7 +41,7 @@ const partnerIcons: Record<string, React.ReactNode> = {
 function Logo() {
   const { t } = useLang();
   return (
-    <Link href="/" className="flex flex-col gap-0 leading-none">
+    <Link href="/" target="_blank" rel="noopener noreferrer" className="flex flex-col gap-0 leading-none">
       <Image
         src="/bhojpatra-logo.png"
         alt="Bhojpatra"
@@ -69,12 +69,16 @@ function AccountMenu() {
       <>
         <Link
           href="/login"
+          target="_blank"
+          rel="noopener noreferrer"
           className="rounded-md border border-maroon/40 px-5 py-2 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
         >
           {t("Log In", "लॉग इन")}
         </Link>
         <Link
           href="/signup"
+          target="_blank"
+          rel="noopener noreferrer"
           className="btn-sheen rounded-md bg-maroon px-5 py-2 text-sm font-medium text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
         >
           {t("Sign Up", "साइन अप")}
@@ -119,6 +123,8 @@ function AccountMenu() {
           <li className="border-b border-maroon/10">
             <Link
               href={dashboardPath(session.type)}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5 hover:text-maroon"
             >
               {t("My Dashboard", "मेरा डैशबोर्ड")}
@@ -158,6 +164,8 @@ export default function Header() {
             <div key={link.label} className="group relative">
               <a
                 href={link.href.startsWith("#") ? `/${link.href}` : link.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="link-underline flex items-center gap-1 transition-colors group-hover:text-maroon"
               >
                 {lang === "hi" ? link.labelHi : link.label}
@@ -177,18 +185,20 @@ export default function Header() {
 
               {link.items && (
                 <div className="invisible absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                  <ul className="overflow-hidden rounded-2xl border border-maroon-dark/40 bg-maroon shadow-xl shadow-maroon/30 [&_a]:[text-shadow:none]">
+                  <ul className="overflow-hidden rounded-2xl border border-maroon/15 bg-white shadow-xl shadow-maroon/20 [&_a]:[text-shadow:none]">
                     {link.items.map((item) => (
-                      <li key={item.title} className="border-b border-cream/15 last:border-b-0">
+                      <li key={item.title} className="border-b border-maroon/10 last:border-b-0">
                         <a
                           href={item.href}
-                          className="group/item flex items-center gap-4 px-5 py-4 transition-colors hover:bg-maroon-dark"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group/item flex items-center gap-4 px-5 py-4 transition-colors hover:bg-maroon/5"
                         >
-                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream/15 ring-1 ring-cream/25 transition-transform duration-300 group-hover/item:scale-110">
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-maroon/10 ring-1 ring-maroon/20 transition-transform duration-300 group-hover/item:scale-110">
                             <svg
                               aria-hidden="true"
                               viewBox="0 0 24 24"
-                              className="h-6 w-6 text-cream"
+                              className="h-6 w-6 text-maroon"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="1.6"
@@ -199,10 +209,10 @@ export default function Header() {
                             </svg>
                           </span>
                           <span className="flex flex-col leading-tight">
-                            <span className="text-base font-bold text-cream">
+                            <span className="text-base font-bold text-maroon">
                               {lang === "hi" ? item.titleHi : item.title}
                             </span>
-                            <span className="text-sm font-normal text-cream/70">
+                            <span className="text-sm font-normal text-ink/60">
                               {lang === "hi" ? item.subtitleHi : item.subtitle}
                             </span>
                           </span>

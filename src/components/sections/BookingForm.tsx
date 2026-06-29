@@ -268,6 +268,8 @@ export default function BookingForm() {
           <div>
             <Link
               href={bookHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn-sheen block w-full rounded-lg bg-maroon px-5 py-3 text-center text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
             >
               {t("Submit Booking Request", "बुकिंग अनुरोध भेजें")}

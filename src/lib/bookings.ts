@@ -10,6 +10,7 @@
 
 import type { Booking } from "@/lib/data";
 import type { InvoiceData } from "@/lib/invoice";
+import type { EmiPlan } from "@/lib/emi";
 
 /** A booked order, plus the receipt text used by the per-order download. */
 export interface StoredBooking extends Booking {
@@ -18,6 +19,11 @@ export interface StoredBooking extends Booking {
   /** Itemised invoice data so the order can be re-downloaded as a PDF invoice.
    *  Optional for backward-compatibility with orders saved before invoices. */
   invoice?: InvoiceData;
+  /** Free-text special requests the customer added when editing the booking. */
+  note?: string;
+  /** Instalment schedule for the balance after the 10% advance, when the guest
+   *  chose to pay the rest in EMIs. Absent for single-payment / unpaid orders. */
+  emiPlan?: EmiPlan;
 }
 
 const KEY = "bhojpatra.bookings";
@@ -49,6 +55,24 @@ export function addStoredBooking(booking: StoredBooking): void {
   }
 }
 
+/** Merge a patch into one stored booking (by id) and notify open views. Used
+ *  by the My Bookings editor — leaves every other order untouched. */
+export function updateStoredBooking(
+  id: string,
+  patch: Partial<StoredBooking>,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const next = getStoredBookings().map((b) =>
+      b.id === id ? { ...b, ...patch } : b,
+    );
+    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(CHANGED_EVENT));
+  } catch {
+    /* storage unavailable (private mode) — ignore for the mock */
+  }
+}
+
 /** Subscribe to stored-booking changes (same tab + other tabs). Returns an
  *  unsubscribe function. */
 export function onStoredBookingsChange(listener: () => void): () => void {
@@ -61,6 +85,32 @@ export function onStoredBookingsChange(listener: () => void): () => void {
   return () => {
     window.removeEventListener(CHANGED_EVENT, listener);
     window.removeEventListener("storage", storage);
+  };
+}
+
+/** The invoice for a booking — its stored itemised invoice when present, or a
+ *  minimal one synthesised from the summary fields (older orders saved before
+ *  invoices existed) so Download / Share / preview always have something real
+ *  to render. GST shows as 0 on the fallback since the split isn't stored. */
+export function bookingInvoice(b: StoredBooking): InvoiceData {
+  if (b.invoice) return b.invoice;
+  return {
+    id: b.id,
+    dateLabel: b.date,
+    occasion: b.occasion,
+    eventDate: b.date,
+    city: b.city,
+    venue: "-",
+    guests: b.guests,
+    packageName: b.vendor,
+    lines: [{ label: `${b.occasion} — ${b.vendor}`, amount: b.amount }],
+    menu: [],
+    subtotal: b.amount,
+    addOnsTotal: 0,
+    discount: 0,
+    gst: 0,
+    grandTotal: b.amount,
+    paid: b.paid,
   };
 }
 

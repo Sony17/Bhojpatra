@@ -216,6 +216,8 @@ export default function Gallery() {
       <div className="mt-6 flex justify-center px-5">
         <Link
           href="/book"
+          target="_blank"
+          rel="noopener noreferrer"
           className="btn-sheen group inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream shadow-[0_14px_24px_-8px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:-translate-y-0.5 active:scale-95"
         >
           {lang === "hi" ? gallery.ctaHi : gallery.cta}

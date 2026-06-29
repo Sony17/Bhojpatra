@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import ThemedSelect from "@/components/ThemedSelect";
@@ -76,25 +77,45 @@ export default function PartnerLanding() {
   return (
     <>
       {/* ─── 1. HERO BAND ─────────────────────────────────────────────── */}
-      <section className="bg-maroon text-cream">
-        <div className="mx-auto max-w-7xl px-5 pb-20 pt-28 sm:pb-24 sm:pt-32">
+      {/* Mirrors the home hero: a full-bleed feast photo with a slow ken-burns
+          drift, a soft white wash for legibility, and ink headline + maroon
+          accent — no red flood over the background. */}
+      <section className="relative isolate flex min-h-[88vh] flex-col overflow-hidden bg-surface-beige text-ink">
+        <div aria-hidden="true" className="absolute inset-0 -z-10">
+          <Image
+            src="/bhoj_Hero_1.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="animate-kenburns object-cover object-center"
+          />
+        </div>
+        {/* Readability scrim — soft on the left where the copy sits, fading to
+            reveal the golden feast spread on the right (the home hero's look). */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-gradient-to-r from-white/80 via-white/45 to-white/5"
+        />
+
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-5 pb-20 pt-32 sm:pt-36 lg:pb-24 lg:pt-44">
           <div className="max-w-2xl">
-            <p className="eyebrow text-xs font-semibold text-gold-soft">
+            <p className="eyebrow text-xs font-semibold text-maroon">
               {t("Partner With Bhojpatra", "Bhojpatra के साथ जुड़ें")}
             </p>
-            <h1 className="font-display mt-4 text-3xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="font-display mt-4 text-[2.75rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl lg:text-7xl">
               {t(
                 "Grow your catering business with India's feast platform",
                 "भारत के फीस्ट प्लेटफ़ॉर्म के साथ अपना कैटरिंग व्यवसाय बढ़ाएँ"
               )}
             </h1>
-            <p className="font-script mt-4 text-xl text-gold-soft sm:text-3xl">
+            <p className="font-script mt-4 text-xl text-maroon sm:text-3xl">
               {t(
                 "More feasts, more bookings, more growth.",
                 "ज़्यादा फीस्ट, ज़्यादा बुकिंग, ज़्यादा ग्रोथ।"
               )}
             </p>
-            <p className="mt-6 max-w-xl text-base text-cream/85 sm:text-lg">
+            <p className="mt-6 max-w-xl text-base text-ink-soft sm:text-lg">
               {t(
                 "Reach lakhs of customers planning celebrations across India. Get quality leads matched to your cuisine and city — with zero upfront cost. List free, get verified, and start receiving bookings.",
                 "पूरे भारत में आयोजन की योजना बना रहे लाखों ग्राहकों तक पहुँचें। अपने व्यंजन और शहर के अनुसार क्वालिटी लीड पाएँ — बिना किसी अग्रिम शुल्क के। मुफ़्त में लिस्ट करें, वेरिफ़ाई हों, और बुकिंग पाना शुरू करें।"
@@ -102,15 +123,15 @@ export default function PartnerLanding() {
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="#partner-enquiry"
-                className="rounded-full bg-cream px-6 py-3 text-center text-sm font-semibold text-maroon shadow-sm transition hover:bg-cream-2"
+              <Link
+                href="/signup?type=partner"
+                className="btn-sheen rounded-full bg-maroon px-6 py-3 text-center text-sm font-semibold text-cream shadow-[0_10px_30px_-12px_rgba(185,32,37,0.6)] transition hover:-translate-y-0.5 hover:bg-maroon-dark"
               >
                 {t("Become a Partner", "अभी जुड़ें")}
-              </a>
+              </Link>
               <Link
-                href="/vendor/register"
-                className="rounded-full border border-cream px-6 py-3 text-center text-sm font-semibold text-cream transition hover:bg-cream/10"
+                href="/signup?type=vendor"
+                className="rounded-full border border-maroon/60 bg-white/60 px-6 py-3 text-center text-sm font-semibold text-maroon backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white"
               >
                 {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}
               </Link>
@@ -121,10 +142,10 @@ export default function PartnerLanding() {
               {stats.map((s) => (
                 <li
                   key={s.label}
-                  className="rounded-full border border-cream/25 bg-cream/10 px-4 py-2 text-sm backdrop-blur-sm"
+                  className="rounded-full border border-maroon/20 bg-white/70 px-4 py-2 text-sm backdrop-blur-sm"
                 >
-                  <span className="font-semibold text-cream">{s.value}</span>{" "}
-                  <span className="text-cream/75">{s.label}</span>
+                  <span className="font-semibold text-ink">{s.value}</span>{" "}
+                  <span className="text-ink-soft">{s.label}</span>
                 </li>
               ))}
             </ul>
@@ -533,14 +554,14 @@ export default function PartnerLanding() {
             )}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <a
-              href="#partner-enquiry"
+            <Link
+              href="/signup?type=partner"
               className="rounded-full bg-cream px-6 py-3 text-center text-sm font-semibold text-maroon shadow-sm transition hover:bg-cream-2"
             >
               {t("Become a Partner", "अभी जुड़ें")}
-            </a>
+            </Link>
             <Link
-              href="/vendor/register"
+              href="/signup?type=vendor"
               className="rounded-full border border-cream px-6 py-3 text-center text-sm font-semibold text-cream transition hover:bg-cream/10"
             >
               {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}

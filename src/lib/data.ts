@@ -1318,6 +1318,12 @@ export interface Booking {
   amount: number;
   paid: number;
   status: BookingStatus;
+  /** Referral code this feast was booked with (when a partner referred it). */
+  referralCode?: string;
+  /** Display name of the referring partner, resolved at booking time. */
+  referrerName?: string;
+  /** Which kind of partner referred it — "planner" | "individual". */
+  referrerType?: string;
 }
 
 export const myBookings: Booking[] = [

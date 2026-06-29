@@ -16,6 +16,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   "vendor-approvals": "Vendor Approvals",
   customers: "Customers & Bookings",
   leads: "Lead Generation",
+  referrals: "Referrals",
   payments: "Payments",
   coupons: "Coupons",
   content: "Content Control",

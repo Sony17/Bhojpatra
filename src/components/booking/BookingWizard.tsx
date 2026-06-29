@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent } from "@/lib/homeContent";
+import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import { addStoredBooking } from "@/lib/bookings";
+import { fetchVenueById } from "@/lib/venues";
 import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
   buildUpiUri,
@@ -11,6 +14,19 @@ import {
   DEFAULT_MERCHANT,
   type UpiPayeeConfig,
 } from "@/lib/upi";
+import {
+  ORDER_PAYMENT_METHODS,
+  ORDER_PAYMENT_LABELS,
+  ORDER_PAYMENT_HINTS,
+  isOnlineMethod,
+  type OrderPaymentMethod,
+} from "@/lib/orderPayment";
+import {
+  emiOptionsForEvent,
+  buildEmiPlan,
+  formatEmiPlanText,
+  type EmiPlan,
+} from "@/lib/emi";
 import {
   occasions,
   cities,
@@ -22,24 +38,38 @@ import {
   packageCategoryItems,
   packageBasePerPlate,
   packageLeadDays,
+  vendorListings,
   type Occasion,
   type PackageTier,
   type AddOn,
   type MenuCategory,
   type CategoryItem,
   type Coupon,
+  type VendorListing,
 } from "@/lib/data";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
 const MAX_GUESTS = 50_000;
 const GST_RATE = 0.18;
+// Advance booking fee — guests can lock a date by paying this share of the
+// grand total up front (the rest is settled later with our team).
+const ADVANCE_RATE = 0.1;
 const TOTAL_STEPS = 4;
 // Large functions (1000+ guests) may split a single segment across vendors.
 const MULTI_VENDOR_MIN = 1000;
 
+// Which catalogue vendors a guest may assign to an add-on / counter depends on
+// the package they picked — each tier surfaces its own roster from the existing
+// vendor catalogue (`vendorListings`). A package id not listed here (Custom,
+// short-notice) opens the full catalogue.
+const PACKAGE_VENDOR_TIERS: Record<string, VendorListing["tier"][]> = {
+  silver: ["Silver"],
+  gold: ["Gold"],
+  platinum: ["Platinum"],
+};
+
 type Lang = "en" | "hi";
-type DietFilter = "all" | "veg" | "non-veg";
 type City = (typeof cities)[number];
 
 /** category id → chosen vendor ids. Most tiers hold a single id; Platinum
@@ -84,6 +114,19 @@ function packageAvailable(packageId: string, eventDate: string): boolean {
   return days >= (packageLeadDays[packageId] ?? 0);
 }
 
+/** The soonest `YYYY-MM-DD` a package can be booked for, given its lead time —
+ *  used as the date picker's `min` and to spell out the requirement in a
+ *  notice when the chosen date falls short. */
+function earliestDateFor(packageId: string): string {
+  const lead = packageLeadDays[packageId] ?? 0;
+  const d = new Date();
+  d.setDate(d.getDate() + lead);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function BookingWizard() {
   // Language is driven by the shared, site-wide context (Header toggle).
@@ -109,7 +152,22 @@ export default function BookingWizard() {
   const [eventDate, setEventDate] = useState<string>("");
   const [cityId, setCityId] = useState<string>("");
   const [venue, setVenue] = useState<string>("");
+  // When a venue is selected from the catalogue (/book?venue=ID), we resolve it
+  // to its name (above) plus a numeric booking fee that's folded into the feast
+  // total, invoice and receipt. A free-text venue (Hero bar) carries no fee.
+  const [venueFee, setVenueFee] = useState<number>(0);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  // add-on id → chosen vendor (catalogue) id. The roster a guest can choose
+  // from is narrowed to the selected package's tier (see PACKAGE_VENDOR_TIERS).
+  const [addOnVendor, setAddOnVendor] = useState<Record<string, string>>({});
+
+  // Referral attribution — a partner's code arrives via /book?ref=CODE or is
+  // typed on the Confirm step. We resolve it to the referrer's name so the
+  // booking can be tagged and surfaced on the partner's dashboard. Declared
+  // here (above the prefill/resolve effects below) so those effects can read it.
+  const [referralCode, setReferralCode] = useState<string>("");
+  const [referrerName, setReferrerName] = useState<string>("");
+  const [referrerType, setReferrerType] = useState<string>("");
 
   // Prefill occasion / date / city / venue from the Hero booking bar's query
   // params (e.g. /book?occasion=wedding&date=2026-07-19&city=lucknow). Read in
@@ -135,25 +193,85 @@ export default function BookingWizard() {
     // selection (Step 2) so they flow into the booking instead of re-picking.
     if (pkg && packages.some((p) => p.id === pkg)) setPackageId(pkg);
     if (stepParam === "menu") setStep(2);
+    // A partner's share link (/book?ref=CODE) pre-fills the referral code.
+    const ref = sp.get("ref");
+    if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
 
-  // When the chosen date can't meet the selected package's lead time, fall back
-  // to the first package the date does qualify for (Custom always qualifies).
+  // Resolve a venue passed by id (/book?venue=ID from the venue catalogue) to
+  // its name + booking fee, so the feast order folds the venue in. An unknown
+  // or free-text venue keeps the raw value with no fee.
   useEffect(() => {
-    if (packageAvailable(packageId, eventDate)) return;
-    const next = packages.find((p) => packageAvailable(p.id, eventDate));
-    if (next) setPackageId(next.id);
-  }, [eventDate, packageId]);
+    const venueParam = new URLSearchParams(window.location.search).get("venue");
+    if (!venueParam) return;
+    let active = true;
+    fetchVenueById(venueParam).then((v) => {
+      if (!active || !v) return;
+      setVenue(v.name);
+      setVenueFee(v.price);
+      setCityId((c) => c || v.city);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  // Step 4 — Confirm (coupon only; no advance payment is collected at booking)
+  // Resolve the referral code to the partner's name so the booking can show
+  // "Referred by …" and be attributed on their dashboard. An unknown code is
+  // still kept (and tagged) — the team reconciles it on follow-up.
+  useEffect(() => {
+    const code = referralCode.trim();
+    if (!code) {
+      setReferrerName("");
+      setReferrerType("");
+      return;
+    }
+    let active = true;
+    fetch(`/api/partners?code=${encodeURIComponent(code)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!active) return;
+        const p = data?.partner;
+        setReferrerName(p?.name ?? "");
+        setReferrerType(p?.type ?? "");
+      })
+      .catch(() => {
+        /* offline — keep the raw code, no resolved name */
+      });
+    return () => {
+      active = false;
+    };
+  }, [referralCode]);
+
+  // The chosen date must clear the selected package's lead time. We deliberately
+  // do NOT auto-switch the package here: silently downgrading (e.g. Platinum →
+  // Gold) stripped Platinum's multi-vendor menu out from under the guest without
+  // explanation. Instead we keep their pick and surface a lead-time notice +
+  // block "Next" (see `dateMeetsLead` / `nextBlockers`) so they choose a later
+  // date or a lower tier on purpose. Step 1 still hides too-soon tiers up front.
+
+  // Step 4 — Confirm (coupon + optional 10% advance / full payment)
   const [couponInput, setCouponInput] = useState<string>("");
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string>("");
   const [confirming, setConfirming] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string>("");
   const [confirmed, setConfirmed] = useState<boolean>(false);
-  // Amount the guest has settled up front via UPI/QR (0 until they pay in full).
+  // Amount the guest has settled up front via UPI/QR — the 10% advance, the
+  // full total, or 0 if they book without paying.
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  // Who to reach out to — captured on the Confirm step so COD / "connect"
+  // orders are actionable for our team in the admin console.
+  const [customerName, setCustomerName] = useState<string>("");
+  const [customerPhone, setCustomerPhone] = useState<string>("");
+  // How the guest wants to pay: UPI / QR settle online now; COD and Connect are
+  // arranged later. Defaults to UPI (pay-now).
+  const [payMethod, setPayMethod] = useState<OrderPaymentMethod>("UPI");
+  // After the 10% advance, how many EMIs the guest wants to split the balance
+  // into. `1` = settle the balance in one go (no EMI); 3 / 6 unlock with lead
+  // time. A count the chosen date no longer supports simply reads back as "no
+  // EMI" everywhere it's consumed (see the inclusion guards), so no reset needed.
+  const [emiCount, setEmiCount] = useState<number>(1);
 
   /* ─── Menu helpers ─────────────────────────────────────────────────── */
   // Short-notice dates can't be sourced for the regular tiers (Silver/Gold/
@@ -266,6 +384,20 @@ export default function BookingWizard() {
     setGuests((g) => Math.max(paxMin, Math.min(paxMax, g)));
   }, [paxMin, paxMax]);
 
+  // Does the chosen date clear the selected package's lead time? Empty date is
+  // treated as fine (the guest hasn't committed one yet). When it falls short we
+  // warn and block "Next" rather than silently swapping the package.
+  const dateMeetsLead = packageAvailable(packageId, eventDate);
+  const earliestDate = earliestDateFor(packageId);
+  const leadDays = packageLeadDays[packageId] ?? 0;
+  const leadWarning =
+    eventDate !== "" && !dateMeetsLead
+      ? t(
+          `${selectedPackage?.name ?? "This package"} needs ${leadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
+          `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${leadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
+        )
+      : "";
+
   const categoryAddTotal = useMemo<number>(
     () =>
       activeCategories.reduce((sum, cat) => {
@@ -292,11 +424,51 @@ export default function BookingWizard() {
     [selectedAddOns, guests],
   );
 
+  // Vendors a guest may assign to an add-on — the existing catalogue narrowed to
+  // the tier(s) the chosen package unlocks (Custom / short-notice: everyone).
+  const eligibleAddOnVendors = useMemo<VendorListing[]>(() => {
+    const tiers = PACKAGE_VENDOR_TIERS[packageId];
+    return tiers
+      ? vendorListings.filter((v) => tiers.includes(v.tier))
+      : vendorListings;
+  }, [packageId]);
+
+  // The vendor effectively assigned to an add-on. We honour the guest's explicit
+  // pick when it's still valid for the current package tier; otherwise we fall
+  // back to the first eligible vendor. Deriving this at read time (rather than
+  // reconciling stored state in an effect) keeps it correct when the package —
+  // and therefore the eligible roster — changes.
+  const addOnVendorId = (addOnId: string): string | undefined => {
+    const chosen = addOnVendor[addOnId];
+    if (chosen && eligibleAddOnVendors.some((v) => v.id === chosen)) return chosen;
+    return eligibleAddOnVendors[0]?.id;
+  };
+
+  const addOnVendorName = (addOnId: string): string | undefined =>
+    eligibleAddOnVendors.find((v) => v.id === addOnVendorId(addOnId))?.name;
+
+  // Toggle an add-on; clearing one also drops any explicit vendor pick for it.
+  const toggleAddOn = (id: string) => {
+    if (selectedAddOns.includes(id)) {
+      setSelectedAddOns(selectedAddOns.filter((x) => x !== id));
+      setAddOnVendor((m) => {
+        if (!(id in m)) return m;
+        const next = { ...m };
+        delete next[id];
+        return next;
+      });
+    } else {
+      setSelectedAddOns([...selectedAddOns, id]);
+    }
+  };
+
   const preDiscount = subtotal + addOnsTotal;
   const discount = appliedCoupon
     ? Math.min((preDiscount * appliedCoupon.percent) / 100, appliedCoupon.cap)
     : 0;
-  const taxable = preDiscount - discount;
+  // The venue booking fee (when a venue was selected) is taxed alongside the
+  // catering but isn't subject to the catering coupon.
+  const taxable = preDiscount - discount + venueFee;
   const gst = taxable * GST_RATE;
   const grandTotal = taxable + gst;
 
@@ -322,7 +494,8 @@ export default function BookingWizard() {
           occasionId !== "" &&
           guests >= paxMin &&
           guests <= paxMax &&
-          eventDate !== ""
+          eventDate !== "" &&
+          dateMeetsLead
         );
       default:
         return true;
@@ -330,10 +503,32 @@ export default function BookingWizard() {
   };
   const canNext = stepValid(step);
 
+  // When "Next" is disabled, spell out exactly what's still required on this
+  // step so the guest isn't staring at a dead button with no clue what to do.
+  const nextBlockers = ((): string[] => {
+    if (canNext) return [];
+    if (step === 1) {
+      return [t("Choose a package", "एक पैकेज चुनें")];
+    }
+    if (step === 3) {
+      const out: string[] = [];
+      if (occasionId === "") out.push(t("Select an occasion", "अवसर चुनें"));
+      if (eventDate === "") out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
+      else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
+      if (guests < paxMin || guests > paxMax) {
+        out.push(
+          t(
+            `Set guests between ${inr.format(paxMin)} and ${inr.format(paxMax)}`,
+            `मेहमानों की संख्या ${inr.format(paxMin)} से ${inr.format(paxMax)} के बीच रखें`,
+          ),
+        );
+      }
+      return out;
+    }
+    return [];
+  })();
+
   /* ─── Handlers ─────────────────────────────────────────────────────── */
-  const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) => {
-    setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
-  };
 
   const applyCoupon = () => {
     const code = couponInput.trim().toUpperCase();
@@ -349,6 +544,18 @@ export default function BookingWizard() {
 
   // A plain-text receipt for THIS order — used both for the download action and
   // for the saved booking that appears on the My Bookings page.
+  // The EMI plan to record on the order: the balance left after the advance,
+  // split into the chosen number of instalments. Only meaningful once the guest
+  // has paid an advance (not the full bill) and picked a real multi-EMI count —
+  // it's track-only, so this is purely a schedule our team collects against.
+  const buildEmiPlanForOrder = (): EmiPlan | undefined => {
+    const total = Math.round(grandTotal);
+    const balance = total - paidAmount;
+    if (emiCount <= 1 || paidAmount <= 0 || balance <= 0) return undefined;
+    if (!emiOptionsForEvent(eventDate).includes(emiCount)) return undefined;
+    return buildEmiPlan(balance, emiCount, eventDate);
+  };
+
   const buildReceipt = (): string => {
     const occ = occasions.find((o) => o.id === occasionId);
     const cityObj = cities.find((c) => c.id === cityId);
@@ -373,7 +580,10 @@ export default function BookingWizard() {
       .join("\n");
     const addOnLines = addOns
       .filter((a) => selectedAddOns.includes(a.id))
-      .map((a) => `  • ${a.name}`)
+      .map((a) => {
+        const vendor = addOnVendorName(a.id);
+        return vendor ? `  • ${a.name} — ${vendor}` : `  • ${a.name}`;
+      })
       .join("\n");
 
     const lines = [
@@ -396,11 +606,21 @@ export default function BookingWizard() {
       `Subtotal:    ${money(subtotal)}`,
       `Add-ons:     ${money(addOnsTotal)}`,
     );
+    if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
     lines.push(
       `GST (18%):   ${money(gst)}`,
       `Grand Total: ${money(grandTotal)}`,
     );
+    const emiPlan = buildEmiPlanForOrder();
+    if (emiPlan) {
+      lines.push(
+        "",
+        `Advance Paid: ${money(paidAmount)}`,
+        "Payment Plan (EMI):",
+        formatEmiPlanText(emiPlan),
+      );
+    }
     return lines.join("\n");
   };
 
@@ -443,13 +663,22 @@ export default function BookingWizard() {
     addOns
       .filter((a) => selectedAddOns.includes(a.id))
       .forEach((a) => {
+        const vendor = addOnVendorName(a.id);
+        const name = vendor ? `${a.name} — ${vendor}` : a.name;
         lines.push({
           label: a.perPlate
-            ? `${a.name} (${money(a.price)}/plate × ${guests})`
-            : a.name,
+            ? `${name} (${money(a.price)}/plate × ${guests})`
+            : name,
           amount: a.perPlate ? a.price * guests : a.price,
         });
       });
+
+    if (venueFee > 0) {
+      lines.push({
+        label: `${venue || "Venue"} — venue booking fee`,
+        amount: venueFee,
+      });
+    }
 
     return {
       id: bookingId,
@@ -504,10 +733,28 @@ export default function BookingWizard() {
       .join("\n");
     const addOnLines = addOns
       .filter((a) => selectedAddOns.includes(a.id))
-      .map((a) => a.name)
+      .map((a) => {
+        const vendor = addOnVendorName(a.id);
+        return vendor ? `${a.name} (${vendor})` : a.name;
+      })
       .join(", ");
+    // Surface the booking advance so the team sees, at a glance, whether a 10%
+    // advance has already been settled and what balance is still outstanding.
+    const advance = Math.round(grandTotal * ADVANCE_RATE);
+    const balance = Math.max(0, Math.round(grandTotal) - paidAmount);
+    const paymentLines =
+      paidAmount > 0
+        ? `\nPaid${paidAmount >= Math.round(grandTotal) ? " (full)" : " (advance)"}: ${money(paidAmount)}\nBalance Due: ${money(balance)}`
+        : `\nAdvance to confirm (10%): ${money(advance)}`;
+    const contactLines =
+      (customerName.trim() ? `Name: ${customerName.trim()}\n` : "") +
+      (customerPhone.trim() ? `Phone: ${customerPhone.trim()}\n` : "");
+    const emiPlan = buildEmiPlanForOrder();
+    const emiLines = emiPlan ? `\nPayment Plan (EMI):\n${formatEmiPlanText(emiPlan)}` : "";
     return (
       `Bhojpatra Feast Enquiry (${bookingId})\n` +
+      contactLines +
+      `Payment: ${ORDER_PAYMENT_LABELS[payMethod].en}\n` +
       `Occasion: ${occ ? occ.name : "-"}\n` +
       `Package: ${pkg ? `${pkg.name} (${pkg.price}${pkg.unit})` : "-"}\n` +
       `Date: ${eventDate || "-"}\n` +
@@ -516,7 +763,9 @@ export default function BookingWizard() {
       `Guests: ${guests}\n` +
       (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
       (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
-      `\nGrand Total: ${money(grandTotal)}`
+      `\nGrand Total: ${money(grandTotal)}` +
+      paymentLines +
+      emiLines
     );
   };
   const whatsappHref = `https://wa.me/919918359017?text=${encodeURIComponent(
@@ -536,38 +785,102 @@ export default function BookingWizard() {
     else if (allComplete) goNext();
   };
 
-  // No advance is collected at booking — confirm the request directly and save
-  // it so it shows up on the My Bookings page. Our team reaches out to finalise
-  // the menu and payment afterwards.
-  const handleConfirm = () => {
-    setConfirming(true);
+  // Confirm the request and save it so it shows up on the My Bookings page and,
+  // via /api/bookings, in the admin booking console — carrying the chosen
+  // payment method and whatever the guest paid up front (a 10% advance, the
+  // full total, or nothing for COD / "connect"). Our team reaches out to
+  // finalise the menu and collect any balance.
+  const handleConfirm = async () => {
     setConfirmError("");
+    // Contact is required so COD / connect orders are actionable.
+    if (!customerName.trim()) {
+      setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
+      return;
+    }
+    if (customerPhone.replace(/\D/g, "").length < 10) {
+      setConfirmError(
+        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+      );
+      return;
+    }
+
+    setConfirming(true);
     const occ = occasions.find((o) => o.id === occasionId);
     const cityObj = cities.find((c) => c.id === cityId);
-    // Unique vendor names across every chosen course.
+    // Unique vendor names across every chosen course, plus any vendor assigned
+    // to a selected add-on / counter.
     const vendorNames = Array.from(
       new Set(
-        activeCategories.flatMap((cat) => {
-          const chosen = categoryVendor[cat.id] ?? [];
-          return cat.vendors
-            .filter((v) => chosen.includes(v.id))
-            .map((v) => v.name);
-        }),
+        [
+          ...activeCategories.flatMap((cat) => {
+            const chosen = categoryVendor[cat.id] ?? [];
+            return cat.vendors
+              .filter((v) => chosen.includes(v.id))
+              .map((v) => v.name);
+          }),
+          ...selectedAddOns
+            .map((id) => addOnVendorName(id))
+            .filter((n): n is string => Boolean(n)),
+        ],
       ),
     );
+    const vendorLabel =
+      vendorNames.join(", ") || (selectedPackage?.name ?? "Bhojpatra");
+
+    const emiPlan = buildEmiPlanForOrder();
+
     addStoredBooking({
       id: bookingId,
       occasion: occ?.name ?? "Feast",
       date: formatEventDate(eventDate),
       guests,
-      vendor: vendorNames.join(", ") || (selectedPackage?.name ?? "Bhojpatra"),
+      vendor: vendorLabel,
       city: cityObj?.name ?? "—",
       amount: Math.round(grandTotal),
       paid: paidAmount,
       status: "Confirmed",
+      ...(referralCode.trim()
+        ? {
+            referralCode: referralCode.trim(),
+            referrerName: referrerName || undefined,
+            referrerType: referrerType || undefined,
+          }
+        : {}),
+      ...(emiPlan ? { emiPlan } : {}),
       receipt: buildReceipt(),
       invoice: buildInvoice(),
     });
+
+    // Persist to the orders backend so the booking lands in the admin console.
+    // A disk/network blip here shouldn't strand the guest — the order is already
+    // in localStorage and our team follows up — so we confirm regardless.
+    try {
+      await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: bookingId,
+          customer: customerName.trim(),
+          phone: customerPhone.trim(),
+          occasion: occ?.name ?? "Feast",
+          date: formatEventDate(eventDate),
+          guests,
+          vendor: vendorLabel,
+          city: cityObj?.name ?? "—",
+          amount: Math.round(grandTotal),
+          paid: paidAmount,
+          paymentMethod: payMethod,
+          emiPlan: emiPlan ?? undefined,
+          status: "Confirmed",
+          referralCode: referralCode.trim() || undefined,
+          referrerName: referrerName || undefined,
+          referrerType: referrerType || undefined,
+        }),
+      });
+    } catch {
+      /* offline — order is saved locally; team follows up via WhatsApp/phone */
+    }
+
     setConfirmed(true);
     setConfirming(false);
   };
@@ -597,24 +910,25 @@ export default function BookingWizard() {
       </div>
 
       {/* Event bar — occasion / date / city carried from the Hero booking bar,
-          editable up top on every step except the Add Extras step (3), which is
-          kept to just the add-on counters. */}
-      {step !== 3 && (
-        <EventBar
-          lang={lang}
-          t={t}
-          occasionId={occasionId}
-          setOccasionId={setOccasionId}
-          eventDate={eventDate}
-          setEventDate={setEventDate}
-          cityId={cityId}
-          setCityId={setCityId}
-          guests={guests}
-          setGuests={setGuests}
-          paxMin={paxMin}
-          paxMax={paxMax}
-        />
-      )}
+          editable up top on every step. It stays visible on the Add Extras step
+          (3) too, since occasion / date / guests gate the "Next" button there —
+          hiding it would leave the guest unable to satisfy the requirement. */}
+      <EventBar
+        lang={lang}
+        t={t}
+        occasionId={occasionId}
+        setOccasionId={setOccasionId}
+        eventDate={eventDate}
+        setEventDate={setEventDate}
+        cityId={cityId}
+        setCityId={setCityId}
+        guests={guests}
+        setGuests={setGuests}
+        paxMin={paxMin}
+        paxMax={paxMax}
+        minDate={earliestDate}
+        leadWarning={leadWarning}
+      />
 
       {/* Layout */}
       {step === 2 ? (
@@ -673,8 +987,13 @@ export default function BookingWizard() {
               t={t}
               guests={guests}
               selectedAddOns={selectedAddOns}
-              setSelectedAddOns={setSelectedAddOns}
-              toggle={toggle}
+              toggleAddOn={toggleAddOn}
+              packageName={selectedPackage?.name ?? ""}
+              eligibleVendors={eligibleAddOnVendors}
+              vendorIdFor={addOnVendorId}
+              onVendorChange={(addOnId, vendorId) =>
+                setAddOnVendor((m) => ({ ...m, [addOnId]: vendorId }))
+              }
             />
           )}
           {step === 4 && !confirmed && (
@@ -690,6 +1009,7 @@ export default function BookingWizard() {
               categoryVendor={categoryVendor}
               itemsFor={itemsFor}
               selectedAddOns={selectedAddOns}
+              addOnVendorName={addOnVendorName}
               onEditMenu={() => setStep(2)}
               onEditExtras={() => setStep(3)}
               couponInput={couponInput}
@@ -702,6 +1022,17 @@ export default function BookingWizard() {
               bookingId={bookingId}
               paidAmount={paidAmount}
               onPaid={setPaidAmount}
+              customerName={customerName}
+              setCustomerName={setCustomerName}
+              customerPhone={customerPhone}
+              setCustomerPhone={setCustomerPhone}
+              referralCode={referralCode}
+              setReferralCode={setReferralCode}
+              referrerName={referrerName}
+              payMethod={payMethod}
+              setPayMethod={setPayMethod}
+              emiCount={emiCount}
+              setEmiCount={setEmiCount}
               confirming={confirming}
               confirmError={confirmError}
               onConfirm={handleConfirm}
@@ -718,6 +1049,8 @@ export default function BookingWizard() {
               venue={venue}
               guests={guests}
               grandTotal={grandTotal}
+              paidAmount={paidAmount}
+              referrerName={referrerName}
               onDownload={downloadMenu}
               whatsappHref={whatsappHref}
             />
@@ -734,6 +1067,8 @@ export default function BookingWizard() {
             guests={guests}
             subtotal={subtotal}
             addOnsTotal={addOnsTotal}
+            venueFee={venueFee}
+            venueName={venue}
             discount={discount}
             gst={gst}
             grandTotal={grandTotal}
@@ -805,29 +1140,46 @@ export default function BookingWizard() {
           </div>
         </div>
       ) : step < TOTAL_STEPS ? (
-        <div className="mt-10 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={goBack}
-            disabled={step === 1}
-            className={
-              "rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 " +
-              (step === 1 ? "pointer-events-none opacity-40" : "")
-            }
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={!canNext}
-            className={
-              "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
-              (!canNext ? "cursor-not-allowed opacity-50" : "")
-            }
-          >
-            →
-          </button>
+        <div className="mt-10">
+          {/* Spell out what's blocking "Next" so the disabled arrow isn't a
+              dead end with no explanation. */}
+          {nextBlockers.length > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+              <span aria-hidden="true" className="text-maroon">
+                ★
+              </span>
+              <span>
+                {t("Before you continue:", "जारी रखने से पहले:")}{" "}
+                <span className="font-semibold text-maroon">
+                  {nextBlockers.join(" • ")}
+                </span>
+              </span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={goBack}
+              disabled={step === 1}
+              className={
+                "rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 " +
+                (step === 1 ? "pointer-events-none opacity-40" : "")
+              }
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canNext}
+              className={
+                "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
+                (!canNext ? "cursor-not-allowed opacity-50" : "")
+              }
+            >
+              →
+            </button>
+          </div>
         </div>
       ) : null}
     </section>
@@ -864,6 +1216,8 @@ function EventBar({
   setGuests,
   paxMin,
   paxMax,
+  minDate,
+  leadWarning,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -877,6 +1231,8 @@ function EventBar({
   setGuests: (v: number) => void;
   paxMin: number;
   paxMax: number;
+  minDate: string;
+  leadWarning: string;
 }) {
   const fieldClass =
     "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-maroon";
@@ -912,9 +1268,18 @@ function EventBar({
           <input
             type="date"
             value={eventDate}
+            min={minDate}
             onChange={(e) => setEventDate(e.target.value)}
-            className={fieldClass}
+            className={
+              fieldClass + (leadWarning ? " border-maroon" : "")
+            }
           />
+          {leadWarning && (
+            <span className="mt-1.5 flex items-start gap-1.5 text-xs text-maroon">
+              <span aria-hidden="true">★</span>
+              <span>{leadWarning}</span>
+            </span>
+          )}
         </label>
 
         <label className="block">
@@ -975,9 +1340,18 @@ function StepPackage({
   eventDate: string;
   shortNotice: boolean;
 }) {
-  const available = packages.filter((tier) =>
-    packageAvailable(tier.id, eventDate),
-  );
+  // Apply the same admin-editable name / price overrides the home page uses, so
+  // a tier reads identically here and on the landing page. The menu structure
+  // (features / pax / footnote) stays sourced from `data.ts`.
+  const { packages: homePackages } = useHomeContent();
+  const available = packages
+    .filter((tier) => packageAvailable(tier.id, eventDate))
+    .map((tier) => {
+      const meta = homePackages.tiers.find((x) => x.id === tier.id);
+      return meta
+        ? { ...tier, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+        : tier;
+    });
   const hiddenCount = packages.length - available.length;
   return (
     <div>
@@ -1015,12 +1389,14 @@ function StepPackage({
           )}
         </p>
       )}
-      {/* Columns track the number of packages the date qualifies for, so a lone
-          available tier (e.g. only Custom for a same-day date) fills the column
-          instead of stranding an empty half beside it. */}
+      {/* Same "patra scroll" cards the home page advertises, so a tier looks
+          identical here and on the landing page. Columns track the number of
+          packages the date qualifies for, so a lone available tier (e.g. only
+          Custom for a same-day date) fills the column instead of stranding an
+          empty half beside it. */}
       <div
         className={
-          "grid gap-4 " +
+          "grid items-stretch gap-7 " +
           (available.length === 1
             ? "grid-cols-1"
             : available.length === 2
@@ -1032,71 +1408,28 @@ function StepPackage({
       >
         {available.map((tier: PackageTier) => {
           const selected = tier.id === packageId;
+          const tierName = lang === "hi" ? tier.nameHi : tier.name;
           return (
-            <button
+            <PackageScrollCard
               key={tier.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setPackageId(tier.id)}
-              className={
-                "group relative flex flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
-                (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
+              tier={tier}
+              selected={selected}
+              onSelect={() => setPackageId(tier.id)}
+              cta={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPackageId(tier.id);
+                  }}
+                  className="btn-sheen mt-2 block w-full rounded-lg bg-maroon px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+                >
+                  {selected
+                    ? `${t("Selected", "चयनित")} ${tierName} →`
+                    : `${t("Select", "चुनें")} ${tierName}`}
+                </button>
               }
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-display text-base font-semibold text-ink">
-                  {lang === "hi" ? tier.nameHi : tier.name}
-                </span>
-                {tier.popular && (
-                  <span className="rounded-full bg-gold-soft/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon">
-                    {t("Popular", "लोकप्रिय")}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-lg font-semibold text-maroon">
-                {tier.price}
-                <span className="text-xs font-normal text-ink-soft">
-                  {" "}
-                  {lang === "hi" ? tier.unitHi : tier.unit}
-                </span>
-              </p>
-              <ul className="mt-3 flex flex-1 flex-col gap-1.5">
-                {tier.features.map((feature, i) => {
-                  const label = lang === "hi" ? feature.labelHi : feature.label;
-                  if (feature.heading) {
-                    return (
-                      <li
-                        key={i}
-                        className="pt-1 text-sm font-semibold text-ink"
-                      >
-                        {label}
-                      </li>
-                    );
-                  }
-                  return (
-                    <li
-                      key={i}
-                      className="flex items-start gap-1.5 text-sm text-ink-soft"
-                    >
-                      <span aria-hidden="true" className="text-maroon">
-                        ✓
-                      </span>
-                      {label}
-                    </li>
-                  );
-                })}
-              </ul>
-              <span
-                className={
-                  "mt-4 inline-flex items-center justify-center rounded-full px-4 py-1.5 text-xs font-semibold transition " +
-                  (selected
-                    ? "bg-maroon text-cream"
-                    : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
-                }
-              >
-                {selected ? t("Selected", "चयनित") : t("Select", "चुनें")}
-              </span>
-            </button>
+            />
           );
         })}
       </div>
@@ -1134,7 +1467,6 @@ function StepMenu({
   allowanceFor: (catId: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
 }) {
-  const [diet, setDiet] = useState<DietFilter>("all");
   const vendorScrollRef = useRef<HTMLDivElement>(null);
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
@@ -1147,25 +1479,6 @@ function StepMenu({
   const selectedIds = categoryVendor[cat.id] ?? [];
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
   const picks = itemsFor(cat.id);
-
-  // Dishes available across the chosen vendor(s) under the active diet filter.
-  // When this is below the package quota, the guest can pick every visible dish
-  // and still not complete the course — surface that rather than dead-ending.
-  const availableForDiet = selectedVendors.reduce(
-    (n, v) =>
-      n + v.items.filter((it) => diet === "all" || it.diet === diet).length,
-    0,
-  );
-  const dietShortfall =
-    selectedVendors.length > 0 &&
-    picks.length < allowance &&
-    availableForDiet < allowance;
-
-  const dietOptions: { id: DietFilter; en: string; hi: string }[] = [
-    { id: "all", en: "All", hi: "सभी" },
-    { id: "veg", en: "Veg", hi: "वेज" },
-    { id: "non-veg", en: "Non-Veg", hi: "नॉन-वेज" },
-  ];
 
   return (
     <div className="min-w-0">
@@ -1320,46 +1633,6 @@ function StepMenu({
               </span>
             </div>
 
-            {/* Diet filter */}
-            <div className="mt-3 inline-flex rounded-full border border-cream-3 bg-white p-1">
-              {dietOptions.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setDiet(d.id)}
-                  className={
-                    "rounded-full px-4 py-1 text-xs font-medium transition " +
-                    (diet === d.id
-                      ? "bg-maroon text-cream shadow-sm"
-                      : "text-ink-soft hover:text-ink")
-                  }
-                >
-                  {t(d.en, d.hi)}
-                </button>
-              ))}
-            </div>
-
-            {/* Diet-filter trap — the current filter leaves too few dishes for
-                this vendor to meet the package quota. Tell the guest how to
-                proceed instead of silently disabling Continue. */}
-            {dietShortfall && (
-              <p className="mt-3 rounded-xl border border-maroon/30 bg-cream/40 px-4 py-2.5 text-sm text-ink-soft">
-                <span aria-hidden="true" className="text-maroon">★ </span>
-                {t(
-                  `Only ${availableForDiet} ${diet === "veg" ? "Veg" : "Non-Veg"} dish${
-                    availableForDiet === 1 ? "" : "es"
-                  } here, but this course needs ${allowance}. Switch the filter to “All”${
-                    multiVendor ? " or add another vendor" : " or pick another vendor"
-                  } to finish this course.`,
-                  `यहाँ सिर्फ़ ${availableForDiet} ${
-                    diet === "veg" ? "वेज" : "नॉन-वेज"
-                  } डिश हैं, पर इस कोर्स के लिए ${allowance} चाहिए। “सभी” फ़िल्टर चुनें${
-                    multiVendor ? " या एक और वेंडर जोड़ें" : " या दूसरा वेंडर चुनें"
-                  }।`,
-                )}
-              </p>
-            )}
-
             {/* One menu block per selected vendor — a single block for most
                 tiers, several for Platinum's multi-vendor segments. */}
             {selectedVendors.map((vendor) => (
@@ -1368,9 +1641,7 @@ function StepMenu({
                   {vendor.name}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {vendor.items
-                    .filter((it) => diet === "all" || it.diet === diet)
-                    .map((it: CategoryItem) => {
+                  {vendor.items.map((it: CategoryItem) => {
                       const active = picks.includes(it.id);
                       const atCap = !active && picks.length >= allowance;
                       return (
@@ -1417,15 +1688,21 @@ function StepDetails({
   t,
   guests,
   selectedAddOns,
-  setSelectedAddOns,
-  toggle,
+  toggleAddOn,
+  packageName,
+  eligibleVendors,
+  vendorIdFor,
+  onVendorChange,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
   guests: number;
   selectedAddOns: string[];
-  setSelectedAddOns: (v: string[]) => void;
-  toggle: (arr: string[], setArr: (v: string[]) => void, id: string) => void;
+  toggleAddOn: (id: string) => void;
+  packageName: string;
+  eligibleVendors: VendorListing[];
+  vendorIdFor: (addOnId: string) => string | undefined;
+  onVendorChange: (addOnId: string, vendorId: string) => void;
 }) {
   return (
     <div>
@@ -1441,48 +1718,114 @@ function StepDetails({
         {addOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
           const lineTotal = a.perPlate ? a.price * guests : a.price;
+          const selectId = `addon-vendor-${a.id}`;
           return (
-            <button
+            <div
               key={a.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => toggle(selectedAddOns, setSelectedAddOns, a.id)}
               className={
-                "flex items-start gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
+                "rounded-2xl border bg-white p-4 shadow-sm transition " +
                 (active ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
-              <span
-                aria-hidden="true"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream-2 text-xl"
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleAddOn(a.id)}
+                className="flex w-full items-start gap-4 text-left"
               >
-                {a.icon}
-              </span>
-              <div className="flex-1">
-                <h4 className="font-display text-base font-semibold text-ink">
-                  {lang === "hi" ? a.nameHi : a.name}
-                </h4>
-                <p className="mt-0.5 text-sm text-ink-soft">{a.description}</p>
-                <p className="mt-1 text-sm font-semibold text-maroon">
-                  {a.perPlate
-                    ? `${money(a.price)} / ${t("plate", "प्लेट")}`
-                    : money(a.price)}
-                  <span className="ml-2 text-xs font-normal text-ink-soft">
-                    ≈ {money(lineTotal)}
+                <span
+                  aria-hidden="true"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream-2 text-xl"
+                >
+                  {a.icon}
+                </span>
+                <div className="flex-1">
+                  <h4 className="font-display text-base font-semibold text-ink">
+                    {lang === "hi" ? a.nameHi : a.name}
+                  </h4>
+                  <p className="mt-0.5 text-sm text-ink-soft">{a.description}</p>
+                  <p className="mt-1 text-sm font-semibold text-maroon">
+                    {a.perPlate
+                      ? `${money(a.price)} / ${t("plate", "प्लेट")}`
+                      : money(a.price)}
+                    <span className="ml-2 text-xs font-normal text-ink-soft">
+                      ≈ {money(lineTotal)}
+                    </span>
+                  </p>
+                </div>
+                <span
+                  className={
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm " +
+                    (active
+                      ? "border-maroon bg-maroon text-cream"
+                      : "border-cream-3 text-transparent")
+                  }
+                >
+                  ✓
+                </span>
+              </button>
+
+              {/* Vendor for this counter — drawn from the catalogue for the
+                  selected package's tier. Shown only once the add-on is on.
+                  Rendered as selectable tiles (not a dropdown) so every option
+                  is visible at a glance and chosen with a single tap. */}
+              {active && (
+                <div className="mt-3 border-t border-cream-3 pt-3">
+                  <span
+                    id={selectId}
+                    className="block text-xs font-semibold text-ink-soft"
+                  >
+                    {t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
                   </span>
-                </p>
-              </div>
-              <span
-                className={
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm " +
-                  (active
-                    ? "border-maroon bg-maroon text-cream"
-                    : "border-cream-3 text-transparent")
-                }
-              >
-                ✓
-              </span>
-            </button>
+                  {eligibleVendors.length === 0 ? (
+                    <p className="mt-1 text-sm text-ink-soft">
+                      {t(
+                        "No vendors available for this package.",
+                        "इस पैकेज के लिए कोई वेंडर उपलब्ध नहीं।",
+                      )}
+                    </p>
+                  ) : (
+                    <div
+                      role="radiogroup"
+                      aria-labelledby={selectId}
+                      className="mt-2 grid gap-2 sm:grid-cols-2"
+                    >
+                      {eligibleVendors.map((v) => {
+                        const picked = vendorIdFor(a.id) === v.id;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={picked}
+                            onClick={() => onVendorChange(a.id, v.id)}
+                            className={
+                              "flex flex-col rounded-xl border bg-white px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm " +
+                              (picked
+                                ? "border-maroon ring-2 ring-maroon"
+                                : "border-cream-3")
+                            }
+                          >
+                            <span className="font-display text-sm font-semibold text-ink">
+                              {v.name}
+                            </span>
+                            <span className="mt-0.5 text-xs text-ink-soft">
+                              {v.city} · ★ {v.rating}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-xs text-ink-soft">
+                    {t(
+                      `${packageName || "Selected package"} vendors`,
+                      `${packageName || "चयनित पैकेज"} वेंडर`,
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -1490,27 +1833,47 @@ function StepDetails({
   );
 }
 
-/* ─── Full payment via UPI / QR ───────────────────────────────────────
- * Pays the whole grand total against the merchant's UPI VPA. The QR is a real
- * NPCI `upi://pay?...` deep-link rendered by our own /api/payments/qr route, so
- * any UPI app can scan it. There's no gateway callback, so settlement is
- * customer-confirmed: tapping "I've paid" records the payment via /api/payments
- * (idempotent on the txn ref) and marks the booking paid-in-full. */
+/* ─── Choose a payment method ──────────────────────────────────────────
+ * Four ways to settle a booking, selected by the parent wizard so the chosen
+ * method travels with the order to the admin console:
+ *   • UPI / QR — pay online now against the merchant's UPI VPA. The QR is a real
+ *     NPCI `upi://pay?...` deep-link rendered by our /api/payments/qr route, so
+ *     any UPI app can scan it. There's no gateway callback, so settlement is
+ *     customer-confirmed: tapping "I've paid" records the payment via
+ *     /api/payments (idempotent on the txn ref → lands in the payment tracker)
+ *     and reports the paid amount up to the wizard. UPI/QR can settle a 10%
+ *     advance or the whole grand total.
+ *   • COD — pay cash on delivery; nothing collected now.
+ *   • Connect — let our team reach out to arrange the most convenient payment.
+ */
 function PaymentBox({
   t,
   bookingId,
-  amount,
-  paid,
+  grandTotal,
+  paidAmount,
   onPaid,
+  customerName,
+  payMethod,
+  setPayMethod,
+  eventDate,
+  emiCount,
+  setEmiCount,
 }: {
   t: (en: string, hi: string) => string;
   bookingId: string;
-  amount: number;
-  paid: boolean;
-  onPaid: () => void;
+  grandTotal: number;
+  paidAmount: number;
+  onPaid: (amount: number) => void;
+  customerName: string;
+  payMethod: OrderPaymentMethod;
+  setPayMethod: (m: OrderPaymentMethod) => void;
+  eventDate: string;
+  emiCount: number;
+  setEmiCount: (n: number) => void;
 }) {
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
-  const [method, setMethod] = useState<"qr" | "upi">("qr");
+  // Default to the 10% advance — the lightweight way to lock a date at booking.
+  const [choice, setChoice] = useState<"advance" | "full">("advance");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
@@ -1534,7 +1897,25 @@ function PaymentBox({
     };
   }, []);
 
-  const txnRef = upiTxnRef(bookingId, "FULL");
+  const total = Math.round(grandTotal);
+  const advanceAmount = Math.max(1, Math.round(grandTotal * ADVANCE_RATE));
+  const amount = choice === "advance" ? advanceAmount : total;
+
+  // EMI plan for the balance after the advance — offered only when the guest is
+  // paying the 10% advance (the balance is what gets financed) and the event is
+  // far enough out. `emiCount` is owned by the wizard so it travels onto the
+  // saved order; `1` means settle the balance in one go.
+  const emiOptions = emiOptionsForEvent(eventDate);
+  const emiEligible = choice === "advance" && emiOptions.length > 1;
+  // A count the date no longer supports falls back to "settle in one go".
+  const emiSelected = emiOptions.includes(emiCount) ? emiCount : 1;
+  const emiPlan =
+    emiEligible && emiSelected > 1
+      ? buildEmiPlan(total - advanceAmount, emiSelected, eventDate)
+      : null;
+  // Distinct refs per payment type so an advance and a later top-up don't
+  // collide on the idempotency key.
+  const txnRef = upiTxnRef(bookingId, choice === "advance" ? "ADVANCE" : "FULL");
   const note = `Bhojpatra ${bookingId}`;
   const upiUri = buildUpiUri({
     vpa: merchant.vpa,
@@ -1558,9 +1939,10 @@ function PaymentBox({
         body: JSON.stringify({
           bookingId,
           amount,
-          method,
+          method: payMethod === "QR" ? "qr" : "upi",
           vpa: merchant.vpa,
           txnRef,
+          customer: customerName.trim() || undefined,
         }),
       });
       const data = (await res.json().catch(() => null)) as {
@@ -1573,7 +1955,7 @@ function PaymentBox({
         );
         return;
       }
-      onPaid();
+      onPaid(amount);
     } catch {
       setError(
         t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
@@ -1592,123 +1974,299 @@ function PaymentBox({
     }
   };
 
-  if (paid) {
+  if (paidAmount > 0) {
+    const balance = Math.max(0, total - paidAmount);
+    const fullyPaid = balance === 0;
     return (
       <div className="mt-6 rounded-2xl border border-maroon bg-white p-5 shadow-sm">
         <p className="font-display text-lg font-semibold text-maroon">
           ✓ {t("Payment received", "भुगतान प्राप्त हुआ")}
         </p>
         <p className="mt-1 text-sm text-ink-soft">
-          {t("Full payment recorded:", "पूरा भुगतान दर्ज:")}{" "}
-          <span className="font-semibold text-ink">{money(amount)}</span>
+          {fullyPaid
+            ? t("Full payment recorded:", "पूरा भुगतान दर्ज:")
+            : t("Advance recorded:", "एडवांस दर्ज:")}{" "}
+          <span className="font-semibold text-ink">{money(paidAmount)}</span>
         </p>
+        {!fullyPaid && (
+          <p className="mt-1 text-sm text-ink-soft">
+            {t("Balance due:", "शेष राशि:")}{" "}
+            <span className="font-semibold text-ink">{money(balance)}</span>{" "}
+            <span className="text-ink-soft/80">
+              {t("— our team will collect this later.", "— हमारी टीम बाद में लेगी।")}
+            </span>
+          </p>
+        )}
       </div>
     );
   }
+
+  const online = isOnlineMethod(payMethod);
 
   return (
     <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-lg font-semibold text-ink">
-          {t("Pay Full Amount", "पूरा भुगतान करें")}
+          {t("How would you like to pay?", "आप कैसे भुगतान करना चाहेंगे?")}
         </h3>
-        <span className="text-lg font-semibold text-maroon">{money(amount)}</span>
+        {online && (
+          <span className="text-lg font-semibold text-maroon">{money(amount)}</span>
+        )}
       </div>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
-          "Optional — pay securely now with any UPI app.",
-          "वैकल्पिक — किसी भी UPI ऐप से अभी भुगतान करें।",
+          "Pay online now, on delivery, or let us connect to arrange it.",
+          "अभी ऑनलाइन भुगतान करें, डिलीवरी पर करें, या हमें व्यवस्था के लिए संपर्क करने दें।",
         )}
       </p>
 
-      {/* Method toggle */}
-      <div className="mt-4 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
-        {(
-          [
-            ["qr", t("Scan QR", "QR स्कैन")],
-            ["upi", t("UPI ID", "UPI आईडी")],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setMethod(id)}
-            className={
-              "rounded-full px-4 py-1.5 text-xs font-semibold transition " +
-              (method === id
-                ? "bg-maroon text-cream"
-                : "text-ink-soft hover:text-ink")
-            }
-          >
-            {label}
-          </button>
-        ))}
+      {/* Payment method — UPI / QR (online now) · COD · Bhojpatra connects you. */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {ORDER_PAYMENT_METHODS.map((m) => {
+          const active = payMethod === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setPayMethod(m)}
+              className={
+                "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+                (active
+                  ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+                  : "border-cream-3 bg-white hover:bg-cream-2")
+              }
+            >
+              <span className="text-sm font-semibold text-ink">
+                {t(ORDER_PAYMENT_LABELS[m].en, ORDER_PAYMENT_LABELS[m].hi)}
+              </span>
+              <span className="mt-0.5 text-xs text-ink-soft">
+                {t(ORDER_PAYMENT_HINTS[m].en, ORDER_PAYMENT_HINTS[m].hi)}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {method === "qr" ? (
-        <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrSrc}
-            alt={t("UPI payment QR", "UPI भुगतान QR")}
-            width={176}
-            height={176}
-            className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2"
-          />
-          <div className="text-sm text-ink-soft">
-            <p>
-              {t(
-                "Scan with any UPI app to pay",
-                "भुगतान के लिए किसी भी UPI ऐप से स्कैन करें",
-              )}
-            </p>
-            <p className="mt-1 font-semibold text-ink">{merchant.vpa}</p>
-            <a
-              href={upiUri}
-              className="mt-3 inline-block rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:hidden"
-            >
-              {t("Open UPI app", "UPI ऐप खोलें")}
-            </a>
+      {online ? (
+        <>
+          {/* Amount choice — a 10% advance to lock the date, or the full total. */}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                [
+                  "advance",
+                  t("Pay 10% Advance", "10% एडवांस दें"),
+                  advanceAmount,
+                  t("Lock your date now", "अभी अपनी तारीख पक्की करें"),
+                ],
+                [
+                  "full",
+                  t("Pay Full Amount", "पूरा भुगतान करें"),
+                  total,
+                  t("Settle the whole bill", "पूरा बिल चुकाएं"),
+                ],
+              ] as const
+            ).map(([id, label, amt, hint]) => {
+              const active = choice === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setChoice(id)}
+                  className={
+                    "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+                    (active
+                      ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+                      : "border-cream-3 bg-white hover:bg-cream-2")
+                  }
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-ink">{label}</span>
+                    <span className="font-display text-base font-semibold text-maroon">
+                      {money(amt)}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 text-xs text-ink-soft">{hint}</span>
+                </button>
+              );
+            })}
           </div>
+
+          {/* EMI plan for the balance — pay 10% now, split the remaining 90%
+              into instalments. Only shown when the event is far enough out
+              (3+ months → up to 3 EMIs, 6+ → up to 6). Track-only: our team
+              collects each instalment on its due date. */}
+          {emiEligible && (
+            <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/30 p-4">
+              <p className="text-sm font-semibold text-ink">
+                {t(
+                  "Split the balance into EMIs?",
+                  "शेष राशि को EMI में बाँटें?",
+                )}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-soft">
+                {t(
+                  `Pay the ${money(advanceAmount)} advance now; settle the ${money(total - advanceAmount)} balance in easy instalments.`,
+                  `अभी ${money(advanceAmount)} एडवांस दें; ${money(total - advanceAmount)} शेष राशि आसान किश्तों में चुकाएं।`,
+                )}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {emiOptions.map((n) => {
+                  const active = emiSelected === n;
+                  const label =
+                    n === 1
+                      ? t("Pay in full", "एकमुश्त")
+                      : t(`${n} EMIs`, `${n} EMI`);
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setEmiCount(n)}
+                      className={
+                        "rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                        (active
+                          ? "border-maroon bg-maroon text-cream"
+                          : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                      }
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {emiPlan && (
+                <ul className="mt-3 divide-y divide-cream-3 rounded-xl border border-cream-3 bg-white">
+                  {emiPlan.installments.map((it) => (
+                    <li
+                      key={it.index}
+                      className="flex items-center justify-between px-4 py-2 text-sm"
+                    >
+                      <span className="text-ink-soft">
+                        {t(
+                          `EMI ${it.index} · ${it.dueLabel}`,
+                          `EMI ${it.index} · ${it.dueLabel}`,
+                        )}
+                      </span>
+                      <span className="font-semibold text-ink">
+                        {money(it.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {emiPlan && (
+                <p className="mt-2 text-xs text-ink-soft">
+                  {t(
+                    "Our team collects each instalment on its due date — no card is charged automatically.",
+                    "हमारी टीम हर किश्त उसकी नियत तारीख पर लेगी — कोई कार्ड अपने आप चार्ज नहीं होगा।",
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
+          {payMethod === "QR" ? (
+            <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrSrc}
+                alt={t("UPI payment QR", "UPI भुगतान QR")}
+                width={176}
+                height={176}
+                className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2"
+              />
+              <div className="text-sm text-ink-soft">
+                <p>
+                  {t(
+                    "Scan with any UPI app to pay",
+                    "भुगतान के लिए किसी भी UPI ऐप से स्कैन करें",
+                  )}
+                </p>
+                <p className="mt-1 font-semibold text-ink">{merchant.vpa}</p>
+                <a
+                  href={upiUri}
+                  className="mt-3 inline-block rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:hidden"
+                >
+                  {t("Open UPI app", "UPI ऐप खोलें")}
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <p className="text-sm text-ink-soft">
+                {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
+                  {merchant.vpa}
+                </span>
+                <button
+                  type="button"
+                  onClick={copyVpa}
+                  className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+                >
+                  {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
+                </button>
+                <a
+                  href={upiUri}
+                  className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon-dark"
+                >
+                  {t("Open UPI app", "UPI ऐप खोलें")}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
+          )}
+
+          <button
+            type="button"
+            onClick={markPaid}
+            disabled={submitting}
+            className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+          >
+            {submitting
+              ? t("Recording…", "दर्ज हो रहा है…")
+              : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
+          </button>
+          <p className="mt-2 text-xs text-ink-soft">
+            {t(
+              "Optional — you can also just confirm below and pay later.",
+              "वैकल्पिक — आप नीचे केवल पुष्टि करके बाद में भी भुगतान कर सकते हैं।",
+            )}
+          </p>
+        </>
+      ) : payMethod === "COD" ? (
+        <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4">
+          <p className="text-sm font-semibold text-ink">
+            {t("Cash on Delivery", "डिलीवरी पर नकद")}
+          </p>
+          <p className="mt-1 text-sm text-ink-soft">
+            {t(
+              `No payment now — pay ${money(total)} in cash when your order is delivered. Confirm below to place the booking.`,
+              `अभी कोई भुगतान नहीं — आपका ऑर्डर डिलीवर होने पर ${money(total)} नकद में दें। बुकिंग के लिए नीचे पुष्टि करें।`,
+            )}
+          </p>
         </div>
       ) : (
-        <div className="mt-4">
-          <p className="text-sm text-ink-soft">
-            {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
+        <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4">
+          <p className="text-sm font-semibold text-ink">
+            {t("Bhojpatra connects you", "भोजपत्र आपसे संपर्क करेगा")}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
-              {merchant.vpa}
-            </span>
-            <button
-              type="button"
-              onClick={copyVpa}
-              className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
-            >
-              {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
-            </button>
-            <a
-              href={upiUri}
-              className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon-dark"
-            >
-              {t("Open UPI app", "UPI ऐप खोलें")}
-            </a>
-          </div>
+          <p className="mt-1 text-sm text-ink-soft">
+            {t(
+              "Confirm below and our team will call you to finalise the menu and arrange the most convenient way to pay.",
+              "नीचे पुष्टि करें और हमारी टीम मेन्यू तय करने और भुगतान का सबसे सुविधाजनक तरीका तय करने के लिए आपको कॉल करेगी।",
+            )}
+          </p>
         </div>
       )}
-
-      {error && <p className="mt-3 text-sm font-medium text-maroon">{error}</p>}
-
-      <button
-        type="button"
-        onClick={markPaid}
-        disabled={submitting}
-        className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
-      >
-        {submitting
-          ? t("Recording…", "दर्ज हो रहा है…")
-          : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
-      </button>
     </div>
   );
 }
@@ -1726,6 +2284,7 @@ function StepConfirm({
   categoryVendor,
   itemsFor,
   selectedAddOns,
+  addOnVendorName,
   onEditMenu,
   onEditExtras,
   couponInput,
@@ -1738,6 +2297,17 @@ function StepConfirm({
   bookingId,
   paidAmount,
   onPaid,
+  customerName,
+  setCustomerName,
+  customerPhone,
+  setCustomerPhone,
+  referralCode,
+  setReferralCode,
+  referrerName,
+  payMethod,
+  setPayMethod,
+  emiCount,
+  setEmiCount,
   confirming,
   confirmError,
   onConfirm,
@@ -1754,6 +2324,7 @@ function StepConfirm({
   categoryVendor: VendorMap;
   itemsFor: (catId: string) => string[];
   selectedAddOns: string[];
+  addOnVendorName: (addOnId: string) => string | undefined;
   onEditMenu: () => void;
   onEditExtras: () => void;
   couponInput: string;
@@ -1766,6 +2337,17 @@ function StepConfirm({
   bookingId: string;
   paidAmount: number;
   onPaid: (amount: number) => void;
+  customerName: string;
+  setCustomerName: (v: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (v: string) => void;
+  referralCode: string;
+  setReferralCode: (v: string) => void;
+  referrerName: string;
+  payMethod: OrderPaymentMethod;
+  setPayMethod: (m: OrderPaymentMethod) => void;
+  emiCount: number;
+  setEmiCount: (n: number) => void;
   confirming: boolean;
   confirmError: string;
   onConfirm: () => void;
@@ -1878,12 +2460,24 @@ function StepConfirm({
         {selectedAddOns.length === 0 ? (
           <p className="mt-2 text-sm text-ink-soft">{t("None", "कोई नहीं")}</p>
         ) : (
-          <p className="mt-2 text-sm text-ink">
+          <ul className="mt-2 space-y-1">
             {addOns
               .filter((a) => selectedAddOns.includes(a.id))
-              .map((a) => a.name)
-              .join(", ")}
-          </p>
+              .map((a) => {
+                const vendor = addOnVendorName(a.id);
+                return (
+                  <li key={a.id} className="text-sm text-ink">
+                    {a.name}
+                    {vendor && (
+                      <span className="text-ink-soft">
+                        {" "}
+                        · <span className="text-maroon">{vendor}</span>
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+          </ul>
         )}
       </div>
 
@@ -1929,6 +2523,72 @@ function StepConfirm({
         </div>
       </div>
 
+      {/* Contact — so our team can reach out (required for COD / connect). */}
+      <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+        <h3 className="font-display text-base font-semibold text-ink">
+          {t("Your contact details", "आपकी संपर्क जानकारी")}
+        </h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium text-ink-soft">
+              {t("Full name", "पूरा नाम")}
+            </label>
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder={t("e.g. Ankit Sharma", "उदा. अंकित शर्मा")}
+              autoComplete="name"
+              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-soft">
+              {t("Phone number", "फ़ोन नंबर")}
+            </label>
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder={t("10-digit mobile", "10 अंकों का मोबाइल")}
+              autoComplete="tel"
+              inputMode="tel"
+              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Referral — auto-filled from a partner's share link (?ref=) or typed in.
+          A recognised code shows the referrer's name as a tag. */}
+      <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+        <h3 className="font-display text-base font-semibold text-ink">
+          {t("Referral code", "रेफ़रल कोड")}{" "}
+          <span className="text-sm font-normal text-ink-soft">
+            ({t("optional", "वैकल्पिक")})
+          </span>
+        </h3>
+        <p className="mt-1 text-sm text-ink-soft">
+          {t(
+            "Referred by a Bhojpatra partner? Enter their code so they get credit.",
+            "किसी Bhojpatra पार्टनर ने रेफ़र किया? उनका कोड दर्ज करें ताकि उन्हें श्रेय मिले।",
+          )}
+        </p>
+        <input
+          type="text"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          placeholder="REF-XXXXXX"
+          className="mt-3 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm uppercase tracking-wider text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60 placeholder:normal-case placeholder:tracking-normal sm:max-w-xs"
+        />
+        {referralCode.trim() && referrerName && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+            <span aria-hidden="true">★</span>
+            {t("Referred by", "रेफ़र किया")} {referrerName}
+          </p>
+        )}
+      </div>
+
       <div className="mt-6 rounded-2xl border border-maroon/30 bg-maroon-soft/30 p-5">
         <div className="flex items-center justify-between">
           <p className="text-sm text-ink-soft">{t("Grand total", "कुल राशि")}</p>
@@ -1940,23 +2600,39 @@ function StepConfirm({
           <p className="mt-1 text-sm font-semibold text-maroon">
             ✓ {t("Paid in full", "पूरा भुगतान हो गया")} · {money(paidAmount)}
           </p>
+        ) : paidAmount > 0 ? (
+          <p className="mt-1 text-sm font-semibold text-maroon">
+            ✓ {t("Advance paid", "एडवांस भुगतान")} · {money(paidAmount)} ·{" "}
+            <span className="font-normal text-ink-soft">
+              {t("Balance", "शेष")}{" "}
+              {money(Math.max(0, Math.round(grandTotal) - paidAmount))}
+            </span>
+          </p>
         ) : (
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              "Pay in full now via UPI / QR below, or book without paying — our team will reach out to finalise the menu and payment.",
-              "नीचे UPI / QR से अभी पूरा भुगतान करें, या बिना भुगतान बुक करें — मेन्यू और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।",
+              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) now to lock your date, or pay in full below — or book without paying and our team will reach out to finalise the menu and payment.`,
+              `अपनी तारीख पक्की करने के लिए अभी 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें, या नीचे पूरा भुगतान करें — या बिना भुगतान बुक करें, मेन्यू और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।`,
             )}
           </p>
         )}
       </div>
 
-      {/* Full payment via UPI / QR (optional). */}
+      {/* Choose how to pay — UPI / QR (online now), COD or "Bhojpatra connects
+          you" (arranged later). UPI/QR can settle a 10% advance or the full
+          amount up front. */}
       <PaymentBox
         t={t}
         bookingId={bookingId}
-        amount={Math.round(grandTotal)}
-        paid={paidAmount >= Math.round(grandTotal)}
-        onPaid={() => onPaid(Math.round(grandTotal))}
+        grandTotal={grandTotal}
+        paidAmount={paidAmount}
+        onPaid={onPaid}
+        customerName={customerName}
+        payMethod={payMethod}
+        setPayMethod={setPayMethod}
+        eventDate={eventDate}
+        emiCount={emiCount}
+        setEmiCount={setEmiCount}
       />
 
       {confirmError && (
@@ -2004,6 +2680,8 @@ function StepDone({
   venue,
   guests,
   grandTotal,
+  paidAmount,
+  referrerName,
   onDownload,
   whatsappHref,
 }: {
@@ -2015,9 +2693,14 @@ function StepDone({
   venue: string;
   guests: number;
   grandTotal: number;
+  paidAmount: number;
+  referrerName: string;
   onDownload: () => void;
   whatsappHref: string;
 }) {
+  const total = Math.round(grandTotal);
+  const balance = Math.max(0, total - paidAmount);
+  const fullyPaid = paidAmount >= total;
   return (
     <div className="mx-auto max-w-2xl text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon text-3xl text-cream shadow-sm">
@@ -2032,6 +2715,14 @@ function StepDone({
       <p className="mt-4 inline-block rounded-full bg-cream-2 px-5 py-2 text-sm font-semibold text-maroon">
         {t("Booking ID", "बुकिंग आईडी")}: {bookingId}
       </p>
+      {referrerName && (
+        <p className="mt-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream">
+            <span aria-hidden="true">★</span>
+            {t("Referred by", "रेफ़र किया")} {referrerName}
+          </span>
+        </p>
+      )}
 
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 text-left shadow-sm">
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
@@ -2063,14 +2754,40 @@ function StepDone({
             <dt className="text-ink-soft">{t("Grand Total", "कुल राशि")}</dt>
             <dd className="font-semibold text-ink">{money(grandTotal)}</dd>
           </div>
+          {paidAmount > 0 && (
+            <>
+              <div>
+                <dt className="text-ink-soft">
+                  {fullyPaid ? t("Paid", "भुगतान") : t("Advance Paid", "एडवांस भुगतान")}
+                </dt>
+                <dd className="font-semibold text-maroon">{money(paidAmount)}</dd>
+              </div>
+              {!fullyPaid && (
+                <div>
+                  <dt className="text-ink-soft">{t("Balance Due", "शेष राशि")}</dt>
+                  <dd className="font-semibold text-ink">{money(balance)}</dd>
+                </div>
+              )}
+            </>
+          )}
         </dl>
       </div>
 
       <p className="mt-4 text-sm text-ink-soft">
-        {t(
-          "A confirmation has been sent via WhatsApp and email. No advance payment is required — our team will reach out to finalise the arrangements.",
-          "पुष्टि WhatsApp और ईमेल पर भेज दी गई है। कोई एडवांस भुगतान आवश्यक नहीं — व्यवस्था तय करने के लिए हमारी टीम संपर्क करेगी।",
-        )}
+        {paidAmount > 0
+          ? fullyPaid
+            ? t(
+                "Payment received in full and a confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements.",
+                "पूरा भुगतान प्राप्त हुआ और पुष्टि WhatsApp व ईमेल पर भेज दी गई है। व्यवस्था तय करने के लिए हमारी टीम संपर्क करेगी।",
+              )
+            : t(
+                `Your ${money(paidAmount)} advance is received and your date is locked. A confirmation has been sent via WhatsApp and email — our team will collect the ${money(balance)} balance and finalise the arrangements.`,
+                `आपका ${money(paidAmount)} एडवांस प्राप्त हुआ और आपकी तारीख पक्की है। पुष्टि WhatsApp व ईमेल पर भेज दी गई है — हमारी टीम ${money(balance)} शेष राशि लेगी और व्यवस्था तय करेगी।`,
+              )
+          : t(
+              "A confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements and payment.",
+              "पुष्टि WhatsApp और ईमेल पर भेज दी गई है। व्यवस्था और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।",
+            )}
       </p>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -2208,6 +2925,8 @@ function SummaryPanel({
   guests,
   subtotal,
   addOnsTotal,
+  venueFee,
+  venueName,
   discount,
   gst,
   grandTotal,
@@ -2220,6 +2939,8 @@ function SummaryPanel({
   guests: number;
   subtotal: number;
   addOnsTotal: number;
+  venueFee: number;
+  venueName: string;
   discount: number;
   gst: number;
   grandTotal: number;
@@ -2261,6 +2982,12 @@ function SummaryPanel({
             label={t("Add-ons", "एक्स्ट्रा")}
             value={money(addOnsTotal)}
           />
+          {venueFee > 0 && (
+            <SummaryRow
+              label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
+              value={money(venueFee)}
+            />
+          )}
           {discount > 0 && (
             <SummaryRow
               label={t("Discount", "छूट")}
@@ -2280,8 +3007,8 @@ function SummaryPanel({
           </div>
           <p className="pt-1 text-xs text-ink-soft">
             {t(
-              "No advance required to book.",
-              "बुकिंग के लिए कोई एडवांस आवश्यक नहीं।",
+              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) to lock your date — or book now, pay later.`,
+              `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
             )}
           </p>
         </div>

@@ -194,3 +194,36 @@ export function ChevronRight(props: IconProps) {
     </svg>
   );
 }
+
+/* Share / network — Referrals. */
+export function Share(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="17.5" cy="6" r="2.5" />
+      <circle cx="17.5" cy="18" r="2.5" />
+      <path d="m8.3 10.8 7-3.6M8.3 13.2l7 3.6" />
+    </svg>
+  );
+}
+
+/* Trophy — leaderboard / top referrers. */
+export function Trophy(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M7 6H4.5a2.5 2.5 0 0 0 2.5 4M17 6h2.5a2.5 2.5 0 0 1-2.5 4" />
+      <path d="M12 14v3M9 20h6M10 20v-1.5a2 2 0 0 1 4 0V20" />
+    </svg>
+  );
+}
+
+/* Copy — copy a referral code. */
+export function Copy(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15a2 2 0 0 1-1-1.7V6a2 2 0 0 1 2-2h7.3A2 2 0 0 1 15 5" />
+    </svg>
+  );
+}
