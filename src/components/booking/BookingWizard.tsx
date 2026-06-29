@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { addStoredBooking, downloadReceipt } from "@/lib/bookings";
@@ -550,8 +550,8 @@ export default function BookingWizard() {
           <StepMenu
             lang={lang}
             t={t}
-            packageName={selectedPackage?.name ?? ""}
             multiVendor={multiVendor}
+            maxVendors={packageId === "silver" ? 5 : undefined}
             categories={activeCategories}
             activeCat={activeCat}
             setActiveCat={setActiveCat}
@@ -561,8 +561,6 @@ export default function BookingWizard() {
             toggleItem={toggleItem}
             allowanceFor={allowanceFor}
             categoryComplete={categoryComplete}
-            completedCount={completedCount}
-            perPlate={perPlate}
           />
         </div>
       ) : (
@@ -1010,8 +1008,8 @@ function StepPackage({
 function StepMenu({
   lang,
   t,
-  packageName,
   multiVendor,
+  maxVendors,
   categories,
   activeCat,
   setActiveCat,
@@ -1021,13 +1019,11 @@ function StepMenu({
   toggleItem,
   allowanceFor,
   categoryComplete,
-  completedCount,
-  perPlate,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
-  packageName: string;
   multiVendor: boolean;
+  maxVendors?: number;
   categories: MenuCategory[];
   activeCat: number;
   setActiveCat: (n: number) => void;
@@ -1037,13 +1033,16 @@ function StepMenu({
   toggleItem: (catId: string, itemId: string) => void;
   allowanceFor: (catId: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
-  completedCount: number;
-  perPlate: number;
 }) {
   const [diet, setDiet] = useState<DietFilter>("all");
+  const vendorScrollRef = useRef<HTMLDivElement>(null);
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
   const cat = categories[activeCat] ?? categories[0];
+  // Silver advertises a fixed set of vendors — cap the carousel accordingly.
+  const visibleVendors = maxVendors
+    ? cat.vendors.slice(0, maxVendors)
+    : cat.vendors;
   const allowance = allowanceFor(cat.id);
   const selectedIds = categoryVendor[cat.id] ?? [];
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
@@ -1069,17 +1068,8 @@ function StepMenu({
   ];
 
   return (
-    <div>
-      <SectionHead
-        title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
-        sub={`${completedCount}/${categories.length} ${t(
-          "categories complete",
-          "श्रेणियां पूरी",
-        )} · ${packageName} ${t("Package", "पैकेज")} · ${t(
-          "≈",
-          "≈",
-        )} ${money(perPlate)}/${t("plate", "प्लेट")}`}
-      />
+    <div className="min-w-0">
+      <SectionHead title={t("Build Your Menu", "अपना मेन्यू बनाएं")} />
 
       {/* Category tabs */}
       <div className="flex flex-wrap gap-2">
@@ -1118,8 +1108,12 @@ function StepMenu({
           ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
           : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
       </h3>
-      <div className="mt-3 flex snap-x gap-4 overflow-x-auto pb-3">
-        {cat.vendors.map((v) => {
+      <div className="relative mt-3">
+      <div
+        ref={vendorScrollRef}
+        className="flex snap-x gap-4 overflow-x-auto pb-3"
+      >
+        {visibleVendors.map((v) => {
           const selected = selectedIds.includes(v.id);
           return (
             <button
@@ -1168,6 +1162,30 @@ function StepMenu({
             </button>
           );
         })}
+      </div>
+
+        {/* Scroll hint — more vendors than fit; nudge the guest to scroll. */}
+        {visibleVendors.length > 5 && (
+          <>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent"
+            />
+            <button
+              type="button"
+              aria-label={t("Show more vendors", "और वेंडर दिखाएं")}
+              onClick={() =>
+                vendorScrollRef.current?.scrollBy({
+                  left: 240,
+                  behavior: "smooth",
+                })
+              }
+              className="absolute right-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-cream-3 bg-maroon text-cream shadow-md transition hover:scale-105"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">→</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Step B · Pick items */}
@@ -1908,7 +1926,7 @@ function SelectedPackageRail({
   if (!tier) return null;
   return (
     <aside className="lg:sticky lg:top-32 lg:self-start">
-      <div className="rounded-2xl border border-maroon bg-gradient-to-b from-cream to-cream-2 p-5 shadow-sm ring-2 ring-maroon">
+      <div className="rounded-2xl border border-maroon bg-white p-5 shadow-sm ring-2 ring-maroon">
         <p className="eyebrow text-xs font-semibold text-gold">
           {t("YOUR PACKAGE", "आपका पैकेज")}
         </p>
@@ -1933,6 +1951,14 @@ function SelectedPackageRail({
           {t("Base / plate", "बेस / प्लेट")}:{" "}
           <span className="font-semibold text-ink">{money(basePerPlate)}</span>
         </p>
+        {(lang === "hi" ? tier.paxHi : tier.pax) && (
+          <p className="mt-1 text-sm text-ink-soft">
+            {t("Guests", "मेहमान")}:{" "}
+            <span className="font-semibold text-ink">
+              {lang === "hi" ? tier.paxHi : tier.pax}
+            </span>
+          </p>
+        )}
         <ul className="mt-3 flex flex-col gap-1.5">
           {tier.features.map((feature, i) => {
             const label = lang === "hi" ? feature.labelHi : feature.label;
