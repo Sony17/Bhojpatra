@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 
 /**
  * Site-wide brand watermark — the Bhojpatra matka (clay pot) artwork sitting
@@ -31,13 +30,13 @@ export default function ScrollWatermark() {
       className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center select-none transition-opacity duration-700 ease-out motion-reduce:transition-none"
       style={{ opacity: scrolled ? 0.07 : 0 }}
     >
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src="/watermark-pot.png"
         alt=""
         width={421}
         height={534}
-        priority={false}
-        className="h-[80vh] w-auto max-w-[90vw]"
+        className="scroll-watermark-img"
       />
     </div>
   );
