@@ -10,24 +10,30 @@ import { Field, inputClass, Toggle } from "@/components/admin/shared/FormControl
 import { StarSolid } from "@/components/admin/shared/icons";
 import { contentBanners, contentTestimonials, contentFaqs } from "@/lib/admin/mockData";
 import type { ContentBanner, ContentTestimonial, ContentFaq } from "@/lib/admin/types";
+import PagesTab from "./PagesTab";
+import ContactInfoTab from "./ContactInfoTab";
 
 const TABS: TabItem[] = [
+  { id: "pages", label: "Pages" },
+  { id: "contact", label: "Contact Info" },
   { id: "banners", label: "Banners" },
   { id: "testimonials", label: "Testimonials" },
   { id: "faq", label: "FAQ" },
 ];
 
 export default function ContentManager() {
-  const [tab, setTab] = useState("banners");
+  const [tab, setTab] = useState("pages");
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin Panel"
         title="Content Control"
-        subtitle="Edit homepage banners, testimonials and FAQs."
+        subtitle="Edit site pages, contact details, banners, testimonials and FAQs."
       />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      {tab === "pages" && <PagesTab />}
+      {tab === "contact" && <ContactInfoTab />}
       {tab === "banners" && <BannersTab />}
       {tab === "testimonials" && <TestimonialsTab />}
       {tab === "faq" && <FaqTab />}

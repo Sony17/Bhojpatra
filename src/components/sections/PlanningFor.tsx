@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { planningOccasions, type PlanningOccasion, type TrendingDish } from "@/lib/data";
+import { useLang } from "@/lib/i18n";
 import {
   Sparkle,
   Rings,
@@ -26,10 +27,22 @@ const planningIcons: Record<string, IconComponent> = {
   diya: Diya,
 };
 
+const tagHi: Record<string, string> = {
+  Bestseller: "बेस्टसेलर",
+  "Most Loved": "सबसे पसंदीदा",
+  Trending: "ट्रेंडिंग",
+  "Sweet Pick": "मिठाई",
+  "Crowd Fav": "भीड़ की पसंद",
+  "Quick Bite": "झटपट",
+};
+
 export default function PlanningFor() {
+  const { lang, t } = useLang();
   const [selected, setSelected] = useState<string>(planningOccasions[0].id);
   const selectedOccasion =
     planningOccasions.find((o) => o.id === selected) ?? planningOccasions[0];
+  const selectedName =
+    lang === "hi" ? selectedOccasion.nameHi : selectedOccasion.name;
 
   return (
     <section className="relative isolate overflow-hidden bg-ink">
@@ -65,8 +78,8 @@ export default function PlanningFor() {
       <div className="flex min-h-[560px] flex-col justify-between py-12 sm:min-h-[680px] sm:py-14">
         {/* Ribbon — label + stamped occasion pills */}
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-2.5 px-5 sm:gap-3">
-          <span className="eyebrow mr-1 text-xs font-semibold text-cream/80 sm:text-[13px]">
-            Planning For
+          <span className="eyebrow mr-1 w-full whitespace-nowrap text-center text-xs font-semibold text-cream/80 sm:w-auto sm:text-[13px]">
+            {t("Planning For", "किसके लिए प्लान कर रहे हैं")}
           </span>
 
           {planningOccasions.map((o: PlanningOccasion) => {
@@ -86,7 +99,7 @@ export default function PlanningFor() {
                 }
               >
                 <Icon className="h-[18px] w-[18px]" />
-                <span className="whitespace-nowrap">{o.name}</span>
+                <span className="whitespace-nowrap">{lang === "hi" ? o.nameHi : o.name}</span>
               </button>
             );
           })}
@@ -100,7 +113,8 @@ export default function PlanningFor() {
           <div className="mb-7 flex items-center justify-center gap-4 px-5">
             <span aria-hidden="true" className="h-px w-10 bg-gradient-to-r from-transparent to-cream/60 sm:w-16" />
             <p className="eyebrow text-center text-xs font-bold uppercase tracking-[0.28em] text-cream drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-sm">
-              Trending for {selectedOccasion.name}
+              {t("Trending for ", "ट्रेंडिंग — ")}
+              {selectedName}
             </p>
             <span aria-hidden="true" className="h-px w-10 bg-gradient-to-l from-transparent to-cream/60 sm:w-16" />
           </div>
@@ -123,7 +137,7 @@ export default function PlanningFor() {
                   {dish.name}
                 </span>
                 <span className="rounded-full bg-maroon px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream shadow-[0_4px_12px_-4px_rgba(0,0,0,0.7)] sm:text-[11px]">
-                  {dish.tag}
+                  {lang === "hi" ? tagHi[dish.tag] ?? dish.tag : dish.tag}
                 </span>
               </li>
             ))}
@@ -136,16 +150,16 @@ export default function PlanningFor() {
           className="animate-fade mx-auto mt-10 flex w-full max-w-7xl flex-col items-start gap-3 px-5 text-cream"
         >
           <h2 className="text-2xl font-semibold tracking-wide sm:text-3xl lg:text-4xl">
-            {selectedOccasion.name}
+            {selectedName}
           </h2>
           <p className="max-w-xl text-sm text-cream/85 sm:text-base">
-            {selectedOccasion.tagline}
+            {lang === "hi" ? selectedOccasion.taglineHi : selectedOccasion.tagline}
           </p>
           <Link
             href="/book"
             className="btn-sheen group mt-2 inline-flex items-center gap-1.5 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-[0_10px_24px_-10px_rgba(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon/90 active:scale-95"
           >
-            Start planning
+            {t("Start planning", "प्लानिंग शुरू करें")}
             <span
               aria-hidden="true"
               className="inline-block transition-transform duration-300 group-hover:translate-x-1"

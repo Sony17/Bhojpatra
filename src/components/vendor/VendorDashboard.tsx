@@ -12,6 +12,7 @@ import {
   type EarningRow,
   type VendorNotification,
 } from "@/lib/data";
+import { useLang } from "@/lib/i18n";
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(n)}`;
@@ -24,13 +25,13 @@ type Tab =
   | "profile"
   | "notifications";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "requests", label: "Booking Requests" },
-  { id: "calendar", label: "Order Calendar" },
-  { id: "earnings", label: "Earnings" },
-  { id: "profile", label: "Profile" },
-  { id: "notifications", label: "Notifications" },
+const TABS: { id: Tab; en: string; hi: string }[] = [
+  { id: "overview", en: "Overview", hi: "अवलोकन" },
+  { id: "requests", en: "Booking Requests", hi: "बुकिंग अनुरोध" },
+  { id: "calendar", en: "Order Calendar", hi: "ऑर्डर कैलेंडर" },
+  { id: "earnings", en: "Earnings", hi: "कमाई" },
+  { id: "profile", en: "Profile", hi: "प्रोफ़ाइल" },
+  { id: "notifications", en: "Notifications", hi: "सूचनाएं" },
 ];
 
 interface VendorProfile {
@@ -55,6 +56,7 @@ const INITIAL_PROFILE: VendorProfile = {
 };
 
 export default function VendorDashboard() {
+  const { t } = useLang();
   const [tab, setTab] = useState<Tab>("overview");
   const [requests, setRequests] = useState<BookingRequest[]>([
     ...vendorBookingRequests,
@@ -81,14 +83,14 @@ export default function VendorDashboard() {
 
       {/* Tab bar */}
       <div className="mt-8 flex flex-wrap gap-2.5">
-        {TABS.map((t) => {
-          const active = tab === t.id;
-          const showBadge = t.id === "notifications" && unreadCount > 0;
+        {TABS.map((tab_) => {
+          const active = tab === tab_.id;
+          const showBadge = tab_.id === "notifications" && unreadCount > 0;
           return (
             <button
-              key={t.id}
+              key={tab_.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(tab_.id)}
               aria-pressed={active}
               className={
                 "inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-colors " +
@@ -97,7 +99,7 @@ export default function VendorDashboard() {
                   : "bg-cream-2 text-ink-soft hover:bg-cream-3")
               }
             >
-              {t.label}
+              {t(tab_.en, tab_.hi)}
               {showBadge && (
                 <span
                   className={
@@ -143,33 +145,42 @@ function DashboardHeader({
   unreadCount: number;
   onBell: () => void;
 }) {
+  const { t } = useLang();
   return (
     <div className="flex flex-col gap-5 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div>
-        <p className="eyebrow text-sm font-medium text-gold">Vendor Dashboard</p>
+        <p className="eyebrow text-sm font-medium text-gold">
+          {t("Vendor Dashboard", "वेंडर डैशबोर्ड")}
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-2xl text-ink sm:text-3xl">
             Awadhi Royal Caterers
           </h1>
           <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
-            <span aria-hidden="true">✓</span> Verified
+            <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-cream-3 bg-cream-2 px-3 py-1 text-xs font-semibold text-ink">
             <span aria-hidden="true" className="text-gold">
               ◆
             </span>{" "}
-            Platinum
+            {t("Platinum", "प्लैटिनम")}
           </span>
         </div>
         <p className="font-script mt-2 text-lg text-ink-soft">
-          Welcome back — here&rsquo;s what&rsquo;s cooking today.
+          {t(
+            "Welcome back — here's what's cooking today.",
+            "वापसी पर स्वागत है — आज क्या पक रहा है, यहाँ देखें।",
+          )}
         </p>
       </div>
 
       <button
         type="button"
         onClick={onBell}
-        aria-label={`Notifications, ${unreadCount} unread`}
+        aria-label={t(
+          `Notifications, ${unreadCount} unread`,
+          `सूचनाएं, ${unreadCount} अपठित`,
+        )}
         className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-full border border-cream-3 bg-cream-2 text-lg text-ink transition hover:bg-cream-3 sm:self-auto"
       >
         <span aria-hidden="true">🔔</span>
@@ -186,23 +197,24 @@ function DashboardHeader({
 /* ── Shared bits ────────────────────────────────────────────────────────── */
 
 function RequestStatusBadge({ status }: { status: RequestStatus }) {
+  const { t } = useLang();
   if (status === "Accepted") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
-        <span aria-hidden="true">✓</span> Accepted
+        <span aria-hidden="true">✓</span> {t("Accepted", "स्वीकृत")}
       </span>
     );
   }
   if (status === "Declined") {
     return (
       <span className="inline-flex items-center rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
-        Declined
+        {t("Declined", "अस्वीकृत")}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center rounded-full border border-maroon px-3 py-1 text-xs font-semibold text-maroon">
-      New
+      {t("New", "नया")}
     </span>
   );
 }
@@ -216,6 +228,7 @@ function OverviewPanel({
   requests: BookingRequest[];
   onSeeAll: () => void;
 }) {
+  const { t } = useLang();
   const recent = requests.slice(0, 3);
 
   const total = vendorEarnings.reduce((s, e) => s + e.amount, 0);
@@ -252,14 +265,14 @@ function OverviewPanel({
         <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold text-ink">
-              Recent Requests
+              {t("Recent Requests", "हाल के अनुरोध")}
             </h2>
             <button
               type="button"
               onClick={onSeeAll}
               className="text-sm font-semibold text-maroon hover:underline"
             >
-              See all
+              {t("See all", "सभी देखें")}
             </button>
           </div>
           <ul className="mt-4 divide-y divide-cream-3">
@@ -271,7 +284,7 @@ function OverviewPanel({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{r.customer}</p>
                   <p className="text-sm text-ink-soft">
-                    {r.occasion} · {r.guests} pax · {r.city}
+                    {r.occasion} · {r.guests} {t("pax", "मेहमान")} · {r.city}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
@@ -288,21 +301,21 @@ function OverviewPanel({
         {/* Mini earnings summary */}
         <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
           <h2 className="font-display text-lg font-semibold text-ink">
-            Earnings Summary
+            {t("Earnings Summary", "कमाई का सारांश")}
           </h2>
           <dl className="mt-4 space-y-3">
             <div className="flex items-baseline justify-between">
-              <dt className="text-sm text-ink-soft">Total</dt>
+              <dt className="text-sm text-ink-soft">{t("Total", "कुल")}</dt>
               <dd className="font-display text-xl font-bold text-ink">
                 {money(total)}
               </dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-cream-3 pt-3">
-              <dt className="text-sm text-ink-soft">Settled</dt>
+              <dt className="text-sm text-ink-soft">{t("Settled", "निपटाया गया")}</dt>
               <dd className="font-semibold text-ink">{money(settled)}</dd>
             </div>
             <div className="flex items-baseline justify-between">
-              <dt className="text-sm text-ink-soft">Pending</dt>
+              <dt className="text-sm text-ink-soft">{t("Pending", "पेंडिंग")}</dt>
               <dd className="font-semibold text-maroon">{money(pending)}</dd>
             </div>
           </dl>
@@ -328,7 +341,17 @@ function RequestsPanel({
   requests: BookingRequest[];
   onSetStatus: (id: string, status: RequestStatus) => void;
 }) {
+  const { t } = useLang();
   const [filter, setFilter] = useState<"All" | RequestStatus>("All");
+
+  const filterLabel = (f: "All" | RequestStatus) =>
+    f === "All"
+      ? t("All", "सभी")
+      : f === "New"
+        ? t("New", "नया")
+        : f === "Accepted"
+          ? t("Accepted", "स्वीकृत")
+          : t("Declined", "अस्वीकृत");
 
   const visible = useMemo(
     () =>
@@ -361,7 +384,7 @@ function RequestsPanel({
                   : "bg-cream-2 text-ink-soft hover:bg-cream-3")
               }
             >
-              {f} ({count})
+              {filterLabel(f)} ({count})
             </button>
           );
         })}
@@ -369,9 +392,11 @@ function RequestsPanel({
 
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
-          <p className="font-display text-lg text-ink">No requests here</p>
+          <p className="font-display text-lg text-ink">
+            {t("No requests here", "यहाँ कोई अनुरोध नहीं")}
+          </p>
           <p className="mt-1 text-sm text-ink-soft">
-            Try a different filter.
+            {t("Try a different filter.", "कोई दूसरा फ़िल्टर आज़माएं।")}
           </p>
         </div>
       ) : (
@@ -391,10 +416,11 @@ function RequestsPanel({
                     <span className="text-xs text-ink-soft">{r.id}</span>
                   </div>
                   <p className="mt-1.5 text-sm text-ink-soft">
-                    {r.occasion} · {r.date} · {r.guests} guests · {r.city}
+                    {r.occasion} · {r.date} · {r.guests} {t("guests", "मेहमान")} ·{" "}
+                    {r.city}
                   </p>
                   <p className="mt-1 text-sm text-ink-soft">
-                    Estimated value:{" "}
+                    {t("Estimated value:", "अनुमानित मूल्य:")}{" "}
                     <span className="font-display font-semibold text-maroon">
                       {money(r.estValue)}
                     </span>
@@ -408,14 +434,14 @@ function RequestsPanel({
                       onClick={() => onSetStatus(r.id, "Accepted")}
                       className="flex-1 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:flex-none"
                     >
-                      Accept
+                      {t("Accept", "स्वीकारें")}
                     </button>
                     <button
                       type="button"
                       onClick={() => onSetStatus(r.id, "Declined")}
                       className="flex-1 rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition hover:bg-cream-2 sm:flex-none"
                     >
-                      Decline
+                      {t("Decline", "अस्वीकारें")}
                     </button>
                   </div>
                 )}
@@ -430,9 +456,12 @@ function RequestsPanel({
 
 /* ── Order Calendar (July 2026) ─────────────────────────────────────────── */
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_HI = ["रवि", "सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि"];
 
 function CalendarPanel() {
+  const { t, lang } = useLang();
+  const weekdays = lang === "hi" ? WEEKDAYS_HI : WEEKDAYS_EN;
   const year = 2026; // July 2026 (calendar is fixed to this month)
   const daysInMonth = 31;
   // July 1 2026 is a Wednesday → index 3 (Sun=0).
@@ -456,14 +485,17 @@ function CalendarPanel() {
     <div className="space-y-6">
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="font-display text-lg font-semibold text-ink">
-          July {year}
+          {t("July", "जुलाई")} {year}
         </h2>
         <p className="font-script mt-1 text-base text-ink-soft">
-          Your confirmed events at a glance.
+          {t(
+            "Your confirmed events at a glance.",
+            "आपके पुष्ट इवेंट एक नज़र में।",
+          )}
         </p>
 
         <div className="mt-5 grid grid-cols-7 gap-0.5 text-center sm:gap-1.5">
-          {WEEKDAYS.map((w) => (
+          {weekdays.map((w) => (
             <div
               key={w}
               className="py-2 text-xs font-semibold uppercase tracking-wide text-ink-soft"
@@ -510,7 +542,7 @@ function CalendarPanel() {
       {/* Legend */}
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <h3 className="font-display text-base font-semibold text-ink">
-          Confirmed Events
+          {t("Confirmed Events", "पुष्ट इवेंट")}
         </h3>
         <ul className="mt-3 space-y-2">
           {vendorCalendarEvents
@@ -528,7 +560,7 @@ function CalendarPanel() {
                     className="h-2 w-2 shrink-0 rounded-full bg-maroon"
                   />
                   <span className="font-semibold text-maroon">
-                    {Number(d)} Jul
+                    {Number(d)} {t("Jul", "जुल")}
                   </span>
                   <span className="text-ink-soft">{ev.label}</span>
                 </li>
@@ -543,10 +575,16 @@ function CalendarPanel() {
 /* ── Earnings ───────────────────────────────────────────────────────────── */
 
 function EarningStatusBadge({ status }: { status: EarningRow["status"] }) {
+  const { t } = useLang();
   const styles: Record<EarningRow["status"], string> = {
     Settled: "bg-maroon text-cream",
     "Advance Received": "border border-maroon text-maroon",
     Pending: "bg-cream-2 text-ink-soft",
+  };
+  const label: Record<EarningRow["status"], string> = {
+    Settled: t("Settled", "निपटाया गया"),
+    "Advance Received": t("Advance Received", "अग्रिम प्राप्त"),
+    Pending: t("Pending", "पेंडिंग"),
   };
   return (
     <span
@@ -555,12 +593,13 @@ function EarningStatusBadge({ status }: { status: EarningRow["status"] }) {
         styles[status]
       }
     >
-      {status}
+      {label[status]}
     </span>
   );
 }
 
 function EarningsPanel() {
+  const { t } = useLang();
   const total = vendorEarnings.reduce((s, e) => s + e.amount, 0);
   const settled = vendorEarnings
     .filter((e) => e.status === "Settled")
@@ -574,9 +613,17 @@ function EarningsPanel() {
       {/* Summary band */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         {[
-          { label: "Total Earnings", value: total, accent: "text-ink" },
-          { label: "Settled", value: settled, accent: "text-ink" },
-          { label: "Pending / In-flight", value: pending, accent: "text-maroon" },
+          {
+            label: t("Total Earnings", "कुल कमाई"),
+            value: total,
+            accent: "text-ink",
+          },
+          { label: t("Settled", "निपटाया गया"), value: settled, accent: "text-ink" },
+          {
+            label: t("Pending / In-flight", "लंबित / प्रक्रियाधीन"),
+            value: pending,
+            accent: "text-maroon",
+          },
         ].map((c) => (
           <div
             key={c.label}
@@ -593,10 +640,10 @@ function EarningsPanel() {
       {/* Rows */}
       <div className="overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
         <div className="hidden grid-cols-12 gap-3 border-b border-cream-3 bg-cream-2 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-soft sm:grid">
-          <span className="col-span-5">Event</span>
-          <span className="col-span-3">Date</span>
-          <span className="col-span-2 text-right">Amount</span>
-          <span className="col-span-2 text-right">Status</span>
+          <span className="col-span-5">{t("Event", "इवेंट")}</span>
+          <span className="col-span-3">{t("Date", "तारीख")}</span>
+          <span className="col-span-2 text-right">{t("Amount", "राशि")}</span>
+          <span className="col-span-2 text-right">{t("Status", "स्थिति")}</span>
         </div>
         <ul className="divide-y divide-cream-3">
           {vendorEarnings.map((e) => (
@@ -631,6 +678,7 @@ const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30";
 
 function ProfilePanel() {
+  const { t } = useLang();
   const [profile, setProfile] = useState<VendorProfile>(INITIAL_PROFILE);
   const [saved, setSaved] = useState<boolean>(false);
 
@@ -653,15 +701,17 @@ function ProfilePanel() {
       className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6"
     >
       <h2 className="font-display text-lg font-semibold text-ink">
-        Profile Management
+        {t("Profile Management", "प्रोफ़ाइल प्रबंधन")}
       </h2>
       <p className="mt-1 text-sm text-ink-soft">
-        Keep your business details current. You can also edit your menus,
-        per-plate pricing and gallery photos from here.
+        {t(
+          "Keep your business details current. You can also edit your menus, per-plate pricing and gallery photos from here.",
+          "अपने बिज़नेस विवरण अद्यतन रखें। आप यहाँ से अपने मेन्यू, प्रति-प्लेट मूल्य और गैलरी फ़ोटो भी संपादित कर सकते हैं।",
+        )}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field label="Business Name">
+        <Field label={t("Business Name", "बिज़नेस का नाम")}>
           <input
             type="text"
             value={profile.businessName}
@@ -669,7 +719,7 @@ function ProfilePanel() {
             className={inputClass}
           />
         </Field>
-        <Field label="Owner Name">
+        <Field label={t("Owner Name", "मालिक का नाम")}>
           <input
             type="text"
             value={profile.owner}
@@ -677,7 +727,7 @@ function ProfilePanel() {
             className={inputClass}
           />
         </Field>
-        <Field label="Phone">
+        <Field label={t("Phone", "फ़ोन")}>
           <input
             type="tel"
             value={profile.phone}
@@ -685,7 +735,7 @@ function ProfilePanel() {
             className={inputClass}
           />
         </Field>
-        <Field label="Email">
+        <Field label={t("Email", "ईमेल")}>
           <input
             type="email"
             value={profile.email}
@@ -693,7 +743,7 @@ function ProfilePanel() {
             className={inputClass}
           />
         </Field>
-        <Field label="City">
+        <Field label={t("City", "शहर")}>
           <input
             type="text"
             value={profile.city}
@@ -701,7 +751,7 @@ function ProfilePanel() {
             className={inputClass}
           />
         </Field>
-        <Field label="Base Price (₹ / plate)">
+        <Field label={t("Base Price (₹ / plate)", "आधार मूल्य (₹ / प्लेट)")}>
           <input
             type="number"
             min={0}
@@ -711,7 +761,7 @@ function ProfilePanel() {
           />
         </Field>
         <div className="sm:col-span-2">
-          <Field label="About / Description">
+          <Field label={t("About / Description", "विवरण / परिचय")}>
             <textarea
               rows={4}
               value={profile.about}
@@ -727,7 +777,7 @@ function ProfilePanel() {
           type="submit"
           className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
         >
-          Save Changes
+          {t("Save Changes", "बदलाव सहेजें")}
         </button>
         {saved && (
           <span
@@ -737,7 +787,7 @@ function ProfilePanel() {
             <span aria-hidden="true" className="text-maroon">
               ✓
             </span>{" "}
-            Profile updated
+            {t("Profile updated", "प्रोफ़ाइल अपडेट हो गई")}
           </span>
         )}
       </div>
@@ -771,6 +821,7 @@ function NotificationsPanel({
   notifications: VendorNotification[];
   onMarkAllRead: () => void;
 }) {
+  const { t } = useLang();
   const hasUnread = notifications.some((n) => n.unread);
 
   return (
@@ -778,10 +829,13 @@ function NotificationsPanel({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink">
-            Notifications
+            {t("Notifications", "सूचनाएं")}
           </h2>
           <p className="text-sm text-ink-soft">
-            Real-time alerts — also sent to you over WhatsApp &amp; email.
+            {t(
+              "Real-time alerts — also sent to you over WhatsApp & email.",
+              "रीयल-टाइम अलर्ट — व्हाट्सएप और ईमेल पर भी भेजे जाते हैं।",
+            )}
           </p>
         </div>
         <button
@@ -790,7 +844,7 @@ function NotificationsPanel({
           disabled={!hasUnread}
           className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Mark all read
+          {t("Mark all read", "सभी पढ़े हुए चिह्नित करें")}
         </button>
       </div>
 

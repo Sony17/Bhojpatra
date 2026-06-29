@@ -9,11 +9,10 @@ export default function ChooseSpecialists() {
       className="mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
       <Reveal className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">03</p>
-        <h2 className="mt-2 text-3xl text-ink sm:text-4xl">
+        <h2 className="text-3xl text-ink sm:text-4xl">
           Choose Specialists
         </h2>
-        <p className="font-script mt-3 text-xl text-ink-soft">
+        <p className="font-sans mt-3 text-xl text-ink-soft">
           Different specialists for every dish — each rated, reviewed, and booked à la carte.
         </p>
       </Reveal>

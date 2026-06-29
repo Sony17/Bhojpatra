@@ -244,7 +244,7 @@ export default function ApprovalsConsole() {
                         <p className="font-medium text-ink">{d.kind}</p>
                         <StatusBadge status={d.status} />
                       </div>
-                      <p className="mt-0.5 font-mono text-sm text-ink-soft">{d.number}</p>
+                      <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
                     </div>
                     <div className="flex shrink-0 gap-2.5">
                       <button

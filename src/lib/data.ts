@@ -20,6 +20,7 @@ export interface Step {
 export interface Occasion {
   id: string;
   name: string;
+  nameHi: string;
   icon: string; // emoji placeholder until real iconography is supplied
   image: string;
 }
@@ -27,17 +28,35 @@ export interface Occasion {
 export interface Category {
   id: string;
   name: string;
+  nameHi: string;
   icon: string;
   image: string;
+}
+
+/** One line in a package's feature list. A `heading` item renders as a bold
+    course header (e.g. "Main Course") without a tick/chevron; everything else
+    is a normal listed item. */
+export interface PackageFeature {
+  label: string;
+  labelHi: string;
+  heading?: boolean;
 }
 
 export interface PackageTier {
   id: string;
   name: string;
+  nameHi: string;
   price: string;
   unit: string;
+  unitHi: string;
   popular?: boolean;
-  features: string[];
+  /** Short label shown under the price (e.g. "Fixed Menu"). */
+  tagline?: string;
+  taglineHi?: string;
+  features: PackageFeature[];
+  /** Closing note above the CTA — one line per entry. */
+  footnote?: string[];
+  footnoteHi?: string[];
   image: string;
 }
 
@@ -125,20 +144,21 @@ export const steps: Step[] = [
 ];
 
 export const occasions: Occasion[] = [
-  { id: "wedding", name: "Wedding", icon: "💍", image: img("photo-1414235077428-338989a2e8c0") },
-  { id: "engagement", name: "Engagement", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf") },
-  { id: "tilak", name: "Tilak", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7") },
-  { id: "haldi", name: "Haldi", icon: "🌼", image: img("photo-1606491956689-2ea866880c84") },
-  { id: "mehndi", name: "Mehndi", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c") },
-  { id: "reception", name: "Reception", icon: "🥂", image: img("photo-1565557623262-b51c2513a641") },
-  { id: "birthday", name: "Birthday Party", icon: "🎂", image: img("photo-1530103862676-de8c9debad1d") },
-  { id: "corporate", name: "Corporate Event", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4") },
+  { id: "wedding", name: "Wedding", nameHi: "शादी", icon: "💍", image: img("photo-1414235077428-338989a2e8c0") },
+  { id: "engagement", name: "Engagement", nameHi: "सगाई", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf") },
+  { id: "tilak", name: "Tilak", nameHi: "तिलक", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7") },
+  { id: "haldi", name: "Haldi", nameHi: "हल्दी", icon: "🌼", image: img("photo-1606491956689-2ea866880c84") },
+  { id: "mehndi", name: "Mehndi", nameHi: "मेहंदी", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c") },
+  { id: "reception", name: "Reception", nameHi: "रिसेप्शन", icon: "🥂", image: img("photo-1565557623262-b51c2513a641") },
+  { id: "birthday", name: "Birthday Party", nameHi: "बर्थडे पार्टी", icon: "🎂", image: img("photo-1530103862676-de8c9debad1d") },
+  { id: "corporate", name: "Corporate Event", nameHi: "कॉर्पोरेट इवेंट", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4") },
 ];
 
 /** A crowd-favourite dish surfaced in the "Trending" panel per occasion. */
 export interface TrendingDish {
   name: string;
-  /** Short badge, e.g. "Bestseller", "Most Loved". */
+  /** Short badge, e.g. "Bestseller", "Most Loved". Translated via a map in the
+   *  PlanningFor component since the vocabulary is small and fixed. */
   tag: string;
   image: string;
 }
@@ -146,10 +166,12 @@ export interface TrendingDish {
 export interface PlanningOccasion {
   id: string;
   name: string;
+  nameHi: string;
   iconKey: string;
   image: string;
   /** One-line descriptor shown over the cinematic showcase for the occasion. */
   tagline: string;
+  taglineHi: string;
   /** Up to 5 crowd-favourite dishes for this occasion. */
   trending: TrendingDish[];
 }
@@ -164,8 +186,9 @@ const trendingImg = (id: string) => img(id, 120);
 
 export const planningOccasions: PlanningOccasion[] = [
   {
-    id: "any", name: "Any Occasion", iconKey: "sparkle", image: img("photo-1565557623262-b51c2513a641", 1400),
+    id: "any", name: "Any Occasion", nameHi: "कोई भी अवसर", iconKey: "sparkle", image: img("photo-1565557623262-b51c2513a641", 1400),
     tagline: "Whatever you're celebrating, we cater it beautifully.",
+    taglineHi: "आप जो भी मना रहे हों, हम उसे खूबसूरती से कैटर करते हैं।",
     trending: [
       { name: "Paneer Butter Masala", tag: "Bestseller", image: trendingImg("photo-1631452180519-c014fe946bc7") },
       { name: "Dum Biryani", tag: "Most Loved", image: trendingImg("photo-1563379091339-03b21ab4a4f8") },
@@ -175,8 +198,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "wedding", name: "Wedding", iconKey: "rings", image: img("photo-1414235077428-338989a2e8c0", 1400),
+    id: "wedding", name: "Wedding", nameHi: "शादी", iconKey: "rings", image: img("photo-1414235077428-338989a2e8c0", 1400),
     tagline: "Grand wedding feasts, flawlessly planned and served.",
+    taglineHi: "भव्य शादी के भोज, बेहतरीन तरीके से प्लान और सर्व किए गए।",
     trending: [
       { name: "Mutton Rogan Josh", tag: "Bestseller", image: trendingImg("photo-1633945274405-b6c8069047b0") },
       { name: "Shahi Paneer", tag: "Most Loved", image: trendingImg("photo-1631452180519-c014fe946bc7") },
@@ -186,8 +210,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "corporate", name: "Corporate", iconKey: "briefcase", image: img("photo-1517248135467-4c7edcad34c4", 1400),
+    id: "corporate", name: "Corporate", nameHi: "कॉर्पोरेट", iconKey: "briefcase", image: img("photo-1517248135467-4c7edcad34c4", 1400),
     tagline: "Polished catering that impresses every guest.",
+    taglineHi: "बेहतरीन कैटरिंग जो हर मेहमान को प्रभावित करे।",
     trending: [
       { name: "Veg Manchurian", tag: "Bestseller", image: trendingImg("photo-1585032226651-759b368d7246") },
       { name: "Pasta Counter", tag: "Trending", image: trendingImg("photo-1473093295043-cdd812d0e601") },
@@ -197,8 +222,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "birthday", name: "Birthday", iconKey: "gift", image: img("photo-1530103862676-de8c9debad1d", 1400),
+    id: "birthday", name: "Birthday", nameHi: "बर्थडे", iconKey: "gift", image: img("photo-1530103862676-de8c9debad1d", 1400),
     tagline: "Joyful spreads that make the day unforgettable.",
+    taglineHi: "खुशियों भरे व्यंजन जो दिन को यादगार बना दें।",
     trending: [
       { name: "Cheese Pizza", tag: "Bestseller", image: trendingImg("photo-1565299624946-b28f40a0ae38") },
       { name: "Chilli Gobi", tag: "Trending", image: trendingImg("photo-1585032226651-759b368d7246") },
@@ -208,8 +234,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "festival", name: "Festival", iconKey: "lantern", image: img("photo-1631452180519-c014fe946bc7", 1400),
+    id: "festival", name: "Festival", nameHi: "त्योहार", iconKey: "lantern", image: img("photo-1631452180519-c014fe946bc7", 1400),
     tagline: "Festive menus steeped in tradition.",
+    taglineHi: "परंपरा में रचे-बसे त्योहारी मेन्यू।",
     trending: [
       { name: "Gajar Ka Halwa", tag: "Bestseller", image: trendingImg("photo-1601050690597-df0568f70950") },
       { name: "Chole Bhature", tag: "Most Loved", image: trendingImg("photo-1585937421612-70a008356fbe") },
@@ -219,8 +246,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "house-party", name: "House Party", iconKey: "home", image: img("photo-1519225421980-715cb0215aed", 1400),
+    id: "house-party", name: "House Party", nameHi: "हाउस पार्टी", iconKey: "home", image: img("photo-1519225421980-715cb0215aed", 1400),
     tagline: "Effortless feasts for gatherings at home.",
+    taglineHi: "घर की महफ़िलों के लिए आसान भोज।",
     trending: [
       { name: "Tandoori Chicken", tag: "Bestseller", image: trendingImg("photo-1633945274405-b6c8069047b0") },
       { name: "Veg Biryani", tag: "Most Loved", image: trendingImg("photo-1563379091339-03b21ab4a4f8") },
@@ -230,8 +258,9 @@ export const planningOccasions: PlanningOccasion[] = [
     ],
   },
   {
-    id: "pooja", name: "Pooja / Bhandara", iconKey: "diya", image: img("photo-1606491956689-2ea866880c84", 1400),
+    id: "pooja", name: "Pooja / Bhandara", nameHi: "पूजा / भंडारा", iconKey: "diya", image: img("photo-1606491956689-2ea866880c84", 1400),
     tagline: "Pure, satvik bhojan for every ritual.",
+    taglineHi: "हर अनुष्ठान के लिए शुद्ध, सात्विक भोजन।",
     trending: [
       { name: "Kadhi Chawal", tag: "Bestseller", image: trendingImg("photo-1585937421612-70a008356fbe") },
       { name: "Aloo Puri", tag: "Most Loved", image: trendingImg("photo-1606491956689-2ea866880c84") },
@@ -242,68 +271,118 @@ export const planningOccasions: PlanningOccasion[] = [
   },
 ];
 
-export const cities: { id: string; name: string }[] = [
-  { id: "lucknow", name: "Lucknow" },
-  { id: "delhi", name: "Delhi" },
-  { id: "mumbai", name: "Mumbai" },
-  { id: "bengaluru", name: "Bengaluru" },
-  { id: "kolkata", name: "Kolkata" },
-  { id: "hyderabad", name: "Hyderabad" },
-  { id: "jaipur", name: "Jaipur" },
-  { id: "pune", name: "Pune" },
+export const cities: { id: string; name: string; nameHi: string }[] = [
+  { id: "lucknow", name: "Lucknow", nameHi: "लखनऊ" },
+  { id: "delhi", name: "Delhi", nameHi: "दिल्ली" },
+  { id: "mumbai", name: "Mumbai", nameHi: "मुंबई" },
+  { id: "bengaluru", name: "Bengaluru", nameHi: "बेंगलुरु" },
+  { id: "kolkata", name: "Kolkata", nameHi: "कोलकाता" },
+  { id: "hyderabad", name: "Hyderabad", nameHi: "हैदराबाद" },
+  { id: "jaipur", name: "Jaipur", nameHi: "जयपुर" },
+  { id: "pune", name: "Pune", nameHi: "पुणे" },
 ];
 
 export const categories: Category[] = [
-  { id: "caterers", name: "Caterers", icon: "🍲", image: img("photo-1599487488170-d11ec9c172f0", 500) },
-  { id: "live-counters", name: "Live Counters", icon: "🍳", image: img("photo-1565895405227-31cffbe0cf86", 500) },
-  { id: "chaat", name: "Chaat Experts", icon: "🥘", image: img("photo-1601050690597-df0568f70950", 500) },
-  { id: "sweets", name: "Sweet Specialists", icon: "🍬", image: img("photo-1631452180519-c014fe946bc7", 500) },
-  { id: "beverages", name: "Beverage Partners", icon: "🥤", image: img("photo-1437418747212-8d9709afab22", 500) },
-  { id: "decor", name: "Decor & More", icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 500) },
+  { id: "caterers", name: "Caterers", nameHi: "केटरर्स", icon: "🍲", image: img("photo-1599487488170-d11ec9c172f0", 500) },
+  { id: "live-counters", name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍳", image: img("photo-1565895405227-31cffbe0cf86", 500) },
+  { id: "chaat", name: "Chaat Experts", nameHi: "चाट एक्सपर्ट", icon: "🥘", image: img("photo-1601050690597-df0568f70950", 500) },
+  { id: "sweets", name: "Sweet Specialists", nameHi: "मिठाई स्पेशलिस्ट", icon: "🍬", image: img("photo-1631452180519-c014fe946bc7", 500) },
+  { id: "beverages", name: "Beverage Partners", nameHi: "बेवरेज पार्टनर", icon: "🥤", image: img("photo-1437418747212-8d9709afab22", 500) },
+  { id: "decor", name: "Decor & More", nameHi: "सजावट और बहुत कुछ", icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 500) },
 ];
 
 export const packages: PackageTier[] = [
   {
     id: "silver",
     name: "Silver",
+    nameHi: "सिल्वर",
     price: "₹799",
     unit: "/ Plate",
+    unitHi: "/ प्लेट",
+    tagline: "Fixed Menu",
+    taglineHi: "फिक्स्ड मेन्यू",
     image: img("photo-1490645935967-10de6ba17061"),
     features: [
-      "Welcome Drink",
-      "2 Starters",
-      "1 Live Counter",
-      "Main Course (Veg)",
-      "1 Sweet (Select)",
+      { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
+      { label: "2 Starters", labelHi: "2 स्टार्टर" },
+      { label: "Main Course", labelHi: "मेन कोर्स", heading: true },
+      {
+        label:
+          "1 Paneer, Dry Veg, Dal, Chawal, Raita, Salad, Papad, Achar, Puri / Nan",
+        labelHi:
+          "1 पनीर, ड्राय वेज, दाल, चावल, रायता, सलाद, पापड़, अचार, पूरी / नान",
+      },
+      { label: "1 Sweet", labelHi: "1 मिठाई" },
     ],
+    footnote: ["5 Vendors", "Same Menu", "Same Price"],
+    footnoteHi: ["5 वेंडर", "एक ही मेन्यू", "एक ही कीमत"],
   },
   {
     id: "gold",
     name: "Gold",
+    nameHi: "गोल्ड",
     price: "₹1199",
     unit: "/ Plate",
+    unitHi: "/ प्लेट",
     popular: true,
+    tagline: "Popular Choice",
+    taglineHi: "लोकप्रिय विकल्प",
     image: img("photo-1543339308-43e59d6b73a6"),
     features: [
-      "Welcome Drink",
-      "5 Starters (Select)",
-      "South Indian Counter",
-      "Chinese (Select)",
-      "Multiple Choices — build your perfect menu",
+      { label: "Welcome Drink", labelHi: "वेलकम ड्रिंक" },
+      { label: "5 Starters (Select)", labelHi: "5 स्टार्टर (चुनें)" },
+      { label: "Live Stalls (3)", labelHi: "लाइव स्टॉल (3)" },
+      { label: "Chaat (Select)", labelHi: "चाट (चुनें)" },
+      { label: "Chinese (Select)", labelHi: "चाइनीज़ (चुनें)" },
+      { label: "South Indian (Select)", labelHi: "साउथ इंडियन (चुनें)" },
+      { label: "Main Course (Select)", labelHi: "मेन कोर्स (चुनें)" },
+      { label: "Sweet Stall (Select)", labelHi: "स्वीट स्टॉल (चुनें)" },
     ],
+    footnote: ["Multiple Choices", "Build Your Perfect Menu"],
+    footnoteHi: ["कई विकल्प", "अपना परफेक्ट मेन्यू बनाएं"],
   },
   {
     id: "platinum",
     name: "Platinum",
+    nameHi: "प्लैटिनम",
     price: "₹1599+",
     unit: "/ Plate",
+    unitHi: "/ प्लेट",
+    tagline: "India's Best Vendors",
+    taglineHi: "भारत के बेहतरीन वेंडर",
     image: img("photo-1600891964599-f61ba0e24092"),
     features: [
-      "Premium Experience",
-      "Premium Starters",
-      "Live Counters",
-      "Best Main Course Vendors",
-      "Premium Sweet Stall",
+      { label: "Luxury Experience", labelHi: "लग्ज़री अनुभव", heading: true },
+      {
+        label: "Select Multiple Vendors in Every Segment",
+        labelHi: "हर सेगमेंट में कई वेंडर चुनें",
+      },
+      { label: "Premium Welcome Drinks & Starters", labelHi: "प्रीमियम वेलकम ड्रिंक और स्टार्टर" },
+      { label: "Best Chaat & Live Counters", labelHi: "बेहतरीन चाट और लाइव काउंटर" },
+      { label: "Best Main Course Vendors", labelHi: "बेहतरीन मेन कोर्स वेंडर" },
+      { label: "Premium Sweet Stalls", labelHi: "प्रीमियम स्वीट स्टॉल" },
+      { label: "City, State & Pan-India Famous Names", labelHi: "शहर, राज्य और पैन इंडिया मशहूर नाम" },
+      { label: "50 to 50,000 Guests", labelHi: "50 से 50,000 मेहमान" },
+    ],
+    footnote: ["Hand-picked luxury vendors", "for an unforgettable feast"],
+    footnoteHi: ["चुनिंदा लग्ज़री वेंडर", "एक यादगार भोज के लिए"],
+  },
+  {
+    id: "custom",
+    name: "Custom",
+    nameHi: "कस्टम",
+    price: "Your Price",
+    unit: "/ Plate",
+    unitHi: "/ प्लेट",
+    tagline: "Build Your Own",
+    taglineHi: "खुद बनाएं",
+    image: img("photo-1467003909585-2f8a72700288"),
+    features: [
+      { label: "Build Your Own Menu", labelHi: "अपना खुद का मेन्यू बनाएं" },
+      { label: "Pick Any Cuisines & Courses", labelHi: "कोई भी व्यंजन और कोर्स चुनें" },
+      { label: "Add Live Counters & Extras", labelHi: "लाइव काउंटर और एक्स्ट्रा जोड़ें" },
+      { label: "Choose Your Vendor", labelHi: "अपना वेंडर चुनें" },
+      { label: "Pay Only For What You Select", labelHi: "सिर्फ़ अपनी पसंद के लिए भुगतान करें" },
     ],
   },
 ];
@@ -386,7 +465,7 @@ export const venues: Venue[] = [
     priceFrom: "₹2,40,000",
     rating: 4.9,
     reviews: 254,
-    image: img("photo-1561912774-79769a0a0a3a", 600),
+    image: img("photo-1505686994434-e3cc5abf1330", 600),
   },
   {
     id: "imperial-grand",
@@ -558,9 +637,97 @@ export const whyChoose: ValueProp[] = [
   },
 ];
 
+export interface Testimonial {
+  id: string;
+  name: string;
+  role: string; // occasion / context, e.g. "Wedding · Lucknow"
+  roleHi: string;
+  quote: string;
+  quoteHi: string;
+  rating: number;
+  avatar: string;
+}
+
+export const testimonials: Testimonial[] = [
+  {
+    id: "t-1",
+    name: "Ananya Sharma",
+    role: "Wedding · Lucknow",
+    roleHi: "शादी · लखनऊ",
+    quote:
+      "Bhojpatra made catering for our 600-guest wedding effortless. The live counters were the talk of the night and every dish arrived exactly on time.",
+    quoteHi:
+      "भोजपत्र ने हमारी 600 मेहमानों की शादी की कैटरिंग को बेहद आसान बना दिया। लाइव काउंटर रात की जान थे और हर व्यंजन बिल्कुल समय पर आया।",
+    rating: 5,
+    avatar: img("photo-1494790108377-be9c29b29330", 160),
+  },
+  {
+    id: "t-2",
+    name: "Rohit Mehta",
+    role: "Corporate Gala · Delhi",
+    roleHi: "कॉर्पोरेट गाला · दिल्ली",
+    quote:
+      "Transparent pricing and zero surprises. I compared three specialists in minutes and booked the best one for our annual gala without a single call.",
+    quoteHi:
+      "पारदर्शी कीमत और कोई छिपी बात नहीं। मैंने मिनटों में तीन स्पेशलिस्ट की तुलना की और बिना एक भी कॉल किए हमारे सालाना गाला के लिए सबसे अच्छा बुक किया।",
+    rating: 5,
+    avatar: img("photo-1500648767791-00dcc994a43e", 160),
+  },
+  {
+    id: "t-3",
+    name: "Priya Nair",
+    role: "Anniversary · Mumbai",
+    roleHi: "एनिवर्सरी · मुंबई",
+    quote:
+      "The team helped us design a fully vegetarian menu that everyone loved. Support was warm and responsive from first click to the final bite.",
+    quoteHi:
+      "टीम ने हमें पूरी तरह शाकाहारी मेन्यू बनाने में मदद की जो सबको पसंद आया। पहले क्लिक से आखिरी निवाले तक सहयोग गर्मजोशी भरा और तत्पर रहा।",
+    rating: 5,
+    avatar: img("photo-1438761681033-6461ffad8d80", 160),
+  },
+  {
+    id: "t-4",
+    name: "Vikram Singh",
+    role: "Diwali Party · Jaipur",
+    roleHi: "दिवाली पार्टी · जयपुर",
+    quote:
+      "Booking was genuinely a five-minute job and the sweet stall was outstanding. We'll never go back to chasing caterers over the phone.",
+    quoteHi:
+      "बुकिंग वाकई पाँच मिनट का काम था और मिठाई स्टॉल लाजवाब था। अब हम कभी फ़ोन पर केटरर्स के पीछे नहीं भागेंगे।",
+    rating: 5,
+    avatar: img("photo-1507003211169-0a1dd7228f2d", 160),
+  },
+  {
+    id: "t-5",
+    name: "Sneha Reddy",
+    role: "Birthday · Hyderabad",
+    roleHi: "बर्थडे · हैदराबाद",
+    quote:
+      "Loved being able to read real reviews before choosing. Our specialist nailed the South Indian spread and the kids' dessert counter was a hit.",
+    quoteHi:
+      "चुनने से पहले असली समीक्षाएं पढ़ पाना बहुत अच्छा लगा। हमारे स्पेशलिस्ट ने साउथ इंडियन स्प्रेड शानदार बनाया और बच्चों का डेज़र्ट काउंटर हिट रहा।",
+    rating: 5,
+    avatar: img("photo-1534528741775-53994a69daeb", 160),
+  },
+  {
+    id: "t-6",
+    name: "Arjun Kapoor",
+    role: "Engagement · Pune",
+    roleHi: "सगाई · पुणे",
+    quote:
+      "End-to-end assistance is real here. They handled vendor coordination so we could actually enjoy our own engagement. Highly recommend.",
+    quoteHi:
+      "यहाँ शुरू से अंत तक की मदद असली है। उन्होंने वेंडर का सारा समन्वय संभाला ताकि हम अपनी सगाई का असल में आनंद ले सकें। ज़रूर सुझाऊंगा।",
+    rating: 5,
+    avatar: img("photo-1463453091185-61582044d556", 160),
+  },
+];
+
 export interface DropdownItem {
   title: string;
+  titleHi: string;
   subtitle: string;
+  subtitleHi: string;
   href: string;
   iconKey: string;
 }
@@ -568,25 +735,33 @@ export interface DropdownItem {
 export const partnerOptions: DropdownItem[] = [
   {
     title: "As a Vendor",
+    titleHi: "वेंडर के रूप में",
     subtitle: "For Work",
+    subtitleHi: "काम के लिए",
     href: "/vendor/register",
     iconKey: "vendor",
   },
   {
     title: "As an Event Planner",
+    titleHi: "इवेंट प्लानर के रूप में",
     subtitle: "For Refer Business",
+    subtitleHi: "बिज़नेस रेफर करने के लिए",
     href: "/partner",
     iconKey: "planner",
   },
   {
     title: "As an Individual",
+    titleHi: "व्यक्ति के रूप में",
     subtitle: "For Refer Business",
+    subtitleHi: "बिज़नेस रेफर करने के लिए",
     href: "/partner",
     iconKey: "individual",
   },
   {
     title: "As a Venue Owner",
+    titleHi: "वेन्यू मालिक के रूप में",
     subtitle: "GST No. Required",
+    subtitleHi: "GST नंबर आवश्यक",
     href: "/partner",
     iconKey: "venue",
   },
@@ -594,16 +769,15 @@ export const partnerOptions: DropdownItem[] = [
 
 export const navLinks: {
   label: string;
+  labelHi: string;
   href: string;
   hasDropdown?: boolean;
   items?: DropdownItem[];
 }[] = [
-  { label: "Book a Feast", href: "/book" },
-  { label: "Vendors", href: "/vendors" },
-  { label: "Venues", href: "/venues" },
-  { label: "My Bookings", href: "/bookings" },
-  { label: "Partner With Us", href: "/partner", hasDropdown: true, items: partnerOptions },
-  { label: "Contact", href: "/contact" },
+  { label: "Vendors", labelHi: "वेंडर", href: "/vendors" },
+  { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
+  { label: "My Bookings", labelHi: "मेरी बुकिंग", href: "/bookings" },
+  { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
 ];
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -786,6 +960,165 @@ export const coupons: Coupon[] = [
 export const guestPresets: number[] = [50, 100, 250, 500, 1000, 2500];
 
 /* ───────────────────────────────────────────────────────────────────────
+   MENU BUILDER — per-category vendor + item selection powering the /book
+   wizard's "Build Your Menu" step. For every category the customer first
+   picks ONE specialist vendor (Step A), then chooses items from that
+   vendor's own menu (Step B). The selected package decides how many items
+   each category includes (see `packageCategoryItems`). Per-plate prices on a
+   vendor are *additions* layered on top of the package's base plate price.
+─────────────────────────────────────────────────────────────────────── */
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  diet: DietType;
+}
+
+export interface CategoryVendor {
+  id: string;
+  name: string;
+  rating: number;
+  reviews: number;
+  /** Per-plate amount added on top of the package base when this vendor is chosen. */
+  perPlate: number;
+  image: string;
+  items: CategoryItem[];
+}
+
+export interface MenuCategory {
+  id: string;
+  name: string;
+  nameHi: string;
+  icon: string;
+  /** One-line note shown in the "what's included" strip. */
+  blurb: string;
+  blurbHi: string;
+  vendors: CategoryVendor[];
+}
+
+/** Compact item builder — ids are unique within a vendor (selection resets
+ *  whenever the customer switches vendors, so global uniqueness isn't needed). */
+const mkItems = (
+  vendorId: string,
+  defs: [name: string, diet?: DietType][],
+): CategoryItem[] =>
+  defs.map(([name, diet], i) => ({ id: `${vendorId}-${i}`, name, diet: diet ?? "veg" }));
+
+const vImg = (id: string) => img(id, 300);
+
+export const menuCategories: MenuCategory[] = [
+  {
+    id: "welcome",
+    name: "Welcome Drinks",
+    nameHi: "वेलकम ड्रिंक्स",
+    icon: "🥤",
+    blurb: "Refreshing arrival drinks to greet your guests.",
+    blurbHi: "मेहमानों के स्वागत के लिए ताज़ा पेय।",
+    vendors: [
+      { id: "wd-sparkle", name: "Sip & Sparkle", rating: 4.8, reviews: 210, perPlate: 40, image: vImg("photo-1437418747212-8d9709afab22"),
+        items: mkItems("wd-sparkle", [["Masala Jaljeera"], ["Aam Panna"], ["Tender Coconut Cooler"], ["Rose Sharbat"], ["Thandai"], ["Virgin Mojito"]]) },
+      { id: "wd-sharbat", name: "Sharbat House", rating: 4.7, reviews: 165, perPlate: 35, image: vImg("photo-1601050690597-df0568f70950"),
+        items: mkItems("wd-sharbat", [["Rose Sharbat"], ["Khus Sharbat"], ["Spiced Buttermilk"], ["Masala Jaljeera"], ["Kokum Cooler"], ["Nimbu Pani"]]) },
+      { id: "wd-cooler", name: "Cooler Co.", rating: 4.6, reviews: 140, perPlate: 30, image: vImg("photo-1565895405227-31cffbe0cf86"),
+        items: mkItems("wd-cooler", [["Tender Coconut Cooler"], ["Spiced Buttermilk"], ["Virgin Mojito"], ["Nimbu Pani"], ["Aam Panna"], ["Masala Jaljeera"]]) },
+      { id: "wd-mocktail", name: "Mocktail Mantra", rating: 4.7, reviews: 188, perPlate: 45, image: vImg("photo-1437418747212-8d9709afab22"),
+        items: mkItems("wd-mocktail", [["Virgin Mojito"], ["Blue Lagoon"], ["Fruit Punch"], ["Thandai"], ["Rose Sharbat"], ["Kokum Cooler"]]) },
+    ],
+  },
+  {
+    id: "starters",
+    name: "Starters",
+    nameHi: "स्टार्टर",
+    icon: "🍢",
+    blurb: "Hot, hand-passed bites to open the feast.",
+    blurbHi: "भोज की शुरुआत के लिए गरमागरम स्टार्टर।",
+    vendors: [
+      { id: "st-tandoor", name: "Tandoor Tales", rating: 4.8, reviews: 260, perPlate: 70, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("st-tandoor", [["Paneer Tikka"], ["Tandoori Mushroom"], ["Hara Bhara Kebab"], ["Chicken Tikka", "non-veg"], ["Mutton Seekh Kebab", "non-veg"], ["Tandoori Aloo"]]) },
+      { id: "st-kebab", name: "Kebab Korner", rating: 4.7, reviews: 205, perPlate: 65, image: vImg("photo-1633945274405-b6c8069047b0"),
+        items: mkItems("st-kebab", [["Galouti Kebab", "non-veg"], ["Mutton Seekh Kebab", "non-veg"], ["Hara Bhara Kebab"], ["Chicken Malai Tikka", "non-veg"], ["Paneer Tikka"], ["Shami Kebab", "non-veg"]]) },
+      { id: "st-crispy", name: "Crispy Counter", rating: 4.6, reviews: 150, perPlate: 55, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("st-crispy", [["Chilli Gobi"], ["Veg Spring Roll"], ["Crispy Corn"], ["Honey Chilli Potato"], ["Paneer 65"], ["Veg Manchurian"]]) },
+      { id: "st-grill", name: "Grill & Gather", rating: 4.7, reviews: 230, perPlate: 75, image: vImg("photo-1606471191009-63994c53433b"),
+        items: mkItems("st-grill", [["Chicken Tikka", "non-veg"], ["Amritsari Fish", "non-veg"], ["Paneer Tikka"], ["Tandoori Prawns", "non-veg"], ["Hara Bhara Kebab"], ["Malai Broccoli"]]) },
+    ],
+  },
+  {
+    id: "live",
+    name: "Live Counters",
+    nameHi: "लाइव काउंटर",
+    icon: "🔥",
+    blurb: "Made-to-order stations cooked in front of guests.",
+    blurbHi: "मेहमानों के सामने बनने वाले लाइव काउंटर।",
+    vendors: [
+      { id: "lc-flame", name: "Live Flame Co.", rating: 4.8, reviews: 240, perPlate: 90, image: vImg("photo-1565895405227-31cffbe0cf86"),
+        items: mkItems("lc-flame", [["Live Tandoor"], ["Dosa Station"], ["Pasta Counter"], ["Tawa Pulao"], ["Momo Counter"], ["Jalebi Live"]]) },
+      { id: "lc-dosa", name: "Dosa Dynamics", rating: 4.7, reviews: 190, perPlate: 70, image: vImg("photo-1630383249896-424e482df921"),
+        items: mkItems("lc-dosa", [["Live Dosa"], ["Uttapam Station"], ["Idli Bar"], ["Filter Coffee"], ["Medu Vada"], ["Pongal Live"]]) },
+      { id: "lc-pasta", name: "Pasta Piazza", rating: 4.6, reviews: 160, perPlate: 80, image: vImg("photo-1473093295043-cdd812d0e601"),
+        items: mkItems("lc-pasta", [["Pasta Counter"], ["Pizza Station"], ["Garlic Bread"], ["Risotto Live"], ["Bruschetta Bar"], ["Mac & Cheese"]]) },
+      { id: "lc-chaat", name: "Chaat Circuit", rating: 4.7, reviews: 275, perPlate: 60, image: vImg("photo-1606491956689-2ea866880c84"),
+        items: mkItems("lc-chaat", [["Golgappa Bar"], ["Tikki Chaat"], ["Papdi Chaat"], ["Dahi Bhalla"], ["Bhel Counter"], ["Raj Kachori"]]) },
+    ],
+  },
+  {
+    id: "main",
+    name: "Main Course",
+    nameHi: "मेन कोर्स",
+    icon: "🍲",
+    blurb: "Signature curries, biryanis and breads.",
+    blurbHi: "खास करी, बिरयानी और ब्रेड।",
+    vendors: [
+      { id: "mc-awadhi", name: "Awadhi Royal", rating: 4.9, reviews: 412, perPlate: 120, image: vImg("photo-1555939594-58d7cb561ad1"),
+        items: mkItems("mc-awadhi", [["Paneer Butter Masala"], ["Dal Makhani"], ["Mutton Rogan Josh", "non-veg"], ["Butter Chicken", "non-veg"], ["Veg Dum Biryani"], ["Assorted Naan"]]) },
+      { id: "mc-nawabi", name: "Nawabi Dawat", rating: 4.8, reviews: 287, perPlate: 90, image: vImg("photo-1556910103-1c02745aae4d"),
+        items: mkItems("mc-nawabi", [["Butter Chicken", "non-veg"], ["Malai Kofta"], ["Dal Makhani"], ["Mutton Dum Biryani", "non-veg"], ["Shahi Paneer"], ["Tandoori Roti"]]) },
+      { id: "mc-spice", name: "Spice Symphony", rating: 4.7, reviews: 198, perPlate: 70, image: vImg("photo-1414235077428-338989a2e8c0"),
+        items: mkItems("mc-spice", [["Veg Manchurian"], ["Paneer Butter Masala"], ["Chicken Chettinad", "non-veg"], ["Jeera Rice"], ["Dal Tadka"], ["Butter Naan"]]) },
+      { id: "mc-ganga", name: "Ganga Caterers", rating: 4.6, reviews: 156, perPlate: 55, image: vImg("photo-1490645935967-10de6ba17061"),
+        items: mkItems("mc-ganga", [["Malai Kofta"], ["Sambar & Rasam"], ["Dal Makhani"], ["Veg Dum Biryani"], ["Mix Veg Handi"], ["Tandoori Roti"]]) },
+    ],
+  },
+  {
+    id: "sweets",
+    name: "Sweets",
+    nameHi: "मिठाई",
+    icon: "🍬",
+    blurb: "A sweet finish — halwai-made desserts.",
+    blurbHi: "हलवाई के हाथ की मिठाइयों के साथ मीठा अंत।",
+    vendors: [
+      { id: "sw-bengal", name: "Bengal Sweet Atelier", rating: 4.8, reviews: 320, perPlate: 85, image: vImg("photo-1601050690597-df0568f70950"),
+        items: mkItems("sw-bengal", [["Jalebi Rabri"], ["Imarti"], ["Gulab Jamun"], ["Rasmalai"], ["Moong Halwa"], ["Gajar Halwa"]]) },
+      { id: "sw-saffron", name: "Saffron Halwai", rating: 4.7, reviews: 240, perPlate: 70, image: vImg("photo-1631452180519-c014fe946bc7"),
+        items: mkItems("sw-saffron", [["Gulab Jamun"], ["Gajar Halwa"], ["Moong Halwa"], ["Kaju Katli"], ["Rasmalai"], ["Jalebi Rabri"]]) },
+      { id: "sw-ghasitaram", name: "Ghasitaram Classic", rating: 4.6, reviews: 190, perPlate: 60, image: vImg("photo-1578985545062-69928b1d9587"),
+        items: mkItems("sw-ghasitaram", [["Kaju Katli"], ["Gulab Jamun"], ["Soan Papdi"], ["Rasgulla"], ["Gajar Halwa"], ["Imarti"]]) },
+      { id: "sw-haldiram", name: "Haldiram Live", rating: 4.7, reviews: 280, perPlate: 75, image: vImg("photo-1601050690597-df0568f70950"),
+        items: mkItems("sw-haldiram", [["Jalebi Rabri"], ["Imarti"], ["Gulab Jamun"], ["Rasmalai"], ["Moong Halwa"], ["Gajar Halwa"]]) },
+    ],
+  },
+];
+
+/**
+ * How many items each package includes per category id. Drives the
+ * "Sweets ×3" allowance strip and the "3/3 picked" counters in Step B.
+ */
+export const packageCategoryItems: Record<string, Record<string, number>> = {
+  silver: { welcome: 1, starters: 2, live: 1, main: 3, sweets: 1 },
+  gold: { welcome: 1, starters: 5, live: 1, main: 5, sweets: 3 },
+  platinum: { welcome: 2, starters: 6, live: 2, main: 6, sweets: 4 },
+  custom: { welcome: 2, starters: 6, live: 2, main: 6, sweets: 4 },
+};
+
+/** Base per-plate price for a package id (₹). Custom bills only what's chosen. */
+export const packageBasePerPlate: Record<string, number> = {
+  silver: 799,
+  gold: 1199,
+  platinum: 1599,
+  custom: 0,
+};
+
+/* ───────────────────────────────────────────────────────────────────────
    VENDOR CATALOG / LISTING — search & filter by city, state, cuisine, tier.
 ─────────────────────────────────────────────────────────────────────── */
 
@@ -798,11 +1131,19 @@ export interface VendorListing {
   city: string;
   state: string;
   cuisines: string[];
+  /** Meals / courses this caterer serves, e.g. "Main Course", "Dinner". */
+  mealTypes: string[];
   diet: "Veg" | "Non-Veg" | "Veg & Non-Veg";
   priceFrom: number;
   verified: boolean;
   image: string;
 }
+
+/** Meal / course offerings used for the "Serves" filter on the catalog. */
+export const mealTypeOptions: string[] = [
+  "Breakfast", "Lunch", "Dinner", "Starters", "Main Course",
+  "Desserts", "Live Counters",
+];
 
 export const indianStates: string[] = [
   "Uttar Pradesh", "Delhi", "Maharashtra", "Karnataka", "West Bengal",
@@ -810,18 +1151,18 @@ export const indianStates: string[] = [
 ];
 
 export const vendorListings: VendorListing[] = [
-  { id: "vl-1", name: "Awadhi Royal Caterers", tier: "Platinum", rating: 4.9, reviews: 412, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Mughlai", "North Indian"], diet: "Veg & Non-Veg", priceFrom: 1349, verified: true, image: img("photo-1555939594-58d7cb561ad1", 500) },
-  { id: "vl-2", name: "Nawabi Dawat", tier: "Gold", rating: 4.8, reviews: 287, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "Punjabi"], diet: "Veg & Non-Veg", priceFrom: 1199, verified: true, image: img("photo-1556910103-1c02745aae4d", 500) },
-  { id: "vl-3", name: "Dilli Darbar Caterers", tier: "Gold", rating: 4.7, reviews: 233, city: "Delhi", state: "Delhi", cuisines: ["Mughlai", "Chinese"], diet: "Veg & Non-Veg", priceFrom: 1250, verified: true, image: img("photo-1633945274405-b6c8069047b0", 500) },
-  { id: "vl-4", name: "Marathi Mejwani", tier: "Silver", rating: 4.6, reviews: 144, city: "Mumbai", state: "Maharashtra", cuisines: ["North Indian", "Continental"], diet: "Veg", priceFrom: 999, verified: true, image: img("photo-1490645935967-10de6ba17061", 500) },
-  { id: "vl-5", name: "Namma Ruchi Caterers", tier: "Gold", rating: 4.8, reviews: 201, city: "Bengaluru", state: "Karnataka", cuisines: ["South Indian", "Chinese"], diet: "Veg & Non-Veg", priceFrom: 1050, verified: true, image: img("photo-1630383249896-424e482df921", 500) },
-  { id: "vl-6", name: "Bengal Bhoj", tier: "Platinum", rating: 4.9, reviews: 318, city: "Kolkata", state: "West Bengal", cuisines: ["Bengali", "Mughlai"], diet: "Veg & Non-Veg", priceFrom: 1299, verified: true, image: img("photo-1565557623262-b51c2513a641", 500) },
-  { id: "vl-7", name: "Nizami Daawat", tier: "Gold", rating: 4.7, reviews: 176, city: "Hyderabad", state: "Telangana", cuisines: ["Mughlai", "South Indian"], diet: "Non-Veg", priceFrom: 1180, verified: true, image: img("photo-1633945274405-b6c8069047b0", 500) },
-  { id: "vl-8", name: "Rajwada Rasoi", tier: "Silver", rating: 4.5, reviews: 98, city: "Jaipur", state: "Rajasthan", cuisines: ["North Indian", "Punjabi"], diet: "Veg", priceFrom: 949, verified: true, image: img("photo-1585937421612-70a008356fbe", 500) },
-  { id: "vl-9", name: "Chettinad Feast Co.", tier: "Gold", rating: 4.8, reviews: 212, city: "Chennai", state: "Tamil Nadu", cuisines: ["South Indian"], diet: "Veg & Non-Veg", priceFrom: 1090, verified: true, image: img("photo-1630383249896-424e482df921", 500) },
-  { id: "vl-10", name: "Maratha Spice Caterers", tier: "Silver", rating: 4.6, reviews: 134, city: "Pune", state: "Maharashtra", cuisines: ["Continental", "Chinese"], diet: "Veg & Non-Veg", priceFrom: 1020, verified: false, image: img("photo-1414235077428-338989a2e8c0", 500) },
-  { id: "vl-11", name: "Tandoor Tales", tier: "Silver", rating: 4.5, reviews: 121, city: "Delhi", state: "Delhi", cuisines: ["Punjabi", "North Indian"], diet: "Non-Veg", priceFrom: 899, verified: true, image: img("photo-1567188040759-fb8a883dc6d8", 500) },
-  { id: "vl-12", name: "Sattvik Bhojan", tier: "Gold", rating: 4.7, reviews: 167, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "South Indian"], diet: "Veg", priceFrom: 1100, verified: true, image: img("photo-1601050690597-df0568f70950", 500) },
+  { id: "vl-1", name: "Awadhi Royal Caterers", tier: "Platinum", rating: 4.9, reviews: 412, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Mughlai", "North Indian"], mealTypes: ["Lunch", "Dinner", "Main Course", "Live Counters", "Desserts"], diet: "Veg & Non-Veg", priceFrom: 1349, verified: true, image: img("photo-1555939594-58d7cb561ad1", 500) },
+  { id: "vl-2", name: "Nawabi Dawat", tier: "Gold", rating: 4.8, reviews: 287, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "Punjabi"], mealTypes: ["Dinner", "Main Course", "Starters", "Desserts"], diet: "Veg & Non-Veg", priceFrom: 1199, verified: true, image: img("photo-1556910103-1c02745aae4d", 500) },
+  { id: "vl-3", name: "Dilli Darbar Caterers", tier: "Gold", rating: 4.7, reviews: 233, city: "Delhi", state: "Delhi", cuisines: ["Mughlai", "Chinese"], mealTypes: ["Lunch", "Dinner", "Main Course", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1250, verified: true, image: img("photo-1633945274405-b6c8069047b0", 500) },
+  { id: "vl-4", name: "Marathi Mejwani", tier: "Silver", rating: 4.6, reviews: 144, city: "Mumbai", state: "Maharashtra", cuisines: ["North Indian", "Continental"], mealTypes: ["Breakfast", "Lunch", "Main Course", "Desserts"], diet: "Veg", priceFrom: 999, verified: true, image: img("photo-1490645935967-10de6ba17061", 500) },
+  { id: "vl-5", name: "Namma Ruchi Caterers", tier: "Gold", rating: 4.8, reviews: 201, city: "Bengaluru", state: "Karnataka", cuisines: ["South Indian", "Chinese"], mealTypes: ["Breakfast", "Lunch", "Dinner", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1050, verified: true, image: img("photo-1630383249896-424e482df921", 500) },
+  { id: "vl-6", name: "Bengal Bhoj", tier: "Platinum", rating: 4.9, reviews: 318, city: "Kolkata", state: "West Bengal", cuisines: ["Bengali", "Mughlai"], mealTypes: ["Lunch", "Dinner", "Main Course", "Desserts", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1299, verified: true, image: img("photo-1565557623262-b51c2513a641", 500) },
+  { id: "vl-7", name: "Nizami Daawat", tier: "Gold", rating: 4.7, reviews: 176, city: "Hyderabad", state: "Telangana", cuisines: ["Mughlai", "South Indian"], mealTypes: ["Dinner", "Main Course", "Starters"], diet: "Non-Veg", priceFrom: 1180, verified: true, image: img("photo-1633945274405-b6c8069047b0", 500) },
+  { id: "vl-8", name: "Rajwada Rasoi", tier: "Silver", rating: 4.5, reviews: 98, city: "Jaipur", state: "Rajasthan", cuisines: ["North Indian", "Punjabi"], mealTypes: ["Lunch", "Main Course", "Desserts"], diet: "Veg", priceFrom: 949, verified: true, image: img("photo-1585937421612-70a008356fbe", 500) },
+  { id: "vl-9", name: "Chettinad Feast Co.", tier: "Gold", rating: 4.8, reviews: 212, city: "Chennai", state: "Tamil Nadu", cuisines: ["South Indian"], mealTypes: ["Breakfast", "Lunch", "Dinner", "Main Course"], diet: "Veg & Non-Veg", priceFrom: 1090, verified: true, image: img("photo-1630383249896-424e482df921", 500) },
+  { id: "vl-10", name: "Maratha Spice Caterers", tier: "Silver", rating: 4.6, reviews: 134, city: "Pune", state: "Maharashtra", cuisines: ["Continental", "Chinese"], mealTypes: ["Lunch", "Starters", "Main Course", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1020, verified: false, image: img("photo-1414235077428-338989a2e8c0", 500) },
+  { id: "vl-11", name: "Tandoor Tales", tier: "Silver", rating: 4.5, reviews: 121, city: "Delhi", state: "Delhi", cuisines: ["Punjabi", "North Indian"], mealTypes: ["Dinner", "Starters", "Main Course"], diet: "Non-Veg", priceFrom: 899, verified: true, image: img("photo-1567188040759-fb8a883dc6d8", 500) },
+  { id: "vl-12", name: "Sattvik Bhojan", tier: "Gold", rating: 4.7, reviews: 167, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "South Indian"], mealTypes: ["Breakfast", "Lunch", "Main Course", "Desserts"], diet: "Veg", priceFrom: 1100, verified: true, image: img("photo-1601050690597-df0568f70950", 500) },
 ];
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -994,20 +1335,22 @@ export const registrationCounters: string[] = [
 export interface GalleryItem {
   /** Stable key + alt text. */
   title: string;
+  titleHi: string;
   /** Short overline shown in the hover overlay (e.g. "Wedding · 500 pax"). */
   caption: string;
+  captionHi: string;
   image: string;
 }
 
 export const galleryItems: GalleryItem[] = [
-  { title: "Royal Wedding Feast", caption: "Wedding · 500 pax", image: img("photo-1414235077428-338989a2e8c0", 700) },
-  { title: "Live Chaat Station", caption: "Street-food counter", image: img("photo-1606491956689-2ea866880c84", 700) },
-  { title: "Dum Biryani Handi", caption: "Most loved · main", image: img("photo-1563379091339-03b21ab4a4f8", 700) },
-  { title: "Mandap & Mehndi", caption: "Haldi · Mehndi", image: img("photo-1546069901-ba9599a7e63c", 700) },
-  { title: "Paneer Butter Masala", caption: "Bestseller · main", image: img("photo-1631452180519-c014fe946bc7", 700) },
-  { title: "Corporate Gala", caption: "Corporate · 200 pax", image: img("photo-1517248135467-4c7edcad34c4", 700) },
-  { title: "Gulab Jamun Tray", caption: "Sweet pick · dessert", image: img("photo-1601050690597-df0568f70950", 700) },
-  { title: "Birthday Celebration", caption: "Birthday · 80 pax", image: img("photo-1530103862676-de8c9debad1d", 700) },
-  { title: "Reception Buffet", caption: "Reception · 300 pax", image: img("photo-1565557623262-b51c2513a641", 700) },
-  { title: "Butter Naan Basket", caption: "Trending · breads", image: img("photo-1585937421612-70a008356fbe", 700) },
+  { title: "Royal Wedding Feast", titleHi: "शाही शादी का भोज", caption: "Wedding · 500 pax", captionHi: "शादी · 500 लोग", image: img("photo-1414235077428-338989a2e8c0", 700) },
+  { title: "Live Chaat Station", titleHi: "लाइव चाट स्टेशन", caption: "Street-food counter", captionHi: "स्ट्रीट-फ़ूड काउंटर", image: img("photo-1606491956689-2ea866880c84", 700) },
+  { title: "Dum Biryani Handi", titleHi: "दम बिरयानी हांडी", caption: "Most loved · main", captionHi: "सबसे पसंदीदा · मेन", image: img("photo-1563379091339-03b21ab4a4f8", 700) },
+  { title: "Mandap & Mehndi", titleHi: "मंडप और मेहंदी", caption: "Haldi · Mehndi", captionHi: "हल्दी · मेहंदी", image: img("photo-1546069901-ba9599a7e63c", 700) },
+  { title: "Paneer Butter Masala", titleHi: "पनीर बटर मसाला", caption: "Bestseller · main", captionHi: "बेस्टसेलर · मेन", image: img("photo-1631452180519-c014fe946bc7", 700) },
+  { title: "Corporate Gala", titleHi: "कॉर्पोरेट गाला", caption: "Corporate · 200 pax", captionHi: "कॉर्पोरेट · 200 लोग", image: img("photo-1517248135467-4c7edcad34c4", 700) },
+  { title: "Gulab Jamun Tray", titleHi: "गुलाब जामुन ट्रे", caption: "Sweet pick · dessert", captionHi: "मिठाई · डेज़र्ट", image: img("photo-1601050690597-df0568f70950", 700) },
+  { title: "Birthday Celebration", titleHi: "बर्थडे सेलिब्रेशन", caption: "Birthday · 80 pax", captionHi: "बर्थडे · 80 लोग", image: img("photo-1530103862676-de8c9debad1d", 700) },
+  { title: "Reception Buffet", titleHi: "रिसेप्शन बुफ़े", caption: "Reception · 300 pax", captionHi: "रिसेप्शन · 300 लोग", image: img("photo-1565557623262-b51c2513a641", 700) },
+  { title: "Butter Naan Basket", titleHi: "बटर नान बास्केट", caption: "Trending · breads", captionHi: "ट्रेंडिंग · ब्रेड", image: img("photo-1585937421612-70a008356fbe", 700) },
 ];

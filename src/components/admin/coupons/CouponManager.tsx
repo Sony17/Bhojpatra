@@ -82,7 +82,7 @@ export default function CouponManager() {
       header: "Coupon",
       cell: (c) => (
         <div className="min-w-0">
-          <p className="font-mono font-semibold text-maroon">{c.code}</p>
+          <p className="font-semibold tracking-wide text-maroon">{c.code}</p>
           <p className="text-xs text-ink-soft">{c.label}</p>
         </div>
       ),

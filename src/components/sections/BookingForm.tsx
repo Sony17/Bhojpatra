@@ -1,94 +1,251 @@
+"use client";
+
+import { useState } from "react";
+import { occasions, packages, guestPresets } from "@/lib/data";
 import Reveal from "@/components/Reveal";
+import { useLang } from "@/lib/i18n";
+
+/** Contact + event detail fields rendered as a two-column grid. */
+const contactFields = [
+  {
+    id: "fullName",
+    label: "Full Name",
+    labelHi: "पूरा नाम",
+    type: "text",
+    placeholder: "Enter your full name",
+    placeholderHi: "अपना पूरा नाम दर्ज करें",
+    autoComplete: "name",
+  },
+  {
+    id: "mobile",
+    label: "Mobile Number",
+    labelHi: "मोबाइल नंबर",
+    type: "tel",
+    placeholder: "10-digit mobile number",
+    placeholderHi: "10 अंकों का मोबाइल नंबर",
+    autoComplete: "tel",
+  },
+  {
+    id: "email",
+    label: "Email Address",
+    labelHi: "ईमेल पता",
+    type: "email",
+    placeholder: "you@example.com",
+    placeholderHi: "you@example.com",
+    autoComplete: "email",
+  },
+  {
+    id: "venue",
+    label: "Venue",
+    labelHi: "वेन्यू",
+    type: "text",
+    placeholder: "City / Banquet / Address",
+    placeholderHi: "शहर / बैंक्वेट / पता",
+    autoComplete: "off",
+  },
+];
 
 export default function BookingForm() {
-  const fields = [
-    {
-      id: "fullName",
-      label: "Full Name",
-      type: "text",
-      placeholder: "Enter your full name",
-      autoComplete: "name",
-    },
-    {
-      id: "mobile",
-      label: "Mobile Number",
-      type: "tel",
-      placeholder: "10-digit mobile number",
-      autoComplete: "tel",
-    },
-    {
-      id: "email",
-      label: "Email Address",
-      type: "email",
-      placeholder: "you@example.com",
-      autoComplete: "email",
-    },
-    {
-      id: "eventDate",
-      label: "Event Date",
-      type: "date",
-      placeholder: "",
-      autoComplete: "off",
-    },
-    {
-      id: "guestCount",
-      label: "Guest Count",
-      type: "number",
-      placeholder: "e.g. 250",
-      autoComplete: "off",
-    },
-    {
-      id: "venue",
-      label: "Venue",
-      type: "text",
-      placeholder: "City / Banquet / Address",
-      autoComplete: "off",
-    },
-  ];
+  const { lang, t } = useLang();
+  const [occasion, setOccasion] = useState<string>(occasions[0].id);
+  const [guests, setGuests] = useState<string>(String(guestPresets[2]));
+  const [selectedPackage, setSelectedPackage] = useState<string>(
+    packages.find((p) => p.popular)?.id ?? packages[0].id,
+  );
 
   return (
     <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="mx-auto max-w-3xl text-center">
-        <p className="eyebrow text-xs font-semibold text-gold sm:text-sm">05</p>
-        <h2 className="mt-2 text-3xl text-ink sm:text-4xl">
-          Book Your Celebration
+        <h2 className="text-3xl text-ink sm:text-4xl">
+          {t("Book Your Celebration", "अपना उत्सव बुक करें")}
         </h2>
         <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
-          Fill in the details to confirm your booking.
+          {t(
+            "Fill in the details to confirm your booking.",
+            "अपनी बुकिंग पक्की करने के लिए विवरण भरें।",
+          )}
         </p>
       </Reveal>
 
-      <Reveal variant="scale" className="mx-auto mt-10 max-w-3xl rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:mt-12 sm:p-8 lg:p-10">
-        <form className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-          {fields.map((field) => (
-            <div key={field.id} className="flex flex-col gap-1.5">
-              <label
-                htmlFor={field.id}
-                className="text-sm text-ink-soft"
-              >
-                {field.label}
-              </label>
-              <input
-                id={field.id}
-                name={field.id}
-                type={field.type}
-                placeholder={field.placeholder || undefined}
-                autoComplete={field.autoComplete}
-                className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
-              />
-            </div>
-          ))}
+      <Reveal
+        variant="scale"
+        className="mx-auto mt-10 max-w-3xl rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:mt-12 sm:p-8 lg:p-10"
+      >
+        <form className="flex flex-col gap-8">
+          {/* Occasion & Guests */}
+          <fieldset className="flex flex-col gap-5">
+            <legend className="eyebrow text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Occasion & Guests", "अवसर और मेहमान")}
+            </legend>
 
-          <div className="sm:col-span-2">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="occasion" className="text-sm text-ink-soft">
+                {t("Occasion", "अवसर")}
+              </label>
+              <div className="flex flex-wrap gap-2.5">
+                {occasions.map((o) => {
+                  const active = occasion === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setOccasion(o.id)}
+                      aria-pressed={active}
+                      className={
+                        "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                        (active
+                          ? "bg-maroon text-cream"
+                          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+                      }
+                    >
+                      <span aria-hidden="true">{o.icon}</span>
+                      {lang === "hi" ? o.nameHi : o.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Selected occasion submitted via a hidden field. */}
+              <input type="hidden" name="occasion" value={occasion} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="eventDate" className="text-sm text-ink-soft">
+                  {t("Event Date", "इवेंट की तारीख")}
+                </label>
+                <input
+                  id="eventDate"
+                  name="eventDate"
+                  type="date"
+                  autoComplete="off"
+                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="guestCount" className="text-sm text-ink-soft">
+                  {t("Guest Count", "मेहमानों की संख्या")}
+                </label>
+                <input
+                  id="guestCount"
+                  name="guestCount"
+                  type="number"
+                  min={1}
+                  value={guests}
+                  onChange={(e) => setGuests(e.target.value)}
+                  placeholder={t("e.g. 250", "जैसे 250")}
+                  autoComplete="off"
+                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                />
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {guestPresets.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setGuests(String(preset))}
+                      className={
+                        "rounded-full px-3 py-1 text-xs font-medium transition-colors " +
+                        (guests === String(preset)
+                          ? "bg-maroon text-cream"
+                          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+                      }
+                    >
+                      {preset.toLocaleString("en-IN")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Package selection — one of the three tiers. */}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="eyebrow text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Select Package", "पैकेज चुनें")}
+            </legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {packages.map((tier) => {
+                const active = selectedPackage === tier.id;
+                return (
+                  <label
+                    key={tier.id}
+                    className={
+                      "relative flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition-all duration-200 " +
+                      (active
+                        ? "border-maroon bg-maroon/[0.04] ring-2 ring-maroon/20"
+                        : "border-cream-3 bg-cream/40 hover:border-maroon/40")
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="package"
+                      value={tier.id}
+                      checked={active}
+                      onChange={() => setSelectedPackage(tier.id)}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-ink">
+                        {lang === "hi" ? tier.nameHi : tier.name}
+                      </span>
+                      {tier.popular && (
+                        <span className="rounded-full bg-gold-soft/50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-maroon">
+                          {t("Popular", "लोकप्रिय")}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-base font-semibold text-maroon">
+                      {tier.price}
+                      <span className="text-xs font-normal text-ink-soft">
+                        {" "}
+                        {lang === "hi" ? tier.unitHi : tier.unit}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {/* Contact details */}
+          <fieldset className="flex flex-col gap-5">
+            <legend className="eyebrow text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Your Details", "आपका विवरण")}
+            </legend>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              {contactFields.map((field) => (
+                <div key={field.id} className="flex flex-col gap-1.5">
+                  <label htmlFor={field.id} className="text-sm text-ink-soft">
+                    {lang === "hi" ? field.labelHi : field.label}
+                  </label>
+                  <input
+                    id={field.id}
+                    name={field.id}
+                    type={field.type}
+                    placeholder={
+                      (lang === "hi" ? field.placeholderHi : field.placeholder) ||
+                      undefined
+                    }
+                    autoComplete={field.autoComplete}
+                    className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                  />
+                </div>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
             <button
               type="button"
               className="btn-sheen w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
             >
-              Submit Booking Request
+              {t("Submit Booking Request", "बुकिंग अनुरोध भेजें")}
             </button>
             <p className="mt-3 text-center text-xs text-ink-soft">
-              Your data is safe with us. We will get back to you shortly to
-              confirm your booking.
+              {t(
+                "Your data is safe with us. We will get back to you shortly to confirm your booking.",
+                "आपका डेटा हमारे पास सुरक्षित है। हम आपकी बुकिंग पक्की करने के लिए जल्द ही संपर्क करेंगे।",
+              )}
             </p>
           </div>
         </form>

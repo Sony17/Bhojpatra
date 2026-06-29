@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLang, type Lang } from "@/lib/i18n";
 
 /* Bhojpatra contact — mirrors the placeholder in the Footer. Swap for the
    real WhatsApp business number later. */
@@ -10,61 +11,76 @@ const waLink = (text: string) =>
   `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 
 /* ── Knowledge base ───────────────────────────────────────────────────
-   Self-contained, scripted answers. Each entry matches on keywords; the
-   first match wins. Anything unmatched falls back to a WhatsApp handoff. */
+   Self-contained, scripted answers (EN + HI). Each entry matches on
+   keywords (matched in either script); the first match wins. Anything
+   unmatched falls back to a WhatsApp handoff. */
 interface Knowledge {
   keywords: string[];
   answer: string;
+  answerHi: string;
 }
 
 const KNOWLEDGE: Knowledge[] = [
   {
-    keywords: ["price", "cost", "plate", "package", "budget", "rate", "charge", "fee"],
+    keywords: ["price", "cost", "plate", "package", "budget", "rate", "charge", "fee", "कीमत", "पैकेज", "रेट", "प्लेट"],
     answer:
       "Our per-plate packages:\n• Silver — ₹799\n• Gold — ₹1199 (most popular)\n• Platinum — ₹1599+\n\nEvery package is fully customizable to your menu and guest count.",
+    answerHi:
+      "हमारे प्रति-प्लेट पैकेज:\n• सिल्वर — ₹799\n• गोल्ड — ₹1199 (सबसे लोकप्रिय)\n• प्लैटिनम — ₹1599+\n\nहर पैकेज आपके मेन्यू और मेहमानों की संख्या के अनुसार पूरी तरह कस्टमाइज़ किया जा सकता है।",
   },
   {
-    keywords: ["city", "cities", "location", "where", "area", "serve", "available", "near"],
+    keywords: ["city", "cities", "location", "where", "area", "serve", "available", "near", "शहर", "लोकेशन", "कहाँ", "कहां"],
     answer:
       "We cover 500+ cities across India — including Lucknow, Delhi, Mumbai, Bengaluru, Kolkata, Hyderabad, Jaipur and Pune. Tell us your city and we'll match you with local specialists.",
+    answerHi:
+      "हम पूरे भारत में 500+ शहरों में सेवा देते हैं — लखनऊ, दिल्ली, मुंबई, बेंगलुरु, कोलकाता, हैदराबाद, जयपुर और पुणे सहित। अपना शहर बताएं और हम आपको स्थानीय स्पेशलिस्ट से जोड़ देंगे।",
   },
   {
-    keywords: ["occasion", "wedding", "haldi", "mehndi", "tilak", "engagement", "reception", "birthday", "corporate", "event", "party"],
+    keywords: ["occasion", "wedding", "haldi", "mehndi", "tilak", "engagement", "reception", "birthday", "corporate", "event", "party", "अवसर", "शादी", "हल्दी", "मेहंदी", "बर्थडे", "पार्टी"],
     answer:
       "We cater every celebration — Weddings, Engagements, Tilak, Haldi, Mehndi, Receptions, Birthday Parties and Corporate Events. Which one are you planning?",
+    answerHi:
+      "हम हर उत्सव के लिए कैटरिंग करते हैं — शादी, सगाई, तिलक, हल्दी, मेहंदी, रिसेप्शन, बर्थडे पार्टी और कॉर्पोरेट इवेंट। आप कौन-सा प्लान कर रहे हैं?",
   },
   {
-    keywords: ["book", "booking", "process", "step", "how", "start", "begin"],
+    keywords: ["book", "booking", "process", "step", "how", "start", "begin", "बुक", "बुकिंग", "प्रोसेस", "कैसे", "शुरू"],
     answer:
       "Booking takes 4 easy steps:\n1. Choose your occasion\n2. Select a package\n3. Pick your specialists\n4. Review & confirm\n\nYou'll get instant confirmation — we assist end-to-end.",
+    answerHi:
+      "बुकिंग सिर्फ़ 4 आसान चरणों में:\n1. अपना अवसर चुनें\n2. पैकेज चुनें\n3. अपने स्पेशलिस्ट चुनें\n4. समीक्षा करें और कन्फ़र्म करें\n\nआपको तुरंत पुष्टि मिलेगी — हम शुरू से अंत तक मदद करते हैं।",
   },
   {
-    keywords: ["vendor", "specialist", "caterer", "verified", "trust", "safe", "quality", "review"],
+    keywords: ["vendor", "specialist", "caterer", "verified", "trust", "safe", "quality", "review", "वेंडर", "स्पेशलिस्ट", "वेरिफाइड", "समीक्षा", "भरोसा"],
     answer:
       "Every one of our 10,000+ specialists is verified and rated by real customers (we average 4.8/5 across 1 Lakh+ happy customers). You can compare menus and reviews before you choose.",
+    answerHi:
+      "हमारे 10,000+ स्पेशलिस्ट में से हर एक वेरिफाइड है और असली ग्राहकों द्वारा रेट किया गया है (1 लाख+ खुश ग्राहकों में औसत 4.8/5)। चुनने से पहले आप मेन्यू और समीक्षाओं की तुलना कर सकते हैं।",
   },
   {
-    keywords: ["contact", "call", "phone", "human", "talk", "agent", "support", "whatsapp", "help"],
+    keywords: ["contact", "call", "phone", "human", "talk", "agent", "support", "whatsapp", "help", "संपर्क", "कॉल", "बात", "मदद", "सहायता"],
     answer:
       "Happy to connect you with our team! Tap “Chat on WhatsApp” below and we'll reply instantly. 🙏",
+    answerHi:
+      "हम आपको हमारी टीम से जोड़कर खुश होंगे! नीचे “WhatsApp पर चैट करें” दबाएं और हम तुरंत जवाब देंगे। 🙏",
   },
 ];
 
-function findAnswer(input: string): string {
+function findAnswer(input: string, lang: Lang): string {
   const text = input.toLowerCase();
   const hit = KNOWLEDGE.find((k) => k.keywords.some((w) => text.includes(w)));
-  return (
-    hit?.answer ??
-    "I'm not fully sure about that one — but our team can help right away. Tap “Chat on WhatsApp” below and we'll get you sorted. 🙏"
-  );
+  if (hit) return lang === "hi" ? hit.answerHi : hit.answer;
+  return lang === "hi"
+    ? "मुझे इसका पूरा भरोसा नहीं है — लेकिन हमारी टीम तुरंत मदद कर सकती है। नीचे “WhatsApp पर चैट करें” दबाएं। 🙏"
+    : "I'm not fully sure about that one — but our team can help right away. Tap “Chat on WhatsApp” below and we'll get you sorted. 🙏";
 }
 
-/* Collapsible FAQ shortcuts — tapping one drops the answer straight into chat. */
-const FAQS: { q: string; a: string }[] = [
-  { q: "What does it cost?", a: KNOWLEDGE[0].answer },
-  { q: "Which cities do you serve?", a: KNOWLEDGE[1].answer },
-  { q: "How does booking work?", a: KNOWLEDGE[3].answer },
-  { q: "Are your vendors verified?", a: KNOWLEDGE[4].answer },
+/* Collapsible FAQ shortcuts — tapping one drops the answer straight into chat.
+   `kb` indexes into KNOWLEDGE so the answer follows the active language. */
+const FAQS: { q: string; qHi: string; kb: number }[] = [
+  { q: "What does it cost?", qHi: "इसकी कीमत क्या है?", kb: 0 },
+  { q: "Which cities do you serve?", qHi: "आप किन शहरों में सेवा देते हैं?", kb: 1 },
+  { q: "How does booking work?", qHi: "बुकिंग कैसे होती है?", kb: 3 },
+  { q: "Are your vendors verified?", qHi: "क्या आपके वेंडर वेरिफाइड हैं?", kb: 4 },
 ];
 
 interface Message {
@@ -72,10 +88,10 @@ interface Message {
   text: string;
 }
 
-const GREETING: Message = {
-  from: "bot",
-  text: "Namaste! 🙏 I'm the Bhojpatra assistant. Ask me about pricing, occasions, cities or booking — or pick a question below.",
-};
+const GREETING_EN =
+  "Namaste! 🙏 I'm the Bhojpatra assistant. Ask me about pricing, occasions, cities or booking — or pick a question below.";
+const GREETING_HI =
+  "नमस्ते! 🙏 मैं भोजपत्र असिस्टेंट हूँ। मुझसे कीमत, अवसर, शहर या बुकिंग के बारे में पूछें — या नीचे से कोई सवाल चुनें।";
 
 /** Official WhatsApp glyph. */
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -87,8 +103,11 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 export default function FloatingChat() {
+  const { lang, t } = useLang();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([GREETING]);
+  const [messages, setMessages] = useState<Message[]>([
+    { from: "bot", text: GREETING_EN },
+  ]);
   const [draft, setDraft] = useState("");
   const [faqOpen, setFaqOpen] = useState(true);
 
@@ -100,42 +119,57 @@ export default function FloatingChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
+  // Keep the opening greeting in the active language while the chat is still
+  // pristine (only the greeting shown). Once the user engages, leave history be.
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.length === 1 && prev[0].from === "bot"
+        ? [{ from: "bot", text: lang === "hi" ? GREETING_HI : GREETING_EN }]
+        : prev,
+    );
+  }, [lang]);
+
   function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
     setMessages((prev) => [
       ...prev,
       { from: "user", text: trimmed },
-      { from: "bot", text: findAnswer(trimmed) },
+      { from: "bot", text: findAnswer(trimmed, lang) },
     ]);
     setDraft("");
     inputRef.current?.focus();
   }
 
-  function askFaq(faq: { q: string; a: string }) {
-    setMessages((prev) => [...prev, { from: "user", text: faq.q }, { from: "bot", text: faq.a }]);
+  function askFaq(faq: { q: string; qHi: string; kb: number }) {
+    const k = KNOWLEDGE[faq.kb];
+    setMessages((prev) => [
+      ...prev,
+      { from: "user", text: lang === "hi" ? faq.qHi : faq.q },
+      { from: "bot", text: lang === "hi" ? k.answerHi : k.answer },
+    ]);
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
       {/* ── Chat panel ──────────────────────────────────────────────── */}
       {open && (
-        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(142,23,27,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
+        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
               <WhatsAppIcon className="h-5 w-5" />
             </span>
             <div className="flex-1 leading-tight">
-              <p className="font-display text-base text-cream">Bhojpatra Assistant</p>
+              <p className="font-display text-base text-cream">{t("Bhojpatra Assistant", "भोजपत्र असिस्टेंट")}</p>
               <p className="flex items-center gap-1.5 text-xs text-cream/80">
-                <span className="h-2 w-2 rounded-full bg-cream" /> Online · replies instantly
+                <span className="h-2 w-2 rounded-full bg-cream" /> {t("Online · replies instantly", "ऑनलाइन · तुरंत जवाब")}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close chat"
+              aria-label={t("Close chat", "चैट बंद करें")}
               className="flex h-8 w-8 items-center justify-center rounded-full text-cream/80 transition-colors hover:bg-cream/15 hover:text-cream"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
@@ -168,7 +202,7 @@ export default function FloatingChat() {
                 aria-expanded={faqOpen}
                 className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-maroon"
               >
-                Frequently asked
+                {t("Frequently asked", "अक्सर पूछे जाने वाले")}
                 <svg
                   viewBox="0 0 24 24"
                   className={`h-4 w-4 transition-transform ${faqOpen ? "rotate-180" : ""}`}
@@ -190,7 +224,7 @@ export default function FloatingChat() {
                       onClick={() => askFaq(faq)}
                       className="rounded-lg border border-cream-3 bg-surface-beige px-3 py-2 text-left text-sm text-ink transition-colors hover:border-maroon hover:bg-cream-2"
                     >
-                      {faq.q}
+                      {lang === "hi" ? faq.qHi : faq.q}
                     </button>
                   ))}
                 </div>
@@ -211,8 +245,8 @@ export default function FloatingChat() {
                 ref={inputRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type your question…"
-                aria-label="Type your question"
+                placeholder={t("Type your question…", "अपना सवाल लिखें…")}
+                aria-label={t("Type your question", "अपना सवाल लिखें")}
                 className="min-w-0 flex-1 rounded-full border border-cream-3 bg-surface-beige px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-maroon"
               />
               <button
@@ -233,7 +267,7 @@ export default function FloatingChat() {
               className="mt-2 flex items-center justify-center gap-2 text-xs font-semibold text-maroon transition-colors hover:text-maroon-dark"
             >
               <WhatsAppIcon className="h-4 w-4" />
-              Prefer to talk? Chat on WhatsApp
+              {t("Prefer to talk? Chat on WhatsApp", "बात करना चाहते हैं? WhatsApp पर चैट करें")}
             </a>
           </div>
         </div>
@@ -244,8 +278,8 @@ export default function FloatingChat() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={open ? "Close chat" : "Chat with Bhojpatra"}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(142,23,27,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95"
+        aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
+        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95"
       >
         {!open && <span className="absolute inset-0 animate-ping rounded-full bg-maroon/40" />}
         {open ? (

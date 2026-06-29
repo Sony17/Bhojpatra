@@ -2,6 +2,8 @@
  * Controlled select filter. Reusable across all list pages — the parent owns the
  * value, so it maps cleanly to a future query param.
  */
+import ThemedSelect from "@/components/ThemedSelect";
+
 export interface SelectOption {
   label: string;
   value: string;
@@ -25,18 +27,14 @@ export default function SelectFilter({
   return (
     <label className={"flex items-center gap-2 " + className}>
       <span className="sr-only">{label}</span>
-      <select
+      <ThemedSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={label}
-        className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={options}
+        ariaLabel={label}
+        className="min-w-[10rem]"
+        buttonClassName="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-sm transition-colors"
+      />
     </label>
   );
 }

@@ -3,21 +3,39 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { vendorListings, indianStates, type VendorListing } from "@/lib/data";
+import {
+  vendorListings,
+  indianStates,
+  mealTypeOptions,
+  type VendorListing,
+} from "@/lib/data";
+import { useLang } from "@/lib/i18n";
+import ThemedSelect from "@/components/ThemedSelect";
 
 const ALL = "all";
 
 type DietFilter = "all" | "Veg" | "Non-Veg";
 type TierFilter = "all" | "Silver" | "Gold" | "Platinum";
-type SortKey = "rating" | "price-asc" | "price-desc";
+type PriceRange = "all" | "budget" | "premium" | "luxury";
+type SortKey = "relevance" | "rating" | "price-asc" | "price-desc";
 
-const DIET_OPTIONS: { value: DietFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "Veg", label: "Veg" },
-  { value: "Non-Veg", label: "Non-Veg" },
-];
+const DIET_OPTIONS: DietFilter[] = ["all", "Veg", "Non-Veg"];
 
 const TIER_OPTIONS: TierFilter[] = ["all", "Silver", "Gold", "Platinum"];
+
+/** Cost bands for the price filter. `priceFrom` is the per-plate starting rate. */
+const PRICE_RANGES: { value: PriceRange; min: number; max: number }[] = [
+  { value: "all", min: 0, max: Infinity },
+  { value: "budget", min: 0, max: 999 },
+  { value: "premium", min: 1000, max: 1250 },
+  { value: "luxury", min: 1251, max: Infinity },
+];
+
+const matchesPrice = (vendor: VendorListing, range: PriceRange): boolean => {
+  const band = PRICE_RANGES.find((r) => r.value === range);
+  if (!band) return true;
+  return vendor.priceFrom >= band.min && vendor.priceFrom <= band.max;
+};
 
 /** A "Veg & Non-Veg" vendor satisfies both the Veg and Non-Veg filters. */
 const matchesDiet = (vendor: VendorListing, filter: DietFilter): boolean => {
@@ -38,13 +56,96 @@ const tierBadgeClass = (tier: VendorListing["tier"]): string => {
 };
 
 export default function VendorCatalog() {
+  const { t } = useLang();
+
+  // Display-only translations for small fixed vocabularies. Underlying values
+  // stay English (used for filtering/keys); only the label shown is localized.
+  const tierLabel = (tier: TierFilter): string => {
+    switch (tier) {
+      case "Silver":
+        return t("Silver", "सिल्वर");
+      case "Gold":
+        return t("Gold", "गोल्ड");
+      case "Platinum":
+        return t("Platinum", "प्लैटिनम");
+      default:
+        return t("All", "सभी");
+    }
+  };
+
+  const dietLabel = (value: DietFilter): string => {
+    switch (value) {
+      case "Veg":
+        return t("Veg", "वेज");
+      case "Non-Veg":
+        return t("Non-Veg", "नॉन-वेज");
+      default:
+        return t("All", "सभी");
+    }
+  };
+
+  // Diet value as stored on a vendor (includes the combined option).
+  const vendorDietLabel = (value: VendorListing["diet"]): string => {
+    switch (value) {
+      case "Veg":
+        return t("Veg", "वेज");
+      case "Non-Veg":
+        return t("Non-Veg", "नॉन-वेज");
+      case "Veg & Non-Veg":
+        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
+      default:
+        return value;
+    }
+  };
+
+  const priceLabel = (value: PriceRange): string => {
+    switch (value) {
+      case "budget":
+        return t("Under ₹1,000", "₹1,000 से कम");
+      case "premium":
+        return t("₹1,000 – ₹1,250", "₹1,000 – ₹1,250");
+      case "luxury":
+        return t("₹1,250+", "₹1,250+");
+      default:
+        return t("Any Price", "कोई भी कीमत");
+    }
+  };
+
+  const mealLabel = (value: string): string => {
+    switch (value) {
+      case "Breakfast":
+        return t("Breakfast", "नाश्ता");
+      case "Lunch":
+        return t("Lunch", "दोपहर का भोजन");
+      case "Dinner":
+        return t("Dinner", "रात्रि भोज");
+      case "Starters":
+        return t("Starters", "स्टार्टर");
+      case "Main Course":
+        return t("Main Course", "मुख्य व्यंजन");
+      case "Desserts":
+        return t("Desserts", "मिठाई");
+      case "Live Counters":
+        return t("Live Counters", "लाइव काउंटर");
+      default:
+        return value;
+    }
+  };
+
   const [query, setQuery] = useState<string>("");
   const [city, setCity] = useState<string>(ALL);
   const [state, setState] = useState<string>(ALL);
   const [cuisine, setCuisine] = useState<string>(ALL);
   const [diet, setDiet] = useState<DietFilter>(ALL);
   const [tier, setTier] = useState<TierFilter>(ALL);
-  const [sort, setSort] = useState<SortKey>("rating");
+  const [price, setPrice] = useState<PriceRange>(ALL);
+  const [meals, setMeals] = useState<string[]>([]);
+  const [sort, setSort] = useState<SortKey>("relevance");
+
+  const toggleMeal = (meal: string) =>
+    setMeals((prev) =>
+      prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal],
+    );
 
   // Distinct cities, in first-seen order.
   const cityOptions = useMemo(
@@ -68,13 +169,18 @@ export default function VendorCatalog() {
         v.name.toLowerCase().includes(q) ||
         v.cuisines.some((c) => c.toLowerCase().includes(q));
 
+      const matchesMeals =
+        meals.length === 0 || meals.some((m) => v.mealTypes.includes(m));
+
       return (
         matchesQuery &&
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
         (cuisine === ALL || v.cuisines.includes(cuisine)) &&
         matchesDiet(v, diet) &&
-        (tier === ALL || v.tier === tier)
+        (tier === ALL || v.tier === tier) &&
+        matchesPrice(v, price) &&
+        matchesMeals
       );
     });
 
@@ -86,12 +192,24 @@ export default function VendorCatalog() {
       case "price-desc":
         sorted.sort((a, b) => b.priceFrom - a.priceFrom);
         break;
-      default:
+      case "rating":
         sorted.sort((a, b) => b.rating - a.rating);
+        break;
+      default:
+        // Relevance: verified & higher-tier first, then rating, then reviews.
+        sorted.sort((a, b) => {
+          const tierRank = { Platinum: 3, Gold: 2, Silver: 1 } as const;
+          const score = (v: VendorListing) =>
+            (v.verified ? 1000 : 0) +
+            tierRank[v.tier] * 100 +
+            v.rating * 10 +
+            v.reviews / 1000;
+          return score(b) - score(a);
+        });
         break;
     }
     return sorted;
-  }, [query, city, state, cuisine, diet, tier, sort]);
+  }, [query, city, state, cuisine, diet, tier, price, meals, sort]);
 
   const hasActiveFilters =
     query !== "" ||
@@ -99,7 +217,9 @@ export default function VendorCatalog() {
     state !== ALL ||
     cuisine !== ALL ||
     diet !== ALL ||
-    tier !== ALL;
+    tier !== ALL ||
+    price !== ALL ||
+    meals.length > 0;
 
   const resetFilters = () => {
     setQuery("");
@@ -108,169 +228,182 @@ export default function VendorCatalog() {
     setCuisine(ALL);
     setDiet(ALL);
     setTier(ALL);
-    setSort("rating");
+    setPrice(ALL);
+    setMeals([]);
+    setSort("relevance");
   };
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
       <div className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">Vendor Catalog</p>
+        <p className="eyebrow text-sm font-medium text-gold">
+          {t("Vendor Catalog", "वेंडर कैटलॉग")}
+        </p>
         <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-          Compare Verified Caterers
+          {t("Compare Verified", "वेरिफाइड कैटरर्स की")}
+          <br />
+          {t("Caterers", "तुलना करें")}
         </h1>
         <p className="font-script mt-3 text-xl text-ink-soft">
-          Search by cuisine or name, filter by city, diet & tier — then compare
-          the best.
+          {t(
+            "Search by cuisine or name, filter by city, diet & tier — then compare the best.",
+            "व्यंजन या नाम से खोजें, शहर, डाइट और टियर से फ़िल्टर करें — फिर सर्वश्रेष्ठ की तुलना करें।",
+          )}
         </p>
       </div>
 
       {/* Filter bar */}
       <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
-        {/* Search */}
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="vendor-search"
-            className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
-          >
-            Search
-          </label>
-          <input
-            id="vendor-search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Try “Awadhi”, “Mughlai”, “South Indian”…"
-            className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-soft/70 focus:border-maroon focus:bg-white"
+        {/* Search — prominent, Swiggy/Zomato-style with icon, sort & clear */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="group relative flex-1">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-soft transition-colors group-focus-within:text-maroon"
+            >
+              <SearchIcon />
+            </span>
+            <input
+              id="vendor-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label={t("Search caterers", "कैटरर खोजें")}
+              placeholder={t(
+                "Search caterers, cuisines, dishes…",
+                "कैटरर, व्यंजन, डिश खोजें…",
+              )}
+              className="w-full rounded-full border border-cream-3 bg-cream-2/40 py-3.5 pl-12 pr-11 text-base text-ink shadow-sm outline-none transition-colors placeholder:text-ink-soft/70 focus:border-maroon focus:bg-white [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {query !== "" && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label={t("Clear search", "खोज साफ़ करें")}
+                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-cream-2 hover:text-maroon"
+              >
+                <span aria-hidden="true" className="text-lg leading-none">×</span>
+              </button>
+            )}
+          </div>
+
+          {/* Sort */}
+          <ThemedSelect
+            id="vendor-sort"
+            value={sort}
+            onChange={(v) => setSort(v as SortKey)}
+            ariaLabel={t("Sort by", "क्रम")}
+            className="shrink-0"
+            buttonClassName="rounded-full border border-cream-3 bg-cream-2/40 py-3.5 pl-5 pr-5 text-sm font-medium transition-colors"
+            options={[
+              { value: "relevance", label: t("Sort: Relevance", "क्रम: प्रासंगिकता") },
+              { value: "rating", label: t("Sort: Rating", "क्रम: रेटिंग") },
+              {
+                value: "price-asc",
+                label: t("Sort: Price (low → high)", "क्रम: कीमत (कम → अधिक)"),
+              },
+              {
+                value: "price-desc",
+                label: t("Sort: Price (high → low)", "क्रम: कीमत (अधिक → कम)"),
+              },
+            ]}
           />
         </div>
 
-        {/* City chips */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            City
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2.5">
-            <Chip
-              label="All Cities"
-              active={city === ALL}
-              onClick={() => setCity(ALL)}
-            />
-            {cityOptions.map((c) => (
-              <Chip
-                key={c}
-                label={c}
-                active={city === c}
-                onClick={() => setCity(c)}
-              />
-            ))}
-          </div>
+        {/* Compact dropdown row — City, State, Cuisine, Tier, Price */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <FilterSelect
+            id="vendor-city"
+            label={t("City", "शहर")}
+            value={city}
+            onChange={setCity}
+            options={[
+              { value: ALL, label: t("All Cities", "सभी शहर") },
+              ...cityOptions.map((c) => ({ value: c, label: c })),
+            ]}
+          />
+          <FilterSelect
+            id="vendor-state"
+            label={t("State", "राज्य")}
+            value={state}
+            onChange={setState}
+            options={[
+              { value: ALL, label: t("All States", "सभी राज्य") },
+              ...indianStates.map((s) => ({ value: s, label: s })),
+            ]}
+          />
+          <FilterSelect
+            id="vendor-cuisine"
+            label={t("Cuisine", "व्यंजन")}
+            value={cuisine}
+            onChange={setCuisine}
+            options={[
+              { value: ALL, label: t("All Cuisines", "सभी व्यंजन") },
+              ...cuisineOptions.map((c) => ({ value: c, label: c })),
+            ]}
+          />
+          <FilterSelect
+            id="vendor-tier"
+            label={t("Tier", "टियर")}
+            value={tier}
+            onChange={(v) => setTier(v as TierFilter)}
+            options={TIER_OPTIONS.map((tv) => ({
+              value: tv,
+              label: tv === ALL ? t("All Tiers", "सभी टियर") : tierLabel(tv),
+            }))}
+          />
+          <FilterSelect
+            id="vendor-price"
+            label={t("Price / plate", "कीमत / प्लेट")}
+            value={price}
+            onChange={(v) => setPrice(v as PriceRange)}
+            options={PRICE_RANGES.map((r) => ({
+              value: r.value,
+              label: priceLabel(r.value),
+            }))}
+          />
         </div>
 
-        {/* Tier chips */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            Tier
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2.5">
-            {TIER_OPTIONS.map((t) => (
-              <Chip
-                key={t}
-                label={t === ALL ? "All Tiers" : t}
-                active={tier === t}
-                onClick={() => setTier(t)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Diet segmented toggle */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            Preference
-          </p>
-          <div className="mt-3 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
-            {DIET_OPTIONS.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => setDiet(d.value)}
-                aria-pressed={diet === d.value}
-                className={
-                  "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
-                  (diet === d.value
-                    ? "bg-maroon text-cream"
-                    : "text-ink-soft hover:text-ink")
-                }
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Dropdown row: State, Cuisine, Sort */}
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="vendor-state"
-              className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
-            >
-              State
-            </label>
-            <select
-              id="vendor-state"
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-            >
-              <option value={ALL}>All States</option>
-              {indianStates.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+        {/* Quick filters — Diet (segmented) + Serves (multi-select chips) */}
+        <div className="mt-5 flex flex-col gap-4 border-t border-cream-3 pt-5 lg:flex-row lg:items-start lg:gap-8">
+          <div className="shrink-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Diet", "डाइट")}
+            </p>
+            <div className="mt-3 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
+              {DIET_OPTIONS.map((dietValue) => (
+                <button
+                  key={dietValue}
+                  type="button"
+                  onClick={() => setDiet(dietValue)}
+                  aria-pressed={diet === dietValue}
+                  className={
+                    "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
+                    (diet === dietValue
+                      ? "bg-maroon text-cream"
+                      : "text-ink-soft hover:text-ink")
+                  }
+                >
+                  {dietLabel(dietValue)}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="vendor-cuisine"
-              className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
-            >
-              Cuisine
-            </label>
-            <select
-              id="vendor-cuisine"
-              value={cuisine}
-              onChange={(e) => setCuisine(e.target.value)}
-              className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-            >
-              <option value={ALL}>All Cuisines</option>
-              {cuisineOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Serves", "परोसता है")}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {mealTypeOptions.map((meal) => (
+                <Chip
+                  key={meal}
+                  label={mealLabel(meal)}
+                  active={meals.includes(meal)}
+                  onClick={() => toggleMeal(meal)}
+                />
               ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="vendor-sort"
-              className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
-            >
-              Sort by
-            </label>
-            <select
-              id="vendor-sort"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-            >
-              <option value="rating">Rating (high → low)</option>
-              <option value="price-asc">Price (low → high)</option>
-              <option value="price-desc">Price (high → low)</option>
-            </select>
+            </div>
           </div>
         </div>
       </div>
@@ -278,12 +411,16 @@ export default function VendorCatalog() {
       {/* Results summary */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-soft">
-          Showing{" "}
+          {t("Showing", "दिखा रहे हैं")}{" "}
           <span className="font-semibold text-ink">{results.length}</span>{" "}
-          verified {results.length === 1 ? "caterer" : "caterers"}
+          {results.length === 1
+            ? t("verified caterer", "वेरिफाइड कैटरर")
+            : t("verified caterers", "वेरिफाइड कैटरर्स")}
           {city !== ALL && (
             <>
-              {" "}in <span className="font-medium text-maroon">{city}</span>
+              {" "}
+              {t("in", "में")}{" "}
+              <span className="font-medium text-maroon">{city}</span>
             </>
           )}
           {cuisine !== ALL && (
@@ -298,7 +435,7 @@ export default function VendorCatalog() {
             onClick={resetFilters}
             className="text-sm font-medium text-maroon underline-offset-4 hover:underline"
           >
-            Clear filters
+            {t("Clear all", "सभी हटाएं")}
           </button>
         )}
       </div>
@@ -312,9 +449,14 @@ export default function VendorCatalog() {
         </ul>
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
-          <p className="font-display text-lg text-ink">No caterers found</p>
+          <p className="font-display text-lg text-ink">
+            {t("No vendors found", "कोई वेंडर नहीं मिला")}
+          </p>
           <p className="mt-1 text-sm text-ink-soft">
-            Try a different search or relax your filters.
+            {t(
+              "Try a different search or relax your filters.",
+              "अलग खोज आज़माएं या अपने फ़िल्टर हटाएं।",
+            )}
           </p>
           {hasActiveFilters && (
             <button
@@ -322,12 +464,64 @@ export default function VendorCatalog() {
               onClick={resetFilters}
               className="mt-4 inline-flex items-center rounded-full border border-maroon px-5 py-2 text-sm font-medium text-maroon transition-shadow hover:shadow-md"
             >
-              Clear filters
+              {t("Clear all", "सभी हटाएं")}
             </button>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function FilterSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label
+        htmlFor={id}
+        className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
+      >
+        {label}
+      </label>
+      <ThemedSelect
+        id={id}
+        value={value}
+        onChange={onChange}
+        ariaLabel={label}
+        buttonClassName="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
+        options={options}
+      />
+    </div>
   );
 }
 
@@ -358,6 +552,55 @@ function Chip({
 }
 
 function VendorCard({ vendor }: { vendor: VendorListing }) {
+  const { t } = useLang();
+
+  const tierBadgeLabel = (tier: VendorListing["tier"]): string => {
+    switch (tier) {
+      case "Silver":
+        return t("Silver", "सिल्वर");
+      case "Gold":
+        return t("Gold", "गोल्ड");
+      case "Platinum":
+        return t("Platinum", "प्लैटिनम");
+      default:
+        return tier;
+    }
+  };
+
+  const dietBadgeLabel = (value: VendorListing["diet"]): string => {
+    switch (value) {
+      case "Veg":
+        return t("Veg", "वेज");
+      case "Non-Veg":
+        return t("Non-Veg", "नॉन-वेज");
+      case "Veg & Non-Veg":
+        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
+      default:
+        return value;
+    }
+  };
+
+  const mealBadgeLabel = (value: string): string => {
+    switch (value) {
+      case "Breakfast":
+        return t("Breakfast", "नाश्ता");
+      case "Lunch":
+        return t("Lunch", "दोपहर का भोजन");
+      case "Dinner":
+        return t("Dinner", "रात्रि भोज");
+      case "Starters":
+        return t("Starters", "स्टार्टर");
+      case "Main Course":
+        return t("Main Course", "मुख्य व्यंजन");
+      case "Desserts":
+        return t("Desserts", "मिठाई");
+      case "Live Counters":
+        return t("Live Counters", "लाइव काउंटर");
+      default:
+        return value;
+    }
+  };
+
   return (
     <li className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
@@ -374,11 +617,11 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
             tierBadgeClass(vendor.tier)
           }
         >
-          {vendor.tier}
+          {tierBadgeLabel(vendor.tier)}
         </span>
         {vendor.verified && (
           <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
-            <span aria-hidden="true">✓</span> Verified
+            <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
           </span>
         )}
       </div>
@@ -412,23 +655,30 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
             </span>
           ))}
           <span className="rounded-full bg-surface-beige px-2.5 py-1 text-xs font-medium text-ink-soft">
-            {vendor.diet}
+            {dietBadgeLabel(vendor.diet)}
           </span>
         </div>
 
+        <p className="mt-2.5 flex items-start gap-1.5 text-xs text-ink-soft">
+          <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>
+          <span>{vendor.mealTypes.map(mealBadgeLabel).join(" · ")}</span>
+        </p>
+
         <div className="mt-4 flex items-end justify-between border-t border-cream-3 pt-4">
           <div>
-            <p className="text-xs text-ink-soft">Starts at</p>
+            <p className="text-xs text-ink-soft">{t("From", "से")}</p>
             <p className="font-display text-lg font-semibold text-maroon">
               ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
-              <span className="text-sm font-normal text-ink-soft">/ plate</span>
+              <span className="text-sm font-normal text-ink-soft">
+                / {t("plate", "प्लेट")}
+              </span>
             </p>
           </div>
           <Link
             href="/book"
             className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
-            View &amp; Compare
+            {t("View & Compare", "देखें और तुलना करें")}
           </Link>
         </div>
       </div>

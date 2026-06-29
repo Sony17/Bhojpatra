@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment } from "react";
 import { Search, Bell, Menu, ChevronRight } from "@/components/admin/shared/icons";
 import { adminProfile } from "@/lib/admin/mockData";
@@ -35,9 +35,23 @@ interface AdminTopbarProps {
  */
 export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const segments = pathname.split("/").filter(Boolean); // e.g. ["admin","vendors"]
 
   const firstName = adminProfile.name.split(" ")[0];
+
+  // Global search drives the `?q=` URL param; list pages (vendors, etc.) read it
+  // to filter their data. Keeping the value in the URL means the topbar and any
+  // in-page search bar stay in sync and the query survives reloads/shares.
+  const query = searchParams.get("q") ?? "";
+  const onSearch = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("q", value);
+    else params.delete("q");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
 
   return (
     <header className="sticky top-0 z-20 border-b border-cream-3 bg-white/95 backdrop-blur-sm">
@@ -88,12 +102,14 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
 
         {/* Right — search, bell, profile */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Search (decorative in Phase 1) */}
+          {/* Global search — drives the `?q=` URL param consumed by list pages. */}
           <label className="relative hidden md:block">
             <span className="sr-only">Search</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
             <input
               type="search"
+              value={query}
+              onChange={(e) => onSearch(e.target.value)}
               placeholder="Search…"
               className="w-56 rounded-lg border border-cream-3 bg-cream/40 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30"
             />

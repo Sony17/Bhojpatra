@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
 import { galleryItems, type GalleryItem } from "@/lib/data";
+import { useLang } from "@/lib/i18n";
 
 /**
  * Fan layout for the seven cards in the scroll-driven cluster. Each entry is
@@ -26,6 +27,7 @@ const FAN = [
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
 
 export default function Gallery() {
+  const { lang, t } = useLang();
   const clusterRef = useRef<HTMLDivElement>(null);
   /** 0 → stacked at centre, 1 → fully fanned out. */
   const [progress, setProgress] = useState(0);
@@ -109,14 +111,17 @@ export default function Gallery() {
       <Reveal className="mx-auto mb-4 max-w-7xl px-5 text-center" stagger>
         <p className="eyebrow mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-maroon">
           <span className="h-1.5 w-1.5 rounded-full bg-maroon shadow-[0_0_0_3px_rgba(185,32,37,0.18)]" />
-          Real Events
+          {t("Real Events", "असली इवेंट")}
         </p>
         <h2 className="font-display text-4xl font-bold tracking-tight text-ink sm:text-5xl lg:text-6xl">
-          Feasts we&apos;ve <em className="not-italic text-maroon">brought to life</em>
+          {t("Feasts we've", "जो भोज हमने")}{" "}
+          <em className="not-italic text-maroon">{t("brought to life", "साकार किए")}</em>
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm text-ink-soft sm:text-base">
-          A glimpse from real weddings, corporate galas and house parties —
-          plated, served and celebrated by our specialists.
+          {t(
+            "A glimpse from real weddings, corporate galas and house parties — plated, served and celebrated by our specialists.",
+            "असली शादियों, कॉर्पोरेट गाला और हाउस पार्टियों की एक झलक — हमारे स्पेशलिस्ट द्वारा परोसी और मनाई गई।",
+          )}
         </p>
       </Reveal>
 
@@ -164,7 +169,7 @@ export default function Gallery() {
               >
                 {/* Card — hover lift sits on its own layer to avoid clashing
                     with the float animation above it. */}
-                <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_30px_50px_-16px_rgba(91,18,24,0.45),0_10px_22px_-8px_rgba(91,18,24,0.3)] ring-1 ring-cream-3/40 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.05]">
+                <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_30px_50px_-16px_rgba(185,32,37,0.45),0_10px_22px_-8px_rgba(185,32,37,0.3)] ring-1 ring-cream-3/40 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.05]">
                   <Image
                     src={item.image}
                     alt={item.title}
@@ -177,7 +182,7 @@ export default function Gallery() {
                     className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-white/15"
                   />
                   <span className="absolute inset-x-2 bottom-2 translate-y-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-semibold text-cream opacity-0 backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                    {item.title}
+                    {lang === "hi" ? item.titleHi : item.title}
                   </span>
                 </div>
               </div>
@@ -192,7 +197,7 @@ export default function Gallery() {
           href="/book"
           className="btn-sheen group inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream shadow-[0_14px_24px_-8px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:-translate-y-0.5 active:scale-95"
         >
-          Plan your feast
+          {t("Plan your feast", "अपना भोज प्लान करें")}
           <span className="grid h-6 w-6 place-items-center rounded-full bg-maroon text-cream transition-transform duration-300 group-hover:rotate-45">
             →
           </span>
@@ -204,12 +209,12 @@ export default function Gallery() {
         as="ul"
         stagger
         from="up"
-        className="mt-20 grid w-full grid-cols-2 gap-4 px-5 sm:grid-cols-3 sm:gap-5 sm:px-8 lg:grid-cols-5 lg:px-12"
+        className="mt-20 grid w-full grid-cols-2 gap-2 px-2 sm:grid-cols-3 sm:gap-3 sm:px-3 lg:grid-cols-5 lg:px-4"
       >
         {galleryItems.map((item: GalleryItem) => (
           <li
             key={item.title}
-            className="group relative aspect-[3/4] overflow-hidden rounded-2xl ring-1 ring-cream-3/50 shadow-[0_16px_30px_-18px_rgba(91,18,24,0.4)] transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2"
+            className="group relative aspect-[3/4] overflow-hidden rounded-2xl ring-1 ring-cream-3/50 shadow-[0_16px_30px_-18px_rgba(185,32,37,0.4)] transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2"
           >
             <Image
               src={item.image}
@@ -224,9 +229,11 @@ export default function Gallery() {
             />
             {/* Hover meta — slides up like the mockup's .t-meta overlay */}
             <div className="absolute inset-x-3 bottom-3 translate-y-2 rounded-xl border border-white/15 bg-black/55 px-3 py-2.5 text-cream opacity-0 backdrop-blur-md transition-all duration-300 ease-[cubic-bezier(.16,1,.3,1)] group-hover:translate-y-0 group-hover:opacity-100">
-              <p className="text-sm font-bold leading-tight">{item.title}</p>
+              <p className="text-sm font-bold leading-tight">
+                {lang === "hi" ? item.titleHi : item.title}
+              </p>
               <p className="mt-0.5 text-[11px] tracking-wide text-cream/70">
-                {item.caption}
+                {lang === "hi" ? item.captionHi : item.caption}
               </p>
             </div>
           </li>

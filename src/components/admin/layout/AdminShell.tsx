@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
@@ -30,7 +30,11 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="lg:pl-64">
-        <AdminTopbar onMenu={() => setOpen(true)} />
+        {/* Topbar reads the URL query (useSearchParams) — needs a Suspense
+            boundary so the admin pages can be statically prerendered. */}
+        <Suspense fallback={<div className="h-16 border-b border-cream-3 bg-white" />}>
+          <AdminTopbar onMenu={() => setOpen(true)} />
+        </Suspense>
         <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>

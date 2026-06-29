@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
@@ -36,8 +36,20 @@ const STATUS_OPTIONS = [
  */
 export default function VendorList() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [q, setQ] = useState("");
+  // The search term lives in the URL (`?q=`) so the topbar global search and the
+  // in-page search bar share one source of truth.
+  const q = searchParams.get("q") ?? "";
+  const setQ = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("q", value);
+    else params.delete("q");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
   const [tier, setTier] = useState("All");
   const [status, setStatus] = useState("All");
   const [city, setCity] = useState("All");

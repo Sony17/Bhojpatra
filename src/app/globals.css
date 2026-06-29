@@ -1,49 +1,47 @@
 @import "tailwindcss";
 
 /* ── Bhojpatra design system ──────────────────────────────────────────
-   Strictly aligned to the official brand guidelines.
-   Core palette (the ONLY base colours allowed):
-     Red    #B92025   RGB 185 32 37
-     Cream  #F0D09E   RGB 240 208 158
+   The brand palette is EXACTLY four colours — nothing else is allowed:
+     Red    #B92025
+     Cream  #F0D09E
      Black  #000000
      White  #FFFFFF
-   Every working token below is the brand red/cream/black/white or a
-   plain tint/shade of one of them. No off-brand hues.
+   Every token below resolves to one of those four exact hex codes.
+   No tints, shades, beiges, greys, or any off-brand hue. The only
+   transparency anywhere is alpha applied to one of these four colours
+   (for shadows/overlays) — never a new colour.
 ─────────────────────────────────────────────────────────────────────── */
 @theme {
-  /* Exact brand colours */
+  /* The four brand colours */
   --color-brand-red: #b92025;
   --color-brand-cream: #f0d09e;
   --color-brand-black: #000000;
   --color-brand-white: #ffffff;
 
-  /* ── Primary (brand red + shades) ───────────────────────── */
-  --color-maroon: #b92025; /* brand red */
-  --color-maroon-soft: #a51d22; /* slightly deeper red */
-  --color-maroon-dark: #8e171b; /* hover / deep sections */
+  /* ── Red — every red role is the one brand red ──────────── */
+  --color-maroon: #b92025;
+  --color-maroon-soft: #b92025;
+  --color-maroon-dark: #b92025;
 
-  /* ── Cream (brand cream + tints) ────────────────────────── */
-  --color-cream: #f0d09e; /* brand cream — light-on-red, accents */
-  --color-cream-2: #f7e6c8; /* soft cream surface */
-  --color-cream-3: #e9d4ac; /* cream border / hairline */
+  /* ── Cream — every cream role is the one brand cream ────── */
+  --color-cream: #f0d09e;
+  --color-cream-2: #f0d09e;
+  --color-cream-3: #f0d09e;
 
-  /* ── Section surfaces — light beige tints of the brand cream.
-       Two tones that flow out of the hero beige and alternate down the
-       page so every section reads as a distinct band (never white). ─── */
-  --color-surface-beige: #fbf4e6; /* base page band — lightest beige */
-  --color-surface-beige-2: #f5e8ce; /* alternating band — a touch deeper */
+  /* ── Section surfaces — brand white / brand cream only ──── */
+  --color-surface-beige: #ffffff;
+  --color-surface-beige-2: #f0d09e;
 
-  /* ── Accents previously "gold" → folded into the brand pair ─ */
-  --color-gold: #b92025; /* accent text → brand red */
-  --color-gold-soft: #f0d09e; /* soft accent → brand cream */
+  /* ── Accent aliases (kept for existing markup) → red / cream */
+  --color-gold: #b92025;
+  --color-gold-soft: #f0d09e;
 
-  /* ── Ink (near-black brand text) ────────────────────────── */
-  --color-ink: #1a1410; /* near-black body/heading text */
-  --color-ink-soft: #6b5d4e; /* muted secondary text */
+  /* ── Ink — brand black for all text ─────────────────────── */
+  --color-ink: #000000;
+  --color-ink-soft: #000000;
 
-  /* Page surface — light beige base, not white, so the whole page flows
-     out of the warm hero. Sections layer the two beige bands on top. */
-  --color-surface: #fbf4e6;
+  /* Page surface — brand white */
+  --color-surface: #ffffff;
 }
 
 @theme inline {
@@ -52,13 +50,11 @@
 }
 
 :root {
-  /* Display / branding font.
-     Primary: Yatra One — a Devanagari-inspired Latin display face loaded via
-     next/font, approximating the proprietary "Ananda Neptouch 2" logo font.
-     "Ananda Neptouch 2" is kept next so it wins automatically if a viewer has
-     the real logo font installed locally; Open Sans is the final fallback. */
-  --font-display-stack: var(--font-brand-display), "Ananda Neptouch 2",
-    var(--font-open-sans), system-ui, sans-serif;
+  /* Branding / display font — self-hosted "Ananda Neptouch 2" (loaded via
+     next/font/local in layout.tsx as --font-brand-display). Open Sans is the
+     fallback. These are the ONLY two fonts used anywhere on the site. */
+  --font-display-stack: var(--font-brand-display), var(--font-open-sans),
+    system-ui, sans-serif;
 }
 
 body {
@@ -67,21 +63,34 @@ body {
   font-family: var(--font-open-sans), system-ui, -apple-system, sans-serif;
 }
 
-/* Headings — normal brand display font (Yatra One), like the hero headline */
+/* ── Type system (two brand fonts only) ──────────────────────────────────
+   Display / brand  → Ananda Neptouch 2 (--font-display-stack): headings and
+                      short, high-impact brand moments. Decorative — never use
+                      it for running text or long sentences.
+   Everything else  → Open Sans: body, subtitles/ledes, eyebrows, UI, forms.
+─────────────────────────────────────────────────────────────────────────── */
 h1,
 h2,
 h3,
+h4,
+h5,
+h6,
 .font-display {
   font-family: var(--font-display-stack);
 }
 
-/* Legible cursive accent — Dancing Script (e.g. hero headline accent) */
+/* Subtitles / ledes (the `.font-script` accents under section titles).
+   Kept in Open Sans for readability — these are usually full sentences. Size
+   + muted colour (set per element) give them their distinct, elegant feel. */
 .font-script {
-  font-family: var(--font-script), "Brush Script MT", cursive;
+  font-family: var(--font-open-sans), system-ui, sans-serif;
 }
 
-/* Subtle section label used throughout (e.g. "01", "TOP CATEGORIES") */
+/* Subtle section label used throughout (e.g. "01", "TOP CATEGORIES").
+   Always Open Sans — uppercase + wide tracking needs a clean grotesque, not
+   the decorative display face. */
 .eyebrow {
+  font-family: var(--font-open-sans), system-ui, sans-serif;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -194,9 +203,9 @@ html {
   }
   40%,
   100% {
-    border-color: rgba(233, 212, 172, 0.7);
+    border-color: rgba(240,208,158, 0.7);
     background-color: rgba(255, 255, 255, 0.7);
-    box-shadow: 0 8px 22px -18px rgba(91, 18, 24, 0.6);
+    box-shadow: 0 8px 22px -18px rgba(185,32,37, 0.6);
     transform: translateY(0);
   }
 }

@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
-import { Field, inputClass, Toggle } from "@/components/admin/shared/FormControls";
-import { adminProfile, businessDetails, adminRoles } from "@/lib/admin/mockData";
+import { Field, inputClass } from "@/components/admin/shared/FormControls";
+import { adminProfile, businessDetails } from "@/lib/admin/mockData";
 import type { BusinessDetails } from "@/lib/admin/types";
+import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
 
 const TABS: TabItem[] = [
   { id: "profile", label: "Admin Profile" },
   { id: "business", label: "Business" },
-  { id: "notifications", label: "Notifications" },
-  { id: "roles", label: "Roles" },
+  { id: "payments", label: "Payments (UPI)" },
 ];
 
 export default function SettingsView() {
@@ -23,8 +23,7 @@ export default function SettingsView() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "profile" && <ProfileTab />}
       {tab === "business" && <BusinessTab />}
-      {tab === "notifications" && <NotificationsTab />}
-      {tab === "roles" && <RolesTab />}
+      {tab === "payments" && <PaymentsTab />}
     </div>
   );
 }
@@ -84,47 +83,92 @@ function BusinessTab() {
   );
 }
 
-function NotificationsTab() {
-  const [prefs, setPrefs] = useState([
-    { id: "vendor", label: "New vendor applications", on: true },
-    { id: "booking", label: "New bookings", on: true },
-    { id: "payment", label: "Payments received", on: true },
-    { id: "refund", label: "Refund requests", on: false },
-    { id: "settlement", label: "Vendor settlement reminders", on: false },
-  ]);
-  const toggle = (id: string) => setPrefs((p) => p.map((x) => (x.id === id ? { ...x, on: !x.on } : x)));
+function PaymentsTab() {
+  const [vpa, setVpa] = useState(DEFAULT_MERCHANT.vpa);
+  const [payeeName, setPayeeName] = useState(DEFAULT_MERCHANT.payeeName);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Load the persisted merchant identity used by customer checkout.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/payment-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { vpa?: string; payeeName?: string } | null) => {
+        if (active && d?.vpa) {
+          setVpa(d.vpa);
+          setPayeeName(d.payeeName ?? DEFAULT_MERCHANT.payeeName);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const save = async () => {
+    setError("");
+    if (!isValidVpa(vpa)) {
+      setError("Enter a valid UPI ID (e.g. name@bank).");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/payment-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vpa, payeeName }),
+      });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(d.error || "Could not save settings.");
+      }
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <WidgetCard title="Notification Settings">
-      <ul className="divide-y divide-cream-3">
-        {prefs.map((p) => (
-          <li key={p.id} className="flex items-center justify-between py-3.5">
-            <span className="text-sm text-ink">{p.label}</span>
-            <Toggle checked={p.on} onChange={() => toggle(p.id)} label={p.label} />
-          </li>
-        ))}
-      </ul>
-    </WidgetCard>
-  );
-}
-
-function RolesTab() {
-  return (
-    <WidgetCard title="Roles & Permissions">
+    <WidgetCard title="UPI Collection">
       <p className="mb-4 text-sm text-ink-soft">
-        Role-based access control is read-only in this prototype. Editable permissions arrive with authentication.
+        This UPI ID receives customer advance payments. It powers the live
+        deep-link and QR code shown at checkout.
       </p>
-      <ul className="space-y-3">
-        {adminRoles.map((r) => (
-          <li key={r.name} className="flex items-center justify-between rounded-xl border border-cream-3 p-4">
-            <div>
-              <p className="font-medium text-ink">{r.name}</p>
-              <p className="text-sm text-ink-soft">{r.description}</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink">{r.members} members</span>
-          </li>
-        ))}
-      </ul>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Merchant UPI ID">
+          <input
+            className={inputClass}
+            value={vpa}
+            placeholder="bhojpatra@hdfcbank"
+            onChange={(e) => {
+              setVpa(e.target.value);
+              setSaved(false);
+              setError("");
+            }}
+          />
+        </Field>
+        <Field label="Payee Name">
+          <input
+            className={inputClass}
+            value={payeeName}
+            onChange={(e) => {
+              setPayeeName(e.target.value);
+              setSaved(false);
+            }}
+          />
+        </Field>
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
+      <div className="mt-5 flex items-center gap-4">
+        <button type="button" disabled={saving} onClick={save} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60">
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+        <SavedChip show={saved} />
+      </div>
     </WidgetCard>
   );
 }

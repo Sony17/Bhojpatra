@@ -1,11 +1,15 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import CreamLogo from "@/components/CreamLogo";
+import { useLang } from "@/lib/i18n";
 
 /**
  * Shared shell for the auth routes (/login, /signup).
  *
- * Split layout: a maroon brand panel on the left (hidden on small screens)
- * and the form column on the right. The root layout already provides
+ * Split layout: a maroon brand panel on the right (hidden on small screens)
+ * and the form column on the left. The root layout already provides
  * <html>/<body>, so this nested layout only arranges the auth surface.
  */
 export default function AuthLayout({
@@ -13,13 +17,14 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useLang();
   return (
-    <main className="flex min-h-screen flex-col bg-surface-beige lg:flex-row">
+    <main className="flex min-h-screen flex-col bg-surface-beige lg:flex-row-reverse">
       {/* Brand panel */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-maroon px-12 py-12 text-cream lg:flex lg:w-[44%] xl:w-[40%]">
         {/* Background imagery */}
         <Image
-          src="/login.png"
+          src="/login.webp"
           alt=""
           fill
           priority
@@ -33,28 +38,29 @@ export default function AuthLayout({
         />
 
         <Link href="/" className="relative z-10 inline-flex w-fit">
-          <Image
-            src="/bhojpatra-logo.png"
-            alt="Bhojpatra"
-            width={894}
-            height={226}
-            priority
-            className="h-14 w-auto"
-          />
+          <CreamLogo className="h-14 w-[222px]" />
         </Link>
 
         <div className="relative z-10 max-w-md">
-          <p className="font-script text-3xl leading-tight text-cream xl:text-4xl">
-            Plan your perfect celebration.
+          <p className="font-display text-3xl leading-tight text-cream xl:text-4xl">
+            {t(
+              "Plan your perfect celebration.",
+              "अपना उत्तम समारोह योजना बनाएं।"
+            )}
           </p>
           <p className="mt-4 text-base leading-relaxed text-cream/80">
-            Book verified feast specialists from your city, your state, or
-            across India — with transparent pricing and effortless booking.
+            {t(
+              "Book verified feast specialists from your city, your state, or across India — with transparent pricing and effortless booking.",
+              "अपने शहर, अपने राज्य या पूरे भारत से सत्यापित भोज विशेषज्ञ बुक करें — पारदर्शी मूल्य और आसान बुकिंग के साथ।"
+            )}
           </p>
         </div>
 
         <p className="relative z-10 text-sm text-cream/60">
-          India&apos;s Feast Booking Platform
+          {t(
+            "India's Feast Booking Platform",
+            "भारत का भोज बुकिंग प्लेटफॉर्म"
+          )}
         </p>
       </aside>
 

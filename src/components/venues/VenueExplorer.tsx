@@ -3,14 +3,27 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { cities, venues, type Venue } from "@/lib/data";
+import { useLang, type Lang, type Translate } from "@/lib/i18n";
+import ThemedSelect from "@/components/ThemedSelect";
 
 const ALL = "all";
+
+/** Hindi translations for the fixed venue-type vocabulary, keyed by English value. */
+const VENUE_TYPE_HI: Record<string, string> = {
+  "Banquet Hall": "बैंक्वेट हॉल",
+  "Open Lawn": "खुला लॉन",
+  "Convention Center": "कन्वेंशन सेंटर",
+  "Hotel Ballroom": "होटल बॉलरूम",
+  Resort: "रिज़ॉर्ट",
+  "Heritage Venue": "हेरिटेज वेन्यू",
+};
 
 /** Only show city chips that actually have venues listed. */
 const cityName = (id: string) =>
   cities.find((c) => c.id === id)?.name ?? id;
 
 export default function VenueExplorer() {
+  const { lang, t } = useLang();
   const [city, setCity] = useState<string>(ALL);
   const [location, setLocation] = useState<string>(ALL);
 
@@ -45,72 +58,77 @@ export default function VenueExplorer() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
       <div className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">Venues</p>
+        <p className="eyebrow text-sm font-medium text-gold">
+          {t("Venues", "वेन्यू")}
+        </p>
         <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-          Find the Perfect Venue
+          {t("Find the Perfect Venue", "एकदम सही वेन्यू खोजें")}
         </h1>
         <p className="font-script mt-3 text-xl text-ink-soft">
-          Browse banquet halls, lawns & resorts — filtered by your city and
-          locality.
+          {t(
+            "Browse banquet halls, lawns & resorts — filtered by your city and locality.",
+            "बैंक्वेट हॉल, लॉन और रिज़ॉर्ट देखें — अपने शहर और इलाके के अनुसार फ़िल्टर करें।",
+          )}
         </p>
       </div>
 
       {/* Filter bar */}
       <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
-        {/* City chips */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            City
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2.5">
-            <CityChip
-              label="All Cities"
-              active={city === ALL}
-              onClick={() => onCityChange(ALL)}
+        <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
+          {/* City dropdown */}
+          <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+            <label
+              htmlFor="venue-city"
+              className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
+            >
+              {t("City", "शहर")}
+            </label>
+            <ThemedSelect
+              id="venue-city"
+              value={city}
+              onChange={onCityChange}
+              ariaLabel={t("City", "शहर")}
+              buttonClassName="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium transition-colors"
+              options={[
+                { value: ALL, label: t("All Cities", "सभी शहर") },
+                ...cityOptions.map((c) => ({ value: c.id, label: c.name })),
+              ]}
             />
-            {cityOptions.map((c) => (
-              <CityChip
-                key={c.id}
-                label={c.name}
-                active={city === c.id}
-                onClick={() => onCityChange(c.id)}
-              />
-            ))}
           </div>
-        </div>
 
-        {/* Location dropdown */}
-        <div className="mt-5 flex w-full flex-col gap-2 sm:max-w-xs">
-          <label
-            htmlFor="venue-location"
-            className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
-          >
-            Location
-          </label>
-          <select
-            id="venue-location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-          >
-            <option value={ALL}>All Locations</option>
-            {locationOptions.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
+          {/* Location dropdown */}
+          <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+            <label
+              htmlFor="venue-location"
+              className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
+            >
+              {t("Location", "स्थान")}
+            </label>
+            <ThemedSelect
+              id="venue-location"
+              value={location}
+              onChange={setLocation}
+              ariaLabel={t("Location", "स्थान")}
+              buttonClassName="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium transition-colors"
+              options={[
+                { value: ALL, label: t("All Locations", "सभी स्थान") },
+                ...locationOptions.map((loc) => ({ value: loc, label: loc })),
+              ]}
+            />
+          </div>
         </div>
       </div>
 
       {/* Results summary */}
       <p className="mt-8 text-sm text-ink-soft">
-        Showing <span className="font-semibold text-ink">{results.length}</span>{" "}
-        {results.length === 1 ? "venue" : "venues"}
+        {t("Showing", "दिखा रहे हैं")}{" "}
+        <span className="font-semibold text-ink">{results.length}</span>{" "}
+        {results.length === 1 ? t("venue", "वेन्यू") : t("venues", "वेन्यू")}
         {city !== ALL && (
           <>
             {" "}
-            in <span className="font-medium text-maroon">{cityName(city)}</span>
+            {t("in", "में")}{" "}
+            <span className="font-medium text-maroon">{cityName(city)}</span>
           </>
         )}
         {location !== ALL && (
@@ -124,14 +142,19 @@ export default function VenueExplorer() {
       {results.length > 0 ? (
         <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {results.map((venue) => (
-            <VenueCard key={venue.id} venue={venue} />
+            <VenueCard key={venue.id} venue={venue} lang={lang} t={t} />
           ))}
         </ul>
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
-          <p className="font-display text-lg text-ink">No venues found</p>
+          <p className="font-display text-lg text-ink">
+            {t("No venues found", "कोई वेन्यू नहीं मिला")}
+          </p>
           <p className="mt-1 text-sm text-ink-soft">
-            Try a different city or location.
+            {t(
+              "Try a different city or location.",
+              "कोई दूसरा शहर या स्थान आज़माएँ।",
+            )}
           </p>
         </div>
       )}
@@ -139,33 +162,21 @@ export default function VenueExplorer() {
   );
 }
 
-function CityChip({
-  label,
-  active,
-  onClick,
+function VenueCard({
+  venue,
+  lang,
+  t,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
+  venue: Venue;
+  lang: Lang;
+  t: Translate;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:px-5 sm:py-2 " +
-        (active
-          ? "bg-maroon text-cream"
-          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
-function VenueCard({ venue }: { venue: Venue }) {
+  // Translate the fixed venue-type vocabulary for display; underlying value stays English.
+  const typeLabel =
+    lang === "hi" ? (VENUE_TYPE_HI[venue.type] ?? venue.type) : venue.type;
+  // Capacity strings embed the word "Guests" (e.g. "300–600 Guests"); translate the label token only.
+  const capacityLabel =
+    lang === "hi" ? venue.capacity.replace(/Guests/g, "मेहमान") : venue.capacity;
   return (
     <li className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
@@ -177,7 +188,7 @@ function VenueCard({ venue }: { venue: Venue }) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
-          {venue.type}
+          {typeLabel}
         </span>
       </div>
 
@@ -201,18 +212,18 @@ function VenueCard({ venue }: { venue: Venue }) {
 
         <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-soft">
           <span aria-hidden="true">👥</span>
-          {venue.capacity}
+          {capacityLabel}
         </p>
 
         <div className="mt-4 flex items-end justify-between border-t border-cream-3 pt-4">
           <div>
-            <p className="text-xs text-ink-soft">Starts at</p>
+            <p className="text-xs text-ink-soft">{t("Starts at", "से शुरू")}</p>
             <p className="font-display text-lg font-semibold text-maroon">
               {venue.priceFrom}
             </p>
           </div>
           <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md">
-            View Venue
+            {t("View Details", "विवरण देखें")}
           </span>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useLang } from "@/lib/i18n";
+import ThemedSelect from "@/components/ThemedSelect";
 import {
   partnerBenefits,
   partnerSteps,
@@ -13,13 +15,6 @@ import {
 
 const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
-
-const stats: { value: string; label: string }[] = [
-  { value: "10,000+", label: "Vendors" },
-  { value: "500+", label: "Cities" },
-  { value: "Zero", label: "Joining Fee" },
-  { value: "1 Lakh+", label: "Customers" },
-];
 
 interface EnquiryForm {
   fullName: string;
@@ -44,8 +39,16 @@ const emptyForm: EnquiryForm = {
 };
 
 export default function PartnerLanding() {
+  const { t } = useLang();
   const [form, setForm] = useState<EnquiryForm>(emptyForm);
   const [submitted, setSubmitted] = useState(false);
+
+  const stats: { value: string; label: string }[] = [
+    { value: "10,000+", label: t("Vendors", "वेंडर") },
+    { value: "500+", label: t("Cities", "शहर") },
+    { value: t("Zero", "शून्य"), label: t("Joining Fee", "जॉइनिंग फीस") },
+    { value: "1 Lakh+", label: t("Customers", "ग्राहक") },
+  ];
 
   function update<K extends keyof EnquiryForm>(key: K, value: EnquiryForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -77,18 +80,25 @@ export default function PartnerLanding() {
         <div className="mx-auto max-w-7xl px-5 pb-20 pt-28 sm:pb-24 sm:pt-32">
           <div className="max-w-2xl">
             <p className="eyebrow text-xs font-semibold text-gold-soft">
-              Partner With Bhojpatra
+              {t("Partner With Bhojpatra", "Bhojpatra के साथ जुड़ें")}
             </p>
             <h1 className="font-display mt-4 text-3xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
-              Grow your catering business with India&apos;s feast platform
+              {t(
+                "Grow your catering business with India's feast platform",
+                "भारत के फीस्ट प्लेटफ़ॉर्म के साथ अपना कैटरिंग व्यवसाय बढ़ाएँ"
+              )}
             </h1>
             <p className="font-script mt-4 text-xl text-gold-soft sm:text-3xl">
-              More feasts, more bookings, more growth.
+              {t(
+                "More feasts, more bookings, more growth.",
+                "ज़्यादा फीस्ट, ज़्यादा बुकिंग, ज़्यादा ग्रोथ।"
+              )}
             </p>
             <p className="mt-6 max-w-xl text-base text-cream/85 sm:text-lg">
-              Reach lakhs of customers planning celebrations across India. Get
-              quality leads matched to your cuisine and city — with zero upfront
-              cost. List free, get verified, and start receiving bookings.
+              {t(
+                "Reach lakhs of customers planning celebrations across India. Get quality leads matched to your cuisine and city — with zero upfront cost. List free, get verified, and start receiving bookings.",
+                "पूरे भारत में आयोजन की योजना बना रहे लाखों ग्राहकों तक पहुँचें। अपने व्यंजन और शहर के अनुसार क्वालिटी लीड पाएँ — बिना किसी अग्रिम शुल्क के। मुफ़्त में लिस्ट करें, वेरिफ़ाई हों, और बुकिंग पाना शुरू करें।"
+              )}
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -96,13 +106,13 @@ export default function PartnerLanding() {
                 href="#partner-enquiry"
                 className="rounded-full bg-cream px-6 py-3 text-center text-sm font-semibold text-maroon shadow-sm transition hover:bg-cream-2"
               >
-                Become a Partner
+                {t("Become a Partner", "अभी जुड़ें")}
               </a>
               <Link
                 href="/vendor/register"
                 className="rounded-full border border-cream px-6 py-3 text-center text-sm font-semibold text-cream transition hover:bg-cream/10"
               >
-                List as a Vendor
+                {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}
               </Link>
             </div>
 
@@ -126,13 +136,16 @@ export default function PartnerLanding() {
       <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-2xl text-center">
           <p className="eyebrow text-xs font-semibold text-gold">
-            Who Can Partner
+            {t("Who Can Partner", "कौन जुड़ सकता है")}
           </p>
           <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
-            Choose how you want to partner
+            {t("Choose how you want to partner", "चुनें कि आप कैसे जुड़ना चाहते हैं")}
           </h2>
           <p className="font-script mt-4 text-xl text-ink-soft">
-            Pick the path that fits you — we&apos;ll pre-fill your enquiry below.
+            {t(
+              "Pick the path that fits you — we'll pre-fill your enquiry below.",
+              "अपने लिए सही विकल्प चुनें — हम नीचे आपकी पूछताछ पहले से भर देंगे।"
+            )}
           </p>
         </div>
 
@@ -176,13 +189,16 @@ export default function PartnerLanding() {
         <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
             <p className="eyebrow text-xs font-semibold text-gold">
-              The Bhojpatra Advantage
+              {t("The Bhojpatra Advantage", "Bhojpatra की खूबियाँ")}
             </p>
             <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
-              Why partner with us
+              {t("Why partner with us", "हमारे साथ क्यों जुड़ें")}
             </h2>
             <p className="font-script mt-4 text-xl text-ink-soft">
-              Everything you need to win more bookings and grow with confidence.
+              {t(
+                "Everything you need to win more bookings and grow with confidence.",
+                "ज़्यादा बुकिंग पाने और आत्मविश्वास के साथ बढ़ने के लिए सब कुछ।"
+              )}
             </p>
           </div>
 
@@ -214,11 +230,16 @@ export default function PartnerLanding() {
       <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-2xl text-center">
           <p className="eyebrow text-xs font-semibold text-gold">
-            Simple Onboarding
+            {t("Simple Onboarding", "आसान ऑनबोर्डिंग")}
           </p>
-          <h2 className="mt-3 text-3xl text-ink sm:text-4xl">How it works</h2>
+          <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
+            {t("How it works", "यह कैसे काम करता है")}
+          </h2>
           <p className="font-script mt-4 text-xl text-ink-soft">
-            Three easy steps from sign-up to your first booking.
+            {t(
+              "Three easy steps from sign-up to your first booking.",
+              "साइन-अप से लेकर आपकी पहली बुकिंग तक तीन आसान चरण।"
+            )}
           </p>
         </div>
 
@@ -256,13 +277,16 @@ export default function PartnerLanding() {
           <div className="mx-auto max-w-3xl">
             <div className="mx-auto max-w-2xl text-center">
               <p className="eyebrow text-xs font-semibold text-gold">
-                Get Started
+                {t("Get Started", "शुरू करें")}
               </p>
               <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
-                Send a partner enquiry
+                {t("Send a partner enquiry", "पार्टनर पूछताछ भेजें")}
               </h2>
               <p className="font-script mt-4 text-xl text-ink-soft">
-                Tell us about your business and our team will reach out.
+                {t(
+                  "Tell us about your business and our team will reach out.",
+                  "हमें अपने व्यवसाय के बारे में बताएँ और हमारी टीम आपसे संपर्क करेगी।"
+                )}
               </p>
             </div>
 
@@ -276,10 +300,13 @@ export default function PartnerLanding() {
                     🎉
                   </span>
                   <h3 className="font-display mt-5 text-2xl font-semibold text-ink">
-                    Thank you!
+                    {t("Thank you!", "धन्यवाद!")}
                   </h3>
                   <p className="mt-3 max-w-md text-ink-soft">
-                    Our onboarding team will WhatsApp you within 24 hours.
+                    {t(
+                      "Our onboarding team will WhatsApp you within 24 hours.",
+                      "हमारी ऑनबोर्डिंग टीम 24 घंटों के भीतर आपको WhatsApp करेगी।"
+                    )}
                   </p>
                   <button
                     type="button"
@@ -289,7 +316,7 @@ export default function PartnerLanding() {
                     }}
                     className="mt-6 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                   >
-                    Submit another enquiry
+                    {t("Submit another enquiry", "एक और पूछताछ भेजें")}
                   </button>
                 </div>
               ) : (
@@ -300,7 +327,7 @@ export default function PartnerLanding() {
                         htmlFor="fullName"
                         className="text-sm text-ink-soft"
                       >
-                        Full Name
+                        {t("Full Name", "पूरा नाम")}
                       </label>
                       <input
                         id="fullName"
@@ -308,7 +335,7 @@ export default function PartnerLanding() {
                         type="text"
                         required
                         autoComplete="name"
-                        placeholder="Enter your full name"
+                        placeholder={t("Enter your full name", "अपना पूरा नाम दर्ज करें")}
                         value={form.fullName}
                         onChange={(e) => update("fullName", e.target.value)}
                         className={inputClass}
@@ -320,13 +347,13 @@ export default function PartnerLanding() {
                         htmlFor="businessName"
                         className="text-sm text-ink-soft"
                       >
-                        Business Name
+                        {t("Business Name", "व्यवसाय का नाम")}
                       </label>
                       <input
                         id="businessName"
                         name="businessName"
                         type="text"
-                        placeholder="Your business / brand"
+                        placeholder={t("Your business / brand", "आपका व्यवसाय / ब्रांड")}
                         value={form.businessName}
                         onChange={(e) =>
                           update("businessName", e.target.value)
@@ -340,32 +367,33 @@ export default function PartnerLanding() {
                         htmlFor="partnerType"
                         className="text-sm text-ink-soft"
                       >
-                        I want to partner as
+                        {t("I want to partner as", "मैं जुड़ना चाहता/चाहती हूँ")}
                       </label>
-                      <select
+                      <ThemedSelect
                         id="partnerType"
                         name="partnerType"
                         required
                         value={form.partnerType}
-                        onChange={(e) =>
-                          update("partnerType", e.target.value)
-                        }
-                        className={inputClass}
-                      >
-                        <option value="" disabled>
-                          Select partner type
-                        </option>
-                        {partnerTypes.map((type) => (
-                          <option key={type.id} value={type.title}>
-                            {type.title}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(v) => update("partnerType", v)}
+                        placeholder={t(
+                          "Select partner type",
+                          "पार्टनर प्रकार चुनें",
+                        )}
+                        ariaLabel={t(
+                          "I want to partner as",
+                          "मैं जुड़ना चाहता/चाहती हूँ",
+                        )}
+                        buttonClassName={inputClass}
+                        options={partnerTypes.map((type) => ({
+                          value: type.title,
+                          label: type.title,
+                        }))}
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
                       <label htmlFor="city" className="text-sm text-ink-soft">
-                        City
+                        {t("City", "शहर")}
                       </label>
                       <input
                         id="city"
@@ -373,7 +401,7 @@ export default function PartnerLanding() {
                         type="text"
                         required
                         autoComplete="address-level2"
-                        placeholder="Your city"
+                        placeholder={t("Your city", "आपका शहर")}
                         value={form.city}
                         onChange={(e) => update("city", e.target.value)}
                         className={inputClass}
@@ -385,13 +413,13 @@ export default function PartnerLanding() {
                         htmlFor="speciality"
                         className="text-sm text-ink-soft"
                       >
-                        Cuisine / Speciality
+                        {t("Cuisine / Speciality", "व्यंजन / विशेषता")}
                       </label>
                       <input
                         id="speciality"
                         name="speciality"
                         type="text"
-                        placeholder="e.g. Mughlai, Live Counters"
+                        placeholder={t("e.g. Mughlai, Live Counters", "जैसे मुगलई, लाइव काउंटर")}
                         value={form.speciality}
                         onChange={(e) =>
                           update("speciality", e.target.value)
@@ -405,7 +433,7 @@ export default function PartnerLanding() {
                         htmlFor="mobile"
                         className="text-sm text-ink-soft"
                       >
-                        Mobile
+                        {t("Mobile", "मोबाइल नंबर")}
                       </label>
                       <input
                         id="mobile"
@@ -413,7 +441,7 @@ export default function PartnerLanding() {
                         type="tel"
                         required
                         autoComplete="tel"
-                        placeholder="10-digit mobile number"
+                        placeholder={t("10-digit mobile number", "10 अंकों का मोबाइल नंबर")}
                         value={form.mobile}
                         onChange={(e) => update("mobile", e.target.value)}
                         className={inputClass}
@@ -425,7 +453,7 @@ export default function PartnerLanding() {
                         htmlFor="email"
                         className="text-sm text-ink-soft"
                       >
-                        Email
+                        {t("Email", "ईमेल")}
                       </label>
                       <input
                         id="email"
@@ -445,13 +473,16 @@ export default function PartnerLanding() {
                         htmlFor="message"
                         className="text-sm text-ink-soft"
                       >
-                        Message
+                        {t("Message", "संदेश")}
                       </label>
                       <textarea
                         id="message"
                         name="message"
                         rows={3}
-                        placeholder="Tell us a little about your business"
+                        placeholder={t(
+                          "Tell us a little about your business",
+                          "हमें अपने व्यवसाय के बारे में थोड़ा बताएँ"
+                        )}
                         value={form.message}
                         onChange={(e) => update("message", e.target.value)}
                         className={inputClass}
@@ -460,8 +491,10 @@ export default function PartnerLanding() {
                   </div>
 
                   <p className="text-xs text-ink-soft">
-                    Your enquiry is sent to our team + WhatsApp for quick
-                    onboarding.
+                    {t(
+                      "Your enquiry is sent to our team + WhatsApp for quick onboarding.",
+                      "त्वरित ऑनबोर्डिंग के लिए आपकी पूछताछ हमारी टीम + WhatsApp पर भेजी जाती है।"
+                    )}
                   </p>
 
                   <div className="flex flex-col gap-3 sm:flex-row">
@@ -469,7 +502,7 @@ export default function PartnerLanding() {
                       type="submit"
                       className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
                     >
-                      Submit Enquiry
+                      {t("Submit Enquiry", "पूछताछ भेजें")}
                     </button>
                     <a
                       href={waLink}
@@ -477,7 +510,7 @@ export default function PartnerLanding() {
                       rel="noopener noreferrer"
                       className="rounded-full border border-maroon px-6 py-3 text-center text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                     >
-                      Enquire on WhatsApp
+                      {t("Enquire on WhatsApp", "WhatsApp पर पूछताछ करें")}
                     </a>
                   </div>
                 </form>
@@ -491,23 +524,26 @@ export default function PartnerLanding() {
       <section className="bg-maroon text-cream">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-5 py-16 text-center sm:py-20">
           <h2 className="font-display text-3xl font-bold sm:text-4xl">
-            Start with zero upfront cost
+            {t("Start with zero upfront cost", "बिना किसी अग्रिम शुल्क के शुरू करें")}
           </h2>
           <p className="font-script max-w-xl text-2xl text-gold-soft">
-            List free today and let the bookings come to you.
+            {t(
+              "List free today and let the bookings come to you.",
+              "आज ही मुफ़्त में लिस्ट करें और बुकिंग आपके पास आने दें।"
+            )}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <a
               href="#partner-enquiry"
               className="rounded-full bg-cream px-6 py-3 text-center text-sm font-semibold text-maroon shadow-sm transition hover:bg-cream-2"
             >
-              Become a Partner
+              {t("Become a Partner", "अभी जुड़ें")}
             </a>
             <Link
               href="/vendor/register"
               className="rounded-full border border-cream px-6 py-3 text-center text-sm font-semibold text-cream transition hover:bg-cream/10"
             >
-              List as a Vendor
+              {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}
             </Link>
           </div>
         </div>

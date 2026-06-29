@@ -1,29 +1,28 @@
 import type { Metadata } from "next";
-import { Open_Sans, Yatra_One, Dancing_Script } from "next/font/google";
+import { Open_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
+import { LanguageProvider } from "@/lib/i18n";
+import ScrollWatermark from "@/components/ScrollWatermark";
 
-/* Brand body typeface — Open Sans (per Bhojpatra brand guidelines). */
+/* The Bhojpatra brand uses exactly two typefaces (per the brand guidelines):
+   - Open Sans          → primary UI / body font
+   - Ananda Neptouch 2  → branding / display font (proprietary, self-hosted)
+   No other fonts allowed. */
 const openSans = Open_Sans({
   variable: "--font-open-sans",
   subsets: ["latin"],
 });
 
-/* Brand display typeface — Yatra One: a Devanagari-inspired Latin display
-   face (shirorekha-style top bar) that approximates the proprietary
-   "Ananda Neptouch 2" logo font. Self-hosted via next/font. */
-const yatraOne = Yatra_One({
+/* Branding / display typeface — self-hosted Ananda Neptouch 2 (Regular).
+   Path is relative to this file; the .ttf lives in /public. Open Sans is the
+   swap/fallback face while it loads. */
+const anandaNeptouch = localFont({
+  src: "../../public/ananda-neptouch-2.regular.ttf",
   variable: "--font-brand-display",
   weight: "400",
-  subsets: ["latin"],
-});
-
-/* Cursive accent typeface — Dancing Script: a legible flowing script used for
-   celebratory accents (e.g. the hero headline). More readable than a formal
-   calligraphic face at small sizes. Self-hosted via next/font. */
-const dancingScript = Dancing_Script({
-  variable: "--font-script",
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
+  display: "swap",
+  fallback: ["var(--font-open-sans)", "system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {
@@ -40,10 +39,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${openSans.variable} ${yatraOne.variable} ${dancingScript.variable} h-full antialiased`}
+      className={`${openSans.variable} ${anandaNeptouch.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col overflow-x-hidden bg-white text-ink">
-        {children}
+        <LanguageProvider>
+          {children}
+          <ScrollWatermark />
+        </LanguageProvider>
       </body>
     </html>
   );

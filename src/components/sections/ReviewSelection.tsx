@@ -28,7 +28,6 @@ export default function ReviewSelection() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="mb-10 max-w-2xl">
-        <p className="eyebrow mb-3 text-sm font-semibold text-gold">04</p>
         <h2 className="text-3xl font-semibold text-ink sm:text-4xl">
           Review Your Selection
         </h2>

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import CreamLogo from "@/components/CreamLogo";
 import type { ComponentType, SVGProps } from "react";
 import { adminNav, type NavIconKey } from "@/lib/admin/nav";
 import {
@@ -65,14 +65,7 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
       {/* Brand header */}
       <div className="flex items-center justify-between gap-2 px-5 py-5">
         <Link href="/admin/dashboard" onClick={onClose} className="inline-flex">
-          <Image
-            src="/bhojpatra-logo.png"
-            alt="Bhojpatra"
-            width={894}
-            height={226}
-            priority
-            className="h-10 w-auto"
-          />
+          <CreamLogo className="h-10 w-[158px]" />
         </Link>
         <button
           type="button"

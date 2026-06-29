@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Captured lead submissions (runtime data store)
+/data/leads.json
+
+# Uploaded KYC documents + their metadata index (runtime data store)
+/data/kyc/
+/data/kyc-documents.json
+
+# Recorded UPI payments + merchant UPI config (runtime data store)
+/data/payments.json
+/data/payment-settings.json

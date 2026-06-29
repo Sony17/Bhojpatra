@@ -1,21 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useLang } from "@/lib/i18n";
+import {
+  DEFAULT_MERCHANT,
+  buildUpiUri,
+  upiTxnRef,
+  type UpiPayeeConfig,
+} from "@/lib/upi";
 import {
   occasions,
+  cities,
   guestPresets,
-  cuisines,
-  menuCourses,
+  packages,
   addOns,
-  comparisonVendors,
   coupons,
+  menuCategories,
+  packageCategoryItems,
+  packageBasePerPlate,
   type Occasion,
-  type Cuisine,
-  type MenuCourse,
-  type Dish,
+  type PackageTier,
   type AddOn,
-  type ComparisonVendor,
+  type MenuCategory,
+  type CategoryItem,
   type Coupon,
 } from "@/lib/data";
 
@@ -24,69 +32,166 @@ const MIN_GUESTS = 50;
 const MAX_GUESTS = 50_000;
 const GST_RATE = 0.18;
 const ADVANCE_RATE = 0.25;
-const DEFAULT_PER_PLATE = comparisonVendors[comparisonVendors.length - 1].perPlate;
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 4;
+// Large functions (1000+ guests) may split a single segment across vendors.
+const MULTI_VENDOR_MIN = 1000;
 
 type Lang = "en" | "hi";
 type DietFilter = "all" | "veg" | "non-veg";
-type SortBy = "price" | "rating";
-type PayMethod = "upi" | "qr" | "card";
+type PayMethod = "upi" | "qr";
+type City = (typeof cities)[number];
+
+/** category id → chosen vendor ids. Most tiers hold a single id; Platinum
+ *  (luxury) lets guests pick multiple vendors per segment. */
+type VendorMap = Record<string, string[]>;
+/** category id → chosen item ids. Item ids are vendor-scoped (`${vendorId}-${i}`),
+ *  so a category's picks may span several selected vendors. */
+type ItemMap = Record<string, string[]>;
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(Math.round(n))}`;
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function BookingWizard() {
-  const [lang, setLang] = useState<Lang>("en");
-  const t = (en: string, hi: string) => (lang === "hi" ? hi : en);
+  // Language is driven by the shared, site-wide context (Header toggle).
+  const { lang, t } = useLang();
 
   const [step, setStep] = useState<number>(1);
 
-  // Step 1
+  // Step 1 — Package
+  const [packageId, setPackageId] = useState<string>(
+    packages.find((p) => p.popular)?.id ?? packages[0].id,
+  );
+
+  // Step 2 — Menu (per-category vendor + items)
+  const [activeCat, setActiveCat] = useState<number>(0);
+  const [categoryVendor, setCategoryVendor] = useState<VendorMap>({});
+  const [categoryItems, setCategoryItems] = useState<ItemMap>({});
+
+  // Step 3 — Event details (occasion, date, city, venue, guests, extras).
+  // Occasion / date / city / venue are usually pre-chosen in the Hero booking
+  // bar and carried over via the URL; here they remain fully editable.
   const [occasionId, setOccasionId] = useState<string>("");
   const [guests, setGuests] = useState<number>(100);
   const [eventDate, setEventDate] = useState<string>("");
-
-  // Step 2
-  const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
-  const [diet, setDiet] = useState<DietFilter>("all");
-  const [selectedDishes, setSelectedDishes] = useState<string[]>([]);
-
-  // Step 3
-  const [vendorId, setVendorId] = useState<string>("");
-  const [sortBy, setSortBy] = useState<SortBy>("price");
-
-  // Step 4
+  const [cityId, setCityId] = useState<string>("");
+  const [venue, setVenue] = useState<string>("");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
 
-  // Step 6
+  // Prefill occasion / date / city / venue from the Hero booking bar's query
+  // params (e.g. /book?occasion=wedding&date=2026-07-19&city=lucknow). Read in
+  // an effect so the server and first client render match — and so we don't
+  // depend on a Suspense boundary for useSearchParams.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const occ = sp.get("occasion");
+    const date = sp.get("date");
+    const city = sp.get("city");
+    const venueParam = sp.get("venue");
+    if (occ && occasions.some((o) => o.id === occ)) setOccasionId(occ);
+    if (date) setEventDate(date);
+    if (city && cities.some((c) => c.id === city)) setCityId(city);
+    if (venueParam) setVenue(venueParam);
+  }, []);
+
+  // Step 4 — Confirm (coupon + payment)
   const [couponInput, setCouponInput] = useState<string>("");
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string>("");
   const [payMethod, setPayMethod] = useState<PayMethod>("upi");
+  const [paying, setPaying] = useState<boolean>(false);
+  const [payError, setPayError] = useState<string>("");
+  const [confirmed, setConfirmed] = useState<boolean>(false);
 
-  /* ─── Derived data ─────────────────────────────────────────────────── */
-  const selectedVendor: ComparisonVendor | undefined = comparisonVendors.find(
-    (v) => v.id === vendorId,
-  );
-  const perPlate = selectedVendor ? selectedVendor.perPlate : DEFAULT_PER_PLATE;
+  /* ─── Menu helpers ─────────────────────────────────────────────────── */
+  // When a segment may be split across several vendors:
+  //  • Platinum (luxury) — always.
+  //  • Gold ("city best") — for large functions of 1000+ guests.
+  const multiVendor =
+    packageId === "platinum" ||
+    (packageId === "gold" && guests >= MULTI_VENDOR_MIN);
+  // Gold unlocks multi-vendor only past 1000 guests — nudge smaller Gold events.
+  const multiVendorHint = packageId === "gold" && guests < MULTI_VENDOR_MIN;
 
-  const sortedVendors = useMemo<ComparisonVendor[]>(
-    () =>
-      [...comparisonVendors].sort((a, b) =>
-        sortBy === "price" ? a.perPlate - b.perPlate : b.rating - a.rating,
-      ),
-    [sortBy],
-  );
+  const allowanceFor = (catId: string): number =>
+    packageCategoryItems[packageId]?.[catId] ?? 1;
 
-  const dishVisible = (d: Dish): boolean => {
-    const cuisineOk =
-      selectedCuisines.length === 0 || selectedCuisines.includes(d.cuisineId);
-    const dietOk = diet === "all" || d.diet === diet;
-    return cuisineOk && dietOk;
+  const vendorsFor = (catId: string): string[] => categoryVendor[catId] ?? [];
+  const itemsFor = (catId: string): string[] => categoryItems[catId] ?? [];
+
+  const categoryComplete = (cat: MenuCategory): boolean => {
+    return (
+      vendorsFor(cat.id).length > 0 &&
+      itemsFor(cat.id).length >= allowanceFor(cat.id)
+    );
   };
 
-  // Money math
+  const completedCount = menuCategories.filter(categoryComplete).length;
+  const allComplete = completedCount === menuCategories.length;
+  // Courses still missing a vendor or their full item quota — used to tell the
+  // guest exactly what's blocking "Continue" and to jump them there.
+  const incompleteCategories = menuCategories.filter((c) => !categoryComplete(c));
+  const firstIncompleteCat = menuCategories.findIndex((c) => !categoryComplete(c));
+  const incompleteCategoryNames = incompleteCategories.map((c) =>
+    lang === "hi" ? c.nameHi : c.name,
+  );
+
+  const pickVendor = (catId: string, vendorId: string) => {
+    const current = vendorsFor(catId);
+    if (!multiVendor) {
+      // Single-vendor tiers: switching vendor replaces the choice and its items.
+      setCategoryVendor((m) => ({ ...m, [catId]: [vendorId] }));
+      setCategoryItems((m) => ({ ...m, [catId]: [] }));
+      return;
+    }
+    // Platinum: toggle the vendor in/out of the per-segment selection.
+    if (current.includes(vendorId)) {
+      setCategoryVendor((m) => ({
+        ...m,
+        [catId]: current.filter((id) => id !== vendorId),
+      }));
+      // Drop any items that belonged to the de-selected vendor.
+      setCategoryItems((m) => ({
+        ...m,
+        [catId]: itemsFor(catId).filter((id) => !id.startsWith(`${vendorId}-`)),
+      }));
+    } else {
+      setCategoryVendor((m) => ({ ...m, [catId]: [...current, vendorId] }));
+    }
+  };
+
+  const toggleItem = (catId: string, itemId: string) => {
+    const cur = itemsFor(catId);
+    if (cur.includes(itemId)) {
+      setCategoryItems((m) => ({ ...m, [catId]: cur.filter((x) => x !== itemId) }));
+    } else {
+      if (cur.length >= allowanceFor(catId)) return; // at the package cap
+      setCategoryItems((m) => ({ ...m, [catId]: [...cur, itemId] }));
+    }
+  };
+
+  /* ─── Derived pricing ──────────────────────────────────────────────── */
+  const selectedPackage: PackageTier | undefined = packages.find(
+    (p) => p.id === packageId,
+  );
+  const basePerPlate = packageBasePerPlate[packageId] ?? 0;
+
+  const categoryAddTotal = useMemo<number>(
+    () =>
+      menuCategories.reduce((sum, cat) => {
+        const chosen = categoryVendor[cat.id] ?? [];
+        // Each selected premium vendor adds its per-plate uplift.
+        return (
+          sum +
+          cat.vendors
+            .filter((v) => chosen.includes(v.id))
+            .reduce((s, v) => s + v.perPlate, 0)
+        );
+      }, 0),
+    [categoryVendor],
+  );
+
+  const perPlate = basePerPlate + categoryAddTotal;
   const subtotal = perPlate * guests;
 
   const addOnsTotal = useMemo<number>(
@@ -107,9 +212,12 @@ export default function BookingWizard() {
   const advance = grandTotal * ADVANCE_RATE;
 
   // Deterministic booking id derived from state (no random / time).
+  const totalItems = Object.values(categoryItems).reduce(
+    (n, arr) => n + arr.length,
+    0,
+  );
   const bookingId = `BHJ-${(
-    (guests * 7 + Math.round(grandTotal) + selectedDishes.length * 13) %
-    90000 +
+    ((guests * 7 + Math.round(grandTotal) + totalItems * 13) % 90000) +
     10000
   ).toString()}`;
 
@@ -117,30 +225,24 @@ export default function BookingWizard() {
   const stepValid = (s: number): boolean => {
     switch (s) {
       case 1:
-        return occasionId !== "" && guests >= MIN_GUESTS && guests <= MAX_GUESTS;
+        return packageId !== "";
       case 2:
-        return selectedDishes.length > 0;
+        return allComplete;
       case 3:
-        return vendorId !== "";
-      case 4:
-        return true; // add-ons optional
-      case 5:
-        return eventDate !== "";
-      case 6:
-        return true;
+        return (
+          occasionId !== "" &&
+          guests >= MIN_GUESTS &&
+          guests <= MAX_GUESTS &&
+          eventDate !== ""
+        );
       default:
         return true;
     }
   };
-
   const canNext = stepValid(step);
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
-  const toggle = (
-    arr: string[],
-    setArr: (v: string[]) => void,
-    id: string,
-  ) => {
+  const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) => {
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   };
 
@@ -168,14 +270,23 @@ export default function BookingWizard() {
 
   const buildWhatsAppMessage = (): string => {
     const occ = occasions.find((o) => o.id === occasionId);
-    const dishLines = menuCourses
-      .map((course) => {
-        const picks = course.dishes
-          .filter((d) => selectedDishes.includes(d.id))
-          .map((d) => d.name);
-        return picks.length
-          ? `${course.name}: ${picks.join(", ")}`
-          : "";
+    const city = cities.find((c) => c.id === cityId);
+    const pkg = packages.find((p) => p.id === packageId);
+    const menuLines = menuCategories
+      .map((cat) => {
+        const chosen = categoryVendor[cat.id] ?? [];
+        const lines = cat.vendors
+          .filter((v) => chosen.includes(v.id))
+          .map((v) => {
+            const picks = v.items
+              .filter((it) => itemsFor(cat.id).includes(it.id))
+              .map((it) => it.name);
+            return picks.length
+              ? `${cat.name} — ${v.name}: ${picks.join(", ")}`
+              : "";
+          })
+          .filter(Boolean);
+        return lines.join("\n");
       })
       .filter(Boolean)
       .join("\n");
@@ -186,10 +297,12 @@ export default function BookingWizard() {
     return (
       `Bhojpatra Feast Enquiry (${bookingId})\n` +
       `Occasion: ${occ ? occ.name : "-"}\n` +
+      `Package: ${pkg ? `${pkg.name} (${pkg.price}${pkg.unit})` : "-"}\n` +
       `Date: ${eventDate || "-"}\n` +
+      `City: ${city ? city.name : "-"}\n` +
+      `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
-      `Vendor: ${selectedVendor ? selectedVendor.name : "-"}\n` +
-      (dishLines ? `\nMenu:\n${dishLines}\n` : "") +
+      (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
       (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
       `\nGrand Total: ${money(grandTotal)}\n` +
       `Advance (25%): ${money(advance)}`
@@ -202,140 +315,147 @@ export default function BookingWizard() {
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
-  const stepTitles: string[] = [
-    t("Occasion & Guests", "अवसर और मेहमान"),
-    t("Build the Menu", "मेन्यू बनाएं"),
-    t("Compare Vendors", "वेंडर तुलना"),
-    t("Add Extras", "एक्स्ट्रा जोड़ें"),
-    t("Review & Share", "समीक्षा और शेयर"),
-    t("Discount & Payment", "छूट और भुगतान"),
-    t("Confirmation", "पुष्टि"),
-  ];
+  // Menu-step category navigation that spills into wizard steps at the edges.
+  const menuPrev = () => {
+    if (activeCat > 0) setActiveCat((c) => c - 1);
+    else goBack();
+  };
+  const menuNext = () => {
+    if (activeCat < menuCategories.length - 1) setActiveCat((c) => c + 1);
+    else if (allComplete) goNext();
+  };
+
+  // Record the UPI advance against the booking, then mark it confirmed.
+  const handlePay = async (method: PayMethod, vpa: string) => {
+    setPaying(true);
+    setPayError("");
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId,
+          amount: Math.round(advance),
+          method,
+          vpa,
+          txnRef: upiTxnRef(bookingId, "ADVANCE"),
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Payment could not be recorded.");
+      }
+      setConfirmed(true);
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
-  const showSummary = step >= 2 && step <= 6;
+  // Full-width menu builder (step 3) and confirmation; summary rail elsewhere.
+  const showSummary = (step === 3 || (step === 4 && !confirmed));
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
-      {/* Header + language toggle */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="eyebrow text-sm font-medium text-gold">
-            {t("BOOK A FEAST", "भोज बुक करें")}
-          </p>
-          <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-            {t("Plan Your Celebration", "अपना उत्सव प्लान करें")}
-          </h1>
-          <p className="font-script mt-3 text-xl text-ink-soft">
-            {t(
-              "a few guided steps to your perfect feast",
-              "कुछ आसान चरणों में आपका परफेक्ट भोज",
-            )}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {(["en", "hi"] as Lang[]).map((l) => (
-            <button
-              key={l}
-              type="button"
-              onClick={() => setLang(l)}
-              className={
-                "rounded-full px-5 py-2 text-sm font-medium transition " +
-                (lang === l
-                  ? "bg-maroon text-cream"
-                  : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-              }
-            >
-              {l === "en" ? "English" : "हिंदी"}
-            </button>
-          ))}
-        </div>
+      {/* Header */}
+      <div>
+        <p className="eyebrow text-sm font-medium text-gold">
+          {t("BOOK A FEAST", "भोज बुक करें")}
+        </p>
+        <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
+          {t("Plan Your Celebration", "अपना उत्सव प्लान करें")}
+        </h1>
+        <p className="font-script mt-3 text-xl text-ink-soft">
+          {t(
+            "a few guided steps to your perfect feast",
+            "कुछ आसान चरणों में आपका परफेक्ट भोज",
+          )}
+        </p>
       </div>
 
-      {/* Step indicator */}
-      <StepIndicator
-        step={step}
-        titles={stepTitles}
-        onJump={(s) => {
-          // only allow jumping to already-completed/current steps
-          if (s < step) setStep(s);
-        }}
+      {/* Event bar — occasion / date / city carried from the Hero booking bar,
+          shown up top and editable from any step (mirrors the Step 3 fields). */}
+      <EventBar
+        lang={lang}
+        t={t}
+        occasionId={occasionId}
+        setOccasionId={setOccasionId}
+        eventDate={eventDate}
+        setEventDate={setEventDate}
+        cityId={cityId}
+        setCityId={setCityId}
       />
 
       {/* Layout: content + summary */}
       <div
         className={
-          showSummary
-            ? "mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]"
-            : "mt-8"
+          showSummary ? "mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]" : "mt-8"
         }
       >
         <div>
           {step === 1 && (
-            <Step1
+            <StepPackage
+              lang={lang}
+              t={t}
+              packageId={packageId}
+              setPackageId={setPackageId}
+            />
+          )}
+          {step === 2 && (
+            <StepMenu
+              lang={lang}
+              t={t}
+              packageName={selectedPackage?.name ?? ""}
+              multiVendor={multiVendor}
+              multiVendorHint={multiVendorHint}
+              activeCat={activeCat}
+              setActiveCat={setActiveCat}
+              categoryVendor={categoryVendor}
+              pickVendor={pickVendor}
+              itemsFor={itemsFor}
+              toggleItem={toggleItem}
+              allowanceFor={allowanceFor}
+              categoryComplete={categoryComplete}
+              completedCount={completedCount}
+              perPlate={perPlate}
+            />
+          )}
+          {step === 3 && (
+            <StepDetails
+              lang={lang}
               t={t}
               occasionId={occasionId}
               setOccasionId={setOccasionId}
               guests={guests}
               setGuests={setGuests}
               clampGuests={clampGuests}
-            />
-          )}
-          {step === 2 && (
-            <Step2
-              lang={lang}
-              t={t}
-              selectedCuisines={selectedCuisines}
-              setSelectedCuisines={setSelectedCuisines}
-              diet={diet}
-              setDiet={setDiet}
-              selectedDishes={selectedDishes}
-              setSelectedDishes={setSelectedDishes}
-              dishVisible={dishVisible}
-              toggle={toggle}
-            />
-          )}
-          {step === 3 && (
-            <Step3
-              t={t}
-              vendors={sortedVendors}
-              vendorId={vendorId}
-              setVendorId={setVendorId}
-              guests={guests}
-              sortBy={sortBy}
-              setSortBy={setSortBy}
-            />
-          )}
-          {step === 4 && (
-            <Step4
-              lang={lang}
-              t={t}
-              guests={guests}
+              eventDate={eventDate}
+              setEventDate={setEventDate}
+              cityId={cityId}
+              setCityId={setCityId}
+              venue={venue}
+              setVenue={setVenue}
               selectedAddOns={selectedAddOns}
               setSelectedAddOns={setSelectedAddOns}
               toggle={toggle}
             />
           )}
-          {step === 5 && (
-            <Step5
+          {step === 4 && !confirmed && (
+            <StepConfirm
               t={t}
               occasion={occasions.find((o) => o.id === occasionId)}
+              packageName={selectedPackage?.name ?? ""}
               eventDate={eventDate}
-              setEventDate={setEventDate}
+              city={cities.find((c) => c.id === cityId)}
+              venue={venue}
               guests={guests}
-              vendor={selectedVendor}
-              selectedDishes={selectedDishes}
+              categoryVendor={categoryVendor}
+              itemsFor={itemsFor}
               selectedAddOns={selectedAddOns}
-              grandTotal={grandTotal}
               onEditMenu={() => setStep(2)}
-              onEditExtras={() => setStep(4)}
-              onDownload={downloadMenu}
-              whatsappHref={whatsappHref}
-            />
-          )}
-          {step === 6 && (
-            <Step6
-              t={t}
+              onEditExtras={() => setStep(3)}
               couponInput={couponInput}
               setCouponInput={setCouponInput}
               applyCoupon={applyCoupon}
@@ -345,17 +465,23 @@ export default function BookingWizard() {
               payMethod={payMethod}
               setPayMethod={setPayMethod}
               advance={advance}
-              onPay={goNext}
+              grandTotal={grandTotal}
+              bookingId={bookingId}
+              paying={paying}
+              payError={payError}
+              onPay={handlePay}
+              whatsappHref={whatsappHref}
             />
           )}
-          {step === 7 && (
-            <Step7
+          {step === 4 && confirmed && (
+            <StepDone
               t={t}
               bookingId={bookingId}
               occasion={occasions.find((o) => o.id === occasionId)}
               eventDate={eventDate}
+              city={cities.find((c) => c.id === cityId)}
+              venue={venue}
               guests={guests}
-              vendor={selectedVendor}
               grandTotal={grandTotal}
               advance={advance}
               onDownload={downloadMenu}
@@ -367,8 +493,9 @@ export default function BookingWizard() {
         {showSummary && (
           <SummaryPanel
             t={t}
+            basePerPlate={basePerPlate}
+            categoryAddTotal={categoryAddTotal}
             perPlate={perPlate}
-            usingDefault={!selectedVendor}
             guests={guests}
             subtotal={subtotal}
             addOnsTotal={addOnsTotal}
@@ -380,8 +507,69 @@ export default function BookingWizard() {
         )}
       </div>
 
-      {/* Nav buttons (hidden on confirmation) */}
-      {step < TOTAL_STEPS && (
+      {/* Nav buttons */}
+      {step === 2 ? (
+        <div className="mt-10">
+          {/* When the menu isn't finished, name the unfinished courses and let
+              the guest jump straight to the first one — a silently-disabled
+              Continue gives no clue what's left to pick. */}
+          {!allComplete && (
+            <button
+              type="button"
+              onClick={() => setActiveCat(firstIncompleteCat)}
+              className="mb-4 flex w-full items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
+            >
+              <span aria-hidden="true" className="text-maroon">
+                ★
+              </span>
+              <span>
+                {t("Still to finish:", "अभी बाकी:")}{" "}
+                <span className="font-semibold text-maroon">
+                  {incompleteCategoryNames.join(", ")}
+                </span>
+                {". "}
+                {t(
+                  "Tap to jump to the next course and pick the rest.",
+                  "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
+                )}
+              </span>
+            </button>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={menuPrev}
+              className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+            >
+              ←{" "}
+              {activeCat > 0
+                ? t("Prev Category", "पिछली श्रेणी")
+                : t("Back", "पीछे")}
+            </button>
+            {activeCat < menuCategories.length - 1 ? (
+              <button
+                type="button"
+                onClick={menuNext}
+                className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              >
+                {t("Next Category", "अगली श्रेणी")} →
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={menuNext}
+                disabled={!allComplete}
+                className={
+                  "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
+                  (!allComplete ? "cursor-not-allowed opacity-50" : "")
+                }
+              >
+                {t("Continue to Details", "विवरण तक जारी रखें")} →
+              </button>
+            )}
+          </div>
+        </div>
+      ) : step < TOTAL_STEPS ? (
         <div className="mt-10 flex items-center justify-between">
           <button
             type="button"
@@ -394,225 +582,270 @@ export default function BookingWizard() {
           >
             ← {t("Back", "पीछे")}
           </button>
-          {/* Step 6 uses its own Pay button to advance, so hide generic Next there */}
-          {step !== 6 && (
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!canNext}
-              className={
-                "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
-                (!canNext ? "cursor-not-allowed opacity-50" : "")
-              }
-            >
-              {t("Next", "आगे")} →
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={!canNext}
+            className={
+              "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
+              (!canNext ? "cursor-not-allowed opacity-50" : "")
+            }
+          >
+            {t("Next", "आगे")} →
+          </button>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
 
-/* ─── Step indicator ─────────────────────────────────────────────────── */
-function StepIndicator({
-  step,
-  titles,
-  onJump,
+/* ─── Reusable heading ───────────────────────────────────────────────── */
+function SectionHead({
+  title,
+  sub,
 }: {
-  step: number;
-  titles: string[];
-  onJump: (s: number) => void;
+  title: string;
+  sub?: string;
 }) {
   return (
-    <ol className="mt-10 flex flex-wrap items-center gap-x-2 gap-y-3">
-      {titles.map((title, i) => {
-        const n = i + 1;
-        const done = n < step;
-        const current = n === step;
-        return (
-          <li key={title} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onJump(n)}
-              disabled={n >= step}
-              className={
-                "flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition " +
-                (n < step ? "cursor-pointer hover:bg-cream-2" : "cursor-default")
-              }
-            >
-              <span
-                className={
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition " +
-                  (done
-                    ? "bg-maroon text-cream"
-                    : current
-                      ? "bg-maroon text-cream ring-2 ring-maroon ring-offset-2"
-                      : "bg-cream-2 text-ink-soft")
-                }
-              >
-                {done ? "✓" : n}
-              </span>
-              <span
-                className={
-                  "hidden text-sm font-medium sm:inline " +
-                  (current ? "text-ink" : "text-ink-soft")
-                }
-              >
-                {title}
-              </span>
-            </button>
-            {n < titles.length && (
-              <span aria-hidden="true" className="h-px w-4 bg-cream-3 sm:w-6" />
-            )}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-/* ─── Reusable heading ───────────────────────────────────────────────── */
-function SectionHead({ label, title }: { label: string; title: string }) {
-  return (
     <div className="mb-6">
-      <p className="eyebrow text-sm font-medium text-gold">{label}</p>
-      <h1 className="mt-2 text-2xl text-ink sm:text-3xl">{title}</h1>
+      <h1 className="text-2xl text-ink sm:text-3xl">{title}</h1>
+      {sub && <p className="mt-1 text-sm text-ink-soft">{sub}</p>}
     </div>
   );
 }
 
-/* ─── Step 1 ─────────────────────────────────────────────────────────── */
-function Step1({
+/* ─── Event bar · always-visible occasion / date / city (from the Hero) ──── */
+function EventBar({
+  lang,
   t,
   occasionId,
   setOccasionId,
-  guests,
-  setGuests,
-  clampGuests,
+  eventDate,
+  setEventDate,
+  cityId,
+  setCityId,
 }: {
+  lang: Lang;
   t: (en: string, hi: string) => string;
   occasionId: string;
   setOccasionId: (v: string) => void;
-  guests: number;
-  setGuests: (v: number) => void;
-  clampGuests: (raw: number) => void;
+  eventDate: string;
+  setEventDate: (v: string) => void;
+  cityId: string;
+  setCityId: (v: string) => void;
+}) {
+  const fieldClass =
+    "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-maroon";
+
+  return (
+    <div className="mt-6 rounded-2xl border border-maroon/30 bg-cream-2/40 p-4 shadow-sm sm:p-5">
+      <p className="eyebrow text-xs font-semibold text-gold">
+        {t("YOUR EVENT", "आपका इवेंट")}
+      </p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-3">
+        <label className="block">
+          <span className="text-xs font-medium text-ink-soft">
+            {t("Occasion", "अवसर")}
+          </span>
+          <select
+            value={occasionId}
+            onChange={(e) => setOccasionId(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">{t("Select occasion", "अवसर चुनें")}</option>
+            {occasions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {lang === "hi" ? o.nameHi : o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium text-ink-soft">
+            {t("Date", "तारीख")}
+          </span>
+          <input
+            type="date"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium text-ink-soft">
+            {t("City / Location", "शहर / लोकेशन")}
+          </span>
+          <select
+            value={cityId}
+            onChange={(e) => setCityId(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">{t("Select city", "शहर चुनें")}</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {lang === "hi" ? c.nameHi : c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Step 1 · Package ────────────────────────────────────────────────  */
+function StepPackage({
+  lang,
+  t,
+  packageId,
+  setPackageId,
+}: {
+  lang: Lang;
+  t: (en: string, hi: string) => string;
+  packageId: string;
+  setPackageId: (v: string) => void;
 }) {
   return (
     <div>
       <SectionHead
-        label={t("STEP 1", "चरण 1")}
-        title={t("Occasion & Guests", "अवसर और मेहमान")}
+        title={t("Choose a package", "पैकेज चुनें")}
+        sub={t(
+          "Sets your base plate price and how many items each course includes.",
+          "यह आपकी बेस प्लेट कीमत और हर कोर्स में शामिल आइटम तय करता है।",
+        )}
       />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {occasions.map((occasion: Occasion) => {
-          const selected = occasion.id === occasionId;
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {packages.map((tier: PackageTier) => {
+          const selected = tier.id === packageId;
           return (
             <button
-              key={occasion.id}
+              key={tier.id}
               type="button"
               aria-pressed={selected}
-              onClick={() => setOccasionId(occasion.id)}
+              onClick={() => setPackageId(tier.id)}
               className={
-                "group relative flex flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
+                "group relative flex flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
                 (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
-              <div className="relative aspect-[4/3] w-full overflow-hidden">
-                <Image
-                  src={occasion.image}
-                  alt={occasion.name}
-                  fill
-                  sizes="(min-width: 1024px) 200px, (min-width: 640px) 30vw, 45vw"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                {selected && (
-                  <span className="absolute right-2 top-2 rounded-full bg-maroon px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream shadow-sm">
-                    {t("Selected", "चयनित")}
+              <div className="flex items-center justify-between">
+                <span className="font-display text-base font-semibold text-ink">
+                  {lang === "hi" ? tier.nameHi : tier.name}
+                </span>
+                {tier.popular && (
+                  <span className="rounded-full bg-gold-soft/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon">
+                    {t("Popular", "लोकप्रिय")}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2.5 px-4 py-3.5">
-                <span
-                  aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-2 text-base"
-                >
-                  {occasion.icon}
+              <p className="mt-1 text-lg font-semibold text-maroon">
+                {tier.price}
+                <span className="text-xs font-normal text-ink-soft">
+                  {" "}
+                  {lang === "hi" ? tier.unitHi : tier.unit}
                 </span>
-                <span className="font-display text-sm font-semibold text-ink">
-                  {occasion.name}
-                </span>
-              </div>
+              </p>
+              <ul className="mt-3 flex flex-1 flex-col gap-1.5">
+                {tier.features.map((feature, i) => {
+                  const label = lang === "hi" ? feature.labelHi : feature.label;
+                  if (feature.heading) {
+                    return (
+                      <li
+                        key={i}
+                        className="pt-1 text-sm font-semibold text-ink"
+                      >
+                        {label}
+                      </li>
+                    );
+                  }
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-start gap-1.5 text-sm text-ink-soft"
+                    >
+                      <span aria-hidden="true" className="text-maroon">
+                        ✓
+                      </span>
+                      {label}
+                    </li>
+                  );
+                })}
+              </ul>
+              <span
+                className={
+                  "mt-4 inline-flex items-center justify-center rounded-full px-4 py-1.5 text-xs font-semibold transition " +
+                  (selected
+                    ? "bg-maroon text-cream"
+                    : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
+                }
+              >
+                {selected ? t("Selected", "चयनित") : t("Select", "चुनें")}
+              </span>
             </button>
           );
         })}
-      </div>
-
-      {/* Guests */}
-      <div className="mt-10">
-        <h3 className="font-display text-lg font-semibold text-ink">
-          {t("How many guests?", "कितने मेहमान?")}
-        </h3>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {guestPresets.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGuests(g)}
-              className={
-                "rounded-full px-5 py-2 text-sm font-medium transition " +
-                (guests === g
-                  ? "bg-maroon text-cream"
-                  : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-              }
-            >
-              {inr.format(g)}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 max-w-xs">
-          <label className="mb-1.5 block text-sm font-medium text-ink-soft">
-            {t("Exact count", "सटीक संख्या")} ({MIN_GUESTS}–{inr.format(MAX_GUESTS)})
-          </label>
-          <input
-            type="number"
-            min={MIN_GUESTS}
-            max={MAX_GUESTS}
-            value={guests}
-            onChange={(e) => setGuests(Number(e.target.value))}
-            onBlur={(e) => clampGuests(Number(e.target.value))}
-            className="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-          />
-        </div>
       </div>
     </div>
   );
 }
 
-/* ─── Step 2 ─────────────────────────────────────────────────────────── */
-function Step2({
+/* ─── Step 2 · Build the menu (per-category vendor + items) ───────────  */
+function StepMenu({
   lang,
   t,
-  selectedCuisines,
-  setSelectedCuisines,
-  diet,
-  setDiet,
-  selectedDishes,
-  setSelectedDishes,
-  dishVisible,
-  toggle,
+  packageName,
+  multiVendor,
+  multiVendorHint,
+  activeCat,
+  setActiveCat,
+  categoryVendor,
+  pickVendor,
+  itemsFor,
+  toggleItem,
+  allowanceFor,
+  categoryComplete,
+  completedCount,
+  perPlate,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
-  selectedCuisines: string[];
-  setSelectedCuisines: (v: string[]) => void;
-  diet: DietFilter;
-  setDiet: (v: DietFilter) => void;
-  selectedDishes: string[];
-  setSelectedDishes: (v: string[]) => void;
-  dishVisible: (d: Dish) => boolean;
-  toggle: (arr: string[], setArr: (v: string[]) => void, id: string) => void;
+  packageName: string;
+  multiVendor: boolean;
+  multiVendorHint: boolean;
+  activeCat: number;
+  setActiveCat: (n: number) => void;
+  categoryVendor: VendorMap;
+  pickVendor: (catId: string, vendorId: string) => void;
+  itemsFor: (catId: string) => string[];
+  toggleItem: (catId: string, itemId: string) => void;
+  allowanceFor: (catId: string) => number;
+  categoryComplete: (cat: MenuCategory) => boolean;
+  completedCount: number;
+  perPlate: number;
 }) {
+  const [diet, setDiet] = useState<DietFilter>("all");
+  const cat = menuCategories[activeCat];
+  const allowance = allowanceFor(cat.id);
+  const selectedIds = categoryVendor[cat.id] ?? [];
+  const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
+  const picks = itemsFor(cat.id);
+
+  // Dishes available across the chosen vendor(s) under the active diet filter.
+  // When this is below the package quota, the guest can pick every visible dish
+  // and still not complete the course — surface that rather than dead-ending.
+  const availableForDiet = selectedVendors.reduce(
+    (n, v) =>
+      n + v.items.filter((it) => diet === "all" || it.diet === diet).length,
+    0,
+  );
+  const dietShortfall =
+    selectedVendors.length > 0 &&
+    picks.length < allowance &&
+    availableForDiet < allowance;
+
   const dietOptions: { id: DietFilter; en: string; hi: string }[] = [
     { id: "all", en: "All", hi: "सभी" },
     { id: "veg", en: "Veg", hi: "वेज" },
@@ -622,252 +855,291 @@ function Step2({
   return (
     <div>
       <SectionHead
-        label={t("STEP 2", "चरण 2")}
-        title={t("Build the Menu", "मेन्यू बनाएं")}
+        title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
+        sub={`${completedCount}/${menuCategories.length} ${t(
+          "categories complete",
+          "श्रेणियां पूरी",
+        )} · ${packageName} ${t("Package", "पैकेज")} · ${t(
+          "≈",
+          "≈",
+        )} ${money(perPlate)}/${t("plate", "प्लेट")}`}
       />
 
-      {/* Cuisine multi-select */}
-      <h3 className="font-display text-sm font-semibold text-ink-soft">
-        {t("Cuisines", "व्यंजन")}
-      </h3>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {cuisines.map((c: Cuisine) => {
-          const active = selectedCuisines.includes(c.id);
+      {/* Gold "city best" nudge — multi-vendor segments unlock at 1000+ guests. */}
+      {multiVendorHint && (
+        <div className="mb-5 flex items-start gap-2 rounded-2xl border border-maroon/20 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+          <span aria-hidden="true" className="text-maroon">
+            ★
+          </span>
+          <p>
+            {t(
+              "Planning a grand function? Gold lets you book more than one vendor in a segment for events of 1,000+ guests.",
+              "बड़ा फंक्शन प्लान कर रहे हैं? गोल्ड में 1,000+ मेहमानों के इवेंट के लिए आप एक सेगमेंट में एक से ज़्यादा वेंडर बुक कर सकते हैं।",
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Category tabs */}
+      <div className="flex flex-wrap gap-2">
+        {menuCategories.map((c, i) => {
+          const active = i === activeCat;
+          const complete = categoryComplete(c);
           return (
             <button
               key={c.id}
               type="button"
-              onClick={() => toggle(selectedCuisines, setSelectedCuisines, c.id)}
+              onClick={() => setActiveCat(i)}
               className={
-                "rounded-full px-5 py-2 text-sm font-medium transition " +
+                "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition " +
                 (active
-                  ? "bg-maroon text-cream"
-                  : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+                  ? "border-maroon bg-maroon text-cream"
+                  : "border-cream-3 bg-white text-ink-soft hover:bg-cream-2")
               }
             >
-              <span aria-hidden="true">{c.icon}</span>{" "}
-              {lang === "hi" ? c.nameHi : c.name}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Diet segmented filter */}
-      <div className="mt-6 flex flex-wrap sm:inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
-        {dietOptions.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setDiet(d.id)}
-            className={
-              "rounded-full px-5 py-1.5 text-sm font-medium transition " +
-              (diet === d.id
-                ? "bg-maroon text-cream shadow-sm"
-                : "text-ink-soft hover:text-ink")
-            }
-          >
-            {t(d.en, d.hi)}
-          </button>
-        ))}
-      </div>
-
-      {/* Courses */}
-      <div className="mt-8 space-y-8">
-        {menuCourses.map((course: MenuCourse) => {
-          const visible = course.dishes.filter(dishVisible);
-          const selectedInCourse = course.dishes.filter((d) =>
-            selectedDishes.includes(d.id),
-          ).length;
-          return (
-            <div key={course.id}>
-              <div className="flex items-baseline justify-between">
-                <h3 className="font-display text-lg font-semibold text-ink">
-                  {lang === "hi" ? course.nameHi : course.name}
-                </h3>
-                <span className="text-sm text-ink-soft">
-                  {selectedInCourse} {t("selected", "चयनित")} ·{" "}
-                  {t("suggest", "सुझाव")} {course.suggested}
+              <span aria-hidden="true">{c.icon}</span>
+              <span className="eyebrow text-xs">
+                {(lang === "hi" ? c.nameHi : c.name).toUpperCase()}
+              </span>
+              {complete && (
+                <span aria-hidden="true" className={active ? "text-cream" : "text-maroon"}>
+                  ✓
                 </span>
-              </div>
-              {visible.length === 0 ? (
-                <p className="mt-2 text-sm text-ink-soft/70">
-                  {t(
-                    "No dishes match your filters.",
-                    "आपके फ़िल्टर से कोई व्यंजन मेल नहीं खाता।",
-                  )}
-                </p>
-              ) : (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {visible.map((d) => {
-                    const active = selectedDishes.includes(d.id);
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() =>
-                          toggle(selectedDishes, setSelectedDishes, d.id)
-                        }
-                        className={
-                          "flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition " +
-                          (active
-                            ? "border-maroon bg-maroon text-cream"
-                            : "border-cream-3 bg-white text-ink hover:bg-cream-2")
-                        }
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={
-                            "inline-block h-2.5 w-2.5 rounded-sm border " +
-                            (d.diet === "veg"
-                              ? "border-green-600"
-                              : "border-red-600") +
-                            (active ? " bg-cream" : "")
-                          }
-                        />
-                        {d.name}
-                      </button>
-                    );
-                  })}
-                </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
-    </div>
-  );
-}
 
-/* ─── Step 3 ─────────────────────────────────────────────────────────── */
-function Step3({
-  t,
-  vendors,
-  vendorId,
-  setVendorId,
-  guests,
-  sortBy,
-  setSortBy,
-}: {
-  t: (en: string, hi: string) => string;
-  vendors: ComparisonVendor[];
-  vendorId: string;
-  setVendorId: (v: string) => void;
-  guests: number;
-  sortBy: SortBy;
-  setSortBy: (v: SortBy) => void;
-}) {
-  return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <SectionHead
-          label={t("STEP 3", "चरण 3")}
-          title={t("Compare Vendors", "वेंडर तुलना")}
-        />
-        <div className="mb-6 flex flex-wrap sm:inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
-          {(["price", "rating"] as SortBy[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSortBy(s)}
-              className={
-                "rounded-full px-4 py-1.5 text-sm font-medium transition " +
-                (sortBy === s
-                  ? "bg-maroon text-cream shadow-sm"
-                  : "text-ink-soft hover:text-ink")
-              }
-            >
-              {s === "price"
-                ? t("Sort: Price", "क्रम: कीमत")
-                : t("Sort: Rating", "क्रम: रेटिंग")}
-            </button>
-          ))}
+      {/* What's included */}
+      <div className="mt-5 rounded-2xl border border-cream-3 bg-cream-2/30 p-5">
+        <p className="eyebrow text-xs font-semibold text-ink-soft">
+          {t("What's included in", "इसमें शामिल है")}{" "}
+          {(lang === "hi" ? cat.nameHi : cat.name).toUpperCase()}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span className="rounded-full bg-gold-soft/50 px-3 py-1 text-sm font-semibold text-maroon">
+            {lang === "hi" ? cat.nameHi : cat.name} ×{allowance}
+          </span>
+          <span className="text-sm text-ink-soft">
+            {lang === "hi" ? cat.blurbHi : cat.blurb}
+          </span>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {vendors.map((v) => {
-          const selected = v.id === vendorId;
-          const total = v.perPlate * guests;
+      {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
+      <h3 className="mt-7 font-display text-lg font-semibold text-maroon">
+        {multiVendor
+          ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
+          : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
+      </h3>
+      <div className="mt-3 flex snap-x gap-4 overflow-x-auto pb-3">
+        {cat.vendors.map((v) => {
+          const selected = selectedIds.includes(v.id);
           return (
             <button
               key={v.id}
               type="button"
               aria-pressed={selected}
-              onClick={() => setVendorId(v.id)}
+              onClick={() => pickVendor(cat.id, v.id)}
               className={
-                "group flex flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
+                "group relative flex w-56 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
                 (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
-              <div className="relative aspect-[16/9] w-full overflow-hidden">
+              <div className="relative aspect-[16/10] w-full overflow-hidden">
                 <Image
                   src={v.image}
                   alt={v.name}
                   fill
-                  sizes="(min-width: 1280px) 280px, (min-width: 640px) 45vw, 90vw"
+                  sizes="224px"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-                <span className="absolute left-2 top-2 rounded-full bg-maroon px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream shadow-sm">
-                  {v.tier}
-                </span>
-                {selected && (
-                  <span className="absolute right-2 top-2 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-maroon shadow-sm">
-                    {t("Selected", "चयनित")}
-                  </span>
-                )}
               </div>
               <div className="flex flex-1 flex-col p-4">
-                <h3 className="font-display text-base font-semibold text-ink">
+                <h4 className="font-display text-sm font-semibold text-maroon">
                   {v.name}
-                </h3>
-                <p className="mt-0.5 text-sm text-ink-soft">
-                  ⭐ {v.rating} · {inr.format(v.reviews)}{" "}
-                  {t("reviews", "समीक्षाएं")} · {v.location}
+                </h4>
+                <p className="mt-1 text-xs text-ink-soft">
+                  ⭐ {v.rating}{" "}
+                  <span className="text-ink-soft/70">
+                    ({inr.format(v.reviews)})
+                  </span>
                 </p>
-                <p className="mt-1 text-sm text-ink-soft">{v.speciality}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {v.badges.map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-full bg-cream-2 px-2.5 py-0.5 text-[11px] font-medium text-ink-soft"
-                    >
-                      {b}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-auto pt-4">
-                  <p className="text-lg font-semibold text-maroon">
-                    {money(v.perPlate)}{" "}
-                    <span className="text-sm font-normal text-ink-soft">
-                      / {t("plate", "प्लेट")}
-                    </span>
-                  </p>
-                  <p className="text-sm text-ink-soft">
-                    {t("Total", "कुल")}: {money(total)} ({inr.format(guests)}{" "}
-                    {t("guests", "मेहमान")})
-                  </p>
-                </div>
+                <p className="mt-1 text-sm font-semibold text-ink">
+                  + {money(v.perPlate)}/{t("plate", "प्लेट")}
+                </p>
               </div>
+              <span
+                className={
+                  "block py-2 text-center text-xs font-semibold uppercase tracking-wide transition " +
+                  (selected
+                    ? "bg-maroon text-cream"
+                    : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
+                }
+              >
+                {selected ? `✓ ${t("Selected", "चयनित")}` : t("Select", "चुनें")}
+              </span>
             </button>
           );
         })}
+      </div>
+
+      {/* Step B · Pick items */}
+      <div className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 shadow-sm">
+        {selectedVendors.length === 0 ? (
+          <p className="text-sm text-ink-soft">
+            {multiVendor
+              ? t(
+                  "Pick one or more vendors above to see their menus.",
+                  "उनके मेन्यू देखने के लिए ऊपर एक या अधिक वेंडर चुनें।",
+                )
+              : t(
+                  "Pick a vendor above to see their menu.",
+                  "उनका मेन्यू देखने के लिए ऊपर वेंडर चुनें।",
+                )}
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-display text-lg font-semibold text-maroon">
+                {multiVendor
+                  ? t("Step B · Pick items across your vendors", "चरण B · अपने वेंडरों से आइटम चुनें")
+                  : t("Step B · Pick items from their menu", "चरण B · उनके मेन्यू से आइटम चुनें")}
+              </h3>
+              <span
+                className={
+                  "eyebrow text-xs font-semibold " +
+                  (picks.length >= allowance ? "text-maroon" : "text-ink-soft")
+                }
+              >
+                {picks.length}/{allowance} {t("PICKED", "चुने गए")}
+              </span>
+            </div>
+
+            {/* Diet filter */}
+            <div className="mt-3 inline-flex rounded-full border border-cream-3 bg-white p-1">
+              {dietOptions.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setDiet(d.id)}
+                  className={
+                    "rounded-full px-4 py-1 text-xs font-medium transition " +
+                    (diet === d.id
+                      ? "bg-maroon text-cream shadow-sm"
+                      : "text-ink-soft hover:text-ink")
+                  }
+                >
+                  {t(d.en, d.hi)}
+                </button>
+              ))}
+            </div>
+
+            {/* Diet-filter trap — the current filter leaves too few dishes for
+                this vendor to meet the package quota. Tell the guest how to
+                proceed instead of silently disabling Continue. */}
+            {dietShortfall && (
+              <p className="mt-3 rounded-xl border border-maroon/30 bg-cream/40 px-4 py-2.5 text-sm text-ink-soft">
+                <span aria-hidden="true" className="text-maroon">★ </span>
+                {t(
+                  `Only ${availableForDiet} ${diet === "veg" ? "Veg" : "Non-Veg"} dish${
+                    availableForDiet === 1 ? "" : "es"
+                  } here, but this course needs ${allowance}. Switch the filter to “All”${
+                    multiVendor ? " or add another vendor" : " or pick another vendor"
+                  } to finish this course.`,
+                  `यहाँ सिर्फ़ ${availableForDiet} ${
+                    diet === "veg" ? "वेज" : "नॉन-वेज"
+                  } डिश हैं, पर इस कोर्स के लिए ${allowance} चाहिए। “सभी” फ़िल्टर चुनें${
+                    multiVendor ? " या एक और वेंडर जोड़ें" : " या दूसरा वेंडर चुनें"
+                  }।`,
+                )}
+              </p>
+            )}
+
+            {/* One menu block per selected vendor — a single block for most
+                tiers, several for Platinum's multi-vendor segments. */}
+            {selectedVendors.map((vendor) => (
+              <div key={vendor.id} className="mt-4">
+                <p className="eyebrow text-xs font-semibold text-gold">
+                  {vendor.name}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {vendor.items
+                    .filter((it) => diet === "all" || it.diet === diet)
+                    .map((it: CategoryItem) => {
+                      const active = picks.includes(it.id);
+                      const atCap = !active && picks.length >= allowance;
+                      return (
+                        <button
+                          key={it.id}
+                          type="button"
+                          onClick={() => toggleItem(cat.id, it.id)}
+                          disabled={atCap}
+                          className={
+                            "flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition " +
+                            (active
+                              ? "border-maroon bg-maroon text-cream"
+                              : atCap
+                                ? "cursor-not-allowed border-cream-3 bg-white text-ink-soft/40"
+                                : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                          }
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "inline-block h-2.5 w-2.5 rounded-sm border " +
+                              (it.diet === "veg" ? "border-ink" : "border-maroon") +
+                              (active ? " bg-cream" : "")
+                            }
+                          />
+                          {active && "✓ "}
+                          {it.name}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-/* ─── Step 4 ─────────────────────────────────────────────────────────── */
-function Step4({
+/* ─── Step 3 · Event details (occasion, date, venue, guests, extras) ───── */
+function StepDetails({
   lang,
   t,
+  occasionId,
+  setOccasionId,
   guests,
+  setGuests,
+  clampGuests,
+  eventDate,
+  setEventDate,
+  cityId,
+  setCityId,
+  venue,
+  setVenue,
   selectedAddOns,
   setSelectedAddOns,
   toggle,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
+  occasionId: string;
+  setOccasionId: (v: string) => void;
   guests: number;
+  setGuests: (v: number) => void;
+  clampGuests: (raw: number) => void;
+  eventDate: string;
+  setEventDate: (v: string) => void;
+  cityId: string;
+  setCityId: (v: string) => void;
+  venue: string;
+  setVenue: (v: string) => void;
   selectedAddOns: string[];
   setSelectedAddOns: (v: string[]) => void;
   toggle: (arr: string[], setArr: (v: string[]) => void, id: string) => void;
@@ -875,10 +1147,123 @@ function Step4({
   return (
     <div>
       <SectionHead
-        label={t("STEP 4", "चरण 4")}
-        title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर")}
+        title={t("Event Details", "इवेंट विवरण")}
+        sub={t(
+          "Confirm the occasion, date and venue, then the headcount and any add-on counters.",
+          "अवसर, तारीख और वेन्यू की पुष्टि करें, फिर मेहमानों की संख्या और एक्स्ट्रा काउंटर बताएं।",
+        )}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+
+      {/* Occasion */}
+      <h3 className="font-display text-lg font-semibold text-ink">
+        {t("What's the occasion?", "क्या अवसर है?")}
+      </h3>
+      <div className="mt-3 flex flex-wrap gap-2.5">
+        {occasions.map((occasion: Occasion) => {
+          const active = occasion.id === occasionId;
+          return (
+            <button
+              key={occasion.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setOccasionId(occasion.id)}
+              className={
+                "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition " +
+                (active
+                  ? "bg-maroon text-cream"
+                  : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+              }
+            >
+              <span aria-hidden="true">{occasion.icon}</span>
+              {t(occasion.name, occasion.nameHi)}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        <div>
+          <h3 className="font-display text-lg font-semibold text-ink">
+            {t("How many guests?", "कितने मेहमान?")}
+          </h3>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {guestPresets.map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGuests(g)}
+                className={
+                  "rounded-full px-5 py-2 text-sm font-medium transition " +
+                  (guests === g
+                    ? "bg-maroon text-cream"
+                    : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+                }
+              >
+                {inr.format(g)}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 max-w-xs">
+            <label className="mb-1.5 block text-sm font-medium text-ink-soft">
+              {t("Exact count", "सटीक संख्या")} ({MIN_GUESTS}–
+              {inr.format(MAX_GUESTS)})
+            </label>
+            <input
+              type="number"
+              min={MIN_GUESTS}
+              max={MAX_GUESTS}
+              value={guests}
+              onChange={(e) => setGuests(Number(e.target.value))}
+              onBlur={(e) => clampGuests(Number(e.target.value))}
+              className="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-display text-lg font-semibold text-ink">
+            {t("Event date", "इवेंट की तारीख")}
+          </h3>
+          <input
+            type="date"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
+          />
+
+          <h3 className="mt-6 font-display text-lg font-semibold text-ink">
+            {t("City", "शहर")}
+          </h3>
+          <select
+            value={cityId}
+            onChange={(e) => setCityId(e.target.value)}
+            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
+          >
+            <option value="">{t("Select a city", "शहर चुनें")}</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {lang === "hi" ? c.nameHi : c.name}
+              </option>
+            ))}
+          </select>
+
+          <h3 className="mt-6 font-display text-lg font-semibold text-ink">
+            {t("Venue / Address", "वेन्यू / पता")}
+          </h3>
+          <input
+            type="text"
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
+            placeholder={t("Banquet / Hall / Address", "बैंक्वेट / हॉल / पता")}
+            className="mt-4 w-full max-w-xs rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+          />
+        </div>
+      </div>
+
+      <h3 className="mt-10 font-display text-lg font-semibold text-ink">
+        {t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
+      </h3>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {addOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
           const lineTotal = a.perPlate ? a.price * guests : a.price;
@@ -900,16 +1285,16 @@ function Step4({
                 {a.icon}
               </span>
               <div className="flex-1">
-                <h3 className="font-display text-base font-semibold text-ink">
+                <h4 className="font-display text-base font-semibold text-ink">
                   {lang === "hi" ? a.nameHi : a.name}
-                </h3>
+                </h4>
                 <p className="mt-0.5 text-sm text-ink-soft">{a.description}</p>
                 <p className="mt-1 text-sm font-semibold text-maroon">
                   {a.perPlate
                     ? `${money(a.price)} / ${t("plate", "प्लेट")}`
                     : money(a.price)}
                   <span className="ml-2 text-xs font-normal text-ink-soft">
-                    {t("≈", "≈")} {money(lineTotal)}
+                    ≈ {money(lineTotal)}
                   </span>
                 </p>
               </div>
@@ -931,80 +1316,151 @@ function Step4({
   );
 }
 
-/* ─── Step 5 ─────────────────────────────────────────────────────────── */
-function Step5({
+/* ─── Step 4 · Confirm (review + coupon + payment) ───────────────────  */
+function StepConfirm({
   t,
   occasion,
+  packageName,
   eventDate,
-  setEventDate,
+  city,
+  venue,
   guests,
-  vendor,
-  selectedDishes,
+  categoryVendor,
+  itemsFor,
   selectedAddOns,
-  grandTotal,
   onEditMenu,
   onEditExtras,
-  onDownload,
+  couponInput,
+  setCouponInput,
+  applyCoupon,
+  appliedCoupon,
+  couponError,
+  discount,
+  payMethod,
+  setPayMethod,
+  advance,
+  grandTotal,
+  bookingId,
+  paying,
+  payError,
+  onPay,
   whatsappHref,
 }: {
   t: (en: string, hi: string) => string;
   occasion: Occasion | undefined;
+  packageName: string;
   eventDate: string;
-  setEventDate: (v: string) => void;
+  city: City | undefined;
+  venue: string;
   guests: number;
-  vendor: ComparisonVendor | undefined;
-  selectedDishes: string[];
+  categoryVendor: VendorMap;
+  itemsFor: (catId: string) => string[];
   selectedAddOns: string[];
-  grandTotal: number;
   onEditMenu: () => void;
   onEditExtras: () => void;
-  onDownload: () => void;
+  couponInput: string;
+  setCouponInput: (v: string) => void;
+  applyCoupon: () => void;
+  appliedCoupon: Coupon | null;
+  couponError: string;
+  discount: number;
+  payMethod: PayMethod;
+  setPayMethod: (v: PayMethod) => void;
+  advance: number;
+  grandTotal: number;
+  bookingId: string;
+  paying: boolean;
+  payError: string;
+  onPay: (method: PayMethod, vpa: string) => void;
   whatsappHref: string;
 }) {
+  const methods: { id: PayMethod; en: string; hi: string; icon: string }[] = [
+    { id: "upi", en: "UPI App", hi: "UPI ऐप", icon: "📱" },
+    { id: "qr", en: "Scan QR", hi: "QR स्कैन", icon: "🔳" },
+  ];
+
+  // Merchant UPI identity (admin-configured, with a default fallback).
+  const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/payment-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: UpiPayeeConfig | null) => {
+        if (active && d?.vpa) setMerchant({ vpa: d.vpa, payeeName: d.payeeName });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const amount = Math.round(advance);
+  const txnRef = upiTxnRef(bookingId, "ADVANCE");
+  const note = `Bhojpatra advance ${bookingId}`;
+  const upiUri = buildUpiUri({
+    vpa: merchant.vpa,
+    payeeName: merchant.payeeName,
+    amount,
+    note,
+    txnRef,
+  });
+  const qrSrc =
+    `/api/payments/qr?pa=${encodeURIComponent(merchant.vpa)}` +
+    `&pn=${encodeURIComponent(merchant.payeeName)}` +
+    `&am=${amount.toFixed(2)}` +
+    `&tn=${encodeURIComponent(note)}` +
+    `&tr=${encodeURIComponent(txnRef)}`;
+
   return (
-    <div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onPay(payMethod, merchant.vpa);
+      }}
+    >
       <SectionHead
-        label={t("STEP 5", "चरण 5")}
-        title={t("Review & Share", "समीक्षा और शेयर")}
+        title={t("Review & Confirm", "समीक्षा और पुष्टि")}
       />
 
+      {/* Snapshot */}
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <div>
             <dt className="text-ink-soft">{t("Occasion", "अवसर")}</dt>
             <dd className="font-semibold text-ink">
-              {occasion ? occasion.name : "—"}
+              {occasion ? t(occasion.name, occasion.nameHi) : "—"}
             </dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">{t("Package", "पैकेज")}</dt>
+            <dd className="font-semibold text-ink">{packageName || "—"}</dd>
           </div>
           <div>
             <dt className="text-ink-soft">{t("Guests", "मेहमान")}</dt>
             <dd className="font-semibold text-ink">{inr.format(guests)}</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">{t("Vendor", "वेंडर")}</dt>
+            <dt className="text-ink-soft">{t("Date", "तारीख")}</dt>
+            <dd className="font-semibold text-ink">{eventDate || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">{t("City", "शहर")}</dt>
             <dd className="font-semibold text-ink">
-              {vendor ? vendor.name : "—"}
+              {city ? t(city.name, city.nameHi) : "—"}
             </dd>
           </div>
           <div>
-            <dt className="mb-1 text-ink-soft">{t("Event date", "तारीख")}</dt>
-            <dd>
-              <input
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                className="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-3 py-1.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white"
-              />
-            </dd>
+            <dt className="text-ink-soft">{t("Venue", "वेन्यू")}</dt>
+            <dd className="font-semibold text-ink">{venue || "—"}</dd>
           </div>
         </dl>
       </div>
 
-      {/* Menu summary */}
+      {/* Menu summary by category */}
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold text-ink">
-            {t("Selected Menu", "चयनित मेन्यू")}
+            {t("Your Menu", "आपका मेन्यू")}
           </h3>
           <button
             type="button"
@@ -1015,19 +1471,30 @@ function Step5({
           </button>
         </div>
         <div className="mt-3 space-y-3">
-          {menuCourses.map((course) => {
-            const picks = course.dishes.filter((d) =>
-              selectedDishes.includes(d.id),
-            );
-            if (picks.length === 0) return null;
+          {menuCategories.map((cat) => {
+            const chosen = categoryVendor[cat.id] ?? [];
+            // One line per selected vendor (several possible on Platinum).
+            const rows = cat.vendors
+              .filter((v) => chosen.includes(v.id))
+              .map((v) => ({
+                vendor: v,
+                picks: v.items
+                  .filter((it) => itemsFor(cat.id).includes(it.id))
+                  .map((it) => it.name),
+              }))
+              .filter((r) => r.picks.length > 0);
+            if (rows.length === 0) return null;
             return (
-              <div key={course.id}>
-                <p className="text-sm font-semibold text-ink-soft">
-                  {course.name}
-                </p>
-                <p className="text-sm text-ink">
-                  {picks.map((d) => d.name).join(", ")}
-                </p>
+              <div key={cat.id}>
+                {rows.map((r) => (
+                  <div key={r.vendor.id} className="mt-2 first:mt-0">
+                    <p className="text-sm font-semibold text-ink-soft">
+                      {cat.icon} {t(cat.name, cat.nameHi)} ·{" "}
+                      <span className="text-maroon">{r.vendor.name}</span>
+                    </p>
+                    <p className="text-sm text-ink">{r.picks.join(", ")}</p>
+                  </div>
+                ))}
               </div>
             );
           })}
@@ -1060,73 +1527,8 @@ function Step5({
         )}
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onDownload}
-          className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-        >
-          ⬇ {t("Download Menu (PDF)", "मेन्यू डाउनलोड (PDF)")}
-        </button>
-        <a
-          href={whatsappHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-        >
-          {t("Share on WhatsApp", "WhatsApp पर शेयर करें")} · {money(grandTotal)}
-        </a>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Step 6 ─────────────────────────────────────────────────────────── */
-function Step6({
-  t,
-  couponInput,
-  setCouponInput,
-  applyCoupon,
-  appliedCoupon,
-  couponError,
-  discount,
-  payMethod,
-  setPayMethod,
-  advance,
-  onPay,
-}: {
-  t: (en: string, hi: string) => string;
-  couponInput: string;
-  setCouponInput: (v: string) => void;
-  applyCoupon: () => void;
-  appliedCoupon: Coupon | null;
-  couponError: string;
-  discount: number;
-  payMethod: PayMethod;
-  setPayMethod: (v: PayMethod) => void;
-  advance: number;
-  onPay: () => void;
-}) {
-  const methods: { id: PayMethod; en: string; hi: string; icon: string }[] = [
-    { id: "upi", en: "UPI", hi: "UPI", icon: "📱" },
-    { id: "qr", en: "QR Code", hi: "QR कोड", icon: "🔳" },
-    { id: "card", en: "Card", hi: "कार्ड", icon: "💳" },
-  ];
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onPay();
-      }}
-    >
-      <SectionHead
-        label={t("STEP 6", "चरण 6")}
-        title={t("Discount & Payment", "छूट और भुगतान")}
-      />
-
       {/* Coupon */}
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+      <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <h3 className="font-display text-base font-semibold text-ink">
           {t("Apply a coupon", "कूपन लगाएं")}
         </h3>
@@ -1136,7 +1538,7 @@ function Step6({
             value={couponInput}
             onChange={(e) => setCouponInput(e.target.value)}
             placeholder={t("Enter code", "कोड दर्ज करें")}
-            className="min-w-0 flex-1 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink uppercase outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            className="min-w-0 flex-1 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm uppercase text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
           />
           <button
             type="button"
@@ -1146,11 +1548,9 @@ function Step6({
             {t("Apply", "लगाएं")}
           </button>
         </div>
-        {couponError && (
-          <p className="mt-2 text-sm text-maroon">{couponError}</p>
-        )}
+        {couponError && <p className="mt-2 text-sm text-maroon">{couponError}</p>}
         {appliedCoupon && discount > 0 && (
-          <p className="mt-2 text-sm font-medium text-green-700">
+          <p className="mt-2 text-sm font-medium text-maroon">
             {t("Applied", "लागू")} {appliedCoupon.code} — {t("you save", "बचत")}{" "}
             {money(discount)}
           </p>
@@ -1169,12 +1569,19 @@ function Step6({
         </div>
       </div>
 
-      {/* Payment method */}
+      {/* Pay via UPI */}
       <div className="mt-6">
         <h3 className="font-display text-base font-semibold text-ink">
-          {t("Payment method", "भुगतान का तरीका")}
+          {t("Pay the advance via UPI", "UPI से एडवांस भुगतान")}
         </h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <p className="mt-1 text-sm text-ink-soft">
+          {t(
+            "Pay securely to our UPI ID with any app — GPay, PhonePe, Paytm and more.",
+            "किसी भी ऐप — GPay, PhonePe, Paytm आदि से हमारी UPI ID पर सुरक्षित भुगतान करें।",
+          )}
+        </p>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {methods.map((m) => {
             const active = payMethod === m.id;
             return (
@@ -1199,64 +1606,106 @@ function Step6({
           })}
         </div>
 
-        {payMethod === "qr" && (
-          <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-cream-3 bg-white p-6 shadow-sm">
-            <svg
-              viewBox="0 0 100 100"
-              className="h-32 w-32 sm:h-40 sm:w-40 text-ink"
-              role="img"
-              aria-label={t("QR code placeholder", "QR कोड प्लेसहोल्डर")}
-            >
-              <rect x="0" y="0" width="100" height="100" fill="white" />
-              <rect x="6" y="6" width="22" height="22" fill="currentColor" />
-              <rect x="12" y="12" width="10" height="10" fill="white" />
-              <rect x="72" y="6" width="22" height="22" fill="currentColor" />
-              <rect x="78" y="12" width="10" height="10" fill="white" />
-              <rect x="6" y="72" width="22" height="22" fill="currentColor" />
-              <rect x="12" y="78" width="10" height="10" fill="white" />
-              <rect x="40" y="10" width="8" height="8" fill="currentColor" />
-              <rect x="52" y="10" width="8" height="8" fill="currentColor" />
-              <rect x="40" y="40" width="20" height="20" fill="currentColor" />
-              <rect x="46" y="46" width="8" height="8" fill="white" />
-              <rect x="72" y="46" width="8" height="8" fill="currentColor" />
-              <rect x="84" y="60" width="8" height="8" fill="currentColor" />
-              <rect x="40" y="78" width="8" height="8" fill="currentColor" />
-              <rect x="60" y="84" width="8" height="8" fill="currentColor" />
-            </svg>
-            <p className="text-sm text-ink-soft">
-              {t("Scan to pay the advance", "एडवांस चुकाने के लिए स्कैन करें")}
-            </p>
-          </div>
-        )}
+        <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-cream-3 bg-white p-6 shadow-sm">
+          {payMethod === "qr" ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrSrc}
+                alt={t("UPI payment QR code", "UPI भुगतान QR कोड")}
+                width={176}
+                height={176}
+                className="h-40 w-40 sm:h-44 sm:w-44"
+              />
+              <p className="text-sm text-ink-soft">
+                {t(
+                  "Scan with any UPI app to pay the advance",
+                  "एडवांस चुकाने के लिए किसी भी UPI ऐप से स्कैन करें",
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <a
+                href={upiUri}
+                className="w-full rounded-full bg-maroon px-6 py-3 text-center text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
+              >
+                {t("Open UPI App", "UPI ऐप खोलें")} · {money(advance)}
+              </a>
+              <p className="text-sm text-ink-soft">
+                {t(
+                  "Opens your UPI app with the amount prefilled. On desktop, switch to Scan QR.",
+                  "आपका UPI ऐप राशि के साथ खुलेगा। डेस्कटॉप पर QR स्कैन चुनें।",
+                )}
+              </p>
+            </>
+          )}
+          <p className="text-xs text-ink-soft">
+            {t("Paying to", "भुगतान प्राप्तकर्ता")}:{" "}
+            <span className="font-semibold text-ink">{merchant.vpa}</span>
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 rounded-2xl border border-maroon/30 bg-maroon-soft/30 p-5">
-        <p className="text-sm text-ink-soft">
-          {t("Amount payable now (25% advance)", "अभी देय राशि (25% एडवांस)")}
-        </p>
-        <p className="mt-1 text-2xl font-semibold text-maroon">
-          {money(advance)}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-ink-soft">
+            {t("Grand total", "कुल राशि")}
+          </p>
+          <p className="font-semibold text-ink">{money(grandTotal)}</p>
+        </div>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-sm text-ink-soft">
+            {t("Amount payable now (25% advance)", "अभी देय राशि (25% एडवांस)")}
+          </p>
+          <p className="text-2xl font-semibold text-maroon">{money(advance)}</p>
+        </div>
       </div>
 
-      <button
-        type="submit"
-        className="mt-6 w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
-      >
-        {t("Pay Advance", "एडवांस भुगतान")} {money(advance)}
-      </button>
+      {payError && (
+        <p role="alert" className="mt-4 text-sm font-medium text-maroon">
+          {payError}
+        </p>
+      )}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={paying}
+          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+        >
+          {paying
+            ? t("Confirming…", "पुष्टि हो रही है…")
+            : t("I've Paid — Confirm Booking", "भुगतान हो गया — बुकिंग पक्की करें")}
+        </button>
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+        >
+          {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
+        </a>
+      </div>
+      <p className="mt-2 text-xs text-ink-soft">
+        {t(
+          "Tap after completing the payment in your UPI app.",
+          "अपने UPI ऐप में भुगतान पूरा करने के बाद टैप करें।",
+        )}
+      </p>
     </form>
   );
 }
 
-/* ─── Step 7 ─────────────────────────────────────────────────────────── */
-function Step7({
+/* ─── Confirmation view ──────────────────────────────────────────────── */
+function StepDone({
   t,
   bookingId,
   occasion,
   eventDate,
+  city,
+  venue,
   guests,
-  vendor,
   grandTotal,
   advance,
   onDownload,
@@ -1266,8 +1715,9 @@ function Step7({
   bookingId: string;
   occasion: Occasion | undefined;
   eventDate: string;
+  city: City | undefined;
+  venue: string;
   guests: number;
-  vendor: ComparisonVendor | undefined;
   grandTotal: number;
   advance: number;
   onDownload: () => void;
@@ -1293,7 +1743,7 @@ function Step7({
           <div>
             <dt className="text-ink-soft">{t("Occasion", "अवसर")}</dt>
             <dd className="font-semibold text-ink">
-              {occasion ? occasion.name : "—"}
+              {occasion ? t(occasion.name, occasion.nameHi) : "—"}
             </dd>
           </div>
           <div>
@@ -1301,14 +1751,18 @@ function Step7({
             <dd className="font-semibold text-ink">{eventDate || "—"}</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">{t("Guests", "मेहमान")}</dt>
-            <dd className="font-semibold text-ink">{inr.format(guests)}</dd>
+            <dt className="text-ink-soft">{t("City", "शहर")}</dt>
+            <dd className="font-semibold text-ink">
+              {city ? t(city.name, city.nameHi) : "—"}
+            </dd>
           </div>
           <div>
-            <dt className="text-ink-soft">{t("Vendor", "वेंडर")}</dt>
-            <dd className="font-semibold text-ink">
-              {vendor ? vendor.name : "—"}
-            </dd>
+            <dt className="text-ink-soft">{t("Venue", "वेन्यू")}</dt>
+            <dd className="font-semibold text-ink">{venue || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">{t("Guests", "मेहमान")}</dt>
+            <dd className="font-semibold text-ink">{inr.format(guests)}</dd>
           </div>
           <div>
             <dt className="text-ink-soft">{t("Grand Total", "कुल राशि")}</dt>
@@ -1316,7 +1770,7 @@ function Step7({
           </div>
           <div>
             <dt className="text-ink-soft">{t("Advance Paid", "एडवांस")}</dt>
-            <dd className="font-semibold text-green-700">{money(advance)}</dd>
+            <dd className="font-semibold text-maroon">{money(advance)}</dd>
           </div>
         </dl>
       </div>
@@ -1332,7 +1786,7 @@ function Step7({
         <button
           type="button"
           onClick={onDownload}
-          className="rounded-full border border-maroon px-4 sm:px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+          className="rounded-full border border-maroon px-4 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 sm:px-6"
         >
           ⬇ {t("Download Menu", "मेन्यू डाउनलोड")}
         </button>
@@ -1340,7 +1794,7 @@ function Step7({
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full bg-maroon px-4 sm:px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+          className="rounded-full bg-maroon px-4 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:px-6"
         >
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>
@@ -1362,7 +1816,7 @@ function SummaryRow({
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-ink-soft">{label}</span>
-      <span className={accent ? "font-medium text-green-700" : "text-ink"}>
+      <span className={accent ? "font-medium text-maroon" : "text-ink"}>
         {value}
       </span>
     </div>
@@ -1371,8 +1825,9 @@ function SummaryRow({
 
 function SummaryPanel({
   t,
+  basePerPlate,
+  categoryAddTotal,
   perPlate,
-  usingDefault,
   guests,
   subtotal,
   addOnsTotal,
@@ -1382,8 +1837,9 @@ function SummaryPanel({
   advance,
 }: {
   t: (en: string, hi: string) => string;
+  basePerPlate: number;
+  categoryAddTotal: number;
   perPlate: number;
-  usingDefault: boolean;
   guests: number;
   subtotal: number;
   addOnsTotal: number;
@@ -1400,15 +1856,25 @@ function SummaryPanel({
         </h3>
         <div className="mt-4 space-y-2">
           <SummaryRow
-            label={`${t("Per plate", "प्रति प्लेट")}${
-              usingDefault ? ` (${t("est.", "अनुमानित")})` : ""
-            }`}
+            label={t("Package base / plate", "पैकेज बेस / प्लेट")}
+            value={money(basePerPlate)}
+          />
+          <SummaryRow
+            label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
+            value={`+ ${money(categoryAddTotal)}`}
+          />
+          <SummaryRow
+            label={t("Per plate", "प्रति प्लेट")}
             value={money(perPlate)}
+            accent
           />
           <SummaryRow label={t("Guests", "मेहमान")} value={inr.format(guests)} />
           <div className="my-2 h-px bg-cream-3" />
           <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
-          <SummaryRow label={t("Add-ons", "एक्स्ट्रा")} value={money(addOnsTotal)} />
+          <SummaryRow
+            label={t("Add-ons", "एक्स्ट्रा")}
+            value={money(addOnsTotal)}
+          />
           {discount > 0 && (
             <SummaryRow
               label={t("Discount", "छूट")}

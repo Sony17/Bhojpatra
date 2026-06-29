@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -13,13 +13,45 @@ import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import { money } from "@/components/admin/shared/money";
 import { Wallet } from "@/components/admin/shared/icons";
 import {
+  adminPayments,
   paymentsSummary,
-  queryPayments,
   vendorSettlements as seedSettlements,
 } from "@/lib/admin/mockData";
 import type { AdminPayment, VendorSettlement } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
+
+// A payment recorded by checkout via /api/payments.
+interface LivePayment {
+  id: string;
+  bookingId: string;
+  customer: string;
+  method: "UPI" | "QR";
+  type: "Advance";
+  amount: number;
+  status: "Advance Received";
+  createdAt: string;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function toAdminPayment(p: LivePayment): AdminPayment {
+  return {
+    id: p.id,
+    bookingId: p.bookingId,
+    customer: p.customer,
+    method: p.method,
+    type: p.type,
+    amount: p.amount,
+    status: p.status,
+    date: formatDate(p.createdAt),
+  };
+}
 
 const TABS: TabItem[] = [
   { id: "transactions", label: "Transactions" },
@@ -43,6 +75,23 @@ const METHOD_OPTIONS = [
 
 export default function PaymentTracking() {
   const [tab, setTab] = useState("transactions");
+  const [live, setLive] = useState<AdminPayment[]>([]);
+
+  // Pull in advances collected through the live UPI checkout.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/payments")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { payments?: LivePayment[] } | null) => {
+        if (active && d?.payments) setLive(d.payments.map(toAdminPayment));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const liveCollected = live.reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -53,22 +102,22 @@ export default function PaymentTracking() {
       />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Wallet} label="Collected" value={money(paymentsSummary.collected)} />
-        <StatCard icon={Wallet} label="Advance" value={money(paymentsSummary.advance)} />
+        <StatCard icon={Wallet} label="Collected" value={money(paymentsSummary.collected + liveCollected)} />
+        <StatCard icon={Wallet} label="Advance" value={money(paymentsSummary.advance + liveCollected)} />
         <StatCard icon={Wallet} label="Settled to Vendors" value={money(paymentsSummary.settled)} />
         <StatCard icon={Wallet} label="Pending" value={money(paymentsSummary.pending)} />
       </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === "transactions" ? <TransactionsTab /> : <SettlementsTab />}
+      {tab === "transactions" ? <TransactionsTab live={live} /> : <SettlementsTab />}
     </div>
   );
 }
 
 /* ── Transactions ─────────────────────────────────────────────────────────── */
 
-function TransactionsTab() {
+function TransactionsTab({ live }: { live: AdminPayment[] }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [method, setMethod] = useState("All");
@@ -79,10 +128,23 @@ function TransactionsTab() {
     setPage(1);
   };
 
-  const result = useMemo(
-    () => queryPayments({ q, status: status as never, method: method as never, page, pageSize: PAGE_SIZE }),
-    [q, status, method, page],
-  );
+  // Live checkout payments shown ahead of the seeded history.
+  const result = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const filtered = [...live, ...adminPayments].filter((p) => {
+      const matchesQ =
+        !needle ||
+        p.id.toLowerCase().includes(needle) ||
+        p.bookingId.toLowerCase().includes(needle) ||
+        p.customer.toLowerCase().includes(needle);
+      const matchesStatus = status === "All" || p.status === status;
+      const matchesMethod = method === "All" || p.method === method;
+      return matchesQ && matchesStatus && matchesMethod;
+    });
+    const total = filtered.length;
+    const start = (page - 1) * PAGE_SIZE;
+    return { data: filtered.slice(start, start + PAGE_SIZE), page, pageSize: PAGE_SIZE, total };
+  }, [q, status, method, page, live]);
 
   const columns: Column<AdminPayment>[] = [
     {

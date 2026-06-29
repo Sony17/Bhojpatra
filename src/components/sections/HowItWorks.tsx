@@ -10,7 +10,7 @@ export default function HowItWorks() {
       className="mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
       <div className="mx-auto max-w-2xl text-center">
-        <h2 className="eyebrow text-2xl text-maroon sm:text-3xl">
+        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           How It Works
         </h2>
 
@@ -29,7 +29,7 @@ export default function HowItWorks() {
         {steps.map((step, i) => (
           <Fragment key={step.n}>
             <li className="flex max-w-[15rem] flex-col items-center text-center">
-              <span className="relative flex h-32 w-32 items-center justify-center rounded-full bg-cream/40 p-1.5 ring-1 ring-cream-3 shadow-[0_14px_30px_-18px_rgba(91,18,24,0.5)]">
+              <span className="relative flex h-32 w-32 items-center justify-center rounded-full bg-cream/40 p-1.5 ring-1 ring-cream-3 shadow-[0_14px_30px_-18px_rgba(185,32,37,0.5)]">
                 <span className="relative h-full w-full overflow-hidden rounded-full">
                   <Image
                     src={step.image}
