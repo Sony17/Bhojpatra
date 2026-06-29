@@ -2,9 +2,11 @@
 
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { useSiteContent } from "@/lib/sitePages";
 
 export default function Footer() {
   const { lang, t } = useLang();
+  const { contact } = useSiteContent();
   return (
     <>
       <section className="bg-maroon-dark">
@@ -33,7 +35,7 @@ export default function Footer() {
         </div>
       </section>
       <section className="bg-white text-black">
-        <div className="mx-auto grid max-w-7xl origin-top scale-75 items-center gap-10 px-5 py-14 sm:py-16 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-7xl [zoom:0.75] items-center gap-10 px-5 py-7 sm:py-8 lg:grid-cols-2">
           <div className="text-center lg:text-left">
             <span className="inline-flex items-center gap-2 rounded-full bg-maroon px-3 py-1 text-xs font-semibold tracking-wide text-cream">
               <span className="h-1.5 w-1.5 rounded-full bg-cream" />
@@ -71,43 +73,32 @@ export default function Footer() {
               </span>
             </div>
           </div>
-          <div className="flex justify-center lg:justify-end">
-            <div className="relative h-[460px] w-full max-w-md">
-              {/* sweets backdrop */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/bhoj_Hero_1.png"
-                alt=""
-                className="absolute inset-0 h-full w-full rounded-[2rem] object-cover"
-              />
-              <div className="absolute inset-0 rounded-[2rem] bg-cream/10" />
-              {/* tilted phone */}
-              <div className="absolute left-1/2 top-1/2 h-[420px] w-[210px] -translate-x-1/2 -translate-y-1/2 -rotate-[8deg] rounded-[2.5rem] bg-black p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
-                <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
-                  <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-maroon px-5 pt-10 text-center">
+          <div className="flex h-[220px] items-start justify-center overflow-hidden lg:justify-end">
+            {/* tilted phone — cropped to show top half */}
+            <div className="relative h-[420px] w-[210px] -rotate-[8deg] rounded-[2.5rem] bg-black p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
+              <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
+              <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-white px-5 pt-12 text-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/bhoj7.png"
-                    alt=""
-                    width={424}
-                    height={538}
-                    className="h-20 w-auto"
+                    src="/bhojpatra-logo.png"
+                    alt="bhojpatra"
+                    width={910}
+                    height={250}
+                    className="h-8 w-auto"
                   />
-                  <span className="font-display mt-3 text-2xl leading-none text-cream">bhojpatra</span>
-                  <p className="mt-2 text-[11px] text-cream/70">
+                  <p className="mt-3 text-[11px] text-black/60">
                     {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
                   </p>
                   <div className="mt-5 w-full space-y-2.5">
-                    <div className="h-9 rounded-xl bg-cream/15" />
-                    <div className="h-9 rounded-xl bg-cream/15" />
-                    <div className="h-9 rounded-xl bg-cream/15" />
-                    <div className="mt-4 h-10 rounded-xl bg-cream" />
+                    <div className="h-9 rounded-xl bg-maroon/10" />
+                    <div className="h-9 rounded-xl bg-maroon/10" />
+                    <div className="h-9 rounded-xl bg-maroon/10" />
+                    <div className="mt-4 h-10 rounded-xl bg-maroon" />
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
       </section>
     <footer className="bg-maroon-dark pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-cream/80 lg:pb-0">
       <div className="mx-auto max-w-7xl px-5 py-12">
@@ -122,7 +113,7 @@ export default function Footer() {
               className="h-auto w-32"
             />
             <a
-              href="https://www.instagram.com/bhojpatraofficial"
+              href={`https://www.instagram.com/${contact.instagram.replace(/^@/, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-flex items-center gap-2 text-sm text-cream/70 hover:text-cream"
@@ -170,14 +161,26 @@ export default function Footer() {
 
           <div className="col-span-2 sm:col-span-1">
             <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Get in touch", "संपर्क करें")}</p>
-            <p className="text-sm text-cream/70">info@bhojpatra.com</p>
-            <p className="mt-1 text-sm text-cream/70">+91 12345 67890</p>
-            <p className="mt-1 text-sm text-cream/70">www.bhojpatra.com</p>
+            <a href={`mailto:${contact.email}`} className="block text-sm text-cream/70 hover:text-cream">
+              {contact.email}
+            </a>
+            <a href={`tel:+${contact.whatsapp}`} className="mt-1 block text-sm text-cream/70 hover:text-cream">
+              {contact.phoneDisplay}
+            </a>
+            <a
+              href={`https://${contact.website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 block text-sm text-cream/70 hover:text-cream"
+            >
+              {contact.website}
+            </a>
+            <p className="mt-1 text-sm text-cream/70">{contact.address}</p>
           </div>
         </div>
 
         <div className="mt-10 border-t border-cream/10 pt-6 text-center text-xs text-cream/50">
-          © {new Date().getFullYear()} Bhojpatra. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
+          © {new Date().getFullYear()} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
         </div>
       </div>
     </footer>

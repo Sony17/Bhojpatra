@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
-import { Gift, Mail, Phone } from "@/components/icons";
+import { Mail, Phone } from "@/components/icons";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -68,8 +68,15 @@ export default function PromoLeadCapture() {
           variant="scale"
           className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-2xl border border-cream/30 px-5 py-5 text-center sm:flex-row sm:items-center sm:gap-6 sm:px-7 sm:text-left"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream text-maroon shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)]">
-            <Gift className="h-5 w-5" />
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/watermark-pot.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-auto object-contain"
+            />
           </span>
 
           <div className="flex flex-col gap-0.5 sm:flex-1">
