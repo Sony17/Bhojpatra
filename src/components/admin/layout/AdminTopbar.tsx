@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment } from "react";
-import { Bell, Menu, ChevronRight } from "@/components/admin/shared/icons";
+import { Menu, ChevronRight } from "@/components/admin/shared/icons";
+import BrandIcon from "@/components/BrandIcon";
 import { adminProfile } from "@/lib/admin/mockData";
 import { clearAdminSession } from "@/lib/adminAuth";
 
@@ -53,6 +54,14 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
             <Menu className="h-5 w-5" />
           </button>
 
+          <Link
+            href="/admin/dashboard"
+            aria-label="Bhojpatra admin home"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md lg:hidden"
+          >
+            <BrandIcon className="h-8 w-8 bg-maroon" />
+          </Link>
+
           <nav aria-label="Breadcrumb" className="min-w-0">
             <ol className="flex items-center gap-1.5 text-sm">
               {segments.map((seg, i) => {
@@ -86,18 +95,8 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
           </nav>
         </div>
 
-        {/* Right — bell, profile */}
+        {/* Right — profile */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Notifications */}
-          <Link
-            href="/admin/dashboard"
-            aria-label="Notifications"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full border border-cream-3 bg-cream-2 text-ink transition-colors hover:bg-cream-3"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-maroon ring-2 ring-white" />
-          </Link>
-
           {/* Welcome + avatar */}
           <div className="flex items-center gap-2.5">
             <span className="font-script hidden text-base text-ink-soft sm:inline">

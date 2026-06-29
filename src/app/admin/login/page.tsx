@@ -7,6 +7,7 @@ import {
   setAdminSession,
   verifyAdmin,
 } from "@/lib/adminAuth";
+import BrandIcon from "@/components/BrandIcon";
 
 const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
@@ -38,6 +39,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-surface-beige px-4 py-12 text-ink">
       <div className="w-full max-w-sm rounded-2xl border border-cream-3 bg-white p-7 shadow-sm sm:p-8">
         <header className="mb-7 text-center">
+          <BrandIcon className="mx-auto mb-3 h-14 w-14 bg-maroon" />
           <span className="font-display text-2xl text-maroon">bhojpatra</span>
           <h1 className="mt-3 text-xl font-semibold text-ink">Admin Login</h1>
           <p className="mt-1.5 text-sm text-ink-soft">
