@@ -137,6 +137,17 @@ export function Search(props: IconProps) {
   );
 }
 
+/* Megaphone — promotions / lead generation. */
+export function Megaphone(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l9 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M15 6a4.5 4.5 0 0 1 0 12" />
+      <path d="M7 14v3a2 2 0 0 0 4 0v-1" />
+    </svg>
+  );
+}
+
 /* Bell — notifications. */
 export function Bell(props: IconProps) {
   return (

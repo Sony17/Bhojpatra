@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
-import BookingManagement from "@/components/admin/bookings/BookingManagement";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Booking Management" };
-
+// Booking Management was merged into the unified "Customers & Bookings" page.
+// Preserve any existing links by redirecting straight to the bookings tab.
 export default function BookingsPage() {
-  return <BookingManagement />;
+  redirect("/admin/customers?tab=bookings");
 }

@@ -28,9 +28,16 @@ export default function Modal({
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Focus the panel only when the modal opens. Keeping `onClose` out of the
+  // deps is deliberate: callers pass an inline `onClose`, so a new reference
+  // every render would re-run this and steal focus from inputs on each keystroke.
   useEffect(() => {
     if (!open) return;
     panelRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };

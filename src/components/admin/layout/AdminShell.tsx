@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAdminSession } from "@/lib/adminAuth";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
 
@@ -15,6 +17,30 @@ import AdminTopbar from "./AdminTopbar";
  */
 export default function AdminShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const admin = useAdminSession();
+  const isLoginRoute = pathname === "/admin/login";
+
+  // Gate every admin route except the login page. `undefined` means the
+  // session is still loading (server + first client render) — wait. `null`
+  // means signed out — bounce to the login page.
+  useEffect(() => {
+    if (!isLoginRoute && admin === null) {
+      router.replace("/admin/login");
+    }
+  }, [isLoginRoute, admin, router]);
+
+  // The login page renders full-screen, without the sidebar/topbar chrome.
+  if (isLoginRoute) {
+    return <>{children}</>;
+  }
+
+  // While loading, or redirecting an unauthenticated visitor, render nothing
+  // to avoid flashing the admin chrome.
+  if (admin === undefined || admin === null) {
+    return <div className="min-h-screen bg-surface-beige" />;
+  }
 
   return (
     <div className="min-h-screen bg-surface-beige text-ink">

@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
-import ReportsView from "@/components/admin/reports/ReportsView";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Reports" };
-
+/**
+ * Reports were merged into the dashboard's analytics section. Keep this route as
+ * a permanent redirect so any old links / bookmarks land on the right place.
+ */
 export default function ReportsPage() {
-  return <ReportsView />;
+  redirect("/admin/dashboard");
 }

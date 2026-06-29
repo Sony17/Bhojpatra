@@ -5,6 +5,7 @@ import RevenueCard from "./RevenueCard";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
 import QuickActions from "./QuickActions";
 import NotificationsPanel from "./NotificationsPanel";
+import AnalyticsSection from "./AnalyticsSection";
 import {
   adminProfile,
   adminKpis,
@@ -43,20 +44,14 @@ export default function AdminDashboard() {
       {/* Row 1 — KPI cards */}
       <KpiGrid kpis={adminKpis} />
 
-      {/*
-        EXTENSION POINT (later phase): analytics row goes here, e.g.
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <BookingTrendsChart ... />
-          <PopularCuisineChart ... />
-        </div>
-        Reserved as its own row so charts slot in without touching the rows below.
-      */}
+      {/* Analytics row — Reports merged into the dashboard (revenue, bookings, vendors). */}
+      <AnalyticsSection />
 
       {/* Row 2 — recent bookings (wide) + revenue summary */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <RecentBookingsTable
           rows={recentBookings}
-          seeAllHref="/admin/bookings"
+          seeAllHref="/admin/customers?tab=bookings"
           className="lg:col-span-2"
         />
         <RevenueCard data={revenueSummary} detailsHref="/admin/payments" />

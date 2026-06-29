@@ -10,6 +10,7 @@ import {
   setSession,
   type AccountType,
 } from "@/lib/session";
+import { setAdminSession, verifyAdmin } from "@/lib/adminAuth";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -67,8 +68,21 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       setSubmitted(true);
       return;
     }
-    // Mock login — no backend. Reuse the persisted role (set at signup) so the
-    // header reflects the signed-in user; default to a customer account.
+    // Mock login — no backend. The admin signs in through this same form: if the
+    // credentials match the admin account, grant the admin session and send them
+    // to the control panel instead of a customer/vendor dashboard.
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
+    const admin = verifyAdmin(email, password);
+    if (admin) {
+      setAdminSession(admin);
+      router.push("/admin/dashboard");
+      return;
+    }
+
+    // Otherwise reuse the persisted role (set at signup) so the header reflects
+    // the signed-in user; default to a customer account.
     const existing = getSession();
     setSession(existing ?? { type: "customer" });
     router.push(dashboardPath(existing?.type));

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
@@ -91,12 +90,6 @@ export default function CustomerManagement() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Admin Panel"
-        title="Customer Management"
-        subtitle="View customers, their bookings and lifetime value."
-      />
-
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Users} label="Total Customers" value={String(stats.total)} />
         <StatCard icon={Users} label="Active" value={String(stats.active)} />

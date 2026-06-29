@@ -5,6 +5,7 @@ import Link from "next/link";
 import { occasions, packages, guestPresets } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent } from "@/lib/homeContent";
 
 /** Contact + event detail fields rendered as a two-column grid. */
 const contactFields = [
@@ -48,6 +49,7 @@ const contactFields = [
 
 export default function BookingForm() {
   const { lang, t } = useLang();
+  const { booking, packages: homePackages } = useHomeContent();
   const [occasion, setOccasion] = useState<string>(occasions[0].id);
   const [guests, setGuests] = useState<string>(String(guestPresets[2]));
   const [selectedPackage, setSelectedPackage] = useState<string>(
@@ -66,17 +68,17 @@ export default function BookingForm() {
   if (eventDate) bookParams.set("date", eventDate);
   const bookHref = `/book?${bookParams.toString()}`;
 
+  // Admin-editable name / price overrides, keyed by package id.
+  const tierMeta = (id: string) => homePackages.tiers.find((x) => x.id === id);
+
   return (
     <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="mx-auto max-w-3xl text-center">
         <h2 className="text-3xl text-ink sm:text-4xl">
-          {t("Book Your Celebration", "अपना उत्सव बुक करें")}
+          {lang === "hi" ? booking.headingHi : booking.heading}
         </h2>
         <p className="font-script mt-3 text-xl text-ink-soft sm:text-2xl">
-          {t(
-            "Fill in the details to confirm your booking.",
-            "अपनी बुकिंग पक्की करने के लिए विवरण भरें।",
-          )}
+          {lang === "hi" ? booking.subtitleHi : booking.subtitle}
         </p>
       </Reveal>
 
@@ -189,6 +191,12 @@ export default function BookingForm() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {packages.map((tier) => {
                 const active = selectedPackage === tier.id;
+                const meta = tierMeta(tier.id);
+                const name =
+                  lang === "hi"
+                    ? meta?.nameHi ?? tier.nameHi
+                    : meta?.name ?? tier.name;
+                const price = meta?.price ?? tier.price;
                 return (
                   <label
                     key={tier.id}
@@ -209,7 +217,7 @@ export default function BookingForm() {
                     />
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-ink">
-                        {lang === "hi" ? tier.nameHi : tier.name}
+                        {name}
                       </span>
                       {tier.popular && (
                         <span className="rounded-full bg-gold-soft/50 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-maroon">
@@ -218,7 +226,7 @@ export default function BookingForm() {
                       )}
                     </div>
                     <span className="text-base font-semibold text-maroon">
-                      {tier.price}
+                      {price}
                       <span className="text-xs font-normal text-ink-soft">
                         {" "}
                         {lang === "hi" ? tier.unitHi : tier.unit}

@@ -25,7 +25,6 @@ export type AdminIconKey =
   | "revenue"
   | "customers"
   | "coupons"
-  | "menu"
   | "addons"
   | "payments"
   | "content"
@@ -246,7 +245,7 @@ export interface PaymentQuery {
 
 /* ── Coupons ─────────────────────────────────────────────────────────────── */
 
-export type CouponStatus = "Active" | "Scheduled" | "Expired";
+export type CouponStatus = "Active" | "Inactive";
 
 export interface AdminCoupon {
   id: string;
@@ -257,8 +256,6 @@ export interface AdminCoupon {
   eligibility: string;
   startsAt: string;
   expiresAt: string;
-  usageLimit: number;
-  usedCount: number;
   status: CouponStatus;
 }
 

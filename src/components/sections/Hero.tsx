@@ -6,6 +6,7 @@ import BrandSelect from "@/components/BrandSelect";
 import DatePicker from "@/components/DatePicker";
 import { occasions, cities, planningOccasions, type PlanningOccasion } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 import {
   Sparkle,
   Rings,
@@ -107,6 +108,7 @@ function toYmd(d: Date) {
 
 export default function Hero() {
   const { lang, t } = useLang();
+  const { hero } = useHomeContent();
 
   // Booking selections, carried into /book as query params.
   const [occasionId, setOccasionId] = useState(occasions[0].id);
@@ -119,6 +121,9 @@ export default function Hero() {
   // Hero-look switch — flip between the three treatments.
   const [variant, setVariant] = useState<VariantId>("original");
   const v = variantStyles[variant];
+  // The Original / Minimal looks use a single static backdrop; the admin can
+  // swap it via the home-content store. Other looks crossfade the event photos.
+  const staticBg = v.staticBg ? hero.background : undefined;
 
   const bookParams = new URLSearchParams({ occasion: occasionId, city: cityId });
   if (date) bookParams.set("date", toYmd(date));
@@ -208,14 +213,15 @@ export default function Hero() {
       {/* Full-bleed hero artwork — every event's image is stacked and only the
           selected one is faded in, so clicking a pill crossfades the backdrop. */}
       <div className="absolute inset-0 -z-10">
-        {v.staticBg ? (
+        {staticBg ? (
           <Image
-            src={v.staticBg}
+            src={staticBg}
             alt="A golden Indian wedding feast laid out in brass serving dishes"
             fill
             priority
             sizes="100vw"
             className="animate-kenburns object-cover object-center"
+            unoptimized={isUnoptimized(staticBg)}
           />
         ) : (
           planningOccasions.map((o: PlanningOccasion) => {
@@ -315,18 +321,15 @@ export default function Hero() {
           <div className="max-w-xl">
             <h1 className={"font-display text-[2.75rem] font-bold leading-[1.05] tracking-tight transition-colors duration-500 sm:text-6xl " + v.headline}>
               <span className="animate-rise block font-sans sm:whitespace-nowrap">
-                {t("Different Specialists.", "अलग-अलग स्पेशलिस्ट।")}
+                {lang === "hi" ? hero.headlineTopHi : hero.headlineTop}
               </span>
               <span className={"animate-rise delay-1 font-display block pt-1 text-6xl font-normal transition-colors duration-500 sm:text-7xl " + v.accent}>
-                {t("One Celebration.", "एक उत्सव।")}
+                {lang === "hi" ? hero.headlineBottomHi : hero.headlineBottom}
               </span>
             </h1>
 
             <p className={"animate-rise delay-2 mt-5 max-w-md text-base transition-colors duration-500 sm:text-lg " + v.lede}>
-              {t(
-                "Plan your perfect celebration with the best specialists from your city, state or across India.",
-                "अपने शहर, राज्य या पूरे भारत के बेहतरीन स्पेशलिस्ट के साथ अपना परफेक्ट उत्सव प्लान करें।",
-              )}
+              {lang === "hi" ? hero.ledeHi : hero.lede}
             </p>
 
             {/* Event switch — crossfades the hero backdrop. Hidden in the

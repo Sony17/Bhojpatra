@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -11,7 +11,7 @@ import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
-import { vendorApplications, queryApprovals } from "@/lib/admin/mockData";
+import { queryApprovals } from "@/lib/admin/mockData";
 import type {
   VendorApplication,
   VerificationStatus,
@@ -34,12 +34,32 @@ const STATUS_OPTIONS = [
  * with calls.
  */
 export default function ApprovalsConsole() {
-  const [apps, setApps] = useState<VendorApplication[]>(vendorApplications);
+  const [apps, setApps] = useState<VendorApplication[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Load submitted applications from the file-backed store on mount.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/vendors/applications", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { applications?: VendorApplication[] }) => {
+        if (active) setApps(data.applications ?? []);
+      })
+      .catch(() => {
+        if (active) setToast("Couldn't load applications. Please refresh.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -64,7 +84,24 @@ export default function ApprovalsConsole() {
     ? apps.find((a) => a.id === selectedId) ?? null
     : null;
 
+  // Persist a review decision, applying it optimistically and rolling back if
+  // the request fails so the UI never drifts from the store.
+  const persist = async (id: string, body: object, snapshot: VendorApplication[]) => {
+    try {
+      const res = await fetch(`/api/vendors/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("request failed");
+    } catch {
+      setApps(snapshot);
+      setToast("Couldn't save. Please try again.");
+    }
+  };
+
   const setAppStatus = (id: string, next: VerificationStatus) => {
+    const snapshot = apps;
     setApps((prev) =>
       prev.map((a) =>
         a.id === id
@@ -80,6 +117,7 @@ export default function ApprovalsConsole() {
       ),
     );
     setToast(`Application ${next === "Verified" ? "approved" : "rejected"}`);
+    void persist(id, { status: next }, snapshot);
   };
 
   const setDocStatus = (
@@ -87,6 +125,7 @@ export default function ApprovalsConsole() {
     kind: string,
     next: VerificationStatus,
   ) => {
+    const snapshot = apps;
     setApps((prev) =>
       prev.map((a) =>
         a.id === id
@@ -99,6 +138,7 @@ export default function ApprovalsConsole() {
           : a,
       ),
     );
+    void persist(id, { document: { kind, status: next } }, snapshot);
   };
 
   const columns: Column<VendorApplication>[] = [
@@ -159,10 +199,17 @@ export default function ApprovalsConsole() {
         onRowClick={(a) => setSelectedId(a.id)}
         minWidthClass="min-w-[680px]"
         empty={
-          <EmptyState
-            title="No applications found"
-            message="Try a different search term or status filter."
-          />
+          loading ? (
+            <EmptyState
+              title="Loading applications…"
+              message="Fetching the latest vendor submissions."
+            />
+          ) : (
+            <EmptyState
+              title="No applications found"
+              message="New vendor registrations will appear here for review."
+            />
+          )
         }
       />
 

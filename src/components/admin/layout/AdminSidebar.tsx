@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CreamLogo from "@/components/CreamLogo";
+import BrandIcon from "@/components/BrandIcon";
 import type { ComponentType, SVGProps } from "react";
 import { adminNav, type NavIconKey } from "@/lib/admin/nav";
 import {
@@ -10,13 +11,11 @@ import {
   Store,
   ShieldCheck,
   Users,
+  Megaphone,
   Calendar,
-  Utensils,
-  PlusCircle,
   Wallet,
   Ticket,
   Layout,
-  BarChart,
   Gear,
   LogOut,
   Close,
@@ -28,13 +27,11 @@ const NAV_ICON: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   vendors: Store,
   approvals: ShieldCheck,
   customers: Users,
+  leads: Megaphone,
   bookings: Calendar,
-  menu: Utensils,
-  addons: PlusCircle,
   payments: Wallet,
   coupons: Ticket,
   content: Layout,
-  reports: BarChart,
   settings: Gear,
 };
 

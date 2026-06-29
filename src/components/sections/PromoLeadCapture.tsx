@@ -3,12 +3,14 @@
 import { useState, type FormEvent } from "react";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent } from "@/lib/homeContent";
 import { Mail, Phone } from "@/components/icons";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
 export default function PromoLeadCapture() {
-  const { t } = useLang();
+  const { lang, t } = useLang();
+  const { promo } = useHomeContent();
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -81,13 +83,10 @@ export default function PromoLeadCapture() {
 
           <div className="flex flex-col gap-0.5 sm:flex-1">
             <h2 className="text-lg text-cream sm:text-xl">
-              {t("Get Promotional Offers First", "प्रोमोशनल ऑफर सबसे पहले पाएं")}
+              {lang === "hi" ? promo.headingHi : promo.heading}
             </h2>
             <p className="text-xs text-cream/80">
-              {t(
-                "Seasonal discounts, early-bird deals & festive menu offers — straight to you.",
-                "सीज़नल छूट, अर्ली-बर्ड डील और त्योहारी मेन्यू ऑफर — सीधे आपके पास।",
-              )}
+              {lang === "hi" ? promo.subtitleHi : promo.subtitle}
             </p>
           </div>
 

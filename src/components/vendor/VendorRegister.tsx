@@ -152,6 +152,9 @@ export default function VendorRegister() {
 
   const [step, setStep] = useState<number>(0);
   const [submitted, setSubmitted] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  /** Application id returned by the server once persisted. */
+  const [serverVendorId, setServerVendorId] = useState<string>("");
 
   // Step 1 — business
   const [businessName, setBusinessName] = useState<string>("");
@@ -370,14 +373,79 @@ export default function VendorRegister() {
     setStep((s) => Math.max(s - 1, 0));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+
+    const message = validateStep();
+    if (message) {
+      setError(message);
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    // Only forward documents that finished uploading; their server ids let the
+    // admin pull the actual files during review.
+    const docIds: Partial<Record<DocKey, string>> = {};
+    (Object.keys(docFiles) as DocKey[]).forEach((key) => {
+      const id = docFiles[key].id;
+      if (id) docIds[key] = id;
+    });
+
+    const payload = {
+      business: businessName,
+      owner: ownerName,
+      email,
+      phone: mobile,
+      city: city ? cityName(city) : "",
+      state,
+      cuisines,
+      gstNumber,
+      fssaiNumber,
+      docIds,
+      packages,
+      minGuests,
+      maxGuests,
+      serviceCities: serviceCities.map(cityName),
+      counters,
+    };
+
+    try {
+      const res = await fetch("/api/vendors/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json()) as { id?: string; error?: string };
+      if (!res.ok) {
+        setError(
+          data.error ??
+            t(
+              "Couldn't submit your application. Please try again.",
+              "आपका आवेदन सबमिट नहीं हो सका। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      if (data.id) setServerVendorId(data.id);
+      setSubmitted(true);
+    } catch {
+      setError(
+        t(
+          "Network error. Please try again.",
+          "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।",
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const vendorId = deriveVendorId(
-    `${businessName}|${email}|${city}|${packages.length}`,
-  );
+  const vendorId =
+    serverVendorId ||
+    deriveVendorId(`${businessName}|${email}|${city}|${packages.length}`);
 
   /* ── success screen ────────────────────────────────────────────────── */
 
@@ -1067,9 +1135,12 @@ export default function VendorRegister() {
           ) : (
             <button
               type="submit"
-              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
+              disabled={submitting}
+              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              {t("Submit Application", "आवेदन सबमिट करें")}
+              {submitting
+                ? t("Submitting…", "सबमिट हो रहा है…")
+                : t("Submit Application", "आवेदन सबमिट करें")}
             </button>
           )}
         </div>

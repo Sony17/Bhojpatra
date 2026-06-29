@@ -156,6 +156,7 @@ export default function Footer() {
               <li><a href="/careers" className="hover:text-cream">{t("Careers", "करियर")}</a></li>
               <li><a href="/contact" className="hover:text-cream">{t("Contact", "संपर्क")}</a></li>
               <li><a href="/terms" className="hover:text-cream">{t("Terms & Privacy", "नियम और गोपनीयता")}</a></li>
+              <li><a href="/refund" className="hover:text-cream">{t("Refund Policy", "रिफंड नीति")}</a></li>
             </ul>
           </div>
 

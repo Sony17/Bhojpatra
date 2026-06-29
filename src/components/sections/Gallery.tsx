@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
-import { galleryItems, type GalleryItem } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import {
+  useHomeContent,
+  isUnoptimized,
+  type HomeGalleryItem,
+} from "@/lib/homeContent";
 
 /**
  * Spread layout for the seven cards in the scroll-driven cluster. Each entry is
@@ -31,7 +35,9 @@ const FAN = [
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
 
 export default function Gallery() {
-  const { lang, t } = useLang();
+  const { lang } = useLang();
+  const { gallery } = useHomeContent();
+  const galleryItems = gallery.items;
   const clusterRef = useRef<HTMLDivElement>(null);
   /** 0 → stacked at centre, 1 → fully fanned out. */
   const [progress, setProgress] = useState(0);
@@ -120,17 +126,16 @@ export default function Gallery() {
       <Reveal className="mx-auto mb-4 max-w-7xl px-5 text-center" stagger>
         <p className="eyebrow mb-3 inline-flex items-center gap-2.5 text-2xl font-semibold uppercase tracking-[0.2em] text-maroon sm:text-3xl">
           <span className="h-2 w-2 rounded-full bg-maroon shadow-[0_0_0_3px_rgba(185,32,37,0.18)]" />
-          {t("Real Events", "असली इवेंट")}
+          {lang === "hi" ? gallery.eyebrowHi : gallery.eyebrow}
         </p>
         <h2 className="font-display text-5xl font-bold tracking-tight text-ink sm:text-6xl lg:text-7xl">
-          {t("Feasts we've", "जो भोज हमने")}{" "}
-          <em className="not-italic text-maroon">{t("brought to life", "साकार किए")}</em>
+          {lang === "hi" ? gallery.headingHi : gallery.heading}{" "}
+          <em className="not-italic text-maroon">
+            {lang === "hi" ? gallery.headingEmHi : gallery.headingEm}
+          </em>
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm text-ink-soft sm:text-base">
-          {t(
-            "A glimpse from real weddings, corporate galas and house parties — plated, served and celebrated by our specialists.",
-            "असली शादियों, कॉर्पोरेट गाला और हाउस पार्टियों की एक झलक — हमारे स्पेशलिस्ट द्वारा परोसी और मनाई गई।",
-          )}
+          {lang === "hi" ? gallery.subtitleHi : gallery.subtitle}
         </p>
       </Reveal>
 
@@ -140,7 +145,7 @@ export default function Gallery() {
         className="relative mx-auto mt-6 h-[130px] w-full max-w-7xl px-5 sm:h-[240px]"
         style={{ perspective: "1100px" }}
       >
-        {fanCards.map((item: GalleryItem, i: number) => {
+        {fanCards.map((item: HomeGalleryItem, i: number) => {
           const f = FAN[i];
           const p = progress;
           // Outer transform: collapse → spread. Intro adds a drop + scale-in.
@@ -154,7 +159,7 @@ export default function Gallery() {
           const h = f.h * spread;
           return (
             <div
-              key={item.title}
+              key={item.id}
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
               style={{
                 width: w,
@@ -183,13 +188,16 @@ export default function Gallery() {
                 {/* Card — hover lift sits on its own layer to avoid clashing
                     with the float animation above it. */}
                 <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_22px_44px_-22px_rgba(0,0,0,0.6),0_8px_18px_-12px_rgba(0,0,0,0.4)] ring-1 ring-cream/60 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.04]">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    sizes="220px"
-                    className="object-cover"
-                  />
+                  {item.image && (
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      sizes="220px"
+                      className="object-cover"
+                      unoptimized={isUnoptimized(item.image)}
+                    />
+                  )}
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
@@ -210,7 +218,7 @@ export default function Gallery() {
           href="/book"
           className="btn-sheen group inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream shadow-[0_14px_24px_-8px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:-translate-y-0.5 active:scale-95"
         >
-          {t("Plan your feast", "अपना भोज प्लान करें")}
+          {lang === "hi" ? gallery.ctaHi : gallery.cta}
           <span className="grid h-6 w-6 place-items-center rounded-full bg-maroon text-cream transition-transform duration-300 group-hover:rotate-45">
             →
           </span>
@@ -236,18 +244,21 @@ export default function Gallery() {
                 animationDirection: reverse ? "reverse" : "normal",
               }}
             >
-              {[...row, ...row].map((item: GalleryItem, i: number) => (
+              {[...row, ...row].map((item: HomeGalleryItem, i: number) => (
                 <div
-                  key={`${item.title}-${i}`}
+                  key={`${item.id}-${i}`}
                   className="group relative aspect-[4/5] w-36 shrink-0 overflow-hidden rounded-2xl ring-1 ring-cream/50 shadow-[0_14px_30px_-20px_rgba(0,0,0,0.5)] sm:w-44 lg:w-52"
                 >
-                  <Image
-                    src={item.image}
-                    alt={i < row.length ? item.title : ""}
-                    fill
-                    sizes="(min-width:1024px) 208px, (min-width:640px) 176px, 144px"
-                    className="object-cover transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-105"
-                  />
+                  {item.image && (
+                    <Image
+                      src={item.image}
+                      alt={i < row.length ? item.title : ""}
+                      fill
+                      sizes="(min-width:1024px) 208px, (min-width:640px) 176px, 144px"
+                      className="object-cover transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-105"
+                      unoptimized={isUnoptimized(item.image)}
+                    />
+                  )}
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent"

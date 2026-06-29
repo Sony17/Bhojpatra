@@ -7,17 +7,28 @@ import { packages, type PackageTier, type PackageFeature } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
+import { useHomeContent } from "@/lib/homeContent";
 
 export default function Packages() {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const { contact } = useSiteContent();
+  const { packages: homePackages } = useHomeContent();
   const waText = t(
     "Hi Bhojpatra, none of the packages quite fit my event — I'd like a curated package.",
     "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
   );
   const waLink = `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(waText)}`;
   // Only the three headline tiers are shown here — Custom lives in the booking flow.
-  const tiers = packages.filter((p) => p.id !== "custom");
+  // Admin-editable name / price (from the home-content store) override the
+  // seed values; the menu structure stays sourced from `data.ts`.
+  const tiers = packages
+    .filter((p) => p.id !== "custom")
+    .map((p) => {
+      const meta = homePackages.tiers.find((x) => x.id === p.id);
+      return meta
+        ? { ...p, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+        : p;
+    });
   // Pre-select the popular tier so a highlight is visible by default.
   const [selectedId, setSelectedId] = useState<string>(
     tiers.find((p) => p.popular)?.id ?? tiers[0].id,
@@ -36,13 +47,10 @@ export default function Packages() {
       <div className="relative w-full px-5 sm:px-8 lg:px-12">
         <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl text-maroon sm:text-4xl">
-            {t("Select Your Package", "अपना पैकेज चुनें")}
+            {lang === "hi" ? homePackages.headingHi : homePackages.heading}
           </h2>
           <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
-            {t(
-              "Choose a package as per your preference.",
-              "अपनी पसंद के अनुसार एक पैकेज चुनें।",
-            )}
+            {lang === "hi" ? homePackages.subtitleHi : homePackages.subtitle}
           </p>
           <Ornament className="mx-auto mt-6 text-maroon/50" />
         </Reveal>
@@ -130,14 +138,15 @@ function Ornament({ className = "" }: { className?: string }) {
   );
 }
 
-/** Aspect ratio of the patra scroll artwork (public/package.png, 441×566). */
-const SCROLL_RATIO = "441 / 566";
+/** Aspect ratio of the patra scroll artwork (public/package1.png, 433×576). */
+const SCROLL_RATIO = "433 / 576";
 
 /**
  * Writable cream area of the scroll, as inset % of the artwork. The package
  * content is positioned inside this box; nudge these if text crowds the frame.
+ * The horizontal insets keep the rhombus markers clear of the maroon border.
  */
-const PARCHMENT = "left-[22%] right-[26%] top-[15%] bottom-[14%]";
+const PARCHMENT = "left-[13%] right-[21%] top-[17%] bottom-[15%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
@@ -233,7 +242,7 @@ function PricingCard({
         style={{ aspectRatio: SCROLL_RATIO }}
       >
         <Image
-          src="/package.png"
+          src="/package1.png"
           alt=""
           fill
           sizes="(min-width:1024px) 360px, (min-width:640px) 45vw, 90vw"
@@ -242,7 +251,7 @@ function PricingCard({
         />
 
         {/* Writable parchment area */}
-        <div className={`absolute ${PARCHMENT} flex flex-col`}>
+        <div className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}>
           {/* Title + price */}
           <h3 className="text-center font-display text-2xl leading-none tracking-wide text-maroon">
             {tierName}
@@ -258,7 +267,7 @@ function PricingCard({
           )}
 
           {/* Menu list — scrolls within the parchment if it overflows. */}
-          <ul className="mt-2 flex-1 overflow-y-auto pr-1">
+          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
             {segments.map((seg) => {
               if (seg.type === "item") {
                 const label =
@@ -334,7 +343,7 @@ function PricingCard({
             })}
           </ul>
 
-          {/* Closing note */}
+          {/* Closing note — sits just above the CTA, inside the parchment. */}
           {footnote && footnote.length > 0 && (
             <div className="mt-1.5 text-center text-[10px] font-medium leading-tight text-ink-soft">
               {footnote.map((line, i) => (
@@ -342,20 +351,18 @@ function PricingCard({
               ))}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* CTA — sits below the scroll; carries the package into the booking flow. */}
-      <div className="mt-4 w-full px-1">
-        <Link
-          href={`/book?package=${tier.id}&step=menu`}
-          onClick={onSelect}
-          className="btn-sheen block w-full rounded-xl bg-maroon px-5 py-2.5 text-center text-sm font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
-        >
-          {selected
-            ? `${t("Continue", "जारी रखें")} ${tierName} →`
-            : `${t("Select", "चुनें")} ${tierName}`}
-        </Link>
+          {/* CTA — sits on the parchment; carries the package into booking. */}
+          <Link
+            href={`/book?package=${tier.id}&step=menu`}
+            onClick={onSelect}
+            className="btn-sheen mt-2 block w-full rounded-lg bg-maroon px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+          >
+            {selected
+              ? `${t("Continue", "जारी रखें")} ${tierName} →`
+              : `${t("Select", "चुनें")} ${tierName}`}
+          </Link>
+        </div>
       </div>
     </div>
   );

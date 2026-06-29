@@ -19,8 +19,7 @@ import type { AdminCoupon, CouponStatus } from "@/lib/admin/types";
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "All" },
   { label: "Active", value: "Active" },
-  { label: "Scheduled", value: "Scheduled" },
-  { label: "Expired", value: "Expired" },
+  { label: "Inactive", value: "Inactive" },
 ];
 
 const emptyDraft: AdminCoupon = {
@@ -32,8 +31,6 @@ const emptyDraft: AdminCoupon = {
   eligibility: "All occasions",
   startsAt: "",
   expiresAt: "",
-  usageLimit: 500,
-  usedCount: 0,
   status: "Active",
 };
 
@@ -47,8 +44,7 @@ export default function CouponManager() {
   const stats = useMemo(
     () => ({
       active: list.filter((c) => c.status === "Active").length,
-      scheduled: list.filter((c) => c.status === "Scheduled").length,
-      redemptions: list.reduce((s, c) => s + c.usedCount, 0),
+      inactive: list.filter((c) => c.status === "Inactive").length,
       total: list.length,
     }),
     [list],
@@ -88,7 +84,6 @@ export default function CouponManager() {
       ),
     },
     { key: "discount", header: "Discount", cell: (c) => <span className="text-ink">{c.percent}% · up to {money(c.cap)}</span> },
-    { key: "usage", header: "Usage", cell: (c) => <span className="text-ink-soft">{c.usedCount} / {c.usageLimit}</span> },
     { key: "validity", header: "Validity", cell: (c) => <span className="text-ink-soft">{c.startsAt || "—"} → {c.expiresAt || "—"}</span> },
     { key: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} /> },
     {
@@ -123,10 +118,9 @@ export default function CouponManager() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={Ticket} label="Active" value={String(stats.active)} />
-        <StatCard icon={Ticket} label="Scheduled" value={String(stats.scheduled)} />
-        <StatCard icon={Ticket} label="Total Redemptions" value={String(stats.redemptions)} />
+        <StatCard icon={Ticket} label="Inactive" value={String(stats.inactive)} />
         <StatCard icon={Ticket} label="Total Coupons" value={String(stats.total)} />
       </div>
 
@@ -189,17 +183,13 @@ export default function CouponManager() {
             <Field label="Expires">
               <input className={inputClass} value={draft.expiresAt} onChange={(e) => setDraft({ ...draft, expiresAt: e.target.value })} placeholder="31 Dec 2026" />
             </Field>
-            <Field label="Usage Limit">
-              <input type="number" min={0} className={inputClass} value={draft.usageLimit} onChange={(e) => setDraft({ ...draft, usageLimit: Number(e.target.value) })} />
-            </Field>
             <Field label="Status">
               <SelectFilter
                 label="Status"
                 value={draft.status}
                 options={[
                   { label: "Active", value: "Active" },
-                  { label: "Scheduled", value: "Scheduled" },
-                  { label: "Expired", value: "Expired" },
+                  { label: "Inactive", value: "Inactive" },
                 ]}
                 onChange={(v) => setDraft({ ...draft, status: v as CouponStatus })}
               />

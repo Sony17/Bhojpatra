@@ -12,8 +12,10 @@ import { contentBanners, contentTestimonials, contentFaqs } from "@/lib/admin/mo
 import type { ContentBanner, ContentTestimonial, ContentFaq } from "@/lib/admin/types";
 import PagesTab from "./PagesTab";
 import ContactInfoTab from "./ContactInfoTab";
+import HomePageTab from "./HomePageTab";
 
 const TABS: TabItem[] = [
+  { id: "home", label: "Home Page" },
   { id: "pages", label: "Pages" },
   { id: "contact", label: "Contact Info" },
   { id: "banners", label: "Banners" },
@@ -22,16 +24,17 @@ const TABS: TabItem[] = [
 ];
 
 export default function ContentManager() {
-  const [tab, setTab] = useState("pages");
+  const [tab, setTab] = useState("home");
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin Panel"
         title="Content Control"
-        subtitle="Edit site pages, contact details, banners, testimonials and FAQs."
+        subtitle="Edit the home page, site pages, contact details, banners, testimonials and FAQs."
       />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      {tab === "home" && <HomePageTab />}
       {tab === "pages" && <PagesTab />}
       {tab === "contact" && <ContactInfoTab />}
       {tab === "banners" && <BannersTab />}

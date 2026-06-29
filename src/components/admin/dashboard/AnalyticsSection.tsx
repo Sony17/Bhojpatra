@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
@@ -24,7 +23,13 @@ const TABS: TabItem[] = [
   { id: "vendors", label: "Vendor Performance" },
 ];
 
-export default function ReportsView() {
+/**
+ * Reports & analytics, merged into the dashboard as a single row. Carries the
+ * tabbed revenue / bookings / vendor views (formerly the standalone Reports
+ * page) under its own section heading so the dashboard is the one place admins
+ * read both their at-a-glance widgets and their deeper analytics.
+ */
+export default function AnalyticsSection() {
   const [tab, setTab] = useState("revenue");
 
   const onExport = () => {
@@ -38,24 +43,27 @@ export default function ReportsView() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Admin Panel"
-        title="Reports"
-        subtitle="Revenue, bookings and performance analytics."
-        actions={
-          <button type="button" onClick={onExport} className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5">
-            Export CSV
-          </button>
-        }
-      />
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-ink">Reports &amp; Analytics</h2>
+          <p className="mt-0.5 text-sm text-ink-soft">Revenue, bookings and performance analytics.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onExport}
+          className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
+        >
+          Export CSV
+        </button>
+      </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === "revenue" && <RevenueTab />}
       {tab === "bookings" && <BookingsTab />}
       {tab === "vendors" && <VendorsTab />}
-    </div>
+    </section>
   );
 }
 

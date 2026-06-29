@@ -11,13 +11,11 @@ export type NavIconKey =
   | "vendors"
   | "approvals"
   | "customers"
+  | "leads"
   | "bookings"
-  | "menu"
-  | "addons"
   | "payments"
   | "coupons"
   | "content"
-  | "reports"
   | "settings";
 
 export interface AdminNavItem {
@@ -30,13 +28,10 @@ export const adminNav: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", iconKey: "dashboard" },
   { label: "Vendors", href: "/admin/vendors", iconKey: "vendors" },
   { label: "Vendor Approvals", href: "/admin/vendor-approvals", iconKey: "approvals" },
-  { label: "Customer Management", href: "/admin/customers", iconKey: "customers" },
-  { label: "Booking Management", href: "/admin/bookings", iconKey: "bookings" },
-  { label: "Menu & Catalog", href: "/admin/menu", iconKey: "menu" },
-  { label: "Add-On Manager", href: "/admin/add-ons", iconKey: "addons" },
+  { label: "Customers & Bookings", href: "/admin/customers", iconKey: "customers" },
+  { label: "Lead Generation", href: "/admin/leads", iconKey: "leads" },
   { label: "Payments", href: "/admin/payments", iconKey: "payments" },
   { label: "Coupons", href: "/admin/coupons", iconKey: "coupons" },
   { label: "Content Control", href: "/admin/content", iconKey: "content" },
-  { label: "Reports", href: "/admin/reports", iconKey: "reports" },
   { label: "Settings", href: "/admin/settings", iconKey: "settings" },
 ];

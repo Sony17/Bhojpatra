@@ -1,0 +1,643 @@
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { inputClass } from "@/components/admin/shared/FormControls";
+import ImageField from "@/components/admin/shared/ImageField";
+import {
+  useHomeContent,
+  saveHomeContent,
+  resetHomeContent,
+  DEFAULT_HOME_CONTENT,
+  type HomeContent,
+  type HomeCategory,
+  type HomeGalleryItem,
+  type HomeTestimonial,
+} from "@/lib/homeContent";
+
+/**
+ * Admin editor for the public home page. Every section's copy (English +
+ * Hindi) and imagery is editable here; saving writes to the shared
+ * `homeContent` store so the live home page updates immediately.
+ *
+ * Edits are held in a local `draft` and only committed on Save, so an admin can
+ * revise freely and back out with Cancel.
+ */
+export default function HomePageTab() {
+  const content = useHomeContent();
+  const [draft, setDraft] = useState<HomeContent>(() =>
+    structuredClone(content),
+  );
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // `content` starts at the server/default snapshot and only resolves to the
+  // localStorage-backed value after hydration. Re-sync the draft to the real
+  // stored content once it arrives (and whenever it changes elsewhere), but
+  // never clobber in-progress edits.
+  const syncedRef = useRef(content);
+  useEffect(() => {
+    if (content !== syncedRef.current && !dirty) {
+      syncedRef.current = content;
+      setDraft(structuredClone(content));
+    }
+  }, [content, dirty]);
+
+  // Mutate one top-level section of the draft.
+  function patch<K extends keyof HomeContent>(
+    key: K,
+    value: Partial<HomeContent[K]>,
+  ) {
+    setDraft((d) => ({ ...d, [key]: { ...d[key], ...value } }));
+    setDirty(true);
+    setSaved(false);
+  }
+
+  const save = () => {
+    saveHomeContent(draft);
+    setDirty(false);
+    setSaved(true);
+  };
+
+  const cancel = () => {
+    setDraft(structuredClone(content));
+    setDirty(false);
+    setSaved(false);
+  };
+
+  const reset = () => {
+    if (
+      !window.confirm(
+        "Reset the entire home page to its default content and images? This can't be undone.",
+      )
+    )
+      return;
+    resetHomeContent();
+    setDraft(structuredClone(DEFAULT_HOME_CONTENT));
+    setDirty(false);
+    setSaved(false);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Sticky action bar */}
+      <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cream-3 bg-cream/70 px-4 py-3 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-ink-soft hover:underline"
+          >
+            View home page
+          </a>
+          {saved && (
+            <span className="text-xs font-medium text-maroon">Saved ✓</span>
+          )}
+          {dirty && (
+            <span className="text-xs font-medium text-ink-soft">
+              Unsaved changes
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-full border border-cream-3 px-4 py-2 text-xs font-semibold text-ink-soft transition-colors hover:bg-cream-2"
+          >
+            Reset to defaults
+          </button>
+          <button
+            type="button"
+            onClick={cancel}
+            disabled={!dirty}
+            className="rounded-full border border-cream-3 px-5 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={!dirty}
+            className="rounded-full bg-maroon px-5 py-2 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-50"
+          >
+            Save changes
+          </button>
+        </div>
+      </div>
+
+      {/* ── Hero ────────────────────────────────────────────────────────── */}
+      <SectionCard title="Hero" defaultOpen>
+        <TextRow
+          label="Headline — line 1"
+          en={draft.hero.headlineTop}
+          hi={draft.hero.headlineTopHi}
+          onEn={(v) => patch("hero", { headlineTop: v })}
+          onHi={(v) => patch("hero", { headlineTopHi: v })}
+        />
+        <TextRow
+          label="Headline — line 2 (accent)"
+          en={draft.hero.headlineBottom}
+          hi={draft.hero.headlineBottomHi}
+          onEn={(v) => patch("hero", { headlineBottom: v })}
+          onHi={(v) => patch("hero", { headlineBottomHi: v })}
+        />
+        <AreaRow
+          label="Sub-headline"
+          en={draft.hero.lede}
+          hi={draft.hero.ledeHi}
+          onEn={(v) => patch("hero", { lede: v })}
+          onHi={(v) => patch("hero", { ledeHi: v })}
+        />
+        <ImageField
+          label="Background image"
+          value={draft.hero.background}
+          hint="Shown behind the headline."
+          onChange={(v) => patch("hero", { background: v })}
+        />
+      </SectionCard>
+
+      {/* ── Services / Top Categories ───────────────────────────────────── */}
+      <SectionCard title="Services">
+        <TextRow
+          label="Heading"
+          en={draft.services.heading}
+          hi={draft.services.headingHi}
+          onEn={(v) => patch("services", { heading: v })}
+          onHi={(v) => patch("services", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.services.subtitle}
+          hi={draft.services.subtitleHi}
+          onEn={(v) => patch("services", { subtitle: v })}
+          onHi={(v) => patch("services", { subtitleHi: v })}
+        />
+        <TextRow
+          label="Button label"
+          en={draft.services.cta}
+          hi={draft.services.ctaHi}
+          onEn={(v) => patch("services", { cta: v })}
+          onHi={(v) => patch("services", { ctaHi: v })}
+        />
+
+        <ItemList
+          label="Category"
+          items={draft.services.categories}
+          onChange={(categories) => patch("services", { categories })}
+          makeNew={(): HomeCategory => ({
+            id: `cat-${Date.now()}`,
+            name: "New category",
+            nameHi: "नई कैटेगरी",
+            image: "",
+          })}
+          renderItem={(c, set) => (
+            <>
+              <TextRow
+                label="Name"
+                en={c.name}
+                hi={c.nameHi}
+                onEn={(v) => set({ name: v })}
+                onHi={(v) => set({ nameHi: v })}
+              />
+              <ImageField
+                value={c.image}
+                onChange={(v) => set({ image: v })}
+              />
+            </>
+          )}
+        />
+      </SectionCard>
+
+      {/* ── Packages ────────────────────────────────────────────────────── */}
+      <SectionCard title="Packages">
+        <TextRow
+          label="Heading"
+          en={draft.packages.heading}
+          hi={draft.packages.headingHi}
+          onEn={(v) => patch("packages", { heading: v })}
+          onHi={(v) => patch("packages", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.packages.subtitle}
+          hi={draft.packages.subtitleHi}
+          onEn={(v) => patch("packages", { subtitle: v })}
+          onHi={(v) => patch("packages", { subtitleHi: v })}
+        />
+        <p className="text-xs text-ink-soft">
+          The menu / feature list for each tier is managed under Menu &amp;
+          Catalog. Here you can edit each tier&apos;s name and price.
+        </p>
+        {draft.packages.tiers.map((tier, i) => (
+          <SubCard key={tier.id} title={`Tier — ${tier.name || tier.id}`}>
+            <TextRow
+              label="Name"
+              en={tier.name}
+              hi={tier.nameHi}
+              onEn={(v) =>
+                patch("packages", {
+                  tiers: draft.packages.tiers.map((x, j) =>
+                    j === i ? { ...x, name: v } : x,
+                  ),
+                })
+              }
+              onHi={(v) =>
+                patch("packages", {
+                  tiers: draft.packages.tiers.map((x, j) =>
+                    j === i ? { ...x, nameHi: v } : x,
+                  ),
+                })
+              }
+            />
+            <Field label="Price">
+              <input
+                className={inputClass}
+                value={tier.price}
+                onChange={(e) =>
+                  patch("packages", {
+                    tiers: draft.packages.tiers.map((x, j) =>
+                      j === i ? { ...x, price: e.target.value } : x,
+                    ),
+                  })
+                }
+              />
+            </Field>
+          </SubCard>
+        ))}
+      </SectionCard>
+
+      {/* ── Gallery ─────────────────────────────────────────────────────── */}
+      <SectionCard title="Real Events (Gallery)">
+        <TextRow
+          label="Eyebrow"
+          en={draft.gallery.eyebrow}
+          hi={draft.gallery.eyebrowHi}
+          onEn={(v) => patch("gallery", { eyebrow: v })}
+          onHi={(v) => patch("gallery", { eyebrowHi: v })}
+        />
+        <TextRow
+          label="Heading"
+          en={draft.gallery.heading}
+          hi={draft.gallery.headingHi}
+          onEn={(v) => patch("gallery", { heading: v })}
+          onHi={(v) => patch("gallery", { headingHi: v })}
+        />
+        <TextRow
+          label="Heading — accent words"
+          en={draft.gallery.headingEm}
+          hi={draft.gallery.headingEmHi}
+          onEn={(v) => patch("gallery", { headingEm: v })}
+          onHi={(v) => patch("gallery", { headingEmHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.gallery.subtitle}
+          hi={draft.gallery.subtitleHi}
+          onEn={(v) => patch("gallery", { subtitle: v })}
+          onHi={(v) => patch("gallery", { subtitleHi: v })}
+        />
+        <TextRow
+          label="Button label"
+          en={draft.gallery.cta}
+          hi={draft.gallery.ctaHi}
+          onEn={(v) => patch("gallery", { cta: v })}
+          onHi={(v) => patch("gallery", { ctaHi: v })}
+        />
+
+        <p className="text-xs text-ink-soft">
+          These photos fill the fan-out cluster and the two ribbons that scroll
+          left &amp; right below the &ldquo;Plan your feast&rdquo; button. Add as
+          many as you like, then Save — the first 5 fill the top ribbon and the
+          rest fill the bottom one.
+        </p>
+        <ItemList
+          label="Event photo"
+          items={draft.gallery.items}
+          onChange={(items) => patch("gallery", { items })}
+          makeNew={(): HomeGalleryItem => ({
+            id: `g-${Date.now()}`,
+            title: "New image",
+            titleHi: "नई तस्वीर",
+            caption: "",
+            captionHi: "",
+            image: "",
+          })}
+          renderItem={(g, set) => (
+            <>
+              <TextRow
+                label="Title"
+                en={g.title}
+                hi={g.titleHi}
+                onEn={(v) => set({ title: v })}
+                onHi={(v) => set({ titleHi: v })}
+              />
+              <TextRow
+                label="Caption"
+                en={g.caption}
+                hi={g.captionHi}
+                onEn={(v) => set({ caption: v })}
+                onHi={(v) => set({ captionHi: v })}
+              />
+              <ImageField
+                value={g.image}
+                onChange={(v) => set({ image: v })}
+              />
+            </>
+          )}
+        />
+      </SectionCard>
+
+      {/* ── Testimonials ────────────────────────────────────────────────── */}
+      <SectionCard title="Testimonials">
+        <TextRow
+          label="Eyebrow"
+          en={draft.testimonials.eyebrow}
+          hi={draft.testimonials.eyebrowHi}
+          onEn={(v) => patch("testimonials", { eyebrow: v })}
+          onHi={(v) => patch("testimonials", { eyebrowHi: v })}
+        />
+        <TextRow
+          label="Heading"
+          en={draft.testimonials.heading}
+          hi={draft.testimonials.headingHi}
+          onEn={(v) => patch("testimonials", { heading: v })}
+          onHi={(v) => patch("testimonials", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.testimonials.subtitle}
+          hi={draft.testimonials.subtitleHi}
+          onEn={(v) => patch("testimonials", { subtitle: v })}
+          onHi={(v) => patch("testimonials", { subtitleHi: v })}
+        />
+
+        <ItemList
+          label="Testimonial"
+          items={draft.testimonials.items}
+          onChange={(items) => patch("testimonials", { items })}
+          makeNew={(): HomeTestimonial => ({
+            id: `t-${Date.now()}`,
+            name: "New customer",
+            role: "Occasion · City",
+            roleHi: "अवसर · शहर",
+            quote: "",
+            quoteHi: "",
+            rating: 5,
+          })}
+          renderItem={(t, set) => (
+            <>
+              <Field label="Name">
+                <input
+                  className={inputClass}
+                  value={t.name}
+                  onChange={(e) => set({ name: e.target.value })}
+                />
+              </Field>
+              <TextRow
+                label="Role / context"
+                en={t.role}
+                hi={t.roleHi}
+                onEn={(v) => set({ role: v })}
+                onHi={(v) => set({ roleHi: v })}
+              />
+              <AreaRow
+                label="Quote"
+                en={t.quote}
+                hi={t.quoteHi}
+                onEn={(v) => set({ quote: v })}
+                onHi={(v) => set({ quoteHi: v })}
+              />
+              <Field label="Rating (1–5)">
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  className={inputClass}
+                  value={t.rating}
+                  onChange={(e) =>
+                    set({
+                      rating: Math.min(5, Math.max(1, Number(e.target.value))),
+                    })
+                  }
+                />
+              </Field>
+            </>
+          )}
+        />
+      </SectionCard>
+
+      {/* ── Promo banner ────────────────────────────────────────────────── */}
+      <SectionCard title="Promotional Banner">
+        <TextRow
+          label="Heading"
+          en={draft.promo.heading}
+          hi={draft.promo.headingHi}
+          onEn={(v) => patch("promo", { heading: v })}
+          onHi={(v) => patch("promo", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.promo.subtitle}
+          hi={draft.promo.subtitleHi}
+          onEn={(v) => patch("promo", { subtitle: v })}
+          onHi={(v) => patch("promo", { subtitleHi: v })}
+        />
+      </SectionCard>
+
+      {/* ── Booking form ────────────────────────────────────────────────── */}
+      <SectionCard title="Booking Form">
+        <TextRow
+          label="Heading"
+          en={draft.booking.heading}
+          hi={draft.booking.headingHi}
+          onEn={(v) => patch("booking", { heading: v })}
+          onHi={(v) => patch("booking", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.booking.subtitle}
+          hi={draft.booking.subtitleHi}
+          onEn={(v) => patch("booking", { subtitle: v })}
+          onHi={(v) => patch("booking", { subtitleHi: v })}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ── Building blocks ──────────────────────────────────────────────────────── */
+
+function SectionCard({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group overflow-hidden rounded-xl border border-cream-3 bg-white"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 font-medium text-ink marker:hidden hover:bg-cream/40">
+        {title}
+        <span className="text-maroon transition-transform duration-200 group-open:rotate-90">
+          ›
+        </span>
+      </summary>
+      <div className="space-y-4 border-t border-cream-3 px-5 py-5">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function SubCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-lg border border-cream-3 bg-cream/30 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        {title}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+/** A single label with side-by-side English + Hindi inputs. */
+function TextRow({
+  label,
+  en,
+  hi,
+  onEn,
+  onHi,
+}: {
+  label: string;
+  en: string;
+  hi: string;
+  onEn: (v: string) => void;
+  onHi: (v: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          className={inputClass}
+          value={en}
+          placeholder="English"
+          onChange={(e) => onEn(e.target.value)}
+        />
+        <input
+          className={inputClass}
+          value={hi}
+          placeholder="हिन्दी"
+          onChange={(e) => onHi(e.target.value)}
+        />
+      </div>
+    </Field>
+  );
+}
+
+/** Like TextRow, but multi-line. */
+function AreaRow({
+  label,
+  en,
+  hi,
+  onEn,
+  onHi,
+}: {
+  label: string;
+  en: string;
+  hi: string;
+  onEn: (v: string) => void;
+  onHi: (v: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <textarea
+          rows={3}
+          className={inputClass + " resize-y"}
+          value={en}
+          placeholder="English"
+          onChange={(e) => onEn(e.target.value)}
+        />
+        <textarea
+          rows={3}
+          className={inputClass + " resize-y"}
+          value={hi}
+          placeholder="हिन्दी"
+          onChange={(e) => onHi(e.target.value)}
+        />
+      </div>
+    </Field>
+  );
+}
+
+/** A reorderable-free list of editable items with add / remove. */
+function ItemList<T extends { id: string }>({
+  label,
+  items,
+  onChange,
+  makeNew,
+  renderItem,
+}: {
+  label: string;
+  items: T[];
+  onChange: (next: T[]) => void;
+  makeNew: () => T;
+  renderItem: (item: T, set: (patch: Partial<T>) => void) => ReactNode;
+}) {
+  return (
+    <div className="space-y-3 border-t border-cream-3 pt-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+          {label}s ({items.length})
+        </p>
+        <button
+          type="button"
+          onClick={() => onChange([...items, makeNew()])}
+          className="text-sm font-semibold text-maroon hover:underline"
+        >
+          + Add {label.toLowerCase()}
+        </button>
+      </div>
+
+      {items.map((item, i) => (
+        <div
+          key={item.id}
+          className="space-y-3 rounded-lg border border-cream-3 bg-cream/30 p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-ink-soft">
+              {label} {i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              className="text-xs font-semibold text-maroon hover:underline"
+            >
+              Remove
+            </button>
+          </div>
+          {renderItem(item, (p) =>
+            onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x))),
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

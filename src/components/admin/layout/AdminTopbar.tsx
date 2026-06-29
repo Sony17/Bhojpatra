@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Fragment } from "react";
-import { Search, Bell, Menu, ChevronRight } from "@/components/admin/shared/icons";
+import { Bell, Menu, ChevronRight } from "@/components/admin/shared/icons";
 import { adminProfile } from "@/lib/admin/mockData";
+import { clearAdminSession } from "@/lib/adminAuth";
 
 /** Human labels for admin path segments (drives the breadcrumb). */
 const SEGMENT_LABEL: Record<string, string> = {
@@ -12,10 +13,8 @@ const SEGMENT_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
   vendors: "Vendors",
   "vendor-approvals": "Vendor Approvals",
-  customers: "Customer Management",
-  bookings: "Booking Management",
-  menu: "Menu & Catalog",
-  "add-ons": "Add-On Manager",
+  customers: "Customers & Bookings",
+  leads: "Lead Generation",
   payments: "Payments",
   coupons: "Coupons",
   content: "Content Control",
@@ -29,29 +28,16 @@ interface AdminTopbarProps {
 }
 
 /**
- * Sticky top navigation: hamburger (mobile) + breadcrumb, a (decorative for now)
- * global search, a notifications bell, a welcome message and the admin avatar.
+ * Sticky top navigation: hamburger (mobile) + breadcrumb, a notifications bell,
+ * a welcome message and the admin avatar.
  * All styling reuses the brand tokens so it matches the public header.
  */
 export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const segments = pathname.split("/").filter(Boolean); // e.g. ["admin","vendors"]
 
   const firstName = adminProfile.name.split(" ")[0];
-
-  // Global search drives the `?q=` URL param; list pages (vendors, etc.) read it
-  // to filter their data. Keeping the value in the URL means the topbar and any
-  // in-page search bar stay in sync and the query survives reloads/shares.
-  const query = searchParams.get("q") ?? "";
-  const onSearch = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set("q", value);
-    else params.delete("q");
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  };
 
   return (
     <header className="sticky top-0 z-20 border-b border-cream-3 bg-white/95 backdrop-blur-sm">
@@ -100,21 +86,8 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
           </nav>
         </div>
 
-        {/* Right — search, bell, profile */}
+        {/* Right — bell, profile */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Global search — drives the `?q=` URL param consumed by list pages. */}
-          <label className="relative hidden md:block">
-            <span className="sr-only">Search</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => onSearch(e.target.value)}
-              placeholder="Search…"
-              className="w-56 rounded-lg border border-cream-3 bg-cream/40 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30"
-            />
-          </label>
-
           {/* Notifications */}
           <Link
             href="/admin/dashboard"
@@ -136,6 +109,16 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
             >
               {adminProfile.initials}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                clearAdminSession();
+                router.replace("/admin/login");
+              }}
+              className="rounded-lg border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
+            >
+              Log out
+            </button>
           </div>
         </div>
       </div>

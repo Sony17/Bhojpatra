@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import CustomerManagement from "@/components/admin/customers/CustomerManagement";
+import CustomerBookingManagement from "@/components/admin/customers/CustomerBookingManagement";
 
-export const metadata: Metadata = { title: "Customer Management" };
+export const metadata: Metadata = { title: "Customers & Bookings" };
 
 export default function CustomersPage() {
-  return <CustomerManagement />;
+  return <CustomerBookingManagement />;
 }

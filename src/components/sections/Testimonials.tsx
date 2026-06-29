@@ -1,9 +1,17 @@
 "use client";
 
-import Image from "next/image";
-import { testimonials, type Testimonial } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent, type HomeTestimonial } from "@/lib/homeContent";
+
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
 
 function Stars({ rating, label }: { rating: number; label: string }) {
   return (
@@ -22,8 +30,9 @@ function Stars({ rating, label }: { rating: number; label: string }) {
 
 export default function Testimonials() {
   const { lang, t: tr } = useLang();
+  const { testimonials } = useHomeContent();
 
-  const renderCard = (t: Testimonial, copy: number) => (
+  const renderCard = (t: HomeTestimonial, copy: number) => (
     <li
       key={`${copy}-${t.id}`}
       aria-hidden={copy === 1 ? true : undefined}
@@ -50,15 +59,11 @@ export default function Testimonials() {
       </p>
 
       <div className="mt-6 flex items-center gap-3 border-t border-cream-3 pt-5">
-        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-cream-3">
-          <Image
-            src={t.avatar}
-            alt={t.name}
-            fill
-            sizes="44px"
-            className="object-cover"
-            draggable={false}
-          />
+        <span
+          aria-hidden="true"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream ring-2 ring-cream-3"
+        >
+          {initials(t.name)}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-ink">
@@ -76,16 +81,13 @@ export default function Testimonials() {
     <section id="testimonials" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="mx-auto max-w-2xl text-center">
         <p className="eyebrow text-[1.6875rem] font-semibold text-gold">
-          {tr("Loved by Hosts", "मेज़बानों की पसंद")}
+          {lang === "hi" ? testimonials.eyebrowHi : testimonials.eyebrow}
         </p>
         <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
-          {tr("What Our Customers Say", "हमारे ग्राहक क्या कहते हैं")}
+          {lang === "hi" ? testimonials.headingHi : testimonials.heading}
         </h2>
         <p className="font-script mt-4 text-xl text-ink-soft">
-          {tr(
-            "From weddings to corporate galas — thousands of celebrations served and remembered.",
-            "शादियों से लेकर कॉर्पोरेट गाला तक — हज़ारों उत्सव परोसे और याद रखे गए।",
-          )}
+          {lang === "hi" ? testimonials.subtitleHi : testimonials.subtitle}
         </p>
       </Reveal>
 
@@ -95,7 +97,7 @@ export default function Testimonials() {
         <div className="marquee-pause -mx-5 overflow-hidden px-5 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
           <ul className="animate-marquee-slow flex w-max gap-5 py-2 sm:gap-6">
             {[0, 1].map((copy) =>
-              testimonials.map((t: Testimonial) => renderCard(t, copy)),
+              testimonials.items.map((t) => renderCard(t, copy)),
             )}
           </ul>
         </div>

@@ -86,3 +86,11 @@ export async function POST(request: Request) {
 
   return Response.json({ ok: true }, { status: 201 });
 }
+
+// Admin → Lead Generation reads the captured leads here. Newest first so the
+// most recent promo sign-ups surface at the top of the table.
+export async function GET() {
+  const leads = await readLeads();
+  leads.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return Response.json({ leads });
+}

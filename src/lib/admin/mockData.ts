@@ -66,7 +66,7 @@ export const adminProfile: AdminProfile = {
 export const adminKpis: AdminKpi[] = [
   { key: "vendors", label: "Total Vendors", value: "128", sub: "+6 this month", iconKey: "vendors", href: "/admin/vendors" },
   { key: "approvals", label: "Pending Approvals", value: "7", sub: "Awaiting KYC", iconKey: "approvals", href: "/admin/vendor-approvals" },
-  { key: "today", label: "Today's Bookings", value: "12", sub: "3 events today", iconKey: "bookings", href: "/admin/bookings" },
+  { key: "today", label: "Today's Bookings", value: "12", sub: "3 events today", iconKey: "bookings", href: "/admin/customers?tab=bookings" },
   { key: "revenue", label: "Revenue", value: "₹42.8L", sub: "+12% MoM", iconKey: "revenue", href: "/admin/payments" },
   { key: "customers", label: "Customers", value: "3,940", sub: "+128 this week", iconKey: "customers", href: "/admin/customers" },
   { key: "coupons", label: "Active Coupons", value: "5", sub: "2 expiring soon", iconKey: "coupons", href: "/admin/coupons" },
@@ -158,9 +158,7 @@ export const adminNotifications: AdminNotification[] = [
 export const quickActions: QuickAction[] = [
   { label: "Review Approvals", href: "/admin/vendor-approvals", iconKey: "approvals" },
   { label: "Add Coupon", href: "/admin/coupons", iconKey: "coupons" },
-  { label: "Manage Menu", href: "/admin/menu", iconKey: "menu" },
-  { label: "Add-On Manager", href: "/admin/add-ons", iconKey: "addons" },
-  { label: "View Reports", href: "/admin/reports", iconKey: "reports" },
+  { label: "Manage Content", href: "/admin/content", iconKey: "content" },
 ];
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -420,9 +418,9 @@ export function queryPayments(params: PaymentQuery = {}): Paginated<AdminPayment
 ─────────────────────────────────────────────────────────────────────── */
 
 const COUPON_META = [
-  { id: "CPN-01", eligibility: "All occasions", startsAt: "01 Jun 2026", expiresAt: "31 Dec 2026", usageLimit: 1000, usedCount: 318, status: "Active" as const },
-  { id: "CPN-02", eligibility: "First booking only", startsAt: "01 Jan 2026", expiresAt: "31 Dec 2026", usageLimit: 2000, usedCount: 742, status: "Active" as const },
-  { id: "CPN-03", eligibility: "Weddings only", startsAt: "01 Jul 2026", expiresAt: "31 Mar 2027", usageLimit: 500, usedCount: 96, status: "Active" as const },
+  { id: "CPN-01", eligibility: "All occasions", startsAt: "01 Jun 2026", expiresAt: "31 Dec 2026", status: "Active" as const },
+  { id: "CPN-02", eligibility: "First booking only", startsAt: "01 Jan 2026", expiresAt: "31 Dec 2026", status: "Active" as const },
+  { id: "CPN-03", eligibility: "Weddings only", startsAt: "01 Jul 2026", expiresAt: "31 Mar 2027", status: "Active" as const },
 ];
 
 export const adminCoupons: AdminCoupon[] = [
@@ -433,8 +431,8 @@ export const adminCoupons: AdminCoupon[] = [
     cap: c.cap,
     ...COUPON_META[i % COUPON_META.length],
   })),
-  { id: "CPN-04", code: "DIWALI20", label: "20% off festive feasts, up to ₹15,000", percent: 20, cap: 15000, eligibility: "Festivals", startsAt: "01 Oct 2026", expiresAt: "15 Nov 2026", usageLimit: 800, usedCount: 0, status: "Scheduled" },
-  { id: "CPN-05", code: "MONSOON10", label: "10% off, up to ₹3,000", percent: 10, cap: 3000, eligibility: "All occasions", startsAt: "01 Jun 2026", expiresAt: "31 Aug 2026", usageLimit: 600, usedCount: 540, status: "Expired" },
+  { id: "CPN-04", code: "DIWALI20", label: "20% off festive feasts, up to ₹15,000", percent: 20, cap: 15000, eligibility: "Festivals", startsAt: "01 Oct 2026", expiresAt: "15 Nov 2026", status: "Inactive" },
+  { id: "CPN-05", code: "MONSOON10", label: "10% off, up to ₹3,000", percent: 10, cap: 3000, eligibility: "All occasions", startsAt: "01 Jun 2026", expiresAt: "31 Aug 2026", status: "Inactive" },
 ];
 
 /* ───────────────────────────────────────────────────────────────────────

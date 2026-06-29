@@ -169,6 +169,52 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         },
       ],
     },
+    {
+      slug: "refund",
+      navLabel: "Refund Policy",
+      eyebrow: "Legal",
+      eyebrowHi: "कानूनी",
+      title: "Refund & Cancellation Policy",
+      titleHi: "रिफंड और रद्दीकरण नीति",
+      intro:
+        "We want every celebration to go smoothly. This policy explains how cancellations and refunds work for bookings made through Bhojpatra. This is sample placeholder content — replace it with your finalised policy.",
+      introHi:
+        "हम चाहते हैं कि हर आयोजन सहजता से हो। यह नीति बताती है कि Bhojpatra के माध्यम से की गई बुकिंग के लिए रद्दीकरण और रिफंड कैसे काम करते हैं। यह नमूना सामग्री है — इसे अपनी अंतिम नीति से बदलें।",
+      sections: [
+        {
+          id: "refund-cancellation",
+          heading: "Cancellations",
+          headingHi: "रद्दीकरण",
+          body: "You may request a cancellation by contacting us with your booking details. The applicable refund depends on how far in advance you cancel before the event date, as outlined below. Cancellation requests are processed only once confirmed in writing by our team.",
+          bodyHi:
+            "आप अपनी बुकिंग का विवरण देकर हमसे संपर्क करके रद्दीकरण का अनुरोध कर सकते हैं। लागू रिफंड इस बात पर निर्भर करता है कि आप आयोजन की तारीख से कितने पहले रद्द करते हैं, जैसा कि नीचे बताया गया है। रद्दीकरण अनुरोध केवल हमारी टीम द्वारा लिखित में पुष्टि होने के बाद ही संसाधित किए जाते हैं।",
+        },
+        {
+          id: "refund-timelines",
+          heading: "Refund Timelines",
+          headingHi: "रिफंड की समय-सीमा",
+          body: "Cancelled 7 or more days before the event: full refund of the advance, less payment-gateway charges.\nCancelled 3 to 6 days before the event: 50% of the advance is refunded.\nCancelled within 48 hours of the event: the advance is non-refundable, as preparations and procurement are already underway.",
+          bodyHi:
+            "आयोजन से 7 या अधिक दिन पहले रद्द: अग्रिम का पूरा रिफंड, पेमेंट-गेटवे शुल्क घटाकर।\nआयोजन से 3 से 6 दिन पहले रद्द: अग्रिम का 50% वापस किया जाता है।\nआयोजन के 48 घंटे के भीतर रद्द: अग्रिम वापस नहीं किया जाता, क्योंकि तैयारी और खरीद पहले ही शुरू हो चुकी होती है।",
+        },
+        {
+          id: "refund-process",
+          heading: "How Refunds Are Processed",
+          headingHi: "रिफंड कैसे संसाधित होते हैं",
+          body: "Approved refunds are credited to your original payment method within 7–10 business days. Timelines may vary depending on your bank or payment provider. You will receive a confirmation once the refund is initiated.",
+          bodyHi:
+            "स्वीकृत रिफंड 7–10 कार्य दिवसों के भीतर आपके मूल भुगतान माध्यम में जमा कर दिए जाते हैं। समय-सीमा आपके बैंक या भुगतान प्रदाता के आधार पर भिन्न हो सकती है। रिफंड शुरू होने पर आपको एक पुष्टि प्राप्त होगी।",
+        },
+        {
+          id: "refund-contact",
+          heading: "Need Help?",
+          headingHi: "मदद चाहिए?",
+          body: "For any cancellation or refund request, reach us at info@bhojpatra.co.in and our team will guide you through the process.",
+          bodyHi:
+            "किसी भी रद्दीकरण या रिफंड अनुरोध के लिए, हमें info@bhojpatra.co.in पर संपर्क करें और हमारी टीम पूरी प्रक्रिया में आपका मार्गदर्शन करेगी।",
+        },
+      ],
+    },
   ],
   contact: {
     eyebrow: "Contact Us",
@@ -193,8 +239,17 @@ const EVENT = "bhojpatra:site-content";
 /** Merge stored content over defaults so newly-added fields keep a value. */
 function reconcile(stored: Partial<SiteContent> | null): SiteContent {
   if (!stored) return DEFAULT_SITE_CONTENT;
+  const storedPages = stored.pages ?? [];
+  // Keep the admin's edited pages, but append any default pages that were
+  // added after this store was last saved (e.g. a newly-introduced policy page)
+  // so they always surface on the public site and in the admin editor.
+  const missingDefaults = DEFAULT_SITE_CONTENT.pages.filter(
+    (def) => !storedPages.some((p) => p.slug === def.slug),
+  );
   return {
-    pages: stored.pages?.length ? stored.pages : DEFAULT_SITE_CONTENT.pages,
+    pages: storedPages.length
+      ? [...storedPages, ...missingDefaults]
+      : DEFAULT_SITE_CONTENT.pages,
     contact: { ...DEFAULT_SITE_CONTENT.contact, ...stored.contact },
   };
 }
