@@ -34,11 +34,11 @@ export default function AuthLayout({
         {/* Maroon overlay for text legibility */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-maroon/85 via-maroon/70 to-maroon-dark/90"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-maroon/65 via-maroon/45 to-maroon-dark/75"
         />
 
         <Link href="/" target="_blank" rel="noopener noreferrer" className="relative z-10 inline-flex w-fit">
-          <CreamLogo className="h-14 w-[222px]" />
+          <CreamLogo src="/bhojpatra-logo1.png" className="h-24 w-[81px]" />
         </Link>
 
         <div className="relative z-10 max-w-md">

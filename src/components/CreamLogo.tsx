@@ -9,26 +9,35 @@ import type { CSSProperties } from "react";
  * treatment the auth panel used for white, but yellow instead of red.
  *
  * The caller must supply both width and height via `className` (the masked
- * span has no intrinsic size). The logo's aspect ratio is ~894:226 (≈3.96),
- * so pair heights with widths that keep that ratio, e.g. `h-14 w-[222px]`.
+ * span has no intrinsic size), sized to match the source PNG's aspect ratio.
+ * The default wordmark is ~894:226 (≈3.96), e.g. `h-14 w-[222px]`; the stacked
+ * mark (`/bhojpatra-logo1.png`) is ~460:543 (≈0.85), e.g. `h-24 w-[81px]`.
  */
-const maskStyle: CSSProperties = {
-  WebkitMaskImage: "url(/bhojpatra-logo.png)",
-  maskImage: "url(/bhojpatra-logo.png)",
-  WebkitMaskRepeat: "no-repeat",
-  maskRepeat: "no-repeat",
-  WebkitMaskPosition: "center",
-  maskPosition: "center",
-  WebkitMaskSize: "contain",
-  maskSize: "contain",
-};
+function maskStyle(src: string): CSSProperties {
+  return {
+    WebkitMaskImage: `url(${src})`,
+    maskImage: `url(${src})`,
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center",
+    maskPosition: "center",
+    WebkitMaskSize: "contain",
+    maskSize: "contain",
+  };
+}
 
-export default function CreamLogo({ className }: { className?: string }) {
+export default function CreamLogo({
+  className,
+  src = "/bhojpatra-logo.png",
+}: {
+  className?: string;
+  src?: string;
+}) {
   return (
     <span
       role="img"
       aria-label="Bhojpatra"
-      style={maskStyle}
+      style={maskStyle(src)}
       className={"block bg-cream " + (className ?? "")}
     />
   );
