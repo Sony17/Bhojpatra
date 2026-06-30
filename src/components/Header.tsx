@@ -57,6 +57,84 @@ function Logo() {
   );
 }
 
+/** Compact auth control for the mobile header — the bottom tab bar is full
+ *  with primary destinations, so Log In / account lives up here next to the
+ *  language toggle. Signed out → a Log In button; signed in → an avatar that
+ *  links to the dashboard, with a Log Out action beside it. */
+function MobileAccount() {
+  const { t } = useLang();
+  const router = useRouter();
+  const session = useSession();
+
+  if (!session) {
+    return (
+      <Link
+        href="/login"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={t("Log In", "लॉग इन")}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      </Link>
+    );
+  }
+
+  const name = session.name?.trim();
+  const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
+  const initial = (name || label).charAt(0).toUpperCase();
+
+  function handleLogout() {
+    clearSession();
+    router.push("/");
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-maroon/40 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+      <Link
+        href={dashboardPath(session.type)}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={t("My Dashboard", "मेरा डैशबोर्ड")}
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-xs font-semibold text-cream transition-transform duration-200 active:scale-95"
+      >
+        {initial}
+      </Link>
+      <button
+        type="button"
+        onClick={handleLogout}
+        aria-label={t("Log Out", "लॉग आउट")}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-maroon transition-colors duration-200 hover:bg-maroon/5 active:scale-95"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3M10 8l-4 4 4 4M6 12h11" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 /** Signed-in account menu — name + dashboard/logout, shown in place of the
  *  Log In / Sign Up buttons once a session exists. */
 function AccountMenu() {
@@ -232,9 +310,10 @@ export default function Header() {
           <AccountMenu />
         </div>
 
-        {/* Mobile language toggle — auth + nav live in the bottom tab bar */}
-        <div className="lg:hidden">
+        {/* Mobile auth + language toggle — primary nav lives in the bottom tab bar */}
+        <div className="flex items-center gap-2.5 lg:hidden">
           <LanguageToggle />
+          <MobileAccount />
         </div>
 
       </div>
