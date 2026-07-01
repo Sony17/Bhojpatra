@@ -41,7 +41,7 @@ const partnerIcons: Record<string, React.ReactNode> = {
 function Logo() {
   const { t } = useLang();
   return (
-    <Link href="/" target="_blank" rel="noopener noreferrer" className="flex flex-col gap-0 leading-none">
+    <Link href="/" className="flex flex-col gap-0 leading-none">
       <Image
         src="/bhojpatra-logo.png"
         alt="Bhojpatra"
@@ -70,8 +70,6 @@ function MobileAccount() {
     return (
       <Link
         href="/login"
-        target="_blank"
-        rel="noopener noreferrer"
         aria-label={t("Log In", "लॉग इन")}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
       >
@@ -105,8 +103,6 @@ function MobileAccount() {
     <div className="inline-flex items-center gap-1 rounded-full border border-maroon/40 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
       <Link
         href={dashboardPath(session.type)}
-        target="_blank"
-        rel="noopener noreferrer"
         aria-label={t("My Dashboard", "मेरा डैशबोर्ड")}
         className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-xs font-semibold text-cream transition-transform duration-200 active:scale-95"
       >
@@ -147,16 +143,12 @@ function AccountMenu() {
       <>
         <Link
           href="/login"
-          target="_blank"
-          rel="noopener noreferrer"
           className="rounded-md border border-maroon/40 px-5 py-2 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
         >
           {t("Log In", "लॉग इन")}
         </Link>
         <Link
           href="/signup"
-          target="_blank"
-          rel="noopener noreferrer"
           className="btn-sheen rounded-md bg-maroon px-5 py-2 text-sm font-medium text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
         >
           {t("Sign Up", "साइन अप")}
@@ -201,8 +193,6 @@ function AccountMenu() {
           <li className="border-b border-maroon/10">
             <Link
               href={dashboardPath(session.type)}
-              target="_blank"
-              rel="noopener noreferrer"
               className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5 hover:text-maroon"
             >
               {t("My Dashboard", "मेरा डैशबोर्ड")}
@@ -242,8 +232,6 @@ export default function Header() {
             <div key={link.label} className="group relative">
               <a
                 href={link.href.startsWith("#") ? `/${link.href}` : link.href}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="link-underline flex items-center gap-1 transition-colors group-hover:text-maroon"
               >
                 {lang === "hi" ? link.labelHi : link.label}
@@ -268,8 +256,6 @@ export default function Header() {
                       <li key={item.title} className="border-b border-maroon/10 last:border-b-0">
                         <a
                           href={item.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="group/item flex items-center gap-4 px-5 py-4 transition-colors hover:bg-maroon/5"
                         >
                           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-maroon/10 ring-1 ring-maroon/20 transition-transform duration-300 group-hover/item:scale-110">

@@ -184,7 +184,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </span>
 
         {isPartner && referralCode && (
-          <div className="mt-5 rounded-xl border border-maroon/30 bg-maroon-soft px-4 py-4">
+          <div className="mt-5 rounded-xl border border-maroon/30 bg-cream px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Your Referral Code", "आपका रेफ़रल कोड")}
             </p>
@@ -197,8 +197,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <div className="mt-8 flex flex-col gap-3">
           <Link
             href={dashboardPath(accountType)}
-            target="_blank"
-            rel="noopener noreferrer"
             className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
           >
             {isVendor
@@ -210,8 +208,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           {isVendor && (
             <Link
               href="/vendor/register"
-              target="_blank"
-              rel="noopener noreferrer"
               className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
             >
               {t("Complete Vendor Registration", "वेंडर रजिस्ट्रेशन पूरा करें")}
@@ -219,8 +215,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           )}
           <Link
             href="/login"
-            target="_blank"
-            rel="noopener noreferrer"
             className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
           >
             {t("Go to Log In", "लॉग इन पर जाएं")}
@@ -503,8 +497,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             {!isSignup && (
               <Link
                 href="/forgot-password"
-                target="_blank"
-                rel="noopener noreferrer"
                 className="text-sm font-medium text-maroon hover:text-maroon-dark"
               >
                 {t("Forgot password?", "पासवर्ड भूल गए?")}
@@ -625,8 +617,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         {isForgot ? (
           <Link
             href="/login"
-            target="_blank"
-            rel="noopener noreferrer"
             className="font-semibold text-maroon hover:text-maroon-dark"
           >
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
@@ -638,8 +628,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
             <Link
               href={isSignup ? "/login" : "/signup"}
-              target="_blank"
-              rel="noopener noreferrer"
               className="font-semibold text-maroon hover:text-maroon-dark"
             >
               {isSignup

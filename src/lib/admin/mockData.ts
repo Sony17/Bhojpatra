@@ -85,14 +85,14 @@ export const recentBookings: AdminBookingRow[] = [
    full Vendor Approvals / KYC console. `pendingApprovals` is DERIVED from this
    (status === "Pending") so there is one source of truth. */
 const APPLICATIONS_BASE: PendingVendorApproval[] = [
-  { id: "AP-2042", business: "Royal Tandoor Caterers", owner: "Faiz Khan", city: "Lucknow", speciality: "Mughlai & Tandoor", requestedTier: "Gold", submitted: "2 hrs ago", status: "Pending" },
-  { id: "AP-2039", business: "Green Leaf Pure Veg", owner: "Anita Joshi", city: "Pune", speciality: "Pure Veg / Jain", requestedTier: "Silver", submitted: "5 hrs ago", status: "Pending" },
-  { id: "AP-2035", business: "Coastal Spice Co.", owner: "Rohan Pai", city: "Mangalore", speciality: "South Indian / Coastal", requestedTier: "Gold", submitted: "1 day ago", status: "Pending" },
-  { id: "AP-2031", business: "Maratha Spice Caterers", owner: "Sunil More", city: "Pune", speciality: "Continental & Chinese", requestedTier: "Silver", submitted: "1 day ago", status: "Pending" },
-  { id: "AP-2028", business: "Grand Nawabi Dawat", owner: "Imtiaz Ahmed", city: "Lucknow", speciality: "Awadhi", requestedTier: "Platinum", submitted: "2 days ago", status: "Pending" },
-  { id: "AP-2025", business: "Hyderabadi House", owner: "Mohsin Ali", city: "Hyderabad", speciality: "Hyderabadi Biryani", requestedTier: "Gold", submitted: "3 days ago", status: "Pending" },
-  { id: "AP-2019", business: "Annapurna Bhog", owner: "Deepa Nair", city: "Kochi", speciality: "Kerala Sadya", requestedTier: "Silver", submitted: "5 days ago", status: "Verified" },
-  { id: "AP-2012", business: "Quick Bites Co.", owner: "Rajat Malhotra", city: "Noida", speciality: "Fast Food", requestedTier: "Silver", submitted: "1 week ago", status: "Rejected" },
+  { id: "AP-2042", business: "Royal Tandoor Caterers", owner: "Faiz Khan", city: "Lucknow", speciality: "Mughlai & Tandoor", requestedTiers: ["Gold", "Platinum"], submitted: "2 hrs ago", status: "Pending" },
+  { id: "AP-2039", business: "Green Leaf Pure Veg", owner: "Anita Joshi", city: "Pune", speciality: "Pure Veg / Jain", requestedTiers: ["Silver"], submitted: "5 hrs ago", status: "Pending" },
+  { id: "AP-2035", business: "Coastal Spice Co.", owner: "Rohan Pai", city: "Mangalore", speciality: "South Indian / Coastal", requestedTiers: ["Silver", "Gold"], submitted: "1 day ago", status: "Pending" },
+  { id: "AP-2031", business: "Maratha Spice Caterers", owner: "Sunil More", city: "Pune", speciality: "Continental & Chinese", requestedTiers: ["Silver"], submitted: "1 day ago", status: "Pending" },
+  { id: "AP-2028", business: "Grand Nawabi Dawat", owner: "Imtiaz Ahmed", city: "Lucknow", speciality: "Awadhi", requestedTiers: ["Gold", "Platinum"], submitted: "2 days ago", status: "Pending" },
+  { id: "AP-2025", business: "Hyderabadi House", owner: "Mohsin Ali", city: "Hyderabad", speciality: "Hyderabadi Biryani", requestedTiers: ["Silver", "Gold"], submitted: "3 days ago", status: "Pending" },
+  { id: "AP-2019", business: "Annapurna Bhog", owner: "Deepa Nair", city: "Kochi", speciality: "Kerala Sadya", requestedTiers: ["Silver"], submitted: "5 days ago", status: "Verified" },
+  { id: "AP-2012", business: "Quick Bites Co.", owner: "Rajat Malhotra", city: "Noida", speciality: "Fast Food", requestedTiers: ["Silver"], submitted: "1 week ago", status: "Rejected" },
 ];
 
 export const vendorApplications: VendorApplication[] = APPLICATIONS_BASE.map(
@@ -204,7 +204,7 @@ export const adminVendors: AdminVendor[] = vendorListings.map((v, i) => {
     email: `hello@${slug(v.name)}.in`,
     city: v.city,
     state: v.state,
-    tier: v.tier,
+    tiers: v.tiers,
     status,
     suspended,
     cuisines: v.cuisines,
@@ -240,7 +240,7 @@ export function queryVendors(params: VendorQuery = {}): Paginated<AdminVendor> {
       v.business.toLowerCase().includes(needle) ||
       v.owner.toLowerCase().includes(needle) ||
       v.city.toLowerCase().includes(needle);
-    const matchesTier = tier === "All" || v.tier === tier;
+    const matchesTier = tier === "All" || v.tiers.includes(tier);
     const matchesStatus = status === "All" || v.status === status;
     const matchesCity = city === "All" || v.city === city;
     return matchesQ && matchesTier && matchesStatus && matchesCity;

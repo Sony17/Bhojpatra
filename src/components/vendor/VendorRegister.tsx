@@ -474,8 +474,6 @@ export default function VendorRegister() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/vendor/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
               className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
             >
               {t("Go to Dashboard", "डैशबोर्ड पर जाएं")}

@@ -63,7 +63,7 @@ const MULTI_VENDOR_MIN = 1000;
 // the package they picked — each tier surfaces its own roster from the existing
 // vendor catalogue (`vendorListings`). A package id not listed here (Custom,
 // short-notice) opens the full catalogue.
-const PACKAGE_VENDOR_TIERS: Record<string, VendorListing["tier"][]> = {
+const PACKAGE_VENDOR_TIERS: Record<string, VendorListing["tiers"]> = {
   silver: ["Silver"],
   gold: ["Gold"],
   platinum: ["Platinum"],
@@ -429,7 +429,7 @@ export default function BookingWizard() {
   const eligibleAddOnVendors = useMemo<VendorListing[]>(() => {
     const tiers = PACKAGE_VENDOR_TIERS[packageId];
     return tiers
-      ? vendorListings.filter((v) => tiers.includes(v.tier))
+      ? vendorListings.filter((v) => v.tiers.some((t) => tiers.includes(t)))
       : vendorListings;
   }, [packageId]);
 

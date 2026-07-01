@@ -200,8 +200,6 @@ export default function Hero() {
 
         <a
           href={bookHref}
-          target="_blank"
-          rel="noopener noreferrer"
           className="btn-sheen flex shrink-0 items-center rounded-xl bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:whitespace-nowrap"
         >
           {t("Explore Packages", "पैकेज देखें")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
@@ -27,6 +27,25 @@ const STATUS_OPTIONS = [
 
 const STATUS_SET: BookingStatus[] = ["Pending", "Confirmed", "Completed", "Cancelled"];
 
+/** Map a persisted order (from `GET /api/bookings`) to the admin row shape. */
+function toAdminBooking(o: Record<string, unknown>): AdminBooking {
+  return {
+    id: String(o.id),
+    customer: typeof o.customer === "string" ? o.customer : "Online Booking",
+    occasion: typeof o.occasion === "string" ? o.occasion : "Feast",
+    date: typeof o.date === "string" ? o.date : "",
+    guests: Number(o.guests) || 0,
+    vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
+    city: typeof o.city === "string" ? o.city : "—",
+    amount: Number(o.amount) || 0,
+    paid: Number(o.paid) || 0,
+    status: (o.status as AdminBooking["status"]) ?? "Confirmed",
+    ...(typeof o.referralCode === "string" ? { referralCode: o.referralCode } : {}),
+    ...(typeof o.referrerName === "string" ? { referrerName: o.referrerName } : {}),
+    ...(typeof o.referrerType === "string" ? { referrerType: o.referrerType } : {}),
+  };
+}
+
 export default function BookingManagement() {
   const [rows, setRows] = useState<AdminBooking[]>(adminBookings);
   const [q, setQ] = useState("");
@@ -34,6 +53,31 @@ export default function BookingManagement() {
   const [city, setCity] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Pull the real, persisted bookings from the API and surface them ahead of the
+  // demo rows so genuine customer bookings show up in the console. Local status
+  // edits stay intact because we only prepend orders the list doesn't already have.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bookings", { cache: "no-store" });
+        if (!res.ok) return;
+        const { orders } = (await res.json()) as { orders?: Record<string, unknown>[] };
+        if (cancelled || !Array.isArray(orders) || orders.length === 0) return;
+        const live = orders.map(toAdminBooking);
+        setRows((prev) => {
+          const liveIds = new Set(live.map((b) => b.id));
+          return [...live, ...prev.filter((b) => !liveIds.has(b.id))];
+        });
+      } catch {
+        // Network/parse failure — keep the existing rows.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);

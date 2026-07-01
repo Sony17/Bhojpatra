@@ -7,7 +7,13 @@ import {
   type VendorApplicationRecord,
   type VendorPackageInput,
 } from "@/lib/vendorApplications";
-import type { VendorDocKind, VendorTier } from "@/lib/admin/types";
+import {
+  TIER_ORDER,
+  sortTiers,
+  tierForPrice,
+  type VendorDocKind,
+  type VendorTier,
+} from "@/lib/admin/types";
 
 // Applications are submitted at request time and appended to a JSON store on
 // disk — never prerender or cache this handler.
@@ -28,15 +34,26 @@ function strList(v: unknown): string[] {
   return Array.isArray(v) ? v.map(str).filter(Boolean) : [];
 }
 
-/** Higher per-plate pricing implies a more premium tier. */
-function deriveTier(packages: VendorPackageInput[]): VendorTier {
-  const prices = packages
-    .map((p) => Number(p.price))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  const min = prices.length ? Math.min(...prices) : 0;
-  if (min >= 1500) return "Platinum";
-  if (min >= 1000) return "Gold";
-  return "Silver";
+/** A caterer sits in every tier band their packages span — a menu with a
+ *  ₹800 and a ₹1,600 package serves both Silver and Platinum. Falls back to
+ *  Silver when no priced package is present. */
+function deriveTiers(packages: VendorPackageInput[]): VendorTier[] {
+  const tiers = new Set<VendorTier>();
+  for (const p of packages) {
+    const price = Number(p.price);
+    if (Number.isFinite(price) && price > 0) tiers.add(tierForPrice(price));
+  }
+  const derived = sortTiers([...tiers]);
+  return derived.length ? derived : ["Silver"];
+}
+
+/** Keep only valid tier values, in canonical order. */
+function parseTiers(raw: unknown): VendorTier[] {
+  if (!Array.isArray(raw)) return [];
+  const valid = raw.filter((t): t is VendorTier =>
+    TIER_ORDER.includes(t as VendorTier),
+  );
+  return sortTiers(valid);
 }
 
 const DOC_FIELDS: { kind: VendorDocKind; key: string }[] = [
@@ -103,6 +120,13 @@ export async function POST(request: Request) {
     };
   });
 
+  // Tiers are auto-derived from the packages' price bands, but an explicit
+  // `tiers` array (e.g. an admin assigning bands by hand) overrides that.
+  const overrideTiers = parseTiers(body.tiers);
+  const requestedTiers = overrideTiers.length
+    ? overrideTiers
+    : deriveTiers(packages);
+
   const now = new Date();
   const record: VendorApplicationRecord = {
     id: `VND-${randomUUID().slice(0, 6).toUpperCase()}`,
@@ -114,7 +138,7 @@ export async function POST(request: Request) {
     state: str(body.state),
     cuisines,
     speciality: cuisines.slice(0, 2).join(", ") || "Catering",
-    requestedTier: deriveTier(packages),
+    requestedTiers,
     gstNumber,
     fssaiNumber,
     documents,

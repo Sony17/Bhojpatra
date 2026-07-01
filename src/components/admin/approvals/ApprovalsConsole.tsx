@@ -7,6 +7,7 @@ import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
 import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
+import TierBadges from "@/components/admin/shared/TierBadges";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
@@ -155,7 +156,7 @@ export default function ApprovalsConsole() {
       ),
     },
     { key: "city", header: "City", cell: (a) => <span className="text-ink-soft">{a.city}</span> },
-    { key: "tier", header: "Requested", cell: (a) => <StatusBadge status={a.requestedTier} /> },
+    { key: "tier", header: "Requested", cell: (a) => <TierBadges tiers={a.requestedTiers} /> },
     { key: "submitted", header: "Submitted", cell: (a) => <span className="text-ink-soft">{a.submitted}</span> },
     { key: "status", header: "Status", cell: (a) => <StatusBadge status={a.status} /> },
     {
@@ -262,7 +263,7 @@ export default function ApprovalsConsole() {
         {selected && (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2.5">
-              <StatusBadge status={selected.requestedTier} />
+              <TierBadges tiers={selected.requestedTiers} />
               <StatusBadge status={selected.status} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>

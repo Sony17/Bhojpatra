@@ -43,8 +43,10 @@ const matchesDiet = (vendor: VendorListing, filter: DietFilter): boolean => {
   return vendor.diet === filter || vendor.diet === "Veg & Non-Veg";
 };
 
+type Tier = VendorListing["tiers"][number];
+
 /** Brand-aligned tier badge styling. */
-const tierBadgeClass = (tier: VendorListing["tier"]): string => {
+const tierBadgeClass = (tier: Tier): string => {
   switch (tier) {
     case "Platinum":
       return "bg-maroon text-cream";
@@ -178,7 +180,7 @@ export default function VendorCatalog() {
         (state === ALL || v.state === state) &&
         (cuisine === ALL || v.cuisines.includes(cuisine)) &&
         matchesDiet(v, diet) &&
-        (tier === ALL || v.tier === tier) &&
+        (tier === ALL || v.tiers.includes(tier)) &&
         matchesPrice(v, price) &&
         matchesMeals
       );
@@ -197,11 +199,14 @@ export default function VendorCatalog() {
         break;
       default:
         // Relevance: verified & higher-tier first, then rating, then reviews.
+        // A multi-tier vendor is ranked by its highest band.
         sorted.sort((a, b) => {
           const tierRank = { Platinum: 3, Gold: 2, Silver: 1 } as const;
+          const topTier = (v: VendorListing) =>
+            Math.max(...v.tiers.map((t) => tierRank[t]));
           const score = (v: VendorListing) =>
             (v.verified ? 1000 : 0) +
-            tierRank[v.tier] * 100 +
+            topTier(v) * 100 +
             v.rating * 10 +
             v.reviews / 1000;
           return score(b) - score(a);
@@ -554,7 +559,7 @@ function Chip({
 function VendorCard({ vendor }: { vendor: VendorListing }) {
   const { t } = useLang();
 
-  const tierBadgeLabel = (tier: VendorListing["tier"]): string => {
+  const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
       case "Silver":
         return t("Silver", "सिल्वर");
@@ -611,13 +616,18 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
           sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <span
-          className={
-            "absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-semibold shadow-sm " +
-            tierBadgeClass(vendor.tier)
-          }
-        >
-          {tierBadgeLabel(vendor.tier)}
+        <span className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {vendor.tiers.map((tier) => (
+            <span
+              key={tier}
+              className={
+                "rounded-full px-3 py-1 text-xs font-semibold shadow-sm " +
+                tierBadgeClass(tier)
+              }
+            >
+              {tierBadgeLabel(tier)}
+            </span>
+          ))}
         </span>
         {vendor.verified && (
           <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
@@ -676,8 +686,6 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
           </div>
           <Link
             href="/book"
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
             {t("View & Compare", "देखें और तुलना करें")}

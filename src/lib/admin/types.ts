@@ -46,6 +46,22 @@ export interface AdminKpi {
 export type VerificationStatus = "Pending" | "Verified" | "Rejected";
 export type VendorTier = "Silver" | "Gold" | "Platinum";
 
+/** Canonical display order for tiers (entry → premium). A vendor can sit in
+ *  several of these at once — one per price band their packages cover. */
+export const TIER_ORDER: VendorTier[] = ["Silver", "Gold", "Platinum"];
+
+/** Normalise an arbitrary set of tiers into canonical order, de-duplicated. */
+export function sortTiers(tiers: readonly VendorTier[]): VendorTier[] {
+  return TIER_ORDER.filter((t) => tiers.includes(t));
+}
+
+/** The tier band a single per-plate price falls into. */
+export function tierForPrice(price: number): VendorTier {
+  if (price >= 1500) return "Platinum";
+  if (price >= 1000) return "Gold";
+  return "Silver";
+}
+
 /** A vendor awaiting KYC review (compact form used by the dashboard panel). */
 export interface PendingVendorApproval {
   id: string;
@@ -53,7 +69,7 @@ export interface PendingVendorApproval {
   owner: string;
   city: string;
   speciality: string;
-  requestedTier: VendorTier;
+  requestedTiers: VendorTier[];
   submitted: string;
   status: VerificationStatus;
 }
@@ -110,7 +126,7 @@ export interface AdminVendor {
   email: string;
   city: string;
   state: string;
-  tier: VendorTier;
+  tiers: VendorTier[];
   status: VerificationStatus;
   suspended: boolean;
   cuisines: string[];

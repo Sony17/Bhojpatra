@@ -50,7 +50,7 @@ export default function AuthLayout({
       <div className="flex flex-1 flex-col px-5 py-8 sm:px-8 lg:py-12">
         {/* Logo + form centered together as one block, logo directly above the form */}
         <div className="flex flex-1 flex-col items-center justify-center">
-          <Link href="/" target="_blank" rel="noopener noreferrer" className="mb-10 inline-flex w-fit">
+          <Link href="/" className="mb-10 inline-flex w-fit">
             <Image
               src="/bhojpatra-logo.png"
               alt="Bhojpatra"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
@@ -141,9 +142,9 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               {navLinks.map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="hover:text-cream">
+                  <Link href={link.href} className="hover:text-cream">
                     {lang === "hi" ? link.labelHi : link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -152,11 +153,11 @@ export default function Footer() {
           <div>
             <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Company", "कंपनी")}</p>
             <ul className="space-y-2 text-sm">
-              <li><a href="/about" target="_blank" rel="noopener noreferrer" className="hover:text-cream">{t("About Us", "हमारे बारे में")}</a></li>
-              <li><a href="/careers" target="_blank" rel="noopener noreferrer" className="hover:text-cream">{t("Careers", "करियर")}</a></li>
-              <li><a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-cream">{t("Contact", "संपर्क")}</a></li>
-              <li><a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-cream">{t("Terms & Privacy", "नियम और गोपनीयता")}</a></li>
-              <li><a href="/refund" target="_blank" rel="noopener noreferrer" className="hover:text-cream">{t("Refund Policy", "रिफंड नीति")}</a></li>
+              <li><Link href="/about" className="hover:text-cream">{t("About Us", "हमारे बारे में")}</Link></li>
+              <li><Link href="/careers" className="hover:text-cream">{t("Careers", "करियर")}</Link></li>
+              <li><Link href="/contact" className="hover:text-cream">{t("Contact", "संपर्क")}</Link></li>
+              <li><Link href="/terms" className="hover:text-cream">{t("Terms & Privacy", "नियम और गोपनीयता")}</Link></li>
+              <li><Link href="/refund" className="hover:text-cream">{t("Refund Policy", "रिफंड नीति")}</Link></li>
             </ul>
           </div>
 

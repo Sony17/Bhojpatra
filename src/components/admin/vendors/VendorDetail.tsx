@@ -5,20 +5,22 @@ import Link from "next/link";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
+import TierBadges from "@/components/admin/shared/TierBadges";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
-import SelectFilter from "@/components/admin/shared/SelectFilter";
 import { money } from "@/components/admin/shared/money";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
 import { getBookingsByVendor } from "@/lib/admin/mockData";
-import type {
-  AdminVendor,
-  VendorDocument,
-  VendorTier,
-  VerificationStatus,
+import {
+  TIER_ORDER,
+  sortTiers,
+  type AdminVendor,
+  type VendorDocument,
+  type VendorTier,
+  type VerificationStatus,
 } from "@/lib/admin/types";
 
 const TABS: TabItem[] = [
@@ -26,12 +28,6 @@ const TABS: TabItem[] = [
   { id: "kyc", label: "KYC & Documents" },
   { id: "menu", label: "Menu" },
   { id: "bookings", label: "Bookings" },
-];
-
-const TIER_OPTIONS = [
-  { label: "Silver", value: "Silver" },
-  { label: "Gold", value: "Gold" },
-  { label: "Platinum", value: "Platinum" },
 ];
 
 type Dialog =
@@ -73,13 +69,26 @@ export default function VendorDetail({ vendor }: { vendor: AdminVendor | null })
 function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
   const [tab, setTab] = useState("overview");
   const [status, setStatus] = useState<VerificationStatus>(vendor.status);
-  const [tier, setTier] = useState<VendorTier>(vendor.tier);
+  const [tiers, setTiers] = useState<VendorTier[]>(sortTiers(vendor.tiers));
   const [suspended, setSuspended] = useState(vendor.suspended);
   const [docs, setDocs] = useState<VendorDocument[]>(vendor.documents);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const flash = (msg: string) => setToast(msg);
+
+  // A vendor can sit in several tiers at once — toggle bands on/off, but never
+  // leave them with none.
+  const toggleTier = (t: VendorTier) => {
+    setTiers((prev) => {
+      const next = prev.includes(t)
+        ? prev.filter((x) => x !== t)
+        : [...prev, t];
+      if (next.length === 0) return prev;
+      flash("Tiers updated");
+      return sortTiers(next);
+    });
+  };
 
   const verify = () => {
     setStatus("Verified");
@@ -171,7 +180,7 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
 
       {/* Status row */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <StatusBadge status={tier} />
+        <TierBadges tiers={tiers} />
         <StatusBadge status={status} />
         {suspended && <StatusBadge status="Suspended" />}
       </div>
@@ -179,7 +188,7 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === "overview" && (
-        <OverviewTab vendor={vendor} tier={tier} onTierChange={(t) => { setTier(t); flash("Tier updated"); }} />
+        <OverviewTab vendor={vendor} tiers={tiers} onToggleTier={toggleTier} />
       )}
       {tab === "kyc" && <KycTab docs={docs} onSetDoc={setDocStatus} />}
       {tab === "menu" && (
@@ -230,12 +239,12 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
 
 function OverviewTab({
   vendor,
-  tier,
-  onTierChange,
+  tiers,
+  onToggleTier,
 }: {
   vendor: AdminVendor;
-  tier: VendorTier;
-  onTierChange: (t: VendorTier) => void;
+  tiers: VendorTier[];
+  onToggleTier: (t: VendorTier) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -260,20 +269,34 @@ function OverviewTab({
           </dl>
         </WidgetCard>
 
-        <WidgetCard title="Tier">
+        <WidgetCard title="Tiers">
           <p className="text-sm text-ink-soft">
-            Assign this vendor&rsquo;s marketplace tier.
+            Assign every marketplace tier this vendor serves — a caterer can sit
+            in more than one band.
           </p>
           <div className="mt-3">
-            <StatusBadge status={tier} />
+            <TierBadges tiers={tiers} />
           </div>
-          <div className="mt-4">
-            <SelectFilter
-              label="Tier"
-              value={tier}
-              options={TIER_OPTIONS}
-              onChange={(v) => onTierChange(v as VendorTier)}
-            />
+          <div className="mt-4 space-y-2">
+            {TIER_ORDER.map((t) => {
+              const active = tiers.includes(t);
+              const last = active && tiers.length === 1;
+              return (
+                <label
+                  key={t}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-maroon"
+                    checked={active}
+                    disabled={last}
+                    onChange={() => onToggleTier(t)}
+                  />
+                  {t}
+                </label>
+              );
+            })}
           </div>
         </WidgetCard>
       </div>

@@ -43,7 +43,7 @@ export interface VendorApplicationRecord {
   state: string;
   cuisines: string[];
   speciality: string;
-  requestedTier: VendorTier;
+  requestedTiers: VendorTier[];
   gstNumber: string;
   fssaiNumber: string;
   documents: VendorApplicationDoc[];
@@ -100,7 +100,7 @@ export function toAdminApplication(
     owner: r.owner,
     city: r.city,
     speciality: r.speciality,
-    requestedTier: r.requestedTier,
+    requestedTiers: r.requestedTiers,
     submitted: r.submitted,
     status: r.status,
     email: r.email,

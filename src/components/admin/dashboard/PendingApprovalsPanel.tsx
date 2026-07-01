@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
-import StatusBadge from "@/components/admin/shared/StatusBadge";
+import TierBadges from "@/components/admin/shared/TierBadges";
 import type { PendingVendorApproval } from "@/lib/admin/types";
 
 /**
@@ -73,7 +73,7 @@ export default function PendingApprovalsPanel({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-ink">{v.business}</p>
-                  <StatusBadge status={v.requestedTier} />
+                  <TierBadges tiers={v.requestedTiers} />
                 </div>
                 <p className="mt-0.5 text-sm text-ink-soft">
                   {v.owner} · {v.speciality} · {v.city}

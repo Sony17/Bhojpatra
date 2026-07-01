@@ -77,8 +77,6 @@ export default function MobileTabBar() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
-                target="_blank"
-                rel="noopener noreferrer"
                 aria-current={active ? "page" : undefined}
                 className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
                   active ? "text-maroon" : "text-ink-soft hover:text-maroon"

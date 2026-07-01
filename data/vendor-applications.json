@@ -1,1 +1,56 @@
-[]
+[
+  {
+    "id": "VND-DCCA80",
+    "business": "PostEdit",
+    "owner": "O",
+    "email": "a@b.com",
+    "phone": "9876543210",
+    "city": "",
+    "state": "",
+    "cuisines": [
+      "X"
+    ],
+    "speciality": "X",
+    "requestedTiers": [
+      "Silver"
+    ],
+    "gstNumber": "",
+    "fssaiNumber": "",
+    "documents": [
+      {
+        "kind": "GST",
+        "number": "",
+        "status": "Pending"
+      },
+      {
+        "kind": "FSSAI",
+        "number": "",
+        "status": "Pending"
+      },
+      {
+        "kind": "ID",
+        "number": "Uploaded",
+        "status": "Pending"
+      },
+      {
+        "kind": "Business Proof",
+        "number": "Uploaded",
+        "status": "Pending"
+      }
+    ],
+    "packages": [
+      {
+        "name": "p",
+        "dishes": "d",
+        "price": "900"
+      }
+    ],
+    "minGuests": "",
+    "maxGuests": "",
+    "serviceCities": [],
+    "counters": [],
+    "status": "Pending",
+    "submitted": "2026-07-01",
+    "submittedAt": "2026-07-01T10:02:51.190Z"
+  }
+]

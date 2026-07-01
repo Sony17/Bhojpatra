@@ -445,7 +445,7 @@ function OverviewPanel({
           <h2 className="font-display text-lg font-semibold text-ink">
             {t("Your Referral Code", "आपका रेफ़रल कोड")}
           </h2>
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-maroon-soft px-4 py-3">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream px-4 py-3">
             <span className="font-display text-2xl font-bold tracking-wider text-maroon">
               {code || "—"}
             </span>
@@ -514,7 +514,7 @@ function SharePanel({ code, name }: { code: string; name?: string }) {
             {t("Referral code", "रेफ़रल कोड")}
           </label>
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <span className="font-display rounded-lg border border-maroon/30 bg-maroon-soft px-4 py-2 text-xl font-bold tracking-wider text-maroon">
+            <span className="font-display rounded-lg border border-maroon/30 bg-cream px-4 py-2 text-xl font-bold tracking-wider text-maroon">
               {code || "—"}
             </span>
             <button

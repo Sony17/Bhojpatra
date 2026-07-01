@@ -7,6 +7,7 @@ import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
 import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
+import TierBadges from "@/components/admin/shared/TierBadges";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { StarSolid, ChevronRight } from "@/components/admin/shared/icons";
@@ -102,7 +103,7 @@ export default function VendorList() {
         </span>
       ),
     },
-    { key: "tier", header: "Tier", cell: (v) => <StatusBadge status={v.tier} /> },
+    { key: "tier", header: "Tiers", cell: (v) => <TierBadges tiers={v.tiers} /> },
     {
       key: "status",
       header: "Status",

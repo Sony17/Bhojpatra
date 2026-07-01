@@ -72,8 +72,6 @@ export default function Packages() {
                 cta={
                   <Link
                     href={`/book?package=${tier.id}&step=menu`}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     onClick={() => setSelectedId(tier.id)}
                     className="btn-sheen mt-2 block w-full rounded-lg bg-maroon px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
                   >
