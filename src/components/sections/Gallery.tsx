@@ -128,13 +128,13 @@ export default function Gallery() {
           <span className="h-2 w-2 rounded-full bg-maroon shadow-[0_0_0_3px_rgba(185,32,37,0.18)]" />
           {lang === "hi" ? gallery.eyebrowHi : gallery.eyebrow}
         </p>
-        <h2 className="font-display text-5xl font-bold tracking-tight text-ink sm:text-6xl lg:text-7xl">
+        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           {lang === "hi" ? gallery.headingHi : gallery.heading}{" "}
-          <em className="not-italic text-maroon">
+          <em className="not-italic text-ink">
             {lang === "hi" ? gallery.headingEmHi : gallery.headingEm}
           </em>
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-sm text-ink-soft sm:text-base">
+        <p className="font-script mx-auto mt-4 max-w-xl text-xl text-ink-soft sm:text-2xl">
           {lang === "hi" ? gallery.subtitleHi : gallery.subtitle}
         </p>
       </Reveal>

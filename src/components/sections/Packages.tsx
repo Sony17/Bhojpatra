@@ -37,16 +37,11 @@ export default function Packages() {
   return (
     <section
       id="packages"
-      className="relative overflow-hidden bg-gradient-to-b from-surface-beige to-surface-beige-2 py-20 sm:py-24"
+      className="relative overflow-hidden py-20 sm:py-24"
     >
-      {/* Soft brand-warm glow on the beige band. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-10 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-maroon/[0.06] blur-[140px]" />
-      </div>
-
       <div className="relative w-full px-5 sm:px-8 lg:px-12">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl text-maroon sm:text-4xl">
+          <h2 className="font-display text-3xl text-maroon sm:text-4xl">
             {lang === "hi" ? homePackages.headingHi : homePackages.heading}
           </h2>
           <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">

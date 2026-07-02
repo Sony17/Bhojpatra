@@ -131,6 +131,9 @@ function VenueBooking({
   const [payMethod, setPayMethod] = useState<OrderPaymentMethod>("UPI");
   const [choice, setChoice] = useState<"advance" | "full">("advance");
   const [paidAmount, setPaidAmount] = useState(0);
+  // Transaction / reference ID captured when the online payment succeeds, so it
+  // travels onto the saved booking (admin console + customer's My Bookings).
+  const [paidRef, setPaidRef] = useState("");
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
@@ -256,6 +259,7 @@ function VenueBooking({
         return;
       }
       setPaidAmount(amount);
+      setPaidRef(txnRef);
     } catch {
       setPayError(
         t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
@@ -280,6 +284,7 @@ function VenueBooking({
       amount: total,
       paid,
       status: "Confirmed",
+      ...(paidRef ? { paymentRef: paidRef } : {}),
       receipt: buildReceipt(paid),
       invoice: buildInvoice(paid),
       // Credit the venue back to the Venue-Owner partner who listed it.
@@ -310,6 +315,7 @@ function VenueBooking({
           amount: total,
           paid,
           paymentMethod: payMethod,
+          paymentRef: paidRef || undefined,
           status: "Confirmed",
           referralCode: venue.ownerCode || undefined,
           referrerName: venue.ownerName || undefined,

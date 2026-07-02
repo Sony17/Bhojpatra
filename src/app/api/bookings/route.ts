@@ -23,6 +23,9 @@ export interface StoredOrder {
   amount: number;
   paid: number;
   paymentMethod: OrderPaymentMethod;
+  /** Transaction / reference ID of the online payment (UPI/QR), when money was
+   *  settled at booking time. Absent for COD / "connect". */
+  paymentRef?: string;
   /** Instalment schedule for the balance, when the guest chose an EMI plan. */
   emiPlan?: EmiPlan;
   status: BookingStatus;
@@ -70,6 +73,7 @@ export async function POST(request: Request) {
     amount,
     paid,
     paymentMethod,
+    paymentRef,
     emiPlan,
     status,
     referralCode,
@@ -107,6 +111,9 @@ export async function POST(request: Request) {
     amount: Math.round(amt),
     paid: Number.isFinite(paidAmt) && paidAmt > 0 ? Math.round(paidAmt) : 0,
     paymentMethod,
+    ...(typeof paymentRef === "string" && paymentRef.trim()
+      ? { paymentRef: paymentRef.trim() }
+      : {}),
     ...(isEmiPlan(emiPlan) ? { emiPlan } : {}),
     status: isBookingStatus(status) ? status : "Confirmed",
     createdAt: new Date().toISOString(),

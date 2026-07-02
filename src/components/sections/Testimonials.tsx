@@ -80,13 +80,13 @@ export default function Testimonials() {
   return (
     <section id="testimonials" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
       <Reveal className="mx-auto max-w-2xl text-center">
-        <p className="eyebrow text-[1.6875rem] font-semibold text-gold">
+        <p className="eyebrow mb-3 text-2xl font-semibold uppercase tracking-[0.2em] text-maroon sm:text-3xl">
           {lang === "hi" ? testimonials.eyebrowHi : testimonials.eyebrow}
         </p>
-        <h2 className="mt-3 text-3xl text-ink sm:text-4xl">
+        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           {lang === "hi" ? testimonials.headingHi : testimonials.heading}
         </h2>
-        <p className="font-script mt-4 text-xl text-ink-soft">
+        <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
           {lang === "hi" ? testimonials.subtitleHi : testimonials.subtitle}
         </p>
       </Reveal>

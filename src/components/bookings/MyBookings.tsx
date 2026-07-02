@@ -336,6 +336,11 @@ function BookingCard({
           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
             {t("Booking ID", "बुकिंग आईडी")}: {booking.id}
           </p>
+          {booking.paymentRef && (
+            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
+              {t("Transaction Ref", "ट्रांज़ैक्शन रेफ़")}: {booking.paymentRef}
+            </p>
+          )}
 
           <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm text-ink-soft sm:grid-cols-2">
             <p className="flex items-center gap-1.5">
@@ -603,6 +608,11 @@ function BookingDetailsModal({
             <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-ink-soft">
               {t("Booking ID", "बुकिंग आईडी")}: {booking.id}
             </p>
+            {booking.paymentRef && (
+              <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                {t("Transaction Ref", "ट्रांज़ैक्शन रेफ़")}: {booking.paymentRef}
+              </p>
+            )}
           </div>
           <button
             type="button"

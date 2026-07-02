@@ -84,6 +84,7 @@ export default function PackageScrollCard({
 }) {
   const { lang, t } = useLang();
   const popular = tier.popular === true;
+  const premium = tier.id === "platinum";
   const tierName = lang === "hi" ? tier.nameHi : tier.name;
   const pax = lang === "hi" ? tier.paxHi : tier.pax;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
@@ -115,9 +116,19 @@ export default function PackageScrollCard({
         </span>
       )}
 
+      {/* Premium ribbon — inverted (cream on maroon ring) so Platinum reads as
+          the top tier, distinct from Gold's solid "Popular" pill. */}
+      {premium && (
+        <span className="absolute -top-2 z-30 inline-flex items-center gap-1 rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
+          ★ {t("Premium", "प्रीमियम")}
+        </span>
+      )}
+
       {/* ── Patra scroll artwork with the menu written on its parchment ── */}
       <div
         className={`relative w-full transition duration-300 ${
+          premium ? "premium-shimmer" : ""
+        } ${
           selected
             ? "[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.45))]"
             : "[filter:drop-shadow(0_10px_22px_rgba(0,0,0,0.25))] group-hover:[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.32))]"
@@ -181,7 +192,7 @@ export default function PackageScrollCard({
                       e.stopPropagation();
                       toggleCourse(seg.index);
                     }}
-                    className="flex w-full items-start justify-between gap-2 py-1 text-left text-[11px] font-bold leading-tight text-ink"
+                    className="flex w-full items-start justify-between gap-2 py-1 text-left text-[11px] leading-tight text-ink"
                   >
                     <span className="flex items-start gap-2">
                       <RhombusMarker />

@@ -260,6 +260,9 @@ export default function BookingWizard() {
   // Amount the guest has settled up front via UPI/QR — the 10% advance, the
   // full total, or 0 if they book without paying.
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  // Transaction / reference ID of that online payment, so it travels onto the
+  // saved order (admin console) and the customer's booking (My Bookings).
+  const [paymentRef, setPaymentRef] = useState<string>("");
   // Who to reach out to — captured on the Confirm step so COD / "connect"
   // orders are actionable for our team in the admin console.
   const [customerName, setCustomerName] = useState<string>("");
@@ -744,7 +747,8 @@ export default function BookingWizard() {
     const balance = Math.max(0, Math.round(grandTotal) - paidAmount);
     const paymentLines =
       paidAmount > 0
-        ? `\nPaid${paidAmount >= Math.round(grandTotal) ? " (full)" : " (advance)"}: ${money(paidAmount)}\nBalance Due: ${money(balance)}`
+        ? `\nPaid${paidAmount >= Math.round(grandTotal) ? " (full)" : " (advance)"}: ${money(paidAmount)}\nBalance Due: ${money(balance)}` +
+          (paymentRef ? `\nTransaction Ref: ${paymentRef}` : "")
         : `\nAdvance to confirm (10%): ${money(advance)}`;
     const contactLines =
       (customerName.trim() ? `Name: ${customerName.trim()}\n` : "") +
@@ -839,6 +843,7 @@ export default function BookingWizard() {
       amount: Math.round(grandTotal),
       paid: paidAmount,
       status: "Confirmed",
+      ...(paymentRef ? { paymentRef } : {}),
       ...(referralCode.trim()
         ? {
             referralCode: referralCode.trim(),
@@ -870,6 +875,7 @@ export default function BookingWizard() {
           amount: Math.round(grandTotal),
           paid: paidAmount,
           paymentMethod: payMethod,
+          paymentRef: paymentRef || undefined,
           emiPlan: emiPlan ?? undefined,
           status: "Confirmed",
           referralCode: referralCode.trim() || undefined,
@@ -1021,7 +1027,10 @@ export default function BookingWizard() {
               grandTotal={grandTotal}
               bookingId={bookingId}
               paidAmount={paidAmount}
-              onPaid={setPaidAmount}
+              onPaid={(amount, ref) => {
+                setPaidAmount(amount);
+                setPaymentRef(ref);
+              }}
               customerName={customerName}
               setCustomerName={setCustomerName}
               customerPhone={customerPhone}
@@ -1863,7 +1872,7 @@ function PaymentBox({
   bookingId: string;
   grandTotal: number;
   paidAmount: number;
-  onPaid: (amount: number) => void;
+  onPaid: (amount: number, txnRef: string) => void;
   customerName: string;
   payMethod: OrderPaymentMethod;
   setPayMethod: (m: OrderPaymentMethod) => void;
@@ -1955,7 +1964,7 @@ function PaymentBox({
         );
         return;
       }
-      onPaid(amount);
+      onPaid(amount, txnRef);
     } catch {
       setError(
         t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
@@ -2336,7 +2345,7 @@ function StepConfirm({
   grandTotal: number;
   bookingId: string;
   paidAmount: number;
-  onPaid: (amount: number) => void;
+  onPaid: (amount: number, txnRef: string) => void;
   customerName: string;
   setCustomerName: (v: string) => void;
   customerPhone: string;

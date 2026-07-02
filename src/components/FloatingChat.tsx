@@ -154,7 +154,7 @@ export default function FloatingChat() {
     <div className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
       {/* ── Chat panel ──────────────────────────────────────────────── */}
       {open && (
-        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
+        <div className="animate-rise flex h-[19.6rem] max-h-[calc(100dvh-6rem)] w-[14rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[22.4rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[15.4rem]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
@@ -279,15 +279,15 @@ export default function FloatingChat() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
       >
         {!open && <span className="absolute inset-0 animate-ping rounded-full bg-maroon/40" />}
         {open ? (
-          <svg viewBox="0 0 24 24" className="relative h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+          <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" className="relative h-7 w-7" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="relative h-5 w-5 sm:h-7 sm:w-7" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.9-.9L3 21l1.9-5.6a8.5 8.5 0 0 1-.9-3.9 8.38 8.38 0 0 1 8.5-8.5 8.38 8.38 0 0 1 8.5 8.5Z" />
             <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
           </svg>

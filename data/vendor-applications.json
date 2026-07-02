@@ -52,5 +52,81 @@
     "status": "Pending",
     "submitted": "2026-07-01",
     "submittedAt": "2026-07-01T10:02:51.190Z"
+  },
+  {
+    "id": "VND-DFE315",
+    "business": "Open Idea",
+    "owner": "Open Idea",
+    "email": "vendor@gmail.com",
+    "phone": "7838832332",
+    "city": "Kolkata",
+    "state": "West Bengal",
+    "cuisines": [
+      "North Indian",
+      "South Indian",
+      "Chinese",
+      "Continental",
+      "Mughlai",
+      "Punjabi",
+      "Bengali"
+    ],
+    "speciality": "North Indian, South Indian",
+    "requestedTiers": [
+      "Silver"
+    ],
+    "gstNumber": "54234242424",
+    "fssaiNumber": "432434535345345",
+    "documents": [
+      {
+        "kind": "GST",
+        "number": "54234242424",
+        "status": "Pending",
+        "docId": "KYC-CFFB59D5"
+      },
+      {
+        "kind": "FSSAI",
+        "number": "432434535345345",
+        "status": "Pending",
+        "docId": "KYC-F5FDFFD4"
+      },
+      {
+        "kind": "ID",
+        "number": "Uploaded",
+        "status": "Pending",
+        "docId": "KYC-F70FFB5E"
+      },
+      {
+        "kind": "Business Proof",
+        "number": "Uploaded",
+        "status": "Pending",
+        "docId": "KYC-74BBC2DC"
+      }
+    ],
+    "packages": [
+      {
+        "name": "Silver Veg Package",
+        "dishes": "Paneer Tikka, Dal Makhani, Veg Biryani, Gulab Jamun",
+        "price": "799"
+      }
+    ],
+    "minGuests": "2",
+    "maxGuests": "5",
+    "serviceCities": [
+      "Lucknow",
+      "Delhi",
+      "Mumbai",
+      "Bengaluru",
+      "Kolkata",
+      "Hyderabad",
+      "Jaipur",
+      "Pune"
+    ],
+    "counters": [
+      "Pan Counter",
+      "Decoration"
+    ],
+    "status": "Pending",
+    "submitted": "2026-07-01",
+    "submittedAt": "2026-07-01T11:27:50.478Z"
   }
 ]

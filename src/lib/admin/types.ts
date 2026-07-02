@@ -190,6 +190,8 @@ export interface AdminBooking {
   amount: number;
   paid: number;
   status: BookingStatus;
+  /** Transaction / reference ID of the online payment (UPI/QR), when one was made. */
+  paymentRef?: string;
   /** Referral attribution — present when a partner referred the booking. */
   referralCode?: string;
   referrerName?: string;

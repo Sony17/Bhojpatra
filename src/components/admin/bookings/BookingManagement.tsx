@@ -40,6 +40,7 @@ function toAdminBooking(o: Record<string, unknown>): AdminBooking {
     amount: Number(o.amount) || 0,
     paid: Number(o.paid) || 0,
     status: (o.status as AdminBooking["status"]) ?? "Confirmed",
+    ...(typeof o.paymentRef === "string" ? { paymentRef: o.paymentRef } : {}),
     ...(typeof o.referralCode === "string" ? { referralCode: o.referralCode } : {}),
     ...(typeof o.referrerName === "string" ? { referrerName: o.referrerName } : {}),
     ...(typeof o.referrerType === "string" ? { referrerType: o.referrerType } : {}),
@@ -192,6 +193,11 @@ export default function BookingManagement() {
               <Field label="City"><p className="text-sm text-ink">{selected.city}</p></Field>
               <Field label="Amount"><p className="font-display text-sm font-semibold text-ink">{money(selected.amount)}</p></Field>
               <Field label="Balance Due"><p className="font-display text-sm font-semibold text-maroon">{money(selected.amount - selected.paid)}</p></Field>
+              {selected.paymentRef && (
+                <Field label="Transaction Ref">
+                  <p className="text-sm tracking-wide text-ink">{selected.paymentRef}</p>
+                </Field>
+              )}
               {selected.referralCode && (
                 <Field label="Referred By">
                   <p className="text-sm text-ink">

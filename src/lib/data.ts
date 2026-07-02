@@ -1320,6 +1320,9 @@ export interface Booking {
   amount: number;
   paid: number;
   status: BookingStatus;
+  /** Transaction / reference ID of the online payment (UPI/QR), when the guest
+   *  settled money at booking time. Absent for COD / "connect" (nothing paid). */
+  paymentRef?: string;
   /** Referral code this feast was booked with (when a partner referred it). */
   referralCode?: string;
   /** Display name of the referring partner, resolved at booking time. */
