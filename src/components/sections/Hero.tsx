@@ -104,11 +104,11 @@ export default function Hero() {
       {/* Content — left-aligned headline, lede, and booking bar. */}
       <div className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-5 pb-16 pt-32 sm:pt-36 lg:pb-20 lg:pt-44">
         <div className="max-w-xl">
-          <h1 className="font-display text-[2.75rem] font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl">
-            <span className="animate-rise block font-sans sm:whitespace-nowrap">
+          <h1 className="font-display text-3xl font-bold leading-[1.15] tracking-tight text-ink sm:text-4xl lg:text-5xl">
+            <span className="animate-rise block font-sans text-xl sm:text-2xl lg:text-3xl">
               {lang === "hi" ? hero.headlineTopHi : hero.headlineTop}
             </span>
-            <span className="animate-rise delay-1 font-display block pt-1 text-6xl font-normal text-maroon sm:text-7xl">
+            <span className="animate-rise delay-1 font-display block pt-1 text-3xl font-normal text-maroon sm:text-4xl lg:text-5xl">
               {lang === "hi" ? hero.headlineBottomHi : hero.headlineBottom}
             </span>
           </h1>

@@ -122,10 +122,10 @@ export interface HomeContent {
 
 export const DEFAULT_HOME_CONTENT: HomeContent = {
   hero: {
-    headlineTop: "Different Specialists.",
-    headlineTopHi: "अलग-अलग स्पेशलिस्ट।",
-    headlineBottom: "One Celebration.",
-    headlineBottomHi: "एक उत्सव।",
+    headlineTop: "Book Verified Caterers, Food Stalls & Famous Vendors.",
+    headlineTopHi: "वेरिफाइड कैटरर, फूड स्टॉल और मशहूर वेंडर बुक करें।",
+    headlineBottom: "One Bhojpatra Experience.",
+    headlineBottomHi: "एक भोजपत्र अनुभव।",
     lede: "Plan your perfect celebration with the best specialists from your city, state or across India.",
     ledeHi:
       "अपने शहर, राज्य या पूरे भारत के बेहतरीन स्पेशलिस्ट के साथ अपना परफेक्ट उत्सव प्लान करें।",
@@ -216,7 +216,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
 
 /* ── Store (localStorage + cross-tab/component sync) ──────────────────────── */
 
-const STORAGE_KEY = "bhojpatra.home-content.v1";
+const STORAGE_KEY = "bhojpatra.home-content.v2";
 const EVENT = "bhojpatra:home-content";
 
 /** Per-section shallow merge so newly-added fields keep a default value, while
