@@ -28,7 +28,7 @@ export default function ScrollWatermark() {
     <div
       aria-hidden
       className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center select-none transition-opacity duration-700 ease-out motion-reduce:transition-none"
-      style={{ opacity: scrolled ? 0.07 : 0 }}
+      style={{ opacity: scrolled ? 0.035 : 0 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

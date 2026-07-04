@@ -1,6 +1,7 @@
 "use client";
 
 import type { InvoiceData } from "@/lib/invoice";
+import BrandIcon from "@/components/BrandIcon";
 
 /**
  * On-screen, branded rendering of an invoice — the visual twin of the PDF in
@@ -25,9 +26,12 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
       <div className="bg-maroon px-6 py-5 sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="font-display text-2xl font-semibold leading-none text-cream">
-              bhojpatra
-            </p>
+            <div className="flex items-center gap-2">
+              <BrandIcon className="h-8 w-8 bg-cream" />
+              <p className="font-display text-2xl font-semibold leading-none text-cream">
+                bhojpatra
+              </p>
+            </div>
             <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-white/90">
               Premium Catering &amp; Feasts
             </p>

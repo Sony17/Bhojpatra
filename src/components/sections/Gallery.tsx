@@ -111,11 +111,6 @@ export default function Gallery() {
 
   return (
     <section className="relative overflow-hidden py-20 sm:py-24">
-      {/* Hairline divider that opens the section */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto h-px max-w-5xl bg-gradient-to-r from-transparent via-maroon/25 to-transparent"
-      />
       {/* Whisper-soft maroon bloom behind the cluster — barely there */}
       <div
         aria-hidden="true"

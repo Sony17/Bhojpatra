@@ -1,29 +1,31 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Image from "next/image";
 import { type PackageTier, type PackageFeature } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 
 /**
- * The "patra scroll" package card — the menu written on the scroll artwork.
+ * The "patra scroll" package card — the entire menu written on the clean scroll
+ * artwork (public/clean.png).
  *
  * Shared between the home page's Packages section and the booking wizard's
  * package step so both surfaces advertise a tier identically. The card renders
- * the tier's name, price, pax range, course list (collapsible) and footnote;
+ * the tier's name, price, pax range, the full course/item list and footnote;
  * the caller supplies the action area via `cta` (a home-page Link, or a
  * booking-step select button).
  */
 
-/** Aspect ratio of the patra scroll artwork (public/package1.png, 433×576). */
-const SCROLL_RATIO = "433 / 576";
+/** Aspect ratio of the patra scroll artwork (public/clean.png, 1149×1369). */
+const SCROLL_RATIO = "1149 / 1369";
 
 /**
- * Writable cream area of the scroll, as inset % of the artwork. The package
- * content is positioned inside this box; nudge these if text crowds the frame.
- * The horizontal insets keep the rhombus markers clear of the maroon border.
+ * Writable area of the scroll, as inset % of the artwork. The menu is
+ * positioned inside this box; nudge these if text crowds the frame. The
+ * horizontal insets keep text clear of the maroon border and the right-hand
+ * roll; the vertical insets clear the top lace band and bottom roll.
  */
-const PARCHMENT = "left-[13%] right-[21%] top-[17%] bottom-[15%]";
+const PARCHMENT = "left-[13%] right-[21%] top-[16%] bottom-[16%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
@@ -35,7 +37,7 @@ function RhombusMarker() {
   );
 }
 
-/** A flat item, or a collapsible course header holding the items beneath it. */
+/** A flat item, or a course header holding the items beneath it. */
 type CourseSegment =
   | { type: "item"; feature: PackageFeature; index: number }
   | {
@@ -89,16 +91,9 @@ export default function PackageScrollCard({
   const pax = lang === "hi" ? tier.paxHi : tier.pax;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
 
-  // Group the flat feature list into course segments. A `heading` item opens a
-  // collapsible course (e.g. "Main Course") holding the items that follow it.
+  // Group the flat feature list into course segments, then write the whole
+  // menu out — every course header and every item is shown (no collapsing).
   const segments = buildCourseSegments(tier.features);
-  const [openCourses, setOpenCourses] = useState<Set<number>>(() => new Set());
-  const toggleCourse = (idx: number) =>
-    setOpenCourses((prev) => {
-      const next = new Set(prev);
-      next.has(idx) ? next.delete(idx) : next.add(idx);
-      return next;
-    });
 
   return (
     <div
@@ -124,7 +119,7 @@ export default function PackageScrollCard({
         </span>
       )}
 
-      {/* ── Patra scroll artwork with the menu written on its parchment ── */}
+      {/* ── Patra scroll artwork with the entire menu written on it ── */}
       <div
         className={`relative w-full transition duration-300 ${
           premium ? "premium-shimmer" : ""
@@ -136,7 +131,7 @@ export default function PackageScrollCard({
         style={{ aspectRatio: SCROLL_RATIO }}
       >
         <Image
-          src="/package1.png"
+          src="/clean.png"
           alt=""
           fill
           sizes="(min-width:1024px) 360px, (min-width:640px) 45vw, 90vw"
@@ -160,7 +155,8 @@ export default function PackageScrollCard({
             </p>
           )}
 
-          {/* Menu list — scrolls within the parchment if it overflows. */}
+          {/* Entire menu — every course and item written out. Scrolls within
+              the parchment only if a very long tier overflows the frame. */}
           <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
             {segments.map((seg) => {
               if (seg.type === "item") {
@@ -177,61 +173,33 @@ export default function PackageScrollCard({
                 );
               }
 
-              const open = openCourses.has(seg.index);
               const headingLabel =
                 lang === "hi" ? seg.heading.labelHi : seg.heading.label;
               return (
                 <li
                   key={seg.index}
-                  className="border-b border-maroon/10 last:border-b-0"
+                  className="border-b border-maroon/10 py-1 last:border-b-0"
                 >
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCourse(seg.index);
-                    }}
-                    className="flex w-full items-start justify-between gap-2 py-1 text-left text-[11px] leading-tight text-ink"
-                  >
-                    <span className="flex items-start gap-2">
-                      <RhombusMarker />
-                      <span>{headingLabel}</span>
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className={`text-sm leading-none text-maroon transition-transform duration-300 ${
-                        open ? "rotate-90" : ""
-                      }`}
-                    >
-                      ›
-                    </span>
-                  </button>
-                  {/* Collapsible body — animates open via a 0fr→1fr grid row. */}
-                  <div
-                    className={`grid transition-all duration-300 ease-out ${
-                      open
-                        ? "grid-rows-[1fr] opacity-100"
-                        : "grid-rows-[0fr] opacity-0"
-                    }`}
-                  >
-                    <div className="overflow-hidden">
-                      <ul className="pb-1">
-                        {seg.items.map(({ feature, index }) => {
-                          const label =
-                            lang === "hi" ? feature.labelHi : feature.label;
-                          return (
-                            <li
-                              key={index}
-                              className="py-0.5 pl-5 text-left text-[11px] leading-tight text-ink-soft"
-                            >
-                              <span>{label}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
+                  {/* Course header */}
+                  <div className="flex items-start gap-2 text-left text-[11px] font-semibold leading-tight text-maroon">
+                    <RhombusMarker />
+                    <span>{headingLabel}</span>
                   </div>
+                  {/* Every item under this course, always shown. */}
+                  <ul className="mt-0.5">
+                    {seg.items.map(({ feature, index }) => {
+                      const label =
+                        lang === "hi" ? feature.labelHi : feature.label;
+                      return (
+                        <li
+                          key={index}
+                          className="py-0.5 pl-5 text-left text-[11px] leading-tight text-ink-soft"
+                        >
+                          <span>{label}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </li>
               );
             })}

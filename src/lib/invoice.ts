@@ -113,10 +113,20 @@ function toLatin1(s: string): string {
     .replace(/[^\x00-\xff]/g, "?");
 }
 
+/** A pre-rasterised RGB bitmap (each char of `data` is one 0–255 byte, packed
+ *  R,G,B per pixel) plus the source aspect ratio, ready to embed in the PDF. */
+interface LogoBitmap {
+  w: number;
+  h: number;
+  data: string;
+  ratio: number;
+}
+
 /* ── PDF builder ─────────────────────────────────────────────────────────── */
 class Pdf {
   private pages: string[] = [];
   private ops = "";
+  private images: { w: number; h: number; data: string }[] = [];
   y = PAGE_H;
 
   private rgb(c: RGB, stroke = false): string {
@@ -169,6 +179,15 @@ class Pdf {
     this.ops += `${this.rgb(color, true)} ${width} w ${x1} ${y1} m ${x2} ${y2} l S\n`;
   }
 
+  /** Draw a pre-rasterised RGB image; (x, y) is the bottom-left corner and
+   *  (w, h) the placement size in points. */
+  image(x: number, y: number, w: number, h: number, img: { w: number; h: number; data: string }) {
+    const idx = this.images.length;
+    this.images.push(img);
+    this.ops +=
+      `q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im${idx} Do Q\n`;
+  }
+
   /** Break to a fresh page if `space` points won't fit above the bottom margin. */
   ensure(space: number) {
     if (this.y - space < BOTTOM) this.newPage();
@@ -190,6 +209,14 @@ class Pdf {
     objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
     objects[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>";
 
+    // Image XObjects live after the (content, page) pairs.
+    const imgBase = 6 + this.pages.length * 2;
+    const xobj = this.images.length
+      ? "/XObject << " +
+        this.images.map((_, i) => `/Im${i} ${imgBase + i} 0 R`).join(" ") +
+        " >> "
+      : "";
+
     const pageNums: number[] = [];
     this.pages.forEach((stream, i) => {
       const contentNum = 6 + i * 2;
@@ -199,8 +226,16 @@ class Pdf {
         `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
       objects[pageNum - 1] =
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
-        "/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> " +
+        `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> ${xobj}>> ` +
         `/Contents ${contentNum} 0 R >>`;
+    });
+
+    this.images.forEach((im, i) => {
+      const num = imgBase + i;
+      objects[num - 1] =
+        `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${im.data.length} >>\n` +
+        `stream\n${im.data}\nendstream`;
     });
     objects[1] =
       `<< /Type /Pages /Kids [${pageNums
@@ -228,7 +263,10 @@ class Pdf {
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
-export function buildInvoicePdf(data: InvoiceData): Uint8Array<ArrayBuffer> {
+export function buildInvoicePdf(
+  data: InvoiceData,
+  logo?: LogoBitmap | null,
+): Uint8Array<ArrayBuffer> {
   const p = new Pdf();
 
   /* Masthead — full-bleed maroon band with an inset cream frame. */
@@ -236,7 +274,13 @@ export function buildInvoicePdf(data: InvoiceData): Uint8Array<ArrayBuffer> {
   p.rect(0, PAGE_H - HEAD, PAGE_W, HEAD, MAROON);
   p.rectS(14, PAGE_H - HEAD + 12, PAGE_W - 28, HEAD - 24, CREAM, 0.8);
 
-  p.text(MX, PAGE_H - 56, "bhojpatra", 30, F_BOLD, CREAM);
+  /* Brand mark: the cream logo when it could be rasterised, else the wordmark. */
+  if (logo) {
+    const h = 30;
+    p.image(MX, PAGE_H - 72, h * logo.ratio, h, logo);
+  } else {
+    p.text(MX, PAGE_H - 56, "bhojpatra", 30, F_BOLD, CREAM);
+  }
   p.text(MX + 2, PAGE_H - 74, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.2);
 
   p.textRight(RIGHT, PAGE_H - 50, "TAX INVOICE", 15, F_BOLD, WHITE);
@@ -443,10 +487,105 @@ export function invoiceShareUrl(data: InvoiceData): string {
   return `${origin}/bookings/invoice?d=${encodeInvoice(data)}`;
 }
 
+/** Resolve the actual font-family string behind the `.font-display` class
+ *  (Ananda Neptouch 2, loaded via next/font under a hashed name) so it can be
+ *  used in a `<canvas>` `font` string. */
+function displayFontFamily(): string {
+  const el = document.createElement("span");
+  el.className = "font-display";
+  el.style.cssText = "position:absolute;visibility:hidden";
+  document.body.appendChild(el);
+  const fam = getComputedStyle(el).fontFamily;
+  el.remove();
+  return fam || "serif";
+}
+
+/** Rasterise the brand mark — the pot/manuscript icon plus "bhojpatra" set in
+ *  Ananda Neptouch — as a cream (#F0D09E) composite over the masthead maroon
+ *  (#B92025), so it embeds as an opaque PDF image that blends into the band and
+ *  carries the real display typeface (which the PDF's core fonts can't).
+ *  Browser-only (needs a canvas); returns null otherwise, and the builder falls
+ *  back to the plain text wordmark. */
+async function loadMastheadLogo(): Promise<LogoBitmap | null> {
+  if (typeof document === "undefined") return null;
+  try {
+    const icon = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("icon load failed"));
+      im.src = "/bhojpatra-icon.png";
+    });
+
+    const S = 4; // supersample for crisp edges at ~30pt
+    const HPT = 30; // rendered height in points
+    const iconPx = 30 * S;
+    const gapPx = 8 * S;
+    const fontPx = 27 * S;
+    const heightPx = HPT * S;
+
+    const fam = displayFontFamily();
+    const fontSpec = `${fontPx}px ${fam}`;
+    if (document.fonts?.load) {
+      try {
+        await document.fonts.load(fontSpec, "bhojpatra");
+      } catch {
+        /* fall through to whatever face is ready */
+      }
+    }
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.font = fontSpec;
+    const textPx = Math.ceil(ctx.measureText("bhojpatra").width);
+
+    canvas.width = iconPx + gapPx + textPx;
+    canvas.height = heightPx;
+    // Re-sizing the canvas resets the context, so re-apply everything.
+    ctx.font = fontSpec;
+    ctx.fillStyle = "#B92025"; // maroon band
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Icon: composite cream over maroon by the PNG's own alpha (the BrandIcon
+    // mask treatment), vertically centred.
+    const io = document.createElement("canvas");
+    io.width = iconPx;
+    io.height = iconPx;
+    const ictx = io.getContext("2d");
+    if (ictx) {
+      ictx.drawImage(icon, 0, 0, iconPx, iconPx);
+      const px = ictx.getImageData(0, 0, iconPx, iconPx);
+      for (let i = 0; i < px.data.length; i += 4) {
+        const a = px.data[i + 3] / 255;
+        px.data[i] = Math.round(0xf0 * a + 0xb9 * (1 - a));
+        px.data[i + 1] = Math.round(0xd0 * a + 0x20 * (1 - a));
+        px.data[i + 2] = Math.round(0x9e * a + 0x25 * (1 - a));
+        px.data[i + 3] = 255;
+      }
+      ctx.putImageData(px, 0, Math.round((heightPx - iconPx) / 2));
+    }
+
+    // Wordmark: cream Ananda text, edges blend against the maroon fill.
+    ctx.fillStyle = "#F0D09E";
+    ctx.textBaseline = "middle";
+    ctx.fillText("bhojpatra", iconPx + gapPx, heightPx / 2 + S);
+
+    const all = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let bin = "";
+    for (let i = 0; i < all.length; i += 4) {
+      bin += String.fromCharCode(all[i], all[i + 1], all[i + 2]);
+    }
+    return { w: canvas.width, h: canvas.height, data: bin, ratio: canvas.width / canvas.height };
+  } catch {
+    return null;
+  }
+}
+
 /** Trigger a browser download of the invoice as a PDF. */
-export function downloadInvoice(data: InvoiceData): void {
+export async function downloadInvoice(data: InvoiceData): Promise<void> {
   if (typeof window === "undefined") return;
-  const blob = new Blob([buildInvoicePdf(data)], { type: "application/pdf" });
+  const logo = await loadMastheadLogo();
+  const blob = new Blob([buildInvoicePdf(data, logo)], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

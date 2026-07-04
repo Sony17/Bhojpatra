@@ -8,11 +8,6 @@ export default function ChooseOccasion() {
       id="occasions"
       className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
-      {/* Hairline divider that opens the section */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto h-px max-w-5xl bg-gradient-to-r from-transparent via-maroon/25 to-transparent"
-      />
       <Reveal variant="left" className="text-center">
         <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           Occasions

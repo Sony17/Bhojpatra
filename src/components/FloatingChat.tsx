@@ -109,7 +109,7 @@ export default function FloatingChat() {
     { from: "bot", text: GREETING_EN },
   ]);
   const [draft, setDraft] = useState("");
-  const [faqOpen, setFaqOpen] = useState(true);
+  const [faqOpen, setFaqOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -154,7 +154,7 @@ export default function FloatingChat() {
     <div className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
       {/* ── Chat panel ──────────────────────────────────────────────── */}
       {open && (
-        <div className="animate-rise flex h-[19.6rem] max-h-[calc(100dvh-6rem)] w-[14rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[22.4rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[15.4rem]">
+        <div className="animate-rise flex h-[24rem] max-h-[calc(100dvh-6rem)] w-[18rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[28rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[20rem]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
@@ -193,47 +193,48 @@ export default function FloatingChat() {
                 </p>
               </div>
             ))}
+          </div>
 
-            {/* Collapsible FAQ shortcuts */}
-            <div className="overflow-hidden rounded-xl border border-cream-3 bg-white">
-              <button
-                type="button"
-                onClick={() => setFaqOpen((v) => !v)}
-                aria-expanded={faqOpen}
-                className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-maroon"
+          {/* Pinned FAQ quick-replies — stacked above the input, WhatsApp-style.
+              Collapsed to a single pill; tapping expands the full list. */}
+          <div className="border-t border-cream-3 bg-white px-3 pt-2.5">
+            {faqOpen && (
+              <div className="animate-rise flex flex-col gap-1.5 pb-2 [animation-duration:0.25s]">
+                {FAQS.map((faq) => (
+                  <button
+                    key={faq.q}
+                    type="button"
+                    onClick={() => askFaq(faq)}
+                    className="rounded-full border border-cream-3 bg-surface-beige px-4 py-2 text-left text-sm text-ink transition-colors hover:border-maroon hover:bg-cream-2"
+                  >
+                    {lang === "hi" ? faq.qHi : faq.q}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setFaqOpen((v) => !v)}
+              aria-expanded={faqOpen}
+              className="flex w-full items-center justify-between rounded-full bg-cream-2 px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-maroon transition-colors hover:bg-cream-3"
+            >
+              {t("Frequently asked", "अक्सर पूछे जाने वाले")}
+              <svg
+                viewBox="0 0 24 24"
+                className={`h-4 w-4 transition-transform ${faqOpen ? "" : "rotate-180"}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                {t("Frequently asked", "अक्सर पूछे जाने वाले")}
-                <svg
-                  viewBox="0 0 24 24"
-                  className={`h-4 w-4 transition-transform ${faqOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {faqOpen && (
-                <div className="flex flex-col gap-1.5 px-2.5 pb-2.5">
-                  {FAQS.map((faq) => (
-                    <button
-                      key={faq.q}
-                      type="button"
-                      onClick={() => askFaq(faq)}
-                      className="rounded-lg border border-cream-3 bg-surface-beige px-3 py-2 text-left text-sm text-ink transition-colors hover:border-maroon hover:bg-cream-2"
-                    >
-                      {lang === "hi" ? faq.qHi : faq.q}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
           </div>
 
           {/* Input + WhatsApp handoff */}
-          <div className="border-t border-cream-3 bg-white px-3 pb-3 pt-2.5">
+          <div className="bg-white px-3 pb-3 pt-2.5">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -279,15 +280,15 @@ export default function FloatingChat() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12"
       >
         {!open && <span className="absolute inset-0 animate-ping rounded-full bg-maroon/40" />}
         {open ? (
-          <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+          <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" className="relative h-5 w-5 sm:h-7 sm:w-7" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="relative h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.9-.9L3 21l1.9-5.6a8.5 8.5 0 0 1-.9-3.9 8.38 8.38 0 0 1 8.5-8.5 8.38 8.38 0 0 1 8.5 8.5Z" />
             <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
           </svg>
