@@ -2,14 +2,14 @@
  * Vendor application storage.
  *
  * When a caterer completes the public registration wizard
- * (`VendorRegister`), their submission is appended to a JSON store on disk —
- * mirroring the file-based `leads` / `kyc` stores. The admin "Vendor Approvals"
- * console reads these back and flips their status (Pending → Verified /
- * Rejected). The uploaded KYC files themselves live in the separate `kyc` store
- * and are referenced here by id.
+ * (`VendorRegister`), their submission is persisted to Postgres (Neon), or to a
+ * JSON file locally — via the shared `createStore` helper. The admin "Vendor
+ * Approvals" console reads these back and flips their status (Pending →
+ * Verified / Rejected). The uploaded KYC files themselves live in the separate
+ * `kyc` store and are referenced here by id.
  */
-import { promises as fs } from "fs";
 import path from "path";
+import { createStore } from "@/lib/store";
 import type {
   VendorApplication,
   VendorDocKind,
@@ -59,34 +59,28 @@ export interface VendorApplicationRecord {
   reviewedAt?: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
 export const VENDOR_APPLICATIONS_STORE = path.join(
-  DATA_DIR,
+  process.cwd(),
+  "data",
   "vendor-applications.json",
 );
 
-export async function readVendorApplications(): Promise<
-  VendorApplicationRecord[]
-> {
-  try {
-    return JSON.parse(
-      await fs.readFile(VENDOR_APPLICATIONS_STORE, "utf8"),
-    ) as VendorApplicationRecord[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
+const store = createStore<VendorApplicationRecord>({
+  table: "vendor_applications",
+  file: VENDOR_APPLICATIONS_STORE,
+  idField: "id",
+});
+
+export function readVendorApplications(): Promise<VendorApplicationRecord[]> {
+  return store.list();
 }
 
-export async function writeVendorApplications(
+// Callers mutate the array in place then write it back; upsertMany replays
+// those adds/edits (these records are never deleted, so this stays faithful).
+export function writeVendorApplications(
   records: VendorApplicationRecord[],
 ): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(
-    VENDOR_APPLICATIONS_STORE,
-    JSON.stringify(records, null, 2),
-    "utf8",
-  );
+  return store.upsertMany(records);
 }
 
 /** Project a stored record onto the admin `VendorApplication` shape consumed by

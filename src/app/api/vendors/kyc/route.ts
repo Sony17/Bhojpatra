@@ -1,19 +1,17 @@
 import { randomUUID } from "crypto";
-import { promises as fs } from "fs";
-import path from "path";
 import {
   KYC_ALLOWED_TYPES,
-  KYC_FILES_DIR,
   KYC_MAX_BYTES,
   isKycDocKey,
   publicKycShape,
   readKycDocuments,
+  storeKycFile,
   writeKycDocuments,
   type KycDocument,
 } from "@/lib/kyc";
 
-// KYC files are uploaded at request time and written to a disk store — never
-// prerender or cache this handler.
+// KYC files are uploaded at request time to Vercel Blob (bytes) + Postgres
+// (metadata) — never prerender or cache this handler.
 export const dynamic = "force-dynamic";
 
 // List uploaded documents, newest first (for the admin KYC review console).
@@ -66,28 +64,28 @@ export async function POST(request: Request) {
   const id = `KYC-${randomUUID().slice(0, 8).toUpperCase()}`;
   const storedName = `${id}.${ext}`;
 
-  const record: KycDocument = {
-    id,
-    docKey,
-    business,
-    email,
-    originalName: file.name || `${docKey}.${ext}`,
-    storedName,
-    mimeType: file.type,
-    ext,
-    size: file.size,
-    status: "Pending",
-    uploadedAt: new Date().toISOString(),
-  };
-
+  let record: KycDocument;
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    await fs.mkdir(KYC_FILES_DIR, { recursive: true });
-    await fs.writeFile(path.join(KYC_FILES_DIR, storedName), bytes);
+    const blobUrl = await storeKycFile(storedName, bytes, file.type);
 
-    const docs = await readKycDocuments();
-    docs.push(record);
-    await writeKycDocuments(docs);
+    record = {
+      id,
+      docKey,
+      business,
+      email,
+      originalName: file.name || `${docKey}.${ext}`,
+      storedName,
+      ...(blobUrl ? { blobUrl } : {}),
+      mimeType: file.type,
+      ext,
+      size: file.size,
+      status: "Pending",
+      uploadedAt: new Date().toISOString(),
+    };
+
+    // upsertMany([record]) inserts just this one document.
+    await writeKycDocuments([record]);
   } catch (err) {
     console.error("Failed to store KYC document", err);
     return Response.json(

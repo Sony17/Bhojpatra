@@ -1,10 +1,10 @@
-import { promises as fs } from "fs";
 import path from "path";
 import type { PartnerRole } from "@/lib/session";
+import { createStore } from "@/lib/store";
 
-// Referral partners are written at signup and appended to a JSON store on disk
-// so the booking wizard can resolve a referral code to a name and the admin can
-// see who's referring — never prerender or cache this.
+// Referral partners are written at signup to Postgres (Neon) so the booking
+// wizard can resolve a referral code to a name and the admin can see who's
+// referring — never prerender or cache this.
 export const dynamic = "force-dynamic";
 
 export interface PartnerRecord {
@@ -20,16 +20,11 @@ export interface PartnerRecord {
   createdAt: string;
 }
 
-const STORE = path.join(process.cwd(), "data", "partners.json");
-
-async function readPartners(): Promise<PartnerRecord[]> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as PartnerRecord[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
-}
+const store = createStore<PartnerRecord>({
+  table: "partners",
+  file: path.join(process.cwd(), "data", "partners.json"),
+  idField: "code",
+});
 
 function isPartnerRole(v: unknown): v is PartnerRole {
   return v === "planner" || v === "individual" || v === "venue";
@@ -42,7 +37,7 @@ const str = (v: unknown): string | undefined =>
 // referred order), or list every partner (used by the admin).
 export async function GET(request: Request) {
   const code = new URL(request.url).searchParams.get("code");
-  const partners = await readPartners();
+  const partners = await store.list();
   if (code) {
     const partner = partners.find((p) => p.code === code) ?? null;
     return Response.json({ partner });
@@ -80,16 +75,12 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  const partners = await readPartners();
-
   // Idempotent on the referral code so a re-submit updates the existing record
   // rather than duplicating it.
-  const idx = partners.findIndex((p) => p.code === partner.code);
+  const existing = await store.get(partner.code);
+  const merged = existing ? { ...existing, ...partner } : partner;
   try {
-    if (idx >= 0) partners[idx] = { ...partners[idx], ...partner };
-    else partners.push(partner);
-    await fs.mkdir(path.dirname(STORE), { recursive: true });
-    await fs.writeFile(STORE, JSON.stringify(partners, null, 2), "utf8");
+    await store.upsert(merged);
   } catch (err) {
     console.error("Failed to persist partner", err);
     return Response.json(
@@ -98,5 +89,8 @@ export async function POST(request: Request) {
     );
   }
 
-  return Response.json({ ok: true, partner }, { status: idx >= 0 ? 200 : 201 });
+  return Response.json(
+    { ok: true, partner: merged },
+    { status: existing ? 200 : 201 },
+  );
 }

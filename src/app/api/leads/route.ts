@@ -1,8 +1,8 @@
-import { promises as fs } from "fs";
 import path from "path";
+import { createStore } from "@/lib/store";
 
-// Leads are captured at request time and appended to a JSON store on disk —
-// never prerender or cache this handler.
+// Leads are captured at request time to Postgres (Neon) — never prerender or
+// cache this handler.
 export const dynamic = "force-dynamic";
 
 export interface Lead {
@@ -12,7 +12,12 @@ export interface Lead {
   createdAt: string;
 }
 
-const STORE = path.join(process.cwd(), "data", "leads.json");
+// De-duplicated by email (the id-field); a repeat sign-up updates in place.
+const store = createStore<Lead>({
+  table: "leads",
+  file: path.join(process.cwd(), "data", "leads.json"),
+  idField: "email",
+});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Indian mobile: 10 digits starting 6–9, ignoring spaces/dashes and an
@@ -21,15 +26,6 @@ const PHONE_RE = /^[6-9]\d{9}$/;
 
 function normalizePhone(raw: string): string {
   return raw.replace(/[\s-]/g, "").replace(/^(\+91|0091|91|0)/, "");
-}
-
-async function readLeads(): Promise<Lead[]> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as Lead[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
 }
 
 export async function POST(request: Request) {
@@ -66,16 +62,12 @@ export async function POST(request: Request) {
   };
 
   try {
-    const leads = await readLeads();
-    // Skip duplicates so a repeat sign-up stays idempotent.
+    const leads = await store.list();
+    // Skip duplicates so a repeat sign-up stays idempotent (by email or phone).
     const exists = leads.some(
       (l) => l.email === lead.email || l.phone === lead.phone,
     );
-    if (!exists) {
-      leads.push(lead);
-      await fs.mkdir(path.dirname(STORE), { recursive: true });
-      await fs.writeFile(STORE, JSON.stringify(leads, null, 2), "utf8");
-    }
+    if (!exists) await store.upsert(lead);
   } catch (err) {
     console.error("Failed to persist lead", err);
     return Response.json(
@@ -90,7 +82,7 @@ export async function POST(request: Request) {
 // Admin → Lead Generation reads the captured leads here. Newest first so the
 // most recent promo sign-ups surface at the top of the table.
 export async function GET() {
-  const leads = await readLeads();
+  const leads = await store.list();
   leads.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return Response.json({ leads });
 }

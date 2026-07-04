@@ -1,23 +1,18 @@
-import { promises as fs } from "fs";
 import path from "path";
 import { DEFAULT_MERCHANT, isValidVpa, type UpiPayeeConfig } from "@/lib/upi";
+import { readSingleton, writeSingleton } from "@/lib/store";
 
 // Merchant UPI identity used by checkout. The admin sets this once and it is
-// persisted to disk; the booking wizard reads it (with DEFAULT_MERCHANT as a
-// fallback) to build the live UPI deep-link + QR.
+// persisted to Postgres (Neon); the booking wizard reads it (with
+// DEFAULT_MERCHANT as a fallback) to build the live UPI deep-link + QR.
 export const dynamic = "force-dynamic";
 
+const SETTINGS_KEY = "payment";
 const STORE = path.join(process.cwd(), "data", "payment-settings.json");
 
 async function readSettings(): Promise<UpiPayeeConfig> {
-  try {
-    const stored = JSON.parse(
-      await fs.readFile(STORE, "utf8"),
-    ) as Partial<UpiPayeeConfig>;
-    return { ...DEFAULT_MERCHANT, ...stored };
-  } catch {
-    return { ...DEFAULT_MERCHANT };
-  }
+  const stored = await readSingleton<UpiPayeeConfig>(SETTINGS_KEY, STORE);
+  return { ...DEFAULT_MERCHANT, ...(stored ?? {}) };
 }
 
 export async function GET() {
@@ -50,8 +45,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    await fs.mkdir(path.dirname(STORE), { recursive: true });
-    await fs.writeFile(STORE, JSON.stringify(settings, null, 2), "utf8");
+    await writeSingleton(SETTINGS_KEY, STORE, settings);
   } catch (err) {
     console.error("Failed to persist payment settings", err);
     return Response.json(

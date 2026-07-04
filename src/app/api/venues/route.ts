@@ -1,4 +1,3 @@
-import { promises as fs } from "fs";
 import path from "path";
 import {
   parseVenuePrice,
@@ -6,22 +5,18 @@ import {
   venueSlug,
   type VenueRecord,
 } from "@/lib/venues";
+import { createStore } from "@/lib/store";
 
-// Owner-registered venues are written at publish time and appended to a JSON
-// store on disk so the venue catalogue, the booking flow and the owner's
-// dashboard can read them — never prerender or cache this.
+// Owner-registered venues are written at publish time to Postgres (Neon) so the
+// venue catalogue, the booking flow and the owner's dashboard can read them —
+// never prerender or cache this.
 export const dynamic = "force-dynamic";
 
-const STORE = path.join(process.cwd(), "data", "venues.json");
-
-async function readVenues(): Promise<VenueRecord[]> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as VenueRecord[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
-}
+const store = createStore<VenueRecord>({
+  table: "venues",
+  file: path.join(process.cwd(), "data", "venues.json"),
+  idField: "id",
+});
 
 const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() ? v.trim() : undefined;
@@ -33,7 +28,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   const owner = url.searchParams.get("owner");
-  const venues = await readVenues();
+  const venues = await store.list();
 
   if (id) {
     const venue = venues.find((v) => v.id === id) ?? null;
@@ -86,7 +81,7 @@ export async function POST(request: Request) {
   const ratingRaw = Number(b.rating);
   const reviewsRaw = Number(b.reviews);
 
-  const venues = await readVenues();
+  const venues = await store.list();
 
   // Keep the caller's id when editing; otherwise mint a unique slug from the
   // name so two venues never collide.
@@ -124,14 +119,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    if (existing) {
-      const idx = venues.findIndex((v) => v.id === id);
-      venues[idx] = record;
-    } else {
-      venues.push(record);
-    }
-    await fs.mkdir(path.dirname(STORE), { recursive: true });
-    await fs.writeFile(STORE, JSON.stringify(venues, null, 2), "utf8");
+    await store.upsert(record);
   } catch (err) {
     console.error("Failed to persist venue", err);
     return Response.json(

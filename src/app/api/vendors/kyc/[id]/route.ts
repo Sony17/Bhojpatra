@@ -1,11 +1,10 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { KYC_FILES_DIR, readKycDocuments } from "@/lib/kyc";
+import { readKycDocuments, readKycFile } from "@/lib/kyc";
 
 export const dynamic = "force-dynamic";
 
-// Stream a stored KYC file back for review. Files live outside `public/`, so
-// this handler is the only way to read them — letting access be gated later.
+// Stream a stored KYC file back for review. Bytes live in Vercel Blob (or the
+// local disk fallback), never under `public/`, so this handler is the only way
+// to read them — letting access be gated later.
 export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -18,13 +17,8 @@ export async function GET(
     return Response.json({ error: "Document not found." }, { status: 404 });
   }
 
-  // Only ever read the recorded file name — `basename` defends against any
-  // path-traversal sneaking in through a tampered store.
-  const safeName = path.basename(doc.storedName);
-  let file: Buffer;
-  try {
-    file = await fs.readFile(path.join(KYC_FILES_DIR, safeName));
-  } catch {
+  const file = await readKycFile(doc);
+  if (!file) {
     return Response.json(
       { error: "File is no longer available." },
       { status: 404 },

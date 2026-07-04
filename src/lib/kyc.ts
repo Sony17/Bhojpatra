@@ -1,14 +1,17 @@
 /**
  * KYC document storage.
  *
- * Vendor KYC files (GST / FSSAI / ID / Business Proof) are written to a
- * runtime store on disk and their metadata appended to a JSON index — mirroring
- * the file-based `leads`/`payments` stores. Files live OUTSIDE `public/` and are
- * only ever served back through the `/api/vendors/kyc/[id]` handler so disk
- * paths never leak and access can be gated later.
+ * Vendor KYC files (GST / FSSAI / ID / Business Proof) split into two parts:
+ * the file BYTES go to Vercel Blob (or the local disk when the Blob token is
+ * absent), and the METADATA is stored in Postgres/Neon via the shared
+ * `createStore` helper. Files are only ever served back through the
+ * `/api/vendors/kyc/[id]` handler — the raw blob URL (random, unguessable) is
+ * kept on the record and never exposed, so access can be gated later.
  */
 import { promises as fs } from "fs";
 import path from "path";
+import { put } from "@vercel/blob";
+import { createStore } from "@/lib/store";
 
 /** The four documents collected during vendor registration (Step 2). */
 export type KycDocKey = "gst" | "fssai" | "ownerId" | "businessProof";
@@ -46,8 +49,11 @@ export interface KycDocument {
   business: string;
   email: string;
   originalName: string;
-  /** File name on disk (never exposed to clients). */
+  /** File name in the store (never exposed to clients). */
   storedName: string;
+  /** Vercel Blob URL for the bytes, when uploaded to Blob. Absent for files
+   *  written to the local disk fallback. Never exposed to clients. */
+  blobUrl?: string;
   mimeType: string;
   ext: string;
   size: number;
@@ -59,18 +65,68 @@ const DATA_DIR = path.join(process.cwd(), "data");
 export const KYC_STORE = path.join(DATA_DIR, "kyc-documents.json");
 export const KYC_FILES_DIR = path.join(DATA_DIR, "kyc");
 
-export async function readKycDocuments(): Promise<KycDocument[]> {
-  try {
-    return JSON.parse(await fs.readFile(KYC_STORE, "utf8")) as KycDocument[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
+const store = createStore<KycDocument>({
+  table: "kyc_documents",
+  file: KYC_STORE,
+  idField: "id",
+});
+
+export function readKycDocuments(): Promise<KycDocument[]> {
+  return store.list();
 }
 
-export async function writeKycDocuments(docs: KycDocument[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(KYC_STORE, JSON.stringify(docs, null, 2), "utf8");
+// Callers mutate the array in place (add on upload, flip status on review) then
+// write it back; upsertMany replays those changes. KYC records are never
+// deleted, so this stays faithful to the old whole-array rewrite.
+export function writeKycDocuments(docs: KycDocument[]): Promise<void> {
+  return store.upsertMany(docs);
+}
+
+/**
+ * Persist the uploaded file bytes. Uses Vercel Blob when its token is
+ * configured (production), otherwise the local disk fallback. Returns the Blob
+ * URL to record (or `undefined` for the disk fallback).
+ */
+export async function storeKycFile(
+  storedName: string,
+  bytes: Buffer,
+  contentType: string,
+): Promise<string | undefined> {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    // Random suffix → the URL is unguessable; we never expose it (served via
+    // the /api/vendors/kyc/[id] handler), so the bytes stay effectively private.
+    const { url } = await put(`kyc/${storedName}`, bytes, {
+      access: "public",
+      contentType,
+      addRandomSuffix: true,
+    });
+    return url;
+  }
+  await fs.mkdir(KYC_FILES_DIR, { recursive: true });
+  await fs.writeFile(path.join(KYC_FILES_DIR, storedName), bytes);
+  return undefined;
+}
+
+/**
+ * Read a stored KYC file back for the review handler. Fetches from Blob when
+ * the record carries a `blobUrl`, otherwise reads the local disk fallback.
+ * Returns the raw bytes, or `null` if the file is gone.
+ */
+export async function readKycFile(
+  doc: KycDocument,
+): Promise<ArrayBuffer | Buffer | null> {
+  if (doc.blobUrl) {
+    const res = await fetch(doc.blobUrl);
+    if (!res.ok) return null;
+    return res.arrayBuffer();
+  }
+  try {
+    // Only ever read the recorded file name — `basename` defends against any
+    // path-traversal sneaking in through a tampered store.
+    return await fs.readFile(path.join(KYC_FILES_DIR, path.basename(doc.storedName)));
+  } catch {
+    return null;
+  }
 }
 
 export function isKycDocKey(value: unknown): value is KycDocKey {

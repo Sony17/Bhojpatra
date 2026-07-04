@@ -1,4 +1,3 @@
-import { promises as fs } from "fs";
 import path from "path";
 import {
   isOrderPaymentMethod,
@@ -6,9 +5,10 @@ import {
 } from "@/lib/orderPayment";
 import type { BookingStatus } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
+import { createStore } from "@/lib/store";
 
-// Orders are written at confirm time and appended to a JSON store on disk so
-// they show up in the admin booking console — never prerender or cache this.
+// Orders are written at confirm time to Postgres (Neon) so they show up in the
+// admin booking console — never prerender or cache this.
 export const dynamic = "force-dynamic";
 
 export interface StoredOrder {
@@ -36,20 +36,15 @@ export interface StoredOrder {
   referrerType?: string;
 }
 
-const STORE = path.join(process.cwd(), "data", "bookings.json");
-
-async function readOrders(): Promise<StoredOrder[]> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as StoredOrder[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
-}
+const store = createStore<StoredOrder>({
+  table: "bookings",
+  file: path.join(process.cwd(), "data", "bookings.json"),
+  idField: "id",
+});
 
 // List recorded orders, newest first (used by the admin booking console).
 export async function GET() {
-  const orders = await readOrders();
+  const orders = await store.list();
   return Response.json({ orders: orders.slice().reverse() });
 }
 
@@ -130,16 +125,12 @@ export async function POST(request: Request) {
       : {}),
   };
 
-  const orders = await readOrders();
-
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a
   // network blip) updates the existing record rather than duplicating it.
-  const idx = orders.findIndex((o) => o.id === order.id);
+  const existing = await store.get(order.id);
+  const merged = existing ? { ...existing, ...order } : order;
   try {
-    if (idx >= 0) orders[idx] = { ...orders[idx], ...order };
-    else orders.push(order);
-    await fs.mkdir(path.dirname(STORE), { recursive: true });
-    await fs.writeFile(STORE, JSON.stringify(orders, null, 2), "utf8");
+    await store.upsert(merged);
   } catch (err) {
     console.error("Failed to persist order", err);
     return Response.json(
@@ -148,7 +139,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return Response.json({ ok: true, order }, { status: idx >= 0 ? 200 : 201 });
+  return Response.json({ ok: true, order: merged }, { status: existing ? 200 : 201 });
 }
 
 function isBookingStatus(v: unknown): v is BookingStatus {

@@ -1,9 +1,9 @@
-import { promises as fs } from "fs";
 import path from "path";
 import { isValidVpa } from "@/lib/upi";
+import { createStore } from "@/lib/store";
 
-// Payments are recorded at request time and appended to a JSON store on disk —
-// never prerender or cache this handler.
+// Payments are recorded at request time to Postgres (Neon) — never prerender or
+// cache this handler.
 export const dynamic = "force-dynamic";
 
 export type StoredPaymentMethod = "UPI" | "QR";
@@ -22,20 +22,15 @@ export interface StoredPayment {
   createdAt: string;
 }
 
-const STORE = path.join(process.cwd(), "data", "payments.json");
-
-async function readPayments(): Promise<StoredPayment[]> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as StoredPayment[];
-  } catch {
-    // No store yet (or unreadable) — start fresh.
-    return [];
-  }
-}
+const store = createStore<StoredPayment>({
+  table: "payments",
+  file: path.join(process.cwd(), "data", "payments.json"),
+  idField: "id",
+});
 
 // List recorded payments, newest first (used by the admin payment tracker).
 export async function GET() {
-  const payments = await readPayments();
+  const payments = await store.list();
   return Response.json({ payments: payments.slice().reverse() });
 }
 
@@ -67,7 +62,7 @@ export async function POST(request: Request) {
   const ref =
     typeof txnRef === "string" && txnRef ? txnRef : `${bookingId}-ADVANCE`;
 
-  const payments = await readPayments();
+  const payments = await store.list();
 
   // Idempotent on the transaction reference so a repeat confirmation (e.g. the
   // customer double-taps "I've paid") doesn't create a duplicate record.
@@ -93,9 +88,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    payments.push(payment);
-    await fs.mkdir(path.dirname(STORE), { recursive: true });
-    await fs.writeFile(STORE, JSON.stringify(payments, null, 2), "utf8");
+    await store.upsert(payment);
   } catch (err) {
     console.error("Failed to persist payment", err);
     return Response.json(
