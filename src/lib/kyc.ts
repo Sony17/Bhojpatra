@@ -2,15 +2,15 @@
  * KYC document storage.
  *
  * Vendor KYC files (GST / FSSAI / ID / Business Proof) split into two parts:
- * the file BYTES go to Vercel Blob (or the local disk when the Blob token is
- * absent), and the METADATA is stored in Postgres/Neon via the shared
- * `createStore` helper. Files are only ever served back through the
- * `/api/vendors/kyc/[id]` handler — the raw blob URL (random, unguessable) is
- * kept on the record and never exposed, so access can be gated later.
+ * the file BYTES go to a PRIVATE Vercel Blob store (or the local disk when the
+ * Blob token is absent), and the METADATA is stored in Postgres/Neon via the
+ * shared `createStore` helper. Because the store is private, the bytes are only
+ * readable with the store's token — they're served back through the
+ * `/api/vendors/kyc/[id]` handler, so access can be gated later.
  */
 import { promises as fs } from "fs";
 import path from "path";
-import { put } from "@vercel/blob";
+import { put, get } from "@vercel/blob";
 import { createStore } from "@/lib/store";
 
 /** The four documents collected during vendor registration (Step 2). */
@@ -83,9 +83,9 @@ export function writeKycDocuments(docs: KycDocument[]): Promise<void> {
 }
 
 /**
- * Persist the uploaded file bytes. Uses Vercel Blob when its token is
- * configured (production), otherwise the local disk fallback. Returns the Blob
- * URL to record (or `undefined` for the disk fallback).
+ * Persist the uploaded file bytes. Uses the private Vercel Blob store when its
+ * token is configured (production), otherwise the local disk fallback. Returns
+ * the Blob URL to record (or `undefined` for the disk fallback).
  */
 export async function storeKycFile(
   storedName: string,
@@ -93,10 +93,10 @@ export async function storeKycFile(
   contentType: string,
 ): Promise<string | undefined> {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    // Random suffix → the URL is unguessable; we never expose it (served via
-    // the /api/vendors/kyc/[id] handler), so the bytes stay effectively private.
+    // Private store — the bytes can only be read back with the store token
+    // (via readKycFile), never over a public URL.
     const { url } = await put(`kyc/${storedName}`, bytes, {
-      access: "public",
+      access: "private",
       contentType,
       addRandomSuffix: true,
     });
@@ -108,17 +108,17 @@ export async function storeKycFile(
 }
 
 /**
- * Read a stored KYC file back for the review handler. Fetches from Blob when
- * the record carries a `blobUrl`, otherwise reads the local disk fallback.
- * Returns the raw bytes, or `null` if the file is gone.
+ * Read a stored KYC file back for the review handler. Reads from the private
+ * Blob store (with the store token) when the record carries a `blobUrl`,
+ * otherwise from the local disk fallback. Returns a streamable body, or `null`
+ * if the file is gone.
  */
 export async function readKycFile(
   doc: KycDocument,
-): Promise<ArrayBuffer | Buffer | null> {
+): Promise<BodyInit | null> {
   if (doc.blobUrl) {
-    const res = await fetch(doc.blobUrl);
-    if (!res.ok) return null;
-    return res.arrayBuffer();
+    const result = await get(doc.blobUrl, { access: "private" });
+    return result ? result.stream : null;
   }
   try {
     // Only ever read the recorded file name — `basename` defends against any

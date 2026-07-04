@@ -70,8 +70,9 @@ vercel env pull  # writes .env.local with DATABASE_URL + BLOB_READ_WRITE_TOKEN
 
 ## Notes
 
-- **KYC privacy:** files upload to Blob with a random, unguessable URL that is
-  never exposed to clients — they're only served back through
-  `/api/vendors/kyc/[id]`, so access can be gated with real auth later.
+- **KYC privacy:** the Blob store is **private** — file bytes can only be read
+  back with the store token (server-side), never over a public URL. They're
+  served through `/api/vendors/kyc/[id]`, so access can be gated with real auth
+  later.
 - **Migration only touched storage.** Every API route's request/response shape
   is unchanged, so the frontend is untouched.
