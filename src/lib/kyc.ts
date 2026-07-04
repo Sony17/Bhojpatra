@@ -13,6 +13,14 @@ import path from "path";
 import { put, get } from "@vercel/blob";
 import { createStore } from "@/lib/store";
 
+// Extract the Blob read/write token from the env value, tolerating a value
+// pasted with surrounding junk (a leading `BLOB_READ_WRITE_TOKEN=`, a comment,
+// or extra lines) — same robustness as DATABASE_URL in store.ts. A token has no
+// whitespace, so this pulls out exactly the `vercel_blob_rw_…` part.
+const BLOB_TOKEN =
+  (process.env.BLOB_READ_WRITE_TOKEN ?? "").match(/vercel_blob_rw_\S+/)?.[0] ??
+  undefined;
+
 /** The four documents collected during vendor registration (Step 2). */
 export type KycDocKey = "gst" | "fssai" | "ownerId" | "businessProof";
 
@@ -92,13 +100,14 @@ export async function storeKycFile(
   bytes: Buffer,
   contentType: string,
 ): Promise<string | undefined> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (BLOB_TOKEN) {
     // Private store — the bytes can only be read back with the store token
     // (via readKycFile), never over a public URL.
     const { url } = await put(`kyc/${storedName}`, bytes, {
       access: "private",
       contentType,
       addRandomSuffix: true,
+      token: BLOB_TOKEN,
     });
     return url;
   }
@@ -117,7 +126,10 @@ export async function readKycFile(
   doc: KycDocument,
 ): Promise<BodyInit | null> {
   if (doc.blobUrl) {
-    const result = await get(doc.blobUrl, { access: "private" });
+    const result = await get(doc.blobUrl, {
+      access: "private",
+      token: BLOB_TOKEN,
+    });
     return result ? result.stream : null;
   }
   try {

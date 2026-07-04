@@ -19,14 +19,17 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { promises as fs } from "fs";
 import path from "path";
 
-// Trim stray whitespace/newlines — these easily sneak in when the value is
-// pasted into a dashboard env-var field, and would otherwise make neon() reject
-// an otherwise-valid connection string.
-const DATABASE_URL = process.env.DATABASE_URL?.trim() || undefined;
+// Extract the Postgres connection string from the env value. We don't just
+// trim/validate it because the value is often pasted into a dashboard field
+// with surrounding junk — a leading `DATABASE_URL=`, a comment line, or even
+// the whole multi-line .env block. A connection string contains no whitespace,
+// so this pulls out exactly the first `postgres(ql)://…` token and ignores the
+// rest; a value with none degrades to the file fallback instead of throwing.
+const DATABASE_URL =
+  (process.env.DATABASE_URL ?? "").match(/postgres(?:ql)?:\/\/\S+/i)?.[0] ??
+  undefined;
 
-// Only treat it as configured if it actually looks like a Postgres URL, so a
-// malformed value degrades to the file fallback instead of throwing.
-const DB_CONFIGURED = !!DATABASE_URL && /^postgres(ql)?:\/\//i.test(DATABASE_URL);
+const DB_CONFIGURED = !!DATABASE_URL;
 
 /** True when a usable Postgres connection string is configured (Vercel + Neon).
  *  Falsy locally, or when the URL is missing/malformed → the file fallback
