@@ -15,17 +15,37 @@
  * file stores were append-ordered arrays); callers reverse/sort as they did
  * before.
  */
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { promises as fs } from "fs";
 import path from "path";
 
-const DATABASE_URL = process.env.DATABASE_URL;
+// Trim stray whitespace/newlines — these easily sneak in when the value is
+// pasted into a dashboard env-var field, and would otherwise make neon() reject
+// an otherwise-valid connection string.
+const DATABASE_URL = process.env.DATABASE_URL?.trim() || undefined;
 
-/** True when a Postgres connection string is configured (Vercel + Neon). Falsy
- *  locally → the file fallback below keeps dev working. */
-export const hasDatabase = Boolean(DATABASE_URL);
+// Only treat it as configured if it actually looks like a Postgres URL, so a
+// malformed value degrades to the file fallback instead of throwing.
+const DB_CONFIGURED = !!DATABASE_URL && /^postgres(ql)?:\/\//i.test(DATABASE_URL);
 
-const sql = DATABASE_URL ? neon(DATABASE_URL) : null;
+/** True when a usable Postgres connection string is configured (Vercel + Neon).
+ *  Falsy locally, or when the URL is missing/malformed → the file fallback
+ *  keeps things working. */
+export const hasDatabase = DB_CONFIGURED;
+
+// Lazily create the Neon client on first use. Creating it at module load would
+// crash the entire build (Next.js evaluates route modules to collect page data)
+// if the URL were ever malformed; lazy init keeps importing this module free of
+// side effects and confines any connection error to an actual query.
+let sqlInitialized = false;
+let sqlClient: NeonQueryFunction<false, false> | null = null;
+function getSql(): NeonQueryFunction<false, false> | null {
+  if (!sqlInitialized) {
+    sqlInitialized = true;
+    sqlClient = DB_CONFIGURED ? neon(DATABASE_URL!) : null;
+  }
+  return sqlClient;
+}
 
 // The tables we own. Store table names are interpolated into SQL (they can't be
 // bound as parameters), so this whitelist is what keeps that interpolation safe
@@ -78,7 +98,7 @@ export function createStore<T>(opts: {
   }
 
   async function dbUpsert(record: T): Promise<void> {
-    await sql!.query(
+    await getSql()!.query(
       `insert into ${table} (id, data) values ($1, $2::jsonb)
        on conflict (id) do update set data = excluded.data, updated_at = now()`,
       [keyOf(record), JSON.stringify(record)],
@@ -87,12 +107,14 @@ export function createStore<T>(opts: {
 
   return {
     async list() {
+      const sql = getSql();
       if (!sql) return fileRead();
       const rows = await sql.query(`select data from ${table} order by seq asc`);
       return rows.map((r) => (r as { data: T }).data);
     },
 
     async get(id) {
+      const sql = getSql();
       if (!sql) return (await fileRead()).find((r) => keyOf(r) === id) ?? null;
       const rows = await sql.query(
         `select data from ${table} where id = $1`,
@@ -102,7 +124,7 @@ export function createStore<T>(opts: {
     },
 
     async upsert(record) {
-      if (!sql) {
+      if (!getSql()) {
         const rows = await fileRead();
         const idx = rows.findIndex((r) => keyOf(r) === keyOf(record));
         if (idx >= 0) rows[idx] = record;
@@ -114,7 +136,7 @@ export function createStore<T>(opts: {
 
     async upsertMany(records) {
       if (!records.length) return;
-      if (!sql) {
+      if (!getSql()) {
         const rows = await fileRead();
         for (const rec of records) {
           const idx = rows.findIndex((r) => keyOf(r) === keyOf(rec));
@@ -136,6 +158,7 @@ export async function readSingleton<T>(
   key: string,
   file: string,
 ): Promise<Partial<T> | null> {
+  const sql = getSql();
   if (!sql) {
     try {
       return JSON.parse(await fs.readFile(file, "utf8")) as Partial<T>;
@@ -154,6 +177,7 @@ export async function writeSingleton<T>(
   file: string,
   value: T,
 ): Promise<void> {
+  const sql = getSql();
   if (!sql) {
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, JSON.stringify(value, null, 2), "utf8");
