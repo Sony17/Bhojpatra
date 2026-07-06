@@ -104,17 +104,18 @@ export default function PackageScrollCard({
         popular ? "z-10" : selected ? "z-20" : "z-0",
       ].join(" ")}
     >
-      {/* Popular ribbon floating above the scroll's top roll. */}
+      {/* Popular ribbon — golden (brand cream) so the Gold tier reads gold,
+          set off from the parchment by a thin maroon ring. */}
       {popular && (
-        <span className="absolute -top-2 z-30 rounded-full bg-maroon px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-cream shadow-sm">
+        <span className="absolute -top-2 z-30 rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
           {t("Popular Choice", "लोकप्रिय विकल्प")}
         </span>
       )}
 
-      {/* Premium ribbon — inverted (cream on maroon ring) so Platinum reads as
-          the top tier, distinct from Gold's solid "Popular" pill. */}
+      {/* Premium ribbon — solid maroon with a star so Platinum reads as the top
+          tier, distinct from Gold's golden "Popular" pill. */}
       {premium && (
-        <span className="absolute -top-2 z-30 inline-flex items-center gap-1 rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
+        <span className="absolute -top-2 z-30 inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-cream shadow-sm">
           ★ {t("Premium", "प्रीमियम")}
         </span>
       )}

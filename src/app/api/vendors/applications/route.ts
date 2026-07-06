@@ -14,6 +14,8 @@ import {
   type VendorDocKind,
   type VendorTier,
 } from "@/lib/admin/types";
+import { parseListQuery } from "@/lib/validate";
+import { sendVendorApplicationAlert } from "@/lib/email";
 
 // Applications are submitted at request time and appended to a JSON store on
 // disk — never prerender or cache this handler.
@@ -164,12 +166,39 @@ export async function POST(request: Request) {
     );
   }
 
+  // Every submission is a new application — alert the owners (best-effort).
+  await sendVendorApplicationAlert(record);
+
   return Response.json({ ok: true, id: record.id }, { status: 201 });
 }
 
 // Admin → Vendor Approvals reads the submitted applications here, newest first.
-export async function GET() {
+// Backward-compatible `{ applications }`; adds a `Paginated` envelope (over
+// `data`) when a filter/pagination param is present.
+export async function GET(request: Request) {
   const records = await readVendorApplications();
   records.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  return Response.json({ applications: records.map(toAdminApplication) });
+  const applications = records.map(toAdminApplication);
+
+  const { q, status, page, pageSize, hasQuery } = parseListQuery(request.url);
+  if (!hasQuery) return Response.json({ applications });
+
+  const needle = q.trim().toLowerCase();
+  const filtered = applications.filter((a) => {
+    const matchesQ =
+      !needle ||
+      a.id.toLowerCase().includes(needle) ||
+      a.business.toLowerCase().includes(needle) ||
+      a.owner.toLowerCase().includes(needle);
+    const matchesStatus = status === "All" || a.status === status;
+    return matchesQ && matchesStatus;
+  });
+  const start = (page - 1) * pageSize;
+  return Response.json({
+    applications,
+    data: filtered.slice(start, start + pageSize),
+    page,
+    pageSize,
+    total: filtered.length,
+  });
 }

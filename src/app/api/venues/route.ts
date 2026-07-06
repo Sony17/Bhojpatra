@@ -6,6 +6,7 @@ import {
   type VenueRecord,
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
+import { sendVenueAlert } from "@/lib/email";
 
 // Owner-registered venues are written at publish time to Postgres (Neon) so the
 // venue catalogue, the booking flow and the owner's dashboard can read them —
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   const owner = url.searchParams.get("owner");
-  const venues = await store.list();
+  const venues = (await store.list()).filter((v) => !v.deleted);
 
   if (id) {
     const venue = venues.find((v) => v.id === id) ?? null;
@@ -127,6 +128,9 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  // Alert the owners when a venue is first published (skip subsequent edits).
+  if (!existing) await sendVenueAlert(record);
 
   return Response.json({ ok: true, venue: record }, { status: existing ? 200 : 201 });
 }

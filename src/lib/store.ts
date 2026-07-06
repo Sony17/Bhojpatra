@@ -61,6 +61,13 @@ const TABLES = [
   "venues",
   "vendor_applications",
   "kyc_documents",
+  "customers",
+  "coupons",
+  "content_items",
+  "enquiries",
+  "reviews",
+  "users",
+  "sessions",
 ] as const;
 type Table = (typeof TABLES)[number];
 
@@ -75,6 +82,10 @@ export interface RecordStore<T> {
    *  an in-memory mutation. Faithful because these stores only add/mutate,
    *  never delete. */
   upsertMany(records: T[]): Promise<void>;
+  /** Hard-delete a record by its id-field value. Newer stores (coupons, content)
+   *  expect a real delete; the older append-only stores can keep soft-deleting
+   *  via `upsert` and ignore this. No-op if the id isn't present. */
+  remove(id: string): Promise<void>;
 }
 
 export function createStore<T>(opts: {
@@ -149,6 +160,17 @@ export function createStore<T>(opts: {
         return fileWrite(rows);
       }
       for (const rec of records) await dbUpsert(rec);
+    },
+
+    async remove(id) {
+      const sql = getSql();
+      if (!sql) {
+        const rows = await fileRead();
+        const next = rows.filter((r) => keyOf(r) !== id);
+        if (next.length !== rows.length) await fileWrite(next);
+        return;
+      }
+      await sql.query(`delete from ${table} where id = $1`, [id]);
     },
   };
 }

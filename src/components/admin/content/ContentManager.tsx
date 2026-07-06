@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
@@ -8,7 +8,6 @@ import Modal from "@/components/admin/shared/Modal";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { Field, inputClass, Toggle } from "@/components/admin/shared/FormControls";
 import { StarSolid } from "@/components/admin/shared/icons";
-import { contentBanners, contentTestimonials, contentFaqs } from "@/lib/admin/mockData";
 import type { ContentBanner, ContentTestimonial, ContentFaq } from "@/lib/admin/types";
 import PagesTab from "./PagesTab";
 import ContactInfoTab from "./ContactInfoTab";
@@ -44,18 +43,67 @@ export default function ContentManager() {
   );
 }
 
+/* ── Shared content hook ──────────────────────────────────────────────────── */
+
+// Load one content kind from the API and PATCH edits/toggles back. Optimistic:
+// the UI updates immediately, then reconciles with the server's copy.
+function useContentList<T extends { id: string }>(kind: string) {
+  const [rows, setRows] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/content?kind=${kind}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (active && json?.items) setRows(json.items as T[]);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [kind]);
+
+  const patch = async (id: string, changes: Partial<T>) => {
+    const prev = rows;
+    setRows((p) => p.map((r) => (r.id === id ? { ...r, ...changes } : r)));
+    try {
+      const res = await fetch(`/api/content/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      if (!res.ok) throw new Error();
+      const json = (await res.json().catch(() => null)) as { item?: T } | null;
+      if (json?.item) setRows((p) => p.map((r) => (r.id === id ? json.item! : r)));
+    } catch {
+      setRows(prev); // rollback
+    }
+  };
+
+  return { rows, loading, patch };
+}
+
 /* ── Banners ──────────────────────────────────────────────────────────────── */
 
 function BannersTab() {
-  const [rows, setRows] = useState<ContentBanner[]>(contentBanners);
+  const { rows, loading, patch } = useContentList<ContentBanner>("banner");
   const [draft, setDraft] = useState<ContentBanner | null>(null);
 
-  const toggle = (id: string) => setRows((p) => p.map((b) => (b.id === id ? { ...b, active: !b.active } : b)));
-  const save = (b: ContentBanner) => { setRows((p) => p.map((x) => (x.id === b.id ? b : x))); setDraft(null); };
+  const toggle = (id: string, active: boolean) => patch(id, { active: !active });
+  const save = (b: ContentBanner) => {
+    patch(b.id, { title: b.title, subtitle: b.subtitle, placement: b.placement });
+    setDraft(null);
+  };
 
   return (
     <div className="space-y-4">
-      {rows.length === 0 && <EmptyState title="No banners" />}
+      {rows.length === 0 && (
+        <EmptyState title={loading ? "Loading banners…" : "No banners"} />
+      )}
       {rows.map((b) => (
         <WidgetCard key={b.id}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -68,7 +116,7 @@ function BannersTab() {
             </div>
             <div className="flex shrink-0 items-center gap-4">
               <label className="flex items-center gap-2 text-xs text-ink-soft">
-                <Toggle checked={b.active} onChange={() => toggle(b.id)} label={`Toggle ${b.title}`} /> Active
+                <Toggle checked={b.active} onChange={() => toggle(b.id, b.active)} label={`Toggle ${b.title}`} /> Active
               </label>
               <button type="button" onClick={() => setDraft(b)} className="text-sm font-semibold text-maroon hover:underline">Edit</button>
             </div>
@@ -97,14 +145,20 @@ function BannersTab() {
 /* ── Testimonials ─────────────────────────────────────────────────────────── */
 
 function TestimonialsTab() {
-  const [rows, setRows] = useState<ContentTestimonial[]>(contentTestimonials);
+  const { rows, loading, patch } = useContentList<ContentTestimonial>("testimonial");
   const [draft, setDraft] = useState<ContentTestimonial | null>(null);
 
-  const toggle = (id: string) => setRows((p) => p.map((t) => (t.id === id ? { ...t, visible: !t.visible } : t)));
-  const save = (t: ContentTestimonial) => { setRows((p) => p.map((x) => (x.id === t.id ? t : x))); setDraft(null); };
+  const toggle = (id: string, visible: boolean) => patch(id, { visible: !visible });
+  const save = (t: ContentTestimonial) => {
+    patch(t.id, { name: t.name, city: t.city, rating: t.rating, quote: t.quote });
+    setDraft(null);
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {rows.length === 0 && (
+        <EmptyState title={loading ? "Loading testimonials…" : "No testimonials"} />
+      )}
       {rows.map((t) => (
         <WidgetCard key={t.id}>
           <div className="flex items-start justify-between gap-3">
@@ -115,7 +169,7 @@ function TestimonialsTab() {
               </div>
             </div>
             <label className="flex shrink-0 items-center gap-2 text-xs text-ink-soft">
-              <Toggle checked={t.visible} onChange={() => toggle(t.id)} label={`Toggle ${t.name}`} /> Visible
+              <Toggle checked={t.visible} onChange={() => toggle(t.id, t.visible)} label={`Toggle ${t.name}`} /> Visible
             </label>
           </div>
           <p className="mt-2 text-sm text-ink-soft">&ldquo;{t.quote}&rdquo;</p>
@@ -147,14 +201,20 @@ function TestimonialsTab() {
 /* ── FAQ ──────────────────────────────────────────────────────────────────── */
 
 function FaqTab() {
-  const [rows, setRows] = useState<ContentFaq[]>(contentFaqs);
+  const { rows, loading, patch } = useContentList<ContentFaq>("faq");
   const [draft, setDraft] = useState<ContentFaq | null>(null);
 
-  const toggle = (id: string) => setRows((p) => p.map((f) => (f.id === id ? { ...f, visible: !f.visible } : f)));
-  const save = (f: ContentFaq) => { setRows((p) => p.map((x) => (x.id === f.id ? f : x))); setDraft(null); };
+  const toggle = (id: string, visible: boolean) => patch(id, { visible: !visible });
+  const save = (f: ContentFaq) => {
+    patch(f.id, { question: f.question, answer: f.answer });
+    setDraft(null);
+  };
 
   return (
     <div className="space-y-4">
+      {rows.length === 0 && (
+        <EmptyState title={loading ? "Loading FAQs…" : "No FAQs"} />
+      )}
       {rows.map((f) => (
         <WidgetCard key={f.id}>
           <div className="flex items-start justify-between gap-3">
@@ -163,7 +223,7 @@ function FaqTab() {
               <p className="mt-0.5 text-sm text-ink-soft">{f.answer}</p>
             </div>
             <label className="flex shrink-0 items-center gap-2 text-xs text-ink-soft">
-              <Toggle checked={f.visible} onChange={() => toggle(f.id)} label={`Toggle FAQ`} /> Visible
+              <Toggle checked={f.visible} onChange={() => toggle(f.id, f.visible)} label={`Toggle FAQ`} /> Visible
             </label>
           </div>
           <button type="button" onClick={() => setDraft(f)} className="mt-3 text-sm font-semibold text-maroon hover:underline">Edit</button>

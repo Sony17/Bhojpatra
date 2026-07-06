@@ -1,9 +1,11 @@
 import {
   readVendorApplications,
+  removeVendorApplication,
   toAdminApplication,
   writeVendorApplications,
 } from "@/lib/vendorApplications";
 import { readKycDocuments, writeKycDocuments } from "@/lib/kyc";
+import { requireRole } from "@/lib/auth";
 import type { VerificationStatus } from "@/lib/admin/types";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,8 @@ export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   const { id } = await ctx.params;
 
   let body: Record<string, unknown>;
@@ -87,6 +91,30 @@ export async function PATCH(
   }
 
   return Response.json({ application: toAdminApplication(record) });
+}
+
+// DELETE /api/vendors/applications/[id] → archive (remove) an application.
+export async function DELETE(
+  _request: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+  const { id } = await ctx.params;
+  const records = await readVendorApplications();
+  if (!records.some((r) => r.id === id)) {
+    return Response.json({ error: "Application not found." }, { status: 404 });
+  }
+  try {
+    await removeVendorApplication(id);
+  } catch (err) {
+    console.error("Failed to delete vendor application", err);
+    return Response.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+  return Response.json({ ok: true });
 }
 
 /** Keep the KYC file store's status in step with the review decision. */

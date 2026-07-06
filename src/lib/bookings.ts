@@ -24,6 +24,9 @@ export interface StoredBooking extends Booking {
   /** Instalment schedule for the balance after the 10% advance, when the guest
    *  chose to pay the rest in EMIs. Absent for single-payment / unpaid orders. */
   emiPlan?: EmiPlan;
+  /** The customer's own rating + comment for this order, once they've reviewed
+   *  it from My Bookings. Absent until reviewed. */
+  review?: { rating: number; comment: string; createdAt: string };
 }
 
 const KEY = "bhojpatra.bookings";

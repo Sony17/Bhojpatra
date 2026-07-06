@@ -1,6 +1,8 @@
 import path from "path";
 import type { PartnerRole } from "@/lib/session";
 import { createStore } from "@/lib/store";
+import { parseListQuery } from "@/lib/validate";
+import { sendPartnerAlert } from "@/lib/email";
 
 // Referral partners are written at signup to Postgres (Neon) so the booking
 // wizard can resolve a referral code to a name and the admin can see who's
@@ -18,6 +20,8 @@ export interface PartnerRecord {
   /** GST number — collected from Venue Owner partners. */
   gst?: string;
   createdAt: string;
+  /** Soft-deleted by the admin; hidden from lookups and lists. */
+  deleted?: boolean;
 }
 
 const store = createStore<PartnerRecord>({
@@ -34,15 +38,39 @@ const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() ? v.trim() : undefined;
 
 // Resolve a single partner by ?code=… (used by the booking wizard to label a
-// referred order), or list every partner (used by the admin).
+// referred order), or list every partner (used by the admin). Backward-compatible
+// `{ partner }` / `{ partners }`; adds a `Paginated` envelope when filtered.
 export async function GET(request: Request) {
-  const code = new URL(request.url).searchParams.get("code");
-  const partners = await store.list();
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  const all = await store.list();
+  const live = all.filter((p) => !p.deleted);
   if (code) {
-    const partner = partners.find((p) => p.code === code) ?? null;
+    const partner = live.find((p) => p.code === code) ?? null;
     return Response.json({ partner });
   }
-  return Response.json({ partners: partners.slice().reverse() });
+  const partners = live.slice().reverse();
+  const { q, type, page, pageSize, hasQuery } = parseListQuery(request.url);
+  if (!hasQuery) return Response.json({ partners });
+
+  const needle = q.trim().toLowerCase();
+  const filtered = partners.filter((p) => {
+    const matchesQ =
+      !needle ||
+      p.code.toLowerCase().includes(needle) ||
+      p.name.toLowerCase().includes(needle) ||
+      (p.businessName ?? "").toLowerCase().includes(needle);
+    const matchesType = type === "All" || p.type === type;
+    return matchesQ && matchesType;
+  });
+  const start = (page - 1) * pageSize;
+  return Response.json({
+    partners,
+    data: filtered.slice(start, start + pageSize),
+    page,
+    pageSize,
+    total: filtered.length,
+  });
 }
 
 export async function POST(request: Request) {
@@ -88,6 +116,9 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  // Alert the owners on a brand-new partner (not on idempotent re-submits).
+  if (!existing) await sendPartnerAlert(merged);
 
   return Response.json(
     { ok: true, partner: merged },

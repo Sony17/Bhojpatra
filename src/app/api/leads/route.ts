@@ -1,15 +1,20 @@
 import path from "path";
 import { createStore } from "@/lib/store";
+import { sendLeadAlert } from "@/lib/email";
 
 // Leads are captured at request time to Postgres (Neon) — never prerender or
 // cache this handler.
 export const dynamic = "force-dynamic";
+
+export type LeadStatus = "New" | "Contacted";
 
 export interface Lead {
   email: string;
   phone: string;
   source: string;
   createdAt: string;
+  /** Follow-up state, flipped by the admin Lead Generation console. */
+  status?: LeadStatus;
 }
 
 // De-duplicated by email (the id-field); a repeat sign-up updates in place.
@@ -36,28 +41,37 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { email, phone } = (body ?? {}) as Record<string, unknown>;
+  const { email, phone, source } = (body ?? {}) as Record<string, unknown>;
 
-  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
-    return Response.json(
-      { error: "Please enter a valid email address." },
-      { status: 400 },
-    );
-  }
-
+  const cleanEmail =
+    typeof email === "string" && EMAIL_RE.test(email.trim())
+      ? email.trim().toLowerCase()
+      : "";
   const cleanedPhone =
     typeof phone === "string" ? normalizePhone(phone.trim()) : "";
-  if (!PHONE_RE.test(cleanedPhone)) {
+  const validPhone = PHONE_RE.test(cleanedPhone);
+
+  // The promo signup sends both; the booking-intent capture sends phone only.
+  // Require at least one valid contact.
+  if (!cleanEmail && !validPhone) {
     return Response.json(
-      { error: "Please enter a valid 10-digit mobile number." },
+      { error: "Please enter a valid email address or mobile number." },
       { status: 400 },
     );
   }
 
+  const ALLOWED_SOURCES = ["home-promo", "booking-intent", "home-booking-form"];
+  const leadSource =
+    typeof source === "string" && ALLOWED_SOURCES.includes(source)
+      ? source
+      : "home-promo";
+
   const lead: Lead = {
-    email: email.trim().toLowerCase(),
-    phone: cleanedPhone,
-    source: "home-promo",
+    // Leads are keyed by the `email` field; a phone-only lead keys on its phone
+    // so distinct phones stay distinct in the store.
+    email: cleanEmail || cleanedPhone,
+    phone: validPhone ? cleanedPhone : "",
+    source: leadSource,
     createdAt: new Date().toISOString(),
   };
 
@@ -65,9 +79,15 @@ export async function POST(request: Request) {
     const leads = await store.list();
     // Skip duplicates so a repeat sign-up stays idempotent (by email or phone).
     const exists = leads.some(
-      (l) => l.email === lead.email || l.phone === lead.phone,
+      (l) =>
+        l.email === lead.email ||
+        (!!lead.phone && l.phone === lead.phone),
     );
-    if (!exists) await store.upsert(lead);
+    if (!exists) {
+      await store.upsert(lead);
+      // Alert the owners only on a genuinely new lead (best-effort).
+      await sendLeadAlert(lead);
+    }
   } catch (err) {
     console.error("Failed to persist lead", err);
     return Response.json(

@@ -68,11 +68,12 @@ export default function Packages() {
                   <Link
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
-                    className="btn-sheen mt-2 block w-full rounded-lg bg-maroon px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+                    aria-label={`${t("Book", "बुक करें")} ${tierName}`}
+                    className="btn-sheen mx-auto mt-2 flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   >
-                    {selected
-                      ? `${t("Continue", "जारी रखें")} ${tierName} →`
-                      : `${t("Select", "चुनें")} ${tierName}`}
+                    <span aria-hidden="true" className="text-base leading-none">
+                      →
+                    </span>
                   </Link>
                 }
               />

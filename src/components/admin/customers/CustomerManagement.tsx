@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
@@ -13,14 +13,7 @@ import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Users, Calendar, Wallet } from "@/components/admin/shared/icons";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
-import {
-  adminCustomers,
-  queryCustomers,
-  customerCities,
-  getCustomerById,
-  getBookingsByCustomer,
-} from "@/lib/admin/mockData";
-import type { AdminCustomer } from "@/lib/admin/types";
+import type { AdminBooking, AdminCustomer } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
 
@@ -31,6 +24,9 @@ const STATUS_OPTIONS = [
 ];
 
 export default function CustomerManagement() {
+  const [customers, setCustomers] = useState<AdminCustomer[]>([]);
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [city, setCity] = useState("All");
   const [status, setStatus] = useState("All");
@@ -38,32 +34,77 @@ export default function CustomerManagement() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
+  // Load customers (seeded server-side) and the real booking list — the latter
+  // powers the per-customer booking history in the detail modal.
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch("/api/customers?pageSize=1000", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      fetch("/api/bookings", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]).then(([cRes, bRes]) => {
+      if (!active) return;
+      if (cRes?.data) setCustomers(cRes.data as AdminCustomer[]);
+      if (bRes?.orders) setBookings(bRes.orders as AdminBooking[]);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);
     setPage(1);
   };
 
   const stats = useMemo(() => {
-    const spend = adminCustomers.reduce((s, c) => s + c.lifetimeSpend, 0);
+    const spend = customers.reduce((s, c) => s + c.lifetimeSpend, 0);
     return {
-      total: adminCustomers.length,
-      active: adminCustomers.filter((c) => c.status === "Active").length,
-      bookings: adminCustomers.reduce((s, c) => s + c.totalBookings, 0),
+      total: customers.length,
+      active: customers.filter((c) => c.status === "Active").length,
+      bookings: customers.reduce((s, c) => s + c.totalBookings, 0),
       spend,
     };
-  }, []);
+  }, [customers]);
 
-  const result = useMemo(
-    () => queryCustomers({ q, city: city as never, status: status as never, page, pageSize: PAGE_SIZE }),
-    [q, city, status, page],
-  );
+  // Filter + paginate client-side over the loaded list (same rules as the
+  // former mock `queryCustomers`).
+  const result = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const filtered = customers.filter((c) => {
+      const matchesQ =
+        !needle ||
+        c.name.toLowerCase().includes(needle) ||
+        c.email.toLowerCase().includes(needle) ||
+        c.phone.toLowerCase().includes(needle);
+      const matchesCity = city === "All" || c.city === city;
+      const matchesStatus = status === "All" || c.status === status;
+      return matchesQ && matchesCity && matchesStatus;
+    });
+    const start = (page - 1) * PAGE_SIZE;
+    return {
+      data: filtered.slice(start, start + PAGE_SIZE),
+      page,
+      pageSize: PAGE_SIZE,
+      total: filtered.length,
+    };
+  }, [customers, q, city, status, page]);
 
-  const selected = selectedId ? getCustomerById(selectedId) ?? null : null;
+  const selected = selectedId
+    ? customers.find((c) => c.id === selectedId) ?? null
+    : null;
 
-  const cityOptions = useMemo(
-    () => [{ label: "All Cities", value: "All" }, ...customerCities.map((c) => ({ label: c, value: c }))],
-    [],
-  );
+  const cityOptions = useMemo(() => {
+    const cities = Array.from(new Set(customers.map((c) => c.city))).sort();
+    return [
+      { label: "All Cities", value: "All" },
+      ...cities.map((c) => ({ label: c, value: c })),
+    ];
+  }, [customers]);
 
   const columns: Column<AdminCustomer>[] = [
     {
@@ -110,7 +151,16 @@ export default function CustomerManagement() {
         rows={result.data}
         getRowKey={(c) => c.id}
         onRowClick={(c) => { setSelectedId(c.id); setNote(""); }}
-        empty={<EmptyState title="No customers found" message="Try a different search term or filters." />}
+        empty={
+          <EmptyState
+            title={loading ? "Loading customers…" : "No customers found"}
+            message={
+              loading
+                ? "Fetching the customer list."
+                : "Try a different search term or filters."
+            }
+          />
+        }
       />
 
       <Pagination page={result.page} pageSize={result.pageSize} total={result.total} onPageChange={setPage} />
@@ -146,7 +196,7 @@ export default function CustomerManagement() {
                 Booking History
               </p>
               <BookingsMiniTable
-                rows={getBookingsByCustomer(selected.name)}
+                rows={bookings.filter((b) => b.customer === selected.name)}
                 party="vendor"
                 emptyMessage="This customer has no bookings yet."
               />

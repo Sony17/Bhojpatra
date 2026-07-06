@@ -1,6 +1,7 @@
 import path from "path";
 import { DEFAULT_MERCHANT, isValidVpa, type UpiPayeeConfig } from "@/lib/upi";
 import { readSingleton, writeSingleton } from "@/lib/store";
+import { requireRole } from "@/lib/auth";
 
 // Merchant UPI identity used by checkout. The admin sets this once and it is
 // persisted to Postgres (Neon); the booking wizard reads it (with
@@ -20,6 +21,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   let body: unknown;
   try {
     body = await request.json();

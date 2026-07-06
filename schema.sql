@@ -65,3 +65,63 @@ create table if not exists settings (
   data       jsonb not null,
   updated_at timestamptz not null default now()
 );
+
+-- Registered customers (admin Customer Management). Seeded from the former mock
+-- list on first empty read so the console keeps its data.
+create table if not exists customers (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Discount coupons (admin Coupon Manager).
+create table if not exists coupons (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- CMS content — banners, testimonials and FAQs in one table, discriminated by
+-- `data->>'kind'` ('banner' | 'testimonial' | 'faq').
+create table if not exists content_items (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Public contact-form enquiries (ContactPage).
+create table if not exists enquiries (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Customer reviews left from My Bookings after a completed event. Keyed by the
+-- booking id (one review per booking) and surfaced in the home testimonials.
+create table if not exists reviews (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Auth users (customer / vendor / partner / admin). The scrypt password hash
+-- lives inside `data` and is never returned by any API projection.
+create table if not exists users (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Server-side sessions (opaque token -> user), validated against a signed cookie.
+create table if not exists sessions (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);

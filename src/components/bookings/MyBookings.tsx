@@ -125,6 +125,12 @@ export default function MyBookings() {
     () => bookings.find((b) => b.id === activeId) ?? null,
     [bookings, activeId],
   );
+  // The completed booking whose "Rate your experience" modal is open, if any.
+  const [reviewId, setReviewId] = useState<string | null>(null);
+  const reviewTarget = useMemo(
+    () => bookings.find((b) => b.id === reviewId) ?? null,
+    [bookings, reviewId],
+  );
 
   useEffect(() => {
     const load = () => setBookings(getStoredBookings());
@@ -220,6 +226,7 @@ export default function MyBookings() {
               key={booking.id}
               booking={booking}
               onView={() => setActiveId(booking.id)}
+              onReview={() => setReviewId(booking.id)}
             />
           ))}
         </ul>
@@ -241,6 +248,13 @@ export default function MyBookings() {
 
       {active && (
         <BookingDetailsModal booking={active} onClose={() => setActiveId(null)} />
+      )}
+
+      {reviewTarget && (
+        <ReviewModal
+          booking={reviewTarget}
+          onClose={() => setReviewId(null)}
+        />
       )}
     </section>
   );
@@ -296,9 +310,11 @@ function StatusBadge({ status }: { status: BookingStatus }) {
 function BookingCard({
   booking,
   onView,
+  onReview,
 }: {
   booking: StoredBooking;
   onView: () => void;
+  onReview: () => void;
 }) {
   const { t } = useLang();
   const balance = booking.amount - booking.paid;
@@ -425,6 +441,34 @@ function BookingCard({
           {t("View Details", "विवरण देखें")}
         </button>
         <DownloadMenu booking={booking} />
+        {booking.status === "Completed" &&
+          (booking.review ? (
+            <div className="ml-auto flex items-center gap-2">
+              <Stars
+                rating={booking.review.rating}
+                label={t(
+                  `You rated ${booking.review.rating} out of 5 stars`,
+                  `आपने 5 में से ${booking.review.rating} स्टार दिए`,
+                )}
+              />
+              <button
+                type="button"
+                onClick={onReview}
+                className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline"
+              >
+                {t("Edit review", "समीक्षा संपादित करें")}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onReview}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+            >
+              <span aria-hidden="true">★</span>
+              {t("Rate your experience", "अपना अनुभव रेट करें")}
+            </button>
+          ))}
       </div>
     </li>
   );
@@ -850,6 +894,263 @@ function EditBookingForm({
         >
           {t("Cancel", "रद्द करें")}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Read-only 5-star row (matches the home-page testimonial stars). */
+function Stars({ rating, label }: { rating: number; label: string }) {
+  return (
+    <span aria-label={label} className="flex items-center gap-0.5 text-gold">
+      {Array.from({ length: 5 }, (_, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className={i < rating ? "" : "opacity-25"}
+        >
+          ★
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Interactive 1–5 star picker with hover/focus preview. */
+function StarInput({
+  value,
+  onChange,
+  label,
+}: {
+  value: number;
+  onChange: (rating: number) => void;
+  label: (n: number) => string;
+}) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || value;
+  return (
+    <div className="flex items-center gap-1 text-3xl text-gold" role="radiogroup">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          aria-label={label(n)}
+          onMouseEnter={() => setHover(n)}
+          onMouseLeave={() => setHover(0)}
+          onFocus={() => setHover(n)}
+          onBlur={() => setHover(0)}
+          onClick={() => onChange(n)}
+          className="leading-none transition-transform hover:scale-110"
+        >
+          <span className={n <= shown ? "" : "opacity-25"}>★</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * "Rate your experience" — a customer's star rating + written review for a
+ * completed booking. Posts to /api/reviews (which publishes it to the public
+ * home-page testimonials feed) and mirrors the rating back onto the stored
+ * booking, so the card reflects it and a second submission edits in place.
+ */
+function ReviewModal({
+  booking,
+  onClose,
+}: {
+  booking: StoredBooking;
+  onClose: () => void;
+}) {
+  const { t } = useLang();
+  const [rating, setRating] = useState(booking.review?.rating ?? 0);
+  const [name, setName] = useState("");
+  const [comment, setComment] = useState(booking.review?.comment ?? "");
+  const [status, setStatus] = useState<"idle" | "submitting">("idle");
+  const [error, setError] = useState("");
+
+  // Close on Escape and lock background scroll while open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const submit = async () => {
+    if (status === "submitting") return;
+    if (rating < 1) {
+      setError(t("Please choose a star rating.", "कृपया एक स्टार रेटिंग चुनें।"));
+      return;
+    }
+    if (!comment.trim()) {
+      setError(
+        t(
+          "Please write a few words about your experience.",
+          "कृपया अपने अनुभव के बारे में कुछ शब्द लिखें।",
+        ),
+      );
+      return;
+    }
+    setStatus("submitting");
+    setError("");
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          vendor: booking.vendor,
+          name: name.trim(),
+          occasion: booking.occasion,
+          city: booking.city,
+          rating,
+          comment: comment.trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+      } | null;
+      if (!res.ok || !data?.ok) {
+        setStatus("idle");
+        setError(
+          data?.error ??
+            t(
+              "Something went wrong. Please try again.",
+              "कुछ गड़बड़ हो गई। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      // Mirror the rating onto the stored booking so the card reflects it.
+      updateStoredBooking(booking.id, {
+        review: {
+          rating,
+          comment: comment.trim(),
+          createdAt: new Date().toISOString(),
+        },
+      });
+      onClose();
+    } catch {
+      setStatus("idle");
+      setError(
+        t("Network error. Please try again.", "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।"),
+      );
+    }
+  };
+
+  const fieldCls =
+    "mt-1 w-full rounded-lg border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
+  const labelCls =
+    "text-[11px] font-semibold uppercase tracking-wide text-maroon";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(0,0,0,0.55)] p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("Rate your experience", "अपना अनुभव रेट करें")}
+      onClick={onClose}
+    >
+      <div
+        className="relative my-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 border-b border-cream-3 px-5 py-4 sm:px-7">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-semibold text-ink">
+              {t("Rate your experience", "अपना अनुभव रेट करें")}
+            </h2>
+            <p className="mt-0.5 truncate text-sm text-ink-soft">
+              {booking.vendor} · {booking.occasion}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("Close", "बंद करें")}
+            className="shrink-0 rounded-full border border-cream-3 px-3 py-1.5 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5 sm:px-7 sm:py-6">
+          <p className={labelCls}>{t("Your rating", "आपकी रेटिंग")}</p>
+          <div className="mt-2">
+            <StarInput
+              value={rating}
+              onChange={setRating}
+              label={(n) => t(`${n} out of 5 stars`, `5 में से ${n} स्टार`)}
+            />
+          </div>
+
+          <label className="mt-5 block">
+            <span className={labelCls}>{t("Your name", "आपका नाम")}</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t("e.g. Priya S.", "उदा. प्रिया एस.")}
+              className={fieldCls}
+            />
+          </label>
+
+          <label className="mt-4 block">
+            <span className={labelCls}>{t("Your review", "आपकी समीक्षा")}</span>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+              maxLength={600}
+              placeholder={t(
+                "How was the food, service and overall experience?",
+                "खाना, सेवा और समग्र अनुभव कैसा रहा?",
+              )}
+              className={fieldCls + " resize-none"}
+            />
+          </label>
+
+          <p className="mt-2 text-xs text-ink-soft">
+            {t(
+              "Your review may appear publicly on our home page.",
+              "आपकी समीक्षा हमारे होम पेज पर सार्वजनिक रूप से दिख सकती है।",
+            )}
+          </p>
+
+          {error && (
+            <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={status === "submitting"}
+              className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+            >
+              {status === "submitting"
+                ? t("Submitting…", "सबमिट हो रहा है…")
+                : t("Submit review", "समीक्षा सबमिट करें")}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
+            >
+              {t("Cancel", "रद्द करें")}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

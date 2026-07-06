@@ -6,12 +6,11 @@ import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import {
   dashboardPath,
-  getSession,
   setSession,
   type AccountType,
   type PartnerRole,
 } from "@/lib/session";
-import { setAdminSession, verifyAdmin } from "@/lib/adminAuth";
+import { setAdminSession } from "@/lib/adminAuth";
 import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
 
 type Mode = "login" | "signup" | "forgot";
@@ -58,6 +57,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [accountType, setAccountType] = useState<AccountType>("customer");
   const [partnerRole, setPartnerRole] = useState<PartnerRole>("individual");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [fullName, setFullName] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
@@ -75,66 +76,129 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (type === "vendor" || type === "partner") setAccountType(type);
   }, [isSignup]);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (isSignup) {
-      // Mock registration — persist the chosen role so the rest of the app
-      // can route this user to the right dashboard, then show a confirmation.
-      const name = fullName.trim();
-      if (isPartner) {
-        // Referral partners (Event Planners / Individual Referrers) get a unique
-        // code they share to attribute bookings, and land on the partner
-        // dashboard. Persist the partner so the booking wizard can resolve the
-        // code to a name and the admin can see who's referring.
-        const code = makeReferralCode(name);
-        setReferralCode(code);
-        setSession({
-          type: "partner",
-          name: name || undefined,
-          partnerType: partnerRole,
-          referralCode: code,
-          partnerRoles: [{ type: partnerRole, referralCode: code }],
-        });
-        const form = new FormData(e.currentTarget);
-        void fetch("/api/partners", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code,
-            name,
-            type: partnerRole,
-            phone: String(form.get("mobile") ?? ""),
-            email: String(form.get("email") ?? ""),
-            gst: String(form.get("gst") ?? ""),
-          }),
-        }).catch(() => {
-          /* offline — session still holds the code; team follows up */
-        });
-        setSubmitted(true);
-        return;
-      }
-      setSession({ type: accountType, name: name || undefined });
-      setSubmitted(true);
-      return;
-    }
-    // Mock login — no backend. The admin signs in through this same form: if the
-    // credentials match the admin account, grant the admin session and send them
-    // to the control panel instead of a customer/vendor dashboard.
+    if (submitting) return;
     const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") ?? "");
+    const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const admin = verifyAdmin(email, password);
-    if (admin) {
-      setAdminSession(admin);
-      router.push("/admin/dashboard");
+
+    // ── Forgot password ──────────────────────────────────────────────────
+    if (isForgot) {
+      setSubmitting(true);
+      setError("");
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+      setSubmitting(false);
+      setSubmitted(true); // always confirm — don't leak whether the email exists
       return;
     }
 
-    // Otherwise reuse the persisted role (set at signup) so the header reflects
-    // the signed-in user; default to a customer account.
-    const existing = getSession();
-    setSession(existing ?? { type: "customer" });
-    router.push(dashboardPath(existing?.type));
+    // ── Sign up ──────────────────────────────────────────────────────────
+    if (isSignup) {
+      const name = fullName.trim();
+      const confirm = String(form.get("confirmPassword") ?? "");
+      if (password !== confirm) {
+        setError(t("Passwords don't match.", "पासवर्ड मेल नहीं खाते।"));
+        return;
+      }
+      // A referral partner gets a unique code they share to attribute bookings.
+      const code = isPartner ? makeReferralCode(name) : "";
+      const partnerRoles = isPartner
+        ? [{ type: partnerRole, referralCode: code }]
+        : undefined;
+
+      setSubmitting(true);
+      setError("");
+      try {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            role: accountType,
+            ...(partnerRoles ? { partnerRoles } : {}),
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { user?: { role: AccountType }; error?: string }
+          | null;
+        if (!res.ok || !json?.user) {
+          setError(json?.error ?? t("Couldn't create your account.", "आपका अकाउंट नहीं बन सका।"));
+          return;
+        }
+
+        // Mirror the role into the client session so the header + dashboards
+        // route correctly (the server also set an auth cookie).
+        if (isPartner) {
+          setReferralCode(code);
+          setSession({
+            type: "partner",
+            name: name || undefined,
+            partnerType: partnerRole,
+            referralCode: code,
+            partnerRoles: [{ type: partnerRole, referralCode: code }],
+          });
+          // Record the referral partner so the booking wizard can resolve the
+          // code to a name and the admin can see who's referring.
+          void fetch("/api/partners", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              name,
+              type: partnerRole,
+              phone: String(form.get("mobile") ?? ""),
+              email,
+              gst: String(form.get("gst") ?? ""),
+            }),
+          }).catch(() => {});
+        } else {
+          setSession({ type: accountType, name: name || undefined });
+        }
+        setSubmitted(true);
+      } catch {
+        setError(t("Couldn't create your account. Please try again.", "आपका अकाउंट नहीं बन सका। कृपया पुनः प्रयास करें।"));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // ── Log in ───────────────────────────────────────────────────────────
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { user?: { role: AccountType | "admin"; name?: string }; error?: string }
+        | null;
+      if (!res.ok || !json?.user) {
+        setError(json?.error ?? t("Invalid email or password.", "अमान्य ईमेल या पासवर्ड।"));
+        return;
+      }
+      const user = json.user;
+      if (user.role === "admin") {
+        setAdminSession({ email });
+        router.push("/admin/dashboard");
+        return;
+      }
+      setSession({ type: user.role, name: user.name });
+      router.push(dashboardPath(user.role));
+    } catch {
+      setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // ── Mock success screen (signup only) ──────────────────────────────────
@@ -218,6 +282,34 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
           >
             {t("Go to Log In", "लॉग इन पर जाएं")}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Forgot-password confirmation ───────────────────────────────────────
+  if (isForgot && submitted) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
+          ✓
+        </div>
+        <h1 className="font-display mt-6 text-2xl text-ink sm:text-3xl">
+          {t("Check your email", "अपना ईमेल देखें")}
+        </h1>
+        <p className="mt-3 text-base text-ink-soft">
+          {t(
+            "If an account exists for that email, we've sent a link to reset your password.",
+            "यदि उस ईमेल के लिए कोई अकाउंट मौजूद है, तो हमने पासवर्ड रीसेट करने का लिंक भेज दिया है।",
+          )}
+        </p>
+        <div className="mt-8">
+          <Link
+            href="/login"
+            className="inline-block w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
+          >
+            {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
           </Link>
         </div>
       </div>
@@ -597,19 +689,28 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           </label>
         )}
 
+        {error && (
+          <p className="rounded-lg border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
+            {error}
+          </p>
+        )}
+
         <button
           type="submit"
-          className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
+          disabled={submitting}
+          className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
         >
-          {isSignup
-            ? isVendor
-              ? t("Create Vendor Account", "वेंडर अकाउंट बनाएं")
-              : isPartner
-                ? t("Create Partner Account", "पार्टनर अकाउंट बनाएं")
-                : t("Create Account", "अकाउंट बनाएं")
-            : isForgot
-              ? t("Send Reset Link", "रीसेट लिंक भेजें")
-              : t("Log In", "लॉग इन")}
+          {submitting
+            ? t("Please wait…", "कृपया प्रतीक्षा करें…")
+            : isSignup
+              ? isVendor
+                ? t("Create Vendor Account", "वेंडर अकाउंट बनाएं")
+                : isPartner
+                  ? t("Create Partner Account", "पार्टनर अकाउंट बनाएं")
+                  : t("Create Account", "अकाउंट बनाएं")
+              : isForgot
+                ? t("Send Reset Link", "रीसेट लिंक भेजें")
+                : t("Log In", "लॉग इन")}
         </button>
       </form>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -13,7 +13,6 @@ import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Ticket } from "@/components/admin/shared/icons";
-import { adminCoupons } from "@/lib/admin/mockData";
 import type { AdminCoupon, CouponStatus } from "@/lib/admin/types";
 
 const STATUS_OPTIONS = [
@@ -35,11 +34,33 @@ const emptyDraft: AdminCoupon = {
 };
 
 export default function CouponManager() {
-  const [list, setList] = useState<AdminCoupon[]>(adminCoupons);
+  const [list, setList] = useState<AdminCoupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [draft, setDraft] = useState<AdminCoupon | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Load coupons from the API (seeded from the former mock list server-side).
+  useEffect(() => {
+    let active = true;
+    fetch("/api/coupons?pageSize=1000", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (active && json?.data) setList(json.data as AdminCoupon[]);
+      })
+      .catch(() => {
+        if (active) setError("Couldn't load coupons.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const stats = useMemo(
     () => ({
@@ -59,17 +80,64 @@ export default function CouponManager() {
     });
   }, [list, q, status]);
 
-  const upsert = (c: AdminCoupon) => {
-    setList((prev) => {
-      const exists = prev.some((x) => x.id === c.id);
-      return exists ? prev.map((x) => (x.id === c.id ? c : x)) : [{ ...c }, ...prev];
-    });
-    setDraft(null);
+  // Create (POST) or update (PATCH) via the API, then reflect the server's copy.
+  const save = async (c: AdminCoupon) => {
+    setSaving(true);
+    setError("");
+    const editing = Boolean(c.id);
+    const payload = {
+      code: c.code,
+      label: c.label,
+      percent: c.percent,
+      cap: c.cap,
+      eligibility: c.eligibility,
+      startsAt: c.startsAt,
+      expiresAt: c.expiresAt,
+      status: c.status,
+    };
+    try {
+      const res = await fetch(
+        editing ? `/api/coupons/${encodeURIComponent(c.id)}` : "/api/coupons",
+        {
+          method: editing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const json = (await res.json().catch(() => null)) as
+        | { coupon?: AdminCoupon; error?: string }
+        | null;
+      if (!res.ok || !json?.coupon) {
+        setError(json?.error ?? "Couldn't save the coupon.");
+        return;
+      }
+      const saved = json.coupon;
+      setList((prev) =>
+        prev.some((x) => x.id === saved.id)
+          ? prev.map((x) => (x.id === saved.id ? saved : x))
+          : [saved, ...prev],
+      );
+      setDraft(null);
+    } catch {
+      setError("Couldn't save the coupon. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const remove = (id: string) => {
-    setList((prev) => prev.filter((c) => c.id !== id));
+  const remove = async (id: string) => {
     setDeleteId(null);
+    const prev = list;
+    setList((cur) => cur.filter((c) => c.id !== id)); // optimistic
+    try {
+      const res = await fetch(`/api/coupons/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setList(prev); // rollback
+      setError("Couldn't delete the coupon.");
+    }
   };
 
   const columns: Column<AdminCoupon>[] = [
@@ -118,6 +186,12 @@ export default function CouponManager() {
         }
       />
 
+      {error && (
+        <div className="rounded-lg border border-maroon bg-maroon/10 px-4 py-3 text-sm font-medium text-maroon">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={Ticket} label="Active" value={String(stats.active)} />
         <StatCard icon={Ticket} label="Inactive" value={String(stats.inactive)} />
@@ -133,7 +207,16 @@ export default function CouponManager() {
         columns={columns}
         rows={visible}
         getRowKey={(c) => c.id}
-        empty={<EmptyState title="No coupons found" message="Create a coupon or adjust your filters." />}
+        empty={
+          <EmptyState
+            title={loading ? "Loading coupons…" : "No coupons found"}
+            message={
+              loading
+                ? "Fetching the latest coupons."
+                : "Create a coupon or adjust your filters."
+            }
+          />
+        }
       />
 
       {/* Create / edit */}
@@ -148,11 +231,15 @@ export default function CouponManager() {
               <button type="button" onClick={() => setDraft(null)} className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2">Cancel</button>
               <button
                 type="button"
-                onClick={() => upsert({ ...draft, id: draft.id || `CPN-${Date.now()}`, code: draft.code.toUpperCase() })}
-                disabled={!draft.code.trim() || !draft.label.trim()}
+                onClick={() => save({ ...draft, code: draft.code.toUpperCase() })}
+                disabled={saving || !draft.code.trim() || !draft.label.trim()}
                 className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {editing ? "Save changes" : "Create coupon"}
+                {saving
+                  ? "Saving…"
+                  : editing
+                    ? "Save changes"
+                    : "Create coupon"}
               </button>
             </>
           )

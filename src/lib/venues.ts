@@ -55,6 +55,8 @@ export interface VenueRecord {
   ownerName?: string;
   phone?: string;
   createdAt: string;
+  /** Soft-deleted by its owner; hidden from the catalogue and lookups. */
+  deleted?: boolean;
 }
 
 /**

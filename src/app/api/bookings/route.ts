@@ -6,6 +6,8 @@ import {
 import type { BookingStatus } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
 import { createStore } from "@/lib/store";
+import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
+import { parseListQuery } from "@/lib/validate";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
 // admin booking console — never prerender or cache this.
@@ -43,9 +45,35 @@ const store = createStore<StoredOrder>({
 });
 
 // List recorded orders, newest first (used by the admin booking console).
-export async function GET() {
-  const orders = await store.list();
-  return Response.json({ orders: orders.slice().reverse() });
+// Backward-compatible: always returns `{ orders }` (the full newest-first list).
+// When any filter/pagination param is present it ALSO returns a `Paginated`
+// envelope (`data/page/pageSize/total`) over the filtered set.
+export async function GET(request: Request) {
+  const orders = (await store.list()).slice().reverse();
+  const { q, status, city, page, pageSize, hasQuery } = parseListQuery(
+    request.url,
+  );
+  if (!hasQuery) return Response.json({ orders });
+
+  const needle = q.trim().toLowerCase();
+  const filtered = orders.filter((o) => {
+    const matchesQ =
+      !needle ||
+      o.id.toLowerCase().includes(needle) ||
+      o.customer.toLowerCase().includes(needle) ||
+      o.vendor.toLowerCase().includes(needle);
+    const matchesStatus = status === "All" || o.status === status;
+    const matchesCity = city === "All" || o.city === city;
+    return matchesQ && matchesStatus && matchesCity;
+  });
+  const start = (page - 1) * pageSize;
+  return Response.json({
+    orders,
+    data: filtered.slice(start, start + pageSize),
+    page,
+    pageSize,
+    total: filtered.length,
+  });
 }
 
 export async function POST(request: Request) {
@@ -74,6 +102,7 @@ export async function POST(request: Request) {
     referralCode,
     referrerName,
     referrerType,
+    invoiceToken,
   } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof id !== "string" || !/^BHJ-/.test(id)) {
@@ -137,6 +166,21 @@ export async function POST(request: Request) {
       { error: "Something went wrong. Please try again." },
       { status: 500 },
     );
+  }
+
+  // Alert the owners on a brand-new order (not on idempotent repeat confirms).
+  // The client sends only the invoice token; we rebuild the URL from our own
+  // trusted origin so this public endpoint can't inject an arbitrary link.
+  if (!existing) {
+    const token =
+      typeof invoiceToken === "string" &&
+      invoiceToken.length <= 8192 &&
+      /^[A-Za-z0-9_-]+$/.test(invoiceToken)
+        ? invoiceToken
+        : "";
+    const base = siteBaseUrl();
+    const invoiceUrl = token && base ? `${base}/bookings/invoice?d=${token}` : null;
+    await sendOrderAlert(merged, invoiceUrl);
   }
 
   return Response.json({ ok: true, order: merged }, { status: existing ? 200 : 201 });

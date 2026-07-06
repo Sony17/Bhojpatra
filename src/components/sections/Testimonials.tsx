@@ -1,8 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, type HomeTestimonial } from "@/lib/homeContent";
+import type { StoredReview } from "@/app/api/reviews/route";
+
+/** Shape a customer's submitted review into a testimonial card. Their words
+ *  aren't translated, so both languages show the same quote/role. */
+function reviewToTestimonial(r: StoredReview): HomeTestimonial {
+  const role = [r.occasion, r.city].filter(Boolean).join(" · ");
+  return {
+    id: `rev-${r.bookingId}`,
+    name: r.name,
+    role,
+    roleHi: role,
+    quote: r.comment,
+    quoteHi: r.comment,
+    rating: r.rating,
+  };
+}
 
 function initials(name: string) {
   return name
@@ -31,6 +48,29 @@ function Stars({ rating, label }: { rating: number; label: string }) {
 export default function Testimonials() {
   const { lang, t: tr } = useLang();
   const { testimonials } = useHomeContent();
+  // Real customer reviews, published immediately from My Bookings. Fetched on
+  // mount so the curated seed renders first (SSR-safe) and reviews fill in.
+  const [reviews, setReviews] = useState<HomeTestimonial[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/reviews")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { reviews?: StoredReview[] } | null) => {
+        if (live && data?.reviews) {
+          setReviews(data.reviews.map(reviewToTestimonial));
+        }
+      })
+      .catch(() => {
+        /* offline / no backend — keep the curated testimonials */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Newest real reviews lead the marquee, followed by the curated set.
+  const items = [...reviews, ...testimonials.items];
 
   const renderCard = (t: HomeTestimonial, copy: number) => (
     <li
@@ -97,7 +137,7 @@ export default function Testimonials() {
         <div className="marquee-pause -mx-5 overflow-hidden px-5 [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
           <ul className="animate-marquee-slow flex w-max gap-5 py-2 sm:gap-6">
             {[0, 1].map((copy) =>
-              testimonials.items.map((t) => renderCard(t, copy)),
+              items.map((t) => renderCard(t, copy)),
             )}
           </ul>
         </div>

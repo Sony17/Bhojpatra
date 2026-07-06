@@ -7,7 +7,7 @@ import { useHomeContent } from "@/lib/homeContent";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import { addStoredBooking } from "@/lib/bookings";
 import { fetchVenueById } from "@/lib/venues";
-import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
+import { downloadInvoice, encodeInvoice, type InvoiceData } from "@/lib/invoice";
 import {
   buildUpiUri,
   upiTxnRef,
@@ -275,6 +275,25 @@ export default function BookingWizard() {
   // time. A count the chosen date no longer supports simply reads back as "no
   // EMI" everywhere it's consumed (see the inclusion guards), so no reset needed.
   const [emiCount, setEmiCount] = useState<number>(1);
+
+  // Best-effort lead capture: the moment the guest types a valid mobile on the
+  // Confirm step we record it as a "booking-intent" lead, so an abandoned
+  // booking still leaves a contactable lead for follow-up. Fire-and-forget,
+  // de-duped by phone in the API, and once per number here.
+  const capturedPhones = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const phone = customerPhone.replace(/[\s-]/g, "");
+    if (!/^[6-9]\d{9}$/.test(phone)) return;
+    if (capturedPhones.current.has(phone)) return;
+    capturedPhones.current.add(phone);
+    void fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, source: "booking-intent" }),
+    }).catch(() => {
+      /* offline — the full order still persists on confirm */
+    });
+  }, [customerPhone]);
 
   /* ─── Menu helpers ─────────────────────────────────────────────────── */
   // Short-notice dates can't be sourced for the regular tiers (Silver/Gold/
@@ -881,6 +900,8 @@ export default function BookingWizard() {
           referralCode: referralCode.trim() || undefined,
           referrerName: referrerName || undefined,
           referrerType: referrerType || undefined,
+          // Lets the server email the owners a link to this order's invoice.
+          invoiceToken: encodeInvoice(buildInvoice()),
         }),
       });
     } catch {

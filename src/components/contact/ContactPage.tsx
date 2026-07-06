@@ -22,6 +22,8 @@ const SUBJECTS: { value: string; en: string; hi: string }[] = [
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [subject, setSubject] = useState("");
   const { contact } = useSiteContent();
   const { t } = useLang();
@@ -41,10 +43,48 @@ export default function ContactPage() {
     ADDRESS,
   )}`;
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // TODO: wire up to your enquiry backend / CRM.
-    setSubmitted(true);
+    if (submitting) return;
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.get("name"),
+          email: data.get("email"),
+          phone: data.get("mobile"),
+          subject,
+          message: data.get("message"),
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!res.ok) {
+        setError(
+          json?.error ??
+            t("Something went wrong. Please try again.", "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"),
+        );
+        return;
+      }
+      form.reset();
+      setSubject("");
+      setSubmitted(true);
+    } catch {
+      setError(
+        t(
+          "Couldn't send your enquiry. Please check your connection.",
+          "आपकी पूछताछ नहीं भेजी जा सकी। कृपया अपना कनेक्शन जांचें।",
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -72,6 +112,12 @@ export default function ContactPage() {
                 "Thanks! We'll reach out shortly.",
                 "धन्यवाद! हम जल्द ही आपसे संपर्क करेंगे।",
               )}
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 rounded-lg border border-maroon bg-maroon/10 px-4 py-3 text-sm font-medium text-maroon">
+              {error}
             </div>
           )}
 
@@ -160,9 +206,12 @@ export default function ContactPage() {
 
             <button
               type="submit"
-              className="mt-1 w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              disabled={submitting}
+              className="mt-1 w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
             >
-              {t("Send Enquiry", "पूछताछ भेजें")}
+              {submitting
+                ? t("Sending…", "भेज रहे हैं…")
+                : t("Send Enquiry", "पूछताछ भेजें")}
             </button>
           </form>
 

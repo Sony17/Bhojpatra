@@ -51,3 +51,8 @@ next-env.d.ts
 # Recorded UPI payments + merchant UPI config (runtime data store)
 /data/payments.json
 /data/payment-settings.json
+
+# Auth users + active sessions (runtime data store — contains password
+# hashes and live session tokens; never commit)
+/data/users.json
+/data/sessions.json

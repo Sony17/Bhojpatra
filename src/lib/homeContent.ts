@@ -216,7 +216,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
 
 /* ── Store (localStorage + cross-tab/component sync) ──────────────────────── */
 
-const STORAGE_KEY = "bhojpatra.home-content.v2";
+const STORAGE_KEY = "bhojpatra.home-content.v3";
 const EVENT = "bhojpatra:home-content";
 
 /** Per-section shallow merge so newly-added fields keep a default value, while

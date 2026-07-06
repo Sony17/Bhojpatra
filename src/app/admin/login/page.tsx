@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  getAdminSession,
-  setAdminSession,
-  verifyAdmin,
-} from "@/lib/adminAuth";
+import { getAdminSession, loginAdmin } from "@/lib/adminAuth";
 import BrandIcon from "@/components/BrandIcon";
 
 const inputClass =
@@ -18,20 +14,24 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Already signed in → skip straight to the dashboard.
   useEffect(() => {
     if (getAdminSession()) router.replace("/admin/dashboard");
   }, [router]);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const session = verifyAdmin(email, password);
-    if (!session) {
-      setError("Invalid email or password.");
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await loginAdmin(email, password);
+    setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error ?? "Invalid email or password.");
       return;
     }
-    setAdminSession(session);
     router.replace("/admin/dashboard");
   }
 

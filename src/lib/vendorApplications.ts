@@ -83,6 +83,12 @@ export function writeVendorApplications(
   return store.upsertMany(records);
 }
 
+/** Hard-delete an application (admin archive). The referenced KYC files stay in
+ *  their own store. */
+export function removeVendorApplication(id: string): Promise<void> {
+  return store.remove(id);
+}
+
 /** Project a stored record onto the admin `VendorApplication` shape consumed by
  *  the approvals console (drops the menu / coverage fields it doesn't show). */
 export function toAdminApplication(
