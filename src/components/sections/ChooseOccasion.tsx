@@ -68,7 +68,7 @@ export default function ChooseOccasion() {
                 {/* Darken so the name reads on the photo, like the reference */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
-                  <span className="font-display text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
+                  <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
                     {occasion.name}
                   </span>
                 </div>

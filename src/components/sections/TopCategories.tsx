@@ -66,7 +66,7 @@ export default function TopCategories() {
 
               {/* Text over the overlay */}
               <span className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 p-3 text-center">
-                <span className="font-display text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
+                <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
                   {lang === "hi" ? category.nameHi : category.name}
                 </span>
                 <span className="translate-y-1 text-[11px] font-medium text-cream opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
