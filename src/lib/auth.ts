@@ -23,7 +23,7 @@ import { cookies } from "next/headers";
 import { createStore } from "@/lib/store";
 import {
   SESSION_COOKIE,
-  SESSION_SECRET,
+  getSessionSecret,
   signToken,
   verifyCookieValue,
 } from "@/lib/cookieSign";
@@ -158,7 +158,9 @@ export function makeResetToken(): { token: string; hash: string } {
 }
 
 export function hashToken(token: string): string {
-  return createHash("sha256").update(`${token}:${SESSION_SECRET}`).digest("hex");
+  return createHash("sha256")
+    .update(`${token}:${getSessionSecret()}`)
+    .digest("hex");
 }
 
 /* ── Admin bootstrap ─────────────────────────────────────────────────────── */

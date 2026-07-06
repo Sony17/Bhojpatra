@@ -14,19 +14,30 @@ export const SESSION_COOKIE = "bp_session";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 
-export const SESSION_SECRET = (() => {
+/**
+ * Resolve the HMAC secret lazily (memoized), NOT at module import. The "required
+ * in production" guard must fire at request time, never at load time — otherwise
+ * `next build`'s page-data collection (which imports every route module) would
+ * demand the secret just to read a route's exports, failing the build in any
+ * environment where the secret isn't present at build.
+ */
+let cachedSecret: string | undefined;
+export function getSessionSecret(): string {
+  if (cachedSecret !== undefined) return cachedSecret;
   const s = process.env.SESSION_SECRET;
-  if (s && s.length >= 16) return s;
+  if (s && s.length >= 16) return (cachedSecret = s);
   if (IS_PROD) {
     throw new Error(
       "SESSION_SECRET is required in production (set a 32+ char random value).",
     );
   }
-  return "dev-insecure-session-secret-change-me";
-})();
+  return (cachedSecret = "dev-insecure-session-secret-change-me");
+}
 
 export function signToken(token: string): string {
-  return createHmac("sha256", SESSION_SECRET).update(token).digest("base64url");
+  return createHmac("sha256", getSessionSecret())
+    .update(token)
+    .digest("base64url");
 }
 
 /** Verify a `token.sig` cookie value; returns the token when the signature is
