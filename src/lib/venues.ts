@@ -72,6 +72,29 @@ export interface BookableVenue extends Venue {
   registered?: boolean;
 }
 
+/** Fallback venue photo used when an owner submits no (or an unusable) image URL. */
+export const DEFAULT_VENUE_IMAGE =
+  "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=70";
+
+/**
+ * Restrict venue images to sources `next/image` can actually serve: local
+ * `/public` paths and the remote hosts whitelisted under
+ * `images.remotePatterns` in next.config.ts. Owners paste things like an
+ * unsplash.com *page* link (not an image file), which would crash every card
+ * that renders it — those fall back to the default photo instead.
+ */
+export function sanitizeVenueImage(src: string | undefined): string {
+  const url = (src ?? "").trim();
+  if (url.startsWith("/")) return url;
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol === "https:" && hostname === "images.unsplash.com") return url;
+  } catch {
+    /* not an absolute URL — fall through to the default */
+  }
+  return DEFAULT_VENUE_IMAGE;
+}
+
 /** Parse a display price like "₹1,20,000" or "₹85,000" → 120000 / 85000. */
 export function parseVenuePrice(priceFrom: string): number {
   const digits = (priceFrom || "").replace(/[^0-9]/g, "");

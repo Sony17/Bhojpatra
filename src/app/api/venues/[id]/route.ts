@@ -2,6 +2,7 @@ import { createStore } from "@/lib/store";
 import {
   parseVenuePrice,
   formatVenuePrice,
+  sanitizeVenueImage,
   type VenueRecord,
 } from "@/lib/venues";
 
@@ -44,7 +45,9 @@ export async function GET(
   if (!venue || venue.deleted) {
     return Response.json({ error: "Venue not found." }, { status: 404 });
   }
-  return Response.json({ venue });
+  return Response.json({
+    venue: { ...venue, image: sanitizeVenueImage(venue.image) },
+  });
 }
 
 // PATCH /api/venues/[id] → owner edits venue fields (must pass ownerCode)
@@ -69,7 +72,9 @@ export async function PATCH(
   if (body.location !== undefined) next.location = str(body.location) ?? "";
   if (str(body.type)) next.type = str(body.type)!;
   if (body.capacity !== undefined) next.capacity = str(body.capacity) ?? "";
-  if (body.image !== undefined && str(body.image)) next.image = str(body.image)!;
+  if (body.image !== undefined && str(body.image)) {
+    next.image = sanitizeVenueImage(str(body.image));
+  }
   if (str(body.ownerName)) next.ownerName = str(body.ownerName);
   if (str(body.phone)) next.phone = str(body.phone);
   if (body.price !== undefined || body.priceFrom !== undefined) {

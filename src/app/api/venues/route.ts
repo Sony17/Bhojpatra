@@ -2,6 +2,7 @@ import {
   parseVenuePrice,
   formatVenuePrice,
   venueSlug,
+  sanitizeVenueImage,
   type VenueRecord,
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
@@ -27,7 +28,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   const owner = url.searchParams.get("owner");
-  const venues = (await store.list()).filter((v) => !v.deleted);
+  // Sanitize images on the way out too — a previously stored non-servable
+  // URL must never reach a `next/image` and crash the page.
+  const venues = (await store.list())
+    .filter((v) => !v.deleted)
+    .map((v) => ({ ...v, image: sanitizeVenueImage(v.image) }));
 
   if (id) {
     const venue = venues.find((v) => v.id === id) ?? null;
@@ -108,9 +113,7 @@ export async function POST(request: Request) {
     price,
     rating: Number.isFinite(ratingRaw) && ratingRaw > 0 ? ratingRaw : 4.5,
     reviews: Number.isFinite(reviewsRaw) && reviewsRaw > 0 ? Math.round(reviewsRaw) : 0,
-    image:
-      str(b.image) ??
-      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=70",
+    image: sanitizeVenueImage(str(b.image)),
     ownerCode,
     ownerName: str(b.ownerName),
     phone: str(b.phone),
