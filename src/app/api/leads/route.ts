@@ -1,4 +1,3 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 import { sendLeadAlert } from "@/lib/email";
 
@@ -34,7 +33,6 @@ const CALLBACK_TOPICS = [
 // De-duplicated by email (the id-field); a repeat sign-up updates in place.
 const store = createStore<Lead>({
   table: "leads",
-  file: path.join(process.cwd(), "data", "leads.json"),
   idField: "email",
 });
 

@@ -22,9 +22,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import {
-  getStoredBookings,
+  fetchMyBookings,
   onStoredBookingsChange,
-  updateStoredBooking,
+  patchMyBooking,
   bookingVendors,
   slugifyName,
   type StoredBooking,
@@ -52,13 +52,22 @@ export default function VendorReviewPanel({
   const { t } = useLang();
   const session = useSession();
 
-  // The customer's own bookings (localStorage) — kept live so completing an
+  // The customer's own bookings (from the API) — kept live so completing an
   // order elsewhere unlocks this panel without a reload.
   const [bookings, setBookings] = useState<StoredBooking[]>([]);
   useEffect(() => {
-    const load = () => setBookings(getStoredBookings());
+    let active = true;
+    const load = () => {
+      void fetchMyBookings().then((list) => {
+        if (active) setBookings(list);
+      });
+    };
     load();
-    return onStoredBookingsChange(load);
+    const unsub = onStoredBookingsChange(load);
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   // The order this review hangs off: prefer a completed one that names this
@@ -162,7 +171,7 @@ export default function VendorReviewPanel({
       const kept = (target.reviews ?? []).filter(
         (r) => r.vendorId !== vendor.id,
       );
-      updateStoredBooking(target.id, { reviews: [...kept, review] });
+      await patchMyBooking(target.id, { reviews: [...kept, review] });
       setStatus("idle");
       setMode("view");
       onReviewed();

@@ -1,4 +1,3 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import type { PartnerRecord } from "../route";
@@ -7,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 const store = createStore<PartnerRecord>({
   table: "partners",
-  file: path.join(process.cwd(), "data", "partners.json"),
   idField: "code",
 });
 

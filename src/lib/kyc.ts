@@ -70,12 +70,10 @@ export interface KycDocument {
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
-export const KYC_STORE = path.join(DATA_DIR, "kyc-documents.json");
 export const KYC_FILES_DIR = path.join(DATA_DIR, "kyc");
 
 const store = createStore<KycDocument>({
   table: "kyc_documents",
-  file: KYC_STORE,
   idField: "id",
 });
 

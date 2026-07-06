@@ -1,4 +1,3 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import type { Lead } from "../route";
@@ -8,7 +7,6 @@ export const dynamic = "force-dynamic";
 // Leads are keyed by email; the dynamic segment carries a URL-encoded email.
 const store = createStore<Lead>({
   table: "leads",
-  file: path.join(process.cwd(), "data", "leads.json"),
   idField: "email",
 });
 

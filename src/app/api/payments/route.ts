@@ -1,4 +1,3 @@
-import path from "path";
 import { isValidVpa } from "@/lib/upi";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
@@ -39,7 +38,6 @@ export interface StoredPayment {
 
 const store = createStore<StoredPayment>({
   table: "payments",
-  file: path.join(process.cwd(), "data", "payments.json"),
   idField: "id",
 });
 

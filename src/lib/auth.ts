@@ -11,7 +11,6 @@
  *   cheaply in `proxy.ts`; the authoritative check (`getSessionUser`) also
  *   verifies the token exists and hasn't expired.
  */
-import path from "path";
 import {
   scrypt,
   randomBytes,
@@ -85,7 +84,6 @@ interface SessionRecord {
 
 const sessionStore = createStore<SessionRecord>({
   table: "sessions",
-  file: path.join(process.cwd(), "data", "sessions.json"),
   idField: "id",
 });
 

@@ -1,14 +1,14 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import type { BookingStatus } from "@/lib/data";
+import type { InvoiceData } from "@/lib/invoice";
+import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import type { StoredOrder } from "../route";
 
 export const dynamic = "force-dynamic";
 
 const store = createStore<StoredOrder>({
   table: "bookings",
-  file: path.join(process.cwd(), "data", "bookings.json"),
   idField: "id",
 });
 
@@ -109,6 +109,49 @@ export async function PATCH(
       return Response.json({ error: "Invalid paid amount." }, { status: 400 });
     }
     next.paid = Math.round(paid);
+  }
+
+  // Content fields a booking's own customer (or an admin) may edit from My
+  // Bookings: the editable logistics, notes and the per-vendor review mirror.
+  // These carry no money or status semantics, so the owner check above is the
+  // only gate they need. Each is applied only when present in the body.
+  if (typeof body.occasion === "string" && body.occasion.trim()) {
+    next.occasion = body.occasion.trim();
+  }
+  if (typeof body.date === "string" && body.date.trim()) {
+    next.date = body.date.trim();
+  }
+  if (typeof body.city === "string") {
+    next.city = body.city.trim();
+  }
+  if (body.guests !== undefined) {
+    const guests = Math.round(Number(body.guests));
+    if (Number.isFinite(guests) && guests > 0) next.guests = guests;
+  }
+  if (body.note !== undefined) {
+    next.note =
+      typeof body.note === "string" && body.note.trim()
+        ? body.note.trim().slice(0, 2000)
+        : undefined;
+  }
+  if (body.reopened !== undefined) {
+    next.reopened = Boolean(body.reopened);
+  }
+  if (body.invoice && typeof body.invoice === "object") {
+    next.invoice = body.invoice as InvoiceData;
+  }
+  if (Array.isArray(body.vendors)) {
+    next.vendors = body.vendors as BookedVendor[];
+  }
+  if (Array.isArray(body.reviews)) {
+    next.reviews = body.reviews as BookingVendorReview[];
+  }
+  if (body.review && typeof body.review === "object") {
+    next.review = body.review as {
+      rating: number;
+      comment: string;
+      createdAt: string;
+    };
   }
 
   try {

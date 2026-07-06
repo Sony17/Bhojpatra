@@ -8,7 +8,6 @@
  * Verified / Rejected). The uploaded KYC files themselves live in the separate
  * `kyc` store and are referenced here by id.
  */
-import path from "path";
 import { createStore } from "@/lib/store";
 import type {
   VendorApplication,
@@ -58,16 +57,8 @@ export interface VendorApplicationRecord {
   submittedAt: string;
   reviewedAt?: string;
 }
-
-export const VENDOR_APPLICATIONS_STORE = path.join(
-  process.cwd(),
-  "data",
-  "vendor-applications.json",
-);
-
 const store = createStore<VendorApplicationRecord>({
   table: "vendor_applications",
-  file: VENDOR_APPLICATIONS_STORE,
   idField: "id",
 });
 

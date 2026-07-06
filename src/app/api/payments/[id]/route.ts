@@ -1,4 +1,3 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import {
@@ -11,7 +10,6 @@ export const dynamic = "force-dynamic";
 
 const store = createStore<StoredPayment>({
   table: "payments",
-  file: path.join(process.cwd(), "data", "payments.json"),
   idField: "id",
 });
 

@@ -7,7 +7,6 @@
  * (`src/lib/admin/mockData.ts`) on the first empty read, so the console keeps
  * its content with no manual migration.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 import type {
@@ -24,16 +23,8 @@ export interface CustomerRecord extends AdminCustomer {
   createdAt: string;
   deleted?: boolean;
 }
-
-export const CUSTOMERS_STORE = path.join(
-  process.cwd(),
-  "data",
-  "customers.json",
-);
-
 const store = createStore<CustomerRecord>({
   table: "customers",
-  file: CUSTOMERS_STORE,
   idField: "id",
 });
 

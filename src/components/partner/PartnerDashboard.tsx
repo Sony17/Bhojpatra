@@ -106,7 +106,7 @@ export default function PartnerDashboard() {
     } catch {
       /* offline — the session still records the role; team follows up */
     }
-    addPartnerRole({ type, referralCode: newCode });
+    await addPartnerRole({ type, referralCode: newCode });
     setActiveType(type);
     setTab("overview");
     setAdding(null);

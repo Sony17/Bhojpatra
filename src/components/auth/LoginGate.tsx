@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
-import { setSession, type AccountType } from "@/lib/session";
+import { refreshSession, type AccountType } from "@/lib/session";
 
 const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
@@ -78,10 +78,10 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
         );
         return;
       }
-      // Mirror the role into the client session; the server also set the auth
-      // cookie. The parent re-renders and reveals the payment + confirm step now
-      // that the guest is signed in — the in-progress booking is untouched.
-      setSession({ type: user.role, name: user.name });
+      // The server set the auth cookie; refresh the session so the parent
+      // re-renders and reveals the payment + confirm step now that the guest is
+      // signed in — the in-progress booking is untouched.
+      await refreshSession();
     } catch {
       setError(
         t(

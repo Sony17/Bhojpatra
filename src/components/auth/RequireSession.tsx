@@ -12,9 +12,9 @@ import { DASHBOARD_PATH, useSessionStatus, type AccountType } from "@/lib/sessio
  * signed-in user on the wrong dashboard is sent to their own. Only when the
  * stored account type matches `role` is the dashboard rendered.
  *
- * This is a demo-grade gate (the session lives in localStorage). It stops the
- * dashboards from showing to the wrong/anonymous visitor, but is not a
- * substitute for server-side auth — see the note in `session.ts`.
+ * The session is read from the real signed-cookie backend (via
+ * `/api/auth/session`), so this reflects the authoritative server session; it's
+ * still a client-side redirect for UX, paired with the middleware guard.
  */
 export default function RequireSession({
   role,

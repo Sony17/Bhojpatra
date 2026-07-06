@@ -6,7 +6,6 @@
  * "Enquiries" view can read them back. Same `createStore` idiom as the other
  * stores.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 
@@ -20,16 +19,8 @@ export interface EnquiryRecord {
   source: "contact-page";
   createdAt: string;
 }
-
-export const ENQUIRIES_STORE = path.join(
-  process.cwd(),
-  "data",
-  "enquiries.json",
-);
-
 const store = createStore<EnquiryRecord>({
   table: "enquiries",
-  file: ENQUIRIES_STORE,
   idField: "id",
 });
 

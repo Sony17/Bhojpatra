@@ -8,8 +8,9 @@ import { inputClass } from "./FormControls";
 /**
  * Admin image picker. Shows a live thumbnail of the current image and lets the
  * editor either paste a URL or upload a file. Uploads are downscaled and
- * re-encoded to a compact data URL on the client (there is no backend in this
- * prototype) so they fit comfortably in localStorage and render via next/image.
+ * re-encoded to a compact data URL on the client so they stay small when saved
+ * with the rest of the content (persisted to the database) and render via
+ * next/image.
  */
 
 const MAX_DIM = 1280; // longest edge, px

@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type BookingStatus } from "@/lib/data";
 import {
-  getStoredBookings,
+  fetchMyBookings,
   onStoredBookingsChange,
-  updateStoredBooking,
-  completeBookings,
+  patchMyBooking,
   downloadReceipt,
   bookingInvoice,
   bookingVendors,
@@ -121,7 +120,7 @@ export default function MyBookings() {
   const { t } = useLang();
   const [filter, setFilter] = useState<Filter>(ALL);
   // Bookings the user has actually made. Empty until they book through the
-  // wizard — loaded client-side from localStorage so the list starts empty.
+  // wizard — fetched from the API (the customer's own orders).
   const [bookings, setBookings] = useState<StoredBooking[]>([]);
   // The booking open in the details modal, tracked by id so edits made in the
   // modal re-read from the freshly reloaded list rather than going stale.
@@ -138,25 +137,21 @@ export default function MyBookings() {
   );
 
   useEffect(() => {
+    // Bookings come from the API (the customer's own orders). The server runs
+    // the past-event auto-complete sweep, so we just fetch the list and re-fetch
+    // whenever an edit/complete/review elsewhere fires the change event.
+    let active = true;
     const load = () => {
-      const stored = getStoredBookings();
-      // Auto-complete: any confirmed booking whose event date has fully passed
-      // is marked Completed so its review flow opens on its own — no click. The
-      // event day itself (days === 0) is left to the manual "Mark event as
-      // complete" button. `completeBookings` persists the change and returns the
-      // updated list so we render it right away, without a change-event round-trip.
-      const overdue = stored
-        .filter(
-          (b) =>
-            b.status === "Confirmed" &&
-            !b.reopened &&
-            (daysUntilLabel(b.date) ?? 1) < 0,
-        )
-        .map((b) => b.id);
-      setBookings(overdue.length ? completeBookings(overdue) : stored);
+      void fetchMyBookings().then((list) => {
+        if (active) setBookings(list);
+      });
     };
     load();
-    return onStoredBookingsChange(load);
+    const unsub = onStoredBookingsChange(load);
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const counts = useMemo(() => {
@@ -189,7 +184,7 @@ export default function MyBookings() {
           {t("Your Account", "आपका खाता")}
         </p>
         <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-          {t("My Bookings", "मेरी बुकिंग")}
+          {t("My Dashboard", "मेरा डैशबोर्ड")}
         </h1>
         <p className="font-script mt-3 text-xl text-ink-soft">
           {t(
@@ -356,45 +351,25 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
     if (busy) return;
     setBusy(true);
     setError("");
-    try {
-      const res = await fetch(`/api/bookings/${encodeURIComponent(booking.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const data = (await res.json().catch(() => null)) as {
-        order?: unknown;
-        error?: string;
-      } | null;
-      if (!res.ok) {
-        setBusy(false);
-        setError(
-          data?.error ??
-            t(
-              "Couldn't update this booking. Please try again.",
-              "यह बुकिंग अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।",
-            ),
-        );
-        return;
-      }
-      // Server accepted — mirror the new status into the local list so the
-      // My Bookings view updates immediately. Reopens also flag the record so
-      // the local past-event auto-complete sweep won't flip it back.
-      updateStoredBooking(booking.id, {
-        status: nextStatus,
-        ...(completing ? {} : { reopened: true }),
-      });
-      setBusy(false);
-      setConfirming(false);
-    } catch {
-      setBusy(false);
+    // Commit on the server (owner + transition are checked there). Reopens also
+    // flag the record so the past-event auto-complete sweep won't flip it back.
+    // On success the change event fires and My Bookings re-fetches the list.
+    const result = await patchMyBooking(booking.id, {
+      status: nextStatus,
+      ...(completing ? {} : { reopened: true }),
+    });
+    setBusy(false);
+    if (!result.ok) {
       setError(
-        t(
-          "Network error. Please try again.",
-          "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।",
-        ),
+        result.error ??
+          t(
+            "Couldn't update this booking. Please try again.",
+            "यह बुकिंग अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।",
+          ),
       );
+      return;
     }
+    setConfirming(false);
   };
 
   if (confirming) {
@@ -933,7 +908,7 @@ function EditBookingForm({
       return;
     }
     const dateLabel = dateISO ? isoToLabel(dateISO) : booking.date;
-    updateStoredBooking(booking.id, {
+    void patchMyBooking(booking.id, {
       occasion: occasion.trim(),
       date: dateLabel,
       guests: guestCount,
@@ -1190,7 +1165,7 @@ function ReviewModal({
       const avg = Math.round(
         reviews.reduce((s, r) => s + r.rating, 0) / reviews.length,
       );
-      updateStoredBooking(booking.id, {
+      await patchMyBooking(booking.id, {
         reviews,
         review: {
           rating: avg,

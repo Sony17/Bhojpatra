@@ -6,7 +6,6 @@
  * Items are hard-deletable. Seeded from the former mock lists on first empty
  * read.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 import type {
@@ -28,16 +27,8 @@ export type ContentRecord =
   | ({ kind: "banner" } & ContentBanner)
   | ({ kind: "testimonial" } & ContentTestimonial)
   | ({ kind: "faq" } & ContentFaq);
-
-export const CONTENT_STORE = path.join(
-  process.cwd(),
-  "data",
-  "content-items.json",
-);
-
 const store = createStore<ContentRecord>({
   table: "content_items",
-  file: CONTENT_STORE,
   idField: "id",
 });
 

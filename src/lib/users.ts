@@ -7,7 +7,6 @@
  * — every projection goes through `toPublicUser`. Passwords are hashed and
  * verified in `auth.ts`.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 import type { PartnerMembership } from "@/lib/session";
@@ -24,6 +23,8 @@ export interface UserRecord {
   passwordHash: string;
   /** Partner roles + referral codes, when role === "partner". */
   partnerRoles?: PartnerMembership[];
+  /** The user's saved UI language preference (follows them across devices). */
+  lang?: "en" | "hi";
   createdAt: string;
   /** Password-reset flow: hashed token + expiry. Never exposed. */
   resetTokenHash?: string;
@@ -37,13 +38,12 @@ export interface PublicUser {
   name?: string;
   role: UserRole;
   partnerRoles?: PartnerMembership[];
+  lang?: "en" | "hi";
 }
 
-export const USERS_STORE = path.join(process.cwd(), "data", "users.json");
 
 const store = createStore<UserRecord>({
   table: "users",
-  file: USERS_STORE,
   idField: "id",
 });
 
@@ -77,5 +77,6 @@ export function toPublicUser(u: UserRecord): PublicUser {
     name: u.name,
     role: u.role,
     ...(u.partnerRoles ? { partnerRoles: u.partnerRoles } : {}),
+    ...(u.lang ? { lang: u.lang } : {}),
   };
 }

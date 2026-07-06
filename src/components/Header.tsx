@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
-import { clearSession, dashboardPath, useSession } from "@/lib/session";
+import { logout, dashboardPath, useSession } from "@/lib/session";
 import LanguageToggle from "./LanguageToggle";
 import MobileTabBar from "./MobileTabBar";
 
@@ -94,8 +94,8 @@ function MobileAccount() {
   const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
   const initial = (name || label).charAt(0).toUpperCase();
 
-  function handleLogout() {
-    clearSession();
+  async function handleLogout() {
+    await logout();
     router.push("/");
   }
 
@@ -161,8 +161,8 @@ function AccountMenu() {
   const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
   const initial = (name || label).charAt(0).toUpperCase();
 
-  function handleLogout() {
-    clearSession();
+  async function handleLogout() {
+    await logout();
     router.push("/");
   }
 

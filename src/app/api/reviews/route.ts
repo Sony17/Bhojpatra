@@ -1,4 +1,3 @@
-import path from "path";
 import { createStore } from "@/lib/store";
 
 // Reviews are written at request time to Postgres (Neon) — never prerender or
@@ -30,7 +29,6 @@ export interface StoredReview {
 // booking; re-submitting updates in place.
 const store = createStore<StoredReview>({
   table: "reviews",
-  file: path.join(process.cwd(), "data", "reviews.json"),
   idField: "id",
 });
 

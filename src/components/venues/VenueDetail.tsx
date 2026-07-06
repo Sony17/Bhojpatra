@@ -14,7 +14,6 @@ import {
   VENUE_ADVANCE_RATE,
   type BookableVenue,
 } from "@/lib/venues";
-import { addStoredBooking } from "@/lib/bookings";
 import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
   buildUpiUri,
@@ -280,33 +279,14 @@ function VenueBooking({
     setConfirming(true);
     const paid = paidAmount;
 
-    addStoredBooking({
-      id: bookingId,
-      occasion: occasionName,
-      date: eventDate ? formatEventDate(eventDate) : "—",
-      guests,
-      vendor: venue.name,
-      city: cityLabel,
-      amount: total,
-      paid,
-      status: "Confirmed",
-      ...(paidRef ? { paymentRef: paidRef } : {}),
-      receipt: buildReceipt(paid),
-      invoice: buildInvoice(paid),
-      // Credit the venue back to the Venue-Owner partner who listed it.
-      ...(venue.ownerCode
-        ? {
-            referralCode: venue.ownerCode,
-            referrerName: venue.ownerName,
-            referrerType: "venue",
-          }
-        : {}),
-    });
+    const invoiceData = buildInvoice(paid);
 
-    // Persist to the orders backend (admin console + owner dashboard). A blip
-    // here shouldn't strand the guest — the order is already saved locally.
+    // Persist to the orders backend — the single source of truth (admin console,
+    // owner dashboard, the customer's My Bookings). The venue is credited back to
+    // the Venue-Owner partner who listed it. The order MUST land server-side, so
+    // a failure surfaces an error and keeps the guest on this step to retry.
     try {
-      await fetch("/api/bookings", {
+      const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -326,10 +306,33 @@ function VenueBooking({
           referralCode: venue.ownerCode || undefined,
           referrerName: venue.ownerName || undefined,
           referrerType: venue.ownerCode ? "venue" : undefined,
+          receipt: buildReceipt(paid),
+          invoice: invoiceData,
         }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setPayError(
+          data?.error ??
+            t(
+              "Couldn't confirm your booking. Please try again.",
+              "आपकी बुकिंग कन्फर्म नहीं हो सकी। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        setConfirming(false);
+        return;
+      }
     } catch {
-      /* offline — order saved locally; team follows up */
+      setPayError(
+        t(
+          "Network error. Please try again.",
+          "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।",
+        ),
+      );
+      setConfirming(false);
+      return;
     }
 
     setConfirming(false);
@@ -918,7 +921,7 @@ function DonePanel({
           href="/bookings"
           className="w-full rounded-full border border-maroon px-6 py-3 text-center text-sm font-semibold text-maroon transition hover:bg-maroon/5"
         >
-          {t("View in My Bookings", "मेरी बुकिंग में देखें")}
+          {t("View in My Dashboard", "मेरे डैशबोर्ड में देखें")}
         </Link>
       </div>
     </div>

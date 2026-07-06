@@ -1,10 +1,11 @@
-import path from "path";
 import {
   isOrderPaymentMethod,
   type OrderPaymentMethod,
 } from "@/lib/orderPayment";
 import type { BookingStatus } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
+import type { InvoiceData } from "@/lib/invoice";
+import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
@@ -42,11 +43,29 @@ export interface StoredOrder {
   referralCode?: string;
   referrerName?: string;
   referrerType?: string;
+  /* ── Customer-facing extras (previously the localStorage-only fields) ──
+   * These are what the customer's My Bookings view needs beyond the admin
+   * summary: a pre-built receipt, the itemised invoice, editable notes and the
+   * per-vendor review data. Stored on the order so the whole record survives a
+   * device change and stays a single source of truth. */
+  /** Plain-text order summary — what the per-order "Download receipt" exports. */
+  receipt?: string;
+  /** Itemised invoice for PDF re-download / share. */
+  invoice?: InvoiceData;
+  /** Free-text special requests the customer added when editing the booking. */
+  note?: string;
+  /** The specific vendors catered, captured so each can be rated individually. */
+  vendors?: BookedVendor[];
+  /** Per-vendor ratings the customer left for this order (prefill / edit). */
+  reviews?: BookingVendorReview[];
+  /** Rounded-average summary of the customer's review — drives the card stars. */
+  review?: { rating: number; comment: string; createdAt: string };
+  /** Set when the customer reopened a Completed booking (stops auto-complete). */
+  reopened?: boolean;
 }
 
 const store = createStore<StoredOrder>({
   table: "bookings",
-  file: path.join(process.cwd(), "data", "bookings.json"),
   idField: "id",
 });
 
@@ -115,6 +134,9 @@ export async function POST(request: Request) {
     referrerName,
     referrerType,
     invoiceToken,
+    receipt,
+    invoice,
+    vendors,
   } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof id !== "string" || !/^BHJ-/.test(id)) {
@@ -167,6 +189,13 @@ export async function POST(request: Request) {
             typeof referrerType === "string" ? referrerType : undefined,
         }
       : {}),
+    // Customer-facing extras carried from the booking flow (replace the old
+    // localStorage copy). Stored verbatim; the client built + validated them.
+    ...(typeof receipt === "string" && receipt ? { receipt } : {}),
+    ...(invoice && typeof invoice === "object"
+      ? { invoice: invoice as InvoiceData }
+      : {}),
+    ...(Array.isArray(vendors) ? { vendors: vendors as BookedVendor[] } : {}),
   };
 
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a

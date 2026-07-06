@@ -6,7 +6,7 @@ import { Fragment } from "react";
 import { Menu, ChevronRight } from "@/components/admin/shared/icons";
 import BrandIcon from "@/components/BrandIcon";
 import { adminProfile } from "@/lib/admin/mockData";
-import { clearAdminSession } from "@/lib/adminAuth";
+import { logoutAdmin } from "@/lib/adminAuth";
 
 /** Human labels for admin path segments (drives the breadcrumb). */
 const SEGMENT_LABEL: Record<string, string> = {
@@ -111,8 +111,8 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
             </span>
             <button
               type="button"
-              onClick={() => {
-                clearAdminSession();
+              onClick={async () => {
+                await logoutAdmin();
                 router.replace("/admin/login");
               }}
               className="rounded-lg border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"

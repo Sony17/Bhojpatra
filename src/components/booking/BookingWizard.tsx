@@ -7,7 +7,6 @@ import { useHomeContent } from "@/lib/homeContent";
 import { useSessionStatus } from "@/lib/session";
 import LoginGate from "@/components/auth/LoginGate";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
-import { addStoredBooking } from "@/lib/bookings";
 import {
   useVendorRatings,
   statFor,
@@ -65,9 +64,9 @@ const ADVANCE_RATE = 0.1;
 const TOTAL_STEPS = 4;
 // Dev-only affordance: in non-production builds the Confirm step shows a toggle
 // to save the order already Completed & fully paid, so the reviews flow — which
-// only surfaces on a completed booking — can be exercised without hand-editing
-// localStorage. `process.env.NODE_ENV` is inlined at build time, so this and the
-// UI it gates compile out of production bundles.
+// only surfaces on a completed booking — can be exercised without waiting for
+// the event date. `process.env.NODE_ENV` is inlined at build time, so this and
+// the UI it gates compile out of production bundles.
 const DEV_TOOLS = process.env.NODE_ENV !== "production";
 
 // Large functions (1000+ guests) may split a single segment across vendors.
@@ -903,35 +902,15 @@ export default function BookingWizard() {
     const orderPaid = completeNow ? Math.round(grandTotal) : paidAmount;
     const emiPlan = completeNow ? undefined : buildEmiPlanForOrder();
 
-    addStoredBooking({
-      id: bookingId,
-      occasion: occ?.name ?? "Feast",
-      date: formatEventDate(eventDate),
-      guests,
-      vendor: vendorLabel,
-      city: cityObj?.name ?? "—",
-      amount: Math.round(grandTotal),
-      paid: orderPaid,
-      status: orderStatus,
-      ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
-      ...(paymentRef ? { paymentRef } : {}),
-      ...(referralCode.trim()
-        ? {
-            referralCode: referralCode.trim(),
-            referrerName: referrerName || undefined,
-            referrerType: referrerType || undefined,
-          }
-        : {}),
-      ...(emiPlan ? { emiPlan } : {}),
-      receipt: buildReceipt(),
-      invoice: buildInvoice(),
-    });
+    const invoiceData = buildInvoice();
 
-    // Persist to the orders backend so the booking lands in the admin console.
-    // A disk/network blip here shouldn't strand the guest — the order is already
-    // in localStorage and our team follows up — so we confirm regardless.
+    // Persist to the orders backend — the single source of truth (admin console,
+    // the customer's My Bookings, the owner dashboard). The full record is sent,
+    // including the receipt / invoice / vendors the My Bookings view needs. The
+    // order MUST land server-side, so a failure surfaces an error and keeps the
+    // guest on the confirm step to retry rather than showing a false success.
     try {
-      await fetch("/api/bookings", {
+      const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -952,12 +931,37 @@ export default function BookingWizard() {
           referralCode: referralCode.trim() || undefined,
           referrerName: referrerName || undefined,
           referrerType: referrerType || undefined,
+          // Customer-facing extras stored on the order (My Bookings needs these).
+          ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
+          receipt: buildReceipt(),
+          invoice: invoiceData,
           // Lets the server email the owners a link to this order's invoice.
-          invoiceToken: encodeInvoice(buildInvoice()),
+          invoiceToken: encodeInvoice(invoiceData),
         }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setConfirmError(
+          data?.error ??
+            t(
+              "Couldn't confirm your booking. Please try again.",
+              "आपकी बुकिंग कन्फर्म नहीं हो सकी। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        setConfirming(false);
+        return;
+      }
     } catch {
-      /* offline — order is saved locally; team follows up via WhatsApp/phone */
+      setConfirmError(
+        t(
+          "Network error. Please check your connection and try again.",
+          "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जाँचें और पुनः प्रयास करें।",
+        ),
+      );
+      setConfirming(false);
+      return;
     }
 
     setConfirmed(true);
@@ -1147,7 +1151,7 @@ export default function BookingWizard() {
                 <span className="font-semibold text-maroon">Dev only</span> — save
                 this order as <strong>Completed &amp; fully paid</strong> so the
                 &ldquo;Rate your experience&rdquo; review flow shows immediately in
-                My Bookings.
+                My Dashboard.
               </span>
             </label>
           )}

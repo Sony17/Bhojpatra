@@ -21,10 +21,10 @@ export default function PagesTab() {
   const [draft, setDraft] = useState<SitePage | null>(null);
 
   const save = (page: SitePage) => {
-    saveSiteContent({
+    void saveSiteContent({
       ...content,
       pages: content.pages.map((p) => (p.slug === page.slug ? page : p)),
-    });
+    }).catch(() => {});
     setDraft(null);
   };
 

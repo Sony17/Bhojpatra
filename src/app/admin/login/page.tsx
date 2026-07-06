@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAdminSession, loginAdmin } from "@/lib/adminAuth";
+import { useAdminSession, loginAdmin } from "@/lib/adminAuth";
 import BrandIcon from "@/components/BrandIcon";
 
 const inputClass =
@@ -17,9 +17,10 @@ export default function AdminLoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Already signed in → skip straight to the dashboard.
+  const admin = useAdminSession();
   useEffect(() => {
-    if (getAdminSession()) router.replace("/admin/dashboard");
-  }, [router]);
+    if (admin) router.replace("/admin/dashboard");
+  }, [admin, router]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

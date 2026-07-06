@@ -1,11 +1,13 @@
 /**
- * Client-side store for the customer's own bookings.
+ * Client-side access layer for the customer's own bookings.
  *
- * There's no bookings backend yet — when a guest completes the booking wizard
- * we persist the order in localStorage so it shows up on the My Bookings page
- * (/bookings). The list starts empty; only feasts the user actually books
- * appear. Each record carries a pre-built plain-text receipt so the "Download"
- * action can export that one order on its own.
+ * Orders live in the database (`/api/bookings`) — placed by the booking wizard,
+ * read back here for the My Bookings page (`fetchMyBookings` → GET
+ * /api/bookings/mine) and edited via `patchMyBooking` (PATCH /api/bookings/:id).
+ * The list starts empty; only feasts the user actually books appear. Each record
+ * carries a pre-built plain-text receipt so the "Download" action can export
+ * that one order on its own. This module also holds the pure helpers shared with
+ * the server routes (vendor keys, invoice fallback, receipt PDF).
  */
 
 import type { Booking } from "@/lib/data";
@@ -82,86 +84,72 @@ export function bookingVendors(b: StoredBooking): BookedVendor[] {
   return (names.length ? names : ["Bhojpatra"]).map((name) => ({ id: "", name }));
 }
 
-const KEY = "bhojpatra.bookings";
-
-/** Notify any open My Bookings view that the stored list changed. */
+/** Notify any open My Bookings / review view that the customer's list changed
+ *  (so it re-fetches from the API). Same-tab only — the server is the single
+ *  source of truth, so a change here just prompts a refresh. */
 const CHANGED_EVENT = "bhojpatra:bookings-changed";
 
-export function getStoredBookings(): StoredBooking[] {
+/** Fire the change event so every subscribed view re-fetches. */
+export function emitBookingsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CHANGED_EVENT));
+}
+
+/** The result of a booking PATCH — carries the server's error message so the
+ *  caller can surface it (e.g. an invalid status transition). */
+export interface BookingPatchResult {
+  ok: boolean;
+  order?: StoredBooking;
+  error?: string;
+}
+
+/** Fetch the signed-in customer's own bookings from the API (newest first).
+ *  Returns an empty list when signed out or offline. */
+export async function fetchMyBookings(): Promise<StoredBooking[]> {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as StoredBooking[];
-    return Array.isArray(parsed) ? parsed : [];
+    const res = await fetch("/api/bookings/mine", { cache: "no-store" });
+    if (!res.ok) return [];
+    const json = (await res.json().catch(() => null)) as
+      | { orders?: StoredBooking[] }
+      | null;
+    return Array.isArray(json?.orders) ? json.orders : [];
   } catch {
     return [];
   }
 }
 
-/** Prepend a new booking so the most recent order shows first. */
-export function addStoredBooking(booking: StoredBooking): void {
-  if (typeof window === "undefined") return;
-  try {
-    const next = [booking, ...getStoredBookings().filter((b) => b.id !== booking.id)];
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(CHANGED_EVENT));
-  } catch {
-    /* storage unavailable (private mode) — ignore for the mock */
-  }
-}
-
-/** Merge a patch into one stored booking (by id) and notify open views. Used
- *  by the My Bookings editor — leaves every other order untouched. */
-export function updateStoredBooking(
+/** Patch one of the customer's bookings via the API (status, edits, notes or
+ *  the per-vendor review mirror). Notifies open views on success so they
+ *  re-fetch. The owner/transition rules are enforced server-side. */
+export async function patchMyBooking(
   id: string,
   patch: Partial<StoredBooking>,
-): void {
-  if (typeof window === "undefined") return;
+): Promise<BookingPatchResult> {
+  if (typeof window === "undefined") return { ok: false };
   try {
-    const next = getStoredBookings().map((b) =>
-      b.id === id ? { ...b, ...patch } : b,
-    );
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(CHANGED_EVENT));
+    const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { order?: StoredBooking; error?: string }
+      | null;
+    if (!res.ok) return { ok: false, error: json?.error };
+    emitBookingsChanged();
+    return { ok: true, order: json?.order };
   } catch {
-    /* storage unavailable (private mode) — ignore for the mock */
+    return { ok: false };
   }
 }
 
-/** Mark several bookings Completed in one write + one notify, and return the
- *  updated list. Used to auto-complete confirmed orders whose event date has
- *  already passed (so their review flow opens without the customer marking each
- *  one by hand). Returning the new list lets a caller update immediately without
- *  waiting on the change event. Unknown ids are ignored. */
-export function completeBookings(ids: string[]): StoredBooking[] {
-  const current = getStoredBookings();
-  if (typeof window === "undefined" || ids.length === 0) return current;
-  const set = new Set(ids);
-  const next = current.map((b) =>
-    set.has(b.id) ? { ...b, status: "Completed" as const } : b,
-  );
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(CHANGED_EVENT));
-  } catch {
-    /* storage unavailable (private mode) — ignore for the mock */
-  }
-  return next;
-}
-
-/** Subscribe to stored-booking changes (same tab + other tabs). Returns an
- *  unsubscribe function. */
+/** Subscribe to booking-list changes (same tab). Returns an unsubscribe fn. */
 export function onStoredBookingsChange(listener: () => void): () => void {
   if (typeof window === "undefined") return () => {};
-  const storage = (e: StorageEvent) => {
-    if (e.key === KEY) listener();
-  };
   window.addEventListener(CHANGED_EVENT, listener);
-  window.addEventListener("storage", storage);
   return () => {
     window.removeEventListener(CHANGED_EVENT, listener);
-    window.removeEventListener("storage", storage);
   };
 }
 

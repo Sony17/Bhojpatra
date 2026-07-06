@@ -1,4 +1,3 @@
-import path from "path";
 import type { PartnerRole } from "@/lib/session";
 import { createStore } from "@/lib/store";
 import { parseListQuery } from "@/lib/validate";
@@ -26,7 +25,6 @@ export interface PartnerRecord {
 
 const store = createStore<PartnerRecord>({
   table: "partners",
-  file: path.join(process.cwd(), "data", "partners.json"),
   idField: "code",
 });
 

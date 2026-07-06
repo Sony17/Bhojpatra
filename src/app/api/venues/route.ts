@@ -1,4 +1,3 @@
-import path from "path";
 import {
   parseVenuePrice,
   formatVenuePrice,
@@ -15,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 const store = createStore<VenueRecord>({
   table: "venues",
-  file: path.join(process.cwd(), "data", "venues.json"),
   idField: "id",
 });
 

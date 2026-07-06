@@ -6,7 +6,7 @@ import MyBookings from "@/components/bookings/MyBookings";
 import RequireSession from "@/components/auth/RequireSession";
 
 export const metadata: Metadata = {
-  title: "My Bookings — Bhojpatra",
+  title: "My Dashboard — Bhojpatra",
   description:
     "View and manage your Bhojpatra feast bookings — track confirmations, payments due and your celebration history.",
 };

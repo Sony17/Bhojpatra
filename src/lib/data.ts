@@ -806,7 +806,7 @@ export const navLinks: {
 }[] = [
   { label: "Vendors", labelHi: "वेंडर", href: "/vendors" },
   { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
-  { label: "My Bookings", labelHi: "मेरी बुकिंग", href: "/bookings" },
+  { label: "My Dashboard", labelHi: "मेरा डैशबोर्ड", href: "/bookings" },
   { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
 ];
 

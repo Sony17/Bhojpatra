@@ -165,7 +165,7 @@ export default function Hero() {
         <div className="animate-rise delay-3 mt-6 max-w-3xl">{bookingBar}</div>
 
         {/* Trust strip keeps to the same column width as the search bar. */}
-        <div className="animate-rise delay-4 mt-10 grid max-w-3xl grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="animate-rise delay-4 mt-10 grid max-w-3xl grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
           {trustBadges.map(({ Icon, title, sub }) => (
             <div key={title} className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-sm">

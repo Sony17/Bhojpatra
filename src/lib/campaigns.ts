@@ -9,7 +9,6 @@
  * `store.remove`. There is no seed list — the store starts empty until an admin
  * creates one.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 import type { AdminCampaign, CampaignStatus } from "@/lib/admin/types";
@@ -17,16 +16,8 @@ import type { AdminCampaign, CampaignStatus } from "@/lib/admin/types";
 export interface CampaignRecord extends AdminCampaign {
   createdAt: string;
 }
-
-export const CAMPAIGNS_STORE = path.join(
-  process.cwd(),
-  "data",
-  "campaigns.json",
-);
-
 const store = createStore<CampaignRecord>({
   table: "campaigns",
-  file: CAMPAIGNS_STORE,
   idField: "id",
 });
 

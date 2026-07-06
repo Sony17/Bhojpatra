@@ -1,4 +1,3 @@
-import path from "path";
 import { DEFAULT_MERCHANT, isValidVpa, type UpiPayeeConfig } from "@/lib/upi";
 import { readSingleton, writeSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
@@ -9,10 +8,9 @@ import { requireRole } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const SETTINGS_KEY = "payment";
-const STORE = path.join(process.cwd(), "data", "payment-settings.json");
 
 async function readSettings(): Promise<UpiPayeeConfig> {
-  const stored = await readSingleton<UpiPayeeConfig>(SETTINGS_KEY, STORE);
+  const stored = await readSingleton<UpiPayeeConfig>(SETTINGS_KEY);
   return { ...DEFAULT_MERCHANT, ...(stored ?? {}) };
 }
 
@@ -48,7 +46,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    await writeSingleton(SETTINGS_KEY, STORE, settings);
+    await writeSingleton(SETTINGS_KEY, settings);
   } catch (err) {
     console.error("Failed to persist payment settings", err);
     return Response.json(

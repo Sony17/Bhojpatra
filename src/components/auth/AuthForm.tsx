@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import {
   dashboardPath,
-  setSession,
+  refreshSession,
   type AccountType,
   type PartnerRole,
 } from "@/lib/session";
@@ -133,17 +133,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           return;
         }
 
-        // Mirror the role into the client session so the header + dashboards
-        // route correctly (the server also set an auth cookie).
+        // The server set the auth cookie and (for a partner) persisted the
+        // referral roles on the user record — refresh the session so the header
+        // + dashboards pick up the signed-in user.
         if (isPartner) {
           setReferralCode(code);
-          setSession({
-            type: "partner",
-            name: name || undefined,
-            partnerType: partnerRole,
-            referralCode: code,
-            partnerRoles: [{ type: partnerRole, referralCode: code }],
-          });
+          await refreshSession();
           // Record the referral partner so the booking wizard can resolve the
           // code to a name and the admin can see who's referring.
           void fetch("/api/partners", {
@@ -159,7 +154,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             }),
           }).catch(() => {});
         } else {
-          setSession({ type: accountType, name: name || undefined });
+          await refreshSession();
         }
         setSubmitted(true);
       } catch {
@@ -192,7 +187,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         router.push("/admin/dashboard");
         return;
       }
-      setSession({ type: user.role, name: user.name });
+      await refreshSession();
       router.push(dashboardPath(user.role));
     } catch {
       setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));

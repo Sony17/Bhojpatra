@@ -24,7 +24,7 @@ export default function ContactInfoTab() {
   };
 
   const save = () => {
-    saveSiteContent({ ...content, contact: draft });
+    void saveSiteContent({ ...content, contact: draft }).catch(() => {});
     setSaved(true);
   };
 

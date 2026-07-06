@@ -5,7 +5,6 @@
  * financial history), so the DELETE route calls `store.remove`. Seeded from the
  * former mock list on first empty read.
  */
-import path from "path";
 import { randomUUID } from "crypto";
 import { createStore } from "@/lib/store";
 import type { AdminCoupon, CouponStatus, Paginated } from "@/lib/admin/types";
@@ -23,11 +22,9 @@ export interface CouponQuery {
   pageSize?: number;
 }
 
-export const COUPONS_STORE = path.join(process.cwd(), "data", "coupons.json");
 
 const store = createStore<CouponRecord>({
   table: "coupons",
-  file: COUPONS_STORE,
   idField: "id",
 });
 

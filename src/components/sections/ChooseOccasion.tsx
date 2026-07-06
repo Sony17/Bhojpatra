@@ -37,10 +37,10 @@ export default function ChooseOccasion() {
       className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
       <Reveal variant="left" className="text-center">
-        <h2 className="font-display text-4xl text-maroon sm:text-5xl">
+        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           moments when we set tables
         </h2>
-        <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
+        <p className="font-script mx-auto mt-4 max-w-2xl text-xl text-ink-soft sm:text-2xl">
           Make every moment so delicious with the help of Bhojpatra
         </p>
       </Reveal>
@@ -55,20 +55,20 @@ export default function ChooseOccasion() {
           {occasions.map((occasion: Occasion) => (
             <div
               key={occasion.id}
-              className="group relative w-[72vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-[45%] lg:w-[calc((100%-3rem)/3)]"
+              className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-[22.5%] lg:w-[calc((100%-7.5rem)/6)]"
             >
               <div className="relative aspect-[9/10] w-full">
                 <Image
                   src={occasion.image}
                   alt={occasion.name}
                   fill
-                  sizes="(min-width: 1024px) 400px, (min-width: 640px) 45vw, 72vw"
+                  sizes="(min-width: 1024px) 200px, (min-width: 640px) 22.5vw, 36vw"
                   className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
                 />
                 {/* Darken so the name reads on the photo, like the reference */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/15" />
-                <div className="absolute inset-x-0 bottom-0 px-6 pb-8 text-center">
-                  <span className="text-2xl font-bold leading-tight text-white drop-shadow-sm sm:text-3xl">
+                <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
+                  <span className="font-display text-sm font-semibold leading-tight text-white drop-shadow-sm sm:text-base">
                     {occasion.name}
                   </span>
                 </div>

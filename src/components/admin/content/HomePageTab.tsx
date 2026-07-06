@@ -30,10 +30,10 @@ export default function HomePageTab() {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // `content` starts at the server/default snapshot and only resolves to the
-  // localStorage-backed value after hydration. Re-sync the draft to the real
-  // stored content once it arrives (and whenever it changes elsewhere), but
-  // never clobber in-progress edits.
+  // `content` starts at the default snapshot and only resolves to the stored
+  // value once it loads from the API. Re-sync the draft to the real stored
+  // content once it arrives (and whenever it changes elsewhere), but never
+  // clobber in-progress edits.
   const syncedRef = useRef(content);
   useEffect(() => {
     if (content !== syncedRef.current && !dirty) {
@@ -53,7 +53,7 @@ export default function HomePageTab() {
   }
 
   const save = () => {
-    saveHomeContent(draft);
+    void saveHomeContent(draft).catch(() => {});
     setDirty(false);
     setSaved(true);
   };
@@ -71,7 +71,7 @@ export default function HomePageTab() {
       )
     )
       return;
-    resetHomeContent();
+    void resetHomeContent().catch(() => {});
     setDraft(structuredClone(DEFAULT_HOME_CONTENT));
     setDirty(false);
     setSaved(false);

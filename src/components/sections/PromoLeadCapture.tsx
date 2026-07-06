@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
+import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { Mail, Phone } from "@/components/icons";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -19,6 +20,19 @@ export default function PromoLeadCapture() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (status === "submitting") return;
+
+    // Mirror the server's rule (email OR phone) so an incomplete submission
+    // shows an inline message instead of firing a request that's sure to 400.
+    if (!isValidEmail(email) && !isValidPhone(phone)) {
+      setStatus("error");
+      setMessage(
+        t(
+          "Please enter a valid email address or mobile number.",
+          "कृपया एक मान्य ईमेल पता या मोबाइल नंबर दर्ज करें।",
+        ),
+      );
+      return;
+    }
 
     setStatus("submitting");
     setMessage("");

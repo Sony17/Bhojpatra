@@ -1,65 +1,94 @@
+"use client";
+
 /**
- * Admin auth — thin client wrapper over the real auth backend.
+ * Admin auth — a thin client view over the real auth backend.
  *
- * There are no hard-coded credentials any more. Sign-in goes through
- * `POST /api/auth/login`, which sets a signed, HTTP-only session cookie and
- * (for an admin) is mirrored into a small localStorage flag so the admin shell
- * can gate its UI synchronously. The cookie is the source of truth — the flag
- * is re-synced from `GET /api/auth/session` on mount so an expired/again-signed-
- * out session clears the UI too.
+ * There is no localStorage flag any more: the signed, HTTP-only session cookie
+ * (backed by the `users` / `sessions` tables) is the single source of truth.
+ * Sign-in goes through `POST /api/auth/login`; this module reads the resulting
+ * session via `GET /api/auth/session` and exposes it to the admin shell. A
+ * module-level cache is shared across components and reset on every full page
+ * load, so a stale flag can never outlive the real session.
  */
 
 import { useEffect, useState } from "react";
-
-const KEY = "bhojpatra.admin";
-const ADMIN_EVENT = "bhojpatra:admin";
 
 export interface AdminSession {
   email: string;
 }
 
-function notifyChange(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(ADMIN_EVENT));
+interface SessionUser {
+  email: string;
+  role: string;
 }
 
+/* ── Shared admin-session cache (fetch once, notify all subscribers) ───────── */
+
+// `undefined` = not loaded yet; `null` = not an admin; object = signed-in admin.
+let cache: AdminSession | null | undefined = undefined;
+let inflight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function emit(): void {
+  for (const l of listeners) l();
+}
+
+async function load(): Promise<void> {
+  try {
+    const res = await fetch("/api/auth/session", { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as
+      | { user?: SessionUser | null }
+      | null;
+    const user = (res.ok && json?.user) || null;
+    cache = user && user.role === "admin" ? { email: user.email } : null;
+  } catch {
+    cache = null;
+  }
+  emit();
+}
+
+function ensureLoaded(): void {
+  if (cache !== undefined || inflight) return;
+  inflight = load().finally(() => {
+    inflight = null;
+  });
+}
+
+/** Re-fetch the admin session from the server and notify subscribers. */
+export function refreshAdminSession(): Promise<void> {
+  const p = load();
+  inflight = p.finally(() => {
+    inflight = null;
+  });
+  return p;
+}
+
+/** Optimistically set the admin session (right after a successful admin login)
+ *  so the admin shell reveals immediately; reconciled against the server on the
+ *  next page load. */
 export function setAdminSession(session: AdminSession): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(session));
-    notifyChange();
-  } catch {
-    /* storage unavailable (private mode) — ignore */
-  }
+  cache = session;
+  emit();
 }
 
-export function getAdminSession(): AdminSession | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AdminSession;
-    return typeof parsed?.email === "string" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
+/** Clear the cached admin session (optimistic). Prefer `logoutAdmin()`, which
+ *  also ends the server session. */
 export function clearAdminSession(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(KEY);
-    notifyChange();
-  } catch {
-    /* ignore */
-  }
+  cache = null;
+  emit();
+}
+
+/** The current cached admin session (synchronous). `undefined` until first
+ *  loaded — prefer `useAdminSession()` in components. */
+export function getAdminSession(): AdminSession | null | undefined {
+  return cache;
 }
 
 /**
  * Sign in as admin. POSTs to the auth backend; only an account with the `admin`
  * role is accepted here (a customer/vendor logging in on this page is rejected
  * so the public signup flow can never reach the admin console). On success the
- * server sets the session cookie and we mirror the email locally.
+ * server sets the session cookie and we mirror the email into the cache.
  */
 export async function loginAdmin(
   email: string,
@@ -96,41 +125,18 @@ export async function logoutAdmin(): Promise<void> {
 
 /**
  * Reactive read of the admin session. Returns `undefined` while loading (server
- * + first client render), then `null` (signed out) or the session. Re-syncs
- * from the server session cookie on mount so a stale localStorage flag can't
- * outlive the real session.
+ * + first client render), then `null` (not an admin) or the session. Reads the
+ * authoritative server session on mount.
  */
 export function useAdminSession(): AdminSession | null | undefined {
-  const [session, setSession] = useState<AdminSession | null | undefined>(
-    undefined,
-  );
-
+  const [, force] = useState(0);
   useEffect(() => {
-    const sync = () => setSession(getAdminSession());
-    sync();
-
-    // Reconcile with the authoritative server session.
-    let active = true;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!active) return;
-        const user = json?.user as { email: string; role: string } | null;
-        if (user?.role === "admin") setAdminSession({ email: user.email });
-        else clearAdminSession();
-      })
-      .catch(() => {
-        /* offline — keep the cached flag */
-      });
-
-    window.addEventListener(ADMIN_EVENT, sync);
-    window.addEventListener("storage", sync);
+    const rerender = () => force((n) => n + 1);
+    listeners.add(rerender);
+    ensureLoaded();
     return () => {
-      active = false;
-      window.removeEventListener(ADMIN_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      listeners.delete(rerender);
     };
   }, []);
-
-  return session;
+  return cache;
 }
