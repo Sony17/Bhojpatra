@@ -8,7 +8,13 @@
  * Defaults are derived from `src/lib/data.ts` so the seed always matches the
  * original hardcoded page.
  */
-import { categories, packages, galleryItems, testimonials } from "@/lib/data";
+import {
+  categories,
+  packages,
+  galleryItems,
+  testimonials,
+  occasions,
+} from "@/lib/data";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -16,6 +22,23 @@ export interface HomeCategory {
   id: string;
   name: string;
   nameHi: string;
+  image: string;
+}
+
+export interface HomeOccasion {
+  id: string;
+  name: string;
+  nameHi: string;
+  image: string;
+}
+
+export interface HomeBrand {
+  id: string;
+  name: string;
+  nameHi: string;
+  /** Circular brand logo (upload or URL) shown beside the name. When empty,
+   *  the card falls back to the brand name's initials. */
+  logo: string;
   image: string;
 }
 
@@ -64,6 +87,29 @@ export interface HomeContent {
     cta: string;
     ctaHi: string;
     categories: HomeCategory[];
+    /** The curated Baina Box card, shown among the service categories and
+     *  linking to its own catalogue rather than the booking wizard. */
+    bainaBox: HomeCategory;
+  };
+  occasions: {
+    heading: string;
+    headingHi: string;
+    subtitle: string;
+    subtitleHi: string;
+    items: HomeOccasion[];
+  };
+  /** "Celebrate with Sweetness & Love" — the Baina Box promo band. */
+  bainaBoxes: {
+    heading: string;
+    headingHi: string;
+    /** Accent second line (e.g. "Sweetness & Love"). */
+    headingEm: string;
+    headingEmHi: string;
+    subtitle: string;
+    subtitleHi: string;
+    cta: string;
+    ctaHi: string;
+    brands: HomeBrand[];
   };
   packages: {
     heading: string;
@@ -83,7 +129,12 @@ export interface HomeContent {
     subtitleHi: string;
     cta: string;
     ctaHi: string;
-    items: HomeGalleryItem[];
+    /** The fan-out cluster shown *above* the CTA (first 7 are laid out). */
+    cluster: HomeGalleryItem[];
+    /** Top auto-scrolling ribbon (scrolls left → right). */
+    rowOne: HomeGalleryItem[];
+    /** Bottom auto-scrolling ribbon (scrolls right → left). */
+    rowTwo: HomeGalleryItem[];
   };
   testimonials: {
     eyebrow: string;
@@ -134,6 +185,69 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       nameHi: c.nameHi,
       image: c.image,
     })),
+    bainaBox: {
+      id: "baina-box",
+      name: "Baina Box",
+      nameHi: "बैना बॉक्स",
+      image:
+        "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=500&q=70",
+    },
+  },
+  occasions: {
+    heading: "moments when we set tables",
+    headingHi: "जब हम मेज़ सजाते हैं",
+    subtitle: "Make every moment so delicious with the help of Bhojpatra",
+    subtitleHi: "भोजपत्र के साथ हर पल को स्वादिष्ट बनाएं",
+    items: occasions.map((o) => ({
+      id: o.id,
+      name: o.name,
+      nameHi: o.nameHi,
+      image: o.image,
+    })),
+  },
+  bainaBoxes: {
+    heading: "Celebrate with",
+    headingHi: "उत्सव मनाएं",
+    headingEm: "Sweetness & Love",
+    headingEmHi: "मिठास और प्यार के साथ",
+    subtitle: "Premium Baina Boxes from famous brands, beautifully packed.",
+    subtitleHi: "मशहूर ब्रांड्स के प्रीमियम बैना बॉक्स, खूबसूरती से पैक किए हुए।",
+    cta: "Explore Baina Box →",
+    ctaHi: "बैना बॉक्स देखें →",
+    brands: [
+      {
+        id: "ram-asrey",
+        name: "Ram Asrey",
+        nameHi: "राम आसरे",
+        logo: "",
+        image:
+          "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=70",
+      },
+      {
+        id: "chhappan-bhog",
+        name: "Chhappan Bhog",
+        nameHi: "छप्पन भोग",
+        logo: "",
+        image:
+          "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=500&q=70",
+      },
+      {
+        id: "hazelnut-factory",
+        name: "Hazelnut Factory",
+        nameHi: "हेज़लनट फैक्ट्री",
+        logo: "",
+        image:
+          "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=70",
+      },
+      {
+        id: "premium-packaging",
+        name: "Premium Packaging",
+        nameHi: "प्रीमियम पैकेजिंग",
+        logo: "",
+        image:
+          "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=500&q=70",
+      },
+    ],
   },
   packages: {
     heading: "Select Your Package",
@@ -160,8 +274,24 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       "असली शादियों, कॉर्पोरेट गाला और हाउस पार्टियों की एक झलक — हमारे स्पेशलिस्ट द्वारा परोसी और मनाई गई।",
     cta: "Plan your feast",
     ctaHi: "अपना भोज प्लान करें",
-    items: galleryItems.map((g, i) => ({
-      id: `g-${i + 1}`,
+    cluster: galleryItems.slice(0, 7).map((g, i) => ({
+      id: `gc-${i + 1}`,
+      title: g.title,
+      titleHi: g.titleHi,
+      caption: g.caption,
+      captionHi: g.captionHi,
+      image: g.image,
+    })),
+    rowOne: galleryItems.slice(0, 5).map((g, i) => ({
+      id: `gr1-${i + 1}`,
+      title: g.title,
+      titleHi: g.titleHi,
+      caption: g.caption,
+      captionHi: g.captionHi,
+      image: g.image,
+    })),
+    rowTwo: galleryItems.slice(5).map((g, i) => ({
+      id: `gr2-${i + 1}`,
       title: g.title,
       titleHi: g.titleHi,
       caption: g.caption,
@@ -219,6 +349,21 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
       categories: stored.services?.categories?.length
         ? stored.services.categories
         : d.services.categories,
+      bainaBox: { ...d.services.bainaBox, ...stored.services?.bainaBox },
+    },
+    occasions: {
+      ...d.occasions,
+      ...stored.occasions,
+      items: stored.occasions?.items?.length
+        ? stored.occasions.items
+        : d.occasions.items,
+    },
+    bainaBoxes: {
+      ...d.bainaBoxes,
+      ...stored.bainaBoxes,
+      brands: stored.bainaBoxes?.brands?.length
+        ? stored.bainaBoxes.brands
+        : d.bainaBoxes.brands,
     },
     packages: {
       ...d.packages,
@@ -227,13 +372,33 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
         ? stored.packages.tiers
         : d.packages.tiers,
     },
-    gallery: {
-      ...d.gallery,
-      ...stored.gallery,
-      items: stored.gallery?.items?.length
-        ? stored.gallery.items
-        : d.gallery.items,
-    },
+    gallery: (() => {
+      // `items` was the old single list; migrate it into the three groups so
+      // content saved before the split isn't lost.
+      const g = stored.gallery as
+        | (Partial<HomeContent["gallery"]> & { items?: HomeGalleryItem[] })
+        | undefined;
+      const legacy = g?.items?.length ? g.items : null;
+      return {
+        ...d.gallery,
+        ...stored.gallery,
+        cluster: g?.cluster?.length
+          ? g.cluster
+          : legacy
+            ? legacy.slice(0, 7)
+            : d.gallery.cluster,
+        rowOne: g?.rowOne?.length
+          ? g.rowOne
+          : legacy
+            ? legacy.slice(0, 5)
+            : d.gallery.rowOne,
+        rowTwo: g?.rowTwo?.length
+          ? g.rowTwo
+          : legacy
+            ? legacy.slice(5)
+            : d.gallery.rowTwo,
+      };
+    })(),
     testimonials: {
       ...d.testimonials,
       ...stored.testimonials,

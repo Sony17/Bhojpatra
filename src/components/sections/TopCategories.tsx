@@ -7,13 +7,8 @@ import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
-// Curated Baina Box service — surfaced alongside the CMS service categories and
-// pointed at the same baina-box catalogue as the "Sweetness & Love" promo band.
-const BAINA_BOX_IMAGE =
-  "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=500&q=70";
-
 export default function TopCategories() {
-  const { lang, t } = useLang();
+  const { lang } = useLang();
   const { services } = useHomeContent();
 
   // Same swipeable carousel + dot pagination as the "moments when we set
@@ -21,21 +16,26 @@ export default function TopCategories() {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
 
-  // The service categories (from the CMS) plus the curated Baina Box card. Each
-  // regular service opens the booking wizard; Baina Box opens its catalogue.
+  // CMS service categories (each opens the booking wizard) with the curated,
+  // admin-editable Baina Box card slotted into the middle. Baina Box links to
+  // its own catalogue instead of the wizard.
+  const serviceCards = services.categories.map((c) => ({
+    id: c.id,
+    name: lang === "hi" ? c.nameHi : c.name,
+    image: c.image,
+    href: "/book",
+  }));
+  const bainaCard = {
+    id: services.bainaBox.id,
+    name: lang === "hi" ? services.bainaBox.nameHi : services.bainaBox.name,
+    image: services.bainaBox.image,
+    href: "/vendors?q=Baina+Box",
+  };
+  const mid = Math.floor(serviceCards.length / 2);
   const cards = [
-    ...services.categories.map((c) => ({
-      id: c.id,
-      name: lang === "hi" ? c.nameHi : c.name,
-      image: c.image,
-      href: "/book",
-    })),
-    {
-      id: "baina-box",
-      name: t("Baina Box", "बैना बॉक्स"),
-      image: BAINA_BOX_IMAGE,
-      href: "/vendors?q=Baina+Box",
-    },
+    ...serviceCards.slice(0, mid),
+    bainaCard,
+    ...serviceCards.slice(mid),
   ];
 
   const handleScroll = () => {

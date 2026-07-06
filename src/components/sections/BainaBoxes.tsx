@@ -4,56 +4,29 @@ import Link from "next/link";
 import Image from "next/image";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
+import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
-/** Curated, verified Unsplash assets (host allow-listed in next.config.ts). */
-const img = (id: string, w = 500) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
-
-/** Famous mithai houses whose baina boxes we pack & deliver. */
-const brands: {
-  id: string;
-  name: string;
-  nameHi: string;
-  /** Circular monogram shown beside the brand name. */
-  monogram: string;
-  image: string;
-}[] = [
-  {
-    id: "ram-asrey",
-    name: "Ram Asrey",
-    nameHi: "राम आसरे",
-    monogram: "RA",
-    image: img("photo-1631452180519-c014fe946bc7"),
-  },
-  {
-    id: "chhappan-bhog",
-    name: "Chhappan Bhog",
-    nameHi: "छप्पन भोग",
-    monogram: "CB",
-    image: img("photo-1606491956689-2ea866880c84"),
-  },
-  {
-    id: "hazelnut-factory",
-    name: "Hazelnut Factory",
-    nameHi: "हेज़लनट फैक्ट्री",
-    monogram: "HF",
-    image: img("photo-1549465220-1a8b9238cd48"),
-  },
-  {
-    id: "premium-packaging",
-    name: "Premium Packaging",
-    nameHi: "प्रीमियम पैकेजिंग",
-    monogram: "PP",
-    image: img("photo-1513201099705-a9746e1e201f"),
-  },
-];
+/** First letter of the first two words, uppercased — the fallback brand mark
+ *  shown in the circle when a brand has no uploaded logo. */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
 
 /**
  * "Celebrate with Sweetness & Love" — a cream promo band under Services
- * showcasing premium baina boxes from famous brands.
+ * showcasing premium baina boxes from famous brands. All copy, the CTA label
+ * and the brand cards (name, logo, image) are admin-editable via
+ * Admin → Content Control → Home Page → Baina Box Brands.
  */
 export default function BainaBoxes() {
-  const { lang, t } = useLang();
+  const { lang } = useLang();
+  const { bainaBoxes } = useHomeContent();
+  const brands = bainaBoxes.brands;
 
   return (
     <section className="bg-white">
@@ -63,33 +36,36 @@ export default function BainaBoxes() {
             {/* Left — heading, lede, CTA */}
             <div className="text-center lg:text-left">
               <h2 className="font-display text-3xl leading-tight text-ink sm:text-4xl">
-                <span className="block">{t("Celebrate with", "उत्सव मनाएं")}</span>
+                <span className="block">
+                  {lang === "hi" ? bainaBoxes.headingHi : bainaBoxes.heading}
+                </span>
                 <span className="mt-1 block text-maroon">
-                  {t("Sweetness & Love", "मिठास और प्यार के साथ")}
+                  {lang === "hi" ? bainaBoxes.headingEmHi : bainaBoxes.headingEm}
                 </span>
               </h2>
               <p className="font-script mx-auto mt-4 max-w-sm text-lg text-ink-soft lg:mx-0">
-                {t(
-                  "Premium Baina Boxes from famous brands, beautifully packed.",
-                  "मशहूर ब्रांड्स के प्रीमियम बैना बॉक्स, खूबसूरती से पैक किए हुए।",
-                )}
+                {lang === "hi" ? bainaBoxes.subtitleHi : bainaBoxes.subtitle}
               </p>
               <Link
                 href="/vendors?q=Baina+Box"
                 className="btn-sheen mt-8 inline-flex items-center justify-center rounded-full border border-maroon px-8 py-3 text-sm font-semibold text-maroon transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon hover:text-cream hover:shadow-lg active:scale-95"
               >
-                {t("Explore Baina Box →", "बैना बॉक्स देखें →")}
+                {lang === "hi" ? bainaBoxes.ctaHi : bainaBoxes.cta}
               </Link>
             </div>
 
-            {/* Right — brand boxes */}
+            {/* Right — brand boxes. On mobile they sit in a single scrollable
+                row (one line); from sm up they lay out as a 4-up grid. */}
             <Reveal
               as="ul"
               stagger
-              className="grid grid-cols-2 gap-5 sm:grid-cols-4"
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
             >
               {brands.map((brand) => (
-                <li key={brand.id} className="flex flex-col items-center gap-3">
+                <li
+                  key={brand.id}
+                  className="flex w-32 shrink-0 snap-start flex-col items-center gap-3 sm:w-auto"
+                >
                   <div className="relative aspect-square w-full overflow-hidden rounded-2xl ring-1 ring-cream shadow-sm transition duration-300 hover:shadow-md">
                     <Image
                       src={brand.image}
@@ -97,11 +73,23 @@ export default function BainaBoxes() {
                       fill
                       sizes="(min-width: 1024px) 150px, (min-width: 640px) 25vw, 50vw"
                       className="object-cover transition-transform duration-500 hover:scale-105"
+                      unoptimized={isUnoptimized(brand.image)}
                     />
                   </div>
                   <div className="flex min-h-10 w-full items-center justify-center gap-2 text-center">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[10px] font-bold text-maroon ring-1 ring-maroon/40">
-                      {brand.monogram}
+                    <span className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-white text-[10px] font-bold text-maroon ring-1 ring-maroon/40">
+                      {brand.logo ? (
+                        <Image
+                          src={brand.logo}
+                          alt={lang === "hi" ? brand.nameHi : brand.name}
+                          fill
+                          sizes="32px"
+                          className="object-cover"
+                          unoptimized={isUnoptimized(brand.logo)}
+                        />
+                      ) : (
+                        initials(brand.name)
+                      )}
                     </span>
                     <span className="text-sm font-semibold leading-snug text-ink">
                       {lang === "hi" ? brand.nameHi : brand.name}

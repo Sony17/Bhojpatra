@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment } from "react";
-import { Menu, ChevronRight } from "@/components/admin/shared/icons";
+import { Menu, ChevronRight, LogOut } from "@/components/admin/shared/icons";
 import BrandIcon from "@/components/BrandIcon";
 import { adminProfile } from "@/lib/admin/mockData";
 import { logoutAdmin } from "@/lib/adminAuth";
@@ -63,7 +63,7 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
             <BrandIcon className="h-8 w-8 bg-maroon" />
           </Link>
 
-          <nav aria-label="Breadcrumb" className="min-w-0">
+          <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
             <ol className="flex items-center gap-1.5 text-sm">
               {segments.map((seg, i) => {
                 const href = "/" + segments.slice(0, i + 1).join("/");
@@ -71,9 +71,11 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
                 const label = SEGMENT_LABEL[seg] ?? seg;
                 return (
                   <Fragment key={href}>
+                    {/* Separators + parent crumbs only matter once there's room:
+                        on mobile we collapse to just the current page. */}
                     {i > 0 && (
                       <ChevronRight
-                        className="h-3.5 w-3.5 shrink-0 text-ink-soft/50"
+                        className="hidden h-3.5 w-3.5 shrink-0 text-ink-soft/50 sm:block"
                         aria-hidden="true"
                       />
                     )}
@@ -84,7 +86,7 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
                     ) : (
                       <Link
                         href={href}
-                        className="truncate text-ink-soft transition-colors hover:text-maroon"
+                        className="hidden truncate text-ink-soft transition-colors hover:text-maroon sm:inline"
                       >
                         {label}
                       </Link>
@@ -97,29 +99,29 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
         </div>
 
         {/* Right — profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Welcome + avatar */}
-          <div className="flex items-center gap-2.5">
-            <span className="font-script hidden text-base text-ink-soft sm:inline">
-              Welcome, {firstName}
-            </span>
-            <span
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream"
-              title={`${adminProfile.name} · ${adminProfile.role}`}
-            >
-              {adminProfile.initials}
-            </span>
-            <button
-              type="button"
-              onClick={async () => {
-                await logoutAdmin();
-                router.replace("/admin/login");
-              }}
-              className="rounded-lg border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
-            >
-              Log out
-            </button>
-          </div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+          <span className="font-script hidden text-base text-ink-soft sm:inline">
+            Welcome, {firstName}
+          </span>
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream sm:h-10 sm:w-10"
+            title={`${adminProfile.name} · ${adminProfile.role}`}
+          >
+            {adminProfile.initials}
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              await logoutAdmin();
+              router.replace("/admin/login");
+            }}
+            aria-label="Log out"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cream-3 text-sm font-medium text-ink transition-colors hover:bg-cream-2 sm:h-auto sm:w-auto sm:px-3 sm:py-2"
+          >
+            {/* Icon on mobile to save width; full label once there's room. */}
+            <LogOut className="h-5 w-5 sm:hidden" />
+            <span className="hidden sm:inline">Log out</span>
+          </button>
         </div>
       </div>
     </header>

@@ -37,7 +37,6 @@ const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
 export default function Gallery() {
   const { lang } = useLang();
   const { gallery } = useHomeContent();
-  const galleryItems = gallery.items;
   const clusterRef = useRef<HTMLDivElement>(null);
   /** 0 → stacked at centre, 1 → fully fanned out. */
   const [progress, setProgress] = useState(0);
@@ -107,7 +106,7 @@ export default function Gallery() {
     };
   }, []);
 
-  const fanCards = galleryItems.slice(0, FAN.length);
+  const fanCards = gallery.cluster.slice(0, FAN.length);
 
   return (
     <section className="relative overflow-hidden py-20 sm:py-24">
@@ -225,8 +224,8 @@ export default function Gallery() {
           every breakpoint; cards scale up on larger screens. */}
       <div className="mt-16 space-y-3 sm:mt-20 sm:space-y-4">
         {[
-          { row: galleryItems.slice(0, 5), reverse: false },
-          { row: galleryItems.slice(5), reverse: true },
+          { row: gallery.rowOne, reverse: false },
+          { row: gallery.rowTwo, reverse: true },
         ].map(({ row, reverse }, idx) => (
           <div
             key={idx}

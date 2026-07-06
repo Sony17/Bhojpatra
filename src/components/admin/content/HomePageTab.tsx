@@ -10,6 +10,8 @@ import {
   DEFAULT_HOME_CONTENT,
   type HomeContent,
   type HomeCategory,
+  type HomeOccasion,
+  type HomeBrand,
   type HomeGalleryItem,
   type HomeTestimonial,
 } from "@/lib/homeContent";
@@ -207,6 +209,150 @@ export default function HomePageTab() {
             </>
           )}
         />
+
+        <SubCard title="Baina Box (curated card)">
+          <p className="text-xs text-ink-soft">
+            Shown in the middle of the service cards; links to the Baina Box
+            catalogue instead of the booking wizard.
+          </p>
+          <TextRow
+            label="Name"
+            en={draft.services.bainaBox.name}
+            hi={draft.services.bainaBox.nameHi}
+            onEn={(v) =>
+              patch("services", {
+                bainaBox: { ...draft.services.bainaBox, name: v },
+              })
+            }
+            onHi={(v) =>
+              patch("services", {
+                bainaBox: { ...draft.services.bainaBox, nameHi: v },
+              })
+            }
+          />
+          <ImageField
+            value={draft.services.bainaBox.image}
+            onChange={(v) =>
+              patch("services", {
+                bainaBox: { ...draft.services.bainaBox, image: v },
+              })
+            }
+          />
+        </SubCard>
+      </SectionCard>
+
+      {/* ── Occasions ───────────────────────────────────────────────────── */}
+      <SectionCard title="Occasions">
+        <TextRow
+          label="Heading"
+          en={draft.occasions.heading}
+          hi={draft.occasions.headingHi}
+          onEn={(v) => patch("occasions", { heading: v })}
+          onHi={(v) => patch("occasions", { headingHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.occasions.subtitle}
+          hi={draft.occasions.subtitleHi}
+          onEn={(v) => patch("occasions", { subtitle: v })}
+          onHi={(v) => patch("occasions", { subtitleHi: v })}
+        />
+        <ItemList
+          label="Occasion"
+          items={draft.occasions.items}
+          onChange={(items) => patch("occasions", { items })}
+          makeNew={(): HomeOccasion => ({
+            id: `occ-${Date.now()}`,
+            name: "New occasion",
+            nameHi: "नया अवसर",
+            image: "",
+          })}
+          renderItem={(o, set) => (
+            <>
+              <TextRow
+                label="Name"
+                en={o.name}
+                hi={o.nameHi}
+                onEn={(v) => set({ name: v })}
+                onHi={(v) => set({ nameHi: v })}
+              />
+              <ImageField
+                value={o.image}
+                onChange={(v) => set({ image: v })}
+              />
+            </>
+          )}
+        />
+      </SectionCard>
+
+      {/* ── Baina Box Brands ────────────────────────────────────────────── */}
+      <SectionCard title="Baina Box Brands">
+        <p className="text-xs text-ink-soft">
+          The &ldquo;Celebrate with Sweetness &amp; Love&rdquo; promo band. Edit
+          the copy and the famous-brand cards (name, logo &amp; photo).
+        </p>
+        <TextRow
+          label="Heading — line 1"
+          en={draft.bainaBoxes.heading}
+          hi={draft.bainaBoxes.headingHi}
+          onEn={(v) => patch("bainaBoxes", { heading: v })}
+          onHi={(v) => patch("bainaBoxes", { headingHi: v })}
+        />
+        <TextRow
+          label="Heading — line 2 (accent)"
+          en={draft.bainaBoxes.headingEm}
+          hi={draft.bainaBoxes.headingEmHi}
+          onEn={(v) => patch("bainaBoxes", { headingEm: v })}
+          onHi={(v) => patch("bainaBoxes", { headingEmHi: v })}
+        />
+        <AreaRow
+          label="Subtitle"
+          en={draft.bainaBoxes.subtitle}
+          hi={draft.bainaBoxes.subtitleHi}
+          onEn={(v) => patch("bainaBoxes", { subtitle: v })}
+          onHi={(v) => patch("bainaBoxes", { subtitleHi: v })}
+        />
+        <TextRow
+          label="Button label"
+          en={draft.bainaBoxes.cta}
+          hi={draft.bainaBoxes.ctaHi}
+          onEn={(v) => patch("bainaBoxes", { cta: v })}
+          onHi={(v) => patch("bainaBoxes", { ctaHi: v })}
+        />
+        <ItemList
+          label="Brand"
+          items={draft.bainaBoxes.brands}
+          onChange={(brands) => patch("bainaBoxes", { brands })}
+          makeNew={(): HomeBrand => ({
+            id: `brand-${Date.now()}`,
+            name: "New brand",
+            nameHi: "नया ब्रांड",
+            logo: "",
+            image: "",
+          })}
+          renderItem={(b, set) => (
+            <>
+              <TextRow
+                label="Name"
+                en={b.name}
+                hi={b.nameHi}
+                onEn={(v) => set({ name: v })}
+                onHi={(v) => set({ nameHi: v })}
+              />
+              <ImageField
+                label="Box photo"
+                value={b.image}
+                onChange={(v) => set({ image: v })}
+              />
+              <ImageField
+                label="Brand logo"
+                value={b.logo}
+                hint="Shown in the circle beside the name. Leave empty to use the name's initials."
+                onChange={(v) => set({ logo: v })}
+              />
+            </>
+          )}
+        />
       </SectionCard>
 
       {/* ── Packages ────────────────────────────────────────────────────── */}
@@ -306,46 +452,44 @@ export default function HomePageTab() {
         />
 
         <p className="text-xs text-ink-soft">
-          These photos fill the fan-out cluster and the two ribbons that scroll
-          left &amp; right below the &ldquo;Plan your feast&rdquo; button. Add as
-          many as you like, then Save — the first 5 fill the top ribbon and the
-          rest fill the bottom one.
+          The Real Events section has three separate photo groups — edit each on
+          its own below. Every photo has a title, a small tag (e.g. &ldquo;Wedding
+          · 500 pax&rdquo;) and an image.
         </p>
-        <ItemList
-          label="Event photo"
-          items={draft.gallery.items}
-          onChange={(items) => patch("gallery", { items })}
-          makeNew={(): HomeGalleryItem => ({
-            id: `g-${Date.now()}`,
-            title: "New image",
-            titleHi: "नई तस्वीर",
-            caption: "",
-            captionHi: "",
-            image: "",
-          })}
-          renderItem={(g, set) => (
-            <>
-              <TextRow
-                label="Title"
-                en={g.title}
-                hi={g.titleHi}
-                onEn={(v) => set({ title: v })}
-                onHi={(v) => set({ titleHi: v })}
-              />
-              <TextRow
-                label="Caption"
-                en={g.caption}
-                hi={g.captionHi}
-                onEn={(v) => set({ caption: v })}
-                onHi={(v) => set({ captionHi: v })}
-              />
-              <ImageField
-                value={g.image}
-                onChange={(v) => set({ image: v })}
-              />
-            </>
-          )}
-        />
+
+        <SubCard title="Cluster — above the button">
+          <p className="text-xs text-ink-soft">
+            The fan-out cluster shown above the &ldquo;{draft.gallery.cta}&rdquo;
+            button. The first 7 photos are laid out.
+          </p>
+          <ItemList
+            label="Cluster photo"
+            items={draft.gallery.cluster}
+            onChange={(cluster) => patch("gallery", { cluster })}
+            makeNew={() => makeGalleryItem("gc")}
+            renderItem={renderGalleryItem}
+          />
+        </SubCard>
+
+        <SubCard title="Row 1 — top ribbon (scrolls left → right)">
+          <ItemList
+            label="Row 1 photo"
+            items={draft.gallery.rowOne}
+            onChange={(rowOne) => patch("gallery", { rowOne })}
+            makeNew={() => makeGalleryItem("gr1")}
+            renderItem={renderGalleryItem}
+          />
+        </SubCard>
+
+        <SubCard title="Row 2 — bottom ribbon (scrolls right → left)">
+          <ItemList
+            label="Row 2 photo"
+            items={draft.gallery.rowTwo}
+            onChange={(rowTwo) => patch("gallery", { rowTwo })}
+            makeNew={() => makeGalleryItem("gr2")}
+            renderItem={renderGalleryItem}
+          />
+        </SubCard>
       </SectionCard>
 
       {/* ── Testimonials ────────────────────────────────────────────────── */}
@@ -467,6 +611,44 @@ export default function HomePageTab() {
 }
 
 /* ── Building blocks ──────────────────────────────────────────────────────── */
+
+/** A blank Real Events photo; `prefix` keeps ids distinct per group. */
+function makeGalleryItem(prefix: string): HomeGalleryItem {
+  return {
+    id: `${prefix}-${Date.now()}`,
+    title: "New image",
+    titleHi: "नई तस्वीर",
+    caption: "",
+    captionHi: "",
+    image: "",
+  };
+}
+
+/** Shared editor for a single Real Events photo (title + tag + image). */
+function renderGalleryItem(
+  g: HomeGalleryItem,
+  set: (patch: Partial<HomeGalleryItem>) => void,
+) {
+  return (
+    <>
+      <TextRow
+        label="Title"
+        en={g.title}
+        hi={g.titleHi}
+        onEn={(v) => set({ title: v })}
+        onHi={(v) => set({ titleHi: v })}
+      />
+      <TextRow
+        label="Tag (small label, e.g. “Wedding · 500 pax”)"
+        en={g.caption}
+        hi={g.captionHi}
+        onEn={(v) => set({ caption: v })}
+        onHi={(v) => set({ captionHi: v })}
+      />
+      <ImageField value={g.image} onChange={(v) => set({ image: v })} />
+    </>
+  );
+}
 
 function SectionCard({
   title,
