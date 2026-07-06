@@ -9,20 +9,11 @@ import type { AdminCampaign } from "@/lib/admin/types";
 /**
  * Home-page promotional popup. Fetches the currently-running campaign from
  * `GET /api/campaigns/active` (the most recent Active one an admin set in
- * Admin → Campaigns) and shows its picture in a dismissible modal. Once a
- * visitor closes it, that campaign id is remembered in `localStorage` so it
- * won't nag them again — a *new* campaign (new id) shows afresh.
+ * Admin → Campaigns) and shows its picture in a modal covering ~70% of the
+ * screen. It appears on every home-page visit; closing it (X / Escape / click
+ * outside) only hides it for the current view — reloading or coming back shows
+ * it again.
  */
-
-const DISMISS_KEY = "bhojpatra.campaign-dismissed";
-
-function alreadyDismissed(id: string): boolean {
-  try {
-    return window.localStorage.getItem(DISMISS_KEY) === id;
-  } catch {
-    return false;
-  }
-}
 
 /** Absolute URLs (offers on another site) open in a new tab; in-site paths
  *  (`/packages`) navigate in place. */
@@ -35,19 +26,7 @@ export default function CampaignPopup() {
   const [campaign, setCampaign] = useState<AdminCampaign | null>(null);
   const [open, setOpen] = useState(false);
 
-  const close = useCallback(() => {
-    setOpen(false);
-    setCampaign((current) => {
-      if (current) {
-        try {
-          window.localStorage.setItem(DISMISS_KEY, current.id);
-        } catch {
-          /* ignore private-mode storage errors */
-        }
-      }
-      return current; // stays set, but `open` is false so nothing renders
-    });
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     let alive = true;
@@ -56,7 +35,7 @@ export default function CampaignPopup() {
       .then((json) => {
         if (!alive) return;
         const c = json?.campaign as AdminCampaign | null | undefined;
-        if (c?.image && !alreadyDismissed(c.id)) setCampaign(c);
+        if (c?.image) setCampaign(c);
       })
       .catch(() => {});
     return () => {
@@ -83,20 +62,6 @@ export default function CampaignPopup() {
 
   if (!campaign || !open) return null;
 
-  const picture = (
-    <Image
-      src={campaign.image}
-      alt={campaign.name}
-      width={0}
-      height={0}
-      sizes="(max-width: 640px) 92vw, 32rem"
-      style={{ width: "100%", height: "auto" }}
-      unoptimized={isUnoptimized(campaign.image)}
-      className="block"
-      priority
-    />
-  );
-
   return (
     <div
       className="animate-fade fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 [animation-duration:0.3s]"
@@ -105,10 +70,35 @@ export default function CampaignPopup() {
       aria-label={t("Special offer", "विशेष ऑफ़र")}
       onClick={close}
     >
+      {/* Card covers ~70% of the viewport (wider on small screens so it stays
+          usable); the picture is contained within it so nothing is cropped. */}
       <div
-        className="animate-rise relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_rgba(0,0,0,0.35)] [animation-duration:0.4s]"
+        className="animate-rise relative h-[70vh] w-[90vw] max-w-[1000px] overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_rgba(0,0,0,0.35)] [animation-duration:0.4s] sm:w-[70vw]"
         onClick={(e) => e.stopPropagation()}
       >
+        <Image
+          src={campaign.image}
+          alt={campaign.name}
+          fill
+          sizes="(max-width: 640px) 90vw, 70vw"
+          className="object-contain"
+          unoptimized={isUnoptimized(campaign.image)}
+          priority
+        />
+
+        {/* Whole picture is the click target when a link is set. */}
+        {campaign.linkUrl && (
+          <a
+            href={campaign.linkUrl}
+            onClick={close}
+            aria-label={campaign.name}
+            className="absolute inset-0"
+            {...(isExternal(campaign.linkUrl)
+              ? { target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+          />
+        )}
+
         <button
           type="button"
           onClick={close}
@@ -126,21 +116,6 @@ export default function CampaignPopup() {
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-
-        {campaign.linkUrl ? (
-          <a
-            href={campaign.linkUrl}
-            onClick={close}
-            className="block"
-            {...(isExternal(campaign.linkUrl)
-              ? { target: "_blank", rel: "noopener noreferrer" }
-              : {})}
-          >
-            {picture}
-          </a>
-        ) : (
-          picture
-        )}
       </div>
     </div>
   );
