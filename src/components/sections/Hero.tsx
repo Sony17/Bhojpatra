@@ -54,7 +54,8 @@ export default function Hero() {
   // Occasion / date / location + CTA — one unified white search bar, per the
   // reference mock: labelled fields separated by hairlines, CTA on the right
   // edge of the same pill.
-  const fieldLabel = "block truncate text-xs font-semibold text-ink";
+  const fieldLabel =
+    "block truncate text-[11px] font-semibold text-ink sm:text-xs";
   const divider = (
     <span aria-hidden="true" className="block w-px self-stretch bg-maroon/15" />
   );
@@ -63,7 +64,7 @@ export default function Hero() {
   // shrinks to a magnifier; the full label returns from `sm` up.
   const bookingBar = (
     <div className="flex w-full flex-row items-stretch gap-0 rounded-2xl border border-maroon/20 bg-white p-1.5 shadow-[0_18px_45px_-18px_rgba(185,32,37,0.35)] transition-shadow focus-within:border-maroon/40 sm:p-2.5 lg:rounded-[1.6rem]">
-      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
+      <div className="min-w-0 flex-1 px-1.5 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         <BrandSelect
           className="mt-0.5"
@@ -71,7 +72,7 @@ export default function Hero() {
           placeholder={t("Select Occasion", "अवसर चुनें")}
           ariaLabel={t("Select Occasion", "अवसर चुनें")}
           icon="chevron"
-          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
+          buttonClassName="py-0.5 pr-5 text-xs sm:text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
           align="left"
@@ -82,13 +83,13 @@ export default function Hero() {
 
       {divider}
 
-      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
+      <div className="min-w-0 flex-1 px-1.5 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Date", "तारीख")}</span>
         <DatePicker
           className="mt-0.5"
           placeholder={t("Select Date", "तारीख चुनें")}
           ariaLabel={t("Select Date", "तारीख चुनें")}
-          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
+          buttonClassName="py-0.5 pr-5 text-xs sm:text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
           align="center"
@@ -99,7 +100,7 @@ export default function Hero() {
 
       {divider}
 
-      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
+      <div className="min-w-0 flex-1 px-1.5 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Location", "लोकेशन")}</span>
         <BrandSelect
           className="mt-0.5"
@@ -107,7 +108,7 @@ export default function Hero() {
           placeholder={t("Select Location", "लोकेशन चुनें")}
           ariaLabel={t("Select Location", "लोकेशन चुनें")}
           icon="mapPin"
-          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
+          buttonClassName="py-0.5 pr-5 text-xs sm:text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
           align="right"
@@ -119,7 +120,7 @@ export default function Hero() {
       <a
         href={bookHref}
         aria-label={t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
-        className="btn-sheen ml-1 flex shrink-0 items-center justify-center self-center rounded-xl bg-maroon px-3.5 py-3 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:self-stretch sm:px-5 sm:py-3.5 lg:ml-2 lg:rounded-[1.15rem]"
+        className="btn-sheen ml-1 flex shrink-0 items-center justify-center self-center rounded-xl bg-maroon px-2.5 py-2.5 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:self-stretch sm:px-5 sm:py-3.5 lg:ml-2 lg:rounded-[1.15rem]"
       >
         <svg
           aria-hidden="true"
@@ -199,7 +200,7 @@ export default function Hero() {
             </span>
           </h1>
 
-          <p className="animate-rise delay-2 mt-5 max-w-md text-base text-ink-soft sm:text-lg">
+          <p className="animate-rise delay-2 mt-5 max-w-md text-sm text-ink-soft sm:text-base">
             {lang === "hi" ? hero.ledeHi : hero.lede}
           </p>
 

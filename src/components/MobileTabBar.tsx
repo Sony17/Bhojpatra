@@ -9,7 +9,8 @@ import AccountMenuPanel from "./AccountMenuPanel";
 
 /** Primary destinations surfaced as an app-style bottom tab bar on mobile.
  *  On mobile the header nav is hidden, so "Partner With Us" rides here as a
- *  dedicated tab; the final slot is the account menu (see below). */
+ *  dedicated tab. The tab for the page you're currently on is dropped, so the
+ *  bar always shows five slots: four of these plus the account menu (below). */
 const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNode }[] = [
   {
     label: "Home",
@@ -122,18 +123,18 @@ export default function MobileTabBar() {
       )}
 
       <ul className="mx-auto flex max-w-md items-stretch justify-around">
-        {tabs.map((tab) => {
-          const active =
-            tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
-          return (
+        {tabs
+          .filter((tab) =>
+            tab.href === "/"
+              ? pathname !== "/"
+              : !pathname.startsWith(tab.href),
+          )
+          .map((tab) => (
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
-                aria-current={active ? "page" : undefined}
                 onClick={() => setAccountOpen(false)}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
-                  active ? "text-maroon" : "text-ink-soft hover:text-maroon"
-                }`}
+                className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold text-ink-soft transition-colors hover:text-maroon"
               >
                 <svg
                   aria-hidden="true"
@@ -150,8 +151,7 @@ export default function MobileTabBar() {
                 {lang === "hi" ? tab.labelHi : tab.label}
               </Link>
             </li>
-          );
-        })}
+          ))}
 
         {/* Account — opens the shared account/language menu upward. */}
         <li className="flex-1">

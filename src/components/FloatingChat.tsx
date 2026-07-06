@@ -253,7 +253,7 @@ export default function FloatingChat() {
 
   return (
     <div
-      className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
+      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex flex-col items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
       style={
         accountMenu.open
           ? {

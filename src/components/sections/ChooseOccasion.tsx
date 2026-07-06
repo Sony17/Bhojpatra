@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { occasions, type Occasion } from "@/lib/data";
 import Reveal from "@/components/Reveal";
@@ -57,7 +58,13 @@ export default function ChooseOccasion() {
               key={occasion.id}
               className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-xl sm:w-[22.5%] lg:w-[calc((100%-7.5rem)/6)]"
             >
-              <div className="relative aspect-[9/10] w-full">
+              {/* Tapping an occasion opens the booking wizard with that
+                  occasion pre-selected (the wizard reads `?occasion=`). */}
+              <Link
+                href={`/book?occasion=${occasion.id}`}
+                aria-label={`Book — ${occasion.name}`}
+                className="relative block aspect-[9/10] w-full"
+              >
                 <Image
                   src={occasion.image}
                   alt={occasion.name}
@@ -72,7 +79,7 @@ export default function ChooseOccasion() {
                     {occasion.name}
                   </span>
                 </div>
-              </div>
+              </Link>
             </div>
           ))}
         </div>
