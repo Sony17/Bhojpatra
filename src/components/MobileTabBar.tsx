@@ -8,8 +8,8 @@ import { setAccountMenuState } from "@/lib/accountMenu";
 import AccountMenuPanel from "./AccountMenuPanel";
 
 /** Primary destinations surfaced as an app-style bottom tab bar on mobile.
- *  The fifth slot is the account menu (see below); secondary items (Partner,
- *  Contact) stay in the header. */
+ *  On mobile the header nav is hidden, so "Partner With Us" rides here as a
+ *  dedicated tab; the final slot is the account menu (see below). */
 const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNode }[] = [
   {
     label: "Home",
@@ -48,6 +48,18 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
       <>
         <path d="M5 20V6.5L12 4l7 2.5V20" />
         <path d="M3.5 20h17M9 20v-4h6v4M9 9h1.5M13.5 9H15M9 12.5h1.5M13.5 12.5H15" />
+      </>
+    ),
+  },
+  {
+    label: "Partner",
+    labelHi: "पार्टनर",
+    href: "/partner",
+    icon: (
+      <>
+        <circle cx="8.5" cy="8" r="3" />
+        <path d="M3 19a5.5 5.5 0 0 1 11 0" />
+        <path d="M15.5 5.2a3 3 0 0 1 0 5.6M16.5 13.4A5.5 5.5 0 0 1 21 18.8" />
       </>
     ),
   },
