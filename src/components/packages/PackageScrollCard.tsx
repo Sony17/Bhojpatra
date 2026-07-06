@@ -25,7 +25,7 @@ const SCROLL_RATIO = "458 / 545";
  * horizontal insets keep text clear of the maroon border and the right-hand
  * roll; the vertical insets clear the top lace band and bottom roll.
  */
-const PARCHMENT = "left-[13%] right-[21%] top-[16%] bottom-[16%]";
+const PARCHMENT = "left-[13%] right-[21%] top-[16%] bottom-[19%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
@@ -153,8 +153,19 @@ export default function PackageScrollCard({
           priority={priority || popular}
         />
 
-        {/* Writable parchment area */}
-        <div className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}>
+        {/* Writable parchment area — Gold (popular) gets a soft cream / golden
+            wash so its background reads gold within the brand palette. */}
+        <div
+          className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}
+          style={
+            popular
+              ? {
+                  background:
+                    "radial-gradient(120% 85% at 50% 28%, rgba(240,208,158,0.55), rgba(240,208,158,0.12) 62%, rgba(240,208,158,0) 100%)",
+                }
+              : undefined
+          }
+        >
           {/* Title + price */}
           <h3 className="text-center font-display text-2xl leading-none tracking-wide text-maroon">
             {tierName}
@@ -257,9 +268,11 @@ export default function PackageScrollCard({
           {!ctaOnFold && cta}
         </div>
 
-        {/* Action area sitting on the scroll's bottom red fold (home page). */}
+        {/* Action area centered on the scroll's bottom red fold (home page) —
+            matches the parchment's horizontal span so it lines up with the menu
+            column, and sits on the fold band (≈89–96% of the artwork). */}
         {ctaOnFold && cta && (
-          <div className="absolute inset-x-0 bottom-[2.5%] z-20 flex justify-center">
+          <div className="absolute bottom-[5%] left-[13%] right-[21%] z-20 flex justify-center">
             {cta}
           </div>
         )}
