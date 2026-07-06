@@ -50,17 +50,23 @@ export default function Packages() {
           <Ornament className="mx-auto mt-6 text-maroon/50" />
         </Reveal>
 
+        {/* Mobile: one row, swipe left–right with snap (no-scrollbar hides the
+            bar; pt makes room for the ribbons, which sit above the cards and
+            would otherwise be clipped by the scroll box). sm+: the grid. */}
         <Reveal
           stagger
           from="right"
-          className="mx-auto mt-12 grid max-w-6xl grid-cols-1 items-stretch gap-7 sm:mt-14 sm:grid-cols-2 lg:grid-cols-3"
+          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-6 pt-7 sm:mx-auto sm:mt-14 sm:grid sm:max-w-6xl sm:snap-none sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-0 lg:grid-cols-3"
         >
           {tiers.map((tier) => {
             const selected = tier.id === selectedId;
             const tierName = lang === "hi" ? tier.nameHi : tier.name;
             return (
-              <PackageScrollCard
+              <div
                 key={tier.id}
+                className="w-[85vw] max-w-[345px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+              >
+              <PackageScrollCard
                 tier={tier}
                 selected={selected}
                 onSelect={() => setSelectedId(tier.id)}
@@ -81,6 +87,7 @@ export default function Packages() {
                   </Link>
                 }
               />
+              </div>
             );
           })}
         </Reveal>

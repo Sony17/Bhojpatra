@@ -136,7 +136,7 @@ export default function PackageScrollCard({
       : premium
         ? [
             {
-              band: "linear-gradient(150deg, rgba(0,0,0,0.16), rgba(0,0,0,0.05) 38%, rgba(0,0,0,0.14) 52%, rgba(0,0,0,0.04) 66%, rgba(0,0,0,0.12))",
+              band: "linear-gradient(150deg, rgba(0,0,0,0.32), rgba(0,0,0,0.14) 38%, rgba(0,0,0,0.28) 52%, rgba(0,0,0,0.12) 66%, rgba(0,0,0,0.26))",
               blend: "multiply",
             },
           ]
@@ -229,9 +229,41 @@ export default function PackageScrollCard({
           />
         )}
 
-        {/* Writable parchment area — layout only; tier colour comes from the
-            masked finish overlay above. */}
-        <div className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}>
+        {/* Writable parchment area. The masked finish above only bites where
+            the artwork is opaque (the red folds); the parchment pixels are
+            near-transparent, so Platinum's smoky cast is painted here as a
+            soft radial that fades out well before the edges (no rectangle).
+            A separate masked child carries the mid-card shimmer. */}
+        <div
+          className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}
+          style={
+            premium
+              ? {
+                  // closest-side: the fade reaches exactly 0 AT the box edges,
+                  // so no faint straight line ever shows where the box clips.
+                  // Kept whisper-light — any stronger and the centre reads as
+                  // a dark stain rather than a smoky platinum cast.
+                  background:
+                    "radial-gradient(closest-side at 50% 42%, rgba(0,0,0,0.07), rgba(0,0,0,0.045) 55%, rgba(0,0,0,0) 100%)",
+                }
+              : undefined
+          }
+        >
+          {/* Mid-card shimmer — masked with a radial fade so the sweeping band
+              dissolves before the parchment box's edges instead of being cut
+              off by them (a hard clip reads as a visible rectangle). */}
+          {premium && (
+            <div
+              aria-hidden="true"
+              className="premium-shimmer pointer-events-none absolute inset-0 z-10"
+              style={{
+                WebkitMaskImage:
+                  "radial-gradient(closest-side at 50% 45%, black 40%, transparent 96%)",
+                maskImage:
+                  "radial-gradient(closest-side at 50% 45%, black 40%, transparent 96%)",
+              }}
+            />
+          )}
           {/* Selected marker — a maroon check chip pinned to the parchment's
               top-right corner so the chosen scroll is unmistakable. */}
           {selected && (
@@ -276,8 +308,10 @@ export default function PackageScrollCard({
           )}
 
           {/* Entire menu — every course and item written out. Scrolls within
-              the parchment only if a very long tier overflows the frame. */}
-          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+              the parchment only if a very long tier overflows the frame.
+              pl-1 gives the rotated rhombus markers room — their corners
+              poke ~2px past their box and were being clipped flat. */}
+          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pl-1 pr-1">
             {segments.map((seg) => {
               if (seg.type === "item") {
                 const label =
@@ -374,16 +408,16 @@ export default function PackageScrollCard({
           {!ctaOnFold && cta}
         </div>
 
-        {/* Action area centered on the scroll's bottom red fold (home page) —
-            matches the parchment's horizontal span so it lines up with the menu
-            column. The fold band's visible centreline sits 7.8% up the artwork
-            (band ≈ 88.4–96.0% measured from the RENDERED card, which sits a
-            hair below the raw pack.png rows once scaling and the drop-shadow
-            filter soften its edges); anchoring the pill's bottom at that line
-            minus half its own 28px height keeps it dead centre on the band at
-            every card size. */}
+        {/* Action area centered on the scroll's bottom red fold — matches the
+            parchment's horizontal span so it lines up with the menu column.
+            The fold band's visible centreline sits 7.8% up the artwork (band
+            ≈ 88.4–96.0% measured from the RENDERED card, which sits a hair
+            below the raw pack.png rows once scaling and the drop-shadow filter
+            soften its edges). Anchoring the container's bottom at that line
+            and translating down by half its own height keeps any-height CTA
+            dead centre on the band at every card size. */}
         {ctaOnFold && cta && (
-          <div className="absolute bottom-[calc(7.8%-14px)] left-[13%] right-[21%] z-20 flex justify-center">
+          <div className="absolute bottom-[7.8%] left-[13%] right-[21%] z-20 flex translate-y-1/2 justify-center">
             {cta}
           </div>
         )}

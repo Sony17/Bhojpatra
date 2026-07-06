@@ -1045,7 +1045,9 @@ export default function BookingWizard() {
           showSummary ? "mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]" : "mt-8"
         }
       >
-        <div>
+        {/* min-w-0 lets the package carousel scroll inside this grid column
+            instead of the column growing to the row's full content width. */}
+        <div className="min-w-0">
           {step === 1 && (
             <StepPackage
               lang={lang}
@@ -1500,15 +1502,18 @@ function StepPackage({
         </p>
       )}
       {/* Same "patra scroll" cards the home page advertises, so a tier looks
-          identical here and on the landing page. Columns track the number of
-          packages the date qualifies for, so a lone available tier (e.g. only
-          Custom for a same-day date) fills the column instead of stranding an
-          empty half beside it. */}
+          identical here and on the landing page — fold-mounted CTA pill and,
+          on mobile, the same swipe left–right snap carousel. On sm+ the grid's
+          columns track the number of packages the date qualifies for, so a
+          lone available tier (e.g. only Custom for a same-day date) fills the
+          column instead of stranding an empty half beside it. */}
       <div
         className={
-          "grid items-stretch gap-7 " +
+          // pt keeps the Popular/Premium ribbons (which float above the cards)
+          // clear of the availability notice above the grid.
+          "no-scrollbar flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto pb-4 pt-7 sm:snap-none sm:grid sm:gap-7 sm:overflow-visible sm:pb-0 sm:pt-6 " +
           (available.length === 1
-            ? "grid-cols-1"
+            ? "sm:grid-cols-1"
             : available.length === 2
               ? "sm:grid-cols-2"
               : available.length === 3
@@ -1520,11 +1525,15 @@ function StepPackage({
           const selected = tier.id === packageId;
           const tierName = lang === "hi" ? tier.nameHi : tier.name;
           return (
-            <PackageScrollCard
+            <div
               key={tier.id}
+              className="w-[85vw] max-w-[345px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+            >
+            <PackageScrollCard
               tier={tier}
               selected={selected}
               onSelect={() => setPackageId(tier.id)}
+              ctaOnFold
               cta={
                 <button
                   type="button"
@@ -1532,14 +1541,17 @@ function StepPackage({
                     e.stopPropagation();
                     setPackageId(tier.id);
                   }}
-                  className="btn-sheen mt-2 block w-full rounded-lg bg-maroon px-4 py-2 text-center text-[11px] font-semibold tracking-wide text-cream shadow-sm transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+                  className="btn-sheen inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-3 text-[10px] font-semibold tracking-wide text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
                 >
-                  {selected
-                    ? `${t("Selected", "चयनित")} ${tierName} →`
-                    : `${t("Select", "चुनें")} ${tierName}`}
+                  <span className="font-display leading-none">
+                    {selected
+                      ? `✓ ${t("Selected", "चयनित")}`
+                      : `${t("Select", "चुनें")} ${tierName}`}
+                  </span>
                 </button>
               }
             />
+            </div>
           );
         })}
       </div>

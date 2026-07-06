@@ -95,6 +95,15 @@ h6,
   text-transform: uppercase;
 }
 
+/* Horizontal carousels scroll by touch/drag; the bar itself is just noise */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Brand text-selection colour */
 ::selection {
   background: var(--color-maroon);
@@ -332,9 +341,9 @@ html {
     inset: 0;
     background: linear-gradient(
       110deg,
-      transparent 35%,
-      rgba(255, 255, 255, 0.45) 50%,
-      transparent 65%
+      transparent 32%,
+      rgba(255, 255, 255, 0.6) 50%,
+      transparent 68%
     );
     background-size: 220% 100%;
     background-position: -120% 0;
