@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import BrandSelect from "@/components/BrandSelect";
 import DatePicker from "@/components/DatePicker";
+import { ShieldCheck, PriceTag, ClipboardCheck, Headset } from "@/components/icons";
 import { occasions, cities } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
@@ -28,56 +29,97 @@ export default function Hero() {
   if (date) bookParams.set("date", toYmd(date));
   const bookHref = `/book?${bookParams.toString()}`;
 
-  // Occasion / date / location + CTA search bar.
+  // Occasion / date / location + CTA — one unified white search bar, per the
+  // reference mock: labelled fields separated by hairlines, CTA on the right
+  // edge of the same pill.
+  const fieldLabel = "block text-xs font-semibold text-ink";
+  const divider = (
+    <span aria-hidden="true" className="hidden w-px self-stretch bg-maroon/15 lg:block" />
+  );
   const bookingBar = (
-    <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
-      <div className="relative flex flex-1 items-stretch rounded-2xl border border-maroon/40 bg-white shadow-[0_10px_30px_-12px_rgba(185,32,37,0.25)] transition-shadow focus-within:border-maroon focus-within:shadow-[0_14px_36px_-12px_rgba(185,32,37,0.35)]">
+    <div className="flex w-full flex-col gap-1 rounded-2xl border border-maroon/20 bg-white p-2.5 shadow-[0_18px_45px_-18px_rgba(185,32,37,0.35)] transition-shadow focus-within:border-maroon/40 lg:flex-row lg:items-stretch lg:gap-0 lg:rounded-[1.6rem]">
+      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+        <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         <BrandSelect
-          className="flex-1"
+          className="mt-0.5"
           options={occasions}
           placeholder={t("Select Occasion", "अवसर चुनें")}
           ariaLabel={t("Select Occasion", "अवसर चुनें")}
-          icon="calendar"
+          icon="chevron"
+          buttonClassName="py-0.5 pr-8 text-sm"
+          iconClassName="right-1"
           direction="up"
           defaultId={occasions[0].id}
           onChange={(o) => setOccasionId(o.id)}
         />
       </div>
 
-      <div className="relative flex flex-1 items-stretch rounded-2xl border border-maroon/40 bg-white shadow-[0_10px_30px_-12px_rgba(185,32,37,0.25)] transition-shadow focus-within:border-maroon focus-within:shadow-[0_14px_36px_-12px_rgba(185,32,37,0.35)]">
+      {divider}
+
+      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+        <span className={fieldLabel}>{t("Date", "तारीख")}</span>
         <DatePicker
-          className="flex-1"
+          className="mt-0.5"
           placeholder={t("Select Date", "तारीख चुनें")}
           ariaLabel={t("Select Date", "तारीख चुनें")}
+          buttonClassName="py-0.5 pr-8 text-sm"
+          iconClassName="right-1"
           direction="up"
           defaultDaysAhead={21}
           onChange={(d) => setDate(d)}
         />
       </div>
 
-      <div className="relative flex flex-[1.4] items-stretch rounded-2xl border border-maroon/40 bg-white p-1.5 shadow-[0_10px_30px_-12px_rgba(185,32,37,0.25)] transition-shadow focus-within:border-maroon focus-within:shadow-[0_14px_36px_-12px_rgba(185,32,37,0.35)]">
+      {divider}
+
+      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+        <span className={fieldLabel}>{t("Location", "लोकेशन")}</span>
         <BrandSelect
-          className="flex-1"
+          className="mt-0.5"
           options={cities}
           placeholder={t("Select Location", "लोकेशन चुनें")}
           ariaLabel={t("Select Location", "लोकेशन चुनें")}
           icon="mapPin"
-          buttonClassName="px-3.5 py-2 pr-9"
-          iconClassName="right-2.5"
+          buttonClassName="py-0.5 pr-8 text-sm"
+          iconClassName="right-1"
           direction="up"
           defaultId={cities[0].id}
           onChange={(c) => setCityId(c.id)}
         />
-
-        <a
-          href={bookHref}
-          className="btn-sheen flex shrink-0 items-center rounded-xl bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:whitespace-nowrap"
-        >
-          {t("Explore Packages", "पैकेज देखें")}
-        </a>
       </div>
+
+      <a
+        href={bookHref}
+        className="btn-sheen flex shrink-0 items-center justify-center rounded-xl bg-maroon px-5 py-3.5 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] lg:ml-2 lg:whitespace-nowrap lg:rounded-[1.15rem]"
+      >
+        {t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
+      </a>
     </div>
   );
+
+  // Trust strip under the booking bar — mirrors the reference mock.
+  const trustBadges = [
+    {
+      Icon: ShieldCheck,
+      title: t("Verified Partners", "वेरिफाइड पार्टनर्स"),
+      sub: t("Quality you can trust", "क्वालिटी जिस पर भरोसा हो"),
+    },
+    {
+      Icon: PriceTag,
+      title: t("Transparent Pricing", "पारदर्शी कीमतें"),
+      sub: t("No hidden surprises", "कोई छिपा खर्च नहीं"),
+    },
+    {
+      Icon: ClipboardCheck,
+      title: t("Easy Booking", "आसान बुकिंग"),
+      sub: t("In just a few clicks", "बस कुछ क्लिक में"),
+    },
+    {
+      Icon: Headset,
+      title: t("Dedicated Support", "समर्पित सपोर्ट"),
+      sub: t("We're here for you", "हम आपके साथ हैं"),
+    },
+  ];
 
   return (
     <section id="home" className="relative isolate flex min-h-screen flex-col overflow-hidden bg-surface-beige">
@@ -98,7 +140,7 @@ export default function Hero() {
       {/* Readability scrim. */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 bg-gradient-to-r from-white/90 via-white/60 to-white/10"
+        className="absolute inset-0 -z-10 bg-gradient-to-r from-white/95 via-white/85 via-[62%] to-white/15"
       />
 
       {/* Content — left-aligned headline, lede, and booking bar. */}
@@ -117,7 +159,26 @@ export default function Hero() {
             {lang === "hi" ? hero.ledeHi : hero.lede}
           </p>
 
-          <div className="animate-rise delay-3 mt-6 max-w-2xl">{bookingBar}</div>
+        </div>
+
+        {/* Search bar — slightly wider than the headline column. */}
+        <div className="animate-rise delay-3 mt-6 max-w-3xl">{bookingBar}</div>
+
+        {/* Trust strip keeps to the same column width as the search bar. */}
+        <div className="animate-rise delay-4 mt-10 grid max-w-3xl grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+          {trustBadges.map(({ Icon, title, sub }) => (
+            <div key={title} className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-sm">
+                <Icon className="h-4 w-4 text-maroon" />
+              </span>
+              <span className="min-w-0 [text-shadow:0_0_6px_rgba(255,255,255,0.95),0_0_14px_rgba(255,255,255,0.85),0_0_26px_rgba(255,255,255,0.7)]">
+                <span className="block whitespace-nowrap text-[13px] font-bold text-ink">
+                  {title}
+                </span>
+                <span className="block whitespace-nowrap text-xs text-ink-soft">{sub}</span>
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </section>

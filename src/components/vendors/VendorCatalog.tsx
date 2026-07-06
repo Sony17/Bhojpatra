@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   vendorListings,
   indianStates,
@@ -139,7 +140,10 @@ export default function VendorCatalog() {
     }
   };
 
-  const [query, setQuery] = useState<string>("");
+  // Seed the search box from `?q=` so other pages can deep-link a pre-filtered
+  // catalog (e.g. the home page's Baina Box CTA → /vendors?q=Baina+Box).
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState<string>(() => searchParams.get("q") ?? "");
   const [city, setCity] = useState<string>(ALL);
   const [state, setState] = useState<string>(ALL);
   const [cuisine, setCuisine] = useState<string>(ALL);

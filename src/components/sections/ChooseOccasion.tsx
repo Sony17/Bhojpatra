@@ -1,76 +1,100 @@
+"use client";
+
 import Image from "next/image";
+import { useRef, useState } from "react";
 import { occasions, type Occasion } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 
 export default function ChooseOccasion() {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [active, setActive] = useState(0);
+
+  const handleScroll = () => {
+    const track = trackRef.current;
+    if (!track) return;
+    const cards = Array.from(track.children) as HTMLElement[];
+    if (cards.length < 2) return;
+    const step = cards[1].offsetLeft - cards[0].offsetLeft;
+    const index = Math.round(track.scrollLeft / step);
+    setActive(Math.min(cards.length - 1, Math.max(0, index)));
+  };
+
+  const scrollToCard = (index: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const cards = Array.from(track.children) as HTMLElement[];
+    const card = cards[index];
+    if (!card) return;
+    track.scrollTo({
+      left: card.offsetLeft - cards[0].offsetLeft,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <section
       id="occasions"
       className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20"
     >
       <Reveal variant="left" className="text-center">
-        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
-          Occasions
+        <h2 className="font-display text-4xl text-maroon sm:text-5xl">
+          moments when we set tables
         </h2>
         <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
-          Select the type of celebration you are planning.
+          Make every moment so delicious with the help of Bhojpatra
         </p>
       </Reveal>
 
-      <Reveal
-        as="div"
-        stagger
-        from="alt"
-        className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4"
-      >
-        {occasions.map((occasion: Occasion, index: number) => {
-          const selected = index === 0;
-          return (
-            <button
+      <Reveal as="div" variant="up" className="mt-12">
+        <div
+          ref={trackRef}
+          onScroll={handleScroll}
+          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto sm:gap-6"
+          aria-label="Occasions"
+        >
+          {occasions.map((occasion: Occasion) => (
+            <div
               key={occasion.id}
-              type="button"
-              aria-pressed={selected}
-              className={
-                "group relative flex flex-col overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-xl " +
-                (selected
-                  ? "ring-2 ring-maroon shadow-md"
-                  : "ring-black/[0.06] hover:ring-black/10")
-              }
+              className="group relative w-[72vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-[45%] lg:w-[calc((100%-3rem)/3)]"
             >
-              <div className="relative aspect-[4/3] w-full overflow-hidden">
+              <div className="relative aspect-[9/10] w-full">
                 <Image
                   src={occasion.image}
                   alt={occasion.name}
                   fill
-                  sizes="(min-width: 1024px) 220px, (min-width: 640px) 30vw, 45vw"
-                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.07]"
+                  sizes="(min-width: 1024px) 400px, (min-width: 640px) 45vw, 72vw"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
                 />
-                {selected && (
-                  <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-maroon px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream shadow-sm ring-1 ring-white/20">
-                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-cream" />
-                    Selected
-                  </span>
-                )}
-
-                {/* Title reads on the image over a merged bottom gradient */}
-                <div className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/75 via-black/30 to-transparent px-4 pb-3.5 pt-10">
-                  <span className="font-display text-sm font-semibold leading-tight text-white drop-shadow-sm sm:text-base">
+                {/* Darken so the name reads on the photo, like the reference */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/15" />
+                <div className="absolute inset-x-0 bottom-0 px-6 pb-8 text-center">
+                  <span className="text-2xl font-bold leading-tight text-white drop-shadow-sm sm:text-3xl">
                     {occasion.name}
                   </span>
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
 
-              {/* Maroon accent bar animates in on hover / when selected */}
-              <span
-                aria-hidden="true"
-                className={
-                  "h-1 w-full bg-maroon origin-left transition-transform duration-300 ease-out " +
-                  (selected ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100")
-                }
-              />
+        {/* Dot pagination — one dot per card, active dot gets the outline ring */}
+        <div className="mt-8 flex items-center justify-center gap-2.5">
+          {occasions.map((occasion: Occasion, index: number) => (
+            <button
+              key={occasion.id}
+              type="button"
+              aria-label={`Go to ${occasion.name}`}
+              aria-current={index === active}
+              onClick={() => scrollToCard(index)}
+              className={
+                "flex h-5 w-5 items-center justify-center rounded-full border transition-colors duration-200 " +
+                (index === active ? "border-black" : "border-transparent")
+              }
+            >
+              <span className="h-2 w-2 rounded-full bg-maroon" />
             </button>
-          );
-        })}
+          ))}
+        </div>
       </Reveal>
     </section>
   );

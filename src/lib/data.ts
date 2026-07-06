@@ -1314,6 +1314,11 @@ export const vendorListings: VendorListing[] = [
   { id: "vl-10", name: "Maratha Spice Caterers", tiers: ["Silver", "Gold"], rating: 4.6, reviews: 134, city: "Pune", state: "Maharashtra", cuisines: ["Continental", "Chinese"], mealTypes: ["Lunch", "Starters", "Main Course", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1020, verified: false, image: img("photo-1414235077428-338989a2e8c0", 500) },
   { id: "vl-11", name: "Tandoor Tales", tiers: ["Silver"], rating: 4.5, reviews: 121, city: "Delhi", state: "Delhi", cuisines: ["Punjabi", "North Indian"], mealTypes: ["Dinner", "Starters", "Main Course"], diet: "Non-Veg", priceFrom: 899, verified: true, image: img("photo-1567188040759-fb8a883dc6d8", 500) },
   { id: "vl-12", name: "Sattvik Bhojan", tiers: ["Gold", "Platinum"], rating: 4.7, reviews: 167, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "South Indian"], mealTypes: ["Breakfast", "Lunch", "Main Course", "Desserts"], diet: "Veg", priceFrom: 1100, verified: true, image: img("photo-1601050690597-df0568f70950", 500) },
+  // Baina box specialists — famous mithai houses surfaced by the home page's
+  // "Celebrate with Sweetness & Love" section (its CTA links to /vendors?q=Baina+Box).
+  { id: "vl-13", name: "Ram Asrey", tiers: ["Gold", "Platinum"], rating: 4.9, reviews: 356, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 749, verified: true, image: img("photo-1631452180519-c014fe946bc7", 500) },
+  { id: "vl-14", name: "Chhappan Bhog", tiers: ["Gold", "Platinum"], rating: 4.8, reviews: 289, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 699, verified: true, image: img("photo-1606491956689-2ea866880c84", 500) },
+  { id: "vl-15", name: "Hazelnut Factory", tiers: ["Silver", "Gold"], rating: 4.7, reviews: 214, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 599, verified: true, image: img("photo-1549465220-1a8b9238cd48", 500) },
 ];
 
 /* ───────────────────────────────────────────────────────────────────────

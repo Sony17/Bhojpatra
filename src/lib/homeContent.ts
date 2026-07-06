@@ -126,9 +126,9 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     headlineTopHi: "वेरिफाइड कैटरर, फूड स्टॉल और मशहूर वेंडर बुक करें।",
     headlineBottom: "One Bhojpatra Experience.",
     headlineBottomHi: "एक भोजपत्र अनुभव।",
-    lede: "Plan your perfect celebration with the best specialists from your city, state or across India.",
+    lede: "Compare curated menus, customize your feast and book trusted celebration partners in minutes.",
     ledeHi:
-      "अपने शहर, राज्य या पूरे भारत के बेहतरीन स्पेशलिस्ट के साथ अपना परफेक्ट उत्सव प्लान करें।",
+      "क्यूरेटेड मेन्यू की तुलना करें, अपनी दावत कस्टमाइज़ करें और मिनटों में भरोसेमंद सेलिब्रेशन पार्टनर बुक करें।",
     background: "/hero-bg.webp",
   },
   services: {

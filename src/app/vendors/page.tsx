@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -17,7 +18,11 @@ export default function VendorsPage() {
       {/* Header is absolutely positioned over the hero on the home page; on
           this page there is no hero, so pad the top to clear the nav bar. */}
       <main className="flex-1 pt-28 sm:pt-32">
-        <VendorCatalog />
+        {/* VendorCatalog reads ?q= via useSearchParams, which requires a
+            Suspense boundary on a statically prerendered page. */}
+        <Suspense fallback={null}>
+          <VendorCatalog />
+        </Suspense>
       </main>
       <Footer />
       <FloatingChat />

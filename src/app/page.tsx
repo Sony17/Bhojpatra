@@ -6,6 +6,7 @@ import SectionDivider from "@/components/SectionDivider";
 import Hero from "@/components/sections/Hero";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
+import BainaBoxes from "@/components/sections/BainaBoxes";
 import Packages from "@/components/sections/Packages";
 import Gallery from "@/components/sections/Gallery";
 import Testimonials from "@/components/sections/Testimonials";
@@ -27,6 +28,8 @@ export default function Home() {
         <div className="bg-surface-beige-2">
           <TopCategories />
         </div>
+        <SectionDivider className="py-6 sm:py-8" />
+        <BainaBoxes />
         <SectionDivider className="py-6 sm:py-8" />
         <Packages />
         <SectionDivider className="py-6 sm:py-8" />

@@ -6,11 +6,12 @@ import { useLang } from "@/lib/i18n";
 
 type Option = { id: string; name: string; nameHi?: string };
 
-type IconKey = "calendar" | "mapPin";
+type IconKey = "calendar" | "mapPin" | "chevron";
 
 const icons = {
   calendar: Calendar,
   mapPin: MapPin,
+  chevron: ChevronDown,
 } as const;
 
 export default function BrandSelect({
@@ -19,7 +20,7 @@ export default function BrandSelect({
   ariaLabel,
   icon,
   className = "",
-  buttonClassName = "px-5 py-3.5 pr-11",
+  buttonClassName = "px-5 py-3.5 pr-11 text-sm",
   iconClassName = "right-4",
   direction = "down",
   defaultId,
@@ -74,7 +75,7 @@ export default function BrandSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`flex h-full w-full cursor-pointer items-center rounded-2xl bg-transparent text-left text-sm outline-none ${buttonClassName} ${selected ? "text-ink" : "text-ink/60"}`}
+        className={`flex h-full w-full cursor-pointer items-center rounded-2xl bg-transparent text-left outline-none ${buttonClassName} ${selected ? "text-ink" : "text-ink/60"}`}
       >
         <span className="truncate">{selected ? label(selected) : placeholder}</span>
       </button>

@@ -29,7 +29,7 @@ export default function DatePicker({
   placeholder = "Select Date",
   ariaLabel = "Select Date",
   className = "",
-  buttonClassName = "px-5 py-3.5 pr-11",
+  buttonClassName = "px-5 py-3.5 pr-11 text-sm",
   iconClassName = "right-4",
   direction = "down",
   defaultDaysAhead,
@@ -121,7 +121,7 @@ export default function DatePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`flex h-full w-full cursor-pointer items-center rounded-2xl bg-transparent text-left text-sm outline-none ${buttonClassName} ${selected ? "text-ink" : "text-ink/60"}`}
+        className={`flex h-full w-full cursor-pointer items-center rounded-2xl bg-transparent text-left outline-none ${buttonClassName} ${selected ? "text-ink" : "text-ink/60"}`}
       >
         <span className="truncate">{selected ? formatDate(selected, lang) : placeholder}</span>
       </button>
