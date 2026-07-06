@@ -11,7 +11,7 @@ import type { StoredReview } from "@/app/api/reviews/route";
 function reviewToTestimonial(r: StoredReview): HomeTestimonial {
   const role = [r.occasion, r.city].filter(Boolean).join(" · ");
   return {
-    id: `rev-${r.bookingId}`,
+    id: `rev-${r.id ?? r.bookingId}`,
     name: r.name,
     role,
     roleHi: role,
@@ -19,6 +19,21 @@ function reviewToTestimonial(r: StoredReview): HomeTestimonial {
     quoteHi: r.comment,
     rating: r.rating,
   };
+}
+
+/** One representative review per order, newest first — reviews arrive per-vendor
+ *  now, so an order with several rated vendors would otherwise flood the feed.
+ *  Keep only reviews that carry a comment (empty ones make blank cards). */
+function representativeReviews(reviews: StoredReview[]): StoredReview[] {
+  const seen = new Set<string>();
+  const out: StoredReview[] = [];
+  for (const r of reviews) {
+    if (!r.comment?.trim()) continue;
+    if (seen.has(r.bookingId)) continue;
+    seen.add(r.bookingId);
+    out.push(r);
+  }
+  return out;
 }
 
 function initials(name: string) {
@@ -58,7 +73,9 @@ export default function Testimonials() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { reviews?: StoredReview[] } | null) => {
         if (live && data?.reviews) {
-          setReviews(data.reviews.map(reviewToTestimonial));
+          setReviews(
+            representativeReviews(data.reviews).map(reviewToTestimonial),
+          );
         }
       })
       .catch(() => {

@@ -281,6 +281,26 @@ export interface AdminCoupon {
   status: CouponStatus;
 }
 
+/* ── Campaigns ───────────────────────────────────────────────────────────── */
+
+export type CampaignStatus = "Active" | "Inactive";
+
+/**
+ * A homepage promotional campaign. The admin uploads a picture and (optionally)
+ * a click-through link; the most recent *Active* campaign is shown to every
+ * homepage visitor as an image popup.
+ */
+export interface AdminCampaign {
+  id: string;
+  /** Internal label shown in the admin list (not shown to visitors). */
+  name: string;
+  /** The popup picture — an uploaded data URL or a pasted image URL. */
+  image: string;
+  /** Optional click-through target ("" = the image isn't clickable). */
+  linkUrl: string;
+  status: CampaignStatus;
+}
+
 /* ── Catalog (Menu & Add-Ons) ────────────────────────────────────────────── */
 
 export interface CatalogCuisine {

@@ -16,6 +16,7 @@ export type NavIconKey =
   | "bookings"
   | "payments"
   | "coupons"
+  | "campaigns"
   | "content"
   | "settings";
 
@@ -34,6 +35,7 @@ export const adminNav: AdminNavItem[] = [
   { label: "Referrals", href: "/admin/referrals", iconKey: "referrals" },
   { label: "Payments", href: "/admin/payments", iconKey: "payments" },
   { label: "Coupons", href: "/admin/coupons", iconKey: "coupons" },
+  { label: "Campaigns", href: "/admin/campaigns", iconKey: "campaigns" },
   { label: "Content Control", href: "/admin/content", iconKey: "content" },
   { label: "Settings", href: "/admin/settings", iconKey: "settings" },
 ];

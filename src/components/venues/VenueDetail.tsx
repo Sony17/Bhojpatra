@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
+import { useSessionStatus } from "@/lib/session";
+import LoginGate from "@/components/auth/LoginGate";
 import { occasions } from "@/lib/data";
 import {
   fetchVenueById,
@@ -117,6 +119,10 @@ function VenueBooking({
   t: (en: string, hi: string) => string;
   lang: "en" | "hi";
 }) {
+  // Booking + payment require a signed-in guest. Tri-state: `undefined` while
+  // loading, `null` signed out, object signed in — the Pay & Confirm step gates
+  // on this so anonymous guests are asked to log in first.
+  const sessionStatus = useSessionStatus();
   const [step, setStep] = useState<Step>("details");
 
   // Step 1 — event details
@@ -571,6 +577,16 @@ function VenueBooking({
                   >
                     {t("Continue to payment", "भुगतान तक जारी रखें")} →
                   </button>
+                </div>
+              ) : sessionStatus === undefined ? (
+                /* Client session still loading — hold the panel to avoid a
+                   sign-in flash before we know whether to show the gate. */
+                <div className="mt-5 min-h-[18rem]" />
+              ) : sessionStatus === null ? (
+                /* Anonymous guest — booking + payment need a login first. The
+                   entered details stay put; logging in reveals Pay & Confirm. */
+                <div className="mt-5">
+                  <LoginGate onBack={() => setStep("details")} />
                 </div>
               ) : (
                 /* ── Step 2 · Pay & confirm ─────────────────────────── */

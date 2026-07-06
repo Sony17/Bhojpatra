@@ -4,8 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
+import { useSessionStatus } from "@/lib/session";
+import LoginGate from "@/components/auth/LoginGate";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import { addStoredBooking } from "@/lib/bookings";
+import {
+  useVendorRatings,
+  statFor,
+  type VendorRatings,
+} from "@/lib/vendorRatings";
 import { fetchVenueById } from "@/lib/venues";
 import { downloadInvoice, encodeInvoice, type InvoiceData } from "@/lib/invoice";
 import {
@@ -56,6 +63,13 @@ const GST_RATE = 0.18;
 // grand total up front (the rest is settled later with our team).
 const ADVANCE_RATE = 0.1;
 const TOTAL_STEPS = 4;
+// Dev-only affordance: in non-production builds the Confirm step shows a toggle
+// to save the order already Completed & fully paid, so the reviews flow — which
+// only surfaces on a completed booking — can be exercised without hand-editing
+// localStorage. `process.env.NODE_ENV` is inlined at build time, so this and the
+// UI it gates compile out of production bundles.
+const DEV_TOOLS = process.env.NODE_ENV !== "production";
+
 // Large functions (1000+ guests) may split a single segment across vendors.
 const MULTI_VENDOR_MIN = 1000;
 
@@ -131,6 +145,11 @@ function earliestDateFor(packageId: string): string {
 export default function BookingWizard() {
   // Language is driven by the shared, site-wide context (Header toggle).
   const { lang, t } = useLang();
+
+  // Booking + payment are only allowed for a signed-in guest. Tri-state:
+  // `undefined` while the client session loads, `null` signed out, object
+  // signed in — the Confirm step (payment + place order) gates on this.
+  const sessionStatus = useSessionStatus();
 
   const [step, setStep] = useState<number>(1);
 
@@ -275,6 +294,13 @@ export default function BookingWizard() {
   // time. A count the chosen date no longer supports simply reads back as "no
   // EMI" everywhere it's consumed (see the inclusion guards), so no reset needed.
   const [emiCount, setEmiCount] = useState<number>(1);
+  // Dev-only: when on, Confirm saves the order already Completed & fully paid so
+  // the My Bookings "Rate your experience" flow is immediately testable. Never
+  // rendered or read in production (see DEV_TOOLS).
+  const [devComplete, setDevComplete] = useState<boolean>(false);
+
+  // Real customer ratings per vendor, shown on the vendor cards (best-effort).
+  const vendorRatings = useVendorRatings();
 
   // Best-effort lead capture: the moment the guest types a valid mobile on the
   // Confirm step we record it as a "booking-intent" lead, so an abandoned
@@ -850,7 +876,32 @@ export default function BookingWizard() {
     const vendorLabel =
       vendorNames.join(", ") || (selectedPackage?.name ?? "Bhojpatra");
 
-    const emiPlan = buildEmiPlanForOrder();
+    // The same vendors as {id, name} pairs, retained on the order so each can be
+    // rated individually later (My Bookings). Deduped by catalogue id.
+    const bookedVendors = Array.from(
+      new Map(
+        [
+          ...activeCategories.flatMap((cat) => {
+            const chosen = categoryVendor[cat.id] ?? [];
+            return cat.vendors
+              .filter((v) => chosen.includes(v.id))
+              .map((v) => ({ id: v.id, name: v.name }));
+          }),
+          ...selectedAddOns.flatMap((id) => {
+            const vId = addOnVendorId(id);
+            const vName = addOnVendorName(id);
+            return vId && vName ? [{ id: vId, name: vName }] : [];
+          }),
+        ].map((v) => [v.id, v] as const),
+      ).values(),
+    );
+
+    // Dev shortcut: mark the order Completed & fully paid so the review flow is
+    // testable right away. A completed/settled order carries no EMI plan.
+    const completeNow = DEV_TOOLS && devComplete;
+    const orderStatus = completeNow ? "Completed" : "Confirmed";
+    const orderPaid = completeNow ? Math.round(grandTotal) : paidAmount;
+    const emiPlan = completeNow ? undefined : buildEmiPlanForOrder();
 
     addStoredBooking({
       id: bookingId,
@@ -860,8 +911,9 @@ export default function BookingWizard() {
       vendor: vendorLabel,
       city: cityObj?.name ?? "—",
       amount: Math.round(grandTotal),
-      paid: paidAmount,
-      status: "Confirmed",
+      paid: orderPaid,
+      status: orderStatus,
+      ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
       ...(paymentRef ? { paymentRef } : {}),
       ...(referralCode.trim()
         ? {
@@ -892,11 +944,11 @@ export default function BookingWizard() {
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
           amount: Math.round(grandTotal),
-          paid: paidAmount,
+          paid: orderPaid,
           paymentMethod: payMethod,
           paymentRef: paymentRef || undefined,
           emiPlan: emiPlan ?? undefined,
-          status: "Confirmed",
+          status: orderStatus,
           referralCode: referralCode.trim() || undefined,
           referrerName: referrerName || undefined,
           referrerType: referrerType || undefined,
@@ -984,6 +1036,7 @@ export default function BookingWizard() {
             toggleItem={toggleItem}
             allowanceFor={allowanceFor}
             categoryComplete={categoryComplete}
+            vendorRatings={vendorRatings}
           />
         </div>
       ) : (
@@ -1023,7 +1076,18 @@ export default function BookingWizard() {
               }
             />
           )}
-          {step === 4 && !confirmed && (
+          {/* Confirm step — payment + placing the order. Both require a
+              signed-in guest, so an anonymous visitor gets the login gate here
+              (their in-progress booking stays intact); logging in reveals the
+              real Confirm step. A neutral placeholder covers the brief moment
+              the client session is still loading, to avoid a sign-in flash. */}
+          {step === 4 && !confirmed && sessionStatus === undefined && (
+            <div className="min-h-[40vh]" />
+          )}
+          {step === 4 && !confirmed && sessionStatus === null && (
+            <LoginGate onBack={() => setStep(3)} />
+          )}
+          {step === 4 && !confirmed && sessionStatus != null && (
             <StepConfirm
               t={t}
               occasion={occasions.find((o) => o.id === occasionId)}
@@ -1068,6 +1132,22 @@ export default function BookingWizard() {
               onConfirm={handleConfirm}
               whatsappHref={whatsappHref}
             />
+          )}
+          {step === 4 && !confirmed && sessionStatus != null && DEV_TOOLS && (
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-dashed border-maroon bg-cream px-4 py-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={devComplete}
+                onChange={(e) => setDevComplete(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-maroon"
+              />
+              <span>
+                <span className="font-semibold text-maroon">Dev only</span> — save
+                this order as <strong>Completed &amp; fully paid</strong> so the
+                &ldquo;Rate your experience&rdquo; review flow shows immediately in
+                My Bookings.
+              </span>
+            </label>
           )}
           {step === 4 && confirmed && (
             <StepDone
@@ -1482,6 +1562,7 @@ function StepMenu({
   toggleItem,
   allowanceFor,
   categoryComplete,
+  vendorRatings,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -1496,6 +1577,7 @@ function StepMenu({
   toggleItem: (catId: string, itemId: string) => void;
   allowanceFor: (catId: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
+  vendorRatings: VendorRatings;
 }) {
   const vendorScrollRef = useRef<HTMLDivElement>(null);
   // Guard against a transient out-of-range index right after the package (and
@@ -1558,6 +1640,7 @@ function StepMenu({
       >
         {visibleVendors.map((v) => {
           const selected = selectedIds.includes(v.id);
+          const stat = statFor(vendorRatings, v);
           return (
             <button
               key={v.id}
@@ -1588,6 +1671,15 @@ function StepMenu({
                     ({inr.format(v.reviews)})
                   </span>
                 </p>
+                {stat && (
+                  <p className="mt-1 text-xs font-semibold text-maroon">
+                    ★ {stat.rating} ·{" "}
+                    {t(
+                      `${stat.count} verified`,
+                      `${stat.count} सत्यापित`,
+                    )}
+                  </p>
+                )}
                 <p className="mt-1 text-sm font-semibold text-ink">
                   + {money(v.perPlate)}/{t("plate", "प्लेट")}
                 </p>

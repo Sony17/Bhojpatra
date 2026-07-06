@@ -83,6 +83,16 @@ create table if not exists coupons (
   updated_at timestamptz not null default now()
 );
 
+-- Homepage promotional campaigns (admin Campaigns). Each carries an image (an
+-- uploaded data URL or a pasted URL) shown to visitors as a popup; the most
+-- recent Active one wins.
+create table if not exists campaigns (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- CMS content — banners, testimonials and FAQs in one table, discriminated by
 -- `data->>'kind'` ('banner' | 'testimonial' | 'faq').
 create table if not exists content_items (

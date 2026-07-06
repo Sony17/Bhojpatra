@@ -12,6 +12,7 @@ import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { StarSolid, ChevronRight } from "@/components/admin/shared/icons";
 import { queryVendors, vendorCities } from "@/lib/admin/mockData";
+import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import type { AdminVendor } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
@@ -83,6 +84,9 @@ export default function VendorList() {
     [],
   );
 
+  // Real customer ratings, matched to vendors by name (best-effort).
+  const ratings = useVendorRatings();
+
   const columns: Column<AdminVendor>[] = [
     {
       key: "business",
@@ -114,13 +118,23 @@ export default function VendorList() {
     {
       key: "rating",
       header: "Rating",
-      cell: (v) => (
-        <span className="inline-flex items-center gap-1 text-ink">
-          <StarSolid className="h-4 w-4 text-maroon" />
-          {v.rating}
-          <span className="text-xs text-ink-soft">({v.reviews})</span>
-        </span>
-      ),
+      cell: (v) => {
+        const stat = statFor(ratings, { id: v.id, name: v.business });
+        return (
+          <div className="min-w-0">
+            <span className="inline-flex items-center gap-1 text-ink">
+              <StarSolid className="h-4 w-4 text-maroon" />
+              {v.rating}
+              <span className="text-xs text-ink-soft">({v.reviews})</span>
+            </span>
+            {stat && (
+              <p className="text-xs font-semibold text-maroon">
+                ★ {stat.rating} · {stat.count} verified
+              </p>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "bookings",

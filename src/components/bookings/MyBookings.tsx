@@ -8,7 +8,10 @@ import {
   updateStoredBooking,
   downloadReceipt,
   bookingInvoice,
+  bookingVendors,
+  vendorKey,
   type StoredBooking,
+  type BookingVendorReview,
 } from "@/lib/bookings";
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
@@ -951,11 +954,16 @@ function StarInput({
   );
 }
 
+/** A vendor's in-progress rating within the review editor. */
+type DraftRating = { rating: number; comment: string };
+
 /**
- * "Rate your experience" — a customer's star rating + written review for a
- * completed booking. Posts to /api/reviews (which publishes it to the public
- * home-page testimonials feed) and mirrors the rating back onto the stored
- * booking, so the card reflects it and a second submission edits in place.
+ * "Rate your experience" — the customer rates each vendor on a completed booking
+ * individually (a star row + optional note per vendor). Posts them as a batch to
+ * /api/reviews (which publishes to the home-page testimonials feed and feeds the
+ * per-vendor rating shown on vendor cards) and mirrors the ratings back onto the
+ * stored booking, so the card reflects them and a second submission edits in
+ * place.
  */
 function ReviewModal({
   booking,
@@ -965,11 +973,30 @@ function ReviewModal({
   onClose: () => void;
 }) {
   const { t } = useLang();
-  const [rating, setRating] = useState(booking.review?.rating ?? 0);
+
+  // The vendors on this order, each rated on its own. Prefill from any ratings
+  // the customer already left (editing) so their earlier scores show.
+  const vendors = useMemo(() => bookingVendors(booking), [booking]);
   const [name, setName] = useState("");
-  const [comment, setComment] = useState(booking.review?.comment ?? "");
+  const [drafts, setDrafts] = useState<Record<string, DraftRating>>(() => {
+    const prev = new Map<string, BookingVendorReview>();
+    (booking.reviews ?? []).forEach((r) =>
+      prev.set(vendorKey({ id: r.vendorId, name: r.vendorName }), r),
+    );
+    const init: Record<string, DraftRating> = {};
+    for (const v of vendors) {
+      const p = prev.get(vendorKey(v));
+      init[vendorKey(v)] = { rating: p?.rating ?? 0, comment: p?.comment ?? "" };
+    }
+    return init;
+  });
   const [status, setStatus] = useState<"idle" | "submitting">("idle");
   const [error, setError] = useState("");
+
+  const setRating = (key: string, rating: number) =>
+    setDrafts((d) => ({ ...d, [key]: { ...d[key], rating } }));
+  const setComment = (key: string, comment: string) =>
+    setDrafts((d) => ({ ...d, [key]: { ...d[key], comment } }));
 
   // Close on Escape and lock background scroll while open.
   useEffect(() => {
@@ -985,15 +1012,15 @@ function ReviewModal({
 
   const submit = async () => {
     if (status === "submitting") return;
-    if (rating < 1) {
-      setError(t("Please choose a star rating.", "कृपया एक स्टार रेटिंग चुनें।"));
-      return;
-    }
-    if (!comment.trim()) {
+    // Only vendors the customer actually gave a star to are submitted.
+    const rated = vendors
+      .map((v) => ({ v, draft: drafts[vendorKey(v)] }))
+      .filter((x) => x.draft && x.draft.rating >= 1);
+    if (rated.length === 0) {
       setError(
         t(
-          "Please write a few words about your experience.",
-          "कृपया अपने अनुभव के बारे में कुछ शब्द लिखें।",
+          "Please give at least one vendor a star rating.",
+          "कृपया कम से कम एक वेंडर को स्टार रेटिंग दें।",
         ),
       );
       return;
@@ -1006,12 +1033,15 @@ function ReviewModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId: booking.id,
-          vendor: booking.vendor,
           name: name.trim(),
           occasion: booking.occasion,
           city: booking.city,
-          rating,
-          comment: comment.trim(),
+          reviews: rated.map((x) => ({
+            vendorId: x.v.id,
+            vendor: x.v.name,
+            rating: x.draft.rating,
+            comment: x.draft.comment.trim(),
+          })),
         }),
       });
       const data = (await res.json().catch(() => null)) as {
@@ -1029,12 +1059,25 @@ function ReviewModal({
         );
         return;
       }
-      // Mirror the rating onto the stored booking so the card reflects it.
+      // Mirror onto the stored booking: the per-vendor ratings for editing, plus
+      // a rounded-average summary for the card's star display.
+      const createdAt = new Date().toISOString();
+      const reviews: BookingVendorReview[] = rated.map((x) => ({
+        vendorId: x.v.id,
+        vendorName: x.v.name,
+        rating: x.draft.rating,
+        comment: x.draft.comment.trim(),
+        createdAt,
+      }));
+      const avg = Math.round(
+        reviews.reduce((s, r) => s + r.rating, 0) / reviews.length,
+      );
       updateStoredBooking(booking.id, {
+        reviews,
         review: {
-          rating,
-          comment: comment.trim(),
-          createdAt: new Date().toISOString(),
+          rating: avg,
+          comment: reviews.find((r) => r.comment)?.comment ?? "",
+          createdAt,
         },
       });
       onClose();
@@ -1070,7 +1113,12 @@ function ReviewModal({
               {t("Rate your experience", "अपना अनुभव रेट करें")}
             </h2>
             <p className="mt-0.5 truncate text-sm text-ink-soft">
-              {booking.vendor} · {booking.occasion}
+              {vendors.length > 1
+                ? t(
+                    `Rate each of your ${vendors.length} vendors`,
+                    `अपने ${vendors.length} वेंडर को रेट करें`,
+                  )
+                : `${booking.vendor} · ${booking.occasion}`}
             </p>
           </div>
           <button
@@ -1085,13 +1133,45 @@ function ReviewModal({
 
         {/* Body */}
         <div className="px-5 py-5 sm:px-7 sm:py-6">
-          <p className={labelCls}>{t("Your rating", "आपकी रेटिंग")}</p>
-          <div className="mt-2">
-            <StarInput
-              value={rating}
-              onChange={setRating}
-              label={(n) => t(`${n} out of 5 stars`, `5 में से ${n} स्टार`)}
-            />
+          {/* One rating block per vendor. */}
+          <div className="flex flex-col gap-4">
+            {vendors.map((v) => {
+              const key = vendorKey(v);
+              const draft = drafts[key] ?? { rating: 0, comment: "" };
+              return (
+                <div
+                  key={key}
+                  className="rounded-xl border border-cream-3 bg-cream-2/40 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-display text-sm font-semibold text-ink">
+                      {v.name}
+                    </p>
+                    <StarInput
+                      value={draft.rating}
+                      onChange={(n) => setRating(key, n)}
+                      label={(n) =>
+                        t(
+                          `${n} out of 5 stars for ${v.name}`,
+                          `${v.name} के लिए 5 में से ${n} स्टार`,
+                        )
+                      }
+                    />
+                  </div>
+                  <textarea
+                    value={draft.comment}
+                    onChange={(e) => setComment(key, e.target.value)}
+                    rows={2}
+                    maxLength={600}
+                    placeholder={t(
+                      "Add a note (optional)",
+                      "एक नोट जोड़ें (वैकल्पिक)",
+                    )}
+                    className={fieldCls + " resize-none"}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           <label className="mt-5 block">
@@ -1105,25 +1185,10 @@ function ReviewModal({
             />
           </label>
 
-          <label className="mt-4 block">
-            <span className={labelCls}>{t("Your review", "आपकी समीक्षा")}</span>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={4}
-              maxLength={600}
-              placeholder={t(
-                "How was the food, service and overall experience?",
-                "खाना, सेवा और समग्र अनुभव कैसा रहा?",
-              )}
-              className={fieldCls + " resize-none"}
-            />
-          </label>
-
           <p className="mt-2 text-xs text-ink-soft">
             {t(
-              "Your review may appear publicly on our home page.",
-              "आपकी समीक्षा हमारे होम पेज पर सार्वजनिक रूप से दिख सकती है।",
+              "Your reviews may appear publicly on our home page and on vendor profiles.",
+              "आपकी समीक्षाएँ हमारे होम पेज और वेंडर प्रोफ़ाइल पर सार्वजनिक रूप से दिख सकती हैं।",
             )}
           </p>
 

@@ -1,6 +1,7 @@
 import path from "path";
 import { isValidVpa } from "@/lib/upi";
 import { createStore } from "@/lib/store";
+import { requireRole } from "@/lib/auth";
 import { parseListQuery } from "@/lib/validate";
 import { sendPaymentAlert } from "@/lib/email";
 
@@ -73,6 +74,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // Payments may only be recorded for a signed-in guest — reject anonymous
+  // posts (the booking UI gates payment behind login before reaching here).
+  const guard = await requireRole();
+  if (guard instanceof Response) return guard;
+
   let body: unknown;
   try {
     body = await request.json();

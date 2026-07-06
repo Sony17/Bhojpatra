@@ -63,6 +63,7 @@ const TABLES = [
   "kyc_documents",
   "customers",
   "coupons",
+  "campaigns",
   "content_items",
   "enquiries",
   "reviews",

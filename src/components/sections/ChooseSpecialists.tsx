@@ -1,8 +1,13 @@
+"use client";
+
 import Image from "next/image";
 import { specialists, specialistTabs } from "@/lib/data";
 import Reveal from "@/components/Reveal";
+import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 
 export default function ChooseSpecialists() {
+  // Real customer ratings, matched to specialists by name (best-effort).
+  const ratings = useVendorRatings();
   return (
     <section
       id="specialists"
@@ -41,7 +46,9 @@ export default function ChooseSpecialists() {
 
       {/* Specialist list */}
       <Reveal stagger from="right" className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
-        {specialists.map((s, i) => (
+        {specialists.map((s, i) => {
+          const stat = statFor(ratings, s);
+          return (
           <div
             key={s.id}
             className={
@@ -70,6 +77,11 @@ export default function ChooseSpecialists() {
                   <span className="text-ink-soft">
                     ({s.reviews} Reviews)
                   </span>
+                  {stat && (
+                    <span className="font-semibold text-maroon">
+                      · ★ {stat.rating} ({stat.count} verified)
+                    </span>
+                  )}
                   <span aria-hidden="true" className="text-cream-3">
                     •
                   </span>
@@ -94,7 +106,8 @@ export default function ChooseSpecialists() {
               </span>
             </div>
           </div>
-        ))}
+          );
+        })}
       </Reveal>
 
       {/* Save & Continue */}

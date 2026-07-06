@@ -14,6 +14,7 @@ import { money } from "@/components/admin/shared/money";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
 import { getBookingsByVendor } from "@/lib/admin/mockData";
+import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import {
   TIER_ORDER,
   sortTiers,
@@ -246,11 +247,23 @@ function OverviewTab({
   tiers: VendorTier[];
   onToggleTier: (t: VendorTier) => void;
 }) {
+  // Real customer ratings, matched to this vendor by name (best-effort).
+  const ratings = useVendorRatings();
+  const verified = statFor(ratings, { id: vendor.id, name: vendor.business });
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Calendar} label="Total Bookings" value={String(vendor.totalBookings)} />
-        <StatCard icon={StarSolid} label="Rating" value={String(vendor.rating)} sub={`${vendor.reviews} reviews`} />
+        <StatCard
+          icon={StarSolid}
+          label="Rating"
+          value={String(vendor.rating)}
+          sub={
+            verified
+              ? `${vendor.reviews} seed · ★ ${verified.rating} from ${verified.count} verified`
+              : `${vendor.reviews} reviews`
+          }
+        />
         <StatCard icon={Users} label="Reviews" value={String(vendor.reviews)} />
         <StatCard icon={Wallet} label="From / plate" value={money(vendor.priceFrom)} />
       </div>

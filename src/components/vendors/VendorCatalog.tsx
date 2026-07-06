@@ -9,6 +9,11 @@ import {
   mealTypeOptions,
   type VendorListing,
 } from "@/lib/data";
+import {
+  useVendorRatings,
+  statFor,
+  type VendorRatingSummary,
+} from "@/lib/vendorRatings";
 import { useLang } from "@/lib/i18n";
 import ThemedSelect from "@/components/ThemedSelect";
 
@@ -143,6 +148,9 @@ export default function VendorCatalog() {
   const [price, setPrice] = useState<PriceRange>(ALL);
   const [meals, setMeals] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("relevance");
+
+  // Real customer ratings, matched to these listings by name (best-effort).
+  const ratings = useVendorRatings();
 
   const toggleMeal = (meal: string) =>
     setMeals((prev) =>
@@ -449,7 +457,11 @@ export default function VendorCatalog() {
       {results.length > 0 ? (
         <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {results.map((vendor) => (
-            <VendorCard key={vendor.id} vendor={vendor} />
+            <VendorCard
+              key={vendor.id}
+              vendor={vendor}
+              stats={statFor(ratings, vendor)}
+            />
           ))}
         </ul>
       ) : (
@@ -556,7 +568,13 @@ function Chip({
   );
 }
 
-function VendorCard({ vendor }: { vendor: VendorListing }) {
+function VendorCard({
+  vendor,
+  stats,
+}: {
+  vendor: VendorListing;
+  stats?: VendorRatingSummary;
+}) {
   const { t } = useLang();
 
   const tierBadgeLabel = (tier: Tier): string => {
@@ -654,6 +672,16 @@ function VendorCard({ vendor }: { vendor: VendorListing }) {
           <span aria-hidden="true">📍</span>
           {vendor.city}, {vendor.state}
         </p>
+
+        {stats && (
+          <p className="mt-1.5 text-sm font-semibold text-maroon">
+            <span aria-hidden="true">★</span> {stats.rating} ·{" "}
+            {t(
+              `${stats.count} verified ${stats.count === 1 ? "review" : "reviews"}`,
+              `${stats.count} सत्यापित समीक्षाएँ`,
+            )}
+          </p>
+        )}
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           {vendor.cuisines.map((c) => (

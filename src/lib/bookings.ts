@@ -24,9 +24,58 @@ export interface StoredBooking extends Booking {
   /** Instalment schedule for the balance after the 10% advance, when the guest
    *  chose to pay the rest in EMIs. Absent for single-payment / unpaid orders. */
   emiPlan?: EmiPlan;
-  /** The customer's own rating + comment for this order, once they've reviewed
-   *  it from My Bookings. Absent until reviewed. */
+  /** The specific vendors catered for this order (catalogue id + display name),
+   *  captured at booking time so each can be rated individually from My Bookings.
+   *  Absent on older orders saved before per-vendor reviews — fall back to
+   *  splitting the joined `vendor` label with `bookingVendors()`. */
+  vendors?: BookedVendor[];
+  /** Per-vendor ratings the customer left for this order, once reviewed. Keyed by
+   *  vendor; used to prefill the review editor and mirror ratings onto the card. */
+  reviews?: BookingVendorReview[];
+  /** Summary of the customer's review for this order (rounded average across the
+   *  per-vendor ratings + their first comment). Drives the card's star display.
+   *  Absent until reviewed. Kept for back-compat with the single-review editor. */
   review?: { rating: number; comment: string; createdAt: string };
+}
+
+/** A vendor chosen for an order — the catalogue id (empty for legacy orders that
+ *  only kept names) plus the display name. */
+export interface BookedVendor {
+  id: string;
+  name: string;
+}
+
+/** One customer rating for a single vendor on an order. */
+export interface BookingVendorReview {
+  vendorId: string;
+  vendorName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+/** Stable key for a booked vendor: its catalogue id when known, else a slug of
+ *  its name (legacy orders). Used to tie reviews to a vendor consistently. */
+export function vendorKey(v: { id?: string; name: string }): string {
+  return v.id || slugifyName(v.name);
+}
+
+/** Lowercase, hyphenated slug of a vendor name — the name-bridge key used to
+ *  match reviews to catalogue listings that don't share the booking's ids. */
+export function slugifyName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** The vendors that can be rated for an order: the stored `vendors` list when
+ *  present, otherwise the joined `vendor` label split back into names (older
+ *  orders). Always returns at least one entry so the review editor has a row. */
+export function bookingVendors(b: StoredBooking): BookedVendor[] {
+  if (b.vendors?.length) return b.vendors;
+  const names = (b.vendor || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return (names.length ? names : ["Bhojpatra"]).map((name) => ({ id: "", name }));
 }
 
 const KEY = "bhojpatra.bookings";

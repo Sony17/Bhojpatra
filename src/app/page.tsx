@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingChat from "@/components/FloatingChat";
+import CampaignPopup from "@/components/CampaignPopup";
 import SectionDivider from "@/components/SectionDivider";
 import Hero from "@/components/sections/Hero";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
@@ -37,6 +38,7 @@ export default function Home() {
       </main>
       <Footer />
       <FloatingChat />
+      <CampaignPopup />
     </>
   );
 }

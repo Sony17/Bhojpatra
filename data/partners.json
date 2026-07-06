@@ -26,5 +26,13 @@
     "phone": "+917838832332",
     "email": "test@gmail.com",
     "createdAt": "2026-07-01T12:47:36.200Z"
+  },
+  {
+    "code": "REF-CLK4W8",
+    "name": "Claude Partner",
+    "type": "individual",
+    "phone": "7777777777",
+    "email": "claude-test-partner@example.com",
+    "createdAt": "2026-07-06T09:33:26.104Z"
   }
 ]

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "ENQ-4A1A80",
+    "name": "Claude Contact",
+    "email": "claude-contact@example.com",
+    "phone": "9876543210",
+    "subject": "General",
+    "message": "Test enquiry from functional testing",
+    "source": "contact-page",
+    "createdAt": "2026-07-06T09:34:14.492Z"
+  }
+]

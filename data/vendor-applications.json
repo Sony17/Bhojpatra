@@ -128,5 +128,64 @@
     "status": "Pending",
     "submitted": "2026-07-01",
     "submittedAt": "2026-07-01T11:27:50.478Z"
+  },
+  {
+    "id": "VND-7C18C7",
+    "business": "Claude Test Caterers",
+    "owner": "Claude Vendor",
+    "email": "claude-test-vendor@example.com",
+    "phone": "8888888888",
+    "city": "Lucknow",
+    "state": "Uttar Pradesh",
+    "cuisines": [
+      "North Indian"
+    ],
+    "speciality": "North Indian",
+    "requestedTiers": [
+      "Silver"
+    ],
+    "gstNumber": "09AAACH7409R1ZZ",
+    "fssaiNumber": "12345678901234",
+    "documents": [
+      {
+        "kind": "GST",
+        "number": "09AAACH7409R1ZZ",
+        "status": "Verified"
+      },
+      {
+        "kind": "FSSAI",
+        "number": "12345678901234",
+        "status": "Verified"
+      },
+      {
+        "kind": "ID",
+        "number": "Uploaded",
+        "status": "Verified"
+      },
+      {
+        "kind": "Business Proof",
+        "number": "Uploaded",
+        "status": "Verified"
+      }
+    ],
+    "packages": [
+      {
+        "name": "Claude Royal Thali",
+        "dishes": "Paneer Tikka, Dal Makhani, Veg Biryani, Gulab Jamun",
+        "price": "899"
+      }
+    ],
+    "minGuests": "100",
+    "maxGuests": "1500",
+    "serviceCities": [
+      "Delhi"
+    ],
+    "counters": [
+      "Decoration"
+    ],
+    "status": "Verified",
+    "submitted": "2026-07-06",
+    "submittedAt": "2026-07-06T09:31:13.267Z",
+    "reviewedAt": "2026-07-06T09:32:04.298Z"
   }
 ]

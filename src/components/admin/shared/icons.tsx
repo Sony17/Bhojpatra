@@ -148,6 +148,17 @@ export function Megaphone(props: IconProps) {
   );
 }
 
+/* Rocket — campaigns / launch a promotion. */
+export function Rocket(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3c2.8 1.7 4.5 4.6 4.5 8 0 1.9-.5 3.3-1 4.2h-7c-.5-.9-1-2.3-1-4.2C7.5 7.6 9.2 4.7 12 3Z" />
+      <circle cx="12" cy="9.5" r="1.6" />
+      <path d="M8.5 15.2 6 17.7M15.5 15.2l2.5 2.5M10 19c0 1.4.9 2.5 2 2.5s2-1.1 2-2.5" />
+    </svg>
+  );
+}
+
 /* Bell — notifications. */
 export function Bell(props: IconProps) {
   return (

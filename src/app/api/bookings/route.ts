@@ -6,6 +6,7 @@ import {
 import type { BookingStatus } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
 import { createStore } from "@/lib/store";
+import { requireRole } from "@/lib/auth";
 import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
 
@@ -77,6 +78,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // A booking may only be placed by a signed-in guest — reject anonymous posts
+  // (the booking UI asks the visitor to log in before reaching this step).
+  const guard = await requireRole();
+  if (guard instanceof Response) return guard;
+
   let body: unknown;
   try {
     body = await request.json();

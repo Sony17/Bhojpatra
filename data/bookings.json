@@ -63,5 +63,39 @@
     "paymentRef": "BHJ-73162-ADVANCE",
     "status": "Confirmed",
     "createdAt": "2026-07-01T12:39:58.523Z"
+  },
+  {
+    "id": "BHJ-22817",
+    "customer": "Claude Test",
+    "phone": "9999999999",
+    "occasion": "Wedding",
+    "date": "20 Aug 2026",
+    "guests": 200,
+    "vendor": "Sip & Sparkle, Tandoor Tales, Live Flame Co., Tuesday Chaat Corner, Wok & Roll, Dakshin Delights, Awadhi Royal, Bengal Sweet Atelier, Awadhi Royal Caterers",
+    "city": "Lucknow",
+    "amount": 461144,
+    "paid": 0,
+    "paymentMethod": "UPI",
+    "status": "Confirmed",
+    "createdAt": "2026-07-06T09:24:12.128Z"
+  },
+  {
+    "id": "BHJ-99001",
+    "customer": "Claude Referred Customer",
+    "phone": "9123456789",
+    "occasion": "Birthday Party",
+    "date": "2026-09-15",
+    "guests": 150,
+    "vendor": "Tandoor Tales",
+    "city": "Lucknow",
+    "amount": 250000,
+    "paid": 25000,
+    "paymentMethod": "UPI",
+    "paymentRef": "TESTUTR123",
+    "status": "Confirmed",
+    "createdAt": "2026-07-06T09:35:51.721Z",
+    "referralCode": "REF-CLK4W8",
+    "referrerName": "Claude Partner",
+    "referrerType": "individual"
   }
 ]
