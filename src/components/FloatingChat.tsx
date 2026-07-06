@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
 
 /* Bhojpatra contact — mirrors the placeholder in the Footer. Swap for the
@@ -88,6 +88,21 @@ interface Message {
   text: string;
 }
 
+/* ── Callback request ─────────────────────────────────────────────────
+   The "Request a callback" view mirrors the in-app help sheet: a phone
+   number, a "what do you need help with?" topic, and an optional note.
+   The `en` label is the canonical value sent to /api/leads (it must match
+   the server's CALLBACK_TOPICS whitelist); `hi` is display-only. */
+const CALLBACK_TOPICS: { en: string; hi: string }[] = [
+  { en: "Service assistance", hi: "सेवा सहायता" },
+  { en: "Daily orders", hi: "रोज़ के ऑर्डर" },
+  { en: "Multi occasion order", hi: "कई अवसरों का ऑर्डर" },
+  { en: "App guidance", hi: "ऐप मार्गदर्शन" },
+  { en: "Rewards & referrals", hi: "रिवॉर्ड्स और रेफरल" },
+];
+
+const PHONE_RE = /^[6-9]\d{9}$/;
+
 const GREETING_EN =
   "Namaste! 🙏 I'm the Bhojpatra assistant. Ask me about pricing, occasions, cities or booking — or pick a question below.";
 const GREETING_HI =
@@ -111,17 +126,76 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
+/** Phone-handset glyph — used on the "Request a callback" tab. */
+function PhoneIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M6.62 10.79a15.53 15.53 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2Z" />
+    </svg>
+  );
+}
+
 export default function FloatingChat() {
   const { lang, t } = useLang();
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "callback">("chat");
   const [messages, setMessages] = useState<Message[]>([
     { from: "bot", text: GREETING_EN },
   ]);
   const [draft, setDraft] = useState("");
   const [faqOpen, setFaqOpen] = useState(false);
 
+  // ── "Request a callback" form ──────────────────────────────────────
+  const [phone, setPhone] = useState("");
+  const [topic, setTopic] = useState("");
+  const [showDesc, setShowDesc] = useState(false);
+  const [note, setNote] = useState("");
+  const [cbSubmitting, setCbSubmitting] = useState(false);
+  const [cbError, setCbError] = useState("");
+  const [cbDone, setCbDone] = useState(false);
+  const validPhone = PHONE_RE.test(phone);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  async function submitCallback(e: FormEvent) {
+    e.preventDefault();
+    if (!validPhone || cbSubmitting) return;
+    setCbSubmitting(true);
+    setCbError("");
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone,
+          source: "support-callback",
+          topic: topic || undefined,
+          note: note.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("request failed");
+      setCbDone(true);
+    } catch {
+      setCbError(
+        t(
+          "Couldn't send your request. Please try again.",
+          "आपका अनुरोध नहीं भेजा जा सका। कृपया फिर से प्रयास करें।",
+        ),
+      );
+    } finally {
+      setCbSubmitting(false);
+    }
+  }
+
+  function resetCallback() {
+    setCbDone(false);
+    setPhone("");
+    setTopic("");
+    setNote("");
+    setShowDesc(false);
+    setCbError("");
+  }
 
   // Keep the latest message in view as the conversation grows.
   useEffect(() => {
@@ -188,6 +262,39 @@ export default function FloatingChat() {
             </button>
           </div>
 
+          {/* View switch — Chat ⇄ Request a callback */}
+          <div className="bg-white px-3 pt-2.5 pb-1">
+            <div className="flex rounded-full bg-cream-2 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setView("chat")}
+                aria-pressed={view === "chat"}
+                className={`flex-1 rounded-full py-1.5 transition-colors ${
+                  view === "chat"
+                    ? "bg-maroon text-cream shadow-sm"
+                    : "text-maroon hover:bg-cream-3"
+                }`}
+              >
+                {t("Chat", "चैट")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("callback")}
+                aria-pressed={view === "callback"}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 transition-colors ${
+                  view === "callback"
+                    ? "bg-maroon text-cream shadow-sm"
+                    : "text-maroon hover:bg-cream-3"
+                }`}
+              >
+                <PhoneIcon className="h-3.5 w-3.5" />
+                {t("Request a callback", "कॉलबैक चाहिए")}
+              </button>
+            </div>
+          </div>
+
+          {view === "chat" && (
+          <>
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-surface-beige px-3.5 py-4">
             {messages.map((m, i) => (
@@ -281,6 +388,147 @@ export default function FloatingChat() {
               {t("Prefer to talk? Chat on WhatsApp", "बात करना चाहते हैं? WhatsApp पर चैट करें")}
             </a>
           </div>
+          </>
+          )}
+
+          {/* ── Request a callback ─────────────────────────────────────── */}
+          {view === "callback" && (
+            <div className="flex-1 overflow-y-auto bg-surface-beige px-4 py-4">
+              {cbDone ? (
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-cream">
+                    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  <p className="mt-4 font-display text-lg text-ink">
+                    {t("Callback requested", "कॉलबैक का अनुरोध हो गया")}
+                  </p>
+                  <p className="mt-1.5 max-w-[15rem] text-sm text-ink-soft">
+                    {t(
+                      `We'll call you on +91 ${phone} within 10 minutes.`,
+                      `हम आपको +91 ${phone} पर 10 मिनट के भीतर कॉल करेंगे।`,
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetCallback}
+                    className="mt-5 rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-cream-2"
+                  >
+                    {t("Request another", "एक और अनुरोध करें")}
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={submitCallback} className="space-y-4">
+                  <div>
+                    <h3 className="font-display text-lg text-ink">
+                      {t("Need help?", "मदद चाहिए?")}
+                    </h3>
+                    <p className="mt-1 text-sm text-ink-soft">
+                      {t(
+                        "Tell us what's blocking you — we'll call within 10 mins.",
+                        "बताएं क्या रुकावट है — हम 10 मिनट में कॉल करेंगे।",
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Phone */}
+                  <div>
+                    <label
+                      htmlFor="cb-phone"
+                      className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft"
+                    >
+                      {t("We'll call you on", "हम आपको इस नंबर पर कॉल करेंगे")}
+                    </label>
+                    <div className="flex items-center overflow-hidden rounded-xl border border-cream-3 bg-white focus-within:border-maroon">
+                      <span className="pl-3.5 pr-2 text-sm font-semibold text-ink-soft">+91</span>
+                      <input
+                        id="cb-phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) =>
+                          setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                        }
+                        placeholder={t("10-digit mobile number", "10 अंकों का मोबाइल नंबर")}
+                        aria-label={t("Your mobile number", "आपका मोबाइल नंबर")}
+                        className="min-w-0 flex-1 bg-transparent py-2.5 pr-3.5 text-sm text-ink outline-none placeholder:text-ink-soft"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Topic */}
+                  <div className="rounded-2xl border border-cream-3 bg-white p-3.5">
+                    <p className="mb-2.5 text-sm font-semibold text-ink">
+                      {t("What do you need help with?", "आपको किसमें मदद चाहिए?")}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {CALLBACK_TOPICS.map((tp) => {
+                        const active = topic === tp.en;
+                        return (
+                          <button
+                            key={tp.en}
+                            type="button"
+                            onClick={() => setTopic(active ? "" : tp.en)}
+                            aria-pressed={active}
+                            className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                              active
+                                ? "border-maroon bg-maroon text-cream"
+                                : "border-cream-3 bg-surface-beige text-ink hover:border-maroon"
+                            }`}
+                          >
+                            {lang === "hi" ? tp.hi : tp.en}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Optional description */}
+                  {showDesc ? (
+                    <textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder={t("Add a description (optional)", "विवरण जोड़ें (वैकल्पिक)")}
+                      aria-label={t("Description", "विवरण")}
+                      className="w-full resize-none rounded-xl border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-maroon"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowDesc(true)}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-maroon transition-colors hover:text-maroon-dark"
+                    >
+                      <span className="text-base leading-none">+</span>
+                      {t("Add description", "विवरण जोड़ें")}
+                    </button>
+                  )}
+
+                  {cbError && (
+                    <p
+                      role="alert"
+                      className="rounded-xl border border-maroon/30 bg-cream-2 px-3.5 py-2.5 text-sm text-maroon"
+                    >
+                      {cbError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!validPhone || cbSubmitting}
+                    className="btn-sheen w-full rounded-full bg-maroon py-3 text-sm font-semibold text-cream shadow-[0_10px_24px_rgba(185,32,37,0.35)] transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {cbSubmitting
+                      ? t("Sending…", "भेजा जा रहा है…")
+                      : t("Request callback", "कॉलबैक का अनुरोध करें")}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       )}
 

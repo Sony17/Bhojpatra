@@ -11,12 +11,15 @@ import LoadingSkeleton from "@/components/admin/shared/LoadingSkeleton";
 import { exportCsv } from "@/components/admin/shared/exportCsv";
 import { Megaphone, Users, Calendar } from "@/components/admin/shared/icons";
 
-/** One captured promo lead — mirrors the `Lead` shape from `/api/leads`. */
+/** One captured lead — mirrors the `Lead` shape from `/api/leads`. */
 interface Lead {
   email: string;
   phone: string;
   source: string;
   createdAt: string;
+  /** Set for support-chat "Request a callback" leads. */
+  topic?: string;
+  note?: string;
 }
 
 const PAGE_SIZE = 10;
@@ -24,10 +27,19 @@ const PAGE_SIZE = 10;
 /** Human-friendly label for the `source` field a lead was captured from. */
 const SOURCE_LABELS: Record<string, string> = {
   "home-promo": "Home — Promo Offers",
+  "booking-intent": "Booking Intent",
+  "home-booking-form": "Home — Booking Form",
+  "support-callback": "Support — Callback",
 };
 
 function sourceLabel(source: string) {
   return SOURCE_LABELS[source] ?? source;
+}
+
+/** A callback lead keys on a `cb:`+phone sentinel, so its `email` field is not
+ *  a real address — only render a mailto when it actually looks like one. */
+function realEmail(email: string): string {
+  return email.includes("@") ? email : "";
 }
 
 function formatDateTime(iso: string) {
@@ -92,8 +104,9 @@ export default function LeadGeneration() {
     if (!term) return all;
     return all.filter(
       (l) =>
-        l.email.toLowerCase().includes(term) ||
+        realEmail(l.email).toLowerCase().includes(term) ||
         l.phone.includes(term) ||
+        (l.topic ?? "").toLowerCase().includes(term) ||
         sourceLabel(l.source).toLowerCase().includes(term),
     );
   }, [leads, q]);
@@ -113,9 +126,11 @@ export default function LeadGeneration() {
     exportCsv(
       "bhojpatra-leads.csv",
       filtered.map((l) => ({
-        Email: l.email,
+        Email: realEmail(l.email),
         Phone: l.phone,
         Source: sourceLabel(l.source),
+        Topic: l.topic ?? "",
+        Details: l.note ?? "",
         "Captured At": formatDateTime(l.createdAt),
       })),
     );
@@ -125,14 +140,19 @@ export default function LeadGeneration() {
     {
       key: "email",
       header: "Email",
-      cell: (l) => (
-        <a
-          href={`mailto:${l.email}`}
-          className="font-medium text-maroon hover:underline"
-        >
-          {l.email}
-        </a>
-      ),
+      cell: (l) => {
+        const email = realEmail(l.email);
+        return email ? (
+          <a
+            href={`mailto:${email}`}
+            className="font-medium text-maroon hover:underline"
+          >
+            {email}
+          </a>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        );
+      },
     },
     {
       key: "phone",
@@ -147,6 +167,19 @@ export default function LeadGeneration() {
       key: "source",
       header: "Source",
       cell: (l) => <span className="text-ink-soft">{sourceLabel(l.source)}</span>,
+    },
+    {
+      key: "topic",
+      header: "Topic",
+      cell: (l) =>
+        l.topic ? (
+          <span className="text-ink" title={l.note || undefined}>
+            {l.topic}
+            {l.note ? " *" : ""}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
     },
     {
       key: "createdAt",
@@ -166,7 +199,7 @@ export default function LeadGeneration() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Lead Generation"
-        subtitle="Email & phone captured from the home-page promotional sign-up."
+        subtitle="Contacts captured from promo sign-ups, booking intent and support-chat callback requests."
         actions={
           <button
             type="button"
@@ -205,7 +238,7 @@ export default function LeadGeneration() {
         columns={columns}
         rows={pageRows}
         getRowKey={(l) => `${l.email}-${l.phone}-${l.createdAt}`}
-        minWidthClass="min-w-[640px]"
+        minWidthClass="min-w-[760px]"
         empty={
           <EmptyState
             title={q ? "No matching leads" : "No leads yet"}

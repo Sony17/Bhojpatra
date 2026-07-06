@@ -36,6 +36,10 @@ export interface StoredBooking extends Booking {
    *  per-vendor ratings + their first comment). Drives the card's star display.
    *  Absent until reviewed. Kept for back-compat with the single-review editor. */
   review?: { rating: number; comment: string; createdAt: string };
+  /** Set when the customer explicitly reopens a Completed booking back to
+   *  Confirmed (un-complete). Stops the auto-complete sweep for past events
+   *  from immediately re-completing it, so the un-complete sticks. */
+  reopened?: boolean;
 }
 
 /** A vendor chosen for an order — the catalogue id (empty for legacy orders that
@@ -123,6 +127,27 @@ export function updateStoredBooking(
   } catch {
     /* storage unavailable (private mode) — ignore for the mock */
   }
+}
+
+/** Mark several bookings Completed in one write + one notify, and return the
+ *  updated list. Used to auto-complete confirmed orders whose event date has
+ *  already passed (so their review flow opens without the customer marking each
+ *  one by hand). Returning the new list lets a caller update immediately without
+ *  waiting on the change event. Unknown ids are ignored. */
+export function completeBookings(ids: string[]): StoredBooking[] {
+  const current = getStoredBookings();
+  if (typeof window === "undefined" || ids.length === 0) return current;
+  const set = new Set(ids);
+  const next = current.map((b) =>
+    set.has(b.id) ? { ...b, status: "Completed" as const } : b,
+  );
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(CHANGED_EVENT));
+  } catch {
+    /* storage unavailable (private mode) — ignore for the mock */
+  }
+  return next;
 }
 
 /** Subscribe to stored-booking changes (same tab + other tabs). Returns an

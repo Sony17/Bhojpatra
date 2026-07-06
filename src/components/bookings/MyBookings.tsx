@@ -6,6 +6,7 @@ import {
   getStoredBookings,
   onStoredBookingsChange,
   updateStoredBooking,
+  completeBookings,
   downloadReceipt,
   bookingInvoice,
   bookingVendors,
@@ -16,6 +17,7 @@ import {
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
 import InvoicePreview from "./InvoicePreview";
+import StarInput from "@/components/reviews/StarInput";
 
 const ALL = "All" as const;
 type Filter = typeof ALL | BookingStatus;
@@ -136,7 +138,23 @@ export default function MyBookings() {
   );
 
   useEffect(() => {
-    const load = () => setBookings(getStoredBookings());
+    const load = () => {
+      const stored = getStoredBookings();
+      // Auto-complete: any confirmed booking whose event date has fully passed
+      // is marked Completed so its review flow opens on its own — no click. The
+      // event day itself (days === 0) is left to the manual "Mark event as
+      // complete" button. `completeBookings` persists the change and returns the
+      // updated list so we render it right away, without a change-event round-trip.
+      const overdue = stored
+        .filter(
+          (b) =>
+            b.status === "Confirmed" &&
+            !b.reopened &&
+            (daysUntilLabel(b.date) ?? 1) < 0,
+        )
+        .map((b) => b.id);
+      setBookings(overdue.length ? completeBookings(overdue) : stored);
+    };
     load();
     return onStoredBookingsChange(load);
   }, []);
@@ -310,6 +328,132 @@ function StatusBadge({ status }: { status: BookingStatus }) {
   }
 }
 
+/**
+ * Two-step control that flips a booking between Confirmed and Completed.
+ * A Confirmed booking shows "Mark as Complete" (→ Completed, which unlocks the
+ * review flow); a Completed booking shows "Reopen booking" (→ Confirmed, an
+ * un-complete). The flip is committed on the server first (PATCH
+ * /api/bookings/[id]) — which checks the customer owns the booking and that the
+ * transition is allowed — and only mirrored into the local list once the server
+ * accepts, so the two never drift. Reopening also sets `reopened` so the
+ * past-event auto-complete sweep leaves it alone. Each action takes one extra
+ * confirm click so it can't fire by accident. Renders nothing for Pending /
+ * Cancelled orders. Shared by the booking card and the details-modal footer.
+ */
+function CompleteToggle({ booking }: { booking: StoredBooking }) {
+  const { t } = useLang();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (booking.status !== "Confirmed" && booking.status !== "Completed") {
+    return null;
+  }
+  const completing = booking.status === "Confirmed";
+  const nextStatus: BookingStatus = completing ? "Completed" : "Confirmed";
+
+  const apply = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/bookings/${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        order?: unknown;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        setBusy(false);
+        setError(
+          data?.error ??
+            t(
+              "Couldn't update this booking. Please try again.",
+              "यह बुकिंग अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      // Server accepted — mirror the new status into the local list so the
+      // My Bookings view updates immediately. Reopens also flag the record so
+      // the local past-event auto-complete sweep won't flip it back.
+      updateStoredBooking(booking.id, {
+        status: nextStatus,
+        ...(completing ? {} : { reopened: true }),
+      });
+      setBusy(false);
+      setConfirming(false);
+    } catch {
+      setBusy(false);
+      setError(
+        t(
+          "Network error. Please try again.",
+          "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।",
+        ),
+      );
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-sm text-ink-soft">
+            {completing
+              ? t("Mark this event as complete?", "इस इवेंट को पूर्ण चिह्नित करें?")
+              : t("Reopen this booking?", "इस बुकिंग को फिर से खोलें?")}
+          </span>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={busy}
+            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+          >
+            {busy
+              ? t("Saving…", "सहेज रहे हैं…")
+              : completing
+                ? t("Yes, it's done", "हाँ, हो गया")
+                : t("Yes, reopen", "हाँ, फिर से खोलें")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirming(false);
+              setError("");
+            }}
+            disabled={busy}
+            className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline disabled:opacity-60"
+          >
+            {t("Not yet", "अभी नहीं")}
+          </button>
+        </div>
+        {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className={
+        "inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-sm font-semibold transition " +
+        (completing
+          ? "bg-maroon text-cream shadow-sm hover:bg-maroon-dark"
+          : "border border-maroon text-maroon hover:bg-maroon/5")
+      }
+    >
+      <span aria-hidden="true">{completing ? "✓" : "↩"}</span>
+      {completing
+        ? t("Mark as Complete", "पूर्ण चिह्नित करें")
+        : t("Reopen booking", "बुकिंग फिर से खोलें")}
+    </button>
+  );
+}
+
 function BookingCard({
   booking,
   onView,
@@ -427,7 +571,7 @@ function BookingCard({
       </div>
 
       {/* Actions */}
-      <div className="mt-5 flex flex-wrap gap-3 border-t border-cream-3 pt-4">
+      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-cream-3 pt-4">
         {booking.status === "Pending" && (
           <button
             type="button"
@@ -444,34 +588,40 @@ function BookingCard({
           {t("View Details", "विवरण देखें")}
         </button>
         <DownloadMenu booking={booking} />
-        {booking.status === "Completed" &&
-          (booking.review ? (
-            <div className="ml-auto flex items-center gap-2">
-              <Stars
-                rating={booking.review.rating}
-                label={t(
-                  `You rated ${booking.review.rating} out of 5 stars`,
-                  `आपने 5 में से ${booking.review.rating} स्टार दिए`,
-                )}
-              />
+
+        {/* Status actions, right-aligned: review a completed order plus the
+            Confirmed ⇄ Completed toggle. */}
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {booking.status === "Completed" &&
+            (booking.review ? (
+              <div className="flex items-center gap-2">
+                <Stars
+                  rating={booking.review.rating}
+                  label={t(
+                    `You rated ${booking.review.rating} out of 5 stars`,
+                    `आपने 5 में से ${booking.review.rating} स्टार दिए`,
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={onReview}
+                  className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline"
+                >
+                  {t("Edit review", "समीक्षा संपादित करें")}
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={onReview}
-                className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline"
+                className="inline-flex items-center gap-1.5 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
               >
-                {t("Edit review", "समीक्षा संपादित करें")}
+                <span aria-hidden="true">★</span>
+                {t("Rate your experience", "अपना अनुभव रेट करें")}
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onReview}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-            >
-              <span aria-hidden="true">★</span>
-              {t("Rate your experience", "अपना अनुभव रेट करें")}
-            </button>
-          ))}
+            ))}
+          <CompleteToggle booking={booking} />
+        </div>
       </div>
     </li>
   );
@@ -730,15 +880,18 @@ function BookingDetailsModal({
             >
               {copied ? t("Link copied ✓", "लिंक कॉपी ✓") : t("Copy link", "लिंक कॉपी करें")}
             </button>
-            {editable && (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="ml-auto rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-              >
-                {t("Edit Booking", "बुकिंग संपादित करें")}
-              </button>
-            )}
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+                >
+                  {t("Edit Booking", "बुकिंग संपादित करें")}
+                </button>
+              )}
+              <CompleteToggle booking={booking} />
+            </div>
           </div>
         )}
       </div>
@@ -916,41 +1069,6 @@ function Stars({ rating, label }: { rating: number; label: string }) {
         </span>
       ))}
     </span>
-  );
-}
-
-/** Interactive 1–5 star picker with hover/focus preview. */
-function StarInput({
-  value,
-  onChange,
-  label,
-}: {
-  value: number;
-  onChange: (rating: number) => void;
-  label: (n: number) => string;
-}) {
-  const [hover, setHover] = useState(0);
-  const shown = hover || value;
-  return (
-    <div className="flex items-center gap-1 text-3xl text-gold" role="radiogroup">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          role="radio"
-          aria-checked={value === n}
-          aria-label={label(n)}
-          onMouseEnter={() => setHover(n)}
-          onMouseLeave={() => setHover(0)}
-          onFocus={() => setHover(n)}
-          onBlur={() => setHover(0)}
-          onClick={() => onChange(n)}
-          className="leading-none transition-transform hover:scale-110"
-        >
-          <span className={n <= shown ? "" : "opacity-25"}>★</span>
-        </button>
-      ))}
-    </div>
   );
 }
 

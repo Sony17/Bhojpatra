@@ -12,13 +12,24 @@ const store = createStore<StoredOrder>({
   idField: "id",
 });
 
-// Allowed status transitions. Terminal states (Completed, Cancelled) can't move
-// on; anything can be cancelled. Same-status updates are idempotent.
+// Allowed status transitions for an admin. A completed booking can be reopened
+// back to Confirmed; only Cancelled is terminal. Same-status updates are
+// idempotent.
 const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   Pending: ["Confirmed", "Cancelled", "Pending"],
   Confirmed: ["Completed", "Cancelled", "Confirmed"],
-  Completed: ["Completed"],
+  Completed: ["Completed", "Confirmed"],
   Cancelled: ["Cancelled"],
+};
+
+// What a booking's own customer may do to it: mark their confirmed event
+// complete, or reopen a completed one. They can't cancel, touch a Pending
+// order, or change the paid amount — that stays with the team.
+const CUSTOMER_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+  Pending: [],
+  Confirmed: ["Completed"],
+  Completed: ["Confirmed"],
+  Cancelled: [],
 };
 
 function isBookingStatus(v: unknown): v is BookingStatus {
@@ -40,13 +51,17 @@ export async function GET(
   return Response.json({ order });
 }
 
-// PATCH /api/bookings/[id] → { status?, paid? } — validated status transition
+// PATCH /api/bookings/[id] → { status?, paid? } — validated status transition.
+// Admins may run any transition and adjust `paid`; a booking's own customer may
+// only complete/reopen their event (see CUSTOMER_TRANSITIONS) and never touch
+// the money.
 export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireRole("admin");
+  const guard = await requireRole();
   if (guard instanceof Response) return guard;
+  const isAdmin = guard.role === "admin";
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
   try {
@@ -60,13 +75,22 @@ export async function PATCH(
     return Response.json({ error: "Booking not found." }, { status: 404 });
   }
 
+  // A customer may only act on a booking they own; admins on any booking.
+  // Legacy orders with no recorded owner stay admin-only.
+  if (!isAdmin && (!order.userId || order.userId !== guard.id)) {
+    return Response.json({ error: "Not allowed." }, { status: 403 });
+  }
+
   const next: StoredOrder = { ...order };
 
   if (body.status !== undefined) {
     if (!isBookingStatus(body.status)) {
       return Response.json({ error: "Invalid status." }, { status: 400 });
     }
-    if (!TRANSITIONS[order.status].includes(body.status)) {
+    const allowed = isAdmin
+      ? TRANSITIONS[order.status]
+      : CUSTOMER_TRANSITIONS[order.status];
+    if (!allowed.includes(body.status)) {
       return Response.json(
         { error: `Cannot move a ${order.status} booking to ${body.status}.` },
         { status: 409 },
@@ -76,6 +100,10 @@ export async function PATCH(
   }
 
   if (body.paid !== undefined) {
+    // Only the team settles money — a customer can't move the paid amount.
+    if (!isAdmin) {
+      return Response.json({ error: "Not allowed." }, { status: 403 });
+    }
     const paid = Number(body.paid);
     if (!Number.isFinite(paid) || paid < 0) {
       return Response.json({ error: "Invalid paid amount." }, { status: 400 });

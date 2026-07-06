@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
 
 export interface StoredOrder {
   id: string;
+  /** The signed-in user who placed the order, captured server-side from the
+   *  session (never trusted from the client). Owner linkage: lets that customer
+   *  complete/reopen their own booking via PATCH. Absent on legacy orders saved
+   *  before ownership was tracked — those stay admin-only. */
+  userId?: string;
   customer: string;
   phone: string;
   occasion: string;
@@ -82,6 +87,7 @@ export async function POST(request: Request) {
   // (the booking UI asks the visitor to log in before reaching this step).
   const guard = await requireRole();
   if (guard instanceof Response) return guard;
+  const user = guard;
 
   let body: unknown;
   try {
@@ -128,6 +134,9 @@ export async function POST(request: Request) {
 
   const order: StoredOrder = {
     id,
+    // Owner is taken from the session, not the request body, so it can't be
+    // forged — this is what authorises the customer's own complete/reopen later.
+    userId: user.id,
     customer:
       typeof customer === "string" && customer.trim()
         ? customer.trim()

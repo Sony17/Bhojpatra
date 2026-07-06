@@ -1639,6 +1639,34 @@ function StepMenu({
         })}
       </div>
 
+      {/* What this package lets you do for the active course — a package that
+          allows several vendors and/or more than one dish per course says so
+          up front, so the guest knows they can mix stalls and pick a spread
+          rather than assuming one vendor / one dish. */}
+      {(multiVendor || allowance > 1) && (
+        <p className="mt-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+          <span aria-hidden="true" className="text-maroon">
+            ★
+          </span>
+          <span>
+            {multiVendor && allowance > 1
+              ? t(
+                  `This package lets you mix multiple vendors and pick up to ${allowance} dishes for this course.`,
+                  `इस पैकेज में आप कई वेंडर मिला सकते हैं और इस कोर्स के लिए ${allowance} तक व्यंजन चुन सकते हैं।`,
+                )
+              : multiVendor
+                ? t(
+                    "This package lets you pick multiple vendors for this course.",
+                    "इस पैकेज में आप इस कोर्स के लिए कई वेंडर चुन सकते हैं।",
+                  )
+                : t(
+                    `This package lets you pick up to ${allowance} dishes for this course.`,
+                    `इस पैकेज में आप इस कोर्स के लिए ${allowance} तक व्यंजन चुन सकते हैं।`,
+                  )}
+          </span>
+        </p>
+      )}
+
       {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
       <h3 className="mt-7 font-display text-lg font-semibold text-maroon">
         {multiVendor

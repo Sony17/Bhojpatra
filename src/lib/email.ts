@@ -162,13 +162,19 @@ export async function sendPaymentAlert(payment: StoredPayment): Promise<void> {
 }
 
 export async function sendLeadAlert(lead: Lead): Promise<void> {
+  const isCallback = lead.source === "support-callback";
   await sendAlert({
-    subject: `New lead — ${lead.email || lead.phone}`,
-    heading: "New lead / enquiry",
+    subject: isCallback
+      ? `Callback requested — +91 ${lead.phone}`
+      : `New lead — ${lead.email || lead.phone}`,
+    heading: isCallback ? "Callback requested (call within 10 mins)" : "New lead / enquiry",
     fields: [
-      { label: "Email", value: lead.email || "—" },
+      // A callback's `email` is a `cb:`+phone sentinel, not a real address.
+      ...(isCallback ? [] : [{ label: "Email", value: lead.email || "—" }]),
       { label: "Phone", value: lead.phone || "—" },
       { label: "Source", value: lead.source },
+      ...(lead.topic ? [{ label: "Topic", value: lead.topic }] : []),
+      ...(lead.note ? [{ label: "Details", value: lead.note }] : []),
     ],
   });
 }

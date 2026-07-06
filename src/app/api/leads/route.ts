@@ -15,7 +15,21 @@ export interface Lead {
   createdAt: string;
   /** Follow-up state, flipped by the admin Lead Generation console. */
   status?: LeadStatus;
+  /** What a support-callback request is about (chat "Request a callback"). */
+  topic?: string;
+  /** Optional free-text detail the customer added to a callback request. */
+  note?: string;
 }
+
+/** Canonical help topics offered by the support-chat callback form. Anything
+ *  else is ignored so the admin console stays tidy. */
+const CALLBACK_TOPICS = [
+  "Service assistance",
+  "Daily orders",
+  "Multi occasion order",
+  "App guidance",
+  "Rewards & referrals",
+];
 
 // De-duplicated by email (the id-field); a repeat sign-up updates in place.
 const store = createStore<Lead>({
@@ -41,7 +55,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { email, phone, source } = (body ?? {}) as Record<string, unknown>;
+  const { email, phone, source, topic, note } = (body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   const cleanEmail =
     typeof email === "string" && EMAIL_RE.test(email.trim())
@@ -51,6 +68,25 @@ export async function POST(request: Request) {
     typeof phone === "string" ? normalizePhone(phone.trim()) : "";
   const validPhone = PHONE_RE.test(cleanedPhone);
 
+  const ALLOWED_SOURCES = [
+    "home-promo",
+    "booking-intent",
+    "home-booking-form",
+    "support-callback",
+  ];
+  const leadSource =
+    typeof source === "string" && ALLOWED_SOURCES.includes(source)
+      ? source
+      : "home-promo";
+  const isCallback = leadSource === "support-callback";
+
+  // A callback request is only actionable with a number to ring back on.
+  if (isCallback && !validPhone) {
+    return Response.json(
+      { error: "Please enter a valid 10-digit mobile number." },
+      { status: 400 },
+    );
+  }
   // The promo signup sends both; the booking-intent capture sends phone only.
   // Require at least one valid contact.
   if (!cleanEmail && !validPhone) {
@@ -60,33 +96,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const ALLOWED_SOURCES = ["home-promo", "booking-intent", "home-booking-form"];
-  const leadSource =
-    typeof source === "string" && ALLOWED_SOURCES.includes(source)
-      ? source
-      : "home-promo";
+  const cleanTopic =
+    typeof topic === "string" && CALLBACK_TOPICS.includes(topic.trim())
+      ? topic.trim()
+      : "";
+  const cleanNote =
+    typeof note === "string" ? note.trim().slice(0, 500) : "";
 
   const lead: Lead = {
-    // Leads are keyed by the `email` field; a phone-only lead keys on its phone
-    // so distinct phones stay distinct in the store.
-    email: cleanEmail || cleanedPhone,
+    // Leads are keyed by the `email` field. A callback keys on a `cb:` +phone
+    // sentinel so it stays distinct from a promo/email lead for the same person
+    // (one open callback per number, refreshed on re-request), while promo and
+    // phone-only leads key on their email/phone as before.
+    email: isCallback ? `cb:${cleanedPhone}` : cleanEmail || cleanedPhone,
     phone: validPhone ? cleanedPhone : "",
     source: leadSource,
     createdAt: new Date().toISOString(),
+    ...(cleanTopic ? { topic: cleanTopic } : {}),
+    ...(cleanNote ? { note: cleanNote } : {}),
   };
 
   try {
-    const leads = await store.list();
-    // Skip duplicates so a repeat sign-up stays idempotent (by email or phone).
-    const exists = leads.some(
-      (l) =>
-        l.email === lead.email ||
-        (!!lead.phone && l.phone === lead.phone),
-    );
-    if (!exists) {
+    if (isCallback) {
+      // Always record (and alert on) a callback — the team needs to ring back,
+      // and a re-request should refresh the topic/note rather than be dropped.
       await store.upsert(lead);
-      // Alert the owners only on a genuinely new lead (best-effort).
       await sendLeadAlert(lead);
+    } else {
+      const leads = await store.list();
+      // Skip duplicates so a repeat sign-up stays idempotent (by email or phone).
+      const exists = leads.some(
+        (l) =>
+          l.email === lead.email || (!!lead.phone && l.phone === lead.phone),
+      );
+      if (!exists) {
+        await store.upsert(lead);
+        // Alert the owners only on a genuinely new lead (best-effort).
+        await sendLeadAlert(lead);
+      }
     }
   } catch (err) {
     console.error("Failed to persist lead", err);

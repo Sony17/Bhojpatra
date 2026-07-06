@@ -15,8 +15,10 @@ import {
   statFor,
   type VendorRatingSummary,
 } from "@/lib/vendorRatings";
+import { useCompare } from "@/lib/compare";
 import { useLang } from "@/lib/i18n";
 import ThemedSelect from "@/components/ThemedSelect";
+import CompareTray from "@/components/vendors/CompareTray";
 
 const ALL = "all";
 
@@ -156,6 +158,10 @@ export default function VendorCatalog() {
   // Real customer ratings, matched to these listings by name (best-effort).
   const ratings = useVendorRatings();
 
+  // When caterers are ticked for comparison, a sticky tray covers the page
+  // bottom — pad the section so the last row of cards clears it.
+  const { count: compareCount } = useCompare();
+
   const toggleMeal = (meal: string) =>
     setMeals((prev) =>
       prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal],
@@ -251,7 +257,12 @@ export default function VendorCatalog() {
   };
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
+    <section
+      className={
+        "mx-auto max-w-7xl px-5 py-12 sm:py-16 " +
+        (compareCount > 0 ? "pb-32 sm:pb-36" : "")
+      }
+    >
       <div className="max-w-2xl">
         <p className="eyebrow text-sm font-medium text-gold">
           {t("Vendor Catalog", "वेंडर कैटलॉग")}
@@ -490,6 +501,8 @@ export default function VendorCatalog() {
           )}
         </div>
       )}
+
+      <CompareTray />
     </section>
   );
 }
@@ -580,6 +593,9 @@ function VendorCard({
   stats?: VendorRatingSummary;
 }) {
   const { t } = useLang();
+  const { has, toggle, isFull } = useCompare();
+  const inCompare = has(vendor.id);
+  const compareDisabled = !inCompare && isFull;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
@@ -656,6 +672,28 @@ function VendorCard({
             <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => toggle(vendor.id)}
+          disabled={compareDisabled}
+          aria-pressed={inCompare}
+          title={
+            compareDisabled
+              ? t("Compare list is full", "तुलना सूची भर गई है")
+              : undefined
+          }
+          className={
+            "absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 " +
+            (inCompare
+              ? "bg-maroon text-cream"
+              : "bg-white/90 text-ink hover:text-maroon")
+          }
+        >
+          <span aria-hidden="true">{inCompare ? "✓" : "+"}</span>
+          {inCompare
+            ? t("Added to compare", "तुलना में जोड़ा")
+            : t("Add to compare", "तुलना में जोड़ें")}
+        </button>
       </div>
 
       <div className="flex flex-1 flex-col p-5">
@@ -663,13 +701,17 @@ function VendorCard({
           <h3 className="font-display text-lg font-semibold text-ink">
             {vendor.name}
           </h3>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
+          <Link
+            href={`/vendors/${vendor.id}#reviews`}
+            aria-label={t("Read reviews", "समीक्षाएँ पढ़ें")}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-cream-3"
+          >
             <span aria-hidden="true" className="text-gold">
               ⭐
             </span>
             {vendor.rating}
             <span className="text-ink-soft">({vendor.reviews})</span>
-          </span>
+          </Link>
         </div>
 
         <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
@@ -717,7 +759,7 @@ function VendorCard({
             </p>
           </div>
           <Link
-            href="/book"
+            href={`/vendors/${vendor.id}`}
             className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
             {t("View & Compare", "देखें और तुलना करें")}
