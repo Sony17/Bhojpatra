@@ -281,7 +281,7 @@ export function buildInvoicePdf(
   } else {
     p.text(MX, PAGE_H - 56, "bhojpatra", 30, F_BOLD, CREAM);
   }
-  p.text(MX + 2, PAGE_H - 74, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.2);
+  p.text(MX + 2, PAGE_H - 82, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.2);
 
   p.textRight(RIGHT, PAGE_H - 50, "TAX INVOICE", 15, F_BOLD, WHITE);
   p.textRight(RIGHT, PAGE_H - 70, `Invoice No.  ${data.id}`, 9, F_REG, CREAM);
