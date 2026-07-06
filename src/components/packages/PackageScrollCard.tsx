@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 
 /**
  * The "patra scroll" package card — the entire menu written on the clean scroll
- * artwork (public/clean.png).
+ * artwork (public/pack.png).
  *
  * Shared between the home page's Packages section and the booking wizard's
  * package step so both surfaces advertise a tier identically. The card renders
@@ -16,8 +16,8 @@ import { useLang } from "@/lib/i18n";
  * booking-step select button).
  */
 
-/** Aspect ratio of the patra scroll artwork (public/clean.png, 1149×1369). */
-const SCROLL_RATIO = "1149 / 1369";
+/** Aspect ratio of the patra scroll artwork (public/pack.png, 458×545). */
+const SCROLL_RATIO = "458 / 545";
 
 /**
  * Writable area of the scroll, as inset % of the artwork. The menu is
@@ -131,7 +131,7 @@ export default function PackageScrollCard({
         style={{ aspectRatio: SCROLL_RATIO }}
       >
         <Image
-          src="/clean.png"
+          src="/pack.png"
           alt=""
           fill
           sizes="(min-width:1024px) 360px, (min-width:640px) 45vw, 90vw"
