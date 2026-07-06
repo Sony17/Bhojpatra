@@ -64,14 +64,15 @@ export default function Packages() {
                 tier={tier}
                 selected={selected}
                 onSelect={() => setSelectedId(tier.id)}
+                ctaOnFold
                 cta={
                   <Link
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
                     aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen mx-auto mt-2 flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                    className="btn-sheen flex h-7 w-7 items-center justify-center rounded-full bg-cream text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 active:scale-95"
                   >
-                    <span aria-hidden="true" className="text-base leading-none">
+                    <span aria-hidden="true" className="text-sm leading-none">
                       →
                     </span>
                   </Link>

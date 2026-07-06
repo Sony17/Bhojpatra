@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import { type PackageTier, type PackageFeature } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
@@ -74,6 +74,7 @@ export default function PackageScrollCard({
   selected,
   onSelect,
   cta,
+  ctaOnFold = false,
   priority = false,
 }: {
   tier: PackageTier;
@@ -81,10 +82,22 @@ export default function PackageScrollCard({
   onSelect: () => void;
   /** Action area rendered on the parchment, below the menu (Link / button). */
   cta: ReactNode;
+  /** Place the CTA on the scroll's bottom red fold instead of inside the parchment. */
+  ctaOnFold?: boolean;
   /** Eager-load the scroll image (use for the popular / above-the-fold card). */
   priority?: boolean;
 }) {
   const { lang, t } = useLang();
+  // Courses start collapsed so the scroll reads clean; clicking a course header
+  // reveals the items beneath it (tracked by segment index).
+  const [openCourses, setOpenCourses] = useState<Set<number>>(new Set());
+  const toggleCourse = (index: number) =>
+    setOpenCourses((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   const popular = tier.popular === true;
   const premium = tier.id === "platinum";
   const tierName = lang === "hi" ? tier.nameHi : tier.name;
@@ -176,31 +189,56 @@ export default function PackageScrollCard({
 
               const headingLabel =
                 lang === "hi" ? seg.heading.labelHi : seg.heading.label;
+              const hasItems = seg.items.length > 0;
+              const isOpen = openCourses.has(seg.index);
               return (
                 <li
                   key={seg.index}
                   className="border-b border-maroon/10 py-1 last:border-b-0"
                 >
-                  {/* Course header */}
-                  <div className="flex items-start gap-2 text-left text-[11px] font-semibold leading-tight text-maroon">
+                  {/* Course header — click to reveal its items; kept collapsed
+                      by default so the scroll stays clean. Stops propagation so
+                      expanding a course doesn't also select the card. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (!hasItems) return;
+                      e.stopPropagation();
+                      toggleCourse(seg.index);
+                    }}
+                    aria-expanded={hasItems ? isOpen : undefined}
+                    className="flex w-full items-start gap-2 text-left text-[11px] font-semibold leading-tight text-maroon"
+                  >
                     <RhombusMarker />
-                    <span>{headingLabel}</span>
-                  </div>
-                  {/* Every item under this course, always shown. */}
-                  <ul className="mt-0.5">
-                    {seg.items.map(({ feature, index }) => {
-                      const label =
-                        lang === "hi" ? feature.labelHi : feature.label;
-                      return (
-                        <li
-                          key={index}
-                          className="py-0.5 pl-5 text-left text-[11px] leading-tight text-ink-soft"
-                        >
-                          <span>{label}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                    <span className="flex-1">{headingLabel}</span>
+                    {hasItems && (
+                      <span
+                        aria-hidden="true"
+                        className={`mt-0.5 shrink-0 leading-none transition-transform duration-200 ${
+                          isOpen ? "rotate-90" : ""
+                        }`}
+                      >
+                        ›
+                      </span>
+                    )}
+                  </button>
+                  {/* Items — revealed only when the course is expanded. */}
+                  {hasItems && isOpen && (
+                    <ul className="mt-0.5">
+                      {seg.items.map(({ feature, index }) => {
+                        const label =
+                          lang === "hi" ? feature.labelHi : feature.label;
+                        return (
+                          <li
+                            key={index}
+                            className="py-0.5 pl-5 text-left text-[11px] leading-tight text-ink-soft"
+                          >
+                            <span>{label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}
@@ -215,9 +253,16 @@ export default function PackageScrollCard({
             </div>
           )}
 
-          {/* Action area — supplied by the caller (Link on home, button in book). */}
-          {cta}
+          {/* Action area — inside the parchment unless placed on the fold. */}
+          {!ctaOnFold && cta}
         </div>
+
+        {/* Action area sitting on the scroll's bottom red fold (home page). */}
+        {ctaOnFold && cta && (
+          <div className="absolute inset-x-0 bottom-[2.5%] z-20 flex justify-center">
+            {cta}
+          </div>
+        )}
       </div>
     </div>
   );
