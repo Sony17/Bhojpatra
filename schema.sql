@@ -50,6 +50,24 @@ create table if not exists vendor_applications (
   updated_at timestamptz not null default now()
 );
 
+-- Live vendor profiles + published menus (an account-owned caterer surfaced in
+-- the catalogue, distinct from the one-off vendor_applications).
+create table if not exists vendors (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Vendor photo metadata (card / dish / gallery). The bytes live in Vercel Blob
+-- (the record carries the blob URL); only the metadata is stored here.
+create table if not exists vendor_photos (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- KYC document metadata. The uploaded file bytes live in Vercel Blob (the
 -- record carries the blob URL); only the metadata is stored here.
 create table if not exists kyc_documents (

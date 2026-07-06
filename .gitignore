@@ -59,3 +59,10 @@ next-env.d.ts
 
 # Admin-editable CMS content (runtime data store — seeded from code defaults)
 /data/content-items.json
+
+# Live vendor profiles + menus (runtime data store — seeded from code defaults)
+/data/vendors.json
+
+# Uploaded vendor card photos + their metadata index (runtime data store)
+/data/vendor-photos/
+/data/vendor-photos.json

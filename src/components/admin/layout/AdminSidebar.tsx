@@ -28,6 +28,7 @@ const NAV_ICON: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   dashboard: Grid,
   vendors: Store,
   approvals: ShieldCheck,
+  menus: Layout,
   customers: Users,
   leads: Megaphone,
   enquiries: Mail,

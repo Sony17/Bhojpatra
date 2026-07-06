@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -162,6 +162,28 @@ export default function VendorCatalog() {
   // bottom — pad the section so the last row of cards clears it.
   const { count: compareCount } = useCompare();
 
+  // Live vendors who published a menu from the vendor dashboard — appended to
+  // the curated static listings. Best-effort: the catalog renders the static
+  // set immediately and on any fetch failure.
+  const [liveVendors, setLiveVendors] = useState<VendorListing[]>([]);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/vendors")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { vendors?: VendorListing[] } | null) => {
+        if (live && d?.vendors) setLiveVendors(d.vendors);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const allVendors = useMemo(
+    () => [...vendorListings, ...liveVendors],
+    [liveVendors],
+  );
+
   const toggleMeal = (meal: string) =>
     setMeals((prev) =>
       prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal],
@@ -169,21 +191,21 @@ export default function VendorCatalog() {
 
   // Distinct cities, in first-seen order.
   const cityOptions = useMemo(
-    () => Array.from(new Set(vendorListings.map((v) => v.city))),
-    [],
+    () => Array.from(new Set(allVendors.map((v) => v.city))),
+    [allVendors],
   );
 
   // Distinct cuisines, sorted alphabetically.
   const cuisineOptions = useMemo(
     () =>
-      Array.from(new Set(vendorListings.flatMap((v) => v.cuisines))).sort(),
-    [],
+      Array.from(new Set(allVendors.flatMap((v) => v.cuisines))).sort(),
+    [allVendors],
   );
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    const filtered = vendorListings.filter((v) => {
+    const filtered = allVendors.filter((v) => {
       const matchesQuery =
         q === "" ||
         v.name.toLowerCase().includes(q) ||
@@ -232,7 +254,7 @@ export default function VendorCatalog() {
         break;
     }
     return sorted;
-  }, [query, city, state, cuisine, diet, tier, price, meals, sort]);
+  }, [allVendors, query, city, state, cuisine, diet, tier, price, meals, sort]);
 
   const hasActiveFilters =
     query !== "" ||
@@ -701,17 +723,21 @@ function VendorCard({
           <h3 className="font-display text-lg font-semibold text-ink">
             {vendor.name}
           </h3>
-          <Link
-            href={`/vendors/${vendor.id}#reviews`}
-            aria-label={t("Read reviews", "समीक्षाएँ पढ़ें")}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-cream-3"
-          >
-            <span aria-hidden="true" className="text-gold">
-              ⭐
+          {vendor.reviews > 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
+              <span aria-hidden="true" className="text-gold">
+                ⭐
+              </span>
+              {vendor.rating}
+              <span className="text-ink-soft">({vendor.reviews})</span>
             </span>
-            {vendor.rating}
-            <span className="text-ink-soft">({vendor.reviews})</span>
-          </Link>
+          ) : (
+            !stats && (
+              <span className="inline-flex shrink-0 items-center rounded-full border border-maroon px-2.5 py-1 text-xs font-semibold text-maroon">
+                {t("New", "नया")}
+              </span>
+            )
+          )}
         </div>
 
         <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
@@ -758,11 +784,15 @@ function VendorCard({
               </span>
             </p>
           </div>
+          {/* Live vendors have a public profile page (gallery + full menu);
+              curated static listings hand off to the wizard as before. */}
           <Link
-            href={`/vendors/${vendor.id}`}
+            href={vendor.id.startsWith("VEN-") ? `/vendors/${vendor.id}` : "/book"}
             className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
-            {t("View & Compare", "देखें और तुलना करें")}
+            {vendor.id.startsWith("VEN-")
+              ? t("View Menu & Photos", "मेन्यू और फ़ोटो देखें")
+              : t("View & Compare", "देखें और तुलना करें")}
           </Link>
         </div>
       </div>

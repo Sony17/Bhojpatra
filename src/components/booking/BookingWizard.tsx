@@ -368,17 +368,47 @@ export default function BookingWizard() {
     (packageId === "platinum" ||
       (packageId === "gold" && guests >= MULTI_VENDOR_MIN));
 
+  // Vendors & dishes per course come from the vendor store (`/api/menu`):
+  // the curated seed specialists plus every live vendor menu published from
+  // the vendor dashboard. The static fixture renders instantly as a fallback
+  // until (or in case) the fetch answers.
+  const [liveMenuCategories, setLiveMenuCategories] =
+    useState<MenuCategory[]>(menuCategories);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/menu")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { categories?: MenuCategory[] } | null) => {
+        if (live && d?.categories?.length) setLiveMenuCategories(d.categories);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // The course tabs the guest sees on this step are driven by the selected
   // package — each tier opens a different set of segments (Silver is a short
   // fixed menu; Gold adds Chaat / Chinese / South Indian; Platinum curates
   // premium segments). This keeps /book in sync with what the package card on
   // the home page advertises. Order follows `packageCategories`.
   const activeCategories = useMemo<MenuCategory[]>(() => {
-    const ids = packageCategories[packageId] ?? menuCategories.map((c) => c.id);
+    const ids =
+      packageCategories[packageId] ?? liveMenuCategories.map((c) => c.id);
+    // Live caterers serve their own city — once the guest has picked one (via
+    // the hero booking bar or Step 3), other-city live vendors are hidden.
+    // Curated seed vendors are city-agnostic and always shown.
+    const cityName = cities.find((c) => c.id === cityId)?.name.toLowerCase();
     return ids
-      .map((id) => menuCategories.find((c) => c.id === id))
-      .filter((c): c is MenuCategory => Boolean(c));
-  }, [packageId]);
+      .map((id) => liveMenuCategories.find((c) => c.id === id))
+      .filter((c): c is MenuCategory => Boolean(c))
+      .map((c) => ({
+        ...c,
+        vendors: c.vendors.filter(
+          (v) => !v.live || !cityName || v.city?.toLowerCase() === cityName,
+        ),
+      }));
+  }, [packageId, liveMenuCategories, cityId]);
 
   // Switching to a package with fewer segments can leave the active tab index
   // past the end of the new list — pull it back into range.
@@ -389,8 +419,23 @@ export default function BookingWizard() {
   const allowanceFor = (catId: string): number =>
     packageCategoryItems[packageId]?.[catId] ?? 1;
 
-  const vendorsFor = (catId: string): string[] => categoryVendor[catId] ?? [];
-  const itemsFor = (catId: string): string[] => categoryItems[catId] ?? [];
+  // Selections are filtered at read time against the vendors currently shown
+  // (same derive-don't-reconcile approach as the add-on vendor fallback):
+  // switching the event city can hide a live vendor after the guest picked
+  // them, and a stale pick must not count towards "menu complete" or price.
+  const vendorsFor = (catId: string): string[] => {
+    const visible = activeCategories.find((c) => c.id === catId)?.vendors;
+    const chosen = categoryVendor[catId] ?? [];
+    return visible
+      ? chosen.filter((id) => visible.some((v) => v.id === id))
+      : chosen;
+  };
+  const itemsFor = (catId: string): string[] => {
+    const chosen = vendorsFor(catId);
+    return (categoryItems[catId] ?? []).filter((id) =>
+      chosen.some((vid) => id.startsWith(`${vid}-`)),
+    );
+  };
 
   const categoryComplete = (cat: MenuCategory): boolean => {
     return (
@@ -1648,9 +1693,15 @@ function StepMenu({
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
   const cat = categories[activeCat] ?? categories[0];
-  // Silver advertises a fixed set of vendors — cap the carousel accordingly.
+  // Silver advertises a fixed set of curated vendors — the cap applies to the
+  // seed roster only. Live caterers who published a menu always stay visible,
+  // whatever the package (they'd otherwise never surface on Silver, since the
+  // curated seeds sort first).
   const visibleVendors = maxVendors
-    ? cat.vendors.slice(0, maxVendors)
+    ? [
+        ...cat.vendors.filter((v) => !v.live).slice(0, maxVendors),
+        ...cat.vendors.filter((v) => v.live),
+      ]
     : cat.vendors;
   const allowance = allowanceFor(cat.id);
   const selectedIds = categoryVendor[cat.id] ?? [];
@@ -1764,12 +1815,20 @@ function StepMenu({
                 <h4 className="font-display text-sm font-semibold text-maroon">
                   {v.name}
                 </h4>
-                <p className="mt-1 text-xs text-ink-soft">
-                  ⭐ {v.rating}{" "}
-                  <span className="text-ink-soft/70">
-                    ({inr.format(v.reviews)})
-                  </span>
-                </p>
+                {v.reviews > 0 ? (
+                  <p className="mt-1 text-xs text-ink-soft">
+                    ⭐ {v.rating}{" "}
+                    <span className="text-ink-soft/70">
+                      ({inr.format(v.reviews)})
+                    </span>
+                  </p>
+                ) : (
+                  !stat && (
+                    <p className="mt-1 text-xs font-semibold text-maroon">
+                      {t("New on Bhojpatra", "भोजपत्र पर नया")}
+                    </p>
+                  )
+                )}
                 {stat && (
                   <p className="mt-1 text-xs font-semibold text-maroon">
                     ★ {stat.rating} ·{" "}
@@ -1880,6 +1939,17 @@ function StepMenu({
                                 : "border-cream-3 bg-white text-ink hover:bg-cream-2")
                           }
                         >
+                          {it.photo && (
+                            <span className="relative -ml-2 block h-7 w-7 shrink-0 overflow-hidden rounded-full border border-cream-3">
+                              <Image
+                                src={it.photo}
+                                alt=""
+                                fill
+                                sizes="28px"
+                                className="object-cover"
+                              />
+                            </span>
+                          )}
                           <span
                             aria-hidden="true"
                             className={

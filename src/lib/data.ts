@@ -1003,6 +1003,8 @@ export interface CategoryItem {
   id: string;
   name: string;
   diet: DietType;
+  /** Dish thumbnail (live vendors upload these; seeds have none). */
+  photo?: string;
 }
 
 export interface CategoryVendor {
@@ -1014,6 +1016,11 @@ export interface CategoryVendor {
   perPlate: number;
   image: string;
   items: CategoryItem[];
+  /** True for live (account-owned) vendors assembled from the vendor store —
+   *  they bypass the Silver carousel cap and are filtered by event city. */
+  live?: boolean;
+  /** Live vendor's base city; curated seeds are city-agnostic. */
+  city?: string;
 }
 
 export interface MenuCategory {

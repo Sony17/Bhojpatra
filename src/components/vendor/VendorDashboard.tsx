@@ -13,12 +13,14 @@ import {
   type VendorNotification,
 } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import MenuBuilder from "@/components/vendor/MenuBuilder";
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(n)}`;
 
 type Tab =
   | "overview"
+  | "menu"
   | "requests"
   | "calendar"
   | "earnings"
@@ -27,6 +29,7 @@ type Tab =
 
 const TABS: { id: Tab; en: string; hi: string }[] = [
   { id: "overview", en: "Overview", hi: "अवलोकन" },
+  { id: "menu", en: "My Menu", hi: "मेरा मेन्यू" },
   { id: "requests", en: "Booking Requests", hi: "बुकिंग अनुरोध" },
   { id: "calendar", en: "Order Calendar", hi: "ऑर्डर कैलेंडर" },
   { id: "earnings", en: "Earnings", hi: "कमाई" },
@@ -119,6 +122,7 @@ export default function VendorDashboard() {
         {tab === "overview" && (
           <OverviewPanel requests={requests} onSeeAll={() => setTab("requests")} />
         )}
+        {tab === "menu" && <MenuBuilder />}
         {tab === "requests" && (
           <RequestsPanel requests={requests} onSetStatus={setRequestStatus} />
         )}
@@ -705,8 +709,8 @@ function ProfilePanel() {
       </h2>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
-          "Keep your business details current. You can also edit your menus, per-plate pricing and gallery photos from here.",
-          "अपने बिज़नेस विवरण अद्यतन रखें। आप यहाँ से अपने मेन्यू, प्रति-प्लेट मूल्य और गैलरी फ़ोटो भी संपादित कर सकते हैं।",
+          "Keep your business details current. Manage your dishes and per-plate pricing from the My Menu tab.",
+          "अपने बिज़नेस विवरण अद्यतन रखें। अपनी डिश और प्रति-प्लेट मूल्य 'मेरा मेन्यू' टैब से प्रबंधित करें।",
         )}
       </p>
 

@@ -1,0 +1,155 @@
+import { requireRole } from "@/lib/auth";
+import { readVendorApplications } from "@/lib/vendorApplications";
+import {
+  findPhotoByOwner,
+  listPhotosByOwner,
+  photoUrl,
+  pruneDishPhotos,
+} from "@/lib/vendorPhotos";
+import {
+  DEFAULT_VENDOR_IMAGE,
+  findVendorByOwner,
+  newVendorId,
+  photoIdFromUrl,
+  saveVendor,
+  validateVendorMenuInput,
+  type LiveVendorRecord,
+  type ModerationStatus,
+} from "@/lib/vendorMenus";
+
+export const dynamic = "force-dynamic";
+
+/** The signed-in vendor's approved/pending application, matched by email —
+ *  used to prefill a first-time menu and to grant the verified badge. */
+async function applicationFor(email: string) {
+  const apps = await readVendorApplications();
+  const key = email.trim().toLowerCase();
+  return apps.find((a) => a.email.trim().toLowerCase() === key) ?? null;
+}
+
+// GET /api/vendor/menu → { vendor: LiveVendorRecord | null, prefill? }
+// The signed-in vendor's own profile + menu. When they haven't saved one yet,
+// `prefill` carries whatever their registration application already told us.
+export async function GET() {
+  const guard = await requireRole("vendor");
+  if (guard instanceof Response) return guard;
+
+  try {
+    const gallery = (await listPhotosByOwner(guard.id, "gallery")).map((p) => ({
+      id: p.id,
+      url: photoUrl(p),
+    }));
+
+    const vendor = await findVendorByOwner(guard.id);
+    if (vendor) return Response.json({ vendor, gallery });
+
+    const app = await applicationFor(guard.email);
+    return Response.json({
+      vendor: null,
+      gallery,
+      prefill: app
+        ? {
+            business: app.business,
+            city: app.city,
+            state: app.state,
+            cuisines: app.cuisines,
+            about: app.speciality,
+          }
+        : { business: guard.name ?? "" },
+    });
+  } catch (err) {
+    console.error("Failed to load vendor menu", err);
+    return Response.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
+
+// PUT /api/vendor/menu → upsert the signed-in vendor's profile + menu.
+export async function PUT(request: Request) {
+  const guard = await requireRole("vendor");
+  if (guard instanceof Response) return guard;
+
+  let body: Record<string, unknown>;
+  try {
+    body = ((await request.json()) ?? {}) as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const check = validateVendorMenuInput(body);
+  if (!check.ok) {
+    return Response.json({ error: check.error }, { status: 400 });
+  }
+
+  try {
+    const existing = await findVendorByOwner(guard.id);
+    const app = await applicationFor(guard.email);
+    const now = new Date().toISOString();
+
+    // Card image: their uploaded photo wins (covers a photo uploaded before
+    // the first menu save), then whatever the record already had, then stock.
+    const photo = await findPhotoByOwner(guard.id);
+    const image = photo
+      ? photoUrl(photo)
+      : (existing?.image ?? DEFAULT_VENDOR_IMAGE);
+
+    // Dish photos may only reference this vendor's own uploads — strip any
+    // reference to a photo they don't own (or that no longer exists).
+    const ownedDishPhotoIds = new Set(
+      (await listPhotosByOwner(guard.id, "dish")).map((p) => p.id),
+    );
+    const menu = check.value.menu.map((s) => ({
+      ...s,
+      items: s.items.map((it) => {
+        if (!it.photo) return it;
+        const photoId = photoIdFromUrl(it.photo);
+        return photoId && ownedDishPhotoIds.has(photoId)
+          ? it
+          : { name: it.name, diet: it.diet };
+      }),
+    }));
+
+    // Takedown moderation: a fresh save re-queues Approved content as Pending;
+    // a Hidden vendor stays hidden until an admin restores them.
+    const moderation: ModerationStatus =
+      existing?.moderation === "Hidden" ? "Hidden" : "Pending";
+
+    const record: LiveVendorRecord = {
+      id: existing?.id ?? newVendorId(),
+      ownerUserId: guard.id,
+      ownerEmail: guard.email,
+      image,
+      rating: existing?.rating ?? 0,
+      reviews: existing?.reviews ?? 0,
+      verified: app?.status === "Verified",
+      moderation,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      ...check.value,
+      menu,
+    };
+
+    await saveVendor(record);
+
+    // Clean up dish photos no longer referenced by any item.
+    const referenced = new Set(
+      menu.flatMap((s) =>
+        s.items.flatMap((it) => {
+          const id = it.photo ? photoIdFromUrl(it.photo) : null;
+          return id ? [id] : [];
+        }),
+      ),
+    );
+    await pruneDishPhotos(guard.id, referenced);
+
+    return Response.json({ ok: true, vendor: record });
+  } catch (err) {
+    console.error("Failed to save vendor menu", err);
+    return Response.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
+}
