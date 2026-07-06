@@ -98,7 +98,7 @@ export default function ImageField({
           <input
             id={fieldId}
             className={inputClass}
-            value={value}
+            value={value ?? ""}
             placeholder="Paste an image URL or upload"
             onChange={(e) => onChange(e.target.value)}
           />

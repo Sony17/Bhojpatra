@@ -27,6 +27,7 @@ const emptyDraft: AdminCampaign = {
   id: "",
   name: "",
   image: "",
+  mobileImage: "",
   linkUrl: "",
   status: "Active",
 };
@@ -86,6 +87,7 @@ export default function CampaignManager() {
     const payload = {
       name: c.name,
       image: c.image,
+      mobileImage: c.mobileImage,
       linkUrl: c.linkUrl,
       status: c.status,
     };
@@ -301,10 +303,17 @@ export default function CampaignManager() {
             </Field>
 
             <ImageField
-              label="Popup image"
+              label="Web image (desktop)"
               value={draft.image}
               onChange={(next) => setDraft({ ...draft, image: next })}
-              hint="Upload or paste an image URL"
+              hint="Shown on desktop. Landscape works best."
+            />
+
+            <ImageField
+              label="Mobile image (optional)"
+              value={draft.mobileImage}
+              onChange={(next) => setDraft({ ...draft, mobileImage: next })}
+              hint="Portrait variant for phones. Leave blank to reuse the web image."
             />
 
             <Field label="Link to (optional)" hint="Where the picture takes visitors when tapped. Leave blank for a non-clickable popup.">

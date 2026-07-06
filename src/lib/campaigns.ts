@@ -60,6 +60,7 @@ export function toAdminCampaign(r: CampaignRecord): AdminCampaign {
     id: r.id,
     name: r.name,
     image: r.image,
+    mobileImage: r.mobileImage ?? "",
     linkUrl: r.linkUrl,
     status: r.status,
   };
@@ -91,11 +92,16 @@ export function validateCampaign(
       return { ok: false, error: "A campaign name is required." };
     out.name = body.name.trim();
   }
-  // image — required; the picture shown in the popup
+  // image — required; the web/desktop picture shown in the popup
   if (body.image !== undefined || !partial) {
     if (typeof body.image !== "string" || !body.image.trim())
       return { ok: false, error: "A campaign image is required." };
     out.image = body.image.trim();
+  }
+  // mobileImage — optional portrait variant; "" falls back to `image` on mobile
+  if (body.mobileImage !== undefined || !partial) {
+    out.mobileImage =
+      typeof body.mobileImage === "string" ? body.mobileImage.trim() : "";
   }
   // linkUrl — optional click-through
   if (body.linkUrl !== undefined || !partial) {

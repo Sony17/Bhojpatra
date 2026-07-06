@@ -294,8 +294,10 @@ export interface AdminCampaign {
   id: string;
   /** Internal label shown in the admin list (not shown to visitors). */
   name: string;
-  /** The popup picture — an uploaded data URL or a pasted image URL. */
+  /** The popup picture for web/desktop — an uploaded data URL or a pasted URL. */
   image: string;
+  /** Optional mobile/portrait variant. "" = fall back to `image` on mobile too. */
+  mobileImage: string;
   /** Optional click-through target ("" = the image isn't clickable). */
   linkUrl: string;
   status: CampaignStatus;

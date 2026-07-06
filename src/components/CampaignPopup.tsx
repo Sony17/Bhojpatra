@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
 import { useLang } from "@/lib/i18n";
-import { isUnoptimized } from "@/lib/homeContent";
 import type { AdminCampaign } from "@/lib/admin/types";
 
 /**
@@ -64,27 +62,33 @@ export default function CampaignPopup() {
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 [animation-duration:0.3s]"
+      className="animate-fade fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3 [animation-duration:0.3s]"
       role="dialog"
       aria-modal="true"
       aria-label={t("Special offer", "विशेष ऑफ़र")}
       onClick={close}
     >
-      {/* Card covers ~70% of the viewport (wider on small screens so it stays
-          usable); the picture is contained within it so nothing is cropped. */}
+      {/* Card hugs the picture — it sizes to the image's own aspect ratio, so
+          there are no white letterbox bars on any screen. On mobile the image
+          always spans 80% of the screen width (any size scales to fit); on
+          desktop it's capped to ~74% of the viewport. */}
       <div
-        className="animate-rise relative h-[70vh] w-[90vw] max-w-[1000px] overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_rgba(0,0,0,0.35)] [animation-duration:0.4s] sm:w-[70vw]"
+        className="animate-rise relative inline-block max-h-[85vh] max-w-[80vw] overflow-hidden rounded-2xl shadow-[0_18px_50px_rgba(0,0,0,0.35)] [animation-duration:0.4s] sm:max-h-[74vh] sm:max-w-[74vw]"
         onClick={(e) => e.stopPropagation()}
       >
-        <Image
-          src={campaign.image}
-          alt={campaign.name}
-          fill
-          sizes="(max-width: 640px) 90vw, 70vw"
-          className="object-contain"
-          unoptimized={isUnoptimized(campaign.image)}
-          priority
-        />
+        {/* Two sizes: the browser picks the mobile image on phones and the web
+            image otherwise. When no mobile image is set the web image is the
+            fallback everywhere. The <img> sizes the card to whichever renders. */}
+        <picture>
+          {campaign.mobileImage && (
+            <source srcSet={campaign.mobileImage} media="(max-width: 640px)" />
+          )}
+          <img
+            src={campaign.image}
+            alt={campaign.name}
+            className="block h-auto w-[80vw] max-h-[85vh] object-contain sm:h-auto sm:w-auto sm:max-h-[74vh] sm:max-w-[74vw]"
+          />
+        </picture>
 
         {/* Whole picture is the click target when a link is set. */}
         {campaign.linkUrl && (
