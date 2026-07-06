@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
+import { useAccountMenuState } from "@/lib/accountMenu";
 
 /* Bhojpatra contact — mirrors the placeholder in the Footer. Swap for the
    real WhatsApp business number later. */
@@ -137,6 +138,7 @@ function PhoneIcon({ className }: { className?: string }) {
 
 export default function FloatingChat() {
   const { lang, t } = useLang();
+  const accountMenu = useAccountMenuState();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"chat" | "callback">("chat");
   const [messages, setMessages] = useState<Message[]>([
@@ -250,7 +252,16 @@ export default function FloatingChat() {
   }
 
   return (
-    <div className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
+    <div
+      className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
+      style={
+        accountMenu.open
+          ? {
+              transform: `translateY(calc(-${accountMenu.height}px - env(safe-area-inset-bottom) - 1rem))`,
+            }
+          : undefined
+      }
+    >
       {/* ── Chat panel — scaled to 96% from the bottom-right so it grows up
           from the launcher without nudging the launcher off the corner. ── */}
       {open && (

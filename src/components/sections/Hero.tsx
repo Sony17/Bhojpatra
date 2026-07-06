@@ -8,6 +8,7 @@ import { ShieldCheck, PriceTag, ClipboardCheck, Headset } from "@/components/ico
 import { occasions, cities } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
+import { useOccasions, OTHER_OCCASION_ID } from "@/lib/occasions";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
 /** Local YYYY-MM-DD (matches the <input type="date"> value on /book). */
@@ -21,8 +22,13 @@ export default function Hero() {
   const { lang, t } = useLang();
   const { hero } = useHomeContent();
 
-  // Admin-managed serviceable locations, plus a free-text "Other" fallback so
-  // customers outside the listed cities/states can still enter their own.
+  // Admin-managed occasions + serviceable locations, each with a free-text
+  // "Other" fallback so customers can enter one that isn't in the list.
+  const occasionList = useOccasions();
+  const occasionOptions = [
+    ...occasionList,
+    { id: OTHER_OCCASION_ID, name: t("Other", "अन्य"), nameHi: "अन्य" },
+  ];
   const locations = useLocations();
   const locationOptions = [
     ...locations,
@@ -31,12 +37,16 @@ export default function Hero() {
 
   // Booking selections, carried into /book as query params.
   const [occasionId, setOccasionId] = useState(occasions[0].id);
+  const [customOccasion, setCustomOccasion] = useState("");
   const [cityId, setCityId] = useState(cities[0].id);
   const [customCity, setCustomCity] = useState("");
   const [date, setDate] = useState<Date | null>(null);
 
+  const isOtherOccasion = occasionId === OTHER_OCCASION_ID;
   const isOtherCity = cityId === OTHER_LOCATION_ID;
   const bookParams = new URLSearchParams({ occasion: occasionId, city: cityId });
+  if (isOtherOccasion && customOccasion.trim())
+    bookParams.set("occName", customOccasion.trim());
   if (isOtherCity && customCity.trim()) bookParams.set("loc", customCity.trim());
   if (date) bookParams.set("date", toYmd(date));
   const bookHref = `/book?${bookParams.toString()}`;
@@ -57,7 +67,7 @@ export default function Hero() {
         <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         <BrandSelect
           className="mt-0.5"
-          options={occasions}
+          options={occasionOptions}
           placeholder={t("Select Occasion", "अवसर चुनें")}
           ariaLabel={t("Select Occasion", "अवसर चुनें")}
           icon="chevron"
@@ -198,15 +208,29 @@ export default function Hero() {
         {/* Search bar — slightly wider than the headline column. */}
         <div className="animate-rise delay-3 mt-6 max-w-3xl">
           {bookingBar}
-          {isOtherCity && (
-            <input
-              type="text"
-              value={customCity}
-              onChange={(e) => setCustomCity(e.target.value)}
-              placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              className="mt-2 w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
-            />
+          {(isOtherOccasion || isOtherCity) && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {isOtherOccasion && (
+                <input
+                  type="text"
+                  value={customOccasion}
+                  onChange={(e) => setCustomOccasion(e.target.value)}
+                  placeholder={t("Type your occasion", "अपना अवसर लिखें")}
+                  aria-label={t("Type your occasion", "अपना अवसर लिखें")}
+                  className="w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
+                />
+              )}
+              {isOtherCity && (
+                <input
+                  type="text"
+                  value={customCity}
+                  onChange={(e) => setCustomCity(e.target.value)}
+                  placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+                  aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+                  className="w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
+                />
+              )}
+            </div>
           )}
         </div>
 

@@ -18,6 +18,28 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Routes that exist only to forward legacy/parent links to their real home.
+  // Handled at the routing layer (checked before the filesystem) so no page
+  // component renders just to throw `redirect()`. `permanent: false` keeps the
+  // 307 status that `redirect()` was already issuing.
+  async redirects() {
+    return [
+      // `/admin` has no page of its own — send visitors to the dashboard.
+      { source: "/admin", destination: "/admin/dashboard", permanent: false },
+      // Booking Management was merged into "Customers & Bookings".
+      {
+        source: "/admin/bookings",
+        destination: "/admin/customers?tab=bookings",
+        permanent: false,
+      },
+      // Reports were merged into the dashboard's analytics section.
+      {
+        source: "/admin/reports",
+        destination: "/admin/dashboard",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

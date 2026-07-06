@@ -8,11 +8,11 @@ import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { adminProfile, businessDetails } from "@/lib/admin/mockData";
 import type { BusinessDetails } from "@/lib/admin/types";
 import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
-import type { LocationOption } from "@/lib/locations";
 
 const TABS: TabItem[] = [
   { id: "profile", label: "Admin Profile" },
   { id: "business", label: "Business" },
+  { id: "occasions", label: "Occasions" },
   { id: "locations", label: "Locations" },
   { id: "payments", label: "Payments (UPI)" },
 ];
@@ -25,7 +25,30 @@ export default function SettingsView() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "profile" && <ProfileTab />}
       {tab === "business" && <BusinessTab />}
-      {tab === "locations" && <LocationsTab />}
+      {tab === "occasions" && (
+        <NameListTab
+          dataKey="occasions"
+          title="Occasions"
+          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Hindi is optional — it defaults to the English name."
+          endpoint="/api/admin/occasions"
+          addLabel="+ Add occasion"
+          namePlaceholder="e.g. Anniversary"
+          nameHiPlaceholder="e.g. सालगिरह"
+          emptyError="Add at least one occasion."
+        />
+      )}
+      {tab === "locations" && (
+        <NameListTab
+          dataKey="locations"
+          title="Serviceable Locations"
+          description="Cities / states offered in the homepage booking bar and the booking wizard. Customers outside this list can still enter their own via the “Other” option. Hindi is optional — it defaults to the English name."
+          endpoint="/api/admin/locations"
+          addLabel="+ Add location"
+          namePlaceholder="e.g. Nagpur"
+          nameHiPlaceholder="e.g. नागपुर"
+          emptyError="Add at least one location."
+        />
+      )}
       {tab === "payments" && <PaymentsTab />}
     </div>
   );
@@ -86,20 +109,46 @@ function BusinessTab() {
   );
 }
 
-function LocationsTab() {
-  const [rows, setRows] = useState<LocationOption[]>([]);
+type NameRow = { id: string; name: string; nameHi: string };
+
+/**
+ * Reusable editor for a simple admin-managed name list (Occasions, Locations).
+ * Loads from `endpoint` (GET returns `{ [dataKey]: NameRow[] }`), lets the admin
+ * add / edit / remove rows, and POSTs the cleaned list back under the same key.
+ */
+function NameListTab({
+  dataKey,
+  title,
+  description,
+  endpoint,
+  addLabel,
+  namePlaceholder,
+  nameHiPlaceholder,
+  emptyError,
+}: {
+  dataKey: "occasions" | "locations";
+  title: string;
+  description: string;
+  endpoint: string;
+  addLabel: string;
+  namePlaceholder: string;
+  nameHiPlaceholder: string;
+  emptyError: string;
+}) {
+  const [rows, setRows] = useState<NameRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
-  // Load the admin-curated list (the API falls back to the seed cities).
+  // Load the admin-curated list (the API falls back to the seed list).
   useEffect(() => {
     let active = true;
-    fetch("/api/admin/locations")
+    fetch(endpoint)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { locations?: LocationOption[] } | null) => {
-        if (active && Array.isArray(d?.locations)) setRows(d.locations);
+      .then((d: Record<string, NameRow[]> | null) => {
+        const list = d?.[dataKey];
+        if (active && Array.isArray(list)) setRows(list);
       })
       .catch(() => {})
       .finally(() => {
@@ -108,7 +157,7 @@ function LocationsTab() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [endpoint, dataKey]);
 
   const update = (i: number, key: "name" | "nameHi", value: string) => {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)));
@@ -128,22 +177,20 @@ function LocationsTab() {
     setError("");
     const cleaned = rows.filter((r) => r.name.trim());
     if (!cleaned.length) {
-      setError("Add at least one location.");
+      setError(emptyError);
       return;
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/locations", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locations: cleaned }),
+        body: JSON.stringify({ [dataKey]: cleaned }),
       });
-      const d = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        locations?: LocationOption[];
-      };
-      if (!res.ok) throw new Error(d.error || "Could not save locations.");
-      if (d.locations) setRows(d.locations);
+      const d = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) throw new Error((d.error as string) || "Could not save changes.");
+      const next = d[dataKey];
+      if (Array.isArray(next)) setRows(next as NameRow[]);
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -153,12 +200,8 @@ function LocationsTab() {
   };
 
   return (
-    <WidgetCard title="Serviceable Locations">
-      <p className="mb-4 text-sm text-ink-soft">
-        Cities / states offered in the homepage booking bar and the booking
-        wizard. Customers outside this list can still enter their own via the
-        “Other” option. Hindi is optional — it defaults to the English name.
-      </p>
+    <WidgetCard title={title}>
+      <p className="mb-4 text-sm text-ink-soft">{description}</p>
       {loading ? (
         <p className="text-sm text-ink-soft">Loading…</p>
       ) : (
@@ -173,21 +216,21 @@ function LocationsTab() {
               <input
                 className={inputClass}
                 value={row.name}
-                placeholder="e.g. Nagpur"
-                aria-label="Location name (English)"
+                placeholder={namePlaceholder}
+                aria-label="Name (English)"
                 onChange={(e) => update(i, "name", e.target.value)}
               />
               <input
                 className={inputClass}
                 value={row.nameHi}
-                placeholder="e.g. नागपुर"
-                aria-label="Location name (Hindi)"
+                placeholder={nameHiPlaceholder}
+                aria-label="Name (Hindi)"
                 onChange={(e) => update(i, "nameHi", e.target.value)}
               />
               <button
                 type="button"
                 onClick={() => removeRow(i)}
-                aria-label={`Remove ${row.name || "location"}`}
+                aria-label={`Remove ${row.name || "row"}`}
                 className="rounded-full border border-maroon/30 px-4 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
               >
                 Remove
@@ -199,7 +242,7 @@ function LocationsTab() {
             onClick={addRow}
             className="rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
           >
-            + Add location
+            {addLabel}
           </button>
         </div>
       )}

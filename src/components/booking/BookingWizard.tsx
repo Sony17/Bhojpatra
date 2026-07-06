@@ -34,7 +34,6 @@ import {
   type EmiPlan,
 } from "@/lib/emi";
 import {
-  occasions,
   cities,
   packages,
   addOns,
@@ -44,8 +43,9 @@ import {
   packageCategoryItems,
   packageBasePerPlate,
   packageLeadDays,
+  DEFAULT_VENDOR_LEAD_DAYS,
+  vendorLeadDays,
   vendorListings,
-  type Occasion,
   type PackageTier,
   type AddOn,
   type MenuCategory,
@@ -58,6 +58,11 @@ import {
   OTHER_LOCATION_ID,
   type LocationOption,
 } from "@/lib/locations";
+import {
+  useOccasions,
+  OTHER_OCCASION_ID,
+  type OccasionOption,
+} from "@/lib/occasions";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -132,11 +137,11 @@ function packageAvailable(packageId: string, eventDate: string): boolean {
   return days >= (packageLeadDays[packageId] ?? 0);
 }
 
-/** The soonest `YYYY-MM-DD` a package can be booked for, given its lead time —
- *  used as the date picker's `min` and to spell out the requirement in a
- *  notice when the chosen date falls short. */
-function earliestDateFor(packageId: string): string {
-  const lead = packageLeadDays[packageId] ?? 0;
+/** The soonest bookable `YYYY-MM-DD` given a lead time in days — used as the
+ *  date picker's `min` and to spell out the requirement in a notice when the
+ *  chosen date falls short. Works for both fixed package leads and the Custom
+ *  flow's per-vendor lead. */
+function isoAfterDays(lead: number): string {
   const d = new Date();
   d.setDate(d.getDate() + lead);
   const yyyy = d.getFullYear();
@@ -171,6 +176,8 @@ export default function BookingWizard() {
   // Occasion / date / city / venue are usually pre-chosen in the Hero booking
   // bar and carried over via the URL; here they remain fully editable.
   const [occasionId, setOccasionId] = useState<string>("");
+  // Free-text occasion typed when the customer picks "Other".
+  const [customOccasion, setCustomOccasion] = useState<string>("");
   const [guests, setGuests] = useState<number>(100);
   const [eventDate, setEventDate] = useState<string>("");
   const [cityId, setCityId] = useState<string>("");
@@ -195,9 +202,19 @@ export default function BookingWizard() {
   const [referrerName, setReferrerName] = useState<string>("");
   const [referrerType, setReferrerType] = useState<string>("");
 
-  // Admin-managed serviceable locations (falls back to the seed list). resolveCity
-  // turns the selected id — or the free-text "Other" value — into a
-  // {name,nameHi} used across the invoice / receipt / summary.
+  // Admin-managed occasions + serviceable locations (both fall back to their
+  // seed lists). resolveOccasion / resolveCity turn the selected id — or the
+  // free-text "Other" value — into a {name,nameHi} used across the invoice /
+  // receipt / summary.
+  const occasionList = useOccasions();
+  const resolveOccasion = (id: string): OccasionOption | undefined => {
+    if (!id) return undefined;
+    if (id === OTHER_OCCASION_ID) {
+      const name = customOccasion.trim();
+      return name ? { id, name, nameHi: name } : undefined;
+    }
+    return occasionList.find((o) => o.id === id);
+  };
   const locations = useLocations();
   const resolveCity = (id: string): City | undefined => {
     if (!id) return undefined;
@@ -221,7 +238,15 @@ export default function BookingWizard() {
     const pkg = sp.get("package");
     const stepParam = sp.get("step");
     const guestsParam = sp.get("guests");
-    if (occ && occasions.some((o) => o.id === occ)) setOccasionId(occ);
+    // Occasion may be a seed id, an admin-added id (resolved once the list
+    // loads), or the "Other" sentinel carrying a typed name in `occName`.
+    const occName = sp.get("occName")?.trim();
+    if (occ === OTHER_OCCASION_ID || occName) {
+      setOccasionId(OTHER_OCCASION_ID);
+      if (occName) setCustomOccasion(occName);
+    } else if (occ) {
+      setOccasionId(occ);
+    }
     if (date) setEventDate(date);
     // City may be a seed id, an admin-added id (resolved once the list loads),
     // or the "Other" sentinel carrying a typed name in `loc`.
@@ -505,20 +530,6 @@ export default function BookingWizard() {
     setGuests((g) => Math.max(paxMin, Math.min(paxMax, g)));
   }, [paxMin, paxMax]);
 
-  // Does the chosen date clear the selected package's lead time? Empty date is
-  // treated as fine (the guest hasn't committed one yet). When it falls short we
-  // warn and block "Next" rather than silently swapping the package.
-  const dateMeetsLead = packageAvailable(packageId, eventDate);
-  const earliestDate = earliestDateFor(packageId);
-  const leadDays = packageLeadDays[packageId] ?? 0;
-  const leadWarning =
-    eventDate !== "" && !dateMeetsLead
-      ? t(
-          `${selectedPackage?.name ?? "This package"} needs ${leadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
-          `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${leadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
-        )
-      : "";
-
   const categoryAddTotal = useMemo<number>(
     () =>
       activeCategories.reduce((sum, cat) => {
@@ -582,6 +593,63 @@ export default function BookingWizard() {
       setSelectedAddOns([...selectedAddOns, id]);
     }
   };
+
+  /* ─── Advance-booking lead time ────────────────────────────────────── */
+  // Silver/Gold/Platinum carry a fixed package lead (7/21/45 days). The Custom
+  // single-stall plan has NO fixed lead — its notice is "as per vendor
+  // specification": the longest lead among the stalls the guest actually picked
+  // (each vendor's `leadDays`, default 2; same-day stalls set 0). So a Custom
+  // order can go same-day when every chosen vendor allows it, but needs 2 days'
+  // notice the moment one standard 2-day stall is in the mix.
+  const customLeadDays = ((): number => {
+    let lead = 0;
+    let picked = false;
+    // Course (single-stall) vendors chosen per segment.
+    for (const cat of menuCategories) {
+      for (const vid of categoryVendor[cat.id] ?? []) {
+        const v = cat.vendors.find((x) => x.id === vid);
+        if (v) {
+          picked = true;
+          lead = Math.max(lead, vendorLeadDays(v));
+        }
+      }
+    }
+    // Catalogue vendors assigned to selected add-ons / live counters.
+    for (const addOnId of selectedAddOns) {
+      const v = eligibleAddOnVendors.find((x) => x.id === addOnVendorId(addOnId));
+      if (v) {
+        picked = true;
+        lead = Math.max(lead, vendorLeadDays(v));
+      }
+    }
+    // Nothing chosen yet → the baseline notice, so an empty Custom order still
+    // can't be locked in for tomorrow.
+    return picked ? lead : DEFAULT_VENDOR_LEAD_DAYS;
+  })();
+
+  // Effective advance notice the chosen date must clear: the fixed package lead
+  // for the tiers, the vendor-derived lead for Custom.
+  const effectiveLeadDays =
+    packageId === "custom" ? customLeadDays : (packageLeadDays[packageId] ?? 0);
+
+  // Does the chosen date clear that notice? Empty date is treated as fine (the
+  // guest hasn't committed one yet). When it falls short we warn and block
+  // "Next" rather than silently swapping the package.
+  const daysToEvent = daysUntil(eventDate);
+  const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
+  const earliestDate = isoAfterDays(effectiveLeadDays);
+  const leadWarning =
+    eventDate === "" || dateMeetsLead
+      ? ""
+      : packageId === "custom"
+        ? t(
+            `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
+            `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
+          )
+        : t(
+            `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
+            `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
+          );
 
   const preDiscount = subtotal + addOnsTotal;
   const discount = appliedCoupon
@@ -678,7 +746,7 @@ export default function BookingWizard() {
   };
 
   const buildReceipt = (): string => {
-    const occ = occasions.find((o) => o.id === occasionId);
+    const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
     const menuLines = activeCategories
@@ -748,7 +816,7 @@ export default function BookingWizard() {
   // Itemised invoice data for THIS order — drives the PDF invoice download and
   // is stored on the booking so it can be re-downloaded from My Bookings.
   const buildInvoice = (): InvoiceData => {
-    const occ = occasions.find((o) => o.id === occasionId);
+    const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
 
@@ -831,7 +899,7 @@ export default function BookingWizard() {
   };
 
   const buildWhatsAppMessage = (): string => {
-    const occ = occasions.find((o) => o.id === occasionId);
+    const occ = resolveOccasion(occasionId);
     const city = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
     const menuLines = activeCategories
@@ -927,7 +995,7 @@ export default function BookingWizard() {
     }
 
     setConfirming(true);
-    const occ = occasions.find((o) => o.id === occasionId);
+    const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
     // Unique vendor names across every chosen course, plus any vendor assigned
     // to a selected add-on / counter.
@@ -993,6 +1061,11 @@ export default function BookingWizard() {
           phone: customerPhone.trim(),
           occasion: occ?.name ?? "Feast",
           date: formatEventDate(eventDate),
+          // Raw ISO date + package/lead so the server can re-check the
+          // advance-booking rule (the `date` above is a display string).
+          eventDateISO: eventDate,
+          packageId,
+          leadDays: effectiveLeadDays,
           guests,
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
@@ -1075,6 +1148,9 @@ export default function BookingWizard() {
         t={t}
         occasionId={occasionId}
         setOccasionId={setOccasionId}
+        customOccasion={customOccasion}
+        setCustomOccasion={setCustomOccasion}
+        occasionList={occasionList}
         eventDate={eventDate}
         setEventDate={setEventDate}
         cityId={cityId}
@@ -1173,7 +1249,7 @@ export default function BookingWizard() {
           {step === 4 && !confirmed && sessionStatus != null && (
             <StepConfirm
               t={t}
-              occasion={occasions.find((o) => o.id === occasionId)}
+              occasion={resolveOccasion(occasionId)}
               packageName={selectedPackage?.name ?? ""}
               eventDate={eventDate}
               city={resolveCity(cityId)}
@@ -1236,7 +1312,7 @@ export default function BookingWizard() {
             <StepDone
               t={t}
               bookingId={bookingId}
-              occasion={occasions.find((o) => o.id === occasionId)}
+              occasion={resolveOccasion(occasionId)}
               eventDate={eventDate}
               city={resolveCity(cityId)}
               venue={venue}
@@ -1401,6 +1477,9 @@ function EventBar({
   t,
   occasionId,
   setOccasionId,
+  customOccasion,
+  setCustomOccasion,
+  occasionList,
   eventDate,
   setEventDate,
   cityId,
@@ -1419,6 +1498,9 @@ function EventBar({
   t: (en: string, hi: string) => string;
   occasionId: string;
   setOccasionId: (v: string) => void;
+  customOccasion: string;
+  setCustomOccasion: (v: string) => void;
+  occasionList: OccasionOption[];
   eventDate: string;
   setEventDate: (v: string) => void;
   cityId: string;
@@ -1452,12 +1534,23 @@ function EventBar({
             className={fieldClass}
           >
             <option value="">{t("Select occasion", "अवसर चुनें")}</option>
-            {occasions.map((o) => (
+            {occasionList.map((o) => (
               <option key={o.id} value={o.id}>
                 {lang === "hi" ? o.nameHi : o.name}
               </option>
             ))}
+            <option value={OTHER_OCCASION_ID}>{t("Other", "अन्य")}</option>
           </select>
+          {occasionId === OTHER_OCCASION_ID && (
+            <input
+              type="text"
+              value={customOccasion}
+              onChange={(e) => setCustomOccasion(e.target.value)}
+              placeholder={t("Type your occasion", "अपना अवसर लिखें")}
+              aria-label={t("Type your occasion", "अपना अवसर लिखें")}
+              className={fieldClass}
+            />
+          )}
         </label>
 
         <label className="block">
@@ -2605,7 +2698,7 @@ function StepConfirm({
   whatsappHref,
 }: {
   t: (en: string, hi: string) => string;
-  occasion: Occasion | undefined;
+  occasion: OccasionOption | undefined;
   packageName: string;
   eventDate: string;
   city: City | undefined;
@@ -2978,7 +3071,7 @@ function StepDone({
 }: {
   t: (en: string, hi: string) => string;
   bookingId: string;
-  occasion: Occasion | undefined;
+  occasion: OccasionOption | undefined;
   eventDate: string;
   city: City | undefined;
   venue: string;

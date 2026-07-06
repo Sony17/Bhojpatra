@@ -1021,6 +1021,10 @@ export interface CategoryVendor {
   live?: boolean;
   /** Live vendor's base city; curated seeds are city-agnostic. */
   city?: string;
+  /** Minimum advance-booking notice (in days) this stall needs before the event —
+   *  the "as per vendor specification" rule for the Custom single-stall flow.
+   *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */
+  leadDays?: number;
 }
 
 export interface MenuCategory {
@@ -1052,18 +1056,20 @@ export const menuCategories: MenuCategory[] = [
     icon: "🥤",
     blurb: "Refreshing arrival drinks to greet your guests.",
     blurbHi: "मेहमानों के स्वागत के लिए ताज़ा पेय।",
+    // Beverages are same-day fulfillable, so these stalls accept walk-up /
+    // same-day Custom orders (leadDays: 0). Other courses keep the 2-day default.
     vendors: [
-      { id: "wd-sparkle", name: "Sip & Sparkle", rating: 4.8, reviews: 210, perPlate: 40, image: vImg("photo-1437418747212-8d9709afab22"),
+      { id: "wd-sparkle", name: "Sip & Sparkle", rating: 4.8, reviews: 210, perPlate: 40, leadDays: 0, image: vImg("photo-1437418747212-8d9709afab22"),
         items: mkItems("wd-sparkle", [["Masala Jaljeera"], ["Aam Panna"], ["Tender Coconut Cooler"], ["Rose Sharbat"], ["Thandai"], ["Virgin Mojito"]]) },
-      { id: "wd-sharbat", name: "Sharbat House", rating: 4.7, reviews: 165, perPlate: 35, image: vImg("photo-1601050690597-df0568f70950"),
+      { id: "wd-sharbat", name: "Sharbat House", rating: 4.7, reviews: 165, perPlate: 35, leadDays: 0, image: vImg("photo-1601050690597-df0568f70950"),
         items: mkItems("wd-sharbat", [["Rose Sharbat"], ["Khus Sharbat"], ["Spiced Buttermilk"], ["Masala Jaljeera"], ["Kokum Cooler"], ["Nimbu Pani"]]) },
-      { id: "wd-cooler", name: "Cooler Co.", rating: 4.6, reviews: 140, perPlate: 30, image: vImg("photo-1565895405227-31cffbe0cf86"),
+      { id: "wd-cooler", name: "Cooler Co.", rating: 4.6, reviews: 140, perPlate: 30, leadDays: 0, image: vImg("photo-1565895405227-31cffbe0cf86"),
         items: mkItems("wd-cooler", [["Tender Coconut Cooler"], ["Spiced Buttermilk"], ["Virgin Mojito"], ["Nimbu Pani"], ["Aam Panna"], ["Masala Jaljeera"]]) },
-      { id: "wd-mocktail", name: "Mocktail Mantra", rating: 4.7, reviews: 188, perPlate: 45, image: vImg("photo-1437418747212-8d9709afab22"),
+      { id: "wd-mocktail", name: "Mocktail Mantra", rating: 4.7, reviews: 188, perPlate: 45, leadDays: 0, image: vImg("photo-1437418747212-8d9709afab22"),
         items: mkItems("wd-mocktail", [["Virgin Mojito"], ["Blue Lagoon"], ["Fruit Punch"], ["Thandai"], ["Rose Sharbat"], ["Kokum Cooler"]]) },
-      { id: "wd-fizz", name: "Fizz & Co.", rating: 4.6, reviews: 132, perPlate: 38, image: vImg("photo-1601050690597-df0568f70950"),
+      { id: "wd-fizz", name: "Fizz & Co.", rating: 4.6, reviews: 132, perPlate: 38, leadDays: 0, image: vImg("photo-1601050690597-df0568f70950"),
         items: mkItems("wd-fizz", [["Jaljeera Fizz"], ["Cola Float"], ["Lemon Soda"], ["Aam Panna"], ["Watermelon Cooler"], ["Mint Lemonade"]]) },
-      { id: "wd-juice", name: "Juice Junction", rating: 4.7, reviews: 174, perPlate: 42, image: vImg("photo-1565895405227-31cffbe0cf86"),
+      { id: "wd-juice", name: "Juice Junction", rating: 4.7, reviews: 174, perPlate: 42, leadDays: 0, image: vImg("photo-1565895405227-31cffbe0cf86"),
         items: mkItems("wd-juice", [["Fresh Orange"], ["Mosambi Juice"], ["Sugarcane Juice"], ["Pineapple Cooler"], ["Tender Coconut Cooler"], ["Mixed Fruit Punch"]]) },
     ],
   },
@@ -1264,7 +1270,9 @@ export const packageBasePerPlate: Record<string, number> = {
  * Minimum advance-booking lead time (in days) each package needs before the
  * event date — richer tiers source more vendors, so they need more notice.
  * A package only appears once the chosen date is at least this many days away.
- * Custom has no lead-time requirement (always available).
+ * Custom carries no fixed package lead: its notice is derived per-order from the
+ * stalls the guest picks (see `DEFAULT_VENDOR_LEAD_DAYS` / each vendor's
+ * `leadDays`), so `0` here is only the baseline the booking flow overrides.
  */
 export const packageLeadDays: Record<string, number> = {
   silver: 7,
@@ -1272,6 +1280,20 @@ export const packageLeadDays: Record<string, number> = {
   platinum: 45,
   custom: 0,
 };
+
+/**
+ * Default advance-booking notice (in days) for a single stall / individual
+ * vendor in the Custom flow when it doesn't specify its own `leadDays`.
+ * Vendors that accept same-day orders set `leadDays: 0`; the Custom order's
+ * effective notice is the longest lead among the vendors it involves.
+ */
+export const DEFAULT_VENDOR_LEAD_DAYS = 2;
+
+/** A vendor's effective advance-booking notice in days (its own `leadDays`, or
+ *  the shared default). Works for both catalogue and course-level vendors. */
+export function vendorLeadDays(v: { leadDays?: number }): number {
+  return v.leadDays ?? DEFAULT_VENDOR_LEAD_DAYS;
+}
 
 /* ───────────────────────────────────────────────────────────────────────
    VENDOR CATALOG / LISTING — search & filter by city, state, cuisine, tier.
@@ -1294,6 +1316,10 @@ export interface VendorListing {
   priceFrom: number;
   verified: boolean;
   image: string;
+  /** Minimum advance-booking notice (in days) this vendor needs before the event
+   *  when picked for a Custom / add-on order — the "as per vendor specification"
+   *  rule. Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day accepted. */
+  leadDays?: number;
 }
 
 /** Meal / course offerings used for the "Serves" filter on the catalog. */

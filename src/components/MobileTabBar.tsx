@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/i18n";
+import { setAccountMenuState } from "@/lib/accountMenu";
+import AccountMenuPanel from "./AccountMenuPanel";
 
 /** Primary destinations surfaced as an app-style bottom tab bar on mobile.
- *  Secondary items (Partner, Contact, auth) stay in the header hamburger. */
+ *  The fifth slot is the account menu (see below); secondary items (Partner,
+ *  Contact) stay in the header. */
 const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNode }[] = [
   {
     label: "Home",
@@ -47,28 +51,64 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
       </>
     ),
   },
-  {
-    label: "Bookings",
-    labelHi: "बुकिंग",
-    href: "/bookings",
-    icon: (
-      <>
-        <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-12Z" />
-        <path d="M8 3v4M16 3v4M4 9.5h16M9 14.5l2 2 4-4" />
-      </>
-    ),
-  },
 ];
 
 export default function MobileTabBar() {
   const pathname = usePathname();
-  const { lang } = useLang();
+  const { t, lang } = useLang();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setAccountOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [accountOpen]);
+
+  // Publish the popup's open state + measured height so the floating chat
+  // launcher can lift itself clear of the menu instead of overlapping it.
+  useEffect(() => {
+    if (accountOpen && popupRef.current) {
+      setAccountMenuState(true, popupRef.current.offsetHeight);
+    } else {
+      setAccountMenuState(false);
+    }
+  }, [accountOpen]);
+
+  // Make sure the signal is cleared if the bar unmounts while open.
+  useEffect(() => () => setAccountMenuState(false), []);
 
   return (
     <nav
+      ref={navRef}
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-maroon/10 bg-cream-2/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(185,32,37,0.08)] backdrop-blur-md lg:hidden"
     >
+      {/* Account popup opens upward, above the bar, anchored to the right by the
+          Account tab. It stays at the bar's z-50 — below the floating chat
+          launcher (z-[60]) — so the chat button remains on top. */}
+      {accountOpen && (
+        <div
+          ref={popupRef}
+          className="absolute bottom-full right-3 z-50 mb-2 w-60 max-w-[calc(100vw-1.5rem)]"
+        >
+          <AccountMenuPanel onClose={() => setAccountOpen(false)} />
+        </div>
+      )}
+
       <ul className="mx-auto flex max-w-md items-stretch justify-around">
         {tabs.map((tab) => {
           const active =
@@ -78,6 +118,7 @@ export default function MobileTabBar() {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
+                onClick={() => setAccountOpen(false)}
                 className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
                   active ? "text-maroon" : "text-ink-soft hover:text-maroon"
                 }`}
@@ -99,6 +140,34 @@ export default function MobileTabBar() {
             </li>
           );
         })}
+
+        {/* Account — opens the shared account/language menu upward. */}
+        <li className="flex-1">
+          <button
+            type="button"
+            onClick={() => setAccountOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={accountOpen}
+            className={`flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
+              accountOpen ? "text-maroon" : "text-ink-soft hover:text-maroon"
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+            </svg>
+            {t("Account", "अकाउंट")}
+          </button>
+        </li>
       </ul>
     </nav>
   );

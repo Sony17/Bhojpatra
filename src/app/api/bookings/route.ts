@@ -2,7 +2,11 @@ import {
   isOrderPaymentMethod,
   type OrderPaymentMethod,
 } from "@/lib/orderPayment";
-import type { BookingStatus } from "@/lib/data";
+import {
+  packageLeadDays,
+  DEFAULT_VENDOR_LEAD_DAYS,
+  type BookingStatus,
+} from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
 import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
@@ -121,6 +125,9 @@ export async function POST(request: Request) {
     phone,
     occasion,
     date,
+    eventDateISO,
+    packageId,
+    leadDays,
     guests,
     vendor,
     city,
@@ -146,6 +153,37 @@ export async function POST(request: Request) {
   const amt = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) {
     return Response.json({ error: "Invalid amount." }, { status: 400 });
+  }
+
+  // Advance-booking rule (server-side backstop for the wizard's date gate). The
+  // fixed tiers (Silver/Gold/Platinum) use our own authoritative lead — the
+  // client can't shorten them. Custom carries no fixed package lead, so we trust
+  // the vendor-derived lead the client computed, clamped to a sane floor of
+  // "no same-day unless a real lead was sent". A missing ISO date skips the
+  // check (legacy clients) rather than blocking the booking.
+  const iso = typeof eventDateISO === "string" ? eventDateISO : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const fixedLead =
+      typeof packageId === "string" ? packageLeadDays[packageId] : undefined;
+    const clientLead =
+      typeof leadDays === "number" && Number.isFinite(leadDays)
+        ? Math.max(0, Math.min(365, Math.round(leadDays)))
+        : DEFAULT_VENDOR_LEAD_DAYS;
+    // Non-custom tiers: enforce the server's own value. Custom / unknown: honour
+    // the client's per-vendor lead (bounded above).
+    const requiredLead =
+      fixedLead !== undefined && packageId !== "custom" ? fixedLead : clientLead;
+    const days = daysUntilISO(iso);
+    if (days !== null && days < requiredLead) {
+      return Response.json(
+        {
+          error: `This booking needs at least ${requiredLead} day${
+            requiredLead === 1 ? "" : "s"
+          } of advance notice. Please pick a later date.`,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   if (!isOrderPaymentMethod(paymentMethod)) {
@@ -237,6 +275,18 @@ function isBookingStatus(v: unknown): v is BookingStatus {
     v === "Completed" ||
     v === "Cancelled"
   );
+}
+
+/** Whole days from today (UTC midnight) until a `YYYY-MM-DD` date. Null for an
+ *  unparseable date. UTC keeps the backstop stable regardless of server TZ; the
+ *  client already enforces the exact local-day gate. */
+function daysUntilISO(dateStr: string): number | null {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const target = Date.UTC(y, m - 1, d);
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((target - today) / 86_400_000);
 }
 
 /** Shallow shape-check for an EMI plan posted from the booking wizard. */

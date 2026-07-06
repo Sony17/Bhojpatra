@@ -2,18 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { navLinks } from "@/lib/data";
-import { useLang, type Lang } from "@/lib/i18n";
-import { logout, dashboardPath, useSession } from "@/lib/session";
+import { useLang } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
+import AccountMenuPanel from "./AccountMenuPanel";
 import MobileTabBar from "./MobileTabBar";
-
-/** Language choices surfaced inside the profile menu. */
-const LANG_OPTIONS: { id: Lang; full: string }[] = [
-  { id: "en", full: "English" },
-  { id: "hi", full: "हिंदी" },
-];
 
 /** Role icons for the "Partner With Us" dropdown — drawn to match each option. */
 const partnerIcons: Record<string, React.ReactNode> = {
@@ -64,16 +58,13 @@ function Logo() {
 }
 
 /**
- * Unified profile menu — one avatar trigger opens a single dropdown holding the
- * account actions (Log In / Sign Up when signed out; My Dashboard / Log Out when
- * signed in) plus the English/Hindi language switch. Used on both the desktop
- * header and the mobile header strip; pass `compact` on mobile to show just the
- * avatar (the name label is dropped to save space). Click / Escape / outside-tap
- * close it, so it works on touch where hover menus don't.
+ * Desktop header profile menu — an avatar pill that opens the shared
+ * {@link AccountMenuPanel} below it. On mobile the account isn't shown up here;
+ * it lives in the bottom tab bar's Account item instead (see MobileTabBar), so
+ * this control is hidden below the `lg` breakpoint by its wrapper.
  */
-function ProfileMenu({ compact = false }: { compact?: boolean }) {
-  const { t, lang, setLang } = useLang();
-  const router = useRouter();
+function ProfileMenu() {
+  const { t } = useLang();
   const session = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -105,12 +96,6 @@ function ProfileMenu({ compact = false }: { compact?: boolean }) {
   const displayName = name || typeLabel || t("Account", "अकाउंट");
   const initial = displayName.charAt(0).toUpperCase();
 
-  async function handleLogout() {
-    setOpen(false);
-    await logout();
-    router.push("/");
-  }
-
   return (
     <div ref={ref} className="relative shrink-0">
       <button
@@ -140,11 +125,9 @@ function ProfileMenu({ compact = false }: { compact?: boolean }) {
             </svg>
           )}
         </span>
-        {!compact && (
-          <span className="max-w-[9rem] truncate">
-            {session ? displayName : t("Account", "अकाउंट")}
-          </span>
-        )}
+        <span className="max-w-[9rem] truncate">
+          {session ? displayName : t("Account", "अकाउंट")}
+        </span>
         <svg
           aria-hidden="true"
           viewBox="0 0 12 12"
@@ -159,101 +142,7 @@ function ProfileMenu({ compact = false }: { compact?: boolean }) {
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-60">
-          <ul className="overflow-hidden rounded-2xl border border-maroon/15 bg-white shadow-xl shadow-maroon/20">
-            {session ? (
-              <li className="flex items-center gap-3 border-b border-maroon/10 px-4 py-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream">
-                  {initial}
-                </span>
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate text-sm font-semibold text-maroon">
-                    {displayName}
-                  </span>
-                  <span className="text-xs text-maroon/70">{typeLabel}</span>
-                </span>
-              </li>
-            ) : (
-              <li className="border-b border-maroon/10 px-4 py-3">
-                <p className="text-sm font-semibold text-maroon">
-                  {t("Welcome to Bhojpatra", "भोजपत्र में आपका स्वागत है")}
-                </p>
-                <p className="text-xs text-maroon/70">
-                  {t("Log in or create an account", "लॉग इन करें या अकाउंट बनाएँ")}
-                </p>
-              </li>
-            )}
-
-            {session ? (
-              <>
-                <li className="border-b border-maroon/10">
-                  <Link
-                    href={dashboardPath(session.type)}
-                    onClick={() => setOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
-                  >
-                    {t("My Dashboard", "मेरा डैशबोर्ड")}
-                  </Link>
-                </li>
-                <li className="border-b border-maroon/10">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="block w-full px-4 py-3 text-left text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
-                  >
-                    {t("Log Out", "लॉग आउट")}
-                  </button>
-                </li>
-              </>
-            ) : (
-              <>
-                <li className="border-b border-maroon/10">
-                  <Link
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
-                  >
-                    {t("Log In", "लॉग इन")}
-                  </Link>
-                </li>
-                <li className="border-b border-maroon/10">
-                  <Link
-                    href="/signup"
-                    onClick={() => setOpen(false)}
-                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
-                  >
-                    {t("Sign Up", "साइन अप")}
-                  </Link>
-                </li>
-              </>
-            )}
-
-            <li className="px-3 py-3">
-              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-maroon/60">
-                {t("Language", "भाषा")}
-              </p>
-              <div className="flex gap-1.5">
-                {LANG_OPTIONS.map((o) => {
-                  const active = lang === o.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => setLang(o.id)}
-                      aria-pressed={active}
-                      className={
-                        "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors " +
-                        (active
-                          ? "bg-maroon text-cream"
-                          : "border border-maroon/30 text-maroon hover:bg-maroon/5")
-                      }
-                    >
-                      {o.full}
-                    </button>
-                  );
-                })}
-              </div>
-            </li>
-          </ul>
+          <AccountMenuPanel onClose={() => setOpen(false)} />
         </div>
       )}
     </div>
@@ -271,10 +160,10 @@ export default function Header() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-cream-2 via-cream-2/85 to-transparent"
       />
-      <div className="animate-fade mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5">
+      <div className="animate-fade relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5">
         <Logo />
 
-        <nav className="hidden flex-1 items-center justify-center gap-7 text-sm font-semibold text-ink lg:flex [&_a]:[text-shadow:0_1px_3px_rgba(255,255,255,0.6)]">
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-7 text-sm font-semibold text-ink lg:flex [&_a]:[text-shadow:0_1px_3px_rgba(255,255,255,0.6)]">
           {navLinks.map((link) => (
             <div key={link.label} className="group relative">
               <a
@@ -337,15 +226,10 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Unified profile menu (account + language) — desktop */}
+        {/* Profile menu (account + language) — desktop only; on mobile the
+            account lives in the bottom tab bar instead (see MobileTabBar). */}
         <div className="hidden items-center lg:flex">
           <ProfileMenu />
-        </div>
-
-        {/* Unified profile menu (account + language) — mobile; primary nav lives
-            in the bottom tab bar */}
-        <div className="flex items-center lg:hidden">
-          <ProfileMenu compact />
         </div>
       </div>
 
