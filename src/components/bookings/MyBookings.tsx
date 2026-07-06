@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type BookingStatus } from "@/lib/data";
 import {
   fetchMyBookings,
@@ -12,7 +12,9 @@ import {
   vendorKey,
   type StoredBooking,
   type BookingVendorReview,
+  type BookingPatchResult,
 } from "@/lib/bookings";
+import type { EmiPlan } from "@/lib/emi";
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
 import InvoicePreview from "./InvoicePreview";
@@ -429,6 +431,190 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
   );
 }
 
+/**
+ * A one-way status action with a two-step confirm, so it can't fire by accident.
+ * The first click reveals a confirm prompt; the second commits the change on the
+ * server (PATCH /api/bookings/[id], which re-checks owner + transition) and — on
+ * success — lets My Bookings re-fetch via the change event. Used for Pay Advance
+ * (Pending → Confirmed) and Cancel (→ Cancelled); the Confirmed ⇄ Completed flip
+ * keeps its own two-way toggle in CompleteToggle.
+ */
+function ConfirmAction({
+  triggerLabel,
+  tone,
+  prompt,
+  confirmLabel,
+  run,
+}: {
+  triggerLabel: ReactNode;
+  tone: "solid" | "outline" | "ghost";
+  prompt: string;
+  confirmLabel: string;
+  run: () => Promise<BookingPatchResult>;
+}) {
+  const { t } = useLang();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const apply = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    const result = await run();
+    setBusy(false);
+    if (!result.ok) {
+      setError(
+        result.error ??
+          t(
+            "Couldn't update this booking. Please try again.",
+            "यह बुकिंग अपडेट नहीं हो सकी। कृपया पुनः प्रयास करें।",
+          ),
+      );
+      return;
+    }
+    setConfirming(false);
+  };
+
+  if (confirming) {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-sm text-ink-soft">{prompt}</span>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={busy}
+            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+          >
+            {busy ? t("Saving…", "सहेज रहे हैं…") : confirmLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirming(false);
+              setError("");
+            }}
+            disabled={busy}
+            className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline disabled:opacity-60"
+          >
+            {t("Not yet", "अभी नहीं")}
+          </button>
+        </div>
+        {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+      </div>
+    );
+  }
+
+  const triggerCls =
+    tone === "solid"
+      ? "bg-maroon text-cream shadow-sm hover:bg-maroon-dark"
+      : tone === "outline"
+        ? "border border-maroon text-maroon hover:bg-maroon/5"
+        : "text-ink-soft hover:bg-cream-2";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className={
+        "inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-sm font-semibold transition " +
+        triggerCls
+      }
+    >
+      {triggerLabel}
+    </button>
+  );
+}
+
+/**
+ * "Pay Balance" — settles a Pending EMI order's outstanding balance in one go,
+ * which confirms it (Pending → Confirmed). The server records the full payment
+ * against `paid` on that transition (the client never sends money), so the
+ * balance clears on refetch.
+ */
+function PayBalanceButton({ booking }: { booking: StoredBooking }) {
+  const { t } = useLang();
+  const balance = Math.max(0, booking.amount - booking.paid);
+  return (
+    <ConfirmAction
+      tone="solid"
+      triggerLabel={t(
+        `Pay Balance · ${formatINR(balance)}`,
+        `शेष भुगतान · ${formatINR(balance)}`,
+      )}
+      prompt={t(
+        `Settle the ${formatINR(balance)} balance now to confirm this booking?`,
+        `इस बुकिंग की पुष्टि के लिए अभी ${formatINR(balance)} शेष राशि चुकाएँ?`,
+      )}
+      confirmLabel={t("Yes, pay balance", "हाँ, भुगतान करें")}
+      run={() => patchMyBooking(booking.id, { status: "Confirmed" })}
+    />
+  );
+}
+
+/** Compact instalment schedule shown on a Pending (EMI) booking so the customer
+ *  can see what's financed and when each instalment falls due. Track-only — the
+ *  team collects each on its date; "Pay Balance" clears them all at once. */
+function EmiSchedule({ plan }: { plan: EmiPlan }) {
+  const { t } = useLang();
+  return (
+    <div className="mt-5 rounded-xl border border-cream-3 bg-cream/40 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-maroon">
+        {t(
+          `Instalment plan · ${plan.count} EMIs`,
+          `किस्त योजना · ${plan.count} EMI`,
+        )}
+      </p>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {plan.installments.map((it) => (
+          <li
+            key={it.index}
+            className="flex items-center justify-between text-sm"
+          >
+            <span className="text-ink-soft">
+              {t(`EMI ${it.index}`, `EMI ${it.index}`)} · {it.dueLabel}
+            </span>
+            <span className="font-medium text-ink">{formatINR(it.amount)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-ink-soft">
+        {t(
+          "Our team collects each instalment on its due date.",
+          "हमारी टीम प्रत्येक किस्त उसकी देय तिथि पर लेती है।",
+        )}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * "Cancel booking" — cancels a Pending or Confirmed order (→ Cancelled, which is
+ * terminal). Rendered low-emphasis so it doesn't compete with the primary
+ * actions; the two-step confirm guards against an accidental cancel.
+ */
+function CancelBookingButton({ booking }: { booking: StoredBooking }) {
+  const { t } = useLang();
+  return (
+    <ConfirmAction
+      tone="ghost"
+      triggerLabel={
+        <>
+          <span aria-hidden="true">✕</span>
+          {t("Cancel booking", "बुकिंग रद्द करें")}
+        </>
+      }
+      prompt={t(
+        "Cancel this booking? This can't be undone.",
+        "इस बुकिंग को रद्द करें? इसे पूर्ववत नहीं किया जा सकता।",
+      )}
+      confirmLabel={t("Yes, cancel", "हाँ, रद्द करें")}
+      run={() => patchMyBooking(booking.id, { status: "Cancelled" })}
+    />
+  );
+}
+
 function BookingCard({
   booking,
   onView,
@@ -545,16 +731,14 @@ function BookingCard({
         </div>
       </div>
 
+      {/* Instalment plan, for a Pending EMI order. */}
+      {booking.status === "Pending" && booking.emiPlan && (
+        <EmiSchedule plan={booking.emiPlan} />
+      )}
+
       {/* Actions */}
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-cream-3 pt-4">
-        {booking.status === "Pending" && (
-          <button
-            type="button"
-            className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-          >
-            {t("Pay Advance", "अभी भुगतान करें")}
-          </button>
-        )}
+        {booking.status === "Pending" && <PayBalanceButton booking={booking} />}
         <button
           type="button"
           onClick={onView}
@@ -563,6 +747,9 @@ function BookingCard({
           {t("View Details", "विवरण देखें")}
         </button>
         <DownloadMenu booking={booking} />
+        {(booking.status === "Pending" || booking.status === "Confirmed") && (
+          <CancelBookingButton booking={booking} />
+        )}
 
         {/* Status actions, right-aligned: review a completed order plus the
             Confirmed ⇄ Completed toggle. */}
@@ -663,6 +850,18 @@ function DownloadMenu({
           role="menu"
           className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-cream-3 bg-white py-1 shadow-lg"
         >
+          {/* Transaction ID — the reference for the online payment on this
+              order, shown for quick copy. Absent on COD / unpaid orders. */}
+          {booking.paymentRef && (
+            <div className="border-b border-cream-3 px-4 py-2.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+                {t("Transaction ID", "लेनदेन आईडी")}
+              </span>
+              <span className="mt-0.5 block select-all break-all text-xs font-medium text-ink">
+                {booking.paymentRef}
+              </span>
+            </div>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -864,6 +1063,13 @@ function BookingDetailsModal({
                 >
                   {t("Edit Booking", "बुकिंग संपादित करें")}
                 </button>
+              )}
+              {booking.status === "Pending" && (
+                <PayBalanceButton booking={booking} />
+              )}
+              {(booking.status === "Pending" ||
+                booking.status === "Confirmed") && (
+                <CancelBookingButton booking={booking} />
               )}
               <CompleteToggle booking={booking} />
             </div>

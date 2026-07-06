@@ -31,6 +31,7 @@ interface LivePayment {
   amount: number;
   status: "Advance Received";
   createdAt: string;
+  customerTxnId?: string;
 }
 
 function formatDate(iso: string): string {
@@ -50,6 +51,7 @@ function toAdminPayment(p: LivePayment): AdminPayment {
     amount: p.amount,
     status: p.status,
     date: formatDate(p.createdAt),
+    ref: p.customerTxnId,
   };
 }
 
@@ -136,7 +138,8 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
         !needle ||
         p.id.toLowerCase().includes(needle) ||
         p.bookingId.toLowerCase().includes(needle) ||
-        p.customer.toLowerCase().includes(needle);
+        p.customer.toLowerCase().includes(needle) ||
+        (p.ref?.toLowerCase().includes(needle) ?? false);
       const matchesStatus = status === "All" || p.status === status;
       const matchesMethod = method === "All" || p.method === method;
       return matchesQ && matchesStatus && matchesMethod;
@@ -154,6 +157,9 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
         <div className="min-w-0">
           <p className="font-medium text-ink">{p.id}</p>
           <p className="text-xs text-ink-soft">{p.bookingId} · {p.customer}</p>
+          {p.ref && (
+            <p className="truncate text-xs text-ink-soft">Txn ID: {p.ref}</p>
+          )}
         </div>
       ),
     },

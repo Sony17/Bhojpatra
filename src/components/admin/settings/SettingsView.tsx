@@ -9,6 +9,10 @@ import { adminProfile, businessDetails } from "@/lib/admin/mockData";
 import type { BusinessDetails } from "@/lib/admin/types";
 import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
 
+/** Cap the uploaded QR file so its base64 form stays within the settings row's
+ *  budget (data URLs are ~1.37× the binary size; see MAX_QR_IMAGE_CHARS). */
+const MAX_QR_FILE_BYTES = 400 * 1024;
+
 const TABS: TabItem[] = [
   { id: "profile", label: "Admin Profile" },
   { id: "business", label: "Business" },
@@ -265,6 +269,8 @@ function NameListTab({
 function PaymentsTab() {
   const [vpa, setVpa] = useState(DEFAULT_MERCHANT.vpa);
   const [payeeName, setPayeeName] = useState(DEFAULT_MERCHANT.payeeName);
+  // Optional custom QR image (base64 data URL). Empty = use the generated QR.
+  const [qrImage, setQrImage] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -274,17 +280,41 @@ function PaymentsTab() {
     let active = true;
     fetch("/api/admin/payment-settings")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { vpa?: string; payeeName?: string } | null) => {
-        if (active && d?.vpa) {
-          setVpa(d.vpa);
-          setPayeeName(d.payeeName ?? DEFAULT_MERCHANT.payeeName);
-        }
-      })
+      .then(
+        (d: { vpa?: string; payeeName?: string; qrImage?: string } | null) => {
+          if (active && d?.vpa) {
+            setVpa(d.vpa);
+            setPayeeName(d.payeeName ?? DEFAULT_MERCHANT.payeeName);
+            setQrImage(d.qrImage ?? "");
+          }
+        },
+      )
       .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
+
+  // Read a chosen QR image file into a data URL we can persist and preview.
+  const onPickQr = (file: File | undefined) => {
+    setSaved(false);
+    setError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Choose an image file (PNG, JPEG or WebP).");
+      return;
+    }
+    if (file.size > MAX_QR_FILE_BYTES) {
+      setError("That image is too large — please use one under 400 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setQrImage(reader.result);
+    };
+    reader.onerror = () => setError("Couldn't read that image. Try another.");
+    reader.readAsDataURL(file);
+  };
 
   const save = async () => {
     setError("");
@@ -297,7 +327,7 @@ function PaymentsTab() {
       const res = await fetch("/api/admin/payment-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vpa, payeeName }),
+        body: JSON.stringify({ vpa, payeeName, qrImage }),
       });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
@@ -341,6 +371,61 @@ function PaymentsTab() {
           />
         </Field>
       </div>
+
+      <div className="mt-6 border-t border-cream-3 pt-5">
+        <p className="text-sm font-semibold text-ink">Custom QR image</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          Upload your own bank / GPay / PhonePe QR to show customers at checkout.
+          When set, it replaces the QR we generate from the UPI ID above. Leave
+          empty to use the generated one.
+        </p>
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+          {qrImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={qrImage}
+              alt="Uploaded payment QR"
+              className="h-40 w-40 shrink-0 rounded-xl border border-cream-3 bg-white p-2 object-contain"
+            />
+          ) : (
+            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-3 text-center text-xs text-ink-soft">
+              No custom QR — the generated QR is shown to customers.
+            </div>
+          )}
+          <div className="flex flex-col gap-3">
+            <label className="inline-flex w-fit cursor-pointer items-center rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5">
+              {qrImage ? "Replace image" : "Upload QR image"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  onPickQr(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {qrImage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQrImage("");
+                  setSaved(false);
+                  setError("");
+                }}
+                className="w-fit rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
+              >
+                Remove
+              </button>
+            )}
+            <p className="max-w-xs text-xs text-ink-soft">
+              PNG, JPEG or WebP up to 400 KB. This is a mock — payments aren’t
+              verified automatically; customers tap “I’ve paid” after scanning.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
       <div className="mt-5 flex items-center gap-4">
         <button type="button" disabled={saving} onClick={save} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60">

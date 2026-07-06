@@ -246,6 +246,8 @@ export interface AdminPayment {
   amount: number;
   status: PaymentStatus;
   date: string;
+  /** Customer-entered UPI transaction reference (UTR), when captured at checkout. */
+  ref?: string;
 }
 
 export interface VendorSettlement {

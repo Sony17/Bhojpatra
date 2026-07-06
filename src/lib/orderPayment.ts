@@ -1,22 +1,22 @@
 // How a guest chooses to settle a booking. Shared between the booking wizard
-// (client), the orders API (server) and the admin booking console so the four
+// (client), the orders API (server) and the admin booking console so the
 // payment methods never drift between surfaces.
 //
-//  • UPI / QR — pay online now against the merchant VPA (a real NPCI deep-link
-//    / QR; confirmation is customer-driven via "I've paid").
-//  • COD      — pay cash when the order is delivered; nothing collected now.
-//  • Connect  — let Bhojpatra reach out to arrange the most convenient payment.
+//  • UPI / QR — pay the 10% advance online against the merchant VPA (a real NPCI
+//    deep-link / QR; confirmation is customer-driven via "I've paid"). These are
+//    the two sub-modes of the single online "UPI" choice shown to the customer.
+//  • Connect  — "Bhojpatra connects you (COD)": nothing collected now; our team
+//    reaches out to finalise the menu and arrange the most convenient payment.
 
-export type OrderPaymentMethod = "UPI" | "QR" | "COD" | "Connect";
+export type OrderPaymentMethod = "UPI" | "QR" | "Connect";
 
 export const ORDER_PAYMENT_METHODS: OrderPaymentMethod[] = [
   "UPI",
   "QR",
-  "COD",
   "Connect",
 ];
 
-/** UPI and QR settle online at booking time; COD and Connect are paid later. */
+/** UPI and QR settle the advance online at booking time; Connect is paid later. */
 export function isOnlineMethod(m: OrderPaymentMethod): boolean {
   return m === "UPI" || m === "QR";
 }
@@ -28,8 +28,10 @@ export const ORDER_PAYMENT_LABELS: Record<
 > = {
   UPI: { en: "UPI ID", hi: "UPI आईडी" },
   QR: { en: "Scan QR", hi: "QR स्कैन" },
-  COD: { en: "Cash on Delivery", hi: "डिलीवरी पर नकद" },
-  Connect: { en: "Bhojpatra connects you", hi: "भोजपत्र आपसे संपर्क करेगा" },
+  Connect: {
+    en: "Bhojpatra connects you (COD)",
+    hi: "भोजपत्र आपसे संपर्क करेगा (COD)",
+  },
 };
 
 /** Short one-line helper text shown under each method when it's selected. */
@@ -45,10 +47,6 @@ export const ORDER_PAYMENT_HINTS: Record<
     en: "Scan & pay with any UPI app",
     hi: "किसी भी UPI ऐप से स्कैन कर भुगतान करें",
   },
-  COD: {
-    en: "Pay cash when we deliver",
-    hi: "डिलीवरी के समय नकद भुगतान करें",
-  },
   Connect: {
     en: "Our team calls to arrange payment",
     hi: "भुगतान के लिए हमारी टीम कॉल करेगी",
@@ -56,7 +54,5 @@ export const ORDER_PAYMENT_HINTS: Record<
 };
 
 export function isOrderPaymentMethod(v: unknown): v is OrderPaymentMethod {
-  return (
-    v === "UPI" || v === "QR" || v === "COD" || v === "Connect"
-  );
+  return v === "UPI" || v === "QR" || v === "Connect";
 }

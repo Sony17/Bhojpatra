@@ -18,6 +18,8 @@ import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
   buildUpiUri,
   upiTxnRef,
+  isValidTxnId,
+  normalizeTxnId,
   DEFAULT_MERCHANT,
   type UpiPayeeConfig,
 } from "@/lib/upi";
@@ -139,6 +141,9 @@ function VenueBooking({
   // Transaction / reference ID captured when the online payment succeeds, so it
   // travels onto the saved booking (admin console + customer's My Bookings).
   const [paidRef, setPaidRef] = useState("");
+  // The transaction / UTR the customer got from their UPI app — taken before the
+  // booking is confirmed so it lands on the payment record and the order.
+  const [txnId, setTxnId] = useState("");
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
@@ -155,6 +160,8 @@ function VenueBooking({
           setMerchant({
             vpa: cfg.vpa,
             payeeName: cfg.payeeName ?? DEFAULT_MERCHANT.payeeName,
+            qrImage:
+              typeof cfg.qrImage === "string" ? cfg.qrImage : undefined,
           });
         }
       })
@@ -240,6 +247,17 @@ function VenueBooking({
     `&am=${amount}&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(txnRef)}`;
 
   const markPaid = async () => {
+    // Require the customer's transaction ID as proof before recording payment.
+    if (!isValidTxnId(txnId)) {
+      setPayError(
+        t(
+          "Enter the transaction ID from your UPI app to confirm the payment.",
+          "भुगतान की पुष्टि के लिए अपने UPI ऐप से लेनदेन आईडी दर्ज करें।",
+        ),
+      );
+      return;
+    }
+    const customerTxnId = normalizeTxnId(txnId);
     setPaying(true);
     setPayError("");
     try {
@@ -252,6 +270,7 @@ function VenueBooking({
           method: payMethod === "QR" ? "qr" : "upi",
           vpa: merchant.vpa,
           txnRef,
+          customerTxnId,
           customer: customerName.trim() || undefined,
         }),
       });
@@ -264,7 +283,7 @@ function VenueBooking({
         return;
       }
       setPaidAmount(amount);
-      setPaidRef(txnRef);
+      setPaidRef(customerTxnId);
     } catch {
       setPayError(
         t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
@@ -692,12 +711,20 @@ function VenueBooking({
                         <div className="mt-4 flex flex-col items-center gap-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={qrSrc}
+                            src={merchant.qrImage || qrSrc}
                             alt={t("UPI payment QR", "UPI भुगतान QR")}
                             width={176}
                             height={176}
-                            className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2"
+                            className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2 object-contain"
                           />
+                          {merchant.qrImage && (
+                            <p className="text-xs text-ink-soft">
+                              {t(
+                                `Enter ${money(amount)} in your UPI app.`,
+                                `अपने UPI ऐप में ${money(amount)} दर्ज करें।`,
+                              )}
+                            </p>
+                          )}
                           <p className="text-sm font-semibold text-ink">{merchant.vpa}</p>
                           <a
                             href={upiUri}
@@ -737,6 +764,37 @@ function VenueBooking({
                         </div>
                       )}
 
+                      {/* Transaction ID — the reference the customer's UPI app
+                          shows after paying. Required before we record the
+                          payment and confirm the booking. */}
+                      <div className="mt-4">
+                        <label
+                          htmlFor="venue-upi-txn-id"
+                          className="text-sm font-semibold text-ink"
+                        >
+                          {t("UPI Transaction ID", "UPI लेनदेन आईडी")}
+                        </label>
+                        <input
+                          id="venue-upi-txn-id"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={txnId}
+                          onChange={(e) => setTxnId(e.target.value)}
+                          placeholder={t(
+                            "12-digit UPI reference / UTR",
+                            "12-अंकों का UPI रेफ़रेंस / UTR",
+                          )}
+                          className="mt-1.5 w-full rounded-xl border border-cream-3 bg-white px-4 py-2.5 text-sm text-ink outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/30"
+                        />
+                        <p className="mt-1.5 text-xs text-ink-soft">
+                          {t(
+                            "After paying, enter the reference number your UPI app shows so we can match your payment.",
+                            "भुगतान के बाद अपने UPI ऐप में दिखने वाला रेफ़रेंस नंबर दर्ज करें ताकि हम आपका भुगतान मिला सकें।",
+                          )}
+                        </p>
+                      </div>
+
                       {payError && (
                         <p className="mt-3 text-sm font-medium text-maroon">{payError}</p>
                       )}
@@ -744,7 +802,7 @@ function VenueBooking({
                       <button
                         type="button"
                         onClick={markPaid}
-                        disabled={paying}
+                        disabled={paying || !isValidTxnId(txnId)}
                         className="mt-4 w-full rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
                       >
                         {paying
@@ -760,15 +818,10 @@ function VenueBooking({
                     </>
                   ) : (
                     <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
-                      {payMethod === "COD"
-                        ? t(
-                            `No payment now — settle ${money(total)} directly with the venue. Confirm to lock your date.`,
-                            `अभी कोई भुगतान नहीं — ${money(total)} सीधे वेन्यू को दें। तारीख़ पक्की करने के लिए पुष्टि करें।`,
-                          )
-                        : t(
-                            "Confirm and our team will call you to arrange the most convenient way to pay.",
-                            "पुष्टि करें और हमारी टीम भुगतान का सुविधाजनक तरीका तय करने के लिए कॉल करेगी।",
-                          )}
+                      {t(
+                        "No payment now — confirm and our team will call you to arrange the most convenient way to pay.",
+                        "अभी कोई भुगतान नहीं — पुष्टि करें और हमारी टीम भुगतान का सुविधाजनक तरीका तय करने के लिए कॉल करेगी।",
+                      )}
                     </div>
                   )}
 

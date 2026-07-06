@@ -12,6 +12,7 @@ import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
+import { isSelfReferral } from "@/lib/referral";
 import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
 
@@ -192,6 +193,14 @@ export async function POST(request: Request) {
 
   const paidAmt = typeof paid === "number" ? paid : Number(paid);
 
+  // Self-referral guard (authoritative): an Individual Referrer / Event Planner
+  // can't credit their own booking. If the applied code belongs to this same
+  // account, drop the attribution rather than blocking the booking — the code is
+  // optional and the booking should still go through, just without self-credit.
+  const selfReferral =
+    typeof referralCode === "string" &&
+    isSelfReferral(referralCode, user.partnerRoles);
+
   const order: StoredOrder = {
     id,
     // Owner is taken from the session, not the request body, so it can't be
@@ -216,7 +225,7 @@ export async function POST(request: Request) {
     ...(isEmiPlan(emiPlan) ? { emiPlan } : {}),
     status: isBookingStatus(status) ? status : "Confirmed",
     createdAt: new Date().toISOString(),
-    ...(typeof referralCode === "string" && referralCode.trim()
+    ...(!selfReferral && typeof referralCode === "string" && referralCode.trim()
       ? {
           referralCode: referralCode.trim(),
           referrerName:

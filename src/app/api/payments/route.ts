@@ -1,4 +1,4 @@
-import { isValidVpa } from "@/lib/upi";
+import { isValidVpa, isValidTxnId, normalizeTxnId } from "@/lib/upi";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { parseListQuery } from "@/lib/validate";
@@ -32,6 +32,11 @@ export interface StoredPayment {
   amount: number;
   vpa: string;
   txnRef: string;
+  // The customer-entered UPI transaction reference (UTR) captured at checkout —
+  // proof of the transfer, used to reconcile against the bank statement. The
+  // `txnRef` above is our merchant-side reference (idempotency key); this is the
+  // number the payer's own app produced.
+  customerTxnId?: string;
   status: StoredPaymentStatus;
   createdAt: string;
 }
@@ -84,8 +89,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { bookingId, amount, method, vpa, txnRef, customer } = (body ??
-    {}) as Record<string, unknown>;
+  const { bookingId, amount, method, vpa, txnRef, customerTxnId, customer } =
+    (body ?? {}) as Record<string, unknown>;
 
   if (typeof bookingId !== "string" || !/^BHJ-/.test(bookingId)) {
     return Response.json({ error: "Missing booking reference." }, { status: 400 });
@@ -99,6 +104,16 @@ export async function POST(request: Request) {
   if (typeof vpa !== "string" || !isValidVpa(vpa)) {
     return Response.json({ error: "Invalid UPI ID." }, { status: 400 });
   }
+
+  // The customer's own transaction reference is required proof of the transfer —
+  // it's captured at checkout before the booking is confirmed.
+  if (typeof customerTxnId !== "string" || !isValidTxnId(customerTxnId)) {
+    return Response.json(
+      { error: "Enter the transaction ID from your UPI app." },
+      { status: 400 },
+    );
+  }
+  const customerRef = normalizeTxnId(customerTxnId);
 
   const normalizedMethod: StoredPaymentMethod = method === "qr" ? "QR" : "UPI";
   const ref =
@@ -125,6 +140,7 @@ export async function POST(request: Request) {
     amount: Math.round(amt),
     vpa: vpa.trim(),
     txnRef: ref,
+    customerTxnId: customerRef,
     status: "Advance Received",
     createdAt: new Date().toISOString(),
   };

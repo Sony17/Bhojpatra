@@ -1,4 +1,9 @@
-import { DEFAULT_MERCHANT, isValidVpa, type UpiPayeeConfig } from "@/lib/upi";
+import {
+  DEFAULT_MERCHANT,
+  isValidVpa,
+  isValidQrImage,
+  type UpiPayeeConfig,
+} from "@/lib/upi";
 import { readSingleton, writeSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 
@@ -28,7 +33,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { vpa, payeeName } = (body ?? {}) as Record<string, unknown>;
+  const { vpa, payeeName, qrImage } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof vpa !== "string" || !isValidVpa(vpa)) {
     return Response.json(
@@ -44,6 +49,20 @@ export async function POST(request: Request) {
     vpa: vpa.trim(),
     payeeName: payeeName.trim(),
   };
+
+  // Optional custom QR image (a base64 data URL). A non-empty value must be a
+  // valid, size-capped image; an empty string / missing value clears any
+  // previously uploaded QR (the whole singleton is rewritten each save, so
+  // omitting the field drops it — checkout falls back to the generated QR).
+  if (typeof qrImage === "string" && qrImage.trim()) {
+    if (!isValidQrImage(qrImage)) {
+      return Response.json(
+        { error: "Upload a valid QR image (PNG/JPEG/WebP under 450 KB)." },
+        { status: 400 },
+      );
+    }
+    settings.qrImage = qrImage.trim();
+  }
 
   try {
     await writeSingleton(SETTINGS_KEY, settings);

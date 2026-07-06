@@ -2,13 +2,11 @@
  * EMI (instalment) plans for the balance left after the 10% booking advance.
  *
  * A guest locks a date by paying 10% up front; the remaining 90% can be split
- * into equal instalments. How many instalments are on offer widens with how far
- * the event is from the booking — coarse, tiered buckets keep the rule easy to
- * explain to a customer:
+ * into equal instalments. EMI opens up once the event is at least three months
+ * out — a coarse, single-threshold rule that's easy to explain to a customer:
  *
  *   • under 3 months away → balance settled in one go (no EMI)
- *   • 3 to 6 months away  → up to 3 EMIs
- *   • 6+ months away      → up to 6 EMIs
+ *   • 3+ months away      → up to 3 or 6 EMIs
  *
  * This is "track only": we compute a dated schedule and record it on the order;
  * our team collects each instalment manually. Nothing here charges a card.
@@ -54,10 +52,10 @@ export function monthsUntil(eventISO: string, from: Date = new Date()): number {
 }
 
 /** Which EMI counts are on offer for a given lead time, in months. `1` means a
- *  single balance payment (no real EMI) and is always available. */
+ *  single balance payment (no real EMI) and is always available. The 3- and
+ *  6-instalment plans both open at the same 3-month threshold. */
 export function emiOptionsForMonths(months: number): number[] {
-  if (months >= 6) return [1, 3, 6];
-  if (months >= 3) return [1, 3];
+  if (months >= 3) return [1, 3, 6];
   return [1];
 }
 

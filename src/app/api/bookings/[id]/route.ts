@@ -22,12 +22,15 @@ const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   Cancelled: ["Cancelled"],
 };
 
-// What a booking's own customer may do to it: mark their confirmed event
-// complete, or reopen a completed one. They can't cancel, touch a Pending
-// order, or change the paid amount — that stays with the team.
+// What a booking's own customer may do to it from My Bookings: pay off a
+// pending EMI order's balance to confirm it, cancel a pending or confirmed
+// order, mark a confirmed event complete, or reopen a completed one. They still
+// can't set the paid amount directly — settling the balance is recorded
+// server-side on Pending → Confirmed (see below) — and a cancelled order is
+// terminal.
 const CUSTOMER_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  Pending: [],
-  Confirmed: ["Completed"],
+  Pending: ["Confirmed", "Cancelled"],
+  Confirmed: ["Completed", "Cancelled"],
   Completed: ["Confirmed"],
   Cancelled: [],
 };
@@ -97,6 +100,13 @@ export async function PATCH(
       );
     }
     next.status = body.status;
+
+    // A pending order is an EMI booking (advance paid, balance financed). When a
+    // customer confirms it they're settling that outstanding balance in full, so
+    // record it here — the client never sends `paid`, keeping money server-side.
+    if (!isAdmin && order.status === "Pending" && next.status === "Confirmed") {
+      next.paid = order.amount;
+    }
   }
 
   if (body.paid !== undefined) {

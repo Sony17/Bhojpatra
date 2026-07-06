@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
-import { useSessionStatus } from "@/lib/session";
+import { useSessionStatus, partnerMemberships } from "@/lib/session";
+import { isSelfReferral } from "@/lib/referral";
 import LoginGate from "@/components/auth/LoginGate";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import {
@@ -17,11 +18,12 @@ import { downloadInvoice, encodeInvoice, type InvoiceData } from "@/lib/invoice"
 import {
   buildUpiUri,
   upiTxnRef,
+  isValidTxnId,
+  normalizeTxnId,
   DEFAULT_MERCHANT,
   type UpiPayeeConfig,
 } from "@/lib/upi";
 import {
-  ORDER_PAYMENT_METHODS,
   ORDER_PAYMENT_LABELS,
   ORDER_PAYMENT_HINTS,
   isOnlineMethod,
@@ -52,6 +54,7 @@ import {
   type CategoryItem,
   type Coupon,
   type VendorListing,
+  type BookingStatus,
 } from "@/lib/data";
 import {
   useLocations,
@@ -72,12 +75,6 @@ const GST_RATE = 0.18;
 // grand total up front (the rest is settled later with our team).
 const ADVANCE_RATE = 0.1;
 const TOTAL_STEPS = 4;
-// Dev-only affordance: in non-production builds the Confirm step shows a toggle
-// to save the order already Completed & fully paid, so the reviews flow — which
-// only surfaces on a completed booking — can be exercised without waiting for
-// the event date. `process.env.NODE_ENV` is inlined at build time, so this and
-// the UI it gates compile out of production bundles.
-const DEV_TOOLS = process.env.NODE_ENV !== "production";
 
 // Large functions (1000+ guests) may split a single segment across vendors.
 const MULTI_VENDOR_MIN = 1000;
@@ -202,6 +199,15 @@ export default function BookingWizard() {
   const [referrerName, setReferrerName] = useState<string>("");
   const [referrerType, setReferrerType] = useState<string>("");
 
+  // The signed-in account's own referral codes — an Individual Referrer or Event
+  // Planner must not credit their own booking, so a code that belongs to this
+  // same account is treated as "no referral" (see the resolve effect + confirm).
+  const ownMemberships = useMemo(
+    () => partnerMemberships(sessionStatus ?? null),
+    [sessionStatus],
+  );
+  const selfReferral = isSelfReferral(referralCode, ownMemberships);
+
   // Admin-managed occasions + serviceable locations (both fall back to their
   // seed lists). resolveOccasion / resolveCity turn the selected id — or the
   // free-text "Other" value — into a {name,nameHi} used across the invoice /
@@ -293,7 +299,8 @@ export default function BookingWizard() {
   // still kept (and tagged) — the team reconciles it on follow-up.
   useEffect(() => {
     const code = referralCode.trim();
-    if (!code) {
+    // No code, or the booker's own code (self-referral) → no attribution.
+    if (!code || isSelfReferral(code, ownMemberships)) {
       setReferrerName("");
       setReferrerType("");
       return;
@@ -313,7 +320,7 @@ export default function BookingWizard() {
     return () => {
       active = false;
     };
-  }, [referralCode]);
+  }, [referralCode, ownMemberships]);
 
   // The chosen date must clear the selected package's lead time. We deliberately
   // do NOT auto-switch the package here: silently downgrading (e.g. Platinum →
@@ -347,10 +354,6 @@ export default function BookingWizard() {
   // time. A count the chosen date no longer supports simply reads back as "no
   // EMI" everywhere it's consumed (see the inclusion guards), so no reset needed.
   const [emiCount, setEmiCount] = useState<number>(1);
-  // Dev-only: when on, Confirm saves the order already Completed & fully paid so
-  // the My Bookings "Rate your experience" flow is immediately testable. Never
-  // rendered or read in production (see DEV_TOOLS).
-  const [devComplete, setDevComplete] = useState<boolean>(false);
 
   // Real customer ratings per vendor, shown on the vendor cards (best-effort).
   const vendorRatings = useVendorRatings();
@@ -737,10 +740,12 @@ export default function BookingWizard() {
   // split into the chosen number of instalments. Only meaningful once the guest
   // has paid an advance (not the full bill) and picked a real multi-EMI count —
   // it's track-only, so this is purely a schedule our team collects against.
-  const buildEmiPlanForOrder = (): EmiPlan | undefined => {
+  const buildEmiPlanForOrder = (
+    paid: number = paidAmount,
+  ): EmiPlan | undefined => {
     const total = Math.round(grandTotal);
-    const balance = total - paidAmount;
-    if (emiCount <= 1 || paidAmount <= 0 || balance <= 0) return undefined;
+    const balance = total - paid;
+    if (emiCount <= 1 || paid <= 0 || balance <= 0) return undefined;
     if (!emiOptionsForEvent(eventDate).includes(emiCount)) return undefined;
     return buildEmiPlan(balance, emiCount, eventDate);
   };
@@ -980,9 +985,14 @@ export default function BookingWizard() {
   // payment method and whatever the guest paid up front (a 10% advance, the
   // full total, or nothing for COD / "connect"). Our team reaches out to
   // finalise the menu and collect any balance.
-  const handleConfirm = async () => {
+  // `paidOverride` / `refOverride` let the online flow confirm the booking in the
+  // same click that records the advance — the freshly-recorded amount + UTR are
+  // passed straight through, since the `paidAmount` / `paymentRef` state they'd
+  // otherwise read hasn't re-rendered yet. Called with no args by the Connect
+  // (pay-later) confirm button, which just uses the current state (nothing paid).
+  const handleConfirm = async (paidOverride?: number, refOverride?: string) => {
     setConfirmError("");
-    // Contact is required so COD / connect orders are actionable.
+    // Contact is required so a "Bhojpatra connects you" order is actionable.
     if (!customerName.trim()) {
       setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
@@ -1037,12 +1047,16 @@ export default function BookingWizard() {
       ).values(),
     );
 
-    // Dev shortcut: mark the order Completed & fully paid so the review flow is
-    // testable right away. A completed/settled order carries no EMI plan.
-    const completeNow = DEV_TOOLS && devComplete;
-    const orderStatus = completeNow ? "Completed" : "Confirmed";
-    const orderPaid = completeNow ? Math.round(grandTotal) : paidAmount;
-    const emiPlan = completeNow ? undefined : buildEmiPlanForOrder();
+    // Use the just-paid amount (auto-confirm passes it in before the `paidAmount`
+    // state has flushed) so the EMI plan is computed against the real balance.
+    const orderPaid = paidOverride ?? paidAmount;
+    const orderPaymentRef = refOverride ?? paymentRef;
+    const emiPlan = buildEmiPlanForOrder(orderPaid);
+    // A booking is Confirmed once the advance is paid outright; an EMI plan
+    // leaves the 90% balance financed over instalments, so the order stays
+    // Pending until that balance is settled (paid off from My Bookings, or by
+    // the team collecting each instalment).
+    const orderStatus: BookingStatus = emiPlan ? "Pending" : "Confirmed";
 
     const invoiceData = buildInvoice();
 
@@ -1072,12 +1086,15 @@ export default function BookingWizard() {
           amount: Math.round(grandTotal),
           paid: orderPaid,
           paymentMethod: payMethod,
-          paymentRef: paymentRef || undefined,
+          paymentRef: orderPaymentRef || undefined,
           emiPlan: emiPlan ?? undefined,
           status: orderStatus,
-          referralCode: referralCode.trim() || undefined,
-          referrerName: referrerName || undefined,
-          referrerType: referrerType || undefined,
+          // A partner can't credit their own booking — drop the attribution
+          // when the applied code is this account's own (the server enforces
+          // this too).
+          referralCode: selfReferral ? undefined : referralCode.trim() || undefined,
+          referrerName: selfReferral ? undefined : referrerName || undefined,
+          referrerType: selfReferral ? undefined : referrerType || undefined,
           // Customer-facing extras stored on the order (My Bookings needs these).
           ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
           receipt: buildReceipt(),
@@ -1113,6 +1130,11 @@ export default function BookingWizard() {
 
     setConfirmed(true);
     setConfirming(false);
+    // Bring the success screen into view — a paid-and-confirmed booking often
+    // triggers from the advance button lower down, so jump back to the top.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
@@ -1274,6 +1296,9 @@ export default function BookingWizard() {
               onPaid={(amount, ref) => {
                 setPaidAmount(amount);
                 setPaymentRef(ref);
+                // Advance settled → confirm the booking in the same click, using
+                // the just-recorded amount + UTR (state above hasn't flushed yet).
+                void handleConfirm(amount, ref);
               }}
               customerName={customerName}
               setCustomerName={setCustomerName}
@@ -1282,6 +1307,7 @@ export default function BookingWizard() {
               referralCode={referralCode}
               setReferralCode={setReferralCode}
               referrerName={referrerName}
+              selfReferral={selfReferral}
               payMethod={payMethod}
               setPayMethod={setPayMethod}
               emiCount={emiCount}
@@ -1291,22 +1317,6 @@ export default function BookingWizard() {
               onConfirm={handleConfirm}
               whatsappHref={whatsappHref}
             />
-          )}
-          {step === 4 && !confirmed && sessionStatus != null && DEV_TOOLS && (
-            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-dashed border-maroon bg-cream px-4 py-3 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={devComplete}
-                onChange={(e) => setDevComplete(e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-maroon"
-              />
-              <span>
-                <span className="font-semibold text-maroon">Dev only</span> — save
-                this order as <strong>Completed &amp; fully paid</strong> so the
-                &ldquo;Rate your experience&rdquo; review flow shows immediately in
-                My Dashboard.
-              </span>
-            </label>
           )}
           {step === 4 && confirmed && (
             <StepDone
@@ -1783,18 +1793,25 @@ function StepMenu({
   vendorRatings: VendorRatings;
 }) {
   const vendorScrollRef = useRef<HTMLDivElement>(null);
+  // "Show more" lets guests expand past the curated cap (Silver only). Reset
+  // whenever the cap itself changes (e.g. switching away from / back to Silver)
+  // so the roster doesn't stay expanded on a package that never capped it.
+  const [showAllVendors, setShowAllVendors] = useState(false);
+  useEffect(() => setShowAllVendors(false), [maxVendors]);
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
   const cat = categories[activeCat] ?? categories[0];
   // Silver advertises a fixed set of curated vendors — the cap applies to the
   // seed roster only. Live caterers who published a menu always stay visible,
   // whatever the package (they'd otherwise never surface on Silver, since the
-  // curated seeds sort first).
+  // curated seeds sort first). "Show more" lifts the cap on demand.
+  const seedVendors = cat.vendors.filter((v) => !v.live);
+  const cap = maxVendors && !showAllVendors ? maxVendors : undefined;
+  const hiddenVendorCount = maxVendors
+    ? Math.max(0, seedVendors.length - maxVendors)
+    : 0;
   const visibleVendors = maxVendors
-    ? [
-        ...cat.vendors.filter((v) => !v.live).slice(0, maxVendors),
-        ...cat.vendors.filter((v) => v.live),
-      ]
+    ? [...seedVendors.slice(0, cap), ...cat.vendors.filter((v) => v.live)]
     : cat.vendors;
   const allowance = allowanceFor(cat.id);
   const selectedIds = categoryVendor[cat.id] ?? [];
@@ -1931,9 +1948,6 @@ function StepMenu({
                     )}
                   </p>
                 )}
-                <p className="mt-1 text-sm font-semibold text-ink">
-                  + {money(v.perPlate)}/{t("plate", "प्लेट")}
-                </p>
               </div>
               <span
                 className={
@@ -1973,6 +1987,28 @@ function StepMenu({
           </>
         )}
       </div>
+
+      {/* Show more — Silver curates a capped roster; let guests expand it to
+          browse the rest of the seed vendors on demand. */}
+      {hiddenVendorCount > 0 && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowAllVendors((s) => !s)}
+            className="inline-flex items-center gap-2 rounded-full border border-maroon/40 bg-white px-5 py-2.5 text-sm font-semibold text-maroon shadow-sm transition hover:bg-maroon hover:text-cream"
+          >
+            {showAllVendors
+              ? t("Show fewer vendors", "कम वेंडर दिखाएं")
+              : t(
+                  `Show ${hiddenVendorCount} more vendors`,
+                  `${hiddenVendorCount} और वेंडर दिखाएं`,
+                )}
+            <span aria-hidden="true" className="text-base leading-none">
+              {showAllVendors ? "↑" : "↓"}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Step B · Pick items */}
       <div className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 shadow-sm">
@@ -2237,6 +2273,7 @@ function PaymentBox({
   paidAmount,
   onPaid,
   customerName,
+  customerPhone,
   payMethod,
   setPayMethod,
   eventDate,
@@ -2249,6 +2286,7 @@ function PaymentBox({
   paidAmount: number;
   onPaid: (amount: number, txnRef: string) => void;
   customerName: string;
+  customerPhone: string;
   payMethod: OrderPaymentMethod;
   setPayMethod: (m: OrderPaymentMethod) => void;
   eventDate: string;
@@ -2256,11 +2294,13 @@ function PaymentBox({
   setEmiCount: (n: number) => void;
 }) {
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
-  // Default to the 10% advance — the lightweight way to lock a date at booking.
-  const [choice, setChoice] = useState<"advance" | "full">("advance");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
+  // The transaction / UTR the customer got from their UPI app — captured here so
+  // it travels onto the payment record and the order before the booking is
+  // confirmed, letting the team reconcile the transfer.
+  const [txnId, setTxnId] = useState<string>("");
 
   // Pull the live merchant VPA (admin-configurable); fall back to the default.
   useEffect(() => {
@@ -2272,6 +2312,8 @@ function PaymentBox({
           setMerchant({
             vpa: cfg.vpa,
             payeeName: cfg.payeeName ?? DEFAULT_MERCHANT.payeeName,
+            qrImage:
+              typeof cfg.qrImage === "string" ? cfg.qrImage : undefined,
           });
         }
       })
@@ -2282,24 +2324,29 @@ function PaymentBox({
   }, []);
 
   const total = Math.round(grandTotal);
+  // A fixed 10% advance confirms the booking; the 90% balance is settled later
+  // (in one go or over EMIs). The online flow always collects exactly this.
   const advanceAmount = Math.max(1, Math.round(grandTotal * ADVANCE_RATE));
-  const amount = choice === "advance" ? advanceAmount : total;
+  const amount = advanceAmount;
+  const balanceAmount = Math.max(0, total - advanceAmount);
 
-  // EMI plan for the balance after the advance — offered only when the guest is
-  // paying the 10% advance (the balance is what gets financed) and the event is
-  // far enough out. `emiCount` is owned by the wizard so it travels onto the
-  // saved order; `1` means settle the balance in one go.
+  // How the customer wants to settle the 90% balance after the advance: pay it
+  // in full (emiCount 1) or split into instalments. EMI counts >1 are only
+  // offered when the event is far enough out; `emiCount` is owned by the wizard
+  // so the choice travels onto the saved order.
   const emiOptions = emiOptionsForEvent(eventDate);
-  const emiEligible = choice === "advance" && emiOptions.length > 1;
-  // A count the date no longer supports falls back to "settle in one go".
   const emiSelected = emiOptions.includes(emiCount) ? emiCount : 1;
   const emiPlan =
-    emiEligible && emiSelected > 1
-      ? buildEmiPlan(total - advanceAmount, emiSelected, eventDate)
+    emiSelected > 1
+      ? buildEmiPlan(balanceAmount, emiSelected, eventDate)
       : null;
-  // Distinct refs per payment type so an advance and a later top-up don't
-  // collide on the idempotency key.
-  const txnRef = upiTxnRef(bookingId, choice === "advance" ? "ADVANCE" : "FULL");
+  // Contact (name + phone) must be captured before we take money, so the paid
+  // order is actionable and the auto-confirm that follows the advance succeeds.
+  const contactReady =
+    customerName.trim().length > 0 &&
+    customerPhone.replace(/\D/g, "").length >= 10;
+  // A stable ref for the advance so a retry stays idempotent on the txn key.
+  const txnRef = upiTxnRef(bookingId, "ADVANCE");
   const note = `Bhojpatra ${bookingId}`;
   const upiUri = buildUpiUri({
     vpa: merchant.vpa,
@@ -2314,6 +2361,18 @@ function PaymentBox({
     `&am=${amount}&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(txnRef)}`;
 
   const markPaid = async () => {
+    // The customer's transaction ID is required proof of the transfer — take it
+    // before recording the payment / confirming the booking.
+    if (!isValidTxnId(txnId)) {
+      setError(
+        t(
+          "Enter the transaction ID from your UPI app to confirm the payment.",
+          "भुगतान की पुष्टि के लिए अपने UPI ऐप से लेनदेन आईडी दर्ज करें।",
+        ),
+      );
+      return;
+    }
+    const customerTxnId = normalizeTxnId(txnId);
     setSubmitting(true);
     setError("");
     try {
@@ -2326,6 +2385,7 @@ function PaymentBox({
           method: payMethod === "QR" ? "qr" : "upi",
           vpa: merchant.vpa,
           txnRef,
+          customerTxnId,
           customer: customerName.trim() || undefined,
         }),
       });
@@ -2339,7 +2399,7 @@ function PaymentBox({
         );
         return;
       }
-      onPaid(amount, txnRef);
+      onPaid(amount, customerTxnId);
     } catch {
       setError(
         t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
@@ -2399,169 +2459,109 @@ function PaymentBox({
       </div>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
-          "Pay online now, on delivery, or let us connect to arrange it.",
-          "अभी ऑनलाइन भुगतान करें, डिलीवरी पर करें, या हमें व्यवस्था के लिए संपर्क करने दें।",
+          "Pay the 10% advance online to confirm now, or let our team connect to arrange payment.",
+          "अभी पुष्टि के लिए 10% एडवांस ऑनलाइन दें, या भुगतान की व्यवस्था के लिए हमारी टीम से संपर्क करने दें।",
         )}
       </p>
 
-      {/* Payment method — UPI / QR (online now) · COD · Bhojpatra connects you. */}
+      {/* Two top-level choices: pay online (UPI) now, or "Bhojpatra connects
+          you (COD)" — book now and settle later. UPI expands into UPI-ID / QR. */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {ORDER_PAYMENT_METHODS.map((m) => {
-          const active = payMethod === m;
-          return (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setPayMethod(m)}
-              className={
-                "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
-                (active
-                  ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
-                  : "border-cream-3 bg-white hover:bg-cream-2")
-              }
-            >
-              <span className="text-sm font-semibold text-ink">
-                {t(ORDER_PAYMENT_LABELS[m].en, ORDER_PAYMENT_LABELS[m].hi)}
-              </span>
-              <span className="mt-0.5 text-xs text-ink-soft">
-                {t(ORDER_PAYMENT_HINTS[m].en, ORDER_PAYMENT_HINTS[m].hi)}
-              </span>
-            </button>
-          );
-        })}
+        <button
+          type="button"
+          aria-pressed={online}
+          onClick={() => {
+            if (!online) setPayMethod("UPI");
+          }}
+          className={
+            "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+            (online
+              ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+              : "border-cream-3 bg-white hover:bg-cream-2")
+          }
+        >
+          <span className="text-sm font-semibold text-ink">{t("UPI", "UPI")}</span>
+          <span className="mt-0.5 text-xs text-ink-soft">
+            {t("Pay 10% advance online now", "अभी 10% एडवांस ऑनलाइन दें")}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={payMethod === "Connect"}
+          onClick={() => setPayMethod("Connect")}
+          className={
+            "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+            (payMethod === "Connect"
+              ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+              : "border-cream-3 bg-white hover:bg-cream-2")
+          }
+        >
+          <span className="text-sm font-semibold text-ink">
+            {t(ORDER_PAYMENT_LABELS.Connect.en, ORDER_PAYMENT_LABELS.Connect.hi)}
+          </span>
+          <span className="mt-0.5 text-xs text-ink-soft">
+            {t(
+              "Confirm now — our team calls to arrange payment",
+              "अभी पुष्टि करें — भुगतान के लिए हमारी टीम कॉल करेगी",
+            )}
+          </span>
+        </button>
       </div>
 
       {online ? (
         <>
-          {/* Amount choice — a 10% advance to lock the date, or the full total. */}
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                [
-                  "advance",
-                  t("Pay 10% Advance", "10% एडवांस दें"),
-                  advanceAmount,
-                  t("Lock your date now", "अभी अपनी तारीख पक्की करें"),
-                ],
-                [
-                  "full",
-                  t("Pay Full Amount", "पूरा भुगतान करें"),
-                  total,
-                  t("Settle the whole bill", "पूरा बिल चुकाएं"),
-                ],
-              ] as const
-            ).map(([id, label, amt, hint]) => {
-              const active = choice === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setChoice(id)}
-                  className={
-                    "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
-                    (active
-                      ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
-                      : "border-cream-3 bg-white hover:bg-cream-2")
-                  }
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-ink">{label}</span>
-                    <span className="font-display text-base font-semibold text-maroon">
-                      {money(amt)}
+          {/* Sub-mode — pay the advance via a UPI ID or by scanning a QR. */}
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-ink">
+              {t("Choose how to pay the advance", "एडवांस कैसे दें, चुनें")}
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              {(["UPI", "QR"] as const).map((m) => {
+                const active = payMethod === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPayMethod(m)}
+                    className={
+                      "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+                      (active
+                        ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+                        : "border-cream-3 bg-white hover:bg-cream-2")
+                    }
+                  >
+                    <span className="text-sm font-semibold text-ink">
+                      {t(ORDER_PAYMENT_LABELS[m].en, ORDER_PAYMENT_LABELS[m].hi)}
                     </span>
-                  </span>
-                  <span className="mt-0.5 text-xs text-ink-soft">{hint}</span>
-                </button>
-              );
-            })}
+                    <span className="mt-0.5 text-xs text-ink-soft">
+                      {t(ORDER_PAYMENT_HINTS[m].en, ORDER_PAYMENT_HINTS[m].hi)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* EMI plan for the balance — pay 10% now, split the remaining 90%
-              into instalments. Only shown when the event is far enough out
-              (3+ months → up to 3 EMIs, 6+ → up to 6). Track-only: our team
-              collects each instalment on its due date. */}
-          {emiEligible && (
-            <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/30 p-4">
-              <p className="text-sm font-semibold text-ink">
-                {t(
-                  "Split the balance into EMIs?",
-                  "शेष राशि को EMI में बाँटें?",
-                )}
-              </p>
-              <p className="mt-0.5 text-xs text-ink-soft">
-                {t(
-                  `Pay the ${money(advanceAmount)} advance now; settle the ${money(total - advanceAmount)} balance in easy instalments.`,
-                  `अभी ${money(advanceAmount)} एडवांस दें; ${money(total - advanceAmount)} शेष राशि आसान किश्तों में चुकाएं।`,
-                )}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {emiOptions.map((n) => {
-                  const active = emiSelected === n;
-                  const label =
-                    n === 1
-                      ? t("Pay in full", "एकमुश्त")
-                      : t(`${n} EMIs`, `${n} EMI`);
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setEmiCount(n)}
-                      className={
-                        "rounded-full border px-4 py-2 text-xs font-semibold transition " +
-                        (active
-                          ? "border-maroon bg-maroon text-cream"
-                          : "border-cream-3 bg-white text-ink hover:bg-cream-2")
-                      }
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {emiPlan && (
-                <ul className="mt-3 divide-y divide-cream-3 rounded-xl border border-cream-3 bg-white">
-                  {emiPlan.installments.map((it) => (
-                    <li
-                      key={it.index}
-                      className="flex items-center justify-between px-4 py-2 text-sm"
-                    >
-                      <span className="text-ink-soft">
-                        {t(
-                          `EMI ${it.index} · ${it.dueLabel}`,
-                          `EMI ${it.index} · ${it.dueLabel}`,
-                        )}
-                      </span>
-                      <span className="font-semibold text-ink">
-                        {money(it.amount)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+          {/* The advance that confirms the booking — fixed at 10%. */}
+          <div className="mt-4 rounded-2xl border border-maroon/30 bg-maroon-soft/20 p-4">
+            <p className="text-sm text-ink">
+              {t(
+                `Pay a 10% advance of ${money(advanceAmount)} now to confirm your booking.`,
+                `अपनी बुकिंग पक्की करने के लिए अभी 10% एडवांस ${money(advanceAmount)} दें।`,
               )}
-              {emiPlan && (
-                <p className="mt-2 text-xs text-ink-soft">
-                  {t(
-                    "Our team collects each instalment on its due date — no card is charged automatically.",
-                    "हमारी टीम हर किश्त उसकी नियत तारीख पर लेगी — कोई कार्ड अपने आप चार्ज नहीं होगा।",
-                  )}
-                </p>
-              )}
-            </div>
-          )}
+            </p>
+          </div>
 
           {payMethod === "QR" ? (
             <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={qrSrc}
+                src={merchant.qrImage || qrSrc}
                 alt={t("UPI payment QR", "UPI भुगतान QR")}
                 width={176}
                 height={176}
-                className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2"
+                className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2 object-contain"
               />
               <div className="text-sm text-ink-soft">
                 <p>
@@ -2570,6 +2570,14 @@ function PaymentBox({
                     "भुगतान के लिए किसी भी UPI ऐप से स्कैन करें",
                   )}
                 </p>
+                {merchant.qrImage && (
+                  <p className="mt-1 text-xs">
+                    {t(
+                      `Enter ${money(amount)} in your UPI app.`,
+                      `अपने UPI ऐप में ${money(amount)} दर्ज करें।`,
+                    )}
+                  </p>
+                )}
                 <p className="mt-1 font-semibold text-ink">{merchant.vpa}</p>
                 <a
                   href={upiUri}
@@ -2605,48 +2613,147 @@ function PaymentBox({
             </div>
           )}
 
+          {/* Transaction ID — the reference the customer's UPI app shows after
+              paying. Required before we record the payment and confirm, so the
+              team can reconcile the transfer. */}
+          <div className="mt-4">
+            <label htmlFor="upi-txn-id" className="text-sm font-semibold text-ink">
+              {t("UPI Transaction ID", "UPI लेनदेन आईडी")}
+            </label>
+            <input
+              id="upi-txn-id"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={txnId}
+              onChange={(e) => setTxnId(e.target.value)}
+              placeholder={t(
+                "12-digit UPI reference / UTR",
+                "12-अंकों का UPI रेफ़रेंस / UTR",
+              )}
+              className="mt-1.5 w-full rounded-xl border border-cream-3 bg-white px-4 py-2.5 text-sm text-ink outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/30"
+            />
+            <p className="mt-1.5 text-xs text-ink-soft">
+              {t(
+                "After paying, enter the reference number your UPI app shows so we can match your payment.",
+                "भुगतान के बाद अपने UPI ऐप में दिखने वाला रेफ़रेंस नंबर दर्ज करें ताकि हम आपका भुगतान मिला सकें।",
+              )}
+            </p>
+          </div>
+
+          {/* Balance preference — how to settle the remaining 90% after the
+              advance: in one payment, or split into EMIs (offered when the event
+              is far enough out). Track-only: our team collects each instalment on
+              its due date. */}
+          <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/30 p-4">
+            <p className="text-sm font-semibold text-ink">
+              {t(
+                "How would you like to settle the balance?",
+                "शेष राशि कैसे चुकाना चाहेंगे?",
+              )}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              {t(
+                `After the ${money(advanceAmount)} advance, settle the ${money(balanceAmount)} balance in full or over easy EMIs.`,
+                `${money(advanceAmount)} एडवांस के बाद, ${money(balanceAmount)} शेष राशि एकमुश्त या आसान EMI में चुकाएं।`,
+              )}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {emiOptions.map((n) => {
+                const active = emiSelected === n;
+                const label =
+                  n === 1
+                    ? t("Pay in full", "एकमुश्त")
+                    : t(`${n} EMIs`, `${n} EMI`);
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setEmiCount(n)}
+                    className={
+                      "rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                      (active
+                        ? "border-maroon bg-maroon text-cream"
+                        : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                    }
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {emiPlan && (
+              <ul className="mt-3 divide-y divide-cream-3 rounded-xl border border-cream-3 bg-white">
+                {emiPlan.installments.map((it) => (
+                  <li
+                    key={it.index}
+                    className="flex items-center justify-between px-4 py-2 text-sm"
+                  >
+                    <span className="text-ink-soft">
+                      {t(
+                        `EMI ${it.index} · ${it.dueLabel}`,
+                        `EMI ${it.index} · ${it.dueLabel}`,
+                      )}
+                    </span>
+                    <span className="font-semibold text-ink">
+                      {money(it.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {emiPlan && (
+              <p className="mt-2 text-xs text-ink-soft">
+                {t(
+                  "Our team collects each instalment on its due date — no card is charged automatically.",
+                  "हमारी टीम हर किश्त उसकी नियत तारीख पर लेगी — कोई कार्ड अपने आप चार्ज नहीं होगा।",
+                )}
+              </p>
+            )}
+          </div>
+
           {error && (
             <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
           )}
 
+          {/* One tap records the advance and confirms the booking — no need to
+              scroll down to a separate confirm button. */}
           <button
             type="button"
             onClick={markPaid}
-            disabled={submitting}
+            disabled={submitting || !isValidTxnId(txnId) || !contactReady}
             className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
           >
             {submitting
-              ? t("Recording…", "दर्ज हो रहा है…")
-              : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
+              ? t("Confirming…", "पुष्टि हो रही है…")
+              : `${t("Pay & Confirm", "भुगतान करें और पुष्टि करें")} ${money(amount)}`}
           </button>
+          {!contactReady && (
+            <p className="mt-2 text-xs font-medium text-maroon">
+              {t(
+                "Enter your name and phone above to confirm your booking.",
+                "अपनी बुकिंग पक्की करने के लिए ऊपर अपना नाम और फ़ोन दर्ज करें।",
+              )}
+            </p>
+          )}
           <p className="mt-2 text-xs text-ink-soft">
             {t(
-              "Optional — you can also just confirm below and pay later.",
-              "वैकल्पिक — आप नीचे केवल पुष्टि करके बाद में भी भुगतान कर सकते हैं।",
+              "Prefer to pay later? Choose “Bhojpatra connects you (COD)” above.",
+              "बाद में भुगतान करना चाहते हैं? ऊपर “भोजपत्र आपसे संपर्क करेगा (COD)” चुनें।",
             )}
           </p>
         </>
-      ) : payMethod === "COD" ? (
-        <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4">
-          <p className="text-sm font-semibold text-ink">
-            {t("Cash on Delivery", "डिलीवरी पर नकद")}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">
-            {t(
-              `No payment now — pay ${money(total)} in cash when your order is delivered. Confirm below to place the booking.`,
-              `अभी कोई भुगतान नहीं — आपका ऑर्डर डिलीवर होने पर ${money(total)} नकद में दें। बुकिंग के लिए नीचे पुष्टि करें।`,
-            )}
-          </p>
-        </div>
       ) : (
         <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4">
           <p className="text-sm font-semibold text-ink">
-            {t("Bhojpatra connects you", "भोजपत्र आपसे संपर्क करेगा")}
+            {t(ORDER_PAYMENT_LABELS.Connect.en, ORDER_PAYMENT_LABELS.Connect.hi)}
           </p>
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              "Confirm below and our team will call you to finalise the menu and arrange the most convenient way to pay.",
-              "नीचे पुष्टि करें और हमारी टीम मेन्यू तय करने और भुगतान का सबसे सुविधाजनक तरीका तय करने के लिए आपको कॉल करेगी।",
+              "Confirm below and our team will call you to finalise the menu and arrange the most convenient way to pay — no payment now.",
+              "नीचे पुष्टि करें और हमारी टीम मेन्यू तय करने और भुगतान का सबसे सुविधाजनक तरीका तय करने के लिए आपको कॉल करेगी — अभी कोई भुगतान नहीं।",
             )}
           </p>
         </div>
@@ -2688,6 +2795,7 @@ function StepConfirm({
   referralCode,
   setReferralCode,
   referrerName,
+  selfReferral,
   payMethod,
   setPayMethod,
   emiCount,
@@ -2728,6 +2836,7 @@ function StepConfirm({
   referralCode: string;
   setReferralCode: (v: string) => void;
   referrerName: string;
+  selfReferral: boolean;
   payMethod: OrderPaymentMethod;
   setPayMethod: (m: OrderPaymentMethod) => void;
   emiCount: number;
@@ -2965,11 +3074,21 @@ function StepConfirm({
           placeholder="REF-XXXXXX"
           className="mt-3 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm uppercase tracking-wider text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60 placeholder:normal-case placeholder:tracking-normal sm:max-w-xs"
         />
-        {referralCode.trim() && referrerName && (
-          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
-            <span aria-hidden="true">★</span>
-            {t("Referred by", "रेफ़र किया")} {referrerName}
+        {selfReferral ? (
+          <p className="mt-2 text-sm font-medium text-maroon">
+            {t(
+              "This is your own referral code — you can't refer yourself, so it won't be credited.",
+              "यह आपका ही रेफ़रल कोड है — आप खुद को रेफ़र नहीं कर सकते, इसलिए इसका श्रेय नहीं मिलेगा।",
+            )}
           </p>
+        ) : (
+          referralCode.trim() &&
+          referrerName && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+              <span aria-hidden="true">★</span>
+              {t("Referred by", "रेफ़र किया")} {referrerName}
+            </p>
+          )
         )}
       </div>
 
@@ -2995,16 +3114,16 @@ function StepConfirm({
         ) : (
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) now to lock your date, or pay in full below — or book without paying and our team will reach out to finalise the menu and payment.`,
-              `अपनी तारीख पक्की करने के लिए अभी 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें, या नीचे पूरा भुगतान करें — या बिना भुगतान बुक करें, मेन्यू और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।`,
+              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) now to confirm your booking — or choose “Bhojpatra connects you (COD)” below and our team will reach out to finalise the menu and payment.`,
+              `अपनी बुकिंग पक्की करने के लिए अभी 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या नीचे “भोजपत्र आपसे संपर्क करेगा (COD)” चुनें, हमारी टीम मेन्यू और भुगतान तय करने के लिए संपर्क करेगी।`,
             )}
           </p>
         )}
       </div>
 
-      {/* Choose how to pay — UPI / QR (online now), COD or "Bhojpatra connects
-          you" (arranged later). UPI/QR can settle a 10% advance or the full
-          amount up front. */}
+      {/* Choose how to pay — pay the 10% advance online (UPI ID / QR) to confirm
+          right here, or "Bhojpatra connects you (COD)" to book now and settle
+          later. The online path records the advance and confirms in one click. */}
       <PaymentBox
         t={t}
         bookingId={bookingId}
@@ -3012,6 +3131,7 @@ function StepConfirm({
         paidAmount={paidAmount}
         onPaid={onPaid}
         customerName={customerName}
+        customerPhone={customerPhone}
         payMethod={payMethod}
         setPayMethod={setPayMethod}
         eventDate={eventDate}
@@ -3026,15 +3146,20 @@ function StepConfirm({
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={confirming}
-          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
-        >
-          {confirming
-            ? t("Confirming…", "पुष्टि हो रही है…")
-            : t("Confirm Booking", "बुकिंग पक्की करें")}
-        </button>
+        {/* The online (UPI) path confirms straight from its "Pay & Confirm"
+            button, so this submit only shows for the pay-later Connect flow, or
+            as a retry once an advance has already been recorded. */}
+        {(payMethod === "Connect" || paidAmount > 0) && (
+          <button
+            type="submit"
+            disabled={confirming}
+            className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+          >
+            {confirming
+              ? t("Confirming…", "पुष्टि हो रही है…")
+              : t("Confirm Booking", "बुकिंग पक्की करें")}
+          </button>
+        )}
         <a
           href={whatsappHref}
           target="_blank"

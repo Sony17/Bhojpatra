@@ -10,7 +10,7 @@
  * Bhojpatra team over WhatsApp (`referralPayoutHref`).
  */
 
-import type { PartnerRole } from "@/lib/session";
+import type { PartnerRole, PartnerMembership } from "@/lib/session";
 
 /** Bhojpatra partner WhatsApp line — same number used on the partner landing. */
 export const WHATSAPP_NUMBER = "919918359017";
@@ -21,6 +21,33 @@ export const PARTNER_ROLE_LABEL: Record<PartnerRole, string> = {
   individual: "Individual Referrer",
   venue: "Venue Owner",
 };
+
+/**
+ * Partner roles that do person-to-person referral and therefore must not credit
+ * their own booking. A Venue Owner earns when someone books their venue (a
+ * place, not a person), so self-referral prevention deliberately targets only
+ * the Individual Referrer and Event Planner roles.
+ */
+export const SELF_REFERRAL_ROLES: PartnerRole[] = ["individual", "planner"];
+
+/**
+ * True when `code` is one of this account's OWN referral codes for a role that
+ * can't self-refer — i.e. applying it would credit the booker for their own
+ * booking. Case- and whitespace-insensitive. A customer (no memberships), an
+ * unrelated code, or a Venue Owner code all read as "not a self-referral".
+ */
+export function isSelfReferral(
+  code: string,
+  memberships: PartnerMembership[] | undefined,
+): boolean {
+  const norm = code.trim().toUpperCase();
+  if (!norm || !memberships?.length) return false;
+  return memberships.some(
+    (m) =>
+      SELF_REFERRAL_ROLES.includes(m.type) &&
+      m.referralCode.trim().toUpperCase() === norm,
+  );
+}
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no easily-confused chars
 
