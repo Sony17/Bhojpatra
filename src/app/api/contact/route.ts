@@ -5,6 +5,7 @@ import {
   type EnquiryRecord,
 } from "@/lib/enquiries";
 import { isValidEmail, isValidPhone, normalizePhone } from "@/lib/validate";
+import { sendEnquiryAlert } from "@/lib/email";
 import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,8 @@ export async function POST(request: Request) {
 
   try {
     await addEnquiry(record);
+    // Alert the owners so a new enquiry is actioned promptly (best-effort).
+    await sendEnquiryAlert(record);
   } catch (err) {
     console.error("Failed to persist enquiry", err);
     return Response.json(

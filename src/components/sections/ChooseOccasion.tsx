@@ -55,7 +55,7 @@ export default function ChooseOccasion() {
           {occasions.map((occasion: Occasion) => (
             <div
               key={occasion.id}
-              className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-[22.5%] lg:w-[calc((100%-7.5rem)/6)]"
+              className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-xl sm:w-[22.5%] lg:w-[calc((100%-7.5rem)/6)]"
             >
               <div className="relative aspect-[9/10] w-full">
                 <Image
@@ -66,9 +66,9 @@ export default function ChooseOccasion() {
                   className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
                 />
                 {/* Darken so the name reads on the photo, like the reference */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/15" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
-                  <span className="font-display text-sm font-semibold leading-tight text-white drop-shadow-sm sm:text-base">
+                  <span className="font-display text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
                     {occasion.name}
                   </span>
                 </div>

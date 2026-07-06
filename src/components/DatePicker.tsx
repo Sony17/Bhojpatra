@@ -32,6 +32,7 @@ export default function DatePicker({
   buttonClassName = "px-5 py-3.5 pr-11 text-sm",
   iconClassName = "right-4",
   direction = "down",
+  align = "left",
   defaultDaysAhead,
   onChange,
 }: {
@@ -41,6 +42,9 @@ export default function DatePicker({
   buttonClassName?: string;
   iconClassName?: string;
   direction?: "up" | "down";
+  /** Horizontal anchor for the calendar popup — keeps the wide panel on-screen
+   *  when the trigger is a narrow, middle-of-row field (mobile hero). */
+  align?: "left" | "center" | "right";
   /** Pre-select a date this many days from today (computed client-side). */
   defaultDaysAhead?: number;
   onChange?: (date: Date) => void;
@@ -134,7 +138,13 @@ export default function DatePicker({
         <div
           role="dialog"
           aria-label={ariaLabel}
-          className={`animate-rise absolute left-0 z-50 w-[19rem] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)] ${
+          className={`animate-rise absolute z-50 w-[19rem] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)] ${
+            align === "right"
+              ? "right-0"
+              : align === "center"
+                ? "left-1/2 -ml-[9.5rem]"
+                : "left-0"
+          } ${
             direction === "up"
               ? "bottom-[calc(100%+0.5rem)]"
               : "top-[calc(100%+0.5rem)]"

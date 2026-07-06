@@ -70,8 +70,8 @@ function findAnswer(input: string, lang: Lang): string {
   const hit = KNOWLEDGE.find((k) => k.keywords.some((w) => text.includes(w)));
   if (hit) return lang === "hi" ? hit.answerHi : hit.answer;
   return lang === "hi"
-    ? "मुझे इसका पूरा भरोसा नहीं है — लेकिन हमारी टीम तुरंत मदद कर सकती है। नीचे “WhatsApp पर चैट करें” दबाएं। 🙏"
-    : "I'm not fully sure about that one — but our team can help right away. Tap “Chat on WhatsApp” below and we'll get you sorted. 🙏";
+    ? "हमारी टीम तुरंत मदद कर सकती है। नीचे “WhatsApp पर चैट करें” दबाएं। 🙏"
+    : "Our team can help right away. Tap “Chat on WhatsApp” below and we'll get you sorted. 🙏";
 }
 
 /* Collapsible FAQ shortcuts — tapping one drops the answer straight into chat.
@@ -174,13 +174,27 @@ export default function FloatingChat() {
           note: note.trim() || undefined,
         }),
       });
-      if (!res.ok) throw new Error("request failed");
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+      // Surface the server's specific reason (e.g. an invalid number) instead
+      // of a generic failure, matching the promo/contact forms.
+      if (!res.ok || !data?.ok) {
+        setCbError(
+          data?.error ??
+            t(
+              "Couldn't send your request. Please try again.",
+              "आपका अनुरोध नहीं भेजा जा सका। कृपया फिर से प्रयास करें।",
+            ),
+        );
+        return;
+      }
       setCbDone(true);
     } catch {
       setCbError(
         t(
-          "Couldn't send your request. Please try again.",
-          "आपका अनुरोध नहीं भेजा जा सका। कृपया फिर से प्रयास करें।",
+          "Couldn't send your request. Please check your connection.",
+          "आपका अनुरोध नहीं भेजा जा सका। कृपया अपना कनेक्शन जांचें।",
         ),
       );
     } finally {
@@ -231,14 +245,16 @@ export default function FloatingChat() {
       { from: "user", text: lang === "hi" ? faq.qHi : faq.q },
       { from: "bot", text: lang === "hi" ? k.answerHi : k.answer },
     ]);
+    // Collapse the shortcuts once one is picked so the answer takes focus.
+    setFaqOpen(false);
   }
 
   return (
     <div className="fixed bottom-24 right-5 z-[60] flex flex-col items-end gap-3 lg:bottom-6 lg:right-6">
-      {/* ── Chat panel — scaled to 80% from the bottom-right so it grows up
+      {/* ── Chat panel — scaled to 96% from the bottom-right so it grows up
           from the launcher without nudging the launcher off the corner. ── */}
       {open && (
-        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] origin-bottom-right scale-[0.8] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
+        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] origin-bottom-right scale-[0.96] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
@@ -538,15 +554,15 @@ export default function FloatingChat() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
-        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
+        className="relative flex h-[2.4rem] w-[2.4rem] items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-[2.8rem] sm:w-[2.8rem]"
       >
         {!open && <span className="absolute inset-0 animate-ping rounded-2xl bg-maroon/40" />}
         {open ? (
-          <svg viewBox="0 0 24 24" className="relative h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+          <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-[1.2rem] sm:w-[1.2rem]" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         ) : (
-          <HeadsetIcon className="relative h-7 w-7 sm:h-8 sm:w-8" />
+          <HeadsetIcon className="relative h-[1.4rem] w-[1.4rem] sm:h-[1.6rem] sm:w-[1.6rem]" />
         )}
       </button>
     </div>

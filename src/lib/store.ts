@@ -56,6 +56,45 @@ function getSql(): NeonQueryFunction<false, false> {
   return sqlClient;
 }
 
+// Neon's serverless database autosuspends when idle, so the first query after a
+// lull can hit a cold connection and fail once. Since there's no file fallback,
+// that single blip would otherwise 500 the request (e.g. a support-callback that
+// then shows "Couldn't send your request"). A short backoff-and-retry turns the
+// transient hiccup into a success. All our operations are idempotent
+// (upsert/delete/select), so re-running a query is always safe.
+function isTransient(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("terminated") ||
+    msg.includes("socket") ||
+    msg.includes("network") ||
+    msg.includes("connection")
+  );
+}
+
+async function runQuery(
+  text: string,
+  params: unknown[] = [],
+): Promise<Record<string, unknown>[]> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return (await getSql().query(text, params)) as Record<string, unknown>[];
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 2 || !isTransient(err)) throw err;
+      // 150ms, then 300ms — enough for a Neon cold-start to settle.
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 // The tables we own. Store table names are interpolated into SQL (they can't be
 // bound as parameters), so this whitelist is what keeps that interpolation safe
 // — a store may only ever name one of these literals, never external input.
@@ -102,7 +141,7 @@ export function createStore<T>(opts: {
   const keyOf = (r: T) => String((r as Record<string, unknown>)[idField]);
 
   async function dbUpsert(record: T): Promise<void> {
-    await getSql().query(
+    await runQuery(
       `insert into ${table} (id, data) values ($1, $2::jsonb)
        on conflict (id) do update set data = excluded.data, updated_at = now()`,
       [keyOf(record), JSON.stringify(record)],
@@ -111,14 +150,14 @@ export function createStore<T>(opts: {
 
   return {
     async list() {
-      const rows = await getSql().query(
+      const rows = await runQuery(
         `select data from ${table} order by seq asc`,
       );
       return rows.map((r) => (r as { data: T }).data);
     },
 
     async get(id) {
-      const rows = await getSql().query(
+      const rows = await runQuery(
         `select data from ${table} where id = $1`,
         [id],
       );
@@ -135,7 +174,7 @@ export function createStore<T>(opts: {
     },
 
     async remove(id) {
-      await getSql().query(`delete from ${table} where id = $1`, [id]);
+      await runQuery(`delete from ${table} where id = $1`, [id]);
     },
   };
 }
@@ -147,7 +186,7 @@ export function createStore<T>(opts: {
 export async function readSingleton<T>(
   key: string,
 ): Promise<Partial<T> | null> {
-  const rows = await getSql().query(
+  const rows = await runQuery(
     `select data from settings where key = $1`,
     [key],
   );
@@ -155,7 +194,7 @@ export async function readSingleton<T>(
 }
 
 export async function writeSingleton<T>(key: string, value: T): Promise<void> {
-  await getSql().query(
+  await runQuery(
     `insert into settings (key, data) values ($1, $2::jsonb)
      on conflict (key) do update set data = excluded.data, updated_at = now()`,
     [key, JSON.stringify(value)],
@@ -165,5 +204,5 @@ export async function writeSingleton<T>(key: string, value: T): Promise<void> {
 /** Delete a singleton so the next read falls back to its default. No-op if the
  *  key isn't present. Used by CMS "reset to defaults" actions. */
 export async function deleteSingleton(key: string): Promise<void> {
-  await getSql().query(`delete from settings where key = $1`, [key]);
+  await runQuery(`delete from settings where key = $1`, [key]);
 }

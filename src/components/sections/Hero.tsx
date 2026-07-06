@@ -7,6 +7,7 @@ import DatePicker from "@/components/DatePicker";
 import { ShieldCheck, PriceTag, ClipboardCheck, Headset } from "@/components/icons";
 import { occasions, cities } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
 /** Local YYYY-MM-DD (matches the <input type="date"> value on /book). */
@@ -20,25 +21,39 @@ export default function Hero() {
   const { lang, t } = useLang();
   const { hero } = useHomeContent();
 
+  // Admin-managed serviceable locations, plus a free-text "Other" fallback so
+  // customers outside the listed cities/states can still enter their own.
+  const locations = useLocations();
+  const locationOptions = [
+    ...locations,
+    { id: OTHER_LOCATION_ID, name: t("Other", "अन्य"), nameHi: "अन्य" },
+  ];
+
   // Booking selections, carried into /book as query params.
   const [occasionId, setOccasionId] = useState(occasions[0].id);
   const [cityId, setCityId] = useState(cities[0].id);
+  const [customCity, setCustomCity] = useState("");
   const [date, setDate] = useState<Date | null>(null);
 
+  const isOtherCity = cityId === OTHER_LOCATION_ID;
   const bookParams = new URLSearchParams({ occasion: occasionId, city: cityId });
+  if (isOtherCity && customCity.trim()) bookParams.set("loc", customCity.trim());
   if (date) bookParams.set("date", toYmd(date));
   const bookHref = `/book?${bookParams.toString()}`;
 
   // Occasion / date / location + CTA — one unified white search bar, per the
   // reference mock: labelled fields separated by hairlines, CTA on the right
   // edge of the same pill.
-  const fieldLabel = "block text-xs font-semibold text-ink";
+  const fieldLabel = "block truncate text-xs font-semibold text-ink";
   const divider = (
-    <span aria-hidden="true" className="hidden w-px self-stretch bg-maroon/15 lg:block" />
+    <span aria-hidden="true" className="block w-px self-stretch bg-maroon/15" />
   );
+  // One horizontal row at every breakpoint — three selectors sharing the pill
+  // with the CTA on the right edge. On phones the fields tighten and the CTA
+  // shrinks to a magnifier; the full label returns from `sm` up.
   const bookingBar = (
-    <div className="flex w-full flex-col gap-1 rounded-2xl border border-maroon/20 bg-white p-2.5 shadow-[0_18px_45px_-18px_rgba(185,32,37,0.35)] transition-shadow focus-within:border-maroon/40 lg:flex-row lg:items-stretch lg:gap-0 lg:rounded-[1.6rem]">
-      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+    <div className="flex w-full flex-row items-stretch gap-0 rounded-2xl border border-maroon/20 bg-white p-1.5 shadow-[0_18px_45px_-18px_rgba(185,32,37,0.35)] transition-shadow focus-within:border-maroon/40 sm:p-2.5 lg:rounded-[1.6rem]">
+      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         <BrandSelect
           className="mt-0.5"
@@ -46,9 +61,10 @@ export default function Hero() {
           placeholder={t("Select Occasion", "अवसर चुनें")}
           ariaLabel={t("Select Occasion", "अवसर चुनें")}
           icon="chevron"
-          buttonClassName="py-0.5 pr-8 text-sm"
+          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
+          align="left"
           defaultId={occasions[0].id}
           onChange={(o) => setOccasionId(o.id)}
         />
@@ -56,15 +72,16 @@ export default function Hero() {
 
       {divider}
 
-      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Date", "तारीख")}</span>
         <DatePicker
           className="mt-0.5"
           placeholder={t("Select Date", "तारीख चुनें")}
           ariaLabel={t("Select Date", "तारीख चुनें")}
-          buttonClassName="py-0.5 pr-8 text-sm"
+          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
+          align="center"
           defaultDaysAhead={21}
           onChange={(d) => setDate(d)}
         />
@@ -72,17 +89,18 @@ export default function Hero() {
 
       {divider}
 
-      <div className="min-w-0 flex-1 px-3 py-2 lg:px-4">
+      <div className="min-w-0 flex-1 px-2 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Location", "लोकेशन")}</span>
         <BrandSelect
           className="mt-0.5"
-          options={cities}
+          options={locationOptions}
           placeholder={t("Select Location", "लोकेशन चुनें")}
           ariaLabel={t("Select Location", "लोकेशन चुनें")}
           icon="mapPin"
-          buttonClassName="py-0.5 pr-8 text-sm"
+          buttonClassName="py-0.5 pr-6 text-sm lg:pr-8"
           iconClassName="right-1"
           direction="up"
+          align="right"
           defaultId={cities[0].id}
           onChange={(c) => setCityId(c.id)}
         />
@@ -90,9 +108,25 @@ export default function Hero() {
 
       <a
         href={bookHref}
-        className="btn-sheen flex shrink-0 items-center justify-center rounded-xl bg-maroon px-5 py-3.5 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] lg:ml-2 lg:whitespace-nowrap lg:rounded-[1.15rem]"
+        aria-label={t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
+        className="btn-sheen ml-1 flex shrink-0 items-center justify-center self-center rounded-xl bg-maroon px-3.5 py-3 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:self-stretch sm:px-5 sm:py-3.5 lg:ml-2 lg:rounded-[1.15rem]"
       >
-        {t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-5 w-5 sm:hidden"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <span className="hidden whitespace-nowrap sm:inline">
+          {t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
+        </span>
       </a>
     </div>
   );
@@ -162,20 +196,39 @@ export default function Hero() {
         </div>
 
         {/* Search bar — slightly wider than the headline column. */}
-        <div className="animate-rise delay-3 mt-6 max-w-3xl">{bookingBar}</div>
+        <div className="animate-rise delay-3 mt-6 max-w-3xl">
+          {bookingBar}
+          {isOtherCity && (
+            <input
+              type="text"
+              value={customCity}
+              onChange={(e) => setCustomCity(e.target.value)}
+              placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+              aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+              className="mt-2 w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
+            />
+          )}
+        </div>
 
-        {/* Trust strip keeps to the same column width as the search bar. */}
-        <div className="animate-rise delay-4 mt-10 grid max-w-3xl grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+        {/* Trust strip keeps to the same column width as the search bar. On
+            phones all four sit in one row as compact stacked chips; from `sm`
+            they return to the horizontal icon + title/subtitle layout. */}
+        <div className="animate-rise delay-4 mt-10 grid max-w-3xl grid-cols-4 gap-x-2 gap-y-5 sm:gap-x-4">
           {trustBadges.map(({ Icon, title, sub }) => (
-            <div key={title} className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-sm">
+            <div
+              key={title}
+              className="flex flex-col items-center gap-1.5 text-center sm:flex-row sm:items-center sm:gap-3 sm:text-left"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-sm sm:h-10 sm:w-10">
                 <Icon className="h-4 w-4 text-maroon" />
               </span>
               <span className="min-w-0 [text-shadow:0_0_6px_rgba(255,255,255,0.95),0_0_14px_rgba(255,255,255,0.85),0_0_26px_rgba(255,255,255,0.7)]">
-                <span className="block whitespace-nowrap text-[13px] font-bold text-ink">
+                <span className="block text-[11px] font-bold leading-tight text-ink sm:whitespace-nowrap sm:text-[13px]">
                   {title}
                 </span>
-                <span className="block whitespace-nowrap text-xs text-ink-soft">{sub}</span>
+                <span className="hidden text-xs text-ink-soft sm:block sm:whitespace-nowrap">
+                  {sub}
+                </span>
               </span>
             </div>
           ))}

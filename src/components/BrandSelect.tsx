@@ -23,6 +23,7 @@ export default function BrandSelect({
   buttonClassName = "px-5 py-3.5 pr-11 text-sm",
   iconClassName = "right-4",
   direction = "down",
+  align = "left",
   defaultId,
   onChange,
 }: {
@@ -34,6 +35,9 @@ export default function BrandSelect({
   buttonClassName?: string;
   iconClassName?: string;
   direction?: "up" | "down";
+  /** Horizontal anchor for the popup — keeps a wide menu on-screen when the
+   *  trigger is narrow (e.g. the compact mobile hero fields). */
+  align?: "left" | "center" | "right";
   /** Pre-select the option with this id on first render. */
   defaultId?: string;
   /** Fired with the chosen option whenever the selection changes. */
@@ -88,7 +92,13 @@ export default function BrandSelect({
         <ul
           role="listbox"
           aria-label={ariaLabel}
-          className={`animate-rise absolute left-0 right-0 z-50 max-h-72 overflow-auto rounded-2xl border border-maroon/40 bg-white p-1.5 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)] ${
+          className={`animate-rise absolute z-50 max-h-72 w-60 max-w-[calc(100vw-2.5rem)] overflow-auto rounded-2xl border border-maroon/40 bg-white p-1.5 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)] ${
+            align === "right"
+              ? "right-0"
+              : align === "center"
+                ? "left-1/2 -ml-[7.5rem]"
+                : "left-0"
+          } ${
             direction === "up"
               ? "bottom-[calc(100%+0.5rem)]"
               : "top-[calc(100%+0.5rem)]"

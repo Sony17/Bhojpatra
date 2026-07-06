@@ -3,11 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { navLinks } from "@/lib/data";
-import { useLang } from "@/lib/i18n";
+import { useLang, type Lang } from "@/lib/i18n";
 import { logout, dashboardPath, useSession } from "@/lib/session";
-import LanguageToggle from "./LanguageToggle";
 import MobileTabBar from "./MobileTabBar";
+
+/** Language choices surfaced inside the profile menu. */
+const LANG_OPTIONS: { id: Lang; full: string }[] = [
+  { id: "en", full: "English" },
+  { id: "hi", full: "हिंदी" },
+];
 
 /** Role icons for the "Partner With Us" dropdown — drawn to match each option. */
 const partnerIcons: Record<string, React.ReactNode> = {
@@ -41,7 +47,7 @@ const partnerIcons: Record<string, React.ReactNode> = {
 function Logo() {
   const { t } = useLang();
   return (
-    <Link href="/" className="flex flex-col gap-0 leading-none">
+    <Link href="/" className="flex shrink-0 flex-col gap-0 leading-none">
       <Image
         src="/bhojpatra-logo.png"
         alt="Bhojpatra"
@@ -57,129 +63,92 @@ function Logo() {
   );
 }
 
-/** Compact auth control for the mobile header — the bottom tab bar is full
- *  with primary destinations, so Log In / account lives up here next to the
- *  language toggle. Signed out → a Log In button; signed in → an avatar that
- *  links to the dashboard, with a Log Out action beside it. */
-function MobileAccount() {
-  const { t } = useLang();
+/**
+ * Unified profile menu — one avatar trigger opens a single dropdown holding the
+ * account actions (Log In / Sign Up when signed out; My Dashboard / Log Out when
+ * signed in) plus the English/Hindi language switch. Used on both the desktop
+ * header and the mobile header strip; pass `compact` on mobile to show just the
+ * avatar (the name label is dropped to save space). Click / Escape / outside-tap
+ * close it, so it works on touch where hover menus don't.
+ */
+function ProfileMenu({ compact = false }: { compact?: boolean }) {
+  const { t, lang, setLang } = useLang();
   const router = useRouter();
   const session = useSession();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  if (!session) {
-    return (
-      <Link
-        href="/login"
-        aria-label={t("Log In", "लॉग इन")}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="8" r="3.5" />
-          <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
-        </svg>
-      </Link>
-    );
-  }
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
-  const name = session.name?.trim();
-  const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
-  const initial = (name || label).charAt(0).toUpperCase();
+  const name = session?.name?.trim();
+  const typeLabel = session
+    ? session.type === "vendor"
+      ? t("Vendor", "वेंडर")
+      : session.type === "partner"
+        ? t("Partner", "पार्टनर")
+        : t("Customer", "ग्राहक")
+    : "";
+  const displayName = name || typeLabel || t("Account", "अकाउंट");
+  const initial = displayName.charAt(0).toUpperCase();
 
   async function handleLogout() {
+    setOpen(false);
     await logout();
     router.push("/");
   }
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-maroon/40 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
-      <Link
-        href={dashboardPath(session.type)}
-        aria-label={t("My Dashboard", "मेरा डैशबोर्ड")}
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-xs font-semibold text-cream transition-transform duration-200 active:scale-95"
-      >
-        {initial}
-      </Link>
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
-        onClick={handleLogout}
-        aria-label={t("Log Out", "लॉग आउट")}
-        className="flex h-7 w-7 items-center justify-center rounded-full text-maroon transition-colors duration-200 hover:bg-maroon/5 active:scale-95"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3M10 8l-4 4 4 4M6 12h11" />
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-/** Signed-in account menu — name + dashboard/logout, shown in place of the
- *  Log In / Sign Up buttons once a session exists. */
-function AccountMenu() {
-  const { t } = useLang();
-  const router = useRouter();
-  const session = useSession();
-
-  if (!session) {
-    return (
-      <>
-        <Link
-          href="/login"
-          className="rounded-md border border-maroon/40 px-5 py-2 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
-        >
-          {t("Log In", "लॉग इन")}
-        </Link>
-        <Link
-          href="/signup"
-          className="btn-sheen rounded-md bg-maroon px-5 py-2 text-sm font-medium text-cream shadow-sm transition-all duration-200 hover:bg-maroon-dark hover:shadow-md active:scale-95"
-        >
-          {t("Sign Up", "साइन अप")}
-        </Link>
-      </>
-    );
-  }
-
-  const name = session.name?.trim();
-  const label = name || (session.type === "vendor" ? t("Vendor", "वेंडर") : t("Customer", "ग्राहक"));
-  const initial = (name || label).charAt(0).toUpperCase();
-
-  async function handleLogout() {
-    await logout();
-    router.push("/");
-  }
-
-  return (
-    <div className="group relative">
-      <button
-        type="button"
-        className="flex items-center gap-2 rounded-md border border-maroon/40 py-1.5 pl-1.5 pr-3 text-sm font-medium text-maroon transition-all duration-200 hover:bg-maroon/5 active:scale-95"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("Account menu", "अकाउंट मेन्यू")}
+        className="flex items-center gap-2 rounded-full border border-maroon/40 bg-white/80 py-1 pl-1 pr-2.5 text-sm font-medium text-maroon shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-maroon/5 active:scale-95"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-cream">
-          {initial}
+          {session ? (
+            <span className="text-xs font-semibold">{initial}</span>
+          ) : (
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+            </svg>
+          )}
         </span>
-        <span className="max-w-[10rem] truncate">{label}</span>
+        {!compact && (
+          <span className="max-w-[9rem] truncate">
+            {session ? displayName : t("Account", "अकाउंट")}
+          </span>
+        )}
         <svg
           aria-hidden="true"
           viewBox="0 0 12 12"
-          className="h-3 w-3 transition-transform group-hover:-rotate-180"
+          className={"h-3 w-3 transition-transform " + (open ? "-rotate-180" : "")}
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
@@ -188,27 +157,105 @@ function AccountMenu() {
         </svg>
       </button>
 
-      <div className="invisible absolute right-0 top-full z-50 w-52 translate-y-2 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-        <ul className="overflow-hidden rounded-xl border border-maroon-dark/40 bg-cream shadow-xl shadow-maroon/20">
-          <li className="border-b border-maroon/10">
-            <Link
-              href={dashboardPath(session.type)}
-              className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5 hover:text-maroon"
-            >
-              {t("My Dashboard", "मेरा डैशबोर्ड")}
-            </Link>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="block w-full px-4 py-3 text-left text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
-            >
-              {t("Log Out", "लॉग आउट")}
-            </button>
-          </li>
-        </ul>
-      </div>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-60">
+          <ul className="overflow-hidden rounded-2xl border border-maroon/15 bg-white shadow-xl shadow-maroon/20">
+            {session ? (
+              <li className="flex items-center gap-3 border-b border-maroon/10 px-4 py-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream">
+                  {initial}
+                </span>
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate text-sm font-semibold text-maroon">
+                    {displayName}
+                  </span>
+                  <span className="text-xs text-maroon/70">{typeLabel}</span>
+                </span>
+              </li>
+            ) : (
+              <li className="border-b border-maroon/10 px-4 py-3">
+                <p className="text-sm font-semibold text-maroon">
+                  {t("Welcome to Bhojpatra", "भोजपत्र में आपका स्वागत है")}
+                </p>
+                <p className="text-xs text-maroon/70">
+                  {t("Log in or create an account", "लॉग इन करें या अकाउंट बनाएँ")}
+                </p>
+              </li>
+            )}
+
+            {session ? (
+              <>
+                <li className="border-b border-maroon/10">
+                  <Link
+                    href={dashboardPath(session.type)}
+                    onClick={() => setOpen(false)}
+                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
+                  >
+                    {t("My Dashboard", "मेरा डैशबोर्ड")}
+                  </Link>
+                </li>
+                <li className="border-b border-maroon/10">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="block w-full px-4 py-3 text-left text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
+                  >
+                    {t("Log Out", "लॉग आउट")}
+                  </button>
+                </li>
+              </>
+            ) : (
+              <>
+                <li className="border-b border-maroon/10">
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
+                  >
+                    {t("Log In", "लॉग इन")}
+                  </Link>
+                </li>
+                <li className="border-b border-maroon/10">
+                  <Link
+                    href="/signup"
+                    onClick={() => setOpen(false)}
+                    className="block px-4 py-3 text-sm font-medium text-maroon transition-colors hover:bg-maroon/5"
+                  >
+                    {t("Sign Up", "साइन अप")}
+                  </Link>
+                </li>
+              </>
+            )}
+
+            <li className="px-3 py-3">
+              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-maroon/60">
+                {t("Language", "भाषा")}
+              </p>
+              <div className="flex gap-1.5">
+                {LANG_OPTIONS.map((o) => {
+                  const active = lang === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setLang(o.id)}
+                      aria-pressed={active}
+                      className={
+                        "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors " +
+                        (active
+                          ? "bg-maroon text-cream"
+                          : "border border-maroon/30 text-maroon hover:bg-maroon/5")
+                      }
+                    >
+                      {o.full}
+                    </button>
+                  );
+                })}
+              </div>
+            </li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -227,7 +274,7 @@ export default function Header() {
       <div className="animate-fade mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5">
         <Logo />
 
-        <nav className="hidden items-center gap-7 text-sm font-semibold text-ink lg:flex [&_a]:[text-shadow:0_1px_3px_rgba(255,255,255,0.6)]">
+        <nav className="hidden flex-1 items-center justify-center gap-7 text-sm font-semibold text-ink lg:flex [&_a]:[text-shadow:0_1px_3px_rgba(255,255,255,0.6)]">
           {navLinks.map((link) => (
             <div key={link.label} className="group relative">
               <a
@@ -290,18 +337,16 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Desktop auth buttons + language toggle */}
-        <div className="hidden items-center gap-2.5 lg:flex">
-          <LanguageToggle />
-          <AccountMenu />
+        {/* Unified profile menu (account + language) — desktop */}
+        <div className="hidden items-center lg:flex">
+          <ProfileMenu />
         </div>
 
-        {/* Mobile auth + language toggle — primary nav lives in the bottom tab bar */}
-        <div className="flex items-center gap-2.5 lg:hidden">
-          <LanguageToggle />
-          <MobileAccount />
+        {/* Unified profile menu (account + language) — mobile; primary nav lives
+            in the bottom tab bar */}
+        <div className="flex items-center lg:hidden">
+          <ProfileMenu compact />
         </div>
-
       </div>
 
       <MobileTabBar />

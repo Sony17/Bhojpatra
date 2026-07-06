@@ -12,6 +12,7 @@ import type { Lead } from "@/app/api/leads/route";
 import type { PartnerRecord } from "@/app/api/partners/route";
 import type { VendorApplicationRecord } from "@/lib/vendorApplications";
 import type { VenueRecord } from "@/lib/venues";
+import type { EnquiryRecord } from "@/lib/enquiries";
 
 export interface AlertField {
   label: string;
@@ -176,6 +177,22 @@ export async function sendLeadAlert(lead: Lead): Promise<void> {
       ...(lead.topic ? [{ label: "Topic", value: lead.topic }] : []),
       ...(lead.note ? [{ label: "Details", value: lead.note }] : []),
     ],
+  });
+}
+
+export async function sendEnquiryAlert(record: EnquiryRecord): Promise<void> {
+  const base = siteBaseUrl();
+  await sendAlert({
+    subject: `New enquiry — ${record.subject} — ${record.name}`,
+    heading: `New contact enquiry (${record.id})`,
+    fields: [
+      { label: "Name", value: record.name },
+      { label: "Email", value: record.email },
+      { label: "Phone", value: `+91 ${record.phone}` },
+      { label: "Subject", value: record.subject },
+      { label: "Message", value: record.message },
+    ],
+    link: base ? { label: "Open Enquiries", url: `${base}/admin/enquiries` } : null,
   });
 }
 

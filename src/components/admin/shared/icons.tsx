@@ -24,6 +24,7 @@ export {
   ShieldCheck,
   Users,
   Calendar,
+  Mail,
   ArrowRight,
   ChevronDown,
   Star,

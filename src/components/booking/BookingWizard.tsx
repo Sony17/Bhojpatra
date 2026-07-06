@@ -53,6 +53,11 @@ import {
   type Coupon,
   type VendorListing,
 } from "@/lib/data";
+import {
+  useLocations,
+  OTHER_LOCATION_ID,
+  type LocationOption,
+} from "@/lib/locations";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -169,6 +174,9 @@ export default function BookingWizard() {
   const [guests, setGuests] = useState<number>(100);
   const [eventDate, setEventDate] = useState<string>("");
   const [cityId, setCityId] = useState<string>("");
+  // Free-text location typed when the customer picks "Other" (their city/state
+  // isn't in the admin-managed list).
+  const [customCity, setCustomCity] = useState<string>("");
   const [venue, setVenue] = useState<string>("");
   // When a venue is selected from the catalogue (/book?venue=ID), we resolve it
   // to its name (above) plus a numeric booking fee that's folded into the feast
@@ -187,6 +195,19 @@ export default function BookingWizard() {
   const [referrerName, setReferrerName] = useState<string>("");
   const [referrerType, setReferrerType] = useState<string>("");
 
+  // Admin-managed serviceable locations (falls back to the seed list). resolveCity
+  // turns the selected id — or the free-text "Other" value — into a
+  // {name,nameHi} used across the invoice / receipt / summary.
+  const locations = useLocations();
+  const resolveCity = (id: string): City | undefined => {
+    if (!id) return undefined;
+    if (id === OTHER_LOCATION_ID) {
+      const name = customCity.trim();
+      return name ? { id, name, nameHi: name } : undefined;
+    }
+    return locations.find((c) => c.id === id) ?? cities.find((c) => c.id === id);
+  };
+
   // Prefill occasion / date / city / venue from the Hero booking bar's query
   // params (e.g. /book?occasion=wedding&date=2026-07-19&city=lucknow). Read in
   // an effect so the server and first client render match — and so we don't
@@ -202,7 +223,15 @@ export default function BookingWizard() {
     const guestsParam = sp.get("guests");
     if (occ && occasions.some((o) => o.id === occ)) setOccasionId(occ);
     if (date) setEventDate(date);
-    if (city && cities.some((c) => c.id === city)) setCityId(city);
+    // City may be a seed id, an admin-added id (resolved once the list loads),
+    // or the "Other" sentinel carrying a typed name in `loc`.
+    const loc = sp.get("loc")?.trim();
+    if (city === OTHER_LOCATION_ID || loc) {
+      setCityId(OTHER_LOCATION_ID);
+      if (loc) setCustomCity(loc);
+    } else if (city) {
+      setCityId(city);
+    }
     if (venueParam) setVenue(venueParam);
     const g = Number(guestsParam);
     if (g >= MIN_GUESTS && g <= MAX_GUESTS) setGuests(Math.round(g));
@@ -605,7 +634,7 @@ export default function BookingWizard() {
 
   const buildReceipt = (): string => {
     const occ = occasions.find((o) => o.id === occasionId);
-    const cityObj = cities.find((c) => c.id === cityId);
+    const cityObj = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
     const menuLines = activeCategories
       .map((cat) => {
@@ -675,7 +704,7 @@ export default function BookingWizard() {
   // is stored on the booking so it can be re-downloaded from My Bookings.
   const buildInvoice = (): InvoiceData => {
     const occ = occasions.find((o) => o.id === occasionId);
-    const cityObj = cities.find((c) => c.id === cityId);
+    const cityObj = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
 
     const menu: InvoiceData["menu"] = activeCategories
@@ -758,7 +787,7 @@ export default function BookingWizard() {
 
   const buildWhatsAppMessage = (): string => {
     const occ = occasions.find((o) => o.id === occasionId);
-    const city = cities.find((c) => c.id === cityId);
+    const city = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
     const menuLines = activeCategories
       .map((cat) => {
@@ -854,7 +883,7 @@ export default function BookingWizard() {
 
     setConfirming(true);
     const occ = occasions.find((o) => o.id === occasionId);
-    const cityObj = cities.find((c) => c.id === cityId);
+    const cityObj = resolveCity(cityId);
     // Unique vendor names across every chosen course, plus any vendor assigned
     // to a selected add-on / counter.
     const vendorNames = Array.from(
@@ -1005,6 +1034,9 @@ export default function BookingWizard() {
         setEventDate={setEventDate}
         cityId={cityId}
         setCityId={setCityId}
+        customCity={customCity}
+        setCustomCity={setCustomCity}
+        locations={locations}
         guests={guests}
         setGuests={setGuests}
         paxMin={paxMin}
@@ -1099,7 +1131,7 @@ export default function BookingWizard() {
               occasion={occasions.find((o) => o.id === occasionId)}
               packageName={selectedPackage?.name ?? ""}
               eventDate={eventDate}
-              city={cities.find((c) => c.id === cityId)}
+              city={resolveCity(cityId)}
               venue={venue}
               guests={guests}
               categories={activeCategories}
@@ -1161,7 +1193,7 @@ export default function BookingWizard() {
               bookingId={bookingId}
               occasion={occasions.find((o) => o.id === occasionId)}
               eventDate={eventDate}
-              city={cities.find((c) => c.id === cityId)}
+              city={resolveCity(cityId)}
               venue={venue}
               guests={guests}
               grandTotal={grandTotal}
@@ -1328,6 +1360,9 @@ function EventBar({
   setEventDate,
   cityId,
   setCityId,
+  customCity,
+  setCustomCity,
+  locations,
   guests,
   setGuests,
   paxMin,
@@ -1343,6 +1378,9 @@ function EventBar({
   setEventDate: (v: string) => void;
   cityId: string;
   setCityId: (v: string) => void;
+  customCity: string;
+  setCustomCity: (v: string) => void;
+  locations: LocationOption[];
   guests: number;
   setGuests: (v: number) => void;
   paxMin: number;
@@ -1408,12 +1446,23 @@ function EventBar({
             className={fieldClass}
           >
             <option value="">{t("Select city", "शहर चुनें")}</option>
-            {cities.map((c) => (
+            {locations.map((c) => (
               <option key={c.id} value={c.id}>
                 {lang === "hi" ? c.nameHi : c.name}
               </option>
             ))}
+            <option value={OTHER_LOCATION_ID}>{t("Other", "अन्य")}</option>
           </select>
+          {cityId === OTHER_LOCATION_ID && (
+            <input
+              type="text"
+              value={customCity}
+              onChange={(e) => setCustomCity(e.target.value)}
+              placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+              aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
+              className={fieldClass}
+            />
+          )}
         </label>
 
         <label className="block">
@@ -1607,10 +1656,44 @@ function StepMenu({
   const selectedIds = categoryVendor[cat.id] ?? [];
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
   const picks = itemsFor(cat.id);
+  // Whether this package lets a guest pick more than one dish in at least one
+  // course. Package-wide (not the active course) so the capability note shows
+  // the moment the menu opens — the first course (e.g. Welcome) may allow only
+  // one dish even on tiers that open a wide spread elsewhere.
+  const multiDish = categories.some((c) => allowanceFor(c.id) > 1);
 
   return (
     <div className="min-w-0">
       <SectionHead title={t("Build Your Menu", "अपना मेन्यू बनाएं")} />
+
+      {/* What this package unlocks — a package that lets the guest mix several
+          vendors and/or pick a spread of dishes says so up front, so they know
+          they can build a broader menu rather than assuming one vendor / one
+          dish. Package-wide, always visible on the menu step (the per-course
+          "N/N PICKED" counter below still spells out each course's exact cap). */}
+      {(multiVendor || multiDish) && (
+        <p className="mb-6 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+          <span aria-hidden="true" className="text-maroon">
+            ★
+          </span>
+          <span>
+            {multiVendor && multiDish
+              ? t(
+                  "This package lets you mix multiple vendors and pick multiple dishes across your courses.",
+                  "इस पैकेज में आप कई वेंडर मिला सकते हैं और अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
+                )
+              : multiVendor
+                ? t(
+                    "This package lets you mix multiple vendors across your courses.",
+                    "इस पैकेज में आप अपने कोर्सेज़ में कई वेंडर मिला सकते हैं।",
+                  )
+                : t(
+                    "This package lets you pick multiple dishes across your courses.",
+                    "इस पैकेज में आप अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
+                  )}
+          </span>
+        </p>
+      )}
 
       {/* Category tabs */}
       <div className="flex flex-wrap gap-2">
@@ -1642,34 +1725,6 @@ function StepMenu({
           );
         })}
       </div>
-
-      {/* What this package lets you do for the active course — a package that
-          allows several vendors and/or more than one dish per course says so
-          up front, so the guest knows they can mix stalls and pick a spread
-          rather than assuming one vendor / one dish. */}
-      {(multiVendor || allowance > 1) && (
-        <p className="mt-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
-          <span aria-hidden="true" className="text-maroon">
-            ★
-          </span>
-          <span>
-            {multiVendor && allowance > 1
-              ? t(
-                  `This package lets you mix multiple vendors and pick up to ${allowance} dishes for this course.`,
-                  `इस पैकेज में आप कई वेंडर मिला सकते हैं और इस कोर्स के लिए ${allowance} तक व्यंजन चुन सकते हैं।`,
-                )
-              : multiVendor
-                ? t(
-                    "This package lets you pick multiple vendors for this course.",
-                    "इस पैकेज में आप इस कोर्स के लिए कई वेंडर चुन सकते हैं।",
-                  )
-                : t(
-                    `This package lets you pick up to ${allowance} dishes for this course.`,
-                    `इस पैकेज में आप इस कोर्स के लिए ${allowance} तक व्यंजन चुन सकते हैं।`,
-                  )}
-          </span>
-        </p>
-      )}
 
       {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
       <h3 className="mt-7 font-display text-lg font-semibold text-maroon">
