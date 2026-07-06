@@ -376,12 +376,14 @@ export default function PackageScrollCard({
 
         {/* Action area centered on the scroll's bottom red fold (home page) —
             matches the parchment's horizontal span so it lines up with the menu
-            column. The fold band's centreline sits 7.98% up the artwork
-            (measured from pack.png, band ≈ 88.3–95.8%); anchoring the pill's
-            bottom at that line minus half its own 28px height keeps it dead
-            centre on the band at every card size. */}
+            column. The fold band's visible centreline sits 7.8% up the artwork
+            (band ≈ 88.4–96.0% measured from the RENDERED card, which sits a
+            hair below the raw pack.png rows once scaling and the drop-shadow
+            filter soften its edges); anchoring the pill's bottom at that line
+            minus half its own 28px height keeps it dead centre on the band at
+            every card size. */}
         {ctaOnFold && cta && (
-          <div className="absolute bottom-[calc(7.98%-14px)] left-[13%] right-[21%] z-20 flex justify-center">
+          <div className="absolute bottom-[calc(7.8%-14px)] left-[13%] right-[21%] z-20 flex justify-center">
             {cta}
           </div>
         )}
