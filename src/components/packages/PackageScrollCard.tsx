@@ -100,13 +100,63 @@ export default function PackageScrollCard({
     });
   const popular = tier.popular === true;
   const premium = tier.id === "platinum";
+  const silver = tier.id === "silver";
   const tierName = lang === "hi" ? tier.nameHi : tier.name;
   const pax = lang === "hi" ? tier.paxHi : tier.pax;
+  const bestFor = lang === "hi" ? tier.bestForHi : tier.bestFor;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
 
   // Group the flat feature list into course segments, then write the whole
   // menu out — every course header and every item is shown (no collapsing).
   const segments = buildCourseSegments(tier.features);
+
+  // Whole-scroll metallic finish — the palette's stand-ins for the metals:
+  // brand white reads silver, brand cream reads gold, and brand black reads
+  // platinum. Each is diagonal banding (the metallic read) masked to the patra
+  // silhouette, BLENDED into the artwork rather than painted over it —
+  // multiply deepens gold/platinum and soft-light brightens silver, so the
+  // scroll's red stays saturated instead of fading under a translucent wash.
+  // Custom (and any future tier) stays plain.
+  // Gold gets two layers: a normal-blend cream underlay that re-establishes a
+  // truly golden parchment (the artwork is semi-transparent, so without it the
+  // pink glow behind the card tints the parchment rosy), then the multiply
+  // banding for metallic depth. Silver and platinum need one layer each.
+  const finish: { band: string; blend: "normal" | "multiply" | "soft-light" }[] =
+    popular
+      ? [
+          {
+            band: "linear-gradient(150deg, rgba(240,208,158,0.5), rgba(240,208,158,0.3) 45%, rgba(240,208,158,0.45))",
+            blend: "normal",
+          },
+          {
+            band: "linear-gradient(150deg, rgba(240,208,158,0.85), rgba(240,208,158,0.45) 38%, rgba(240,208,158,0.8) 52%, rgba(240,208,158,0.4) 66%, rgba(240,208,158,0.75))",
+            blend: "multiply",
+          },
+        ]
+      : premium
+        ? [
+            {
+              band: "linear-gradient(150deg, rgba(0,0,0,0.16), rgba(0,0,0,0.05) 38%, rgba(0,0,0,0.14) 52%, rgba(0,0,0,0.04) 66%, rgba(0,0,0,0.12))",
+              blend: "multiply",
+            },
+          ]
+        : silver
+          ? [
+              {
+                band: "linear-gradient(150deg, rgba(255,255,255,0.95), rgba(255,255,255,0.5) 38%, rgba(255,255,255,0.9) 52%, rgba(255,255,255,0.45) 66%, rgba(255,255,255,0.85))",
+                blend: "soft-light",
+              },
+            ]
+          : [];
+  // Clips an overlay to the scroll artwork's silhouette.
+  const scrollMask = {
+    WebkitMaskImage: "url(/pack.png)",
+    maskImage: "url(/pack.png)",
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskSize: "100% 100%",
+    maskSize: "100% 100%",
+  } as const;
 
   return (
     <div
@@ -118,17 +168,18 @@ export default function PackageScrollCard({
       ].join(" ")}
     >
       {/* Popular ribbon — golden (brand cream) so the Gold tier reads gold,
-          set off from the parchment by a thin maroon ring. */}
+          set off from the parchment by a thin maroon ring. Floated well above
+          the artwork so it doesn't crowd the scroll's lace band. */}
       {popular && (
-        <span className="absolute -top-2 z-30 rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
+        <span className="absolute -top-5 z-30 whitespace-nowrap rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
           {t("Popular Choice", "लोकप्रिय विकल्प")}
         </span>
       )}
 
-      {/* Premium ribbon — solid maroon with a star so Platinum reads as the top
-          tier, distinct from Gold's golden "Popular" pill. */}
+      {/* Premium ribbon — solid brand black ("onyx") with a star so Platinum
+          reads as the top tier, distinct from Gold's golden "Popular" pill. */}
       {premium && (
-        <span className="absolute -top-2 z-30 inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-cream shadow-sm">
+        <span className="absolute -top-5 z-30 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-ink px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-cream shadow-sm">
           ★ {t("Premium", "प्रीमियम")}
         </span>
       )}
@@ -136,8 +187,6 @@ export default function PackageScrollCard({
       {/* ── Patra scroll artwork with the entire menu written on it ── */}
       <div
         className={`relative w-full transition duration-300 ${
-          premium ? "premium-shimmer" : ""
-        } ${
           selected
             ? "[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.45))]"
             : "[filter:drop-shadow(0_10px_22px_rgba(0,0,0,0.25))] group-hover:[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.32))]"
@@ -153,19 +202,47 @@ export default function PackageScrollCard({
           priority={priority || popular}
         />
 
-        {/* Writable parchment area — Gold (popular) gets a soft cream / golden
-            wash so its background reads gold within the brand palette. */}
-        <div
-          className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}
-          style={
-            popular
-              ? {
-                  background:
-                    "radial-gradient(120% 85% at 50% 28%, rgba(240,208,158,0.55), rgba(240,208,158,0.12) 62%, rgba(240,208,158,0) 100%)",
-                }
-              : undefined
-          }
-        >
+        {/* Tier finish, masked to the scroll artwork so it follows the patra's
+            silhouette exactly — no rectangular wash. Blended into the artwork
+            (multiply / soft-light) so the scroll's red stays rich. Rendered
+            before the parchment content so the menu text keeps its ink colour. */}
+        {finish.map((layer, i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              ...scrollMask,
+              background: layer.band,
+              mixBlendMode: layer.blend,
+            }}
+          />
+        ))}
+
+        {/* Platinum-only shimmer sweep — the same mask keeps it inside the
+            scroll's silhouette. The other tiers carry no shine. */}
+        {premium && (
+          <div
+            aria-hidden="true"
+            className="premium-shimmer pointer-events-none absolute inset-0"
+            style={scrollMask}
+          />
+        )}
+
+        {/* Writable parchment area — layout only; tier colour comes from the
+            masked finish overlay above. */}
+        <div className={`absolute ${PARCHMENT} flex flex-col overflow-hidden`}>
+          {/* Selected marker — a maroon check chip pinned to the parchment's
+              top-right corner so the chosen scroll is unmistakable. */}
+          {selected && (
+            <span
+              aria-hidden="true"
+              className="absolute right-0 top-0 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-maroon text-[10px] font-bold leading-none text-cream shadow-sm"
+            >
+              ✓
+            </span>
+          )}
+
           {/* Title + price */}
           <h3 className="text-center font-display text-2xl leading-none tracking-wide text-maroon">
             {tierName}
@@ -175,8 +252,26 @@ export default function PackageScrollCard({
             {lang === "hi" ? tier.unitHi : tier.unit}
           </p>
           {pax && (
-            <p className="mx-auto mt-1.5 rounded-full border border-maroon/30 px-2 py-0.5 text-center text-[9px] font-semibold tracking-wide text-maroon">
+            <p
+              className={`mx-auto mt-1.5 rounded-full px-2 py-0.5 text-center text-[9px] font-semibold tracking-wide ${
+                premium
+                  ? "bg-ink text-cream"
+                  : silver
+                    ? "border border-ink/40 bg-white text-ink"
+                    : "border border-maroon/30 text-maroon"
+              }`}
+            >
               {pax}
+            </p>
+          )}
+
+          {/* Occasion guidance — which celebrations the tier suits best. */}
+          {bestFor && (
+            <p className="mt-1.5 text-center text-[9px] leading-snug text-ink-soft">
+              <span className="font-semibold text-maroon">
+                {t("Perfect for", "इनके लिए परफेक्ट")}:
+              </span>{" "}
+              {bestFor}
             </p>
           )}
 
@@ -218,19 +313,30 @@ export default function PackageScrollCard({
                       toggleCourse(seg.index);
                     }}
                     aria-expanded={hasItems ? isOpen : undefined}
-                    className="flex w-full items-start gap-2 text-left text-[11px] font-semibold leading-tight text-maroon"
+                    className="flex w-full items-start gap-2 rounded text-left text-[11px] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
                   >
                     <RhombusMarker />
                     <span className="flex-1">{headingLabel}</span>
                     {hasItems && (
-                      <span
-                        aria-hidden="true"
-                        className={`mt-0.5 shrink-0 leading-none transition-transform duration-200 ${
-                          isOpen ? "rotate-90" : ""
-                        }`}
-                      >
-                        ›
-                      </span>
+                      <>
+                        {/* Item count — only when more than one line is hidden,
+                            so a lone detail row doesn't read as a quantity. */}
+                        {seg.items.length > 1 && (
+                          <span className="mt-px shrink-0 rounded-full border border-maroon/30 px-1.5 text-[9px] font-bold leading-tight text-maroon">
+                            {seg.items.length}
+                          </span>
+                        )}
+                        {/* Plus → rotates to a cross when open; a clearer
+                            "there's more" affordance than a sideways chevron. */}
+                        <span
+                          aria-hidden="true"
+                          className={`mt-0.5 shrink-0 text-sm leading-none transition-transform duration-200 ${
+                            isOpen ? "rotate-45" : ""
+                          }`}
+                        >
+                          +
+                        </span>
+                      </>
                     )}
                   </button>
                   {/* Items — revealed only when the course is expanded. */}
@@ -270,9 +376,12 @@ export default function PackageScrollCard({
 
         {/* Action area centered on the scroll's bottom red fold (home page) —
             matches the parchment's horizontal span so it lines up with the menu
-            column, and sits on the fold band (≈89–96% of the artwork). */}
+            column. The fold band's centreline sits 7.98% up the artwork
+            (measured from pack.png, band ≈ 88.3–95.8%); anchoring the pill's
+            bottom at that line minus half its own 28px height keeps it dead
+            centre on the band at every card size. */}
         {ctaOnFold && cta && (
-          <div className="absolute bottom-[5%] left-[13%] right-[21%] z-20 flex justify-center">
+          <div className="absolute bottom-[calc(7.98%-14px)] left-[13%] right-[21%] z-20 flex justify-center">
             {cta}
           </div>
         )}

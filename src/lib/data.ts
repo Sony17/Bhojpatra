@@ -60,6 +60,10 @@ export interface PackageTier {
   /** Guest-count range the package serves (e.g. "50–300 Guests"). */
   pax?: string;
   paxHi?: string;
+  /** Occasions the tier suits best, shown as a "Perfect for" line on the
+      package card (e.g. "Birthdays · Pujas · Family Gatherings"). */
+  bestFor?: string;
+  bestForHi?: string;
   /** Min / max guests this package supports — enforced in the booking flow. */
   minPax?: number;
   maxPax?: number;
@@ -313,6 +317,8 @@ export const packages: PackageTier[] = [
     taglineHi: "फिक्स्ड मेन्यू",
     pax: "50 – 300 Guests",
     paxHi: "50 – 300 मेहमान",
+    bestFor: "Birthdays · Pujas · Family Gatherings",
+    bestForHi: "जन्मदिन · पूजा · पारिवारिक समारोह",
     minPax: 50,
     maxPax: 300,
     image: img("photo-1490645935967-10de6ba17061"),
@@ -343,6 +349,8 @@ export const packages: PackageTier[] = [
     taglineHi: "लोकप्रिय विकल्प",
     pax: "150 – 10,000 Guests",
     paxHi: "150 – 10,000 मेहमान",
+    bestFor: "Weddings · Receptions · Engagements",
+    bestForHi: "शादी · रिसेप्शन · सगाई",
     minPax: 150,
     maxPax: 10_000,
     image: img("photo-1543339308-43e59d6b73a6"),
@@ -370,6 +378,8 @@ export const packages: PackageTier[] = [
     taglineHi: "प्रीमियम अनुभव",
     pax: "50 – 50,000 Guests",
     paxHi: "50 – 50,000 मेहमान",
+    bestFor: "Grand Weddings · Galas · VIP Events",
+    bestForHi: "भव्य शादियाँ · गाला · वीआईपी इवेंट",
     minPax: 50,
     maxPax: 50_000,
     image: img("photo-1600891964599-f61ba0e24092"),
@@ -394,6 +404,8 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "Build Your Own",
     taglineHi: "खुद बनाएं",
+    bestFor: "Any Occasion, Your Way",
+    bestForHi: "कोई भी अवसर, आपके अंदाज़ में",
     image: img("photo-1467003909585-2f8a72700288"),
     features: [
       { label: "Build Your Own Menu", labelHi: "अपना खुद का मेन्यू बनाएं" },

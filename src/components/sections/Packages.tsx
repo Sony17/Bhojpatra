@@ -70,8 +70,11 @@ export default function Packages() {
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
                     aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen flex h-7 w-7 items-center justify-center rounded-full bg-cream text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 active:scale-95"
+                    className="btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full bg-cream px-4 text-[11px] font-semibold tracking-wide text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 active:scale-95"
                   >
+                    <span className="font-display leading-none">
+                      {t("Book", "बुक करें")} {tierName}
+                    </span>
                     <span aria-hidden="true" className="text-sm leading-none">
                       →
                     </span>

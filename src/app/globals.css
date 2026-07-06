@@ -322,7 +322,10 @@ html {
   }
 
   /* Continuous diagonal shimmer sweeping across the Platinum scroll — marks it
-     as the premium tier. A cream/white light band pans left→right forever. */
+     as the premium tier. A white light band pans left→right forever. Applied
+     to the card's masked tier-finish overlay, so the sweep is clipped to the
+     scroll artwork's silhouette; plain translucent white (no blend mode — the
+     mask isolates blending, which would mute the band to near-invisible). */
   .premium-shimmer::before {
     content: "";
     position: absolute;
@@ -330,7 +333,7 @@ html {
     background: linear-gradient(
       110deg,
       transparent 35%,
-      rgba(255, 255, 255, 0.55) 50%,
+      rgba(255, 255, 255, 0.45) 50%,
       transparent 65%
     );
     background-size: 220% 100%;
@@ -338,7 +341,6 @@ html {
     animation: bp-shimmer 3.4s linear infinite;
     pointer-events: none;
     z-index: 20;
-    mix-blend-mode: overlay;
   }
   @media (prefers-reduced-motion: reduce) {
     .premium-shimmer::before {
