@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLang, type Lang } from "@/lib/i18n";
 import { useAccountMenuState } from "@/lib/accountMenu";
+import { useCompareTrayState } from "@/lib/compareTray";
+import { useBookingBarState } from "@/lib/bookingBar";
 
 /* Bhojpatra contact — mirrors the placeholder in the Footer. Swap for the
    real WhatsApp business number later. */
@@ -139,6 +141,14 @@ function PhoneIcon({ className }: { className?: string }) {
 export default function FloatingChat() {
   const { lang, t } = useLang();
   const accountMenu = useAccountMenuState();
+  const compareTray = useCompareTrayState();
+  const bookingBar = useBookingBarState();
+  // A sticky dock pinned above the tab bar — the compare tray or the booking
+  // bar (never both at once). Lift the launcher clear of whichever is taller.
+  const dockLift = Math.max(
+    compareTray.visible ? compareTray.height : 0,
+    bookingBar.visible ? bookingBar.height : 0,
+  );
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"chat" | "callback">("chat");
   const [messages, setMessages] = useState<Message[]>([
@@ -259,7 +269,9 @@ export default function FloatingChat() {
           ? {
               transform: `translateY(calc(-${accountMenu.height}px - env(safe-area-inset-bottom) - 1rem))`,
             }
-          : undefined
+          : dockLift > 0
+            ? { transform: `translateY(-${dockLift + 8}px)` }
+            : undefined
       }
     >
       {/* ── Chat panel — scaled to 96% from the bottom-right so it grows up
@@ -565,7 +577,7 @@ export default function FloatingChat() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
-        className="relative flex h-[2.4rem] w-[2.4rem] items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-[2.8rem] sm:w-[2.8rem]"
+        className="relative flex h-[2.7rem] w-[2.7rem] items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-[2.8rem] sm:w-[2.8rem]"
       >
         {!open && <span className="absolute inset-0 animate-ping rounded-2xl bg-maroon/40" />}
         {open ? (

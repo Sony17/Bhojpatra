@@ -397,21 +397,21 @@ export const packages: PackageTier[] = [
   },
   {
     id: "custom",
-    name: "Custom",
-    nameHi: "कस्टम",
+    name: "Single Stall",
+    nameHi: "सिंगल स्टॉल",
     price: "Your Price",
     unit: "/ Plate",
     unitHi: "/ प्लेट",
-    tagline: "Build Your Own",
-    taglineHi: "खुद बनाएं",
+    tagline: "One Stall · One Vendor",
+    taglineHi: "एक स्टॉल · एक वेंडर",
     bestFor: "Any Occasion, Your Way",
     bestForHi: "कोई भी अवसर, आपके अंदाज़ में",
     image: img("photo-1467003909585-2f8a72700288"),
     features: [
+      { label: "Single Stall · Single Vendor", labelHi: "सिंगल स्टॉल · सिंगल वेंडर" },
       { label: "Build Your Own Menu", labelHi: "अपना खुद का मेन्यू बनाएं" },
       { label: "Pick Any Cuisines & Courses", labelHi: "कोई भी व्यंजन और कोर्स चुनें" },
       { label: "Add Live Counters & Extras", labelHi: "लाइव काउंटर और एक्स्ट्रा जोड़ें" },
-      { label: "Choose Your Vendor", labelHi: "अपना वेंडर चुनें" },
       { label: "Pay Only For What You Select", labelHi: "सिर्फ़ अपनी पसंद के लिए भुगतान करें" },
     ],
   },
@@ -936,16 +936,18 @@ export interface AddOn {
   price: number;
   perPlate: boolean;
   icon: string;
+  /** Counter photo shown on the extras step card. */
+  image: string;
 }
 
 export const addOns: AddOn[] = [
-  { id: "pan", name: "Pan Counter", nameHi: "पान काउंटर", description: "Live paan with assorted fillings.", price: 40, perPlate: true, icon: "🍃" },
-  { id: "chaat", name: "Chaat Station", nameHi: "चाट स्टेशन", description: "Golgappa, tikki & papdi chaat, live.", price: 60, perPlate: true, icon: "🥘" },
-  { id: "live", name: "Live Counters", nameHi: "लाइव काउंटर", description: "Dosa, pasta & tandoor made fresh.", price: 90, perPlate: true, icon: "🍳" },
-  { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨" },
-  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳" },
-  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️" },
-  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉" },
+  { id: "pan", name: "Pan Counter", nameHi: "पान काउंटर", description: "Live paan with assorted fillings.", price: 40, perPlate: true, icon: "🍃", image: img("photo-1606491956689-2ea866880c84", 600) },
+  { id: "chaat", name: "Chaat Station", nameHi: "चाट स्टेशन", description: "Golgappa, tikki & papdi chaat, live.", price: 60, perPlate: true, icon: "🥘", image: img("photo-1490645935967-10de6ba17061", 600) },
+  { id: "live", name: "Live Counters", nameHi: "लाइव काउंटर", description: "Dosa, pasta & tandoor made fresh.", price: 90, perPlate: true, icon: "🍳", image: img("photo-1567188040759-fb8a883dc6d8", 600) },
+  { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨", image: img("photo-1565557623262-b51c2513a641", 600) },
+  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600) },
+  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600) },
+  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600) },
 ];
 
 export interface ComparisonVendor {
@@ -1012,6 +1014,10 @@ export interface CategoryVendor {
   name: string;
   rating: number;
   reviews: number;
+  /** Vendor-declared Google rating (0–5) + review count, imported at
+   *  registration and shown as a "Google" badge on their card. */
+  googleRating?: number;
+  googleReviews?: number;
   /** Per-plate amount added on top of the package base when this vendor is chosen. */
   perPlate: number;
   image: string;
@@ -1307,6 +1313,10 @@ export interface VendorListing {
   tiers: ("Silver" | "Gold" | "Platinum")[];
   rating: number;
   reviews: number;
+  /** Vendor-declared Google rating (0–5) + review count, imported at
+   *  registration and shown as a "Google" badge on the card. */
+  googleRating?: number;
+  googleReviews?: number;
   city: string;
   state: string;
   cuisines: string[];

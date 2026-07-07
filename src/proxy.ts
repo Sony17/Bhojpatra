@@ -31,6 +31,7 @@ function isProtected(pathname: string): boolean {
   )
     return true;
   if (pathname === "/bookings") return true; // My Bookings (invoice stays public)
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return true;
   return false;
 }
 
@@ -60,5 +61,6 @@ export const config = {
     "/vendor/:path*",
     "/partner/:path*",
     "/bookings/:path*",
+    "/dashboard/:path*",
   ],
 };

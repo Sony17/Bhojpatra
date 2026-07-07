@@ -57,6 +57,8 @@ export interface BookingVendorReview {
   vendorName: string;
   rating: number;
   comment: string;
+  /** Public URLs of photos the reviewer attached (mirrored for prefill). */
+  images?: string[];
   createdAt: string;
 }
 

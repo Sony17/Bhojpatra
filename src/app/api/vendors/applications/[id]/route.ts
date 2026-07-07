@@ -5,8 +5,10 @@ import {
   writeVendorApplications,
 } from "@/lib/vendorApplications";
 import { readKycDocuments, writeKycDocuments } from "@/lib/kyc";
+import { listLiveVendorRecords, saveVendor } from "@/lib/vendorMenus";
 import { requireRole } from "@/lib/auth";
-import type { VerificationStatus } from "@/lib/admin/types";
+import { parseTiers } from "@/lib/admin/types";
+import type { VendorTier, VerificationStatus } from "@/lib/admin/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,10 @@ function isStatus(v: unknown): v is VerificationStatus {
  *   { status }                  → set the whole application's verification state
  *                                 (approving also verifies every document)
  *   { document: { kind, status } } → flip a single KYC document's state
+ *   { tiers }                   → assign the marketplace tiers this vendor gets
+ *                                 (may accompany a status change to approve +
+ *                                 assign in one call). Propagates to the linked
+ *                                 live vendor so the public catalog reflects it.
  */
 export async function PATCH(
   request: Request,
@@ -44,6 +50,16 @@ export async function PATCH(
   }
 
   const doc = (body.document ?? null) as Record<string, unknown> | null;
+
+  // Tier assignment can ride along with a status change (approve + assign) or
+  // arrive on its own while the vendor is still pending. Reject an explicit but
+  // empty selection — a vendor must sit in at least one tier.
+  const tiersProvided = Array.isArray(body.tiers);
+  const tiers = parseTiers(body.tiers);
+  if (tiersProvided && tiers.length === 0) {
+    return Response.json({ error: "Assign at least one tier." }, { status: 400 });
+  }
+  if (tiers.length) record.assignedTiers = tiers;
 
   if (doc) {
     const kind = doc.kind;
@@ -73,9 +89,9 @@ export async function PATCH(
         await syncKycStatus(d.docId, "Verified");
       }
     }
-  } else {
+  } else if (!tiers.length) {
     return Response.json(
-      { error: "Provide a status or a document update." },
+      { error: "Provide a status, tiers or a document update." },
       { status: 400 },
     );
   }
@@ -88,6 +104,18 @@ export async function PATCH(
       { error: "Something went wrong. Please try again." },
       { status: 500 },
     );
+  }
+
+  // Mirror the tier decision onto the vendor's live catalog record (if they've
+  // already built a profile). Vendors approved before publishing a menu inherit
+  // it later at menu-save time. Best-effort: a sync failure must not fail the
+  // review write that already succeeded.
+  if (record.assignedTiers?.length && (tiers.length || record.status === "Verified")) {
+    try {
+      await syncLiveVendorTiers(record.email, record.assignedTiers);
+    } catch (err) {
+      console.error("Failed to sync assigned tiers to live vendor", err);
+    }
   }
 
   return Response.json({ application: toAdminApplication(record) });
@@ -115,6 +143,25 @@ export async function DELETE(
     );
   }
   return Response.json({ ok: true });
+}
+
+/** Push the admin's tier decision onto the vendor's live catalog record, matched
+ *  by login email. No-op when the vendor hasn't published a profile yet — they
+ *  inherit `assignedTiers` when they next save their menu. */
+async function syncLiveVendorTiers(
+  email: string,
+  tiers: VendorTier[],
+): Promise<void> {
+  const target = email.trim().toLowerCase();
+  if (!target) return;
+  const records = await listLiveVendorRecords();
+  const live = records.find(
+    (r) => r.ownerEmail?.trim().toLowerCase() === target,
+  );
+  if (!live) return;
+  live.tiers = tiers;
+  live.updatedAt = new Date().toISOString();
+  await saveVendor(live);
 }
 
 /** Keep the KYC file store's status in step with the review decision. */

@@ -3,6 +3,7 @@ import {
   formatVenuePrice,
   venueSlug,
   sanitizeVenueImage,
+  isVenuePublic,
   type VenueRecord,
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
@@ -35,15 +36,20 @@ export async function GET(request: Request) {
     .map((v) => ({ ...v, image: sanitizeVenueImage(v.image) }));
 
   if (id) {
-    const venue = venues.find((v) => v.id === id) ?? null;
+    // The single-venue lookup feeds the public detail page + booking flow, so
+    // only ever resolve an approved venue — a pending/hidden one is unbookable.
+    const venue = venues.find((v) => v.id === id && isVenuePublic(v)) ?? null;
     return Response.json({ venue });
   }
   if (owner) {
+    // The owner's own dashboard sees every venue it published, pending ones
+    // included, so it can show each one's approval state.
     return Response.json({
       venues: venues.filter((v) => v.ownerCode === owner).reverse(),
     });
   }
-  return Response.json({ venues: venues.slice().reverse() });
+  // Public catalogue: approved (and grandfathered legacy) venues only.
+  return Response.json({ venues: venues.filter(isVenuePublic).reverse() });
 }
 
 export async function POST(request: Request) {
@@ -118,6 +124,9 @@ export async function POST(request: Request) {
     ownerName: str(b.ownerName),
     phone: str(b.phone),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    // A brand-new venue needs admin approval before it lists; an edit keeps the
+    // current approval state (an owner can't self-approve or un-hide by saving).
+    status: existing ? existing.status : "Pending",
   };
 
   try {

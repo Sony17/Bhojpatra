@@ -9,6 +9,7 @@ import {
   registrationCounters,
 } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import ThemedSelect from "@/components/ThemedSelect";
 
 const WHATSAPP = "https://wa.me/919918359017";
@@ -48,36 +49,6 @@ const STEPS = [
   "Review",
 ] as const;
 
-/* ── Eye icon (mirrors AuthForm) ─────────────────────────────────────── */
-
-function EyeIcon({ off }: { off: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {off ? (
-        <>
-          <path d="M3 3l18 18" />
-          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-          <path d="M9.4 5.2A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7-.4 1-1.2 2.1-2.3 3.1M6.1 6.1C3.9 7.4 2.4 9.6 2 12c.5 1.4 2 3.2 4 4.4A9.3 9.3 0 0 0 12 19c1 0 1.9-.1 2.8-.4" />
-        </>
-      ) : (
-        <>
-          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-          <circle cx="12" cy="12" r="3" />
-        </>
-      )}
-    </svg>
-  );
-}
-
 /* ── Chip ────────────────────────────────────────────────────────────── */
 
 function Chip({
@@ -106,6 +77,52 @@ function Chip({
   );
 }
 
+/* ── Free-text adder for chip groups (extra cities / counters) ───────── */
+
+function CustomAdder({
+  placeholder,
+  onAdd,
+}: {
+  placeholder: string;
+  onAdd: (value: string) => void;
+}) {
+  const { t } = useLang();
+  const [draft, setDraft] = useState<string>("");
+
+  const submit = () => {
+    const value = draft.trim();
+    if (!value) return;
+    onAdd(value);
+    setDraft("");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder={placeholder}
+        className={inputClass + " max-w-xs"}
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!draft.trim()}
+        className="rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        + {t("Add", "जोड़ें")}
+      </button>
+    </div>
+  );
+}
+
 /* ── Deterministic vendor id (no Math.random / Date.now) ─────────────── */
 
 function deriveVendorId(seed: string): string {
@@ -118,6 +135,11 @@ function deriveVendorId(seed: string): string {
 
 export default function VendorRegister() {
   const { t } = useLang();
+  // The caterer reaches this wizard already signed in (it's step 2 of the
+  // vendor sign-up), so identity comes from their account — no re-entered
+  // credentials. Email is bound to the account (it links the application to
+  // their login); the owner name is prefilled but editable.
+  const session = useSession();
 
   const stepLabels = [
     t("Business", "बिज़नेस"),
@@ -158,16 +180,23 @@ export default function VendorRegister() {
 
   // Step 1 — business
   const [businessName, setBusinessName] = useState<string>("");
+  // Owner name defaults to the account holder but stays editable — `ownerTouched`
+  // switches from the session default to the vendor's own edit.
   const [ownerName, setOwnerName] = useState<string>("");
+  const [ownerTouched, setOwnerTouched] = useState<boolean>(false);
   const [mobile, setMobile] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [confirmPassword, setConfirmPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showConfirm, setShowConfirm] = useState<boolean>(false);
   const [city, setCity] = useState<string>("");
   const [state, setState] = useState<string>("");
   const [cuisines, setCuisines] = useState<string[]>([]);
+
+  // Identity comes from the signed-in account (the wizard is step 2 of sign-up):
+  // email is read-only and bound to the login; owner name is prefilled from it.
+  const email = session?.email ?? "";
+  const ownerNameValue = ownerTouched ? ownerName : (session?.name ?? "");
+  // Optional Google reputation the caterer imports so their card doesn't read
+  // "New" before their first Bhojpatra review — shown as a "Google" badge.
+  const [googleRating, setGoogleRating] = useState<string>("");
+  const [googleReviews, setGoogleReviews] = useState<string>("");
 
   // Step 2 — KYC
   const [gstNumber, setGstNumber] = useState<string>("");
@@ -189,6 +218,7 @@ export default function VendorRegister() {
   ]);
   const [minGuests, setMinGuests] = useState<string>("");
   const [maxGuests, setMaxGuests] = useState<string>("");
+  const [maxEventsPerDay, setMaxEventsPerDay] = useState<string>("");
 
   // Step 4 — photos & coverage
   const [galleryNames, setGalleryNames] = useState<string[]>([]);
@@ -210,6 +240,40 @@ export default function VendorRegister() {
         : [...list, value],
     );
   };
+
+  // Add a serviceable city the vendor typed in. If it matches a preset city we
+  // reuse that city's id (so the chip lights up instead of duplicating); an
+  // unlisted city is stored by its literal name (cityName() falls back to it).
+  const addCustomCity = (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
+    const match = cities.find(
+      (c) => c.name.toLowerCase() === name.toLowerCase(),
+    );
+    const value = match ? match.id : name;
+    setServiceCities((prev) => (prev.includes(value) ? prev : [...prev, value]));
+  };
+
+  // Add an add-on counter the vendor typed in — counters are stored by label,
+  // so a custom one is just a label not present in the preset list.
+  const addCustomCounter = (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
+    const match = registrationCounters.find(
+      (c) => c.toLowerCase() === name.toLowerCase(),
+    );
+    const value = match ?? name;
+    setCounters((prev) => (prev.includes(value) ? prev : [...prev, value]));
+  };
+
+  // Vendor-typed entries not covered by the preset chip lists — rendered as
+  // their own removable chips beneath the presets.
+  const customServiceCities = serviceCities.filter(
+    (v) => !cities.some((c) => c.id === v),
+  );
+  const customCounters = counters.filter(
+    (c) => !registrationCounters.includes(c),
+  );
 
   const updatePackage = (
     index: number,
@@ -290,19 +354,14 @@ export default function VendorRegister() {
     if (step === 0) {
       if (
         !businessName.trim() ||
-        !ownerName.trim() ||
+        !ownerNameValue.trim() ||
         !mobile.trim() ||
-        !email.trim() ||
-        !password ||
-        !confirmPassword
+        !email.trim()
       ) {
         return t(
           "Please fill in all required business details.",
           "कृपया सभी आवश्यक बिज़नेस विवरण भरें।",
         );
-      }
-      if (password !== confirmPassword) {
-        return t("Passwords do not match.", "पासवर्ड मेल नहीं खाते।");
       }
       if (!city) return t("Please select your city.", "कृपया अपना शहर चुनें।");
       if (!state) return t("Please select your state.", "कृपया अपना राज्य चुनें।");
@@ -340,10 +399,10 @@ export default function VendorRegister() {
           "हर पैकेज के लिए एक नाम और प्रति-प्लेट मूल्य आवश्यक है।",
         );
       }
-      if (!minGuests.trim() || !maxGuests.trim()) {
+      if (!minGuests.trim() || !maxGuests.trim() || !maxEventsPerDay.trim()) {
         return t(
-          "Please set your minimum and maximum guest capacity.",
-          "कृपया अपनी न्यूनतम और अधिकतम मेहमान क्षमता निर्धारित करें।",
+          "Please set your guest capacity and max events per day.",
+          "कृपया अपनी मेहमान क्षमता और प्रति-दिन अधिकतम इवेंट निर्धारित करें।",
         );
       }
     }
@@ -396,7 +455,7 @@ export default function VendorRegister() {
 
     const payload = {
       business: businessName,
-      owner: ownerName,
+      owner: ownerNameValue,
       email,
       phone: mobile,
       city: city ? cityName(city) : "",
@@ -404,10 +463,13 @@ export default function VendorRegister() {
       cuisines,
       gstNumber,
       fssaiNumber,
+      googleRating,
+      googleReviews,
       docIds,
       packages,
       minGuests,
       maxGuests,
+      maxEventsPerDay,
       serviceCities: serviceCities.map(cityName),
       counters,
     };
@@ -570,9 +632,17 @@ export default function VendorRegister() {
         {/* ── STEP 1 ── */}
         {step === 0 && (
           <div className="flex flex-col gap-4">
-            <h2 className="font-display text-xl text-ink">
-              {t("Business Sign-Up", "बिज़नेस साइन-अप")}
-            </h2>
+            <div>
+              <h2 className="font-display text-xl text-ink">
+                {t("Business Details", "बिज़नेस विवरण")}
+              </h2>
+              <p className="mt-1 text-sm text-ink-soft">
+                {t(
+                  "Signed in to your Bhojpatra account — no need to set a password again. Just add your business details below.",
+                  "आपके भोजपत्र खाते में साइन इन — पासवर्ड फिर से सेट करने की ज़रूरत नहीं। बस नीचे अपने बिज़नेस विवरण जोड़ें।",
+                )}
+              </p>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
@@ -595,8 +665,11 @@ export default function VendorRegister() {
                 <input
                   id="ownerName"
                   type="text"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
+                  value={ownerNameValue}
+                  onChange={(e) => {
+                    setOwnerTouched(true);
+                    setOwnerName(e.target.value);
+                  }}
                   placeholder={t("Full name", "पूरा नाम")}
                   className={inputClass}
                 />
@@ -616,70 +689,23 @@ export default function VendorRegister() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="email" className={labelClass}>
-                  {t("Email", "ईमेल")}
+                  {t("Account Email", "खाता ईमेल")}
                 </label>
                 <input
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  readOnly
+                  aria-describedby="email-note"
                   placeholder="business@example.com"
-                  className={inputClass}
+                  className={`${inputClass} cursor-not-allowed bg-cream-2/60 text-ink-soft`}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="password" className={labelClass}>
-                  {t("Password", "पासवर्ड")}
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t("At least 8 characters", "कम से कम 8 अक्षर")}
-                    className={`${inputClass} pr-11`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={
-                      showPassword
-                        ? t("Hide password", "पासवर्ड छिपाएं")
-                        : t("Show password", "पासवर्ड दिखाएं")
-                    }
-                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-soft transition-colors hover:text-maroon"
-                  >
-                    <EyeIcon off={showPassword} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="confirmPassword" className={labelClass}>
-                  {t("Confirm Password", "पासवर्ड की पुष्टि करें")}
-                </label>
-                <div className="relative">
-                  <input
-                    id="confirmPassword"
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t("Re-enter your password", "अपना पासवर्ड फिर से दर्ज करें")}
-                    className={`${inputClass} pr-11`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm((v) => !v)}
-                    aria-label={
-                      showConfirm
-                        ? t("Hide password", "पासवर्ड छिपाएं")
-                        : t("Show password", "पासवर्ड दिखाएं")
-                    }
-                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-soft transition-colors hover:text-maroon"
-                  >
-                    <EyeIcon off={showConfirm} />
-                  </button>
-                </div>
+                <span id="email-note" className="text-xs text-ink-soft/70">
+                  {t(
+                    "Your application is linked to this signed-in account.",
+                    "आपका आवेदन इसी साइन-इन खाते से जुड़ा है।",
+                  )}
+                </span>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="city" className={labelClass}>
@@ -724,6 +750,54 @@ export default function VendorRegister() {
                     onClick={() => toggle(c, cuisines, setCuisines)}
                   />
                 ))}
+              </div>
+            </div>
+
+            {/* Optional Google reputation — surfaced as a "Google" badge on the
+                caterer's card so a new listing isn't a blank "New". */}
+            <div className="flex flex-col gap-2 rounded-xl border border-cream-3 bg-cream/30 p-4">
+              <span className={labelClass}>
+                {t("Google Reviews (optional)", "गूगल रिव्यू (वैकल्पिक)")}
+              </span>
+              <p className="text-xs text-ink-soft/80">
+                {t(
+                  "Already rated on Google? Add it and we'll show a Google badge on your card while your Bhojpatra reviews build up.",
+                  "गूगल पर पहले से रेटिंग है? इसे जोड़ें और जब तक आपके भोजपत्र रिव्यू बनते हैं, हम आपके कार्ड पर गूगल बैज दिखाएंगे।",
+                )}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="googleRating" className={labelClass}>
+                    {t("Google Rating (0–5)", "गूगल रेटिंग (0–5)")}
+                  </label>
+                  <input
+                    id="googleRating"
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    inputMode="decimal"
+                    value={googleRating}
+                    onChange={(e) => setGoogleRating(e.target.value)}
+                    placeholder="4.6"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="googleReviews" className={labelClass}>
+                    {t("Number of Google Reviews", "गूगल रिव्यू की संख्या")}
+                  </label>
+                  <input
+                    id="googleReviews"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={googleReviews}
+                    onChange={(e) => setGoogleReviews(e.target.value)}
+                    placeholder="230"
+                    className={inputClass}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -921,35 +995,60 @@ export default function VendorRegister() {
               </button>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="minGuests" className={labelClass}>
-                  {t("Min Guests", "न्यूनतम मेहमान")}
-                </label>
-                <input
-                  id="minGuests"
-                  type="number"
-                  min={0}
-                  value={minGuests}
-                  onChange={(e) => setMinGuests(e.target.value)}
-                  placeholder="50"
-                  className={inputClass}
-                />
+            <div className="flex flex-col gap-2">
+              <span className={labelClass}>
+                {t("Capacity", "क्षमता")}
+              </span>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="minGuests" className={labelClass}>
+                    {t("Min Guests", "न्यूनतम मेहमान")}
+                  </label>
+                  <input
+                    id="minGuests"
+                    type="number"
+                    min={0}
+                    value={minGuests}
+                    onChange={(e) => setMinGuests(e.target.value)}
+                    placeholder="50"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="maxGuests" className={labelClass}>
+                    {t("Max Guests / Event", "अधिकतम मेहमान / इवेंट")}
+                  </label>
+                  <input
+                    id="maxGuests"
+                    type="number"
+                    min={0}
+                    value={maxGuests}
+                    onChange={(e) => setMaxGuests(e.target.value)}
+                    placeholder="2000"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="maxEventsPerDay" className={labelClass}>
+                    {t("Max Events / Day", "अधिकतम इवेंट / दिन")}
+                  </label>
+                  <input
+                    id="maxEventsPerDay"
+                    type="number"
+                    min={0}
+                    value={maxEventsPerDay}
+                    onChange={(e) => setMaxEventsPerDay(e.target.value)}
+                    placeholder="3"
+                    className={inputClass}
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="maxGuests" className={labelClass}>
-                  {t("Max Guests", "अधिकतम मेहमान")}
-                </label>
-                <input
-                  id="maxGuests"
-                  type="number"
-                  min={0}
-                  value={maxGuests}
-                  onChange={(e) => setMaxGuests(e.target.value)}
-                  placeholder="2000"
-                  className={inputClass}
-                />
-              </div>
+              <p className="text-xs text-ink-soft/70">
+                {t(
+                  "How many guests you can serve at one event, and how many events you can cater in a single day.",
+                  "आप एक इवेंट में कितने मेहमानों को सेवा दे सकते हैं, और एक ही दिन में कितने इवेंट संभाल सकते हैं।",
+                )}
+              </p>
             </div>
           </div>
         )}
@@ -1032,7 +1131,24 @@ export default function VendorRegister() {
                     }
                   />
                 ))}
+                {customServiceCities.map((name) => (
+                  <Chip
+                    key={name}
+                    label={name}
+                    active
+                    onClick={() =>
+                      toggle(name, serviceCities, setServiceCities)
+                    }
+                  />
+                ))}
               </div>
+              <CustomAdder
+                placeholder={t(
+                  "Add another city…",
+                  "एक और शहर जोड़ें…",
+                )}
+                onAdd={addCustomCity}
+              />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -1048,7 +1164,22 @@ export default function VendorRegister() {
                     onClick={() => toggle(c, counters, setCounters)}
                   />
                 ))}
+                {customCounters.map((c) => (
+                  <Chip
+                    key={c}
+                    label={c}
+                    active
+                    onClick={() => toggle(c, counters, setCounters)}
+                  />
+                ))}
               </div>
+              <CustomAdder
+                placeholder={t(
+                  "Add another counter…",
+                  "एक और काउंटर जोड़ें…",
+                )}
+                onAdd={addCustomCounter}
+              />
             </div>
           </div>
         )}
@@ -1081,6 +1212,17 @@ export default function VendorRegister() {
                 )}
               />
               <ReviewItem
+                label={t("Capacity", "क्षमता")}
+                value={
+                  minGuests || maxGuests || maxEventsPerDay
+                    ? t(
+                        `${minGuests || "—"}–${maxGuests || "—"} guests · ${maxEventsPerDay || "—"} events/day`,
+                        `${minGuests || "—"}–${maxGuests || "—"} मेहमान · ${maxEventsPerDay || "—"} इवेंट/दिन`,
+                      )
+                    : "—"
+                }
+              />
+              <ReviewItem
                 label={t("Serviceable Cities", "सेवा योग्य शहर")}
                 value={
                   serviceCities.length
@@ -1091,6 +1233,17 @@ export default function VendorRegister() {
               <ReviewItem
                 label={t("Add-On Counters", "ऐड-ऑन काउंटर")}
                 value={counters.length ? counters.join(", ") : "—"}
+              />
+              <ReviewItem
+                label={t("Google Reviews", "गूगल रिव्यू")}
+                value={
+                  googleRating.trim()
+                    ? t(
+                        `${googleRating}★ · ${googleReviews.trim() || "0"} reviews`,
+                        `${googleRating}★ · ${googleReviews.trim() || "0"} रिव्यू`,
+                      )
+                    : "—"
+                }
               />
             </dl>
 

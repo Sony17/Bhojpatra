@@ -21,6 +21,13 @@ import { venues as staticVenues, cities, type Venue } from "@/lib/data";
 export const VENUE_GST_RATE = 0.18;
 export const VENUE_ADVANCE_RATE = 0.1;
 
+/** Approval state for owner-registered venues — a pre-approval model: a newly
+ *  published venue is "Pending" and stays OFF every customer surface (catalogue,
+ *  detail page, booking flow) until an admin marks it "Approved"; "Hidden" is an
+ *  admin takedown. Legacy records saved before approvals carry no status and are
+ *  grandfathered as visible. */
+export type VenueStatus = "Pending" | "Approved" | "Hidden";
+
 /** The fixed venue-type vocabulary used across the seed catalogue + filters. */
 export const VENUE_TYPES = [
   "Banquet Hall",
@@ -55,6 +62,8 @@ export interface VenueRecord {
   ownerName?: string;
   phone?: string;
   createdAt: string;
+  /** Admin approval state (see `VenueStatus`). Absent on legacy records = live. */
+  status?: VenueStatus;
   /** Soft-deleted by its owner; hidden from the catalogue and lookups. */
   deleted?: boolean;
 }
@@ -155,6 +164,13 @@ export function recordToBookable(r: VenueRecord): BookableVenue {
     phone: r.phone,
     registered: true,
   };
+}
+
+/** A venue is visible to customers when its owner hasn't deleted it and an admin
+ *  has approved it. Legacy records (no `status`) predate approvals and stay live
+ *  so nothing already published disappears. */
+export function isVenuePublic(v: VenueRecord): boolean {
+  return !v.deleted && v.status !== "Pending" && v.status !== "Hidden";
 }
 
 /** Merge registered venues ahead of the static seed, de-duped by id. */

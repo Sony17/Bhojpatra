@@ -10,7 +10,7 @@ export default function Footer() {
   const { contact } = useSiteContent();
   return (
     <>
-      <section className="bg-maroon-dark">
+      <section className="hidden bg-maroon-dark lg:block">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-4 border-y border-cream/10 px-5 py-10 text-center sm:gap-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -103,8 +103,8 @@ export default function Footer() {
       </section>
     <footer className="bg-maroon-dark pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-cream/80 lg:pb-0">
       <div className="mx-auto max-w-7xl px-5 py-12">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-center sm:grid-cols-4 sm:gap-x-6 sm:text-left">
-          <div className="col-span-2 flex flex-col items-center sm:col-span-1 sm:items-start">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-6">
+          <div className="flex flex-col items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/bhojpatra-logo1.png"
@@ -137,7 +137,7 @@ export default function Footer() {
             </a>
           </div>
 
-          <div>
+          <div className="hidden sm:block">
             <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Explore", "एक्सप्लोर")}</p>
             <ul className="space-y-2 text-sm">
               {navLinks.map((link) => (
@@ -161,7 +161,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
+          <div className="hidden sm:col-span-1 sm:block">
             <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Get in touch", "संपर्क करें")}</p>
             <a href={`mailto:${contact.email}`} className="block text-sm text-cream/70 hover:text-cream">
               {contact.email}

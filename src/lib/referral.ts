@@ -49,6 +49,35 @@ export function isSelfReferral(
   );
 }
 
+/**
+ * Normalise a phone to its last 10 digits (Indian mobile) so numbers entered
+ * with a `+91`, spaces or dashes still compare equal. Returns "" when there
+ * aren't 10 digits — an empty result never matches another empty result.
+ */
+export function normalizePhone(phone: string | undefined | null): string {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : "";
+}
+
+/**
+ * Cross-account self-referral: `isSelfReferral` only sees the codes on the
+ * account that's currently signed in, so it can't catch a person who refers
+ * themselves from a *second* account. This closes that gap by matching the
+ * booking's phone against the registered phone of the partner who owns the
+ * code. `referrer` is the partner record resolved from the code (its role +
+ * phone); pass null/undefined for an unknown code. Only the person-to-person
+ * roles are guarded (a Venue Owner earns on a place, not themselves), and both
+ * phones must normalise to a full 10-digit number to count as a match.
+ */
+export function isPhoneSelfReferral(
+  bookingPhone: string | undefined | null,
+  referrer: { type: PartnerRole; phone?: string } | null | undefined,
+): boolean {
+  if (!referrer || !SELF_REFERRAL_ROLES.includes(referrer.type)) return false;
+  const booker = normalizePhone(bookingPhone);
+  return booker !== "" && booker === normalizePhone(referrer.phone);
+}
+
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no easily-confused chars
 
 /**

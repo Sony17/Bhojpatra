@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         hostname: "images.unsplash.com",
         pathname: "/**",
       },
+      // Customer-uploaded review photos live in the public Vercel Blob store.
+      {
+        protocol: "https",
+        hostname: "**.public.blob.vercel-storage.com",
+        pathname: "/**",
+      },
     ],
   },
   // Routes that exist only to forward legacy/parent links to their real home.

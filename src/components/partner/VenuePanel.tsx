@@ -193,8 +193,8 @@ export default function VenuePanel({
           </h2>
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              "Publish a venue to list it on Bhojpatra — customers can then select, book and pay for it.",
-              "Bhojpatra पर लिस्ट करने के लिए वेन्यू प्रकाशित करें — ग्राहक इसे चुन, बुक और भुगतान कर सकते हैं।",
+              "Submit a venue to list it on Bhojpatra — once our team approves it, customers can select, book and pay for it.",
+              "Bhojpatra पर लिस्ट करने के लिए वेन्यू सबमिट करें — हमारी टीम के मंज़ूर करते ही ग्राहक इसे चुन, बुक और भुगतान कर सकते हैं।",
             )}
           </p>
         </div>
@@ -368,15 +368,17 @@ export default function VenuePanel({
           </p>
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              "Add your first venue — it goes live on the Venues page right away.",
-              "अपना पहला वेन्यू जोड़ें — यह तुरंत वेन्यू पेज पर लाइव हो जाता है।",
+              "Add your first venue — it goes live on the Venues page once our team approves it.",
+              "अपना पहला वेन्यू जोड़ें — हमारी टीम के मंज़ूर करते ही यह वेन्यू पेज पर लाइव हो जाता है।",
             )}
           </p>
         </div>
       ) : (
         venues.length > 0 && (
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {venues.map((v) => (
+            {venues.map((v) => {
+              const live = v.status !== "Pending" && v.status !== "Hidden";
+              return (
               <li
                 key={v.id}
                 className="flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm"
@@ -391,6 +393,22 @@ export default function VenuePanel({
                   />
                   <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
                     {v.type}
+                  </span>
+                  <span
+                    className={
+                      "absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur-sm " +
+                      (v.status === "Pending"
+                        ? "bg-maroon text-cream"
+                        : v.status === "Hidden"
+                          ? "bg-black/75 text-white"
+                          : "bg-white/90 text-maroon")
+                    }
+                  >
+                    {v.status === "Pending"
+                      ? t("Pending review", "समीक्षा बाकी")
+                      : v.status === "Hidden"
+                        ? t("Not visible", "अदृश्य")
+                        : t("Live", "लाइव")}
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col p-5">
@@ -422,17 +440,20 @@ export default function VenuePanel({
                       >
                         {t("Edit", "संपादित करें")}
                       </button>
-                      <Link
-                        href={`/venues/${v.id}`}
-                        className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream transition hover:bg-maroon-dark"
-                      >
-                        {t("View", "देखें")}
-                      </Link>
+                      {live && (
+                        <Link
+                          href={`/venues/${v.id}`}
+                          className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream transition hover:bg-maroon-dark"
+                        >
+                          {t("View", "देखें")}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )
       )}

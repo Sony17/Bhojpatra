@@ -4,15 +4,27 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { vendorListings, cities, type VendorListing } from "@/lib/data";
-import { slugifyName } from "@/lib/bookings";
+import {
+  slugifyName,
+  fetchMyBookings,
+  onStoredBookingsChange,
+  type StoredBooking,
+} from "@/lib/bookings";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import CompareTray from "@/components/vendors/CompareTray";
+import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
+import ReviewCard from "@/components/vendors/ReviewCard";
+import { Stars } from "@/components/reviews/reviewDisplay";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
+  /** The booking this review is for — matches one of the signed-in customer's
+   *  own orders when it's their review (so it becomes editable). */
+  bookingId: string;
   vendorId: string;
   vendor: string;
   name: string;
@@ -20,30 +32,8 @@ interface StoredReview {
   city: string;
   rating: number;
   comment: string;
+  images?: string[];
   createdAt: string;
-}
-
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-/** ISO timestamp → "12 Dec 2026" (matches the booking-list date style). */
-function formatReviewDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${String(d.getDate()).padStart(2, "0")} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-/** Five stars, filled up to `rating` (rounded). */
-function Stars({ rating }: { rating: number }) {
-  const filled = Math.round(rating);
-  return (
-    <span aria-hidden="true" className="text-gold">
-      {"★".repeat(filled)}
-      <span className="text-cream-3">{"★".repeat(Math.max(0, 5 - filled))}</span>
-    </span>
-  );
 }
 
 /** Brand-aligned tier badge styling (mirrors the catalogue card). */
@@ -127,6 +117,30 @@ function VendorProfile({
   useEffect(() => {
     loadReviews();
   }, [loadReviews]);
+
+  const session = useSession();
+
+  // The signed-in customer's own orders — kept live so a review whose booking id
+  // matches one of these can be told apart as "theirs" and made editable inline.
+  const [myBookings, setMyBookings] = useState<StoredBooking[]>([]);
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void fetchMyBookings().then((list) => {
+        if (active) setMyBookings(list);
+      });
+    };
+    load();
+    const unsub = onStoredBookingsChange(load);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+  const myBookingById = useMemo(
+    () => new Map(myBookings.map((b) => [b.id, b] as const)),
+    [myBookings],
+  );
 
   const localize = (value: string): string => {
     switch (value) {
@@ -377,24 +391,25 @@ function VendorProfile({
 
         {reviews.length > 0 ? (
           <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-            {reviews.map((r, i) => (
-              <li
-                key={`${r.vendorId}-${r.name}-${i}`}
-                className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-ink">{r.name}</p>
-                  <Stars rating={r.rating} />
-                </div>
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  {[r.occasion, r.city].filter(Boolean).join(" · ")}
-                  {r.createdAt && ` · ${formatReviewDate(r.createdAt)}`}
-                </p>
-                {r.comment && (
-                  <p className="mt-3 text-sm text-ink-soft">{r.comment}</p>
-                )}
-              </li>
-            ))}
+            {reviews.map((r) => {
+              // The customer can edit a review only when it hangs off one of
+              // their own orders (proven by the booking id matching).
+              const ownBooking =
+                session?.type === "customer"
+                  ? myBookingById.get(r.bookingId)
+                  : undefined;
+              return (
+                <ReviewCard
+                  key={`${r.bookingId}:${r.vendorId || slugifyName(r.vendor)}`}
+                  review={r}
+                  editable={
+                    ownBooking
+                      ? { booking: ownBooking, onSaved: loadReviews }
+                      : undefined
+                  }
+                />
+              );
+            })}
           </ul>
         ) : (
           <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-8 text-center">
@@ -412,6 +427,14 @@ function VendorProfile({
       </div>
 
       <CompareTray />
+
+      {/* Mobile sticky booking bar — steps aside for the compare tray. */}
+      <StickyBookingBar
+        price={`₹${vendor.priceFrom.toLocaleString("en-IN")}`}
+        priceNote={t("per plate", "प्रति प्लेट")}
+        cta={t("Book this caterer", "यह कैटरर बुक करें")}
+        href={bookHref}
+      />
     </section>
   );
 }

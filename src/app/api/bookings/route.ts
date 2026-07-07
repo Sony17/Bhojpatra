@@ -12,7 +12,8 @@ import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
-import { isSelfReferral } from "@/lib/referral";
+import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
+import type { PartnerRecord } from "@/app/api/partners/route";
 import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
 
@@ -72,6 +73,15 @@ export interface StoredOrder {
 const store = createStore<StoredOrder>({
   table: "bookings",
   idField: "id",
+});
+
+// Registered referral partners, keyed by code — used only to resolve the
+// referrer behind an applied code so we can compare their phone against the
+// booking's (cross-account self-referral guard). Same table the /api/partners
+// routes own.
+const partnerStore = createStore<PartnerRecord>({
+  table: "partners",
+  idField: "code",
 });
 
 // List recorded orders, newest first (used by the admin booking console).
@@ -199,9 +209,24 @@ export async function POST(request: Request) {
   // can't credit their own booking. If the applied code belongs to this same
   // account, drop the attribution rather than blocking the booking — the code is
   // optional and the booking should still go through, just without self-credit.
-  const selfReferral =
-    typeof referralCode === "string" &&
-    isSelfReferral(referralCode, user.partnerRoles);
+  const code = typeof referralCode === "string" ? referralCode.trim() : "";
+  const sameAccountSelfReferral =
+    !!code && isSelfReferral(code, user.partnerRoles);
+
+  // Cross-account self-referral guard: the check above only sees the codes on
+  // the account that's signed in, so it misses a person who signs up a *second*
+  // account to refer themselves. Resolve the code to its partner and drop the
+  // credit when that partner's registered phone matches this booking's phone.
+  let phoneSelfReferral = false;
+  if (code && !sameAccountSelfReferral) {
+    const referrer = await partnerStore.get(code.toUpperCase());
+    phoneSelfReferral =
+      !!referrer &&
+      !referrer.deleted &&
+      isPhoneSelfReferral(typeof phone === "string" ? phone : "", referrer);
+  }
+
+  const selfReferral = sameAccountSelfReferral || phoneSelfReferral;
 
   const order: StoredOrder = {
     id,

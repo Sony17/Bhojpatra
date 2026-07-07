@@ -667,7 +667,7 @@ function VendorCard({
   };
 
   return (
-    <li className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+    <li className="group relative flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition-shadow duration-200 hover:shadow-lg">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
         <Image
           src={vendor.image}
@@ -705,7 +705,7 @@ function VendorCard({
               : undefined
           }
           className={
-            "absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 " +
+            "absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 " +
             (inCompare
               ? "bg-maroon text-cream"
               : "bg-white/90 text-ink hover:text-maroon")
@@ -724,12 +724,36 @@ function VendorCard({
             {vendor.name}
           </h3>
           {vendor.reviews > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
-              <span aria-hidden="true" className="text-gold">
-                ⭐
+            <Link
+              href={`/vendors/${vendor.id}#reviews`}
+              aria-label={t(
+                `Read ${vendor.reviews} reviews for ${vendor.name}`,
+                `${vendor.name} की ${vendor.reviews} समीक्षाएँ पढ़ें`,
+              )}
+              className="relative z-10 inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-ink-soft transition-colors hover:text-maroon"
+            >
+              <span className="inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 font-bold text-cream">
+                {vendor.rating}
+                <span aria-hidden="true">★</span>
               </span>
-              {vendor.rating}
-              <span className="text-ink-soft">({vendor.reviews})</span>
+              ({vendor.reviews})
+            </Link>
+          ) : vendor.googleRating ? (
+            // Vendor-declared Google reputation — a distinct badge that shows
+            // alongside any Bhojpatra "verified reviews" line below.
+            <span
+              aria-label={t(
+                `Rated ${vendor.googleRating} on Google${vendor.googleReviews ? ` from ${vendor.googleReviews} reviews` : ""}`,
+                `गूगल पर ${vendor.googleRating} रेटिंग${vendor.googleReviews ? `, ${vendor.googleReviews} रिव्यू` : ""}`,
+              )}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cream-3 bg-cream-2 px-2 py-0.5 text-xs font-medium text-ink"
+            >
+              <span aria-hidden="true" className="text-maroon">★</span>
+              <span className="font-bold">{vendor.googleRating}</span>
+              <span className="text-ink-soft">
+                {t("Google", "गूगल")}
+                {vendor.googleReviews ? ` (${vendor.googleReviews})` : ""}
+              </span>
             </span>
           ) : (
             !stats && (
@@ -746,13 +770,16 @@ function VendorCard({
         </p>
 
         {stats && (
-          <p className="mt-1.5 text-sm font-semibold text-maroon">
+          <Link
+            href={`/vendors/${vendor.id}#reviews`}
+            className="relative z-10 mt-1.5 inline-flex w-fit items-center gap-1 text-sm font-semibold text-maroon hover:underline"
+          >
             <span aria-hidden="true">★</span> {stats.rating} ·{" "}
             {t(
               `${stats.count} verified ${stats.count === 1 ? "review" : "reviews"}`,
               `${stats.count} सत्यापित समीक्षाएँ`,
             )}
-          </p>
+          </Link>
         )}
 
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -784,18 +811,33 @@ function VendorCard({
               </span>
             </p>
           </div>
-          {/* Live vendors have a public profile page (gallery + full menu);
-              curated static listings hand off to the wizard as before. */}
+          {/* Every caterer has a public profile page: live vendors show their
+              gallery + full menu, curated listings show details, reviews and a
+              "Book this caterer" CTA. */}
           <Link
-            href={vendor.id.startsWith("VEN-") ? `/vendors/${vendor.id}` : "/book"}
-            className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
+            href={`/vendors/${vendor.id}`}
+            className="relative z-10 inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
           >
             {vendor.id.startsWith("VEN-")
               ? t("View Menu & Photos", "मेन्यू और फ़ोटो देखें")
-              : t("View & Compare", "देखें और तुलना करें")}
+              : t("View Details", "विवरण देखें")}
           </Link>
         </div>
       </div>
+
+      {/* Whole-card click target → the caterer's profile page. Sits beneath the
+          interactive controls above (compare, rating, View), which carry a
+          higher z-index so they stay independently clickable. */}
+      <Link
+        href={`/vendors/${vendor.id}`}
+        aria-label={t(`View ${vendor.name}`, `${vendor.name} देखें`)}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+        tabIndex={-1}
+      >
+        <span className="sr-only">
+          {t(`View ${vendor.name}`, `${vendor.name} देखें`)}
+        </span>
+      </Link>
     </li>
   );
 }

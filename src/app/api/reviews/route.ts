@@ -22,6 +22,8 @@ export interface StoredReview {
   /** 1–5 stars. */
   rating: number;
   comment: string;
+  /** Public Vercel Blob URLs of photos the reviewer attached (capped). */
+  images?: string[];
   createdAt: string;
 }
 
@@ -34,6 +36,22 @@ const store = createStore<StoredReview>({
 
 /** Longest comment we'll store — keeps a stray paste from bloating the row. */
 const COMMENT_MAX = 600;
+
+/** Most photos a reviewer can attach to one vendor rating. */
+const IMAGES_MAX = 4;
+
+/** Keep only our own uploaded photo URLs (public Vercel Blob), capped. Guards
+ *  the store from arbitrary external URLs being smuggled into a review. */
+function toImages(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (v): v is string =>
+        typeof v === "string" &&
+        /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//.test(v),
+    )
+    .slice(0, IMAGES_MAX);
+}
 
 /** Trim an unknown value to a string, or "" when it isn't one. */
 function str(value: unknown): string {
@@ -51,6 +69,7 @@ interface ReviewInput {
   vendor?: unknown;
   rating?: unknown;
   comment?: unknown;
+  images?: unknown;
 }
 
 /** Validate + normalise a single vendor rating into a StoredReview, or return a
@@ -77,6 +96,7 @@ function buildReview(
     city: ctx.city,
     rating: ratingNum,
     comment: str(input.comment).slice(0, COMMENT_MAX),
+    images: toImages(input.images),
     createdAt: new Date().toISOString(),
   };
 }

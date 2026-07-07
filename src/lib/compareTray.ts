@@ -1,0 +1,41 @@
+"use client";
+
+/**
+ * Tiny shared signal for the mobile compare tray's presence + measured height,
+ * so the floating chat launcher can lift itself clear of the tray instead of
+ * covering its "Compare" CTA. Module-level state + subscribers — mirrors the
+ * pattern in `lib/accountMenu.ts`, no context provider needed.
+ */
+import { useEffect, useState } from "react";
+
+let visible = false;
+let height = 0;
+const listeners = new Set<() => void>();
+
+function emit(): void {
+  for (const l of listeners) l();
+}
+
+/**
+ * Publish the compare tray's state. Called by the tray when it mounts / its
+ * contents change; `trayHeight` is the measured height in px (0 when hidden) so
+ * the chat launcher knows how far to move out of the way.
+ */
+export function setCompareTrayState(nextVisible: boolean, trayHeight = 0): void {
+  visible = nextVisible;
+  height = nextVisible ? trayHeight : 0;
+  emit();
+}
+
+/** Reactive read of the compare tray state (visible flag + measured height). */
+export function useCompareTrayState(): { visible: boolean; height: number } {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const rerender = () => force((n) => n + 1);
+    listeners.add(rerender);
+    return () => {
+      listeners.delete(rerender);
+    };
+  }, []);
+  return { visible, height };
+}

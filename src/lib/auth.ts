@@ -142,7 +142,11 @@ export async function requireRole(
   if (!user) {
     return Response.json({ error: "Not signed in." }, { status: 401 });
   }
-  if (roles.length && !roles.includes(user.role)) {
+  // A person can hold several accounts at once, so authorise against the full
+  // set (customer/vendor/partner) plus the primary role — not `role` alone.
+  // "admin" only ever lives on `role`, keeping the admin console gated.
+  const held = new Set<UserRole>([user.role, ...user.accounts]);
+  if (roles.length && !roles.some((r) => held.has(r))) {
     return Response.json({ error: "Not allowed." }, { status: 403 });
   }
   return user;

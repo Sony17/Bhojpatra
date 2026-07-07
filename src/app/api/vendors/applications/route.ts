@@ -8,12 +8,13 @@ import {
   type VendorPackageInput,
 } from "@/lib/vendorApplications";
 import {
-  TIER_ORDER,
+  parseTiers,
   sortTiers,
   tierForPrice,
   type VendorDocKind,
   type VendorTier,
 } from "@/lib/admin/types";
+import { cleanGoogleRating, cleanGoogleReviews } from "@/lib/vendorMenus";
 import { parseListQuery } from "@/lib/validate";
 import { sendVendorApplicationAlert } from "@/lib/email";
 
@@ -47,15 +48,6 @@ function deriveTiers(packages: VendorPackageInput[]): VendorTier[] {
   }
   const derived = sortTiers([...tiers]);
   return derived.length ? derived : ["Silver"];
-}
-
-/** Keep only valid tier values, in canonical order. */
-function parseTiers(raw: unknown): VendorTier[] {
-  if (!Array.isArray(raw)) return [];
-  const valid = raw.filter((t): t is VendorTier =>
-    TIER_ORDER.includes(t as VendorTier),
-  );
-  return sortTiers(valid);
 }
 
 const DOC_FIELDS: { kind: VendorDocKind; key: string }[] = [
@@ -101,6 +93,13 @@ export async function POST(request: Request) {
   const gstNumber = str(body.gstNumber);
   const fssaiNumber = str(body.fssaiNumber);
 
+  // Optional self-declared Google reputation — only stored when a valid,
+  // positive rating is given (the count alone shows nothing on the card).
+  const googleRating = cleanGoogleRating(body.googleRating);
+  const googleReviews = googleRating
+    ? cleanGoogleReviews(body.googleReviews)
+    : undefined;
+
   // Map uploaded KYC ids (keyed by doc field) onto the per-document records the
   // approvals console reviews.
   const docIds = (body.docIds ?? {}) as Record<string, unknown>;
@@ -143,10 +142,13 @@ export async function POST(request: Request) {
     requestedTiers,
     gstNumber,
     fssaiNumber,
+    ...(googleRating ? { googleRating } : {}),
+    ...(googleReviews !== undefined ? { googleReviews } : {}),
     documents,
     packages,
     minGuests: str(body.minGuests),
     maxGuests: str(body.maxGuests),
+    maxEventsPerDay: str(body.maxEventsPerDay),
     serviceCities: strList(body.serviceCities),
     counters: strList(body.counters),
     status: "Pending",

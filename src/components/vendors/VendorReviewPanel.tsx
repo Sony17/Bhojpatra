@@ -17,6 +17,10 @@
  * id, so the review shows up in the profile's reviews list and feeds the vendor
  * rating aggregate. It's also mirrored onto the stored booking so a second
  * visit prefills for an in-place edit.
+ *
+ * This panel is write-once: it appears only until the customer has left a
+ * review for this caterer. After that it steps aside — the review then shows in
+ * the list below as the author's own editable card (see `ReviewCard`).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/i18n";
@@ -24,14 +28,14 @@ import { useSession } from "@/lib/session";
 import {
   fetchMyBookings,
   onStoredBookingsChange,
-  patchMyBooking,
   bookingVendors,
   slugifyName,
   type StoredBooking,
-  type BookingVendorReview,
 } from "@/lib/bookings";
+import { saveVendorReview } from "@/lib/reviews";
 import type { VendorListing } from "@/lib/data";
 import StarInput from "@/components/reviews/StarInput";
+import { ReviewPhotoEditor } from "@/components/reviews/ReviewPhotos";
 
 /** True when a completed order lists this caterer (by catalogue id or name). */
 function bookingHasVendor(b: StoredBooking, vendor: VendorListing): boolean {
@@ -90,21 +94,13 @@ export default function VendorReviewPanel({
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<"view" | "edit">("edit");
+  const [images, setImages] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting">("idle");
   const [error, setError] = useState("");
+  // Hides the panel the instant a first review is saved, before the reloaded
+  // booking (with its mirrored review) makes `existing` truthy on its own.
+  const [submitted, setSubmitted] = useState(false);
 
-  // Seed the editable fields from any existing review whenever the target order
-  // first resolves (bookings load async). Adjusting state during render — the
-  // pattern React recommends over a setState-in-effect — so the guard runs it
-  // exactly once per order, before paint.
-  const [seededFor, setSeededFor] = useState<string | null>(null);
-  if (target && target.id !== seededFor) {
-    setSeededFor(target.id);
-    setRating(existing?.rating ?? 0);
-    setComment(existing?.comment ?? "");
-    setMode(existing ? "view" : "edit");
-  }
   // Prefill the reviewer name from the session once it's available, unless the
   // customer has already typed one.
   const [nameSeeded, setNameSeeded] = useState(false);
@@ -113,8 +109,12 @@ export default function VendorReviewPanel({
     setName((prev) => prev || session.name || "");
   }
 
-  // Not a signed-in customer, or no completed booking → nothing to show.
-  if (session?.type !== "customer" || !target) return null;
+  // Write-once CTA: show only for a signed-in customer with a completed order
+  // who hasn't reviewed this caterer yet. Once a review exists it lives in the
+  // list below as an editable card (`ReviewCard`), so the panel steps aside.
+  if (session?.type !== "customer" || !target || existing || submitted) {
+    return null;
+  }
 
   const submit = async () => {
     if (status === "submitting") return;
@@ -126,61 +126,28 @@ export default function VendorReviewPanel({
     }
     setStatus("submitting");
     setError("");
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId: target.id,
-          name: name.trim(),
-          occasion: target.occasion,
-          city: target.city,
-          reviews: [
-            {
-              vendorId: vendor.id,
-              vendor: vendor.name,
-              rating,
-              comment: comment.trim(),
-            },
-          ],
-        }),
-      });
-      const data = (await res.json().catch(() => null)) as {
-        ok?: boolean;
-        error?: string;
-      } | null;
-      if (!res.ok || !data?.ok) {
-        setStatus("idle");
-        setError(
-          data?.error ??
-            t(
-              "Something went wrong. Please try again.",
-              "कुछ गड़बड़ हो गई। कृपया पुनः प्रयास करें।",
-            ),
-        );
-        return;
-      }
-      // Mirror onto the stored booking so a return visit prefills for an edit.
-      const review: BookingVendorReview = {
-        vendorId: vendor.id,
-        vendorName: vendor.name,
-        rating,
-        comment: comment.trim(),
-        createdAt: new Date().toISOString(),
-      };
-      const kept = (target.reviews ?? []).filter(
-        (r) => r.vendorId !== vendor.id,
-      );
-      await patchMyBooking(target.id, { reviews: [...kept, review] });
-      setStatus("idle");
-      setMode("view");
-      onReviewed();
-    } catch {
-      setStatus("idle");
+    const result = await saveVendorReview({
+      booking: target,
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+      name,
+      rating,
+      comment,
+      images,
+    });
+    setStatus("idle");
+    if (!result.ok) {
       setError(
-        t("Network error. Please try again.", "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।"),
+        result.error ??
+          t(
+            "Something went wrong. Please try again.",
+            "कुछ गड़बड़ हो गई। कृपया पुनः प्रयास करें।",
+          ),
       );
+      return;
     }
+    setSubmitted(true);
+    onReviewed();
   };
 
   const fieldCls =
@@ -188,46 +155,10 @@ export default function VendorReviewPanel({
   const labelCls =
     "text-[11px] font-semibold uppercase tracking-wide text-maroon";
 
-  // Already rated and not editing → compact summary + edit affordance. Keyed on
-  // the local rating (not the reloaded `existing`) so a just-saved review shows
-  // its summary immediately, without a flash of the form.
-  if (mode === "view" && rating >= 1) {
-    return (
-      <div className="mt-6 rounded-2xl border border-maroon/20 bg-cream/40 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-display text-lg text-ink">
-              {t("Your review", "आपकी समीक्षा")}
-            </p>
-            <p
-              aria-hidden="true"
-              className="mt-1 text-2xl text-gold leading-none"
-            >
-              {"★".repeat(rating)}
-              <span className="text-cream-3">{"★".repeat(5 - rating)}</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMode("edit")}
-            className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-          >
-            {t("Edit review", "समीक्षा संपादित करें")}
-          </button>
-        </div>
-        {comment && (
-          <p className="mt-3 text-sm text-ink-soft">“{comment}”</p>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="mt-6 rounded-2xl border border-maroon/20 bg-cream/40 p-5 sm:p-6">
       <p className="font-display text-lg text-ink">
-        {existing
-          ? t("Edit your review", "अपनी समीक्षा संपादित करें")
-          : t("Rate this caterer", "इस कैटरर को रेट करें")}
+        {t("Rate this caterer", "इस कैटरर को रेट करें")}
       </p>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
@@ -269,6 +200,10 @@ export default function VendorReviewPanel({
         />
       </label>
 
+      <div className="mt-4">
+        <ReviewPhotoEditor images={images} onChange={setImages} />
+      </div>
+
       <p className="mt-2 text-xs text-ink-soft">
         {t(
           "Your review may appear publicly on this profile and our home page.",
@@ -287,24 +222,8 @@ export default function VendorReviewPanel({
         >
           {status === "submitting"
             ? t("Submitting…", "सबमिट हो रहा है…")
-            : existing
-              ? t("Update review", "समीक्षा अपडेट करें")
-              : t("Submit review", "समीक्षा सबमिट करें")}
+            : t("Submit review", "समीक्षा सबमिट करें")}
         </button>
-        {existing && (
-          <button
-            type="button"
-            onClick={() => {
-              setRating(existing.rating);
-              setComment(existing.comment ?? "");
-              setError("");
-              setMode("view");
-            }}
-            className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
-          >
-            {t("Cancel", "रद्द करें")}
-          </button>
-        )}
       </div>
     </div>
   );

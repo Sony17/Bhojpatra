@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import {
-  dashboardPath,
+  MERGED_DASHBOARD_PATH,
   refreshSession,
   type AccountType,
   type PartnerRole,
@@ -188,7 +188,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
       await refreshSession();
-      router.push(dashboardPath(user.role));
+      router.push(MERGED_DASHBOARD_PATH);
     } catch {
       setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
@@ -255,14 +255,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
         <div className="mt-8 flex flex-col gap-3">
           <Link
-            href={dashboardPath(accountType)}
+            href={MERGED_DASHBOARD_PATH}
             className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
           >
-            {isVendor
-              ? t("Go to Vendor Dashboard", "वेंडर डैशबोर्ड पर जाएं")
-              : isPartner
-                ? t("Go to Partner Dashboard", "पार्टनर डैशबोर्ड पर जाएं")
-                : t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
+            {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
           </Link>
           {isVendor && (
             <Link

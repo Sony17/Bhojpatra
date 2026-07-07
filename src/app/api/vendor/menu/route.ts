@@ -54,6 +54,10 @@ export async function GET() {
             state: app.state,
             cuisines: app.cuisines,
             about: app.speciality,
+            maxCapacity: Number(app.maxGuests) || undefined,
+            maxEventsPerDay: Number(app.maxEventsPerDay) || undefined,
+            googleRating: app.googleRating,
+            googleReviews: app.googleReviews,
           }
         : { business: guard.name ?? "" },
     });
@@ -124,6 +128,10 @@ export async function PUT(request: Request) {
       rating: existing?.rating ?? 0,
       reviews: existing?.reviews ?? 0,
       verified: app?.status === "Verified",
+      // Marketplace tiers follow the admin's review decision (falling back to a
+      // value already synced onto the record); price-derived bands fill in on
+      // the catalog when neither is set.
+      tiers: app?.assignedTiers ?? existing?.tiers,
       moderation,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

@@ -32,6 +32,7 @@ export const adminNav: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", iconKey: "dashboard" },
   { label: "Vendors", href: "/admin/vendors", iconKey: "vendors" },
   { label: "Vendor Approvals", href: "/admin/vendor-approvals", iconKey: "approvals" },
+  { label: "Venue Approvals", href: "/admin/venue-approvals", iconKey: "approvals" },
   { label: "Menu Moderation", href: "/admin/menus", iconKey: "menus" },
   { label: "Customers & Bookings", href: "/admin/customers", iconKey: "customers" },
   { label: "Lead Generation", href: "/admin/leads", iconKey: "leads" },

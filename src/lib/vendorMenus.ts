@@ -24,6 +24,7 @@ import {
   type MenuCategory,
   type VendorListing,
 } from "@/lib/data";
+import { sortTiers, type VendorTier } from "@/lib/admin/types";
 
 export interface VendorMenuItem {
   name: string;
@@ -32,11 +33,11 @@ export interface VendorMenuItem {
   photo?: string;
 }
 
-/** Content moderation for live vendors — a takedown model, not pre-approval:
- *  new/edited menus go live at once as "Pending" (review queue), admins can
- *  mark them "Approved" or take them down with "Hidden". A fresh save flips
- *  Approved back to Pending for re-review; Hidden stays Hidden until an admin
- *  restores it. Platform seeds are born Approved. */
+/** Content moderation for live vendors — a pre-approval model: new/edited menus
+ *  land as "Pending" and stay OFF every customer surface (catalog, /book wizard,
+ *  public detail page) until an admin marks them "Approved". A fresh save flips
+ *  Approved back to Pending for re-review; "Hidden" is an admin takedown that
+ *  stays Hidden until restored. Platform seeds are born Approved. */
 export type ModerationStatus = "Pending" | "Approved" | "Hidden";
 
 /** One course/category a vendor serves, with their per-plate uplift. */
@@ -63,11 +64,23 @@ export interface LiveVendorRecord {
   about?: string;
   /** Base per-plate rate shown on the catalog card (₹). */
   priceFrom: number;
+  /** Max guests the caterer can serve at a single event. */
+  maxCapacity?: number;
+  /** Max events the caterer can cater in a single day. */
+  maxEventsPerDay?: number;
   image: string;
   /** Seed display rating; live vendors start at 0 = "New" until real reviews land. */
   rating: number;
   reviews: number;
+  /** Vendor-declared Google rating (0–5) + review count, imported at
+   *  registration. Shown as a distinct "Google" badge on the card, so a new
+   *  vendor isn't a blank "New" while their real Bhojpatra reviews accrue. */
+  googleRating?: number;
+  googleReviews?: number;
   verified: boolean;
+  /** Admin-assigned marketplace tiers, inherited from the linked application.
+   *  Overrides the price-derived default on the catalog card when present. */
+  tiers?: VendorTier[];
   moderation?: ModerationStatus;
   menu: VendorMenuSection[];
   createdAt: string;
@@ -159,7 +172,7 @@ export function saveVendor(record: LiveVendorRecord): Promise<void> {
  *  one dish in that category. */
 export async function assembleMenuCategories(): Promise<MenuCategory[]> {
   const rows = await ensureSeededVendors();
-  const visible = rows.filter((r) => r.moderation !== "Hidden");
+  const visible = rows.filter((r) => r.moderation === "Approved");
   return menuCategories.map((cat) => ({
     ...cat,
     vendors: visible.flatMap((r) => {
@@ -173,6 +186,10 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           name: r.business,
           rating: r.rating,
           reviews: r.reviews,
+          ...(r.googleRating ? { googleRating: r.googleRating } : {}),
+          ...(r.googleReviews !== undefined
+            ? { googleReviews: r.googleReviews }
+            : {}),
           perPlate: section.perPlate,
           image: r.image,
           items: section.items.map((it, i) => ({
@@ -224,9 +241,13 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
   return {
     id: r.id,
     name: r.business,
-    tiers: tiersFor(r.priceFrom),
+    // Admin-assigned tiers win; price-derived bands are the fallback for seeds
+    // and vendors that predate a review decision.
+    tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
     rating: r.rating,
     reviews: r.reviews,
+    ...(r.googleRating ? { googleRating: r.googleRating } : {}),
+    ...(r.googleReviews !== undefined ? { googleReviews: r.googleReviews } : {}),
     city: r.city,
     state: r.state,
     cuisines: r.cuisines,
@@ -245,7 +266,7 @@ export async function listLiveVendorListings(): Promise<VendorListing[]> {
     .filter(
       (r) =>
         r.ownerUserId &&
-        r.moderation !== "Hidden" &&
+        r.moderation === "Approved" &&
         r.menu.some((s) => !s.hidden && s.items.length > 0),
     )
     .map(toVendorListing);
@@ -265,6 +286,8 @@ export interface PublicVendorProfile {
   image: string;
   rating: number;
   reviews: number;
+  googleRating?: number;
+  googleReviews?: number;
   verified: boolean;
   gallery: string[];
   menu: {
@@ -283,7 +306,7 @@ export function toPublicVendorProfile(
   r: LiveVendorRecord,
   gallery: string[],
 ): PublicVendorProfile | null {
-  if (!r.ownerUserId || r.moderation === "Hidden") return null;
+  if (!r.ownerUserId || r.moderation !== "Approved") return null;
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
   if (visible.length === 0) return null;
   return {
@@ -297,6 +320,8 @@ export function toPublicVendorProfile(
     image: r.image,
     rating: r.rating,
     reviews: r.reviews,
+    ...(r.googleRating ? { googleRating: r.googleRating } : {}),
+    ...(r.googleReviews !== undefined ? { googleReviews: r.googleReviews } : {}),
     verified: r.verified,
     gallery,
     menu: visible.flatMap((s) => {
@@ -338,7 +363,32 @@ export interface VendorMenuInput {
   cuisines: string[];
   about?: string;
   priceFrom: number;
+  maxCapacity?: number;
+  maxEventsPerDay?: number;
+  googleRating?: number;
+  googleReviews?: number;
   menu: VendorMenuSection[];
+}
+
+/** Normalize a self-declared Google rating (0–5, one decimal). Returns
+ *  undefined for blank / zero / out-of-range so the badge simply doesn't show.
+ *  Shared by the registration application route and the dashboard menu save. */
+export function cleanGoogleRating(v: unknown): number | undefined {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0 || n > 5) {
+    return undefined;
+  }
+  return Math.round(n * 10) / 10;
+}
+
+/** Normalize a self-declared Google review count (non-negative integer, capped
+ *  well above any real caterer's total). Undefined when blank / invalid. */
+export function cleanGoogleReviews(v: unknown): number | undefined {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 10_000_000) {
+    return undefined;
+  }
+  return Math.floor(n);
 }
 
 type Check = { ok: true; value: VendorMenuInput } | { ok: false; error: string };
@@ -375,6 +425,17 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
   if (priceFrom === null) {
     return { ok: false, error: "Base per-plate price must be a valid amount." };
   }
+
+  // Capacity limits — optional; kept only when a positive value is supplied.
+  const maxCapacity = cleanMoney(body.maxCapacity, 100000);
+  const maxEventsPerDay = cleanMoney(body.maxEventsPerDay, 100);
+
+  // Vendor-declared Google reputation — optional; only kept when a valid,
+  // positive rating is supplied (the count without a rating shows nothing).
+  const googleRating = cleanGoogleRating(body.googleRating);
+  const googleReviews = googleRating
+    ? cleanGoogleReviews(body.googleReviews)
+    : undefined;
 
   if (!Array.isArray(body.menu) || body.menu.length > MAX_SECTIONS) {
     return { ok: false, error: "Invalid menu." };
@@ -421,6 +482,18 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
 
   return {
     ok: true,
-    value: { business, city, state, cuisines, about, priceFrom, menu },
+    value: {
+      business,
+      city,
+      state,
+      cuisines,
+      about,
+      priceFrom,
+      ...(maxCapacity ? { maxCapacity } : {}),
+      ...(maxEventsPerDay ? { maxEventsPerDay } : {}),
+      ...(googleRating ? { googleRating } : {}),
+      ...(googleReviews !== undefined ? { googleReviews } : {}),
+      menu,
+    },
   };
 }

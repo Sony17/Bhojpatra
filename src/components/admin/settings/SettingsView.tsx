@@ -15,6 +15,7 @@ const MAX_QR_FILE_BYTES = 400 * 1024;
 
 const TABS: TabItem[] = [
   { id: "profile", label: "Admin Profile" },
+  { id: "password", label: "Change Password" },
   { id: "business", label: "Business" },
   { id: "occasions", label: "Occasions" },
   { id: "locations", label: "Locations" },
@@ -28,6 +29,7 @@ export default function SettingsView() {
       <PageHeader eyebrow="Admin Panel" title="Settings" subtitle="Platform configuration and admin profile." />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "profile" && <ProfileTab />}
+      {tab === "password" && <ChangePasswordTab />}
       {tab === "business" && <BusinessTab />}
       {tab === "occasions" && (
         <NameListTab
@@ -81,6 +83,105 @@ function ProfileTab() {
       </div>
       <div className="mt-5 flex items-center gap-4">
         <button type="button" onClick={() => setSaved(true)} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark">Save changes</button>
+        <SavedChip show={saved} />
+      </div>
+    </WidgetCard>
+  );
+}
+
+function ChangePasswordTab() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const edit = (set: (v: string) => void) => (value: string) => {
+    set(value);
+    setSaved(false);
+    setError("");
+  };
+
+  const save = async () => {
+    setError("");
+    if (!current || !next) {
+      setError("Enter your current and new password.");
+      return;
+    }
+    if (next.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("New password and confirmation don’t match.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(d.error || "Could not change password.");
+      setSaved(true);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <WidgetCard title="Change Password">
+      <p className="mb-4 text-sm text-ink-soft">
+        Update the password you use to sign in to the admin console. You’ll need
+        your current password to confirm.
+      </p>
+      <div className="grid max-w-md grid-cols-1 gap-4">
+        <Field label="Current password">
+          <input
+            type="password"
+            autoComplete="current-password"
+            className={inputClass}
+            value={current}
+            onChange={(e) => edit(setCurrent)(e.target.value)}
+          />
+        </Field>
+        <Field label="New password" hint="At least 8 characters.">
+          <input
+            type="password"
+            autoComplete="new-password"
+            className={inputClass}
+            value={next}
+            onChange={(e) => edit(setNext)(e.target.value)}
+          />
+        </Field>
+        <Field label="Confirm new password">
+          <input
+            type="password"
+            autoComplete="new-password"
+            className={inputClass}
+            value={confirm}
+            onChange={(e) => edit(setConfirm)(e.target.value)}
+          />
+        </Field>
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
+      <div className="mt-5 flex items-center gap-4">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={save}
+          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
+        >
+          {saving ? "Updating…" : "Update password"}
+        </button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>

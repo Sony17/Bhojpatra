@@ -88,10 +88,10 @@ export default function CompareView() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-5 py-10 sm:py-14">
+    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-5 sm:py-14">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-ink">
+          <h1 className="font-display text-2xl text-ink sm:text-3xl">
             {t("Compare Caterers", "कैटरर की तुलना")}
           </h1>
           <p className="mt-1 text-sm text-ink-soft">
@@ -127,12 +127,21 @@ export default function CompareView() {
         </p>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-cream-3">
+      {vendors.length >= 3 && (
+        <p className="mt-4 text-xs text-ink-soft sm:hidden">
+          {t(
+            "Swipe the table sideways to compare every caterer →",
+            "हर कैटरर की तुलना के लिए टेबल को साइड में स्वाइप करें →",
+          )}
+        </p>
+      )}
+
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-cream-3 sm:mt-6">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
               {/* Sticky corner label */}
-              <th className="sticky left-0 z-10 min-w-[8.5rem] border-b border-r border-cream-3 bg-white p-4 text-left align-bottom">
+              <th className="sticky left-0 z-10 min-w-[5rem] border-b border-r border-cream-3 bg-white p-2.5 text-left align-bottom sm:min-w-[8.5rem] sm:p-4">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                   {t("Caterer", "कैटरर")}
                 </span>
@@ -140,7 +149,7 @@ export default function CompareView() {
               {vendors.map((v) => (
                 <th
                   key={v.id}
-                  className="min-w-[13rem] border-b border-cream-3 bg-white p-4 align-top"
+                  className="min-w-[8.5rem] border-b border-cream-3 bg-white p-2.5 align-top sm:min-w-[13rem] sm:p-4"
                 >
                   <div className="relative">
                     <button
@@ -156,13 +165,13 @@ export default function CompareView() {
                         src={v.image}
                         alt={v.name}
                         fill
-                        sizes="(min-width: 640px) 208px, 60vw"
+                        sizes="(min-width: 640px) 208px, 40vw"
                         className="object-cover"
                       />
                     </span>
                     <Link
                       href={`/vendors/${v.id}`}
-                      className="mt-3 block font-display text-base font-semibold text-ink hover:text-maroon"
+                      className="mt-2.5 block font-display text-sm font-semibold text-ink hover:text-maroon sm:mt-3 sm:text-base"
                     >
                       {v.name}
                     </Link>
@@ -230,23 +239,23 @@ export default function CompareView() {
             />
             {/* CTA row */}
             <tr>
-              <th className="sticky left-0 z-10 border-r border-cream-3 bg-cream-2/40 p-4 text-left align-top">
+              <th className="sticky left-0 z-10 border-r border-cream-3 bg-white p-2.5 text-left align-top sm:p-4">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                   {t("Book", "बुक करें")}
                 </span>
               </th>
               {vendors.map((v) => (
-                <td key={v.id} className="bg-cream-2/40 p-4 align-top">
+                <td key={v.id} className="bg-cream-2/40 p-2.5 align-top sm:p-4">
                   <div className="flex flex-col gap-2">
                     <Link
                       href={bookHref(v)}
-                      className="rounded-full bg-maroon px-4 py-2 text-center text-xs font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+                      className="rounded-full bg-maroon px-3 py-2 text-center text-xs font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:px-4"
                     >
                       {t("Book", "बुक करें")}
                     </Link>
                     <Link
                       href={`/vendors/${v.id}`}
-                      className="rounded-full border border-maroon px-4 py-2 text-center text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+                      className="rounded-full border border-maroon px-3 py-2 text-center text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:px-4"
                     >
                       {t("View", "देखें")}
                     </Link>
@@ -273,13 +282,13 @@ function Row({
 }) {
   return (
     <tr>
-      <th className="sticky left-0 z-10 border-b border-r border-cream-3 bg-cream-2/40 p-4 text-left align-top">
+      <th className="sticky left-0 z-10 border-b border-r border-cream-3 bg-white p-2.5 text-left align-top sm:p-4">
         <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
           {label}
         </span>
       </th>
       {vendors.map((v) => (
-        <td key={v.id} className="border-b border-cream-3 p-4 align-top">
+        <td key={v.id} className="border-b border-cream-3 p-2.5 align-top sm:p-4">
           {render(v)}
         </td>
       ))}

@@ -37,8 +37,27 @@ export default function ReviewSelection() {
       </Reveal>
 
       <Reveal variant="scale" className="rounded-2xl border border-cream-3 bg-white shadow-sm">
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Mobile — stacked cards (no horizontal scroll on phones). */}
+        <ul className="divide-y divide-cream-3 sm:hidden">
+          {rows.map((row) => (
+            <li key={row.category} className="flex items-center gap-3 p-4">
+              <IconBadge>{row.icon}</IconBadge>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-ink">{row.category}</p>
+                <p className="truncate text-sm text-ink-soft">{row.vendor}</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <span className="inline-flex items-center rounded-lg border border-cream-3 bg-cream px-3 py-1 text-xs font-semibold text-maroon">
+                  View Menu
+                </span>
+                <span className="text-xs font-semibold text-maroon">Change</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Desktop — full comparison table. */}
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[640px] border-collapse text-left">
             <thead>
               <tr className="border-b border-cream-3 bg-cream-2/40">

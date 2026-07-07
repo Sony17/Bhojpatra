@@ -42,13 +42,24 @@ export interface VendorApplicationRecord {
   state: string;
   cuisines: string[];
   speciality: string;
+  /** Price-derived baseline (what their package prices qualify for). Immutable. */
   requestedTiers: VendorTier[];
+  /** Admin's explicit tier decision during review. Overrides the baseline and
+   *  drives the vendor's public badges once set. */
+  assignedTiers?: VendorTier[];
   gstNumber: string;
   fssaiNumber: string;
+  /** Vendor-declared Google rating (0–5) + review count imported at
+   *  registration. Carried onto the live vendor record (prefilled into the
+   *  dashboard menu editor) so it surfaces as a "Google" badge on the card. */
+  googleRating?: number;
+  googleReviews?: number;
   documents: VendorApplicationDoc[];
   packages: VendorPackageInput[];
   minGuests: string;
   maxGuests: string;
+  /** Max events the caterer can cater in a single day. */
+  maxEventsPerDay: string;
   serviceCities: string[];
   counters: string[];
   status: VerificationStatus;
@@ -92,6 +103,7 @@ export function toAdminApplication(
     city: r.city,
     speciality: r.speciality,
     requestedTiers: r.requestedTiers,
+    assignedTiers: r.assignedTiers,
     submitted: r.submitted,
     status: r.status,
     email: r.email,

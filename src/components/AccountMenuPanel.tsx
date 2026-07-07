@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang, type Lang } from "@/lib/i18n";
-import { logout, dashboardPath, useSession } from "@/lib/session";
+import {
+  logout,
+  MERGED_DASHBOARD_PATH,
+  ACCOUNT_LABEL,
+  useSession,
+} from "@/lib/session";
 
 /** Language choices surfaced inside the account menu. */
 const LANG_OPTIONS: { id: Lang; full: string }[] = [
@@ -27,12 +32,11 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
   const session = useSession();
 
   const name = session?.name?.trim();
+  // One person can hold several accounts — list them all (Customer · Vendor · …).
   const typeLabel = session
-    ? session.type === "vendor"
-      ? t("Vendor", "वेंडर")
-      : session.type === "partner"
-        ? t("Partner", "पार्टनर")
-        : t("Customer", "ग्राहक")
+    ? session.accounts
+        .map((a) => t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi))
+        .join(" · ")
     : "";
   const displayName = name || typeLabel || t("Account", "अकाउंट");
   const initial = displayName.charAt(0).toUpperCase();
@@ -72,7 +76,7 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
         <>
           <li className="border-b border-maroon/10">
             <Link
-              href={dashboardPath(session.type)}
+              href={MERGED_DASHBOARD_PATH}
               onClick={onClose}
               className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5"
             >

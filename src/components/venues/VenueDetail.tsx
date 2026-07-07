@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { useSessionStatus } from "@/lib/session";
 import LoginGate from "@/components/auth/LoginGate";
+import StickyBookingBar from "@/components/StickyBookingBar";
 import { occasions } from "@/lib/data";
 import {
   fetchVenueById,
@@ -464,7 +465,7 @@ function VenueBooking({
         </div>
 
         {/* ── Booking panel ──────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-32 lg:self-start">
+        <div id="venue-booking" className="scroll-mt-28 lg:sticky lg:top-32 lg:self-start">
           {step === "done" ? (
             <DonePanel
               t={t}
@@ -841,6 +842,20 @@ function VenueBooking({
           )}
         </div>
       </div>
+
+      {/* Mobile sticky booking bar — jumps to the booking form; hidden once the
+          guest moves past the details step (payment / done). */}
+      <StickyBookingBar
+        price={venue.priceFrom}
+        priceNote={t("Booking fee · +18% GST", "बुकिंग शुल्क · +18% जीएसटी")}
+        cta={t("Book This Venue", "यह वेन्यू बुक करें")}
+        onClick={() =>
+          document
+            .getElementById("venue-booking")
+            ?.scrollIntoView({ behavior: "smooth" })
+        }
+        hidden={step !== "details"}
+      />
     </section>
   );
 }

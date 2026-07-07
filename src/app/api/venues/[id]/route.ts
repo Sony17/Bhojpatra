@@ -3,6 +3,7 @@ import {
   parseVenuePrice,
   formatVenuePrice,
   sanitizeVenueImage,
+  isVenuePublic,
   type VenueRecord,
 } from "@/lib/venues";
 
@@ -42,7 +43,8 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   const venue = await store.get(decodeURIComponent(id));
-  if (!venue || venue.deleted) {
+  // Public lookup: an unapproved (pending/hidden) or deleted venue is 404 here.
+  if (!venue || !isVenuePublic(venue)) {
     return Response.json({ error: "Venue not found." }, { status: 404 });
   }
   return Response.json({

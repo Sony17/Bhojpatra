@@ -13,8 +13,10 @@ import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { queryApprovals } from "@/lib/admin/mockData";
+import { TIER_ORDER, sortTiers } from "@/lib/admin/types";
 import type {
   VendorApplication,
+  VendorTier,
   VerificationStatus,
 } from "@/lib/admin/types";
 
@@ -26,6 +28,12 @@ const STATUS_OPTIONS = [
   { label: "Verified", value: "Verified" },
   { label: "Rejected", value: "Rejected" },
 ];
+
+/** The tiers currently in force for an application: the admin's explicit
+ *  decision if made, otherwise the price-derived baseline shown as the default. */
+function effectiveTiers(a: VendorApplication): VendorTier[] {
+  return sortTiers(a.assignedTiers ?? a.requestedTiers);
+}
 
 /**
  * Vendor Approvals / KYC console. Holds the application list in local state for
@@ -103,12 +111,19 @@ export default function ApprovalsConsole() {
 
   const setAppStatus = (id: string, next: VerificationStatus) => {
     const snapshot = apps;
+    const current = apps.find((a) => a.id === id);
+    // Lock in the tier selection at the moment of approval so the vendor's
+    // catalog badges match what the admin sees here (even if untouched → the
+    // price-derived default).
+    const tiers =
+      next === "Verified" && current ? effectiveTiers(current) : undefined;
     setApps((prev) =>
       prev.map((a) =>
         a.id === id
           ? {
               ...a,
               status: next,
+              assignedTiers: tiers ?? a.assignedTiers,
               documents:
                 next === "Verified"
                   ? a.documents.map((d) => ({ ...d, status: "Verified" as const }))
@@ -118,7 +133,33 @@ export default function ApprovalsConsole() {
       ),
     );
     setToast(`Application ${next === "Verified" ? "approved" : "rejected"}`);
-    void persist(id, { status: next }, snapshot);
+    void persist(id, tiers ? { status: next, tiers } : { status: next }, snapshot);
+  };
+
+  // Set the vendor's assigned tiers (multi-select). A vendor must sit in at
+  // least one tier, so an empty selection is ignored. Persists immediately,
+  // mirroring the per-document review pattern.
+  const setTiers = (id: string, next: VendorTier[]) => {
+    const tiers = sortTiers(next);
+    if (tiers.length === 0) return;
+    const snapshot = apps;
+    setApps((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, assignedTiers: tiers } : a)),
+    );
+    setToast("Tiers updated");
+    void persist(id, { tiers }, snapshot);
+  };
+
+  const toggleTier = (id: string, t: VendorTier) => {
+    const app = apps.find((a) => a.id === id);
+    if (!app) return;
+    const current = effectiveTiers(app);
+    setTiers(
+      id,
+      current.includes(t)
+        ? current.filter((x) => x !== t)
+        : [...current, t],
+    );
   };
 
   const setDocStatus = (
@@ -263,7 +304,7 @@ export default function ApprovalsConsole() {
         {selected && (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2.5">
-              <TierBadges tiers={selected.requestedTiers} />
+              <TierBadges tiers={effectiveTiers(selected)} />
               <StatusBadge status={selected.status} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
@@ -276,6 +317,39 @@ export default function ApprovalsConsole() {
               <Detail label="City" value={selected.city} />
               <Detail label="Submitted" value={selected.submitted} />
             </dl>
+
+            {/* Tier assignment — multi-select; defaults to the price-derived
+                tiers the vendor requested until the admin decides otherwise. */}
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                Assigned Tiers
+              </p>
+              <p className="mb-3 text-sm text-ink-soft">
+                Choose every marketplace tier this vendor serves — a caterer can
+                sit in more than one band. Requested: {selected.requestedTiers.join(", ")}.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {TIER_ORDER.map((t) => {
+                  const active = effectiveTiers(selected).includes(t);
+                  const last = active && effectiveTiers(selected).length === 1;
+                  return (
+                    <label
+                      key={t}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-maroon"
+                        checked={active}
+                        disabled={last}
+                        onChange={() => toggleTier(selected.id, t)}
+                      />
+                      {t}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
 
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">

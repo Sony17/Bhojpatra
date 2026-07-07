@@ -5,7 +5,7 @@
  * record so they survive a device change and drive the partner dashboards.
  */
 import { getSessionUser } from "@/lib/auth";
-import { getUserById, saveUser, toPublicUser } from "@/lib/users";
+import { getUserById, saveUser, toPublicUser, grantAccount } from "@/lib/users";
 import type { PartnerRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +47,10 @@ export async function POST(request: Request) {
   if (!roles.some((r) => r.type === body.type)) {
     record.partnerRoles = [...roles, { type: body.type, referralCode }];
   }
-  // Holding a partner role makes this a partner account (admins keep their role).
-  if (record.role !== "admin") record.role = "partner";
+  // Holding a referral role adds the partner account. This keeps the person's
+  // primary role (so a customer stays customer-first) and leaves admins alone —
+  // grantAccount no-ops on admins.
+  grantAccount(record, "partner");
 
   try {
     await saveUser(record);

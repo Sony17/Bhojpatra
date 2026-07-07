@@ -33,8 +33,22 @@ export interface PartnerMembership {
 }
 
 export interface MockSession {
+  /**
+   * The account's primary type — its post-login default. One person can hold
+   * several accounts at once (see `accounts`); this is just which one they
+   * signed up as first.
+   */
   type: AccountType;
+  /**
+   * Every account type this one person holds — customer (always, it's
+   * universal), vendor and/or referral partner. The merged dashboard and the
+   * route guards read this so a single login can reach all of them.
+   */
+  accounts: AccountType[];
   name?: string;
+  /** The account's login email — lets authenticated flows (e.g. the vendor
+   *  registration wizard) bind to the signed-in account instead of re-asking. */
+  email?: string;
   /**
    * Set for partner accounts — the primary/first referrer type. Kept for
    * backward compatibility; prefer `partnerRoles` (this is derivable from it).
@@ -55,14 +69,25 @@ interface SessionUser {
   email: string;
   name?: string;
   role: AccountType | "admin";
+  accounts?: AccountType[];
   partnerRoles?: PartnerMembership[];
 }
 
-/** Where each account type lands after auth. */
+/** The merged dashboard that surfaces every account a person holds. */
+export const MERGED_DASHBOARD_PATH = "/dashboard";
+
+/** Where each account type's *dedicated* dashboard lives. */
 export const DASHBOARD_PATH: Record<AccountType, string> = {
   customer: "/bookings",
   vendor: "/vendor/dashboard",
   partner: "/partner/dashboard",
+};
+
+/** Human labels for each account type. */
+export const ACCOUNT_LABEL: Record<AccountType, { en: string; hi: string }> = {
+  customer: { en: "Customer", hi: "ग्राहक" },
+  vendor: { en: "Vendor", hi: "वेंडर" },
+  partner: { en: "Referral Partner", hi: "रेफ़रल पार्टनर" },
 };
 
 /** Shape the authenticated user into the session the app consumes. Admins have
@@ -74,13 +99,30 @@ function toSession(user: SessionUser | null): MockSession | null {
     return null;
   }
   const roles = user.partnerRoles ?? [];
+  // The server computes the full account set; fall back to the primary type for
+  // any legacy response that predates the `accounts` field. Customer is
+  // universal, so it's always present.
+  const accounts =
+    user.accounts && user.accounts.length
+      ? user.accounts
+      : ([user.role].filter((a) => a === "vendor" || a === "partner") as AccountType[]);
   return {
     type: user.role,
+    accounts: accounts.includes("customer") ? accounts : ["customer", ...accounts],
     name: user.name,
+    email: user.email,
     partnerType: roles[0]?.type,
     referralCode: roles[0]?.referralCode,
     partnerRoles: roles.length ? roles : undefined,
   };
+}
+
+/** Does this session hold the given account type? */
+export function hasAccount(
+  session: MockSession | null,
+  type: AccountType,
+): boolean {
+  return !!session?.accounts.includes(type);
 }
 
 /* ── Shared session cache (fetch once, notify all subscribers) ────────────── */

@@ -62,6 +62,16 @@ export function tierForPrice(price: number): VendorTier {
   return "Silver";
 }
 
+/** Keep only valid tier values from arbitrary input, in canonical order. Shared
+ *  by the application POST (submit) and PATCH (admin assign) routes. */
+export function parseTiers(raw: unknown): VendorTier[] {
+  if (!Array.isArray(raw)) return [];
+  const valid = raw.filter((t): t is VendorTier =>
+    TIER_ORDER.includes(t as VendorTier),
+  );
+  return sortTiers(valid);
+}
+
 /** A vendor awaiting KYC review (compact form used by the dashboard panel). */
 export interface PendingVendorApproval {
   id: string;
@@ -167,6 +177,10 @@ export interface VendorApplication extends PendingVendorApproval {
   email: string;
   phone: string;
   documents: VendorDocument[];
+  /** Tiers the admin has explicitly assigned during review. Absent until an
+   *  admin decides — the console then defaults the editor to `requestedTiers`
+   *  (the price-derived baseline). Once set, this drives the public catalog. */
+  assignedTiers?: VendorTier[];
 }
 
 /** Query params for the approvals queue. */

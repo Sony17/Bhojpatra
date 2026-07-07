@@ -11,6 +11,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
+import StickyBookingBar from "@/components/StickyBookingBar";
 
 const inr = new Intl.NumberFormat("en-IN");
 
@@ -90,17 +91,34 @@ export default function VendorProfile({
               {profile.state && `, ${profile.state}`}
             </p>
 
-            {profile.reviews > 0 ? (
+            {profile.reviews > 0 && (
               <p className="mt-2 text-sm text-ink">
                 ⭐ {profile.rating}{" "}
                 <span className="text-ink-soft">
                   ({inr.format(profile.reviews)} {t("reviews", "समीक्षाएँ")})
                 </span>
               </p>
-            ) : (
-              <p className="mt-2 text-sm font-semibold text-maroon">
-                {t("New on Bhojpatra", "भोजपत्र पर नया")}
+            )}
+
+            {/* Vendor-declared Google reputation — a distinct badge shown
+                alongside any Bhojpatra reviews. */}
+            {profile.googleRating ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cream-3 bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
+                <span aria-hidden="true" className="text-maroon">★</span>
+                <span className="font-bold">{profile.googleRating}</span>
+                <span className="text-ink-soft">
+                  {t("Google", "गूगल")}
+                  {profile.googleReviews
+                    ? ` · ${inr.format(profile.googleReviews)} ${t("reviews", "समीक्षाएँ")}`
+                    : ""}
+                </span>
               </p>
+            ) : (
+              profile.reviews === 0 && (
+                <p className="mt-2 text-sm font-semibold text-maroon">
+                  {t("New on Bhojpatra", "भोजपत्र पर नया")}
+                </p>
+              )
             )}
 
             {profile.cuisines.length > 0 && (
@@ -194,6 +212,14 @@ export default function VendorProfile({
           ))}
         </div>
       </div>
+
+      {/* Mobile sticky booking bar — price + CTA pinned above the tab bar. */}
+      <StickyBookingBar
+        price={`₹${inr.format(profile.priceFrom)}`}
+        priceNote={t("per plate onwards", "प्रति प्लेट से")}
+        cta={t("Start a Booking", "बुकिंग शुरू करें")}
+        href="/book"
+      />
     </section>
   );
 }

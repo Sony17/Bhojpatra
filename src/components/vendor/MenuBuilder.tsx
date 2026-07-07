@@ -46,6 +46,10 @@ interface VendorPayload {
   cuisines: string[];
   about?: string;
   priceFrom: number;
+  maxCapacity?: number;
+  maxEventsPerDay?: number;
+  googleRating?: number;
+  googleReviews?: number;
   menu: VendorMenuSection[];
 }
 
@@ -83,6 +87,11 @@ export default function MenuBuilder() {
   const [cuisinesText, setCuisinesText] = useState("");
   const [about, setAbout] = useState("");
   const [priceFrom, setPriceFrom] = useState("999");
+  const [maxCapacity, setMaxCapacity] = useState("");
+  const [maxEventsPerDay, setMaxEventsPerDay] = useState("");
+  // Self-declared Google reputation — shown as a "Google" badge on the card.
+  const [googleRating, setGoogleRating] = useState("");
+  const [googleReviews, setGoogleReviews] = useState("");
   const [sections, setSections] = useState<Record<string, DraftSection>>(
     emptySections,
   );
@@ -133,6 +142,12 @@ export default function MenuBuilder() {
             setCuisinesText((src.cuisines ?? []).join(", "));
             setAbout(src.about ?? "");
             if (src.priceFrom) setPriceFrom(String(src.priceFrom));
+            if (src.maxCapacity) setMaxCapacity(String(src.maxCapacity));
+            if (src.maxEventsPerDay)
+              setMaxEventsPerDay(String(src.maxEventsPerDay));
+            if (src.googleRating) setGoogleRating(String(src.googleRating));
+            if (src.googleReviews !== undefined)
+              setGoogleReviews(String(src.googleReviews));
           }
           if (d.gallery) setGallery(d.gallery);
           if (d.vendor) {
@@ -324,6 +339,10 @@ export default function MenuBuilder() {
           .filter(Boolean),
         about: about.trim(),
         priceFrom: Number(priceFrom) || 0,
+        maxCapacity: Number(maxCapacity) || undefined,
+        maxEventsPerDay: Number(maxEventsPerDay) || undefined,
+        googleRating: Number(googleRating) || undefined,
+        googleReviews: Number(googleReviews) || undefined,
         // Disabled courses with saved dishes go up as hidden — paused, not
         // deleted — so re-enabling later brings the dishes straight back.
         menu: menuCategories
@@ -550,6 +569,66 @@ export default function MenuBuilder() {
                 setStateName(e.target.value);
                 setSaved(false);
               }}
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("Max Capacity (guests / event)", "अधिकतम क्षमता (मेहमान / इवेंट)")}>
+            <input
+              type="number"
+              min={0}
+              value={maxCapacity}
+              onChange={(e) => {
+                setMaxCapacity(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="2000"
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("Max Events / Day", "अधिकतम इवेंट / दिन")}>
+            <input
+              type="number"
+              min={0}
+              value={maxEventsPerDay}
+              onChange={(e) => {
+                setMaxEventsPerDay(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="3"
+              className={inputClass}
+            />
+          </Field>
+          <Field label={t("Google Rating (0–5)", "गूगल रेटिंग (0–5)")}>
+            <input
+              type="number"
+              min={0}
+              max={5}
+              step={0.1}
+              value={googleRating}
+              onChange={(e) => {
+                setGoogleRating(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="4.6"
+              className={inputClass}
+            />
+            <span className="mt-1 block text-xs text-ink-soft">
+              {t(
+                "Shown as a Google badge on your card. Leave blank to hide it.",
+                "आपके कार्ड पर गूगल बैज के रूप में दिखता है। छिपाने के लिए खाली छोड़ें।",
+              )}
+            </span>
+          </Field>
+          <Field label={t("Google Reviews (count)", "गूगल रिव्यू (संख्या)")}>
+            <input
+              type="number"
+              min={0}
+              value={googleReviews}
+              onChange={(e) => {
+                setGoogleReviews(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="230"
               className={inputClass}
             />
           </Field>

@@ -4,9 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
-import { useSessionStatus, partnerMemberships } from "@/lib/session";
-import { isSelfReferral } from "@/lib/referral";
+import {
+  useSessionStatus,
+  partnerMemberships,
+  type PartnerRole,
+} from "@/lib/session";
+import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import LoginGate from "@/components/auth/LoginGate";
+import ThemedSelect from "@/components/ThemedSelect";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import {
   useVendorRatings,
@@ -168,6 +173,11 @@ export default function BookingWizard() {
   const [activeCat, setActiveCat] = useState<number>(0);
   const [categoryVendor, setCategoryVendor] = useState<VendorMap>({});
   const [categoryItems, setCategoryItems] = useState<ItemMap>({});
+  // Single Stall (custom) plan only — the stalls a guest chose to skip. A
+  // skipped stall bills nothing, never counts as "built", and no longer blocks
+  // Continue ("pay only for what you select"). Inert on the fixed tiers, where
+  // every course is mandatory.
+  const [skippedCats, setSkippedCats] = useState<string[]>([]);
 
   // Step 3 — Event details (occasion, date, city, venue, guests, extras).
   // Occasion / date / city / venue are usually pre-chosen in the Hero booking
@@ -198,6 +208,10 @@ export default function BookingWizard() {
   const [referralCode, setReferralCode] = useState<string>("");
   const [referrerName, setReferrerName] = useState<string>("");
   const [referrerType, setReferrerType] = useState<string>("");
+  // The resolved partner's registered phone — kept so we can spot a booker who's
+  // referring themselves from a second account (their phone matches the code's
+  // owner). The server re-checks this authoritatively; here it's for feedback.
+  const [referrerPhone, setReferrerPhone] = useState<string>("");
 
   // The signed-in account's own referral codes — an Individual Referrer or Event
   // Planner must not credit their own booking, so a code that belongs to this
@@ -206,7 +220,6 @@ export default function BookingWizard() {
     () => partnerMemberships(sessionStatus ?? null),
     [sessionStatus],
   );
-  const selfReferral = isSelfReferral(referralCode, ownMemberships);
 
   // Admin-managed occasions + serviceable locations (both fall back to their
   // seed lists). resolveOccasion / resolveCity turn the selected id — or the
@@ -303,6 +316,7 @@ export default function BookingWizard() {
     if (!code || isSelfReferral(code, ownMemberships)) {
       setReferrerName("");
       setReferrerType("");
+      setReferrerPhone("");
       return;
     }
     let active = true;
@@ -313,6 +327,9 @@ export default function BookingWizard() {
         const p = data?.partner;
         setReferrerName(p?.name ?? "");
         setReferrerType(p?.type ?? "");
+        // Kept only to compare against the booker's phone (second-account
+        // self-referral); never rendered.
+        setReferrerPhone(p?.phone ?? "");
       })
       .catch(() => {
         /* offline — keep the raw code, no resolved name */
@@ -346,6 +363,18 @@ export default function BookingWizard() {
   // orders are actionable for our team in the admin console.
   const [customerName, setCustomerName] = useState<string>("");
   const [customerPhone, setCustomerPhone] = useState<string>("");
+
+  // A booking can't credit its own booker. Two ways that happens, both dropped:
+  //  • same account — the applied code is one of this signed-in account's codes;
+  //  • second account — the code's owner (an Individual Referrer / Event Planner)
+  //    has the same phone as the one entered here. The server re-checks both
+  //    authoritatively; this drives the "you can't refer yourself" notice.
+  const selfReferral =
+    isSelfReferral(referralCode, ownMemberships) ||
+    isPhoneSelfReferral(customerPhone, {
+      type: referrerType as PartnerRole,
+      phone: referrerPhone,
+    });
   // How the guest wants to pay: UPI / QR settle online now; COD and Connect are
   // arranged later. Defaults to UPI (pay-now).
   const [payMethod, setPayMethod] = useState<OrderPaymentMethod>("UPI");
@@ -472,17 +501,52 @@ export default function BookingWizard() {
     );
   };
 
-  const completedCount = activeCategories.filter(categoryComplete).length;
-  const allComplete = completedCount === activeCategories.length;
-  // Courses still missing a vendor or their full item quota — used to tell the
-  // guest exactly what's blocking "Continue" and to jump them there.
-  const incompleteCategories = activeCategories.filter((c) => !categoryComplete(c));
-  const firstIncompleteCat = activeCategories.findIndex((c) => !categoryComplete(c));
+  // The Single Stall (custom) plan lets a guest skip courses they don't want.
+  // Skipping is meaningless on the fixed tiers (every course is included), so
+  // it's gated to `custom` even if a stale skip id lingers from an earlier pick.
+  const singleStall = packageId === "custom";
+  const isSkipped = (catId: string): boolean =>
+    singleStall && skippedCats.includes(catId);
+  // A stall stops blocking "Continue" once it's either fully built or skipped.
+  const categoryResolved = (cat: MenuCategory): boolean =>
+    categoryComplete(cat) || isSkipped(cat.id);
+
+  // Courses actually built (vendor + full item quota).
+  const builtCount = activeCategories.filter(categoryComplete).length;
+  // An order must carry something billable, but not necessarily from the menu —
+  // a Single Stall guest may skip every stall and build an add-ons-only order.
+  // Enforced on the details/extras step, where add-ons are chosen.
+  const orderHasItems = builtCount > 0 || selectedAddOns.length > 0;
+  // "Menu step done" = every stall resolved (built or skipped). Skipping the
+  // whole menu is allowed — the guest just moves on to pick live counters &
+  // extras. On the fixed tiers nothing is skippable, so this reduces to "every
+  // course complete".
+  const allComplete = activeCategories.every(categoryResolved);
+  // Single Stall guest who skipped every stall — the menu is empty and they'll
+  // build the order entirely from add-ons on the next step.
+  const menuFullySkipped = singleStall && allComplete && builtCount === 0;
+  // Courses still needing a decision (not built and not skipped) — used to tell
+  // the guest exactly what's left before "Continue" and to jump them there.
+  const incompleteCategories = activeCategories.filter((c) => !categoryResolved(c));
+  const firstIncompleteCat = activeCategories.findIndex((c) => !categoryResolved(c));
   const incompleteCategoryNames = incompleteCategories.map((c) =>
     lang === "hi" ? c.nameHi : c.name,
   );
 
+  // Skip a stall (Single Stall plan): drop any picks so it bills nothing and
+  // never counts as "built", then mark it skipped so it stops blocking Continue.
+  const skipCat = (catId: string) => {
+    setCategoryVendor((m) => ({ ...m, [catId]: [] }));
+    setCategoryItems((m) => ({ ...m, [catId]: [] }));
+    setSkippedCats((s) => (s.includes(catId) ? s : [...s, catId]));
+  };
+  const unskipCat = (catId: string) =>
+    setSkippedCats((s) => s.filter((id) => id !== catId));
+
   const pickVendor = (catId: string, vendorId: string) => {
+    // Picking a vendor for a skipped stall means the guest changed their mind —
+    // fold it back into the order.
+    if (skippedCats.includes(catId)) unskipCat(catId);
     const current = vendorsFor(catId);
     if (!multiVendor) {
       // Single-vendor tiers: switching vendor replaces the choice and its items.
@@ -687,7 +751,10 @@ export default function BookingWizard() {
           guests >= paxMin &&
           guests <= paxMax &&
           eventDate !== "" &&
-          dateMeetsLead
+          dateMeetsLead &&
+          // An add-ons-only order (menu fully skipped) must pick at least one
+          // extra here, so a booking is never entirely empty.
+          orderHasItems
         );
       default:
         return true;
@@ -704,6 +771,13 @@ export default function BookingWizard() {
     }
     if (step === 3) {
       const out: string[] = [];
+      if (!orderHasItems)
+        out.push(
+          t(
+            "Your menu is empty — add at least one live counter or extra below.",
+            "आपका मेन्यू खाली है — नीचे कम से कम एक लाइव काउंटर या एक्स्ट्रा जोड़ें।",
+          ),
+        );
       if (occasionId === "") out.push(t("Select an occasion", "अवसर चुनें"));
       if (eventDate === "") out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
@@ -979,6 +1053,23 @@ export default function BookingWizard() {
     if (activeCat < activeCategories.length - 1) setActiveCat((c) => c + 1);
     else if (allComplete) goNext();
   };
+  // Single Stall: skip the current stall and slide on to the next one. On the
+  // last stall there's nowhere to advance — skipping just resolves it so the
+  // Continue button below can light up.
+  const skipCurrentStall = () => {
+    const cat = activeCategories[activeCat];
+    if (!cat) return;
+    skipCat(cat.id);
+    if (activeCat < activeCategories.length - 1) setActiveCat((c) => c + 1);
+  };
+  // Single Stall: skip the whole menu in one go and jump to the extras step to
+  // build an add-ons-only order. Skips every stall (so nothing is billed from
+  // the menu), then advances past the menu step.
+  const skipMenuEntirely = () => {
+    activeCategories.forEach((c) => skipCat(c.id));
+    setActiveCat(0);
+    goNext();
+  };
 
   // Confirm the request and save it so it shows up on the My Bookings page and,
   // via /api/bookings, in the admin booking console — carrying the chosen
@@ -1186,6 +1277,9 @@ export default function BookingWizard() {
         paxMax={paxMax}
         minDate={earliestDate}
         leadWarning={leadWarning}
+        // Confirm step (4) locks the headcount and echoes it in the order
+        // summary, so the editable Guests field is redundant there — hide it.
+        showGuests={step !== 4}
       />
 
       {/* Layout */}
@@ -1215,6 +1309,9 @@ export default function BookingWizard() {
             toggleItem={toggleItem}
             allowanceFor={allowanceFor}
             categoryComplete={categoryComplete}
+            isSkipped={isSkipped}
+            unskipCat={unskipCat}
+            onSkipMenu={singleStall ? skipMenuEntirely : undefined}
             vendorRatings={vendorRatings}
           />
         </div>
@@ -1365,7 +1462,7 @@ export default function BookingWizard() {
           {!allComplete && (
             <button
               type="button"
-              onClick={() => setActiveCat(firstIncompleteCat)}
+              onClick={() => setActiveCat(Math.max(0, firstIncompleteCat))}
               className="mb-4 flex w-full items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
             >
               <span aria-hidden="true" className="text-maroon">
@@ -1377,14 +1474,34 @@ export default function BookingWizard() {
                   {incompleteCategoryNames.join(", ")}
                 </span>
                 {". "}
-                {t(
-                  "Tap to jump to the next course and pick the rest.",
-                  "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
-                )}
+                {singleStall
+                  ? t(
+                      "Tap to jump there, or skip the stalls you don't want.",
+                      "वहाँ जाने के लिए टैप करें, या जो स्टॉल नहीं चाहिए उन्हें छोड़ दें।",
+                    )
+                  : t(
+                      "Tap to jump to the next course and pick the rest.",
+                      "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
+                    )}
               </span>
             </button>
           )}
-          <div className="flex items-center justify-between gap-3">
+          {/* Whole menu skipped — reassure the guest they're not stuck: the order
+              will be built from live counters & extras on the next step. */}
+          {menuFullySkipped && (
+            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+              <span aria-hidden="true" className="text-maroon">
+                ★
+              </span>
+              <span>
+                {t(
+                  "You've skipped every stall. Continue to add live counters & extras — you'll pick at least one there to complete your order.",
+                  "आपने हर स्टॉल छोड़ दिया है। लाइव काउंटर और एक्स्ट्रा जोड़ने के लिए जारी रखें — ऑर्डर पूरा करने के लिए वहाँ कम से कम एक चुनें।",
+                )}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               onClick={menuPrev}
@@ -1395,13 +1512,39 @@ export default function BookingWizard() {
                 ? t("Prev Category", "पिछली श्रेणी")
                 : t("Back", "पीछे")}
             </button>
+            {/* Single Stall lets a guest opt out of a course entirely — skip it
+                and slide to the next stall, or undo if they skipped by mistake. */}
+            {singleStall &&
+              (isSkipped(activeCategories[activeCat]?.id ?? "") ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cur = activeCategories[activeCat];
+                    if (cur) unskipCat(cur.id);
+                  }}
+                  className="rounded-full border border-maroon bg-cream-2/60 px-5 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
+                >
+                  {t("Undo skip", "छोड़ना पूर्ववत करें")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={skipCurrentStall}
+                  className="rounded-full border border-maroon px-5 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+                >
+                  {t("Skip this stall", "यह स्टॉल छोड़ें")}
+                </button>
+              ))}
             {activeCat < activeCategories.length - 1 ? (
               <button
                 type="button"
                 onClick={menuNext}
                 className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
               >
-                {t("Next Category", "अगली श्रेणी")} →
+                {singleStall
+                  ? t("Next stall", "अगला स्टॉल")
+                  : t("Next Category", "अगली श्रेणी")}{" "}
+                →
               </button>
             ) : (
               <button
@@ -1503,6 +1646,7 @@ function EventBar({
   paxMax,
   minDate,
   leadWarning,
+  showGuests = true,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -1524,33 +1668,47 @@ function EventBar({
   paxMax: number;
   minDate: string;
   leadWarning: string;
+  /** The headcount is fixed and echoed in the order summary by the Confirm
+   *  step, so the editable field is hidden there to avoid a redundant control. */
+  showGuests?: boolean;
 }) {
   const fieldClass =
     "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-maroon";
+  // Trigger styling for the themed dropdowns — mirrors `fieldClass` minus the
+  // wrapper spacing (which sits on the ThemedSelect root instead).
+  const selectButtonClass =
+    "w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm outline-none transition-colors";
 
   return (
     <div className="mt-6 rounded-2xl border border-maroon/30 bg-cream-2/40 p-4 shadow-sm sm:p-5">
       <p className="eyebrow text-xs font-semibold text-gold">
         {t("YOUR EVENT", "आपका इवेंट")}
       </p>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={
+          "mt-3 grid gap-4 sm:grid-cols-2 " +
+          (showGuests ? "lg:grid-cols-4" : "lg:grid-cols-3")
+        }
+      >
         <label className="block">
           <span className="text-xs font-medium text-ink-soft">
             {t("Occasion", "अवसर")}
           </span>
-          <select
+          <ThemedSelect
             value={occasionId}
-            onChange={(e) => setOccasionId(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="">{t("Select occasion", "अवसर चुनें")}</option>
-            {occasionList.map((o) => (
-              <option key={o.id} value={o.id}>
-                {lang === "hi" ? o.nameHi : o.name}
-              </option>
-            ))}
-            <option value={OTHER_OCCASION_ID}>{t("Other", "अन्य")}</option>
-          </select>
+            onChange={setOccasionId}
+            ariaLabel={t("Occasion", "अवसर")}
+            placeholder={t("Select occasion", "अवसर चुनें")}
+            className="mt-1.5"
+            buttonClassName={selectButtonClass}
+            options={[
+              ...occasionList.map((o) => ({
+                value: o.id,
+                label: lang === "hi" ? o.nameHi : o.name,
+              })),
+              { value: OTHER_OCCASION_ID, label: t("Other", "अन्य") },
+            ]}
+          />
           {occasionId === OTHER_OCCASION_ID && (
             <input
               type="text"
@@ -1588,19 +1746,21 @@ function EventBar({
           <span className="text-xs font-medium text-ink-soft">
             {t("City / Location", "शहर / लोकेशन")}
           </span>
-          <select
+          <ThemedSelect
             value={cityId}
-            onChange={(e) => setCityId(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="">{t("Select city", "शहर चुनें")}</option>
-            {locations.map((c) => (
-              <option key={c.id} value={c.id}>
-                {lang === "hi" ? c.nameHi : c.name}
-              </option>
-            ))}
-            <option value={OTHER_LOCATION_ID}>{t("Other", "अन्य")}</option>
-          </select>
+            onChange={setCityId}
+            ariaLabel={t("City / Location", "शहर / लोकेशन")}
+            placeholder={t("Select city", "शहर चुनें")}
+            className="mt-1.5"
+            buttonClassName={selectButtonClass}
+            options={[
+              ...locations.map((c) => ({
+                value: c.id,
+                label: lang === "hi" ? c.nameHi : c.name,
+              })),
+              { value: OTHER_LOCATION_ID, label: t("Other", "अन्य") },
+            ]}
+          />
           {cityId === OTHER_LOCATION_ID && (
             <input
               type="text"
@@ -1613,25 +1773,27 @@ function EventBar({
           )}
         </label>
 
-        <label className="block">
-          <span className="text-xs font-medium text-ink-soft">
-            {t("Guests", "मेहमान")} ({inr.format(paxMin)}–{inr.format(paxMax)})
-          </span>
-          <input
-            type="number"
-            min={paxMin}
-            max={paxMax}
-            value={guests}
-            onChange={(e) => setGuests(Number(e.target.value))}
-            onBlur={(e) => {
-              const v = Number(e.target.value);
-              setGuests(
-                Math.max(paxMin, Math.min(paxMax, Math.round(v || paxMin))),
-              );
-            }}
-            className={fieldClass}
-          />
-        </label>
+        {showGuests && (
+          <label className="block">
+            <span className="text-xs font-medium text-ink-soft">
+              {t("Guests", "मेहमान")} ({inr.format(paxMin)}–{inr.format(paxMax)})
+            </span>
+            <input
+              type="number"
+              min={paxMin}
+              max={paxMax}
+              value={guests}
+              onChange={(e) => setGuests(Number(e.target.value))}
+              onBlur={(e) => {
+                const v = Number(e.target.value);
+                setGuests(
+                  Math.max(paxMin, Math.min(paxMax, Math.round(v || paxMin))),
+                );
+              }}
+              className={fieldClass}
+            />
+          </label>
+        )}
       </div>
     </div>
   );
@@ -1676,8 +1838,8 @@ function StepPackage({
         )}
       />
       {/* Short-notice dates can't be sourced for the regular tiers — steer the
-          guest to the Custom single-stall plan (one vendor per course) + add-ons
-          rather than leaving the lone Custom card unexplained. */}
+          guest to the Single Stall plan (one vendor per course) + add-ons
+          rather than leaving the lone Single Stall card unexplained. */}
       {shortNotice ? (
         <p className="mb-4 flex items-start gap-2 rounded-lg border border-maroon/30 bg-cream/40 px-4 py-2.5 text-sm text-ink-soft">
           <span aria-hidden="true" className="text-maroon">
@@ -1685,8 +1847,8 @@ function StepPackage({
           </span>
           <span>
             {t(
-              "This date is short-notice, so our full packages can't be arranged in time. You can still book with the Custom single-stall plan — one vendor per course, plus any add-ons & live counters.",
-              "यह तारीख़ बहुत नज़दीक है, इसलिए हमारे पूरे पैकेज समय पर तैयार नहीं हो पाएंगे। फिर भी आप कस्टम सिंगल-स्टॉल प्लान से बुक कर सकते हैं — हर कोर्स के लिए एक वेंडर, साथ में ऐड-ऑन और लाइव काउंटर।",
+              "This date is short-notice, so our full packages can't be arranged in time. You can still book with the Single Stall plan — one vendor per course, plus any add-ons & live counters.",
+              "यह तारीख़ बहुत नज़दीक है, इसलिए हमारे पूरे पैकेज समय पर तैयार नहीं हो पाएंगे। फिर भी आप सिंगल स्टॉल प्लान से बुक कर सकते हैं — हर कोर्स के लिए एक वेंडर, साथ में ऐड-ऑन और लाइव काउंटर।",
             )}
           </span>
         </p>
@@ -1706,7 +1868,7 @@ function StepPackage({
           identical here and on the landing page — fold-mounted CTA pill and,
           on mobile, the same swipe left–right snap carousel. On sm+ the grid's
           columns track the number of packages the date qualifies for, so a
-          lone available tier (e.g. only Custom for a same-day date) fills the
+          lone available tier (e.g. only the Single Stall plan for a same-day date) fills the
           column instead of stranding an empty half beside it. */}
       <div
         className={
@@ -1775,6 +1937,9 @@ function StepMenu({
   toggleItem,
   allowanceFor,
   categoryComplete,
+  isSkipped,
+  unskipCat,
+  onSkipMenu,
   vendorRatings,
 }: {
   lang: Lang;
@@ -1790,6 +1955,10 @@ function StepMenu({
   toggleItem: (catId: string, itemId: string) => void;
   allowanceFor: (catId: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
+  isSkipped: (catId: string) => boolean;
+  unskipCat: (catId: string) => void;
+  /** Single Stall only — skip the whole menu and go straight to add-ons. */
+  onSkipMenu?: () => void;
   vendorRatings: VendorRatings;
 }) {
   const vendorScrollRef = useRef<HTMLDivElement>(null);
@@ -1827,6 +1996,26 @@ function StepMenu({
     <div className="min-w-0">
       <SectionHead title={t("Build Your Menu", "अपना मेन्यू बनाएं")} />
 
+      {/* Single Stall only — a guest who just wants live counters & extras can
+          bypass the courses entirely and jump to the add-ons step. */}
+      {onSkipMenu && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-cream-2/40 px-4 py-3 text-sm text-ink-soft">
+          <span>
+            {t(
+              "Not building a menu? Skip straight to live counters & extras.",
+              "मेन्यू नहीं बना रहे? सीधे लाइव काउंटर और एक्स्ट्रा पर जाएं।",
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={onSkipMenu}
+            className="shrink-0 rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
+          >
+            {t("Skip menu · Add extras only", "मेन्यू छोड़ें · सिर्फ़ एक्स्ट्रा")} →
+          </button>
+        </div>
+      )}
+
       {/* What this package unlocks — a package that lets the guest mix several
           vendors and/or pick a spread of dishes says so up front, so they know
           they can build a broader menu rather than assuming one vendor / one
@@ -1861,6 +2050,7 @@ function StepMenu({
         {categories.map((c, i) => {
           const active = i === activeCat;
           const complete = categoryComplete(c);
+          const skipped = isSkipped(c.id);
           return (
             <button
               key={c.id}
@@ -1870,22 +2060,62 @@ function StepMenu({
                 "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition " +
                 (active
                   ? "border-maroon bg-maroon text-cream"
-                  : "border-cream-3 bg-white text-ink-soft hover:bg-cream-2")
+                  : skipped
+                    ? "border-cream-3 bg-cream-2/60 text-ink-soft/60 hover:bg-cream-2"
+                    : "border-cream-3 bg-white text-ink-soft hover:bg-cream-2")
               }
             >
               <span aria-hidden="true">{c.icon}</span>
-              <span className="eyebrow text-xs">
+              <span
+                className={
+                  "eyebrow text-xs" + (skipped && !active ? " line-through" : "")
+                }
+              >
                 {(lang === "hi" ? c.nameHi : c.name).toUpperCase()}
               </span>
-              {complete && (
+              {complete ? (
                 <span aria-hidden="true" className={active ? "text-cream" : "text-maroon"}>
                   ✓
                 </span>
-              )}
+              ) : skipped ? (
+                <span
+                  className={
+                    "eyebrow text-[10px] font-semibold " +
+                    (active ? "text-cream" : "text-ink-soft/60")
+                  }
+                >
+                  {t("SKIPPED", "छोड़ा")}
+                </span>
+              ) : null}
             </button>
           );
         })}
       </div>
+
+      {/* Skipped-stall notice — the guest opted out of this stall; picking any
+          vendor below folds it straight back in, or they can undo explicitly. */}
+      {isSkipped(cat.id) && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+          <span className="flex items-start gap-2">
+            <span aria-hidden="true" className="text-maroon">
+              ★
+            </span>
+            <span>
+              {t(
+                "You've skipped this stall — it won't be in your order or price. Pick a vendor below to add it back.",
+                "आपने यह स्टॉल छोड़ दिया है — यह आपके ऑर्डर या कीमत में नहीं होगा। इसे वापस जोड़ने के लिए नीचे वेंडर चुनें।",
+              )}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => unskipCat(cat.id)}
+            className="shrink-0 rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
+          >
+            {t("Undo skip", "छोड़ना पूर्ववत करें")}
+          </button>
+        </div>
+      )}
 
       {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
       <h3 className="mt-7 font-display text-lg font-semibold text-maroon">
@@ -1930,6 +2160,15 @@ function StepMenu({
                     ⭐ {v.rating}{" "}
                     <span className="text-ink-soft/70">
                       ({inr.format(v.reviews)})
+                    </span>
+                  </p>
+                ) : v.googleRating ? (
+                  <p className="mt-1 text-xs text-ink-soft">
+                    <span aria-hidden="true" className="text-maroon">★</span>{" "}
+                    <span className="font-semibold text-ink">{v.googleRating}</span>{" "}
+                    <span className="text-ink-soft/70">
+                      {t("Google", "गूगल")}
+                      {v.googleReviews ? ` (${inr.format(v.googleReviews)})` : ""}
                     </span>
                   </p>
                 ) : (
@@ -2126,15 +2365,25 @@ function StepDetails({
 }) {
   return (
     <div>
-      <SectionHead
-        title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
-        sub={t(
-          "Optional live counters and add-ons to round out your menu.",
-          "अपने मेन्यू को पूरा करने के लिए वैकल्पिक लाइव काउंटर और ऐड-ऑन।",
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionHead
+          title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
+          sub={t(
+            "Optional live counters and add-ons to round out your menu.",
+            "अपने मेन्यू को पूरा करने के लिए वैकल्पिक लाइव काउंटर और ऐड-ऑन।",
+          )}
+        />
+        {selectedAddOns.length > 0 && (
+          <span className="shrink-0 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+            {t(
+              `${selectedAddOns.length} added`,
+              `${selectedAddOns.length} जोड़े गए`,
+            )}
+          </span>
         )}
-      />
+      </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-5 flex flex-col gap-4">
         {addOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
           const lineTotal = a.perPlate ? a.price * guests : a.price;
@@ -2143,7 +2392,7 @@ function StepDetails({
             <div
               key={a.id}
               className={
-                "rounded-2xl border bg-white p-4 shadow-sm transition " +
+                "group overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md " +
                 (active ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
@@ -2151,38 +2400,59 @@ function StepDetails({
                 type="button"
                 aria-pressed={active}
                 onClick={() => toggleAddOn(a.id)}
-                className="flex w-full items-start gap-4 text-left"
+                className="flex w-full flex-col text-left sm:flex-row"
               >
-                <span
-                  aria-hidden="true"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream-2 text-xl"
-                >
-                  {a.icon}
-                </span>
-                <div className="flex-1">
-                  <h4 className="font-display text-base font-semibold text-ink">
-                    {lang === "hi" ? a.nameHi : a.name}
-                  </h4>
-                  <p className="mt-0.5 text-sm text-ink-soft">{a.description}</p>
-                  <p className="mt-1 text-sm font-semibold text-maroon">
+                {/* Counter photo — a fixed-width thumbnail on wider screens so
+                    the row stays compact; full-width banner on mobile. The
+                    price rides on the image as a pill. */}
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-2 sm:aspect-auto sm:w-52 sm:shrink-0 sm:self-stretch">
+                  <Image
+                    src={a.image}
+                    alt={lang === "hi" ? a.nameHi : a.name}
+                    fill
+                    sizes="(min-width: 640px) 208px, 100vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <span className="absolute bottom-2 left-2 rounded-full bg-maroon px-2.5 py-1 text-xs font-semibold text-cream shadow-sm">
                     {a.perPlate
                       ? `${money(a.price)} / ${t("plate", "प्लेट")}`
                       : money(a.price)}
-                    <span className="ml-2 text-xs font-normal text-ink-soft">
-                      ≈ {money(lineTotal)}
-                    </span>
-                  </p>
+                  </span>
                 </div>
-                <span
-                  className={
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm " +
-                    (active
-                      ? "border-maroon bg-maroon text-cream"
-                      : "border-cream-3 text-transparent")
-                  }
-                >
-                  ✓
-                </span>
+                <div className="flex flex-1 items-start gap-3 p-4">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream-2 text-xl"
+                  >
+                    {a.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-display text-base font-semibold text-ink">
+                      {lang === "hi" ? a.nameHi : a.name}
+                    </h4>
+                    <p className="mt-0.5 text-sm text-ink-soft">
+                      {a.description}
+                    </p>
+                    <p className="mt-1.5 text-xs text-ink-soft">
+                      {a.perPlate
+                        ? t(
+                            `≈ ${money(lineTotal)} for ${guests} guests`,
+                            `${guests} मेहमानों के लिए ≈ ${money(lineTotal)}`,
+                          )
+                        : t("One-time charge", "एकमुश्त शुल्क")}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm transition " +
+                      (active
+                        ? "border-maroon bg-maroon text-cream"
+                        : "border-cream-3 text-transparent")
+                    }
+                  >
+                    ✓
+                  </span>
+                </div>
               </button>
 
               {/* Vendor for this counter — drawn from the catalogue for the
@@ -2190,10 +2460,10 @@ function StepDetails({
                   Rendered as selectable tiles (not a dropdown) so every option
                   is visible at a glance and chosen with a single tap. */}
               {active && (
-                <div className="mt-3 border-t border-cream-3 pt-3">
+                <div className="border-t border-cream-3 px-4 pb-4 pt-3">
                   <span
                     id={selectId}
-                    className="block text-xs font-semibold text-ink-soft"
+                    className="block text-xs font-semibold uppercase tracking-wide text-ink-soft"
                   >
                     {t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
                   </span>
@@ -2220,24 +2490,45 @@ function StepDetails({
                             aria-checked={picked}
                             onClick={() => onVendorChange(a.id, v.id)}
                             className={
-                              "flex flex-col rounded-xl border bg-white px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm " +
+                              "flex items-center gap-3 rounded-xl border bg-white p-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm " +
                               (picked
                                 ? "border-maroon ring-2 ring-maroon"
                                 : "border-cream-3")
                             }
                           >
-                            <span className="font-display text-sm font-semibold text-ink">
-                              {v.name}
+                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-cream-2">
+                              <Image
+                                src={v.image}
+                                alt={v.name}
+                                fill
+                                sizes="44px"
+                                className="object-cover"
+                              />
                             </span>
-                            <span className="mt-0.5 text-xs text-ink-soft">
-                              {v.city} · ★ {v.rating}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-display text-sm font-semibold text-ink">
+                                {v.name}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-ink-soft">
+                                {v.city} · ★ {v.rating}
+                              </span>
+                            </span>
+                            <span
+                              className={
+                                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] " +
+                                (picked
+                                  ? "border-maroon bg-maroon text-cream"
+                                  : "border-cream-3 text-transparent")
+                              }
+                            >
+                              ✓
                             </span>
                           </button>
                         );
                       })}
                     </div>
                   )}
-                  <p className="mt-1.5 text-xs text-ink-soft">
+                  <p className="mt-2 text-xs text-ink-soft">
                     {t(
                       `${packageName || "Selected package"} vendors`,
                       `${packageName || "चयनित पैकेज"} वेंडर`,
