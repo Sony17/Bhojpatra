@@ -1353,6 +1353,36 @@ export const vendorListings: VendorListing[] = [
   { id: "vl-15", name: "Hazelnut Factory", tiers: ["Silver", "Gold"], rating: 4.7, reviews: 214, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 599, verified: true, image: img("photo-1549465220-1a8b9238cd48", 500) },
 ];
 
+/**
+ * Server-authoritative advance notice (in days) for a Single-Stall / Custom
+ * order, derived from the vendors it actually involves rather than trusting the
+ * client. Mirrors the wizard's `customLeadDays`: the longest `leadDays` among
+ * the catalogue vendors whose ids are on the order (each vendor's own value,
+ * default 2; same-day stalls contribute 0). Ids are resolved against both the
+ * course-level roster (`menuCategories`) and the caterer listings
+ * (`vendorListings`). Unrecognised ids are ignored; if none resolve — a legacy
+ * client or a tampered payload that stripped the vendors — we fall back to the
+ * baseline notice so an order can never be slipped in for same-day by omitting
+ * or faking its vendors.
+ */
+export function customOrderLeadDays(vendorIds: readonly string[]): number {
+  let lead = 0;
+  let matched = false;
+  for (const id of vendorIds) {
+    if (!id) continue;
+    const v =
+      menuCategories
+        .flatMap((c) => c.vendors)
+        .find((x) => x.id === id) ??
+      vendorListings.find((x) => x.id === id);
+    if (v) {
+      matched = true;
+      lead = Math.max(lead, vendorLeadDays(v));
+    }
+  }
+  return matched ? lead : DEFAULT_VENDOR_LEAD_DAYS;
+}
+
 /* ───────────────────────────────────────────────────────────────────────
    MY BOOKINGS — customer booking history & status.
 ─────────────────────────────────────────────────────────────────────── */

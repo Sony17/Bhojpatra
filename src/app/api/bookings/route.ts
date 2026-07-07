@@ -4,7 +4,7 @@ import {
 } from "@/lib/orderPayment";
 import {
   packageLeadDays,
-  DEFAULT_VENDOR_LEAD_DAYS,
+  customOrderLeadDays,
   type BookingStatus,
 } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
@@ -128,7 +128,6 @@ export async function POST(request: Request) {
     date,
     eventDateISO,
     packageId,
-    leadDays,
     guests,
     vendor,
     city,
@@ -157,23 +156,26 @@ export async function POST(request: Request) {
   }
 
   // Advance-booking rule (server-side backstop for the wizard's date gate). The
-  // fixed tiers (Silver/Gold/Platinum) use our own authoritative lead — the
-  // client can't shorten them. Custom carries no fixed package lead, so we trust
-  // the vendor-derived lead the client computed, clamped to a sane floor of
-  // "no same-day unless a real lead was sent". A missing ISO date skips the
-  // check (legacy clients) rather than blocking the booking.
+  // required notice is computed entirely from our own data — the client's
+  // claimed `leadDays` is never trusted. Fixed tiers (Silver/Gold/Platinum) use
+  // their authoritative package lead; Single-Stall / Custom (and any unknown
+  // package) re-derive it from the vendors actually on the order, so a tampered
+  // same-day payload can't slip past a standard stall's 2-day floor. A missing
+  // ISO date skips the check (legacy clients) rather than blocking the booking.
   const iso = typeof eventDateISO === "string" ? eventDateISO : "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
     const fixedLead =
       typeof packageId === "string" ? packageLeadDays[packageId] : undefined;
-    const clientLead =
-      typeof leadDays === "number" && Number.isFinite(leadDays)
-        ? Math.max(0, Math.min(365, Math.round(leadDays)))
-        : DEFAULT_VENDOR_LEAD_DAYS;
-    // Non-custom tiers: enforce the server's own value. Custom / unknown: honour
-    // the client's per-vendor lead (bounded above).
+    // Vendor ids on the order, used to re-derive the single-stall notice.
+    const vendorIds = Array.isArray(vendors)
+      ? (vendors as BookedVendor[])
+          .map((v) => (v && typeof v.id === "string" ? v.id : ""))
+          .filter(Boolean)
+      : [];
     const requiredLead =
-      fixedLead !== undefined && packageId !== "custom" ? fixedLead : clientLead;
+      fixedLead !== undefined && packageId !== "custom"
+        ? fixedLead
+        : customOrderLeadDays(vendorIds);
     const days = daysUntilISO(iso);
     if (days !== null && days < requiredLead) {
       return Response.json(
