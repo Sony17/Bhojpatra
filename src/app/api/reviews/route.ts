@@ -22,7 +22,8 @@ export interface StoredReview {
   /** 1–5 stars. */
   rating: number;
   comment: string;
-  /** Public Vercel Blob URLs of photos the reviewer attached (capped). */
+  /** Same-origin serving URLs (`/api/reviews/photo/[id]`) of photos the
+   *  reviewer attached (capped). */
   images?: string[];
   createdAt: string;
 }
@@ -40,15 +41,17 @@ const COMMENT_MAX = 600;
 /** Most photos a reviewer can attach to one vendor rating. */
 const IMAGES_MAX = 4;
 
-/** Keep only our own uploaded photo URLs (public Vercel Blob), capped. Guards
- *  the store from arbitrary external URLs being smuggled into a review. */
+/** Keep only our own uploaded photo URLs, capped. Photos are served from the
+ *  same-origin `GET /api/reviews/photo/[id]` route, so a valid entry is exactly
+ *  that path. Guards the store from arbitrary external URLs being smuggled into
+ *  a review. */
 function toImages(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter(
       (v): v is string =>
         typeof v === "string" &&
-        /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//.test(v),
+        /^\/api\/reviews\/photo\/[A-Za-z0-9-]+$/.test(v),
     )
     .slice(0, IMAGES_MAX);
 }

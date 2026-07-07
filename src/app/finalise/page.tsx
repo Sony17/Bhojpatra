@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingChat from "@/components/FloatingChat";
-import FinalisedPackages from "@/components/showcase/FinalisedPackages";
+import PackageSectionSwitcher from "@/components/showcase/PackageSectionSwitcher";
 
 export const metadata: Metadata = {
   title: "Choose Your Package — Bhojpatra",
@@ -15,7 +15,7 @@ export default function FinalisePage() {
     <>
       <Header />
       <main className="flex-1 pt-28 sm:pt-32">
-        <FinalisedPackages />
+        <PackageSectionSwitcher />
       </main>
       <Footer />
       <FloatingChat />

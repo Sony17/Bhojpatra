@@ -31,6 +31,9 @@ import {
   isOnlineMethod,
   type OrderPaymentMethod,
 } from "@/lib/orderPayment";
+import { useVendorRatings, statFor } from "@/lib/vendorRatings";
+import { StarIcon } from "@/components/reviews/reviewDisplay";
+import VenueReviews from "@/components/venues/VenueReviews";
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(Math.round(n))}`;
@@ -180,6 +183,14 @@ function VenueBooking({
   const advanceAmount = Math.max(1, Math.round(grandTotal * VENUE_ADVANCE_RATE));
   const amount = choice === "advance" ? advanceAmount : total;
 
+  // Real, customer-submitted rating for this venue — layered over the seed
+  // number for the headline badge (the reviews section below computes its own
+  // live figure from the loaded list). Falls back to the seed until reviews land.
+  const ratings = useVendorRatings();
+  const stat = statFor(ratings, venue);
+  const shownRating = stat?.rating ?? venue.rating;
+  const shownCount = stat?.count ?? venue.reviews;
+
   const bookingId = useMemo(
     () => venueBookingId(venue.id, eventDate, guests),
     [venue.id, eventDate, guests],
@@ -317,6 +328,10 @@ function VenueBooking({
           date: eventDate ? formatEventDate(eventDate) : "—",
           guests,
           vendor: venue.name,
+          // Carry the venue's catalogue identity so the order is rateable as a
+          // venue from My Bookings and the review links back to this venue by id
+          // (name-slug stays the fallback bridge for legacy orders).
+          vendors: [{ id: venue.id, name: venue.name }],
           city: cityLabel,
           amount: total,
           paid,
@@ -392,6 +407,7 @@ function VenueBooking({
   })();
 
   return (
+    <>
     <section className="mx-auto max-w-6xl px-5 py-10 sm:py-14">
       <Link
         href="/venues"
@@ -420,15 +436,17 @@ function VenueBooking({
           <div className="mt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h1 className="font-display text-3xl text-ink">{venue.name}</h1>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-3 py-1 text-sm font-medium text-ink">
-                <span aria-hidden="true" className="text-gold">⭐</span>
-                {venue.rating}
-                {venue.reviews > 0 && (
-                  <span className="text-ink-soft">
-                    ({venue.reviews})
-                  </span>
+              {/* Rating badge — jumps to the reviews section below. */}
+              <a
+                href="#reviews"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-cream-3"
+              >
+                <StarIcon className="h-4 w-4 text-maroon" />
+                {shownRating}
+                {shownCount > 0 && (
+                  <span className="font-normal text-ink-soft">({shownCount})</span>
                 )}
-              </span>
+              </a>
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft">
               <span aria-hidden="true">📍</span>
@@ -857,6 +875,10 @@ function VenueBooking({
         hidden={step !== "details"}
       />
     </section>
+
+    {/* Ratings & reviews — venue-side twin of the caterer profile's reviews. */}
+    <VenueReviews venue={venue} />
+    </>
   );
 }
 

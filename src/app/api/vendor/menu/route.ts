@@ -115,10 +115,18 @@ export async function PUT(request: Request) {
       }),
     }));
 
-    // Takedown moderation: a fresh save re-queues Approved content as Pending;
-    // a Hidden vendor stays hidden until an admin restores them.
+    const verified = app?.status === "Verified";
+
+    // Content moderation: a Hidden vendor stays hidden until an admin restores
+    // them. An already-verified vendor's first published menu goes live at once
+    // (their KYC is cleared), but any later edit re-queues as Pending so the
+    // changed content gets re-reviewed.
     const moderation: ModerationStatus =
-      existing?.moderation === "Hidden" ? "Hidden" : "Pending";
+      existing?.moderation === "Hidden"
+        ? "Hidden"
+        : !existing && verified
+          ? "Approved"
+          : "Pending";
 
     const record: LiveVendorRecord = {
       id: existing?.id ?? newVendorId(),
@@ -127,7 +135,7 @@ export async function PUT(request: Request) {
       image,
       rating: existing?.rating ?? 0,
       reviews: existing?.reviews ?? 0,
-      verified: app?.status === "Verified",
+      verified,
       // Marketplace tiers follow the admin's review decision (falling back to a
       // value already synced onto the record); price-derived bands fill in on
       // the catalog when neither is set.

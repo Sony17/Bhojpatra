@@ -60,6 +60,16 @@ export default function TopCategories() {
     });
   };
 
+  // Prev/next arrows nudge the strip by two cards to reveal more images.
+  const nudge = (dir: 1 | -1) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const items = Array.from(track.children) as HTMLElement[];
+    if (items.length < 2) return;
+    const step = items[1].offsetLeft - items[0].offsetLeft;
+    track.scrollBy({ left: dir * step * 2, behavior: "smooth" });
+  };
+
   return (
     <section className="bg-white">
       <div className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20">
@@ -67,12 +77,13 @@ export default function TopCategories() {
           <h2 className="font-display text-3xl text-maroon sm:text-4xl">
             {lang === "hi" ? services.headingHi : services.heading}
           </h2>
-          <p className="font-script mx-auto mt-4 max-w-2xl text-xl text-ink-soft sm:text-2xl">
+          <p className="font-script mx-auto mt-4 max-w-2xl text-[0.9375rem] text-ink-soft sm:text-lg">
             {lang === "hi" ? services.subtitleHi : services.subtitle}
           </p>
         </Reveal>
 
         <Reveal as="div" variant="up" className="mt-12">
+          <div className="relative">
           <div
             ref={trackRef}
             onScroll={handleScroll}
@@ -82,7 +93,7 @@ export default function TopCategories() {
             {cards.map((card) => (
               <div
                 key={card.id}
-                className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-xl sm:w-[22.5%] lg:w-[calc((100%-7.5rem)/6)]"
+                className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-xl sm:w-[22.5%] lg:w-[calc((100%-6rem)/5)]"
               >
                 {/* Tapping a service card opens the booking wizard — the same
                     "tap a card to begin" gesture as the occasion cards. */}
@@ -95,7 +106,7 @@ export default function TopCategories() {
                     src={card.image}
                     alt={card.name}
                     fill
-                    sizes="(min-width: 1024px) 200px, (min-width: 640px) 22.5vw, 36vw"
+                    sizes="(min-width: 1024px) 240px, (min-width: 640px) 22.5vw, 36vw"
                     className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
                     unoptimized={isUnoptimized(card.image)}
                   />
@@ -111,8 +122,32 @@ export default function TopCategories() {
             ))}
           </div>
 
-          {/* Dot pagination — one dot per card, active dot gets the outline ring */}
-          <div className="mt-8 flex items-center justify-center gap-2.5">
+            {/* Prev / next arrows — nudge the strip to reveal more images. */}
+            <button
+              type="button"
+              aria-label="Show previous images"
+              onClick={() => nudge(-1)}
+              className="absolute left-2 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-maroon/15 bg-white text-maroon shadow-md transition-colors hover:bg-maroon hover:text-cream sm:flex"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              aria-label="Show more images"
+              onClick={() => nudge(1)}
+              className="absolute right-2 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-maroon/15 bg-white text-maroon shadow-md transition-colors hover:bg-maroon hover:text-cream sm:flex"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Dot pagination — the mobile/tablet swipe affordance. Hidden on the
+              web/desktop layout, where every card is visible in the row. */}
+          <div className="mt-8 flex items-center justify-center gap-2.5 lg:hidden">
             {cards.map((card, index) => (
               <button
                 key={card.id}

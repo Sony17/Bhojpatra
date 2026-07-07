@@ -228,13 +228,17 @@ export const vendorCities: string[] = Array.from(
   new Set(adminVendors.map((v) => v.city)),
 ).sort();
 
-/** Paginated, filtered vendor query. Pure — swap the body for a `fetch` later
- *  and the `Paginated<AdminVendor>` shape stays identical. */
-export function queryVendors(params: VendorQuery = {}): Paginated<AdminVendor> {
+/** Paginated, filtered vendor query over an arbitrary vendor list. Pure — the
+ *  admin list feeds it live vendors fetched from the API; `queryVendors` feeds
+ *  it the mock catalog. The `Paginated<AdminVendor>` shape is identical either way. */
+export function filterAdminVendors(
+  source: AdminVendor[],
+  params: VendorQuery = {},
+): Paginated<AdminVendor> {
   const { q = "", tier = "All", status = "All", city = "All", page = 1, pageSize = 8 } = params;
   const needle = q.trim().toLowerCase();
 
-  const filtered = adminVendors.filter((v) => {
+  const filtered = source.filter((v) => {
     const matchesQ =
       !needle ||
       v.business.toLowerCase().includes(needle) ||
@@ -249,6 +253,11 @@ export function queryVendors(params: VendorQuery = {}): Paginated<AdminVendor> {
   const total = filtered.length;
   const start = (page - 1) * pageSize;
   return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
+}
+
+/** Paginated, filtered query over the mock catalog vendors. */
+export function queryVendors(params: VendorQuery = {}): Paginated<AdminVendor> {
+  return filterAdminVendors(adminVendors, params);
 }
 
 /** Single vendor lookup. */

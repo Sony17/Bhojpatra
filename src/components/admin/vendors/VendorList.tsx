@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -11,7 +11,7 @@ import TierBadges from "@/components/admin/shared/TierBadges";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { StarSolid, ChevronRight } from "@/components/admin/shared/icons";
-import { queryVendors, vendorCities } from "@/lib/admin/mockData";
+import { filterAdminVendors } from "@/lib/admin/mockData";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import type { AdminVendor } from "@/lib/admin/types";
 
@@ -32,14 +32,36 @@ const STATUS_OPTIONS = [
 ];
 
 /**
- * Vendor list page (presentation + local query state). Holds search/filter/page
- * state and runs them through the `queryVendors` selector (mock today, API
- * later). Row click navigates to the vendor detail route.
+ * Vendor list page (presentation + local query state). Fetches every vendor the
+ * admin manages (real account-owned caterers assembled live, then the curated
+ * catalog) from `/api/admin/vendors`, then runs search/filter/page state through
+ * the pure `filterAdminVendors` selector. Row click navigates to the detail route.
  */
 export default function VendorList() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Every managed vendor, loaded once on mount. Empty until the fetch resolves.
+  const [vendors, setVendors] = useState<AdminVendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/vendors", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { vendors?: AdminVendor[] }) => {
+        if (active) setVendors(data.vendors ?? []);
+      })
+      .catch(() => {
+        /* leave the list empty; the table shows its empty state */
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // The search term lives in the URL (`?q=`) so the topbar global search and the
   // in-page search bar share one source of truth.
@@ -65,7 +87,7 @@ export default function VendorList() {
 
   const result = useMemo(
     () =>
-      queryVendors({
+      filterAdminVendors(vendors, {
         q,
         tier: tier as never,
         status: status as never,
@@ -73,15 +95,17 @@ export default function VendorList() {
         page,
         pageSize: PAGE_SIZE,
       }),
-    [q, tier, status, city, page],
+    [vendors, q, tier, status, city, page],
   );
 
   const cityOptions = useMemo(
     () => [
       { label: "All Cities", value: "All" },
-      ...vendorCities.map((c) => ({ label: c, value: c })),
+      ...Array.from(new Set(vendors.map((v) => v.city)))
+        .sort()
+        .map((c) => ({ label: c, value: c })),
     ],
-    [],
+    [vendors],
   );
 
   // Real customer ratings, matched to vendors by name (best-effort).
@@ -181,10 +205,17 @@ export default function VendorList() {
         getRowKey={(v) => v.id}
         onRowClick={(v) => router.push(`/admin/vendors/${v.id}`)}
         empty={
-          <EmptyState
-            title="No vendors found"
-            message="Try a different search term or clear the filters."
-          />
+          loading ? (
+            <EmptyState
+              title="Loading vendors…"
+              message="Fetching every caterer on the platform."
+            />
+          ) : (
+            <EmptyState
+              title="No vendors found"
+              message="Try a different search term or clear the filters."
+            />
+          )
         }
       />
 

@@ -128,7 +128,7 @@ export default function Gallery() {
             {lang === "hi" ? gallery.headingEmHi : gallery.headingEm}
           </em>
         </h2>
-        <p className="font-script mx-auto mt-4 max-w-xl text-xl text-ink-soft sm:text-2xl">
+        <p className="font-script mx-auto mt-4 max-w-xl text-[0.9375rem] text-ink-soft sm:text-lg">
           {lang === "hi" ? gallery.subtitleHi : gallery.subtitle}
         </p>
       </Reveal>

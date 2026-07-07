@@ -18,7 +18,7 @@ import CompareTray from "@/components/vendors/CompareTray";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
-import { Stars } from "@/components/reviews/reviewDisplay";
+import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -34,6 +34,26 @@ interface StoredReview {
   comment: string;
   images?: string[];
   createdAt: string;
+}
+
+/** A small cream disc with a red check — the trust marker in the summary. */
+function CheckBadge() {
+  return (
+    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cream-2">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3 w-3 text-maroon"
+        aria-hidden="true"
+      >
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+    </span>
+  );
 }
 
 /** Brand-aligned tier badge styling (mirrors the catalogue card). */
@@ -199,6 +219,19 @@ function VendorProfile({
   const shownRating = verified?.rating ?? vendor.rating;
   const shownCount = verified?.count ?? vendor.reviews;
 
+  // Star breakdown for the ratings summary, built from the written reviews we
+  // actually loaded. The headline count equals this list's length whenever any
+  // written review exists, so the breakdown and headline never disagree.
+  const hasWritten = reviews.length > 0;
+  const dist = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0]; // [5★, 4★, 3★, 2★, 1★]
+    for (const r of reviews) {
+      const s = Math.round(r.rating);
+      if (s >= 1 && s <= 5) buckets[5 - s] += 1;
+    }
+    return buckets;
+  }, [reviews]);
+
   return (
     <section
       className={
@@ -251,11 +284,11 @@ function VendorProfile({
               {/* Rating badge — jumps to the reviews section below. */}
               <a
                 href="#reviews"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-3 py-1 text-sm font-medium text-ink transition-colors hover:bg-cream-3"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-cream-3"
               >
-                <span aria-hidden="true" className="text-gold">⭐</span>
+                <StarIcon className="h-4 w-4 text-maroon" />
                 {shownRating}
-                <span className="text-ink-soft">({shownCount})</span>
+                <span className="font-normal text-ink-soft">({shownCount})</span>
               </a>
             </div>
 
@@ -361,28 +394,95 @@ function VendorProfile({
         </div>
       </div>
 
-      {/* ── Reviews ───────────────────────────────────────────────────── */}
-      <div id="reviews" className="mt-12 scroll-mt-32 border-t border-cream-3 pt-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-2xl text-ink">
-            {t("Reviews", "समीक्षाएँ")}
-          </h2>
-          <p className="flex items-center gap-2 text-sm text-ink-soft">
-            <Stars rating={shownRating} />
-            <span className="font-semibold text-ink">{shownRating}</span>
-            {verified ? (
-              <span>
+      {/* ── Ratings & reviews ─────────────────────────────────────────── */}
+      <div id="reviews" className="mt-14 scroll-mt-32 border-t border-cream-3 pt-10">
+        <p className="eyebrow text-xs font-semibold text-maroon">
+          {t("Ratings & reviews", "रेटिंग और समीक्षाएँ")}
+        </p>
+        <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
+          {t("What guests say", "मेहमान क्या कहते हैं")}
+        </h2>
+
+        {/* Summary — headline score alongside the star breakdown (or, until
+            written reviews land, the reasons the rating can be trusted). */}
+        <div className="mt-6 overflow-hidden rounded-3xl border border-cream-3 bg-white shadow-sm">
+          <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[minmax(0,auto)_1fr] md:gap-10">
+            <div className="flex flex-col items-center justify-center text-center md:min-w-52 md:border-r md:border-cream-3 md:pr-10">
+              <p className="font-display text-6xl leading-none text-ink">
+                {shownRating}
+                <span className="align-top text-2xl text-ink-soft">/5</span>
+              </p>
+              <div className="mt-3">
+                <Stars
+                  rating={shownRating}
+                  size={22}
+                  label={t(
+                    `${shownRating} out of 5 stars`,
+                    `5 में से ${shownRating} स्टार`,
+                  )}
+                />
+              </div>
+              <p className="mt-3 text-sm text-ink-soft">
                 {t(
-                  `· ${verified.count} verified ${verified.count === 1 ? "review" : "reviews"}`,
-                  `· ${verified.count} सत्यापित समीक्षाएँ`,
+                  `Rated by ${shownCount} ${shownCount === 1 ? "guest" : "guests"}`,
+                  `${shownCount} मेहमानों द्वारा रेट किया गया`,
                 )}
-              </span>
+              </p>
+            </div>
+
+            {hasWritten ? (
+              <ul className="flex flex-col justify-center gap-2.5">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = dist[5 - star];
+                  const pct = reviews.length
+                    ? Math.round((count / reviews.length) * 100)
+                    : 0;
+                  return (
+                    <li key={star} className="flex items-center gap-3 text-sm">
+                      <span className="flex w-11 shrink-0 items-center gap-1 font-medium text-ink">
+                        {star}
+                        <StarIcon className="h-3.5 w-3.5 text-maroon" />
+                      </span>
+                      <span
+                        className="h-2.5 flex-1 overflow-hidden rounded-full bg-cream-2"
+                        role="presentation"
+                      >
+                        <span
+                          className="block h-full rounded-full bg-maroon transition-[width] duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                      <span className="w-9 shrink-0 text-right tabular-nums text-ink-soft">
+                        {count}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <span>
-                {t(`· ${vendor.reviews} reviews`, `· ${vendor.reviews} समीक्षाएँ`)}
-              </span>
+              <ul className="flex flex-col justify-center gap-4">
+                {[
+                  t(
+                    "Every review comes from a completed Bhojpatra booking.",
+                    "हर समीक्षा एक पूर्ण Bhojpatra बुकिंग से आती है।",
+                  ),
+                  t(
+                    "Real photos from real events — never stock imagery.",
+                    "असली आयोजनों की असली तस्वीरें — कभी स्टॉक नहीं।",
+                  ),
+                  t(
+                    "Nothing paid or incentivised — just honest hosts.",
+                    "कोई भुगतान या प्रोत्साहन नहीं — बस ईमानदार मेज़बान।",
+                  ),
+                ].map((line) => (
+                  <li key={line} className="flex items-start gap-3 text-sm text-ink">
+                    <CheckBadge />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </p>
+          </div>
         </div>
 
         {/* Signed-in customers who've completed a booking can rate this caterer
@@ -390,36 +490,47 @@ function VendorProfile({
         <VendorReviewPanel vendor={vendor} onReviewed={loadReviews} />
 
         {reviews.length > 0 ? (
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-            {reviews.map((r) => {
-              // The customer can edit a review only when it hangs off one of
-              // their own orders (proven by the booking id matching).
-              const ownBooking =
-                session?.type === "customer"
-                  ? myBookingById.get(r.bookingId)
-                  : undefined;
-              return (
-                <ReviewCard
-                  key={`${r.bookingId}:${r.vendorId || slugifyName(r.vendor)}`}
-                  review={r}
-                  editable={
-                    ownBooking
-                      ? { booking: ownBooking, onSaved: loadReviews }
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-8 text-center">
-            <p className="font-display text-lg text-ink">
-              {t("No reviews yet", "अभी कोई समीक्षा नहीं")}
-            </p>
-            <p className="mt-1 text-sm text-ink-soft">
+          <>
+            <h3 className="mt-10 font-display text-lg text-ink">
               {t(
-                "Be the first to book and review this caterer.",
-                "इस कैटरर को बुक और रिव्यू करने वाले पहले व्यक्ति बनें।",
+                `${reviews.length} written ${reviews.length === 1 ? "review" : "reviews"}`,
+                `${reviews.length} लिखित समीक्षाएँ`,
+              )}
+            </h3>
+            <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+              {reviews.map((r) => {
+                // The customer can edit a review only when it hangs off one of
+                // their own orders (proven by the booking id matching).
+                const ownBooking =
+                  session?.type === "customer"
+                    ? myBookingById.get(r.bookingId)
+                    : undefined;
+                return (
+                  <ReviewCard
+                    key={`${r.bookingId}:${r.vendorId || slugifyName(r.vendor)}`}
+                    review={r}
+                    editable={
+                      ownBooking
+                        ? { booking: ownBooking, onSaved: loadReviews }
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </ul>
+          </>
+        ) : (
+          <div className="mt-8 rounded-3xl border border-dashed border-cream-3 bg-white p-10 text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cream-2">
+              <StarIcon className="h-6 w-6 text-maroon" />
+            </span>
+            <p className="mt-4 font-display text-lg text-ink">
+              {t("No written reviews yet", "अभी कोई लिखित समीक्षा नहीं")}
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
+              {t(
+                "This rating comes from verified bookings. Written reviews from recent guests will show up here.",
+                "यह रेटिंग सत्यापित बुकिंग से है। हाल के मेहमानों की लिखित समीक्षाएँ यहाँ दिखेंगी।",
               )}
             </p>
           </div>

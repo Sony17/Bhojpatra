@@ -13,6 +13,7 @@ import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { queryApprovals } from "@/lib/admin/mockData";
+import { refreshAdminSession } from "@/lib/adminAuth";
 import { TIER_ORDER, sortTiers } from "@/lib/admin/types";
 import type {
   VendorApplication,
@@ -102,10 +103,26 @@ export default function ApprovalsConsole() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("request failed");
+      if (res.ok) return;
+      // The store rejected the change — undo the optimistic update.
+      setApps(snapshot);
+      // A 401/403 means the admin session isn't valid for the API even though
+      // the shell is still showing (it only re-checks the session on a full
+      // reload). Re-validate so the shell bounces to the login screen, and say
+      // so plainly instead of the misleading "try again".
+      if (res.status === 401 || res.status === 403) {
+        setToast("Your admin session has expired — please sign in again.");
+        void refreshAdminSession();
+        return;
+      }
+      const message = await res
+        .json()
+        .then((d: { error?: string }) => d?.error)
+        .catch(() => null);
+      setToast(message || "Couldn't save. Please try again.");
     } catch {
       setApps(snapshot);
-      setToast("Couldn't save. Please try again.");
+      setToast("Couldn't save. Please check your connection and try again.");
     }
   };
 

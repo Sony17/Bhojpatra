@@ -11,6 +11,8 @@ import {
   type BookableVenue,
 } from "@/lib/venues";
 import { useLang, type Lang, type Translate } from "@/lib/i18n";
+import { useVendorRatings, statFor } from "@/lib/vendorRatings";
+import { StarIcon } from "@/components/reviews/reviewDisplay";
 import ThemedSelect from "@/components/ThemedSelect";
 
 const ALL = "all";
@@ -33,6 +35,9 @@ export default function VenueExplorer() {
   const { lang, t } = useLang();
   const [city, setCity] = useState<string>(ALL);
   const [location, setLocation] = useState<string>(ALL);
+
+  // Real, customer-submitted ratings layered over each venue's seed number.
+  const ratings = useVendorRatings();
 
   // Start with the static seed catalogue (available without a round-trip), then
   // fold in owner-registered venues once they load so a freshly-published venue
@@ -163,7 +168,13 @@ export default function VenueExplorer() {
       {results.length > 0 ? (
         <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {results.map((venue) => (
-            <VenueCard key={venue.id} venue={venue} lang={lang} t={t} />
+            <VenueCard
+              key={venue.id}
+              venue={venue}
+              rating={statFor(ratings, venue)?.rating ?? venue.rating}
+              lang={lang}
+              t={t}
+            />
           ))}
         </ul>
       ) : (
@@ -185,10 +196,13 @@ export default function VenueExplorer() {
 
 function VenueCard({
   venue,
+  rating,
   lang,
   t,
 }: {
   venue: BookableVenue;
+  /** Real aggregated rating when available, else the venue's seed rating. */
+  rating: number;
   lang: Lang;
   t: Translate;
 }) {
@@ -223,10 +237,8 @@ function VenueCard({
               {venue.name}
             </h3>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink">
-              <span aria-hidden="true" className="text-gold">
-                ⭐
-              </span>
-              {venue.rating}
+              <StarIcon className="h-3.5 w-3.5 text-maroon" />
+              {rating}
             </span>
           </div>
 

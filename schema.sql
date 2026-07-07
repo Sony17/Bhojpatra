@@ -137,6 +137,16 @@ create table if not exists reviews (
   updated_at timestamptz not null default now()
 );
 
+-- Customer review photo metadata. The image bytes live in the private Vercel
+-- Blob store (the record carries the blob URL) and are served back through
+-- `GET /api/reviews/photo/[id]`; only the metadata is stored here.
+create table if not exists review_photos (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Auth users (customer / vendor / partner / admin). The scrypt password hash
 -- lives inside `data` and is never returned by any API projection.
 create table if not exists users (

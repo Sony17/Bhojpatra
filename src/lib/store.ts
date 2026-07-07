@@ -116,6 +116,7 @@ const TABLES = [
   "sessions",
   "vendors",
   "vendor_photos",
+  "review_photos",
 ] as const;
 type Table = (typeof TABLES)[number];
 

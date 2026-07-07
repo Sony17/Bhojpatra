@@ -53,9 +53,9 @@ export default function ReviewCard({
   const [status, setStatus] = useState<"idle" | "submitting">("idle");
   const [error, setError] = useState("");
 
-  const meta =
-    [review.occasion, review.city].filter(Boolean).join(" · ") +
-    (review.createdAt ? ` · ${formatReviewDate(review.createdAt)}` : "");
+  const context = [review.occasion, review.city].filter(Boolean).join(" · ");
+  const date = review.createdAt ? formatReviewDate(review.createdAt) : "";
+  const initial = (review.name.trim()[0] || "★").toUpperCase();
 
   const cardCls =
     "rounded-2xl border bg-white p-5 shadow-sm " +
@@ -184,31 +184,79 @@ export default function ReviewCard({
   // ── Read-only view (everyone) + edit affordance for the author ──────────
   return (
     <li className={cardCls}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold text-ink">
-          {review.name}
-          {editable && (
-            <span className="ml-2 rounded-full bg-cream-2 px-2 py-0.5 text-[11px] font-semibold text-maroon">
-              {t("You", "आप")}
+      <div className="flex items-start gap-3">
+        {/* Avatar — reviewer's initial */}
+        <span
+          aria-hidden="true"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-maroon font-display text-lg text-cream"
+        >
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold text-ink">
+              {review.name}
             </span>
-          )}
-        </p>
-        <Stars rating={review.rating} />
+            {editable && (
+              <span className="rounded-full bg-cream-2 px-2 py-0.5 text-[11px] font-semibold text-maroon">
+                {t("You", "आप")}
+              </span>
+            )}
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <Stars
+              rating={review.rating}
+              size={14}
+              label={t(
+                `${review.rating} out of 5 stars`,
+                `5 में से ${review.rating} स्टार`,
+              )}
+            />
+            {date && <span className="text-xs text-ink-soft">{date}</span>}
+          </div>
+        </div>
       </div>
-      <p className="mt-0.5 text-xs text-ink-soft">{meta}</p>
+
       {review.comment && (
-        <p className="mt-3 text-sm text-ink-soft">{review.comment}</p>
+        <p className="mt-3 text-sm leading-relaxed text-ink">{review.comment}</p>
       )}
       <ReviewPhotoStrip images={review.images} />
-      {editable && (
-        <button
-          type="button"
-          onClick={startEdit}
-          className="mt-3 rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
-        >
-          {t("Edit your review", "अपनी समीक्षा संपादित करें")}
-        </button>
-      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-maroon">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+            aria-hidden="true"
+          >
+            <path d="M9 12l2 2 4-4" />
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+          {t("Verified booking", "सत्यापित बुकिंग")}
+        </span>
+        {context && (
+          <>
+            <span aria-hidden="true" className="text-ink-soft">
+              ·
+            </span>
+            <span className="text-xs text-ink-soft">{context}</span>
+          </>
+        )}
+        {editable && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="ml-auto rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+          >
+            {t("Edit", "संपादित करें")}
+          </button>
+        )}
+      </div>
     </li>
   );
 }

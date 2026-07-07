@@ -1,101 +1,47 @@
 "use client";
 
 /**
- * Finalised package section — all nine differentiation ideas folded into one
- * cohesive layout, styled in the live Bhojpatra theme (maroon display headings,
- * cream/maroon surfaces with alpha, Reveal motion, ornaments, btn-sheen).
+ * Package section — production redesign.
  *
- * Ideas combined per tier card: role badge (9) · guest-fit + occasion chips (7)
- * · "how full a feast" meter (4) · stat strip (1) · only-here banner (5) ·
- * "everything in X, plus" unlocks (2) · real dish thumbnails (6). Below the
- * cards: the price-jump upgrade path (8) and a single scannable comparison
- * grid (3). Real tier data (names, prices, pax, counts) comes from src/lib/data.
+ * Design principles applied:
+ *  • Trust    — only real data (counts come from packageCategoryItems, the
+ *               exact quota /book uses). No fabricated "fullness" metrics.
+ *  • Clarity  — each tier tells ONE cumulative story ("Everything in X, plus")
+ *               with real numbers; the exhaustive per-course truth lives once,
+ *               in the comparison grid + a single "View full menu" disclosure.
+ *  • Convert  — the popular tier (Gold) is clearly recommended (ring + badge);
+ *               large, obvious CTAs; transparent pricing note.
+ *  • A11y     — semantic <article>/<ul>, visible focus rings, aria-pressed
+ *               toggles, decorative glyphs hidden, 44px tap targets.
+ *  • Responsive — full-width snap cards on mobile, grid on sm+, scrollable
+ *               comparison table.
  * Palette is brand-only: red #B92025, cream #F0D09E, black, white.
  */
 
 import { useState } from "react";
 import Link from "next/link";
-import { packages, packageCategoryItems, type PackageTier } from "@/lib/data";
+import { packages, packageCategoryItems, type PackageTier, type PackageFeature } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
+import { useSiteContent } from "@/lib/sitePages";
 
 type TierId = "silver" | "gold" | "platinum";
 type Bi = [en: string, hi: string];
 
-/* ── Curated per-tier extras that aren't in the seed data ────────────────── */
+const RECOMMENDED: TierId = "gold";
 
-const unsplash = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=200&q=60`;
-
-const SPREAD = {
-  silver: "photo-1490645935967-10de6ba17061",
-  gold: "photo-1543339308-43e59d6b73a6",
-  platinum: "photo-1600891964599-f61ba0e24092",
-  custom: "photo-1467003909585-2f8a72700288",
+const BADGE: Record<TierId, Bi> = {
+  silver: ["Best value", "बेस्ट वैल्यू"],
+  gold: ["Most popular", "सबसे लोकप्रिय"],
+  platinum: ["Premium", "प्रीमियम"],
+};
+const VENDORS: Record<TierId, Bi> = {
+  silver: ["Single vendor", "एक वेंडर"],
+  gold: ["Multiple vendors", "कई वेंडर"],
+  platinum: ["Famous vendors", "मशहूर वेंडर"],
 };
 
-const META: Record<
-  TierId,
-  {
-    badge: Bi;
-    onlyHere: Bi;
-    fill: number; // 0–100, "how full a feast"
-    adds: Bi[]; // what this tier unlocks over the one below
-    vendors: Bi;
-    dishes: { name: string; img: string }[];
-  }
-> = {
-  silver: {
-    badge: ["Best value", "बेस्ट वैल्यू"],
-    onlyHere: ["A fixed, fuss-free menu — nothing to plan", "एक तय, आसान मेन्यू — कुछ प्लान नहीं करना"],
-    fill: 40,
-    adds: [],
-    vendors: ["Single vendor", "एक वेंडर"],
-    dishes: [
-      { name: "Veg thali", img: SPREAD.silver },
-      { name: "Dal & rice", img: SPREAD.custom },
-      { name: "Gulab jamun", img: SPREAD.gold },
-    ],
-  },
-  gold: {
-    badge: ["Most chosen", "सबसे लोकप्रिय"],
-    onlyHere: ["Live stalls, chaat & multi-cuisine counters unlocked", "लाइव स्टॉल, चाट और मल्टी-कुज़ीन काउंटर"],
-    fill: 74,
-    adds: [
-      ["+3 starters (5 total)", "+3 स्टार्टर (कुल 5)"],
-      ["Live stalls", "लाइव स्टॉल"],
-      ["Chaat counters", "चाट काउंटर"],
-      ["Chinese & South-Indian", "चाइनीज़ और साउथ इंडियन"],
-    ],
-    vendors: ["Multiple vendors", "कई वेंडर"],
-    dishes: [
-      { name: "Live chaat", img: SPREAD.gold },
-      { name: "Tandoori grill", img: SPREAD.platinum },
-      { name: "Hakka noodles", img: SPREAD.custom },
-      { name: "Rasmalai", img: SPREAD.silver },
-    ],
-  },
-  platinum: {
-    badge: ["Premium", "प्रीमियम"],
-    onlyHere: ["Famous vendors + the grandest spread, at any guest count", "मशहूर वेंडर और सबसे भव्य दावत, किसी भी संख्या में"],
-    fill: 100,
-    adds: [
-      ["A 6th starter", "छठा स्टार्टर"],
-      ["A 2nd live stall", "दूसरा लाइव स्टॉल"],
-      ["More chaat & sweets", "ज़्यादा चाट और मिठाई"],
-      ["Famous premium vendors", "मशहूर प्रीमियम वेंडर"],
-    ],
-    vendors: ["Famous vendors", "मशहूर वेंडर"],
-    dishes: [
-      { name: "Galouti kebab", img: SPREAD.platinum },
-      { name: "Dum biryani", img: SPREAD.gold },
-      { name: "Shahi tukda", img: SPREAD.silver },
-      { name: "Kulfi falooda", img: SPREAD.custom },
-    ],
-  },
-};
-
-/** Item counts per category, straight from the seed config. */
+/** Real per-course quota /book uses (packageCategoryItems → allowanceFor()). */
 function spec(id: string) {
   const c = packageCategoryItems[id] ?? {};
   return {
@@ -103,31 +49,51 @@ function spec(id: string) {
     starters: c.starters ?? 0,
     live: c.live ?? 0,
     chaat: c.chaat ?? 0,
+    chinese: c.chinese ?? 0,
+    "south-indian": c["south-indian"] ?? 0,
     main: c.main ?? 0,
     sweets: c.sweets ?? 0,
   };
 }
 
-/* ── Brand surface helpers (white → cream → red as the tier climbs) ─────── */
+/* ── Surfaces & tone (white → cream → red as the tier climbs) ────────────── */
 
 function surface(id: TierId) {
   if (id === "platinum") return "bg-maroon border border-maroon text-cream";
-  if (id === "gold") return "bg-cream/60 border border-maroon/30 ring-1 ring-maroon/15";
-  return "bg-white border border-maroon/15";
+  if (id === "gold")
+    return "bg-cream/50 border border-maroon/30 ring-2 ring-maroon/60 shadow-[0_24px_60px_-30px_rgba(185,32,37,0.55)]";
+  return "bg-white border border-maroon/12";
 }
 function badgeChip(id: TierId) {
   if (id === "platinum") return "bg-cream text-maroon";
   if (id === "gold") return "bg-maroon text-cream";
-  return "bg-cream text-maroon ring-1 ring-maroon/25";
+  return "bg-cream text-maroon ring-1 ring-maroon/20";
 }
 const isDark = (id: TierId) => id === "platinum";
 const muted = (id: TierId) => (isDark(id) ? "text-cream/75" : "text-ink-soft");
+const accent = (id: TierId) => (isDark(id) ? "text-cream" : "text-maroon");
 
-/* ── Small brand pieces ─────────────────────────────────────────────────── */
+/* ── Icons ──────────────────────────────────────────────────────────────── */
+
+function CheckIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M4.5 10.5l3.4 3.4 7.6-8.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.06 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.41.25-.69.25-1.28.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 21.5h-.01a9.46 9.46 0 01-4.82-1.32l-.35-.21-3.58.94.96-3.49-.23-.36a9.45 9.45 0 01-1.45-5.04c0-5.22 4.25-9.47 9.48-9.47 2.53 0 4.91.99 6.7 2.78a9.42 9.42 0 012.77 6.7c0 5.22-4.25 9.47-9.47 9.47zm8.06-17.53A11.36 11.36 0 0012.04.5C5.76.5.65 5.61.65 11.89c0 2.01.53 3.98 1.53 5.71L.5 23.5l6.05-1.59a11.35 11.35 0 005.49 1.4h.01c6.28 0 11.39-5.11 11.39-11.39 0-3.04-1.18-5.9-3.34-8.05z" />
+    </svg>
+  );
+}
 
 function Ornament({ className = "" }: { className?: string }) {
   return (
-    <span aria-hidden="true" className={`flex w-28 items-center justify-center gap-2 ${className}`}>
+    <span aria-hidden="true" className={`flex w-24 items-center justify-center gap-2 ${className}`}>
       <span className="h-px flex-1 bg-gradient-to-r from-transparent to-current opacity-70" />
       <span className="h-1.5 w-1.5 rotate-45 bg-current" />
       <span className="h-px flex-1 bg-gradient-to-l from-transparent to-current opacity-70" />
@@ -135,209 +101,220 @@ function Ornament({ className = "" }: { className?: string }) {
   );
 }
 
-function Meter({ value, dark }: { value: number; dark: boolean }) {
+/* ── Full menu — progressive disclosure (courses fold, items expand) ─────── */
+
+type CourseSegment =
+  | { type: "item"; feature: PackageFeature; index: number }
+  | { type: "course"; index: number; heading: PackageFeature; items: { feature: PackageFeature; index: number }[] };
+
+function buildCourseSegments(features: PackageFeature[]): CourseSegment[] {
+  const segments: CourseSegment[] = [];
+  let current: Extract<CourseSegment, { type: "course" }> | null = null;
+  features.forEach((feature, index) => {
+    if (feature.heading) {
+      current = { type: "course", index, heading: feature, items: [] };
+      segments.push(current);
+    } else if (feature.standalone) {
+      current = null;
+      segments.push({ type: "item", feature, index });
+    } else if (current) {
+      current.items.push({ feature, index });
+    } else {
+      segments.push({ type: "item", feature, index });
+    }
+  });
+  return segments;
+}
+
+function RhombusMarker({ className = "" }: { className?: string }) {
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full ${dark ? "bg-cream/25" : "bg-maroon/10"}`}>
-      <div className={`h-full rounded-full ${dark ? "bg-cream" : "bg-maroon"}`} style={{ width: `${value}%` }} />
+    <span
+      aria-hidden="true"
+      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rotate-45 bg-current opacity-70 ${className}`}
+    />
+  );
+}
+
+function MenuList({ features, dark }: { features: PackageFeature[]; dark: boolean }) {
+  const { lang } = useLang();
+  const segments = buildCourseSegments(features);
+  const border = dark ? "border-cream/20" : "border-maroon/10";
+  const sub = dark ? "text-cream/80" : "text-ink-soft";
+  return (
+    <ul className={`text-xs ${dark ? "text-cream" : "text-ink"}`}>
+      {segments.map((seg) => {
+        if (seg.type === "item") {
+          const label = lang === "hi" ? seg.feature.labelHi : seg.feature.label;
+          return (
+            <li key={seg.index} className={`flex items-start gap-2 border-b ${border} py-1.5 leading-snug last:border-b-0`}>
+              <RhombusMarker className={dark ? "text-cream" : "text-maroon"} />
+              <span>{label}</span>
+            </li>
+          );
+        }
+        const headingLabel = lang === "hi" ? seg.heading.labelHi : seg.heading.label;
+        return (
+          <li key={seg.index} className={`border-b ${border} py-1.5 last:border-b-0`}>
+            <p className={`flex items-start gap-2 font-semibold leading-snug ${dark ? "text-cream" : "text-maroon"}`}>
+              <RhombusMarker className={dark ? "text-cream" : "text-maroon"} />
+              <span>{headingLabel}</span>
+            </p>
+            {seg.items.length > 0 && (
+              <ul className={`mt-1 space-y-0.5 pl-5 leading-snug ${sub}`}>
+                {seg.items.map(({ feature, index }) => (
+                  <li key={index}>{lang === "hi" ? feature.labelHi : feature.label}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Single-line disclosure toggle (used for "View full menu"). */
+function Disclosure({ label, dark, children }: { label: string; dark: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`mt-5 border-t pt-4 ${dark ? "border-cream/20" : "border-maroon/10"}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between rounded text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          dark ? "text-cream focus-visible:ring-cream focus-visible:ring-offset-maroon" : "text-maroon focus-visible:ring-maroon"
+        }`}
+      >
+        <span>{label}</span>
+        <span aria-hidden className={`text-lg leading-none transition-transform duration-200 ${open ? "rotate-45" : ""}`}>+</span>
+      </button>
+      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
 
-/* ── One enhanced tier card (ideas 1, 2, 4, 5, 6, 7, 9) ─────────────────── */
+/* ── Tier card ──────────────────────────────────────────────────────────── */
+
+function tierHighlights(id: TierId, s: ReturnType<typeof spec>, t: (en: string, hi: string) => string): string[] {
+  if (id === "silver")
+    return [
+      t("Welcome drink", "वेलकम ड्रिंक"),
+      t(`${s.starters} starters`, `${s.starters} स्टार्टर`),
+      t("Fixed main-course thali", "फिक्स्ड मेन कोर्स थाली"),
+      t(`${s.sweets} sweet`, `${s.sweets} मिठाई`),
+      t("One trusted local vendor", "एक भरोसेमंद लोकल वेंडर"),
+    ];
+  if (id === "gold")
+    return [
+      t(`${s.starters} starters to choose`, `${s.starters} स्टार्टर चुनें`),
+      t(`${s.live} live counter`, `${s.live} लाइव काउंटर`),
+      t("Chaat, Chinese & South Indian", "चाट, चाइनीज़ और साउथ इंडियन"),
+      t(`${s.sweets} sweets to choose`, `${s.sweets} मिठाई चुनें`),
+      t("Multiple specialist vendors", "कई विशेषज्ञ वेंडर"),
+    ];
+  return [
+    t(`${s.starters} premium starters`, `${s.starters} प्रीमियम स्टार्टर`),
+    t(`${s.live} live counters`, `${s.live} लाइव काउंटर`),
+    t("Bigger chaat & sweet spread", "बड़ा चाट और मिठाई स्प्रेड"),
+    t("Curated famous vendors, pan-India", "चुनिंदा मशहूर वेंडर, पूरे भारत"),
+  ];
+}
 
 function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
   const { lang, t } = useLang();
   const id = tier.id as TierId;
-  const m = META[id];
-  const s = spec(id);
   const dark = isDark(id);
-  const bi = (v: Bi) => (lang === "hi" ? v[1] : v[0]);
+  const s = spec(id);
+  const recommended = id === RECOMMENDED;
 
   const name = lang === "hi" ? tier.nameHi : tier.name;
   const pax = lang === "hi" ? tier.paxHi : tier.pax;
-  const bestFor = lang === "hi" ? tier.bestForHi : tier.bestFor;
   const unit = lang === "hi" ? tier.unitHi : tier.unit;
-  const occasions = (bestFor ?? "").split("·").map((x) => x.trim()).filter(Boolean);
+  const bestFor = lang === "hi" ? tier.bestForHi : tier.bestFor;
+  const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
 
-  const stats = [
-    { n: s.starters, l: t("Starters", "स्टार्टर") },
-    { n: s.live, l: t("Live stalls", "लाइव स्टॉल") },
-    { n: s.sweets, l: t("Sweets", "मिठाई") },
-  ];
+  const prevName = id === "gold" ? t("Silver", "सिल्वर") : id === "platinum" ? t("Gold", "गोल्ड") : null;
+  const includesLabel = prevName
+    ? t(`Everything in ${prevName}, plus`, `${prevName} का सब कुछ, और`)
+    : t("What's included", "इसमें क्या शामिल है");
+  const highlights = tierHighlights(id, s, t);
 
   return (
-    <div className={`card-lift relative flex h-full flex-col rounded-3xl p-6 ${surface(id)}`}>
-      {/* Ribbon — Popular (Gold) / Premium (Platinum) */}
-      {tier.popular && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-cream px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-maroon shadow-sm ring-1 ring-maroon/40">
-          {t("Popular Choice", "लोकप्रिय विकल्प")}
-        </span>
-      )}
-      {id === "platinum" && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-ink px-3 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-cream shadow-sm">
-          ★ {t("Premium", "प्रीमियम")}
+    <article
+      aria-label={`${name} ${t("package", "पैकेज")}`}
+      className={`card-lift relative flex h-full flex-col rounded-3xl p-6 sm:p-7 ${dark ? "isolate" : ""} ${surface(id)}`}
+    >
+      {/* Premium shimmer on the Platinum card, behind the text */}
+      {dark && (
+        <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+          <span
+            className="absolute inset-0 animate-[bp-shimmer_3.4s_linear_infinite] motion-reduce:animate-none"
+            style={{
+              background: "linear-gradient(110deg, transparent 35%, rgba(240,208,158,0.28) 50%, transparent 65%)",
+              backgroundSize: "220% 100%",
+              backgroundPosition: "-120% 0",
+            }}
+          />
         </span>
       )}
 
-      {/* Role badge + name + price */}
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${badgeChip(id)}`}>
-          {bi(m.badge)}
-        </span>
-      </div>
-      <h3 className={`mt-3 font-display text-3xl leading-none ${dark ? "text-cream" : "text-maroon"}`}>{name}</h3>
-      <p className={`mt-2 ${muted(id)}`}>
-        <span className={`text-2xl font-bold ${dark ? "text-cream" : "text-maroon"}`}>{tier.price}</span>{" "}
-        <span className="text-sm">{unit}</span>
+      {/* Badge (single recommended/role flag) */}
+      <span className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${badgeChip(id)}`}>
+        {recommended && <span aria-hidden className="mr-1">★</span>}
+        {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
+      </span>
+
+      {/* Name + positioning */}
+      <h3 className={`mt-4 font-display text-[2rem] leading-none ${accent(id)}`}>{name}</h3>
+      {bestFor && <p className={`mt-2 text-[13px] leading-snug ${muted(id)}`}>{bestFor}</p>}
+
+      {/* Price */}
+      <p className="mt-5 flex items-baseline gap-1.5">
+        <span className={`text-[2rem] font-bold leading-none ${accent(id)}`}>{tier.price}</span>
+        <span className={`text-sm ${muted(id)}`}>{unit}</span>
       </p>
+      {pax && <p className={`mt-1.5 text-xs ${muted(id)}`}>{pax}</p>}
 
-      {/* Guest-fit + occasion chips (idea 7) */}
-      {pax && (
-        <div
-          className={`mt-3 inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-            dark ? "bg-cream/15 text-cream" : "bg-maroon/8 text-maroon"
-          }`}
-        >
-          {pax}
-        </div>
-      )}
-      {occasions.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {occasions.map((o) => (
-            <span
-              key={o}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] ${
-                dark ? "bg-cream/12 text-cream/90" : "bg-ink/5 text-ink-soft"
-              }`}
-            >
-              {o}
-            </span>
+      {/* Primary CTA (kept high so it's always visible) */}
+      <div className="mt-5">{cta}</div>
+
+      {/* Cumulative "what you get" — the value story, real numbers, always visible */}
+      <div className={`mt-6 border-t pt-5 ${dark ? "border-cream/20" : "border-maroon/10"}`}>
+        <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${muted(id)}`}>{includesLabel}</p>
+        <ul className="mt-3 space-y-2.5">
+          {highlights.map((h) => (
+            <li key={h} className={`flex items-start gap-2.5 text-sm ${dark ? "text-cream" : "text-ink"}`}>
+              <CheckIcon className={`mt-0.5 h-4 w-4 shrink-0 ${accent(id)}`} />
+              <span>{h}</span>
+            </li>
           ))}
-        </div>
+        </ul>
+      </div>
+
+      {/* Full menu — one progressive-disclosure for people who want every dish */}
+      <Disclosure label={t("View full menu", "पूरा मेन्यू देखें")} dark={dark}>
+        <MenuList features={tier.features} dark={dark} />
+      </Disclosure>
+
+      {/* Qualifying note — subtle, pinned to the foot */}
+      {footnote && footnote.length > 0 && (
+        <p className={`mt-auto pt-6 text-xs leading-snug ${muted(id)}`}>{footnote.join(" ")}</p>
       )}
-
-      {/* Fullness meter (idea 4) */}
-      <div className="mt-5">
-        <div className={`mb-1.5 flex items-center justify-between text-[11px] ${muted(id)}`}>
-          <span>{t("How full a feast", "कितनी भरी दावत")}</span>
-          <span className="font-semibold">{m.fill}%</span>
-        </div>
-        <Meter value={m.fill} dark={dark} />
-      </div>
-
-      {/* Stat strip (idea 1) */}
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        {stats.map((st) => (
-          <div
-            key={st.l}
-            className={`rounded-xl px-2 py-2.5 text-center ${dark ? "bg-cream/12" : "bg-maroon/5"}`}
-          >
-            <div className={`text-2xl font-bold leading-none ${dark ? "text-cream" : "text-maroon"}`}>
-              {st.n || "—"}
-            </div>
-            <div className={`mt-1 text-[10px] ${muted(id)}`}>{st.l}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Only-here banner (idea 5) */}
-      <div
-        className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${
-          dark ? "border border-cream/25 bg-cream/15 text-cream" : "border border-maroon/15 bg-cream/60 text-maroon"
-        }`}
-      >
-        <span className="mr-1 font-bold">{t("Only here:", "सिर्फ़ यहाँ:")}</span>
-        {bi(m.onlyHere)}
-      </div>
-
-      {/* Cumulative unlocks (idea 2) */}
-      {m.adds.length > 0 ? (
-        <div className="mt-4">
-          <p className={`text-[11px] font-semibold uppercase tracking-wide ${muted(id)}`}>
-            {t("Everything below, plus", "नीचे वाला सब, और")}
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {m.adds.map((a) => (
-              <li key={a[0]} className={`flex items-start gap-2 text-sm ${dark ? "text-cream" : "text-ink"}`}>
-                <span
-                  className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold ${
-                    dark ? "bg-cream text-maroon" : "bg-maroon text-cream"
-                  }`}
-                >
-                  +
-                </span>
-                {bi(a)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className={`mt-4 text-sm ${muted(id)}`}>
-          {t("The complete fixed menu — nothing to decide.", "पूरा तय मेन्यू — कुछ तय नहीं करना।")}
-        </p>
-      )}
-
-      {/* Real dish thumbnails (idea 6) */}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {m.dishes.map((d) => (
-          <div key={d.name} className="flex w-14 flex-col items-center gap-1 text-center">
-            <span
-              className="h-11 w-11 rounded-full bg-cream bg-cover bg-center ring-1 ring-maroon/15"
-              style={{ backgroundImage: `url(${unsplash(d.img)})` }}
-            />
-            <span className={`text-[9px] leading-tight ${muted(id)}`}>{d.name}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* CTA pinned to the bottom */}
-      <div className="mt-auto pt-6">{cta}</div>
-    </div>
+    </article>
   );
 }
 
-/* ── Upgrade path (idea 8) ──────────────────────────────────────────────── */
-
-function UpgradePath() {
-  const { t } = useLang();
-  const steps = [
-    { name: t("Silver", "सिल्वर"), price: "₹799" },
-    { jump: "+₹400", note: t("live counters, chaat & 5 starters", "लाइव काउंटर, चाट और 5 स्टार्टर") },
-    { name: t("Gold", "गोल्ड"), price: "₹1199" },
-    { jump: "+₹400", note: t("famous vendors & the fullest spread", "मशहूर वेंडर और सबसे भरी दावत") },
-    { name: t("Platinum", "प्लैटिनम"), price: "₹1599+" },
-  ];
-  return (
-    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
-      {steps.map((step, i) =>
-        "name" in step ? (
-          <div
-            key={i}
-            className="rounded-2xl border border-maroon/20 bg-white px-5 py-3 text-center shadow-sm"
-          >
-            <div className="font-display text-lg text-maroon">{step.name}</div>
-            <div className="text-sm font-semibold text-ink-soft">{step.price}</div>
-          </div>
-        ) : (
-          <div key={i} className="flex flex-col items-center px-1 text-center">
-            <span className="rounded-full bg-maroon px-3 py-1 text-xs font-bold text-cream">{step.jump}</span>
-            <span className="mt-1 max-w-[10rem] text-[11px] text-ink-soft">→ {step.note}</span>
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-/* ── Comparison grid (idea 3) ───────────────────────────────────────────── */
+/* ── Comparison grid — the single exhaustive per-course comparison ───────── */
 
 type Row = { key: keyof ReturnType<typeof spec> | "vendors"; label: Bi };
 const ROWS: Row[] = [
-  { key: "welcome", label: ["Welcome drinks", "वेलकम ड्रिंक"] },
   { key: "starters", label: ["Starters", "स्टार्टर"] },
-  { key: "live", label: ["Live stalls", "लाइव स्टॉल"] },
-  { key: "chaat", label: ["Chaat counters", "चाट काउंटर"] },
-  { key: "main", label: ["Main-course dishes", "मेन कोर्स"] },
+  { key: "live", label: ["Live counters", "लाइव काउंटर"] },
+  { key: "chaat", label: ["Chaat", "चाट"] },
+  { key: "chinese", label: ["Chinese", "चाइनीज़"] },
+  { key: "south-indian", label: ["South Indian", "साउथ इंडियन"] },
+  { key: "main", label: ["Main course", "मेन कोर्स"] },
   { key: "sweets", label: ["Sweets", "मिठाई"] },
   { key: "vendors", label: ["Vendors", "वेंडर"] },
 ];
@@ -348,7 +325,7 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
   const bi = (v: Bi) => (lang === "hi" ? v[1] : v[0]);
 
   const cellFor = (tier: PackageTier, key: Row["key"]) => {
-    if (key === "vendors") return bi(META[tier.id as TierId].vendors);
+    if (key === "vendors") return bi(VENDORS[tier.id as TierId]);
     const v = spec(tier.id)[key];
     return v === 0 ? "—" : String(v);
   };
@@ -360,19 +337,24 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
 
   return (
     <div>
-      <button
-        onClick={() => setHighlight((v) => !v)}
-        className="btn-sheen mb-4 rounded-full border border-maroon px-4 py-1.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon hover:text-cream"
-      >
-        {highlight ? t("Hide upgrades", "अपग्रेड छुपाएँ") : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
-      </button>
-      <div className="overflow-hidden rounded-3xl border border-maroon/15">
-        <table className="w-full border-collapse text-sm">
+      <div className="mb-4 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setHighlight((v) => !v)}
+          aria-pressed={highlight}
+          className="btn-sheen rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
+        >
+          {highlight ? t("Hide upgrades", "अपग्रेड छुपाएँ") : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
+        </button>
+      </div>
+      <div className="no-scrollbar overflow-x-auto rounded-3xl border border-maroon/15">
+        <table className="w-full min-w-[440px] border-collapse text-sm">
+          <caption className="sr-only">{t("What each package includes, by course", "हर पैकेज में क्या शामिल है")}</caption>
           <thead>
             <tr className="bg-maroon text-cream">
-              <th className="p-3 text-left font-semibold">{t("What you get", "आपको क्या मिलता है")}</th>
+              <th scope="col" className="p-3 text-left font-semibold">{t("What you get", "आपको क्या मिलता है")}</th>
               {tiers.map((tier) => (
-                <th key={tier.id} className="p-3 text-center font-semibold">
+                <th key={tier.id} scope="col" className="p-3 text-center font-semibold">
                   <div className="font-display text-base">{lang === "hi" ? tier.nameHi : tier.name}</div>
                   <div className="text-[11px] font-normal text-cream/85">{tier.price}</div>
                 </th>
@@ -382,7 +364,7 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
           <tbody>
             {ROWS.map((row, r) => (
               <tr key={String(row.key)} className={r % 2 ? "bg-cream/20" : "bg-white"}>
-                <td className="p-3 font-medium text-ink">{bi(row.label)}</td>
+                <th scope="row" className="p-3 text-left font-medium text-ink">{bi(row.label)}</th>
                 {tiers.map((tier, i) => {
                   const up = upgraded(row.key, i);
                   return (
@@ -405,10 +387,30 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
 
 /* ── Section ─────────────────────────────────────────────────────────────── */
 
+const ctaClass = (platinum: boolean) =>
+  `btn-sheen inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+    platinum
+      ? "bg-cream text-maroon focus-visible:ring-cream focus-visible:ring-offset-maroon"
+      : "bg-maroon text-cream focus-visible:ring-maroon"
+  }`;
+
 export default function FinalisedPackages() {
   const { lang, t } = useLang();
+  const { contact } = useSiteContent();
   const tiers = packages.filter((p) => p.id !== "custom") as PackageTier[];
   const custom = packages.find((p) => p.id === "custom");
+
+  const waText = t(
+    "Hi Bhojpatra, none of the packages quite fit my event — I'd like a curated package.",
+    "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
+  );
+  const waLink = `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(waText)}`;
+
+  const trust: Bi[] = [
+    ["Verified vendors", "वेरिफाइड वेंडर"],
+    ["Transparent pricing", "पारदर्शी कीमत"],
+    ["Book with a small advance", "छोटे अग्रिम से बुक करें"],
+  ];
 
   return (
     <section id="packages" className="relative overflow-hidden py-16 sm:py-20">
@@ -418,81 +420,81 @@ export default function FinalisedPackages() {
           <h2 className="font-display text-3xl text-maroon sm:text-4xl">
             {t("Find your feast tier", "अपना दावत टियर चुनें")}
           </h2>
-          <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
+          <p className="font-script mt-4 text-[0.84375rem] text-ink-soft sm:text-[0.9375rem]">
             {t(
-              "Every step up is spelled out — so you always see what the next tier adds.",
-              "हर अगला टियर क्या जोड़ता है, यह साफ़ दिखता है।",
+              "Each tier includes everything below it — so you only pay up for what you actually add.",
+              "हर टियर में उसके नीचे वाला सब शामिल है — आप सिर्फ़ उसी के लिए ज़्यादा देते हैं जो आप जोड़ते हैं।",
             )}
           </p>
-          <Ornament className="mx-auto mt-6 text-maroon/50" />
+          <Ornament className="mx-auto mt-6 text-maroon/40" />
         </Reveal>
 
-        {/* Tier cards */}
-        <Reveal stagger className="mx-auto mt-14 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Tier cards — full-width snap carousel on mobile, grid on sm+ */}
+        <Reveal
+          stagger
+          from="right"
+          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-4 pt-4 sm:mx-auto sm:grid sm:max-w-6xl sm:snap-none sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
+        >
           {tiers.map((tier) => {
             const tierName = lang === "hi" ? tier.nameHi : tier.name;
             return (
-              <TierCard
-                key={tier.id}
-                tier={tier}
-                cta={
-                  <Link
-                    href={`/book?package=${tier.id}&step=menu`}
-                    aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className={`btn-sheen inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5 active:scale-95 ${
-                      tier.id === "platinum"
-                        ? "bg-cream text-maroon ring-1 ring-cream/50"
-                        : "bg-maroon text-cream"
-                    }`}
-                  >
-                    <span className="font-display leading-none">
-                      {t("Book", "बुक करें")} {tierName}
-                    </span>
-                    <span aria-hidden="true">→</span>
-                  </Link>
-                }
-              />
+              <div key={tier.id} className="w-[calc(100vw-2.5rem)] shrink-0 snap-center sm:w-auto sm:shrink">
+                <TierCard
+                  tier={tier}
+                  cta={
+                    <Link
+                      href={`/book?package=${tier.id}&step=menu`}
+                      aria-label={`${t("Book the", "बुक करें")} ${tierName} ${t("package", "पैकेज")}`}
+                      className={ctaClass(tier.id === "platinum")}
+                    >
+                      <span className="font-display leading-none">{t("Book", "बुक करें")} {tierName}</span>
+                      <span aria-hidden="true">→</span>
+                    </Link>
+                  }
+                />
+              </div>
             );
           })}
         </Reveal>
 
-        {/* Upgrade path (idea 8) */}
-        <Reveal className="mx-auto mt-16 max-w-4xl">
-          <p className="mb-5 text-center font-display text-xl text-maroon">
-            {t("What each step buys you", "हर कदम आपको क्या देता है")}
-          </p>
-          <UpgradePath />
+        {/* Trust strip */}
+        <Reveal className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-soft">
+          {trust.map((item) => (
+            <span key={item[0]} className="inline-flex items-center gap-1.5">
+              <CheckIcon className="h-4 w-4 text-maroon" />
+              {lang === "hi" ? item[1] : item[0]}
+            </span>
+          ))}
         </Reveal>
 
-        {/* Comparison grid (idea 3) */}
+        {/* Deep-dive comparison (progressive disclosure) */}
         <Reveal className="mx-auto mt-16 max-w-4xl">
-          <p className="mb-5 text-center font-display text-xl text-maroon">
-            {t("Compare every tier", "हर टियर की तुलना करें")}
-          </p>
+          <div className="mb-7 text-center">
+            <h3 className="font-display text-2xl text-maroon">{t("Compare every tier", "हर टियर की तुलना करें")}</h3>
+            <Ornament className="mx-auto mt-3 text-maroon/40" />
+          </div>
           <CompareGrid tiers={tiers} />
         </Reveal>
 
-        {/* Single Stall / flexible option — carried from the live theme */}
+        {/* Single Stall — the flexible, à-la-carte option */}
         {custom && (
-          <Reveal className="mx-auto mt-14 max-w-3xl">
-            <div className="flex flex-col items-center gap-4 rounded-3xl border-2 border-dashed border-maroon/40 bg-white px-6 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
+          <Reveal className="mx-auto mt-12 max-w-3xl">
+            <div className="flex flex-col items-start gap-4 rounded-3xl border border-dashed border-maroon/40 bg-cream/20 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-maroon ring-1 ring-maroon/40">
-                  {t("Most flexible", "सबसे लचीला")}
-                </span>
-                <h3 className="mt-2 font-display text-2xl text-maroon">
-                  {lang === "hi" ? custom.nameHi : custom.name}
+                <h3 className="font-display text-xl text-maroon">
+                  {t("Just one stall?", "सिर्फ़ एक स्टॉल?")}{" "}
+                  <span className="text-ink">{lang === "hi" ? custom.nameHi : custom.name}</span>
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
                   {t(
-                    "One stall, one vendor — build your own menu and pay only for what you pick.",
-                    "एक स्टॉल, एक वेंडर — अपना मेन्यू बनाएँ और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
+                    "Build your own menu, one vendor — and pay only for what you pick.",
+                    "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
                   )}
                 </p>
               </div>
               <Link
                 href="/book?package=custom&step=menu"
-                className="btn-sheen inline-flex shrink-0 items-center gap-2 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                className="btn-sheen inline-flex shrink-0 items-center gap-2 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition-all duration-300 hover:bg-maroon hover:text-cream active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
               >
                 <span className="font-display">{t("Build your own", "अपना बनाएँ")}</span>
                 <span aria-hidden="true">→</span>
@@ -501,14 +503,25 @@ export default function FinalisedPackages() {
           </Reveal>
         )}
 
-        {/* Disclaimer — echoes the live section */}
-        <Reveal className="mx-auto mt-10 max-w-2xl">
-          <p className="rounded-2xl border border-maroon/15 bg-cream/30 px-5 py-3 text-center text-sm text-ink-soft">
-            {t(
-              "Prices are approximate. Final price may vary as per menu & vendor selection.",
-              "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है।",
-            )}
-          </p>
+        {/* Trust / help footer — pricing note + custom-package help, merged */}
+        <Reveal className="mx-auto mt-8 max-w-3xl">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-maroon/15 bg-cream/30 px-6 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
+            <p className="text-sm text-ink-soft">
+              {t(
+                "Prices are approximate — the final price depends on your menu, guests & vendors.",
+                "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
+              )}
+            </p>
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-maroon underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
+            >
+              <WhatsAppIcon className="h-4 w-4" />
+              {t("Need something custom? Chat with us", "कुछ कस्टम चाहिए? हमसे बात करें")}
+            </a>
+          </div>
         </Reveal>
       </div>
     </section>

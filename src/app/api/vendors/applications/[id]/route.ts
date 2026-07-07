@@ -106,15 +106,16 @@ export async function PATCH(
     );
   }
 
-  // Mirror the tier decision onto the vendor's live catalog record (if they've
-  // already built a profile). Vendors approved before publishing a menu inherit
-  // it later at menu-save time. Best-effort: a sync failure must not fail the
-  // review write that already succeeded.
-  if (record.assignedTiers?.length && (tiers.length || record.status === "Verified")) {
+  // Mirror the review decision onto the vendor's live catalog record (if they've
+  // already built a profile): verifying publishes them and grants the verified
+  // badge, rejecting takes them down, and tier assignments follow. Vendors
+  // reviewed before publishing a menu inherit this at menu-save time instead.
+  // Best-effort: a sync failure must not fail the review write that succeeded.
+  if (isStatus(body.status) || tiers.length) {
     try {
-      await syncLiveVendorTiers(record.email, record.assignedTiers);
+      await syncLiveVendorFromReview(record);
     } catch (err) {
-      console.error("Failed to sync assigned tiers to live vendor", err);
+      console.error("Failed to sync review decision to live vendor", err);
     }
   }
 
@@ -145,23 +146,40 @@ export async function DELETE(
   return Response.json({ ok: true });
 }
 
-/** Push the admin's tier decision onto the vendor's live catalog record, matched
- *  by login email. No-op when the vendor hasn't published a profile yet — they
- *  inherit `assignedTiers` when they next save their menu. */
-async function syncLiveVendorTiers(
-  email: string,
-  tiers: VendorTier[],
-): Promise<void> {
-  const target = email.trim().toLowerCase();
+/** Push the admin's review decision onto the vendor's live catalog record,
+ *  matched by login email. No-op when the vendor hasn't published a profile yet
+ *  — they inherit the same decision when they next save their menu.
+ *
+ *  Verifying publishes the vendor (moderation → Approved) and lights the
+ *  verified badge; rejecting takes them off every customer surface. An explicit
+ *  admin takedown ("Hidden") is never resurrected by a re-verify. */
+async function syncLiveVendorFromReview(app: {
+  email: string;
+  status: VerificationStatus;
+  assignedTiers?: VendorTier[];
+}): Promise<void> {
+  const target = app.email.trim().toLowerCase();
   if (!target) return;
   const records = await listLiveVendorRecords();
   const live = records.find(
     (r) => r.ownerEmail?.trim().toLowerCase() === target,
   );
   if (!live) return;
-  live.tiers = tiers;
-  live.updatedAt = new Date().toISOString();
-  await saveVendor(live);
+
+  let moderation = live.moderation;
+  if (app.status === "Verified") {
+    moderation = live.moderation === "Hidden" ? "Hidden" : "Approved";
+  } else if (app.status === "Rejected") {
+    moderation = "Hidden";
+  }
+
+  await saveVendor({
+    ...live,
+    verified: app.status === "Verified",
+    moderation,
+    ...(app.assignedTiers?.length ? { tiers: app.assignedTiers } : {}),
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /** Keep the KYC file store's status in step with the review decision. */

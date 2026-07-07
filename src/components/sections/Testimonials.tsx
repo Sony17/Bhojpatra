@@ -143,7 +143,7 @@ export default function Testimonials() {
         <h2 className="font-display text-3xl text-maroon sm:text-4xl">
           {lang === "hi" ? testimonials.headingHi : testimonials.heading}
         </h2>
-        <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
+        <p className="font-script mt-4 text-[0.9375rem] text-ink-soft sm:text-lg">
           {lang === "hi" ? testimonials.subtitleHi : testimonials.subtitle}
         </p>
       </Reveal>
