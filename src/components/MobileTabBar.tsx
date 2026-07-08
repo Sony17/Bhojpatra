@@ -134,7 +134,7 @@ export default function MobileTabBar() {
               <Link
                 href={tab.href}
                 onClick={() => setAccountOpen(false)}
-                className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold text-ink-soft transition-colors hover:text-maroon"
+                className="focus-ring flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold text-ink-soft transition-colors hover:text-maroon"
               >
                 <svg
                   aria-hidden="true"
@@ -160,7 +160,7 @@ export default function MobileTabBar() {
             onClick={() => setAccountOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={accountOpen}
-            className={`flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
+            className={`focus-ring flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
               accountOpen ? "text-maroon" : "text-ink-soft hover:text-maroon"
             }`}
           >

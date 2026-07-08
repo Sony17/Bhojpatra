@@ -5,6 +5,7 @@ import { useLang, type Lang } from "@/lib/i18n";
 import { useAccountMenuState } from "@/lib/accountMenu";
 import { useCompareTrayState } from "@/lib/compareTray";
 import { useBookingBarState } from "@/lib/bookingBar";
+import { Button, Chip } from "@/components/ui";
 
 /* Bhojpatra contact — mirrors the placeholder in the Footer. Swap for the
    real WhatsApp business number later. */
@@ -277,7 +278,7 @@ export default function FloatingChat() {
       {/* ── Chat panel — scaled to 96% from the bottom-right so it grows up
           from the launcher without nudging the launcher off the corner. ── */}
       {open && (
-        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] origin-bottom-right scale-[0.96] flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-[0_18px_50px_rgba(185,32,37,0.28)] [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
+        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] origin-bottom-right scale-[0.96] flex-col overflow-hidden rounded-card border border-cream-3 bg-white shadow-modal [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
@@ -410,7 +411,7 @@ export default function FloatingChat() {
                 type="submit"
                 aria-label="Send message"
                 disabled={!draft.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-maroon text-cream transition-colors hover:bg-maroon-dark disabled:opacity-40"
+                className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-maroon text-cream shadow-brand transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z" />
@@ -449,13 +450,13 @@ export default function FloatingChat() {
                       `हम आपको +91 ${phone} पर 10 मिनट के भीतर कॉल करेंगे।`,
                     )}
                   </p>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={resetCallback}
-                    className="mt-5 rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-cream-2"
+                    className="mt-5"
                   >
                     {t("Request another", "एक और अनुरोध करें")}
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <form onSubmit={submitCallback} className="space-y-4">
@@ -479,7 +480,7 @@ export default function FloatingChat() {
                     >
                       {t("We'll call you on", "हम आपको इस नंबर पर कॉल करेंगे")}
                     </label>
-                    <div className="flex items-center overflow-hidden rounded-xl border border-cream-3 bg-white focus-within:border-maroon">
+                    <div className="flex items-center overflow-hidden rounded-control border border-cream-3 bg-white focus-within:border-maroon focus-within:ring-2 focus-within:ring-maroon/25">
                       <span className="pl-3.5 pr-2 text-sm font-semibold text-ink-soft">+91</span>
                       <input
                         id="cb-phone"
@@ -506,19 +507,13 @@ export default function FloatingChat() {
                       {CALLBACK_TOPICS.map((tp) => {
                         const active = topic === tp.en;
                         return (
-                          <button
+                          <Chip
                             key={tp.en}
-                            type="button"
+                            selected={active}
                             onClick={() => setTopic(active ? "" : tp.en)}
-                            aria-pressed={active}
-                            className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                              active
-                                ? "border-maroon bg-maroon text-cream"
-                                : "border-cream-3 bg-surface-beige text-ink hover:border-maroon"
-                            }`}
                           >
                             {lang === "hi" ? tp.hi : tp.en}
-                          </button>
+                          </Chip>
                         );
                       })}
                     </div>
@@ -533,7 +528,7 @@ export default function FloatingChat() {
                       maxLength={500}
                       placeholder={t("Add a description (optional)", "विवरण जोड़ें (वैकल्पिक)")}
                       aria-label={t("Description", "विवरण")}
-                      className="w-full resize-none rounded-xl border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-maroon"
+                      className="w-full resize-none rounded-control border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-maroon focus:ring-2 focus:ring-maroon/25"
                     />
                   ) : (
                     <button
@@ -549,21 +544,23 @@ export default function FloatingChat() {
                   {cbError && (
                     <p
                       role="alert"
-                      className="rounded-xl border border-maroon/30 bg-cream-2 px-3.5 py-2.5 text-sm text-maroon"
+                      className="rounded-control border border-maroon/30 bg-cream-2 px-3.5 py-2.5 text-sm text-maroon"
                     >
                       {cbError}
                     </p>
                   )}
 
-                  <button
+                  <Button
                     type="submit"
-                    disabled={!validPhone || cbSubmitting}
-                    className="btn-sheen w-full rounded-full bg-maroon py-3 text-sm font-semibold text-cream shadow-[0_10px_24px_rgba(185,32,37,0.35)] transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
+                    fullWidth
+                    size="lg"
+                    loading={cbSubmitting}
+                    disabled={!validPhone}
                   >
                     {cbSubmitting
                       ? t("Sending…", "भेजा जा रहा है…")
                       : t("Request callback", "कॉलबैक का अनुरोध करें")}
-                  </button>
+                  </Button>
                 </form>
               )}
             </div>

@@ -42,6 +42,15 @@ export interface HomeBrand {
   image: string;
 }
 
+export interface HomeRibbonBrand {
+  id: string;
+  name: string;
+  nameHi: string;
+  /** Brand logo (upload or URL) shown in the moving ribbon. When empty, the
+   *  chip falls back to the brand name's initials. */
+  logo: string;
+}
+
 export interface HomePackage {
   id: string;
   name: string;
@@ -79,6 +88,15 @@ export interface HomeContent {
     /** Static backdrop used by the default (Original / Minimal) hero look. */
     background: string;
   };
+  /** Moving "trusted by" ribbon of the prestigious / famous brands Bhojpatra
+   *  serves. Scrolls continuously beneath the hero; fully admin-managed
+   *  (enable toggle, heading and the brand chips). */
+  brandRibbon: {
+    enabled: boolean;
+    heading: string;
+    headingHi: string;
+    brands: HomeRibbonBrand[];
+  };
   services: {
     heading: string;
     headingHi: string;
@@ -110,6 +128,20 @@ export interface HomeContent {
     cta: string;
     ctaHi: string;
     brands: HomeBrand[];
+  };
+  /** "Baina Box, specially by Bhojpatra" — an admin-editable signature block
+   *  showcasing Bhojpatra's own curated Baina Box offering. Shown as an elegant
+   *  card in the vendor dashboard and atop a Baina Box catalogue search. Its CTA
+   *  always deep-links to the Baina Box catalogue (`/vendors?q=Baina+Box`). */
+  bainaBoxSpecial: {
+    enabled: boolean;
+    heading: string;
+    headingHi: string;
+    body: string;
+    bodyHi: string;
+    cta: string;
+    ctaHi: string;
+    image: string;
   };
   packages: {
     heading: string;
@@ -171,6 +203,64 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     ledeHi:
       "क्यूरेटेड मेन्यू की तुलना करें, अपनी दावत कस्टमाइज़ करें और मिनटों में भरोसेमंद सेलिब्रेशन पार्टनर बुक करें।",
     background: "/hero-bg.webp",
+  },
+  brandRibbon: {
+    enabled: true,
+    heading: "Proudly serving India's finest brands",
+    headingHi: "गर्व से भारत के बेहतरीन ब्रांड्स की सेवा में",
+    // Dummy placeholders — an admin replaces these with the real brands (and
+    // uploads their logos) via Admin → Content Control → Home Page → Brand
+    // Ribbon. With no logo a chip shows the brand's initials.
+    brands: [
+      {
+        id: "brand-grand-pavilion",
+        name: "The Grand Pavilion",
+        nameHi: "द ग्रैंड पवेलियन",
+        logo: "",
+      },
+      {
+        id: "brand-royal-rasoi",
+        name: "Royal Rasoi",
+        nameHi: "रॉयल रसोई",
+        logo: "",
+      },
+      {
+        id: "brand-saffron-court",
+        name: "Saffron Court",
+        nameHi: "सैफ्रॉन कोर्ट",
+        logo: "",
+      },
+      {
+        id: "brand-heritage-halwai",
+        name: "Heritage Halwai",
+        nameHi: "हेरिटेज हलवाई",
+        logo: "",
+      },
+      {
+        id: "brand-maharaja-caterers",
+        name: "Maharaja Caterers",
+        nameHi: "महाराजा कैटरर्स",
+        logo: "",
+      },
+      {
+        id: "brand-golden-spoon",
+        name: "Golden Spoon",
+        nameHi: "गोल्डन स्पून",
+        logo: "",
+      },
+      {
+        id: "brand-silver-platter",
+        name: "Silver Platter",
+        nameHi: "सिल्वर प्लैटर",
+        logo: "",
+      },
+      {
+        id: "brand-nawabs-kitchen",
+        name: "Nawab's Kitchen",
+        nameHi: "नवाब्स किचन",
+        logo: "",
+      },
+    ],
   },
   services: {
     heading: "Services",
@@ -248,6 +338,18 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
           "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=500&q=70",
       },
     ],
+  },
+  bainaBoxSpecial: {
+    enabled: true,
+    heading: "Signature Baina Boxes",
+    headingHi: "सिग्नेचर बैना बॉक्स",
+    body: "Curated and delivered by Bhojpatra — premium gift boxes from famous brands, beautifully packed and made special for every celebration.",
+    bodyHi:
+      "भोजपत्र द्वारा तैयार और डिलीवर — मशहूर ब्रांड्स के प्रीमियम गिफ्ट बॉक्स, खूबसूरती से पैक किए और हर उत्सव के लिए खास।",
+    cta: "Explore Baina Box →",
+    ctaHi: "बैना बॉक्स देखें →",
+    image:
+      "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=70",
   },
   packages: {
     heading: "Select Your Package",
@@ -343,6 +445,13 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
   const d = DEFAULT_HOME_CONTENT;
   return {
     hero: { ...d.hero, ...stored.hero },
+    brandRibbon: {
+      ...d.brandRibbon,
+      ...stored.brandRibbon,
+      brands: stored.brandRibbon?.brands?.length
+        ? stored.brandRibbon.brands
+        : d.brandRibbon.brands,
+    },
     services: {
       ...d.services,
       ...stored.services,
@@ -365,6 +474,7 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
         ? stored.bainaBoxes.brands
         : d.bainaBoxes.brands,
     },
+    bainaBoxSpecial: { ...d.bainaBoxSpecial, ...stored.bainaBoxSpecial },
     packages: {
       ...d.packages,
       ...stored.packages,

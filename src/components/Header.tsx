@@ -104,7 +104,7 @@ function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("Account menu", "अकाउंट मेन्यू")}
-        className="flex items-center gap-2 rounded-full border border-maroon/40 bg-white/80 py-1 pl-1 pr-2.5 text-sm font-medium text-maroon shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-maroon/5 active:scale-95"
+        className="focus-ring flex items-center gap-2 rounded-full border border-maroon/40 bg-white/80 py-1 pl-1 pr-2.5 text-sm font-medium text-maroon shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-maroon/5 active:scale-95"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-maroon text-cream">
           {session ? (
@@ -187,7 +187,7 @@ export default function Header() {
 
               {link.items && (
                 <div className="invisible absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                  <ul className="overflow-hidden rounded-2xl border border-maroon/15 bg-white shadow-xl shadow-maroon/20 [&_a]:[text-shadow:none]">
+                  <ul className="overflow-hidden rounded-card border border-maroon/15 bg-white shadow-pop [&_a]:[text-shadow:none]">
                     {link.items.map((item) => (
                       <li key={item.title} className="border-b border-maroon/10 last:border-b-0">
                         <a

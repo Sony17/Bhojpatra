@@ -3,6 +3,7 @@ import { Open_Sans } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
+import { ToastProvider } from "@/components/ui";
 import ScrollWatermark from "@/components/ScrollWatermark";
 import SiteLoader from "@/components/SiteLoader";
 
@@ -44,8 +45,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col overflow-x-hidden bg-white text-ink">
         <LanguageProvider>
-          {children}
-          <ScrollWatermark />
+          <ToastProvider>
+            {children}
+            <ScrollWatermark />
+          </ToastProvider>
         </LanguageProvider>
         <SiteLoader />
       </body>

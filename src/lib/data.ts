@@ -938,16 +938,192 @@ export interface AddOn {
   icon: string;
   /** Counter photo shown on the extras step card. */
   image: string;
+  /** Extra search aliases — matched by the add-on search box, not shown in UI. */
+  keywords?: string[];
 }
 
 export const addOns: AddOn[] = [
-  { id: "pan", name: "Pan Counter", nameHi: "पान काउंटर", description: "Live paan with assorted fillings.", price: 40, perPlate: true, icon: "🍃", image: img("photo-1606491956689-2ea866880c84", 600) },
-  { id: "chaat", name: "Chaat Station", nameHi: "चाट स्टेशन", description: "Golgappa, tikki & papdi chaat, live.", price: 60, perPlate: true, icon: "🥘", image: img("photo-1490645935967-10de6ba17061", 600) },
-  { id: "live", name: "Live Counters", nameHi: "लाइव काउंटर", description: "Dosa, pasta & tandoor made fresh.", price: 90, perPlate: true, icon: "🍳", image: img("photo-1567188040759-fb8a883dc6d8", 600) },
-  { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨", image: img("photo-1565557623262-b51c2513a641", 600) },
-  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600) },
-  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600) },
-  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600) },
+  { id: "pan", name: "Pan Counter", nameHi: "पान काउंटर", description: "Live paan with assorted fillings.", price: 40, perPlate: true, icon: "🍃", image: img("photo-1606491956689-2ea866880c84", 600), keywords: ["paan", "betel", "mouth freshener", "meetha"] },
+  { id: "chaat", name: "Chaat Station", nameHi: "चाट स्टेशन", description: "Golgappa, tikki & papdi chaat, live.", price: 60, perPlate: true, icon: "🥘", image: img("photo-1490645935967-10de6ba17061", 600), keywords: ["gol gappe", "golgappa", "pani puri", "puchka", "tikki", "papdi", "street food"] },
+  { id: "live", name: "Live Counters", nameHi: "लाइव काउंटर", description: "Dosa, pasta & tandoor made fresh.", price: 90, perPlate: true, icon: "🍳", image: img("photo-1567188040759-fb8a883dc6d8", 600), keywords: ["dosa", "pasta", "tandoor", "south indian", "grill"] },
+  { id: "pizza", name: "Pizza Counter", nameHi: "पिज़्ज़ा काउंटर", description: "Wood-fired pizzas tossed & baked live.", price: 120, perPlate: true, icon: "🍕", image: img("photo-1513104890138-7c749659a591", 600), keywords: ["pizza", "margherita", "italian", "cheese"] },
+  { id: "momo", name: "Momo Counter", nameHi: "मोमो काउंटर", description: "Steamed & fried momos with spicy chutney.", price: 70, perPlate: true, icon: "🥟", image: img("photo-1626074353765-517a681e40be", 600), keywords: ["momo", "dumpling", "dimsum", "steamed"] },
+  { id: "noodle", name: "Chinese Wok", nameHi: "चाइनीज़ वॉक", description: "Hakka noodles & Manchurian from the wok.", price: 85, perPlate: true, icon: "🍜", image: img("photo-1585032226651-759b368d7246", 600), keywords: ["chinese", "noodles", "hakka", "manchurian", "wok", "schezwan"] },
+  { id: "waffle", name: "Waffle & Pancake Bar", nameHi: "वॉफल और पैनकेक बार", description: "Fresh waffles & pancakes with toppings.", price: 80, perPlate: true, icon: "🧇", image: img("photo-1541544741938-0af808871cc0", 600), keywords: ["waffle", "pancake", "nutella", "dessert", "brunch"] },
+  { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨", image: img("photo-1565557623262-b51c2513a641", 600), keywords: ["jalebi", "ice cream", "kulfi", "sweets", "gulab jamun", "mithai"] },
+  { id: "coffee", name: "Coffee & Chai Bar", nameHi: "कॉफ़ी और चाय बार", description: "Barista coffee, cutting chai & more.", price: 45, perPlate: true, icon: "☕", image: img("photo-1509042239860-f550ce710b93", 600), keywords: ["coffee", "chai", "tea", "barista", "cappuccino", "beverage"] },
+  { id: "mocktail", name: "Mocktail & Juice Bar", nameHi: "मॉकटेल और जूस बार", description: "Fresh juices & mocktails, mixed live.", price: 65, perPlate: true, icon: "🍹", image: img("photo-1544145945-f90425340c7e", 600), keywords: ["mocktail", "juice", "drinks", "beverage", "cooler", "lemonade"] },
+  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600), keywords: ["waiter", "steward", "server", "manpower"] },
+  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600), keywords: ["crockery", "cutlery", "glassware", "plates"] },
+  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600), keywords: ["decor", "flowers", "florals", "lighting", "theme", "stage"] },
+];
+
+/**
+ * Service package — the labour/coordination of actually running a feast (crew,
+ * crockery, setup, stewarding, decor, coordination, cleanup) for the whole
+ * event, priced per guest. Reproduced from the "Choose Your Service Package"
+ * reference as four tiers (A–D). Rendered strictly in the four brand colours.
+ *
+ * This array is the seed fallback for the admin-managed `services` settings
+ * singleton (`/api/admin/services`, `useServices`). The customer must pick one
+ * in the wizard's dedicated service step; its price folds into the feast total.
+ */
+export interface ServicePackage {
+  id: string;
+  /** Short marker shown above the title, e.g. "Package A". */
+  badge: string;
+  name: string;
+  nameHi: string;
+  subtitle: string;
+  subtitleHi: string;
+  /** Emoji/glyph for the card header. */
+  icon: string;
+  /** ✓ checklist of what the tier covers. */
+  includes: string[];
+  /** ✗ list — only Package A carries these; empty otherwise. */
+  notIncluded: string[];
+  /** Occasions/events the tier suits best. */
+  bestFor: string[];
+  /** Per-guest floor (the honest "Starting from") — charged once wired in. */
+  priceMin: number;
+  /** Per-guest upper band, display only. */
+  priceMax: number;
+  /** true = per guest (× guests); false = flat feast fee. */
+  perPlate: boolean;
+  /** true = the upper band is open-ended → render a trailing "+". */
+  openTop?: boolean;
+}
+
+export const servicePackages: ServicePackage[] = [
+  {
+    id: "essential",
+    badge: "Package A",
+    name: "Essential Service",
+    nameHi: "एसेंशियल सर्विस",
+    subtitle: "For Single Stall & Small Functions",
+    subtitleHi: "सिंगल स्टॉल और छोटे आयोजनों के लिए",
+    icon: "🍲",
+    includes: [
+      "Disposable Plates & Bowls",
+      "Wooden Buffet Tables",
+      "Plain Table Covers",
+      "Drinking Water Bottles",
+      "Basic Serving Staff",
+      "Dustbins & Garbage Collection",
+      "Basic Food Display",
+    ],
+    notIncluded: ["No LED Counter", "No Crockery", "No Decoration"],
+    bestFor: [
+      "Birthday Parties",
+      "Office Parties",
+      "Small Pujas",
+      "House Functions",
+    ],
+    priceMin: 0,
+    priceMax: 40,
+    perPlate: true,
+  },
+  {
+    id: "standard",
+    badge: "Package B",
+    name: "Standard Service",
+    nameHi: "स्टैंडर्ड सर्विस",
+    subtitle: "For Silver & Gold Packages",
+    subtitleHi: "सिल्वर और गोल्ड पैकेज के लिए",
+    icon: "🍽️",
+    includes: [
+      "Everything in Package A",
+      "Ceramic Crockery",
+      "Steel Cutlery",
+      "Designer LED Buffet Counters",
+      "Uniformed Service Staff",
+      "Drinking Water Bottles",
+      "Food Labels",
+      "Handwash Setup",
+      "Buffet Decoration",
+      "Buffet Lighting",
+    ],
+    notIncluded: [],
+    bestFor: [
+      "Engagements",
+      "Anniversary",
+      "Medium Size Functions",
+      "Family Gatherings",
+    ],
+    priceMin: 80,
+    priceMax: 120,
+    perPlate: true,
+  },
+  {
+    id: "premium",
+    badge: "Package C",
+    name: "Premium Service",
+    nameHi: "प्रीमियम सर्विस",
+    subtitle: "For Weddings & Receptions",
+    subtitleHi: "शादियों और रिसेप्शन के लिए",
+    icon: "👑",
+    includes: [
+      "Everything in Package B",
+      "Premium Bone China Crockery",
+      "Premium Glassware",
+      "Luxury LED Counters",
+      "Theme Buffet Decoration",
+      "Professional Hospitality Team",
+      "Live Counter Chefs",
+      "Service Captain",
+      "Welcome Beverage Service",
+      "VIP Table Service",
+      "Premium Table Linen",
+      "Floral Decoration",
+      "Hygiene Supervisor",
+    ],
+    notIncluded: [],
+    bestFor: ["Weddings", "Receptions", "Large Gatherings", "Corporate Events"],
+    priceMin: 180,
+    priceMax: 300,
+    perPlate: true,
+  },
+  {
+    id: "ultra",
+    badge: "Package D",
+    name: "Ultra Luxury Experience",
+    nameHi: "अल्ट्रा लक्ज़री एक्सपीरियंस",
+    subtitle: "For Luxury Weddings & VIP Events",
+    subtitleHi: "लक्ज़री शादियों और वीआईपी आयोजनों के लिए",
+    icon: "💎",
+    includes: [
+      "Everything in Package C",
+      "Imported Luxury Crockery",
+      "Gold/Silver Finish Cutlery",
+      "Designer Buffet Concepts",
+      "Customized Live Counters",
+      "Premium Floral Styling",
+      "Butler Service",
+      "Guest Hospitality Desk",
+      "Valet Coordination",
+      "Uniform Theme Staff",
+      "Royal Welcome Team",
+      "Mocktail Bar Setup",
+      "Dessert Studio",
+      "Chocolate Fountain",
+      "Luxury Lounge Setup",
+      "Scent & Ambience",
+      "Event Hospitality Manager",
+      "VIP Guest Handling Team",
+      "Unlimited Premium Presentation",
+    ],
+    notIncluded: [],
+    bestFor: [
+      "Luxury Weddings",
+      "Celebrity Events",
+      "VIP Parties",
+      "High Profile Gatherings",
+    ],
+    priceMin: 400,
+    priceMax: 700,
+    perPlate: true,
+    openTop: true,
+  },
 ];
 
 export interface ComparisonVendor {

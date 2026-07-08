@@ -58,6 +58,10 @@ export interface StoredOrder {
   receipt?: string;
   /** Itemised invoice for PDF re-download / share. */
   invoice?: InvoiceData;
+  /** The feast-wide service package the customer chose (crew, crockery, setup,
+   *  decor, coordination). Its price is already included in `amount`; stored
+   *  here so the admin booking detail + My Bookings can show the tier. */
+  service?: { id: string; name: string; price: number };
   /** Free-text special requests the customer added when editing the booking. */
   note?: string;
   /** The specific vendors catered, captured so each can be rated individually. */
@@ -154,6 +158,7 @@ export async function POST(request: Request) {
     receipt,
     invoice,
     vendors,
+    service,
   } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof id !== "string" || !/^BHJ-/.test(id)) {
@@ -270,6 +275,7 @@ export async function POST(request: Request) {
       ? { invoice: invoice as InvoiceData }
       : {}),
     ...(Array.isArray(vendors) ? { vendors: vendors as BookedVendor[] } : {}),
+    ...(isServiceSelection(service) ? { service } : {}),
   };
 
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a
@@ -323,6 +329,20 @@ function daysUntilISO(dateStr: string): number | null {
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   return Math.round((target - today) / 86_400_000);
+}
+
+/** Shape-check for the chosen service package posted from the booking wizard. */
+function isServiceSelection(
+  v: unknown,
+): v is { id: string; name: string; price: number } {
+  if (!v || typeof v !== "object") return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s.id === "string" &&
+    typeof s.name === "string" &&
+    typeof s.price === "number" &&
+    Number.isFinite(s.price)
+  );
 }
 
 /** Shallow shape-check for an EMI plan posted from the booking wizard. */

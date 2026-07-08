@@ -4,6 +4,7 @@ import Link from "next/link";
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
+import BrandRibbon from "@/components/sections/BrandRibbon";
 
 export default function Footer() {
   const { lang, t } = useLang();
@@ -101,6 +102,10 @@ export default function Footer() {
             </div>
           </div>
       </section>
+
+      {/* Prestigious brands Bhojpatra serves — a moving "trusted by" band. */}
+      <BrandRibbon />
+
     <footer className="bg-maroon-dark pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-cream/80 lg:pb-0">
       <div className="mx-auto max-w-7xl px-5 py-12">
         <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-6">

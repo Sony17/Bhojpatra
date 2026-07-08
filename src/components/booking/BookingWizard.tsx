@@ -10,6 +10,11 @@ import {
   type PartnerRole,
 } from "@/lib/session";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
+import {
+  DEFAULT_REFERRAL_RATES,
+  customerPercentFor,
+  type ReferralRates,
+} from "@/lib/referralRates";
 import LoginGate from "@/components/auth/LoginGate";
 import ThemedSelect from "@/components/ThemedSelect";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
@@ -71,6 +76,8 @@ import {
   OTHER_OCCASION_ID,
   type OccasionOption,
 } from "@/lib/occasions";
+import { useServices } from "@/lib/services";
+import ServicePackages from "@/components/sections/ServicePackages";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -79,7 +86,8 @@ const GST_RATE = 0.18;
 // Advance booking fee — guests can lock a date by paying this share of the
 // grand total up front (the rest is settled later with our team).
 const ADVANCE_RATE = 0.1;
-const TOTAL_STEPS = 4;
+// Package (1) · Menu (2) · Details + add-ons (3) · Service package (4) · Confirm (5).
+const TOTAL_STEPS = 5;
 
 // Large functions (1000+ guests) may split a single segment across vendors.
 const MULTI_VENDOR_MIN = 1000;
@@ -201,6 +209,12 @@ export default function BookingWizard() {
   // from is narrowed to the selected package's tier (see PACKAGE_VENDOR_TIERS).
   const [addOnVendor, setAddOnVendor] = useState<Record<string, string>>({});
 
+  // Feast-wide service package (Step 4) — a mandatory single-select. The live
+  // list is admin-managed (`useServices`, falling back to the seed); the chosen
+  // tier's price folds into the order total.
+  const services = useServices();
+  const [serviceId, setServiceId] = useState<string>("");
+
   // Referral attribution — a partner's code arrives via /book?ref=CODE or is
   // typed on the Confirm step. We resolve it to the referrer's name so the
   // booking can be tagged and surfaced on the partner's dashboard. Declared
@@ -212,6 +226,27 @@ export default function BookingWizard() {
   // referring themselves from a second account (their phone matches the code's
   // owner). The server re-checks this authoritatively; here it's for feedback.
   const [referrerPhone, setReferrerPhone] = useState<string>("");
+
+  // Admin-set referral rates. A recognised Individual / Event Planner code gives
+  // the customer the configured discount off their pre-tax bill (0 until an
+  // admin sets one, so behaviour is unchanged by default).
+  const [referralRates, setReferralRates] = useState<ReferralRates>(
+    DEFAULT_REFERRAL_RATES,
+  );
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/referral-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: ReferralRates | null) => {
+        if (active && d) setReferralRates(d);
+      })
+      .catch(() => {
+        /* offline — no referral discount, everything else still works */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // The signed-in account's own referral codes — an Individual Referrer or Event
   // Planner must not credit their own booking, so a code that belongs to this
@@ -623,6 +658,17 @@ export default function BookingWizard() {
     [selectedAddOns, guests],
   );
 
+  // The chosen service package and the amount it adds to the feast: its
+  // per-guest floor × headcount (a flat fee when the tier isn't per-guest). A
+  // ₹0 tier (e.g. Essential) adds nothing. Taxed like the venue fee, but not
+  // coupon-discounted.
+  const selectedService = services.find((s) => s.id === serviceId);
+  const serviceTotal = selectedService
+    ? selectedService.perPlate
+      ? selectedService.priceMin * guests
+      : selectedService.priceMin
+    : 0;
+
   // Vendors a guest may assign to an add-on — the existing catalogue narrowed to
   // the tier(s) the chosen package unlocks (Custom / short-notice: everyone).
   const eligibleAddOnVendors = useMemo<VendorListing[]>(() => {
@@ -719,12 +765,29 @@ export default function BookingWizard() {
           );
 
   const preDiscount = subtotal + addOnsTotal;
-  const discount = appliedCoupon
+  const couponDiscount = appliedCoupon
     ? Math.min((preDiscount * appliedCoupon.percent) / 100, appliedCoupon.cap)
     : 0;
-  // The venue booking fee (when a venue was selected) is taxed alongside the
-  // catering but isn't subject to the catering coupon.
-  const taxable = preDiscount - discount + venueFee;
+  // A recognised Individual / Event Planner referral code gives the customer the
+  // admin-set discount off the pre-tax catering bill. It's dropped for an
+  // unknown code (no resolved referrer), a Venue Owner code, or a self-referral
+  // — the same cases where the booking isn't credited. Stacks with a coupon but
+  // never takes off more than what's left of the catering base.
+  const referralCustomerPercent =
+    !selfReferral && referralCode.trim() && referrerName
+      ? customerPercentFor(referralRates, referrerType)
+      : 0;
+  const referralDiscount = Math.max(
+    0,
+    Math.min(
+      Math.round((preDiscount * referralCustomerPercent) / 100),
+      preDiscount - couponDiscount,
+    ),
+  );
+  const discount = couponDiscount + referralDiscount;
+  // The venue booking fee and the feast-wide service package are taxed
+  // alongside the catering but aren't subject to the catering coupon.
+  const taxable = preDiscount - discount + venueFee + serviceTotal;
   const gst = taxable * GST_RATE;
   const grandTotal = taxable + gst;
 
@@ -756,6 +819,10 @@ export default function BookingWizard() {
           // extra here, so a booking is never entirely empty.
           orderHasItems
         );
+      case 4:
+        // A service package is mandatory — but never dead-end the guest if the
+        // admin has somehow cleared the list.
+        return services.length === 0 || serviceId !== "";
       default:
         return true;
     }
@@ -791,21 +858,35 @@ export default function BookingWizard() {
       }
       return out;
     }
+    if (step === 4) {
+      return serviceId === ""
+        ? [t("Choose a service package", "एक सर्विस पैकेज चुनें")]
+        : [];
+    }
     return [];
   })();
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
 
-  const applyCoupon = () => {
-    const code = couponInput.trim().toUpperCase();
+  const applyCouponCode = (raw: string) => {
+    const code = raw.trim().toUpperCase();
     const found = coupons.find((c) => c.code.toUpperCase() === code);
     if (found) {
       setAppliedCoupon(found);
+      setCouponInput(found.code);
       setCouponError("");
     } else {
       setAppliedCoupon(null);
       setCouponError(t("Invalid coupon code.", "अमान्य कूपन कोड।"));
     }
+  };
+
+  const applyCoupon = () => applyCouponCode(couponInput);
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
   };
 
   // A plain-text receipt for THIS order — used both for the download action and
@@ -874,6 +955,8 @@ export default function BookingWizard() {
       `Subtotal:    ${money(subtotal)}`,
       `Add-ons:     ${money(addOnsTotal)}`,
     );
+    if (selectedService)
+      lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
     lines.push(
@@ -940,6 +1023,15 @@ export default function BookingWizard() {
           amount: a.perPlate ? a.price * guests : a.price,
         });
       });
+
+    if (selectedService) {
+      lines.push({
+        label: selectedService.perPlate
+          ? `Service — ${selectedService.name} (${money(selectedService.priceMin)}/guest × ${guests})`
+          : `Service — ${selectedService.name}`,
+        amount: serviceTotal,
+      });
+    }
 
     if (venueFee > 0) {
       lines.push({
@@ -1032,6 +1124,9 @@ export default function BookingWizard() {
       `Guests: ${guests}\n` +
       (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
       (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
+      (selectedService
+        ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
+        : "") +
       `\nGrand Total: ${money(grandTotal)}` +
       paymentLines +
       emiLines
@@ -1188,6 +1283,16 @@ export default function BookingWizard() {
           referrerType: selfReferral ? undefined : referrerType || undefined,
           // Customer-facing extras stored on the order (My Bookings needs these).
           ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
+          // The feast-wide service package (its price is already in `amount`).
+          ...(selectedService
+            ? {
+                service: {
+                  id: selectedService.id,
+                  name: selectedService.name,
+                  price: serviceTotal,
+                },
+              }
+            : {}),
           receipt: buildReceipt(),
           invoice: invoiceData,
           // Lets the server email the owners a link to this order's invoice.
@@ -1229,10 +1334,11 @@ export default function BookingWizard() {
   };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
-  // Package step (1) and event details (3) show the package list / fields on the
-  // left with the order-summary rail on the right; step 4 keeps it until paid.
-  // The full-width menu builder (step 2) has no summary rail.
-  const showSummary = (step === 1 || step === 3 || (step === 4 && !confirmed));
+  // Package (1) and event details (3) show their content on the left with the
+  // order-summary rail on the right; the confirm step (5) keeps it until paid.
+  // The full-width menu builder (2) and the service comparison (4) have no rail
+  // — the service cards each show their own computed feast price instead.
+  const showSummary = step === 1 || step === 3 || (step === 5 && !confirmed);
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
@@ -1277,9 +1383,10 @@ export default function BookingWizard() {
         paxMax={paxMax}
         minDate={earliestDate}
         leadWarning={leadWarning}
-        // Confirm step (4) locks the headcount and echoes it in the order
+        // The confirm step (5) locks the headcount and echoes it in the order
         // summary, so the editable Guests field is redundant there — hide it.
-        showGuests={step !== 4}
+        // It stays on the service step (4), where the price scales with guests.
+        showGuests={step !== 5}
       />
 
       {/* Layout */}
@@ -1354,18 +1461,30 @@ export default function BookingWizard() {
               }
             />
           )}
+          {/* Service step (4) — the mandatory "Choose Your Service Package"
+              comparison. Single-select; the chosen tier's price folds into the
+              total (each card shows its own computed feast price). */}
+          {step === 4 && (
+            <ServicePackages
+              packages={services}
+              selectedId={serviceId}
+              onSelect={setServiceId}
+              guests={guests}
+              embedded
+            />
+          )}
           {/* Confirm step — payment + placing the order. Both require a
               signed-in guest, so an anonymous visitor gets the login gate here
               (their in-progress booking stays intact); logging in reveals the
               real Confirm step. A neutral placeholder covers the brief moment
               the client session is still loading, to avoid a sign-in flash. */}
-          {step === 4 && !confirmed && sessionStatus === undefined && (
+          {step === 5 && !confirmed && sessionStatus === undefined && (
             <div className="min-h-[40vh]" />
           )}
-          {step === 4 && !confirmed && sessionStatus === null && (
-            <LoginGate onBack={() => setStep(3)} />
+          {step === 5 && !confirmed && sessionStatus === null && (
+            <LoginGate onBack={() => setStep(4)} />
           )}
-          {step === 4 && !confirmed && sessionStatus != null && (
+          {step === 5 && !confirmed && sessionStatus != null && (
             <StepConfirm
               t={t}
               occasion={resolveOccasion(occasionId)}
@@ -1379,14 +1498,22 @@ export default function BookingWizard() {
               itemsFor={itemsFor}
               selectedAddOns={selectedAddOns}
               addOnVendorName={addOnVendorName}
+              serviceName={selectedService?.name}
+              serviceTotal={serviceTotal}
               onEditMenu={() => setStep(2)}
               onEditExtras={() => setStep(3)}
+              onEditService={() => setStep(4)}
               couponInput={couponInput}
               setCouponInput={setCouponInput}
               applyCoupon={applyCoupon}
+              applyCouponCode={applyCouponCode}
+              removeCoupon={removeCoupon}
+              preDiscount={preDiscount}
               appliedCoupon={appliedCoupon}
               couponError={couponError}
-              discount={discount}
+              couponDiscount={couponDiscount}
+              referralDiscount={referralDiscount}
+              referralPercent={referralCustomerPercent}
               grandTotal={grandTotal}
               bookingId={bookingId}
               paidAmount={paidAmount}
@@ -1415,7 +1542,7 @@ export default function BookingWizard() {
               whatsappHref={whatsappHref}
             />
           )}
-          {step === 4 && confirmed && (
+          {step === 5 && confirmed && (
             <StepDone
               t={t}
               bookingId={bookingId}
@@ -1443,9 +1570,13 @@ export default function BookingWizard() {
             guests={guests}
             subtotal={subtotal}
             addOnsTotal={addOnsTotal}
+            serviceTotal={serviceTotal}
+            serviceName={selectedService?.name ?? ""}
             venueFee={venueFee}
             venueName={venue}
-            discount={discount}
+            couponDiscount={couponDiscount}
+            referralDiscount={referralDiscount}
+            referrerName={referrerName}
             gst={gst}
             grandTotal={grandTotal}
           />
@@ -2363,6 +2494,21 @@ function StepDetails({
   vendorIdFor: (addOnId: string) => string | undefined;
   onVendorChange: (addOnId: string, vendorId: string) => void;
 }) {
+  // Free-text filter over the add-on roster. Matches the English/Hindi names,
+  // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
+  // Chaat Station). Selections live in the parent, so filtering never drops a
+  // chosen add-on from the order — it only hides its card.
+  const [addOnQuery, setAddOnQuery] = useState("");
+  const query = addOnQuery.trim().toLowerCase();
+  const visibleAddOns = query
+    ? addOns.filter(
+        (a) =>
+          a.name.toLowerCase().includes(query) ||
+          a.nameHi.includes(query) ||
+          a.description.toLowerCase().includes(query) ||
+          (a.keywords ?? []).some((k) => k.toLowerCase().includes(query)),
+      )
+    : addOns;
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2383,8 +2529,28 @@ function StepDetails({
         )}
       </div>
 
+      <div className="relative mt-4">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft"
+        >
+          🔍
+        </span>
+        <input
+          type="search"
+          value={addOnQuery}
+          onChange={(e) => setAddOnQuery(e.target.value)}
+          placeholder={t(
+            "Search add-ons like pizza or gol gappe",
+            "पिज़्ज़ा या गोल गप्पे जैसे ऐड-ऑन खोजें",
+          )}
+          aria-label={t("Search add-ons", "ऐड-ऑन खोजें")}
+          className="w-full rounded-lg border border-cream-3 bg-white py-2 pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-maroon"
+        />
+      </div>
+
       <div className="mt-5 flex flex-col gap-4">
-        {addOns.map((a: AddOn) => {
+        {visibleAddOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
           const lineTotal = a.perPlate ? a.price * guests : a.price;
           const selectId = `addon-vendor-${a.id}`;
@@ -2540,6 +2706,14 @@ function StepDetails({
           );
         })}
       </div>
+      {visibleAddOns.length === 0 && (
+        <p className="mt-5 rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-4 py-6 text-center text-sm text-ink-soft">
+          {t(
+            `No add-ons match "${addOnQuery.trim()}".`,
+            `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
+          )}
+        </p>
+      )}
     </div>
   );
 }
@@ -3067,14 +3241,22 @@ function StepConfirm({
   itemsFor,
   selectedAddOns,
   addOnVendorName,
+  serviceName,
+  serviceTotal,
   onEditMenu,
   onEditExtras,
+  onEditService,
   couponInput,
   setCouponInput,
   applyCoupon,
+  applyCouponCode,
+  removeCoupon,
+  preDiscount,
   appliedCoupon,
   couponError,
-  discount,
+  couponDiscount,
+  referralDiscount,
+  referralPercent,
   grandTotal,
   bookingId,
   paidAmount,
@@ -3108,14 +3290,22 @@ function StepConfirm({
   itemsFor: (catId: string) => string[];
   selectedAddOns: string[];
   addOnVendorName: (addOnId: string) => string | undefined;
+  serviceName?: string;
+  serviceTotal: number;
   onEditMenu: () => void;
   onEditExtras: () => void;
+  onEditService: () => void;
   couponInput: string;
   setCouponInput: (v: string) => void;
   applyCoupon: () => void;
+  applyCouponCode: (code: string) => void;
+  removeCoupon: () => void;
+  preDiscount: number;
   appliedCoupon: Coupon | null;
   couponError: string;
-  discount: number;
+  couponDiscount: number;
+  referralDiscount: number;
+  referralPercent: number;
   grandTotal: number;
   bookingId: string;
   paidAmount: number;
@@ -3265,46 +3455,160 @@ function StepConfirm({
         )}
       </div>
 
-      {/* Coupon */}
+      {/* Service package */}
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-        <h3 className="font-display text-base font-semibold text-ink">
-          {t("Apply a coupon", "कूपन लगाएं")}
-        </h3>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="text"
-            value={couponInput}
-            onChange={(e) => setCouponInput(e.target.value)}
-            placeholder={t("Enter code", "कोड दर्ज करें")}
-            className="min-w-0 flex-1 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm uppercase text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-          />
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg font-semibold text-ink">
+            {t("Service package", "सर्विस पैकेज")}
+          </h3>
           <button
             type="button"
-            onClick={applyCoupon}
-            className="rounded-full border border-maroon px-6 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+            onClick={onEditService}
+            className="text-sm font-semibold text-maroon hover:underline"
           >
-            {t("Apply", "लगाएं")}
+            {t("Edit", "बदलें")}
           </button>
         </div>
-        {couponError && <p className="mt-2 text-sm text-maroon">{couponError}</p>}
-        {appliedCoupon && discount > 0 && (
-          <p className="mt-2 text-sm font-medium text-maroon">
-            {t("Applied", "लागू")} {appliedCoupon.code} — {t("you save", "बचत")}{" "}
-            {money(discount)}
-          </p>
+        {serviceName ? (
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-sm text-ink">{serviceName}</p>
+            <p className="shrink-0 text-sm font-semibold text-maroon">
+              {serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-ink-soft">{t("None", "कोई नहीं")}</p>
         )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {coupons.map((c) => (
-            <button
-              key={c.code}
-              type="button"
-              onClick={() => setCouponInput(c.code)}
-              className="rounded-full bg-cream-2 px-4 py-1.5 text-xs font-medium text-ink-soft transition hover:bg-cream-3"
+      </div>
+
+      {/* Coupon */}
+      <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-maroon/10 text-maroon">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              {c.code} · {c.label}
-            </button>
-          ))}
+              <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
+              <path d="M9 7v10" strokeDasharray="2 2" />
+            </svg>
+          </span>
+          <h3 className="font-display text-base font-semibold text-ink">
+            {t("Apply a coupon", "कूपन लगाएं")}
+          </h3>
         </div>
+
+        {appliedCoupon && couponDiscount > 0 ? (
+          /* Applied — compact success card with remove */
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream-2/40 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-white">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">
+                  <span className="font-mono font-bold tracking-wide text-maroon">
+                    {appliedCoupon.code}
+                  </span>{" "}
+                  {t("applied", "लागू")}
+                </p>
+                <p className="text-xs font-medium text-ink-soft/70">
+                  {t("You save", "आपकी बचत")} {money(couponDiscount)}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={removeCoupon}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon transition hover:bg-maroon/10"
+            >
+              {t("Remove", "हटाएं")}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Compact single-line input with inline apply */}
+            <div className="mt-3 flex items-center gap-2 rounded-full border border-cream-3 bg-cream-2/30 py-1 pl-4 pr-1 transition-colors focus-within:border-maroon focus-within:bg-white">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder={t("Enter code", "कोड दर्ज करें")}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase tracking-wide text-ink outline-none placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-soft/50"
+              />
+              <button
+                type="button"
+                onClick={applyCoupon}
+                disabled={!couponInput.trim()}
+                className="shrink-0 rounded-full bg-maroon px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t("Apply", "लगाएं")}
+              </button>
+            </div>
+            {couponError && (
+              <p className="mt-2 pl-1 text-xs font-medium text-maroon">
+                {couponError}
+              </p>
+            )}
+
+            {/* Select-to-apply offer tickets */}
+            <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/50">
+              {t("Tap to apply", "लगाने के लिए टैप करें")}
+            </p>
+            <div className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {coupons.map((c) => {
+                const save = Math.min((preDiscount * c.percent) / 100, c.cap);
+                return (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => applyCouponCode(c.code)}
+                    className="group relative flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-dashed border-maroon/40 bg-cream-2/25 p-3 text-left transition hover:border-maroon hover:bg-cream-2/50 hover:shadow-sm"
+                  >
+                    {/* punched ticket notches */}
+                    <span className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
+                    <span className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-bold tracking-wide text-maroon">
+                        {c.code}
+                      </span>
+                      <span className="rounded-md bg-maroon px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white opacity-90 transition group-hover:opacity-100">
+                        {t("Apply", "लगाएं")}
+                      </span>
+                    </div>
+                    <span className="mt-1.5 text-xs font-semibold text-ink">
+                      {save > 0
+                        ? t(`Save ${money(save)}`, `बचाएं ${money(save)}`)
+                        : c.label}
+                    </span>
+                    {save > 0 && (
+                      <span className="mt-0.5 truncate text-[10px] text-ink-soft/60">
+                        {c.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Contact — so our team can reach out (required for COD / connect). */}
@@ -3375,10 +3679,18 @@ function StepConfirm({
         ) : (
           referralCode.trim() &&
           referrerName && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
-              <span aria-hidden="true">★</span>
-              {t("Referred by", "रेफ़र किया")} {referrerName}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+                <span aria-hidden="true">★</span>
+                {t("Referred by", "रेफ़र किया")} {referrerName}
+              </span>
+              {referralDiscount > 0 && (
+                <span className="text-sm font-medium text-maroon">
+                  {t("You save", "आपकी बचत")} {money(referralDiscount)}
+                  {referralPercent > 0 ? ` (${referralPercent}%)` : ""}
+                </span>
+              )}
+            </div>
           )
         )}
       </div>
@@ -3725,9 +4037,13 @@ function SummaryPanel({
   guests,
   subtotal,
   addOnsTotal,
+  serviceTotal,
+  serviceName,
   venueFee,
   venueName,
-  discount,
+  couponDiscount,
+  referralDiscount,
+  referrerName,
   gst,
   grandTotal,
 }: {
@@ -3739,9 +4055,13 @@ function SummaryPanel({
   guests: number;
   subtotal: number;
   addOnsTotal: number;
+  serviceTotal: number;
+  serviceName: string;
   venueFee: number;
   venueName: string;
-  discount: number;
+  couponDiscount: number;
+  referralDiscount: number;
+  referrerName: string;
   gst: number;
   grandTotal: number;
 }) {
@@ -3782,16 +4102,33 @@ function SummaryPanel({
             label={t("Add-ons", "एक्स्ट्रा")}
             value={money(addOnsTotal)}
           />
+          {serviceName && (
+            <SummaryRow
+              label={`${t("Service", "सर्विस")} · ${serviceName}`}
+              value={serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
+            />
+          )}
           {venueFee > 0 && (
             <SummaryRow
               label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
               value={money(venueFee)}
             />
           )}
-          {discount > 0 && (
+          {couponDiscount > 0 && (
             <SummaryRow
-              label={t("Discount", "छूट")}
-              value={`− ${money(discount)}`}
+              label={t("Coupon discount", "कूपन छूट")}
+              value={`− ${money(couponDiscount)}`}
+              accent
+            />
+          )}
+          {referralDiscount > 0 && (
+            <SummaryRow
+              label={
+                referrerName
+                  ? `${t("Referral", "रेफ़रल")} · ${referrerName}`
+                  : t("Referral discount", "रेफ़रल छूट")
+              }
+              value={`− ${money(referralDiscount)}`}
               accent
             />
           )}

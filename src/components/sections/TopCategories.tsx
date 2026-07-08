@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
@@ -11,10 +11,10 @@ export default function TopCategories() {
   const { lang } = useLang();
   const { services } = useHomeContent();
 
-  // Same swipeable carousel + dot pagination as the "moments when we set
-  // tables" occasion section, so the two read as twins.
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const [active, setActive] = useState(0);
+  // Continuous-marquee twin of the "moments when we set tables" occasion strip,
+  // so the two sections read as a matched pair. Touch pauses the slide so a
+  // card can be tapped; hovering pauses it on desktop via `.marquee-pause`.
+  const [paused, setPaused] = useState(false);
 
   // CMS service categories (each opens the booking wizard) with the curated,
   // admin-editable Baina Box card slotted into the middle. Baina Box links to
@@ -38,38 +38,6 @@ export default function TopCategories() {
     ...serviceCards.slice(mid),
   ];
 
-  const handleScroll = () => {
-    const track = trackRef.current;
-    if (!track) return;
-    const items = Array.from(track.children) as HTMLElement[];
-    if (items.length < 2) return;
-    const step = items[1].offsetLeft - items[0].offsetLeft;
-    const index = Math.round(track.scrollLeft / step);
-    setActive(Math.min(items.length - 1, Math.max(0, index)));
-  };
-
-  const scrollToCard = (index: number) => {
-    const track = trackRef.current;
-    if (!track) return;
-    const items = Array.from(track.children) as HTMLElement[];
-    const card = items[index];
-    if (!card) return;
-    track.scrollTo({
-      left: card.offsetLeft - items[0].offsetLeft,
-      behavior: "smooth",
-    });
-  };
-
-  // Prev/next arrows nudge the strip by two cards to reveal more images.
-  const nudge = (dir: 1 | -1) => {
-    const track = trackRef.current;
-    if (!track) return;
-    const items = Array.from(track.children) as HTMLElement[];
-    if (items.length < 2) return;
-    const step = items[1].offsetLeft - items[0].offsetLeft;
-    track.scrollBy({ left: dir * step * 2, behavior: "smooth" });
-  };
-
   return (
     <section className="bg-white">
       <div className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20">
@@ -83,86 +51,58 @@ export default function TopCategories() {
         </Reveal>
 
         <Reveal as="div" variant="up" className="mt-12">
-          <div className="relative">
+          {/* Continuous marquee — the service cards slide sideways forever;
+              hovering (desktop) or touching (mobile) pauses the strip so a card
+              can be tapped. The doubled track makes the -50% loop seamless, and
+              the motion is gated behind `prefers-reduced-motion`. */}
           <div
-            ref={trackRef}
-            onScroll={handleScroll}
-            className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto sm:gap-6"
-            aria-label="Services"
+            className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_5%,#000_95%,transparent)]"
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setPaused(false)}
+            onTouchCancel={() => setPaused(false)}
           >
-            {cards.map((card) => (
-              <div
-                key={card.id}
-                className="group relative w-[36vw] shrink-0 snap-start overflow-hidden rounded-xl sm:w-[22.5%] lg:w-[calc((100%-6rem)/5)]"
-              >
-                {/* Tapping a service card opens the booking wizard — the same
-                    "tap a card to begin" gesture as the occasion cards. */}
-                <Link
-                  href={card.href}
-                  aria-label={card.name}
-                  className="relative block aspect-[9/10] w-full"
-                >
-                  <Image
-                    src={card.image}
-                    alt={card.name}
-                    fill
-                    sizes="(min-width: 1024px) 240px, (min-width: 640px) 22.5vw, 36vw"
-                    className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
-                    unoptimized={isUnoptimized(card.image)}
-                  />
-                  {/* Darken so the name reads on the photo, like the reference */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
-                    <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
-                      {card.name}
-                    </span>
+            <div
+              className="animate-marquee flex w-max gap-4 motion-reduce:!animate-none sm:gap-6"
+              style={paused ? { animationPlayState: "paused" } : undefined}
+            >
+              {[...cards, ...cards].map((card, i) => {
+                const clone = i >= cards.length;
+                return (
+                  <div
+                    key={`${card.id}-${i}`}
+                    aria-hidden={clone}
+                    className="group relative w-[42vw] shrink-0 overflow-hidden rounded-xl sm:w-[30vw] lg:w-60"
+                  >
+                    {/* Tapping a service card opens the booking wizard — the same
+                        "tap a card to begin" gesture as the occasion cards. */}
+                    <Link
+                      href={card.href}
+                      aria-label={card.name}
+                      tabIndex={clone ? -1 : undefined}
+                      className="relative block aspect-[9/10] w-full"
+                    >
+                      <Image
+                        src={card.image}
+                        alt={clone ? "" : card.name}
+                        fill
+                        sizes="(min-width: 1024px) 240px, (min-width: 640px) 30vw, 42vw"
+                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+                        unoptimized={isUnoptimized(card.image)}
+                      />
+                      {/* Black overtone — a full veil for a consistent moody
+                          tint, plus a bottom gradient so the name stays legible. */}
+                      <div className="absolute inset-0 bg-black/40" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
+                        <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
+                          {card.name}
+                        </span>
+                      </div>
+                    </Link>
                   </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-
-            {/* Prev / next arrows — nudge the strip to reveal more images. */}
-            <button
-              type="button"
-              aria-label="Show previous images"
-              onClick={() => nudge(-1)}
-              className="absolute left-2 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-maroon/15 bg-white text-maroon shadow-md transition-colors hover:bg-maroon hover:text-cream sm:flex"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="Show more images"
-              onClick={() => nudge(1)}
-              className="absolute right-2 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-maroon/15 bg-white text-maroon shadow-md transition-colors hover:bg-maroon hover:text-cream sm:flex"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Dot pagination — the mobile/tablet swipe affordance. Hidden on the
-              web/desktop layout, where every card is visible in the row. */}
-          <div className="mt-8 flex items-center justify-center gap-2.5 lg:hidden">
-            {cards.map((card, index) => (
-              <button
-                key={card.id}
-                type="button"
-                aria-label={`Go to ${card.name}`}
-                aria-current={index === active}
-                onClick={() => scrollToCard(index)}
-                className={
-                  "flex h-5 w-5 items-center justify-center rounded-full border transition-colors duration-200 " +
-                  (index === active ? "border-black" : "border-transparent")
-                }
-              >
-                <span className="h-2 w-2 rounded-full bg-maroon" />
-              </button>
-            ))}
+                );
+              })}
+            </div>
           </div>
         </Reveal>
       </div>

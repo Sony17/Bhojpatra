@@ -12,6 +12,7 @@ import {
   type HomeCategory,
   type HomeOccasion,
   type HomeBrand,
+  type HomeRibbonBrand,
   type HomeGalleryItem,
   type HomeTestimonial,
 } from "@/lib/homeContent";
@@ -156,6 +157,55 @@ export default function HomePageTab() {
           value={draft.hero.background}
           hint="Shown behind the headline."
           onChange={(v) => patch("hero", { background: v })}
+        />
+      </SectionCard>
+
+      {/* ── Brand Ribbon ────────────────────────────────────────────────── */}
+      <SectionCard title="Brand Ribbon">
+        <p className="text-xs text-ink-soft">
+          The moving ribbon under the hero showing the prestigious brands
+          Bhojpatra serves. Chips scroll continuously; upload each brand&apos;s
+          logo, or leave it empty to show the name&apos;s initials.
+        </p>
+        <Toggle
+          label="Show the brand ribbon"
+          checked={draft.brandRibbon.enabled}
+          onChange={(enabled) => patch("brandRibbon", { enabled })}
+        />
+        <TextRow
+          label="Heading"
+          en={draft.brandRibbon.heading}
+          hi={draft.brandRibbon.headingHi}
+          onEn={(v) => patch("brandRibbon", { heading: v })}
+          onHi={(v) => patch("brandRibbon", { headingHi: v })}
+        />
+        <ItemList
+          label="Brand"
+          items={draft.brandRibbon.brands}
+          onChange={(brands) => patch("brandRibbon", { brands })}
+          makeNew={(): HomeRibbonBrand => ({
+            id: `ribbon-brand-${Date.now()}`,
+            name: "New brand",
+            nameHi: "नया ब्रांड",
+            logo: "",
+          })}
+          renderItem={(b, set) => (
+            <>
+              <TextRow
+                label="Name"
+                en={b.name}
+                hi={b.nameHi}
+                onEn={(v) => set({ name: v })}
+                onHi={(v) => set({ nameHi: v })}
+              />
+              <ImageField
+                label="Brand logo"
+                value={b.logo}
+                hint="Shown in the chip's circle. Leave empty to use the name's initials."
+                onChange={(v) => set({ logo: v })}
+              />
+            </>
+          )}
         />
       </SectionCard>
 
@@ -352,6 +402,46 @@ export default function HomePageTab() {
               />
             </>
           )}
+        />
+      </SectionCard>
+
+      {/* ── Baina Box by Bhojpatra ──────────────────────────────────────── */}
+      <SectionCard title="Baina Box by Bhojpatra">
+        <p className="text-xs text-ink-soft">
+          The &ldquo;Baina Box, specially by Bhojpatra&rdquo; signature card. It
+          appears in the vendor dashboard and atop a Baina Box catalogue search.
+          Its button always opens the Baina Box catalogue.
+        </p>
+        <Toggle
+          label="Show the Baina Box signature card"
+          checked={draft.bainaBoxSpecial.enabled}
+          onChange={(enabled) => patch("bainaBoxSpecial", { enabled })}
+        />
+        <TextRow
+          label="Heading"
+          en={draft.bainaBoxSpecial.heading}
+          hi={draft.bainaBoxSpecial.headingHi}
+          onEn={(v) => patch("bainaBoxSpecial", { heading: v })}
+          onHi={(v) => patch("bainaBoxSpecial", { headingHi: v })}
+        />
+        <AreaRow
+          label="Details"
+          en={draft.bainaBoxSpecial.body}
+          hi={draft.bainaBoxSpecial.bodyHi}
+          onEn={(v) => patch("bainaBoxSpecial", { body: v })}
+          onHi={(v) => patch("bainaBoxSpecial", { bodyHi: v })}
+        />
+        <TextRow
+          label="Button label"
+          en={draft.bainaBoxSpecial.cta}
+          hi={draft.bainaBoxSpecial.ctaHi}
+          onEn={(v) => patch("bainaBoxSpecial", { cta: v })}
+          onHi={(v) => patch("bainaBoxSpecial", { ctaHi: v })}
+        />
+        <ImageField
+          label="Image"
+          value={draft.bainaBoxSpecial.image}
+          onChange={(v) => patch("bainaBoxSpecial", { image: v })}
         />
       </SectionCard>
 
@@ -696,6 +786,41 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       </span>
       {children}
     </label>
+  );
+}
+
+/** A labelled on/off switch. */
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        {label}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+          checked ? "bg-maroon" : "bg-cream-3"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-[1.375rem]" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
   );
 }
 

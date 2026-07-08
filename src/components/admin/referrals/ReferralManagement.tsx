@@ -14,6 +14,12 @@ import { money } from "@/components/admin/shared/money";
 import { exportCsv } from "@/components/admin/shared/exportCsv";
 import { Share, Trophy, Calendar, Wallet } from "@/components/admin/shared/icons";
 import { PARTNER_ROLE_LABEL } from "@/lib/referral";
+import ReferralRatesCard from "@/components/admin/referrals/ReferralRatesCard";
+import {
+  DEFAULT_REFERRAL_RATES,
+  referrerPercentFor,
+  type ReferralRates,
+} from "@/lib/referralRates";
 import type { PartnerRole } from "@/lib/session";
 import type { BookingStatus } from "@/lib/data";
 
@@ -60,6 +66,8 @@ interface LeaderRow {
   confirmed: number;
   pending: number;
   referredValue: number;
+  /** Referred value from confirmed/completed orders only — the reward base. */
+  confirmedValue: number;
   orders: ReferredOrder[];
 }
 
@@ -105,6 +113,7 @@ function TypeBadge({ type }: { type: PartnerRole }) {
 export default function ReferralManagement() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [orders, setOrders] = useState<ReferredOrder[]>([]);
+  const [rates, setRates] = useState<ReferralRates>(DEFAULT_REFERRAL_RATES);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [type, setType] = useState("All");
@@ -115,11 +124,13 @@ export default function ReferralManagement() {
     Promise.all([
       fetch("/api/partners").then((r) => (r.ok ? r.json() : { partners: [] })),
       fetch("/api/bookings").then((r) => (r.ok ? r.json() : { orders: [] })),
+      fetch("/api/admin/referral-settings").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([p, b]) => {
+      .then(([p, b, s]) => {
         if (!active) return;
         setPartners((p?.partners ?? []) as Partner[]);
         setOrders((b?.orders ?? []) as ReferredOrder[]);
+        if (s) setRates(s as ReferralRates);
       })
       .catch(() => {
         /* offline — fall through to the empty state */
@@ -149,6 +160,7 @@ export default function ReferralManagement() {
         confirmed: 0,
         pending: 0,
         referredValue: 0,
+        confirmedValue: 0,
         orders: [],
       });
     }
@@ -166,6 +178,7 @@ export default function ReferralManagement() {
           confirmed: 0,
           pending: 0,
           referredValue: 0,
+          confirmedValue: 0,
           orders: [],
         };
         byCode.set(code, row);
@@ -173,8 +186,10 @@ export default function ReferralManagement() {
       row.orders.push(o);
       row.total += 1;
       row.referredValue += o.amount;
-      if (isConfirmed(o.status)) row.confirmed += 1;
-      else if (o.status === "Pending") row.pending += 1;
+      if (isConfirmed(o.status)) {
+        row.confirmed += 1;
+        row.confirmedValue += o.amount;
+      } else if (o.status === "Pending") row.pending += 1;
     }
     return [...byCode.values()].sort(
       (a, b) => b.referredValue - a.referredValue || b.total - a.total,
@@ -205,6 +220,11 @@ export default function ReferralManagement() {
     });
   }, [rows, q, type]);
 
+  // Referrer's estimated reward: the configured % for their partner type,
+  // applied to confirmed referred value. Venue / unregistered types get 0.
+  const rewardFor = (r: LeaderRow): number =>
+    Math.round((r.confirmedValue * referrerPercentFor(rates, r.type)) / 100);
+
   const onExport = () =>
     exportCsv(
       "bhojpatra-referrals.csv",
@@ -216,6 +236,7 @@ export default function ReferralManagement() {
         "Referred Bookings": r.total,
         Confirmed: r.confirmed,
         "Referred Value": r.referredValue,
+        "Reward (est.)": rewardFor(r),
       })),
     );
 
@@ -277,6 +298,22 @@ export default function ReferralManagement() {
       className: "whitespace-nowrap text-right",
       headerClassName: "text-right",
     },
+    {
+      key: "reward",
+      header: "Reward (est.)",
+      cell: (r) => {
+        const reward = rewardFor(r);
+        return reward > 0 ? (
+          <span className="font-display font-semibold text-maroon">
+            {money(reward)}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        );
+      },
+      className: "whitespace-nowrap text-right",
+      headerClassName: "text-right",
+    },
   ];
 
   return (
@@ -324,6 +361,8 @@ export default function ReferralManagement() {
         />
       </div>
 
+      <ReferralRatesCard onSaved={setRates} />
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <SearchBar
           value={q}
@@ -341,7 +380,7 @@ export default function ReferralManagement() {
         rows={filtered}
         getRowKey={(r) => r.code}
         onRowClick={(r) => setSelected(r)}
-        minWidthClass="min-w-[680px]"
+        minWidthClass="min-w-[780px]"
         empty={
           <EmptyState
             title={loading ? "Loading referrals…" : "No referrers yet"}
@@ -369,10 +408,14 @@ export default function ReferralManagement() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryStat label="Referred" value={String(selected.total)} />
               <SummaryStat label="Confirmed" value={String(selected.confirmed)} />
               <SummaryStat label="Referred Value" value={money(selected.referredValue)} />
+              <SummaryStat
+                label={`Reward · ${referrerPercentFor(rates, selected.type)}%`}
+                value={money(rewardFor(selected))}
+              />
             </div>
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">

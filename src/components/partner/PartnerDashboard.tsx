@@ -14,6 +14,11 @@ import {
   referralLink,
   referralPayoutHref,
 } from "@/lib/referral";
+import {
+  DEFAULT_REFERRAL_RATES,
+  referrerPercentFor,
+  type ReferralRates,
+} from "@/lib/referralRates";
 import type { BookingStatus } from "@/lib/data";
 import VenuePanel from "@/components/partner/VenuePanel";
 
@@ -67,6 +72,7 @@ export default function PartnerDashboard() {
   const session = useSession();
   const [tab, setTab] = useState<Tab>("overview");
   const [orders, setOrders] = useState<ReferredOrder[]>([]);
+  const [rates, setRates] = useState<ReferralRates>(DEFAULT_REFERRAL_RATES);
   // Which role's dashboard is on screen (null → default to the first held).
   const [activeType, setActiveType] = useState<PartnerRole | null>(null);
   // The role currently being registered, while its referral code is minted.
@@ -132,10 +138,32 @@ export default function PartnerDashboard() {
     };
   }, [code]);
 
+  // Live referral rates, so the reward figure reflects the admin's settings.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/referral-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: ReferralRates | null) => {
+        if (active && d) setRates(d);
+      })
+      .catch(() => {
+        /* offline — reward stays at the default (0) */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const confirmed = orders.filter(
     (o) => o.status === "Confirmed" || o.status === "Completed",
   );
   const referredValue = orders.reduce((s, o) => s + o.amount, 0);
+
+  // Admin-set referral rates → this partner's estimated reward: their type's
+  // configured % of confirmed referred value. 0 until an admin sets a rate.
+  const rewardPercent = referrerPercentFor(rates, active?.type);
+  const confirmedValue = confirmed.reduce((s, o) => s + o.amount, 0);
+  const reward = Math.round((confirmedValue * rewardPercent) / 100);
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
@@ -182,13 +210,20 @@ export default function PartnerDashboard() {
             total={orders.length}
             confirmed={confirmed.length}
             referredValue={referredValue}
+            reward={reward}
+            rewardPercent={rewardPercent}
             onShare={() => setTab("share")}
             onSeeAll={() => setTab("referrals")}
             recent={orders.slice(0, 3)}
           />
         )}
         {tab === "share" && (
-          <SharePanel code={code} name={session?.name} />
+          <SharePanel
+            code={code}
+            name={session?.name}
+            reward={reward}
+            rewardPercent={rewardPercent}
+          />
         )}
         {tab === "referrals" && <ReferralsPanel orders={orders} />}
         {tab === "venues" && active?.type === "venue" && (
@@ -328,6 +363,8 @@ function OverviewPanel({
   total,
   confirmed,
   referredValue,
+  reward,
+  rewardPercent,
   onShare,
   onSeeAll,
   recent,
@@ -336,6 +373,8 @@ function OverviewPanel({
   total: number;
   confirmed: number;
   referredValue: number;
+  reward: number;
+  rewardPercent: number;
   onShare: () => void;
   onSeeAll: () => void;
   recent: ReferredOrder[];
@@ -371,12 +410,24 @@ function OverviewPanel({
       sub: t("total booking value", "कुल बुकिंग मूल्य"),
       icon: "₹",
     },
+    {
+      label: t("Your Earnings", "आपकी कमाई"),
+      value: money(reward),
+      sub:
+        rewardPercent > 0
+          ? t(
+              `${rewardPercent}% of confirmed value`,
+              `पुष्ट मूल्य का ${rewardPercent}%`,
+            )
+          : t("reward not set yet", "रिवॉर्ड अभी तय नहीं"),
+      icon: "🎁",
+    },
   ];
 
   return (
     <div className="space-y-8">
       {/* KPI cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -479,7 +530,17 @@ function OverviewPanel({
 
 /* ── Share & Earn ───────────────────────────────────────────────────────── */
 
-function SharePanel({ code, name }: { code: string; name?: string }) {
+function SharePanel({
+  code,
+  name,
+  reward,
+  rewardPercent,
+}: {
+  code: string;
+  name?: string;
+  reward: number;
+  rewardPercent: number;
+}) {
   const { t } = useLang();
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const link = code ? referralLink(code) : "";
@@ -554,11 +615,29 @@ function SharePanel({ code, name }: { code: string; name?: string }) {
         <h2 className="font-display text-lg font-semibold text-ink">
           {t("Settle your earnings", "अपनी कमाई पाएं")}
         </h2>
+        {rewardPercent > 0 && (
+          <div className="mt-3 flex flex-wrap items-baseline gap-2">
+            <span className="font-display text-2xl font-bold text-maroon">
+              {money(reward)}
+            </span>
+            <span className="text-sm text-ink-soft">
+              {t(
+                `earned · ${rewardPercent}% of confirmed value`,
+                `कमाए · पुष्ट मूल्य का ${rewardPercent}%`,
+              )}
+            </span>
+          </div>
+        )}
         <p className="mt-1 text-sm text-ink-soft">
-          {t(
-            "Your commission is calculated on confirmed bookings. Connect with the Bhojpatra team on WhatsApp to settle your payout.",
-            "आपका कमीशन पुष्ट बुकिंग पर तय होता है। अपना भुगतान पाने के लिए WhatsApp पर Bhojpatra टीम से जुड़ें।",
-          )}
+          {rewardPercent > 0
+            ? t(
+                "This is your reward on confirmed bookings so far. Connect with the Bhojpatra team on WhatsApp to settle your payout.",
+                "यह अब तक की पुष्ट बुकिंग पर आपका रिवॉर्ड है। अपना भुगतान पाने के लिए WhatsApp पर Bhojpatra टीम से जुड़ें।",
+              )
+            : t(
+                "Your commission is calculated on confirmed bookings. Connect with the Bhojpatra team on WhatsApp to settle your payout.",
+                "आपका कमीशन पुष्ट बुकिंग पर तय होता है। अपना भुगतान पाने के लिए WhatsApp पर Bhojpatra टीम से जुड़ें।",
+              )}
         </p>
         <a
           href={referralPayoutHref(code || "—", name)}

@@ -48,7 +48,7 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <ul className="overflow-hidden rounded-2xl border border-maroon/15 bg-white shadow-xl shadow-maroon/20">
+    <ul className="overflow-hidden rounded-card border border-maroon/15 bg-white shadow-pop">
       {session ? (
         <li className="flex items-center gap-3 border-b border-maroon/10 px-4 py-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream">
@@ -130,7 +130,7 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
                 onClick={() => setLang(o.id)}
                 aria-pressed={active}
                 className={
-                  "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors " +
+                  "focus-ring flex-1 rounded-control px-3 py-2 text-sm font-semibold transition-colors " +
                   (active
                     ? "bg-maroon text-cream"
                     : "border border-maroon/30 text-ink hover:bg-maroon/5")

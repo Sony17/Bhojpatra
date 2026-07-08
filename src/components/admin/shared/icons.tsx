@@ -160,6 +160,18 @@ export function Rocket(props: IconProps) {
   );
 }
 
+/* Concierge bell — Service Packages. */
+export function Concierge(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 18h16" />
+      <path d="M5.5 18a6.5 6.5 0 0 1 13 0" />
+      <path d="M12 8.5V6.5" />
+      <path d="M10 6.5h4" />
+    </svg>
+  );
+}
+
 /* Bell — notifications. */
 export function Bell(props: IconProps) {
   return (

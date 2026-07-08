@@ -18,6 +18,7 @@ import {
   Ticket,
   Rocket,
   Layout,
+  Concierge,
   Gear,
   LogOut,
   Close,
@@ -37,6 +38,7 @@ const NAV_ICON: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   payments: Wallet,
   coupons: Ticket,
   campaigns: Rocket,
+  services: Concierge,
   content: Layout,
   settings: Gear,
 };

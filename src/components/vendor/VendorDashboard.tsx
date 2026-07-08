@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import MenuBuilder from "@/components/vendor/MenuBuilder";
+import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { sortTiers, type VendorTier } from "@/lib/admin/types";
 
 /** Header summary drawn from GET /api/vendor/menu (the vendor's live record). */
@@ -64,6 +65,10 @@ export default function VendorDashboard() {
         fallbackName={fallbackName}
         loading={loading}
       />
+      {/* "Baina Box, specially by Bhojpatra" — admin-editable signature card. */}
+      <div className="mt-6">
+        <BainaBoxSpecial variant="dashboard" />
+      </div>
       <div className="mt-8">
         <MenuBuilder />
       </div>

@@ -73,7 +73,7 @@ export default function CampaignPopup() {
           always spans 80% of the screen width (any size scales to fit); on
           desktop it's capped to ~74% of the viewport. */}
       <div
-        className="animate-rise relative inline-block max-h-[85vh] max-w-[80vw] overflow-hidden rounded-2xl shadow-[0_18px_50px_rgba(0,0,0,0.35)] [animation-duration:0.4s] sm:max-h-[74vh] sm:max-w-[74vw]"
+        className="animate-rise relative inline-block max-h-[85vh] max-w-[80vw] overflow-hidden rounded-card shadow-modal [animation-duration:0.4s] sm:max-h-[74vh] sm:max-w-[74vw]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Two sizes: the browser picks the mobile image on phones and the web
@@ -107,7 +107,7 @@ export default function CampaignPopup() {
           type="button"
           onClick={close}
           aria-label={t("Close", "बंद करें")}
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white ring-1 ring-white/40 transition-colors hover:bg-black/60"
+          className="focus-ring absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white ring-1 ring-white/40 transition-colors hover:bg-black/60"
         >
           <svg
             viewBox="0 0 24 24"
