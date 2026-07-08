@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminSession, loginAdmin } from "@/lib/adminAuth";
 import BrandIcon from "@/components/BrandIcon";
+import { Button, controlClass } from "@/components/ui";
 
-const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+const inputClass = controlClass;
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-beige px-4 py-12 text-ink">
-      <div className="w-full max-w-sm rounded-2xl border border-cream-3 bg-white p-7 shadow-sm sm:p-8">
+      <div className="w-full max-w-sm rounded-card border border-cream-3 bg-white p-7 shadow-card sm:p-8">
         <header className="mb-7 text-center">
           <BrandIcon className="mx-auto mb-3 h-14 w-14 bg-maroon" />
           <span className="font-display text-2xl text-maroon">bhojpatra</span>
@@ -91,7 +91,7 @@ export default function AdminLoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-sm font-medium text-maroon hover:text-maroon-dark"
+                className="focus-ring absolute inset-y-0 right-0 flex items-center px-3 text-sm font-medium text-maroon hover:underline"
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
@@ -99,17 +99,14 @@ export default function AdminLoginPage() {
           </div>
 
           {error && (
-            <p className="rounded-lg border border-maroon/30 bg-maroon/5 px-3 py-2 text-sm text-maroon">
+            <p className="rounded-control border border-maroon/30 bg-maroon/5 px-3 py-2 text-sm text-maroon">
               {error}
             </p>
           )}
 
-          <button
-            type="submit"
-            className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-          >
+          <Button type="submit" loading={submitting} size="lg" fullWidth className="mt-1">
             Log In
-          </button>
+          </Button>
         </form>
       </div>
     </div>

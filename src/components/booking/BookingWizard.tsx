@@ -3076,7 +3076,7 @@ function PaymentBox({
                 </button>
                 <a
                   href={upiUri}
-                  className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon-dark"
+                  className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon/90"
                 >
                   {t("Open UPI app", "UPI ऐप खोलें")}
                 </a>
@@ -3195,7 +3195,7 @@ function PaymentBox({
             type="button"
             onClick={markPaid}
             disabled={submitting || !isValidTxnId(txnId) || !contactReady}
-            className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+            className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 disabled:opacity-60"
           >
             {submitting
               ? t("Confirming…", "पुष्टि हो रही है…")
@@ -3762,7 +3762,7 @@ function StepConfirm({
           <button
             type="submit"
             disabled={confirming}
-            className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+            className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 disabled:opacity-60"
           >
             {confirming
               ? t("Confirming…", "पुष्टि हो रही है…")
@@ -3920,7 +3920,7 @@ function StepDone({
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full bg-maroon px-4 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:px-6"
+          className="rounded-full bg-maroon px-4 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 sm:px-6"
         >
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>

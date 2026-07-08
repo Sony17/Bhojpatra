@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Button } from "@/components/ui";
 
 /**
  * App Router error boundary for `/admin/*`. Renders inside the admin shell when
@@ -20,7 +21,7 @@ export default function AdminError({
 
   return (
     <div className="flex min-h-[50vh] items-center justify-center">
-      <div className="max-w-md rounded-2xl border border-cream-3 bg-white p-10 text-center shadow-sm">
+      <div className="max-w-md rounded-card border border-cream-3 bg-white p-10 text-center shadow-card">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cream text-2xl text-maroon">
           !
         </span>
@@ -28,13 +29,9 @@ export default function AdminError({
         <p className="mx-auto mt-1 max-w-prose text-sm text-ink-soft">
           We couldn&rsquo;t load this page. Please try again.
         </p>
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-6 inline-flex rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-        >
+        <Button onClick={reset} className="mt-6">
           Try again
-        </button>
+        </Button>
       </div>
     </div>
   );

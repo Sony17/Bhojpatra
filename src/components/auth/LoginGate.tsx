@@ -4,9 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { refreshSession, type AccountType } from "@/lib/session";
+import { Button, controlClass } from "@/components/ui";
 
-const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+const inputClass = controlClass;
 
 /** Lock glyph — monochrome so it renders in the brand maroon (currentColor). */
 function LockIcon() {
@@ -95,7 +95,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-maroon/20 bg-cream/40 p-6 sm:p-8">
+    <div className="mx-auto max-w-md rounded-card border border-maroon/20 bg-cream/40 p-6 sm:p-8">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-maroon/10 text-maroon">
         <LockIcon />
       </div>
@@ -141,27 +141,23 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
         </div>
 
         {error && (
-          <p className="rounded-lg border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
+          <p className="rounded-control border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
             {error}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
-        >
+        <Button type="submit" loading={submitting} size="lg" fullWidth className="mt-1">
           {submitting
             ? t("Please wait…", "कृपया प्रतीक्षा करें…")
             : t("Log In", "लॉग इन")}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-ink-soft">
         {t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
         <Link
           href="/signup"
-          className="font-semibold text-maroon hover:text-maroon-dark"
+          className="font-semibold text-maroon hover:underline"
         >
           {t("Create an account", "अकाउंट बनाएं")}
         </Link>
