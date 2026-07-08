@@ -181,7 +181,7 @@ export default function Gallery() {
               >
                 {/* Card — hover lift sits on its own layer to avoid clashing
                     with the float animation above it. */}
-                <div className="group relative h-full w-full overflow-hidden rounded-2xl shadow-[0_22px_44px_-22px_rgba(0,0,0,0.6),0_8px_18px_-12px_rgba(0,0,0,0.4)] ring-1 ring-cream/60 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.04]">
+                <div className="group relative h-full w-full overflow-hidden rounded-card shadow-[0_22px_44px_-22px_rgba(0,0,0,0.6),0_8px_18px_-12px_rgba(0,0,0,0.4)] ring-1 ring-cream/60 transition-transform duration-500 ease-[cubic-bezier(.16,1,.3,1)] hover:-translate-y-2 hover:scale-[1.04]">
                   {item.image && (
                     <Image
                       src={item.image}
@@ -241,7 +241,7 @@ export default function Gallery() {
               {[...row, ...row].map((item: HomeGalleryItem, i: number) => (
                 <div
                   key={`${item.id}-${i}`}
-                  className="group relative aspect-[4/5] w-36 shrink-0 overflow-hidden rounded-2xl ring-1 ring-cream/50 shadow-[0_14px_30px_-20px_rgba(0,0,0,0.5)] sm:w-44 lg:w-52"
+                  className="group relative aspect-[4/5] w-36 shrink-0 overflow-hidden rounded-card ring-1 ring-cream/50 shadow-[0_14px_30px_-20px_rgba(0,0,0,0.5)] sm:w-44 lg:w-52"
                 >
                   {item.image && (
                     <Image

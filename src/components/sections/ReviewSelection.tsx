@@ -26,7 +26,7 @@ function IconBadge({ children }: { children: ReactNode }) {
 
 export default function ReviewSelection() {
   return (
-    <section className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+    <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
       <Reveal className="mb-10 max-w-2xl">
         <h2 className="text-3xl font-semibold text-ink sm:text-4xl">
           Review Your Selection
@@ -36,7 +36,7 @@ export default function ReviewSelection() {
         </p>
       </Reveal>
 
-      <Reveal variant="scale" className="rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Reveal variant="scale" className="rounded-card border border-cream-3 bg-white shadow-card">
         {/* Mobile — stacked cards (no horizontal scroll on phones). */}
         <ul className="divide-y divide-cream-3 sm:hidden">
           {rows.map((row) => (
@@ -47,7 +47,7 @@ export default function ReviewSelection() {
                 <p className="truncate text-sm text-ink-soft">{row.vendor}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <span className="inline-flex items-center rounded-lg border border-cream-3 bg-cream px-3 py-1 text-xs font-semibold text-maroon">
+                <span className="inline-flex items-center rounded-control border border-cream-3 bg-cream px-3 py-1 text-xs font-semibold text-maroon">
                   View Menu
                 </span>
                 <span className="text-xs font-semibold text-maroon">Change</span>
@@ -91,7 +91,7 @@ export default function ReviewSelection() {
                   </td>
                   <td className="px-6 py-4 text-ink-soft">{row.vendor}</td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center rounded-lg border border-cream-3 bg-cream px-3.5 py-1.5 text-xs font-semibold text-maroon transition-colors hover:bg-cream-2">
+                    <span className="inline-flex items-center rounded-control border border-cream-3 bg-cream px-3.5 py-1.5 text-xs font-semibold text-maroon transition-colors hover:bg-cream-2">
                       View Menu
                     </span>
                   </td>
@@ -122,10 +122,10 @@ export default function ReviewSelection() {
 
       {/* Action buttons */}
       <Reveal variant="fade" delay={120} className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <span className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-maroon/30 bg-white px-6 py-3 text-sm font-semibold text-maroon shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-cream hover:shadow-md active:scale-95">
+        <span className="inline-flex cursor-pointer items-center justify-center rounded-control border border-maroon/30 bg-white px-6 py-3 text-sm font-semibold text-maroon shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:bg-cream hover:shadow-pop active:scale-95">
           Download Menu
         </span>
-        <span className="btn-sheen group inline-flex cursor-pointer items-center justify-center rounded-xl bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon-dark hover:shadow-lg active:scale-95">
+        <span className="btn-sheen group inline-flex cursor-pointer items-center justify-center rounded-control bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-brand transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop active:scale-95">
           Proceed to Book{" "}
           <span className="ml-1 inline-block transition-transform duration-300 group-hover:translate-x-1">
             →

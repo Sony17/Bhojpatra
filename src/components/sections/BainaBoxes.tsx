@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import Reveal from "@/components/Reveal";
+import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
@@ -30,7 +30,7 @@ export default function BainaBoxes() {
 
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-5 py-16 sm:py-20 sm:px-8">
         <Reveal variant="scale">
           <div className="grid items-center gap-10 rounded-3xl bg-cream/40 p-8 ring-1 ring-cream sm:p-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12">
             {/* Left — heading, lede, CTA */}
@@ -46,12 +46,14 @@ export default function BainaBoxes() {
               <p className="font-script mx-auto mt-4 max-w-sm text-lg text-ink-soft lg:mx-0">
                 {lang === "hi" ? bainaBoxes.subtitleHi : bainaBoxes.subtitle}
               </p>
-              <Link
+              <Button
                 href="/vendors?q=Baina+Box"
-                className="btn-sheen mt-8 inline-flex items-center justify-center rounded-full border border-maroon px-8 py-3 text-sm font-semibold text-maroon transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon hover:text-cream hover:shadow-lg active:scale-95"
+                variant="secondary"
+                size="lg"
+                className="btn-sheen mt-8 rounded-full px-8 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop"
               >
                 {lang === "hi" ? bainaBoxes.ctaHi : bainaBoxes.cta}
-              </Link>
+              </Button>
             </div>
 
             {/* Right — brand boxes. On mobile they sit in a single scrollable
@@ -66,7 +68,7 @@ export default function BainaBoxes() {
                   key={brand.id}
                   className="flex w-32 shrink-0 snap-start flex-col items-center gap-3 sm:w-auto"
                 >
-                  <div className="relative aspect-square w-full overflow-hidden rounded-2xl ring-1 ring-cream shadow-sm transition duration-300 hover:shadow-md">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-card ring-1 ring-cream shadow-card transition duration-300 hover:shadow-pop">
                     <Image
                       src={brand.image}
                       alt={lang === "hi" ? brand.nameHi : brand.name}

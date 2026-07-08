@@ -40,7 +40,7 @@ export default function TopCategories() {
 
   return (
     <section className="bg-white">
-      <div className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20">
+      <div className="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
         <Reveal variant="left" className="text-center">
           <h2 className="font-display text-3xl text-maroon sm:text-4xl">
             {lang === "hi" ? services.headingHi : services.heading}
@@ -71,7 +71,7 @@ export default function TopCategories() {
                   <div
                     key={`${card.id}-${i}`}
                     aria-hidden={clone}
-                    className="group relative w-[42vw] shrink-0 overflow-hidden rounded-xl sm:w-[30vw] lg:w-60"
+                    className="group relative w-[42vw] shrink-0 overflow-hidden rounded-card sm:w-[30vw] lg:w-60"
                   >
                     {/* Tapping a service card opens the booking wizard — the same
                         "tap a card to begin" gesture as the occasion cards. */}

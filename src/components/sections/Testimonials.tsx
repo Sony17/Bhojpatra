@@ -93,7 +93,7 @@ export default function Testimonials() {
     <li
       key={`${copy}-${t.id}`}
       aria-hidden={copy === 1 ? true : undefined}
-      className="card-lift group flex w-[85vw] shrink-0 flex-col rounded-2xl border border-cream-3 bg-white p-6 shadow-sm hover:border-maroon/30 hover:shadow-lg sm:w-[360px]"
+      className="card-lift group flex w-[85vw] shrink-0 flex-col rounded-card border border-cream-3 bg-white p-6 shadow-card hover:border-maroon/30 hover:shadow-pop sm:w-[360px]"
     >
       <div className="flex items-center justify-between">
         <Stars
@@ -135,7 +135,7 @@ export default function Testimonials() {
   );
 
   return (
-    <section id="testimonials" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+    <section id="testimonials" className="mx-auto max-w-7xl px-5 py-16 sm:py-20 sm:px-8">
       <Reveal className="mx-auto max-w-2xl text-center">
         <p className="eyebrow mb-3 text-2xl font-semibold uppercase tracking-[0.2em] text-maroon sm:text-3xl">
           {lang === "hi" ? testimonials.eyebrowHi : testimonials.eyebrow}

@@ -4,7 +4,7 @@ import Reveal from "@/components/Reveal";
 export default function WhyChoose() {
   return (
     <div className="bg-surface-beige-2">
-      <section id="about" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+      <section id="about" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="eyebrow text-xs font-semibold text-gold">
             Why Bhojpatra
@@ -27,11 +27,11 @@ export default function WhyChoose() {
           {whyChoose.map((item: ValueProp) => (
             <li
               key={item.title}
-              className="card-lift group flex flex-col items-center rounded-2xl border border-cream-3 bg-cream/40 p-6 text-center shadow-sm hover:border-maroon/30 hover:shadow-lg"
+              className="card-lift group flex flex-col items-center rounded-card border border-cream-3 bg-cream/40 p-6 text-center shadow-card hover:border-maroon/30 hover:shadow-pop"
             >
               <span
                 aria-hidden="true"
-                className="flex h-16 w-16 items-center justify-center rounded-full border border-cream-3 bg-white text-2xl shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 [background-image:radial-gradient(circle_at_30%_25%,var(--color-gold-soft)_0%,transparent_70%)]"
+                className="flex h-16 w-16 items-center justify-center rounded-full border border-cream-3 bg-white text-2xl shadow-card transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 [background-image:radial-gradient(circle_at_30%_25%,var(--color-gold-soft)_0%,transparent_70%)]"
               >
                 {item.icon}
               </span>

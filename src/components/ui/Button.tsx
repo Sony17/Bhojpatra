@@ -10,14 +10,20 @@ import Spinner from "./Spinner";
  * everywhere.
  *
  * - `variant` — primary (solid red CTA), secondary (red outline → fills on
- *   hover), ghost (text + cream wash), destructive (brand-black).
+ *   hover), ghost (text + cream wash), destructive (brand-black), inverse
+ *   (cream fill / red text — for CTAs sitting ON a red surface).
  * - `size`    — sm (dense/tables), md (default), lg (hero/checkout CTAs).
  * - Pass `href` to render a link (internal → next/link, external/hash → <a>).
  *
  * Brand-safe: hover never darkens the red (there is no darker brand red); it
  * lifts + deepens the shadow + sweeps the `.btn-sheen` highlight instead.
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "destructive"
+  | "inverse";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
@@ -31,6 +37,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
   ghost: "bg-transparent text-maroon hover:bg-cream-2",
   destructive:
     "bg-ink text-cream shadow-card hover:-translate-y-0.5 hover:shadow-pop",
+  inverse:
+    "btn-sheen bg-cream text-maroon shadow-card hover:-translate-y-0.5 hover:bg-white hover:shadow-pop",
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -49,6 +57,10 @@ type BaseProps = {
   className?: string;
   children?: ReactNode;
   href?: string;
+  /** Anchor attributes — only meaningful together with `href`. */
+  target?: string;
+  rel?: string;
+  download?: boolean | string;
 };
 
 type ButtonProps = BaseProps &
@@ -64,6 +76,9 @@ export default function Button({
   className,
   children,
   href,
+  target,
+  rel,
+  download,
   disabled,
   type,
   ...rest
@@ -87,16 +102,26 @@ export default function Button({
 
   if (href && !disabled) {
     const anchorProps = rest as unknown as AnchorHTMLAttributes<HTMLAnchorElement>;
+    // Default external _blank links to a safe rel unless one was given.
+    const relResolved =
+      rel ?? (target === "_blank" ? "noopener noreferrer" : undefined);
     const external = /^(https?:|mailto:|tel:|#)/.test(href);
     if (external) {
       return (
-        <a href={href} className={cls} {...anchorProps}>
+        <a
+          href={href}
+          target={target}
+          rel={relResolved}
+          download={download}
+          className={cls}
+          {...anchorProps}
+        >
           {content}
         </a>
       );
     }
     return (
-      <Link href={href} className={cls} {...anchorProps}>
+      <Link href={href} target={target} rel={relResolved} className={cls} {...anchorProps}>
         {content}
       </Link>
     );

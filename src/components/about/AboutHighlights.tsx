@@ -1,6 +1,7 @@
 "use client";
 
 import Reveal from "@/components/Reveal";
+import { Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 
 /** Trust stats shown as a band beneath the About intro. */
@@ -55,7 +56,7 @@ export default function AboutHighlights() {
       <Reveal
         stagger
         from="up"
-        className="grid grid-cols-3 gap-3 rounded-2xl border border-cream-3 bg-maroon p-6 text-center sm:gap-6 sm:p-8"
+        className="grid grid-cols-3 gap-3 rounded-card border border-cream-3 bg-maroon p-6 text-center shadow-card sm:gap-6 sm:p-8"
       >
         {STATS.map((s) => (
           <div key={s.value}>
@@ -80,17 +81,14 @@ export default function AboutHighlights() {
         className="mt-6 grid gap-4 sm:grid-cols-2"
       >
         {REASONS.map((r) => (
-          <article
-            key={r.title}
-            className="rounded-2xl border border-cream-3 bg-white p-6 shadow-sm transition-transform duration-300 hover:-translate-y-0.5"
-          >
+          <Card as="article" interactive padding="lg" key={r.title}>
             <h3 className="font-display text-lg font-semibold text-maroon">
               {lang === "hi" ? r.titleHi : r.title}
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               {lang === "hi" ? r.bodyHi : r.body}
             </p>
-          </article>
+          </Card>
         ))}
       </Reveal>
     </section>

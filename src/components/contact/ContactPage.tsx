@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useSiteContent } from "@/lib/sitePages";
 import { useLang } from "@/lib/i18n";
-import ThemedSelect from "@/components/ThemedSelect";
-
-const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+import { Button, Card, Container, Field, Input, Select, Textarea } from "@/components/ui";
 
 const WHATSAPP_MESSAGE =
   "Hi Bhojpatra! I'd like to enquire about booking catering for my event.";
@@ -88,7 +85,7 @@ export default function ContactPage() {
   }
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
+    <Container size="lg" className="py-12 sm:py-16">
       <div className="max-w-2xl">
         <p className="eyebrow text-sm font-medium text-gold">
           {contact.eyebrow}
@@ -101,13 +98,13 @@ export default function ContactPage() {
 
       <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
         {/* LEFT — enquiry form */}
-        <div className="rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:p-8">
+        <Card padding="lg" className="sm:p-8">
           <h2 className="font-display text-xl font-semibold text-ink">
             {t("Send us an enquiry", "हमें पूछताछ भेजें")}
           </h2>
 
           {submitted && (
-            <div className="mt-4 rounded-lg border border-maroon/30 bg-maroon/5 px-4 py-3 text-sm font-medium text-maroon">
+            <div className="mt-4 rounded-control border border-maroon/30 bg-maroon/5 px-4 py-3 text-sm font-medium text-maroon">
               {t(
                 "Thanks! We'll reach out shortly.",
                 "धन्यवाद! हम जल्द ही आपसे संपर्क करेंगे।",
@@ -116,62 +113,47 @@ export default function ContactPage() {
           )}
 
           {error && (
-            <div className="mt-4 rounded-lg border border-maroon bg-maroon/10 px-4 py-3 text-sm font-medium text-maroon">
+            <div className="mt-4 rounded-control border border-maroon bg-maroon/10 px-4 py-3 text-sm font-medium text-maroon">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="name" className="text-sm text-ink-soft">
-                {t("Name", "नाम")}
-              </label>
-              <input
+            <Field label={t("Name", "नाम")} htmlFor="name">
+              <Input
                 id="name"
                 name="name"
                 type="text"
                 required
                 autoComplete="name"
                 placeholder={t("Your full name", "आपका पूरा नाम")}
-                className={inputClass}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-sm text-ink-soft">
-                {t("Email", "ईमेल")}
-              </label>
-              <input
+            <Field label={t("Email", "ईमेल")} htmlFor="email">
+              <Input
                 id="email"
                 name="email"
                 type="email"
                 required
                 autoComplete="email"
                 placeholder="you@example.com"
-                className={inputClass}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="mobile" className="text-sm text-ink-soft">
-                {t("Mobile", "मोबाइल")}
-              </label>
-              <input
+            <Field label={t("Mobile", "मोबाइल")} htmlFor="mobile">
+              <Input
                 id="mobile"
                 name="mobile"
                 type="tel"
                 required
                 autoComplete="tel"
                 placeholder={t("10-digit mobile number", "10 अंकों का मोबाइल नंबर")}
-                className={inputClass}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="subject" className="text-sm text-ink-soft">
-                {t("Subject / Occasion", "विषय / अवसर")}
-              </label>
-              <ThemedSelect
+            <Field label={t("Subject / Occasion", "विषय / अवसर")} htmlFor="subject">
+              <Select
                 id="subject"
                 name="subject"
                 required
@@ -179,19 +161,15 @@ export default function ContactPage() {
                 onChange={setSubject}
                 placeholder={t("Select an occasion", "अवसर चुनें")}
                 ariaLabel={t("Subject / Occasion", "विषय / अवसर")}
-                buttonClassName={inputClass}
                 options={SUBJECTS.map((s) => ({
                   value: s.value,
                   label: t(s.en, s.hi),
                 }))}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="message" className="text-sm text-ink-soft">
-                {t("Message", "संदेश")}
-              </label>
-              <textarea
+            <Field label={t("Message", "संदेश")} htmlFor="message">
+              <Textarea
                 id="message"
                 name="message"
                 required
@@ -200,19 +178,20 @@ export default function ContactPage() {
                   "Tell us about your event — date, guest count & city.",
                   "अपने इवेंट के बारे में बताएं — तारीख, मेहमानों की संख्या और शहर।",
                 )}
-                className={`${inputClass} resize-y`}
               />
-            </div>
+            </Field>
 
-            <button
+            <Button
               type="submit"
+              size="lg"
+              fullWidth
               disabled={submitting}
-              className="mt-1 w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+              className="mt-1"
             >
               {submitting
                 ? t("Sending…", "भेज रहे हैं…")
                 : t("Send Enquiry", "पूछताछ भेजें")}
-            </button>
+            </Button>
           </form>
 
           <div className="mt-5 flex items-center gap-3">
@@ -223,20 +202,23 @@ export default function ContactPage() {
             <span className="h-px flex-1 bg-cream-3" />
           </div>
 
-          <a
+          <Button
+            variant="secondary"
+            size="lg"
+            fullWidth
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+            className="mt-5"
+            leftIcon={<span aria-hidden="true">💬</span>}
           >
-            <span aria-hidden="true">💬</span>
             {t("Chat on WhatsApp", "WhatsApp पर चैट करें")}
-          </a>
-        </div>
+          </Button>
+        </Card>
 
         {/* RIGHT — business details */}
         <div className="flex flex-col gap-6">
-          <div className="rounded-2xl bg-maroon p-6 text-cream shadow-sm sm:p-8">
+          <div className="rounded-card bg-maroon p-6 text-cream shadow-card sm:p-8">
             <p className="eyebrow text-sm font-medium text-cream/80">
               Bhojpatra
             </p>
@@ -297,7 +279,7 @@ export default function ContactPage() {
             </a>
           </div>
 
-          <div className="rounded-2xl border border-cream-3 bg-white p-6 shadow-sm">
+          <Card padding="lg">
             <h3 className="font-display text-base font-semibold text-ink">
               {t("Operating Hours", "कार्य समय")}
             </h3>
@@ -308,10 +290,10 @@ export default function ContactPage() {
                 "WhatsApp पर कभी भी संदेश भेजें और हम कार्य समय के दौरान आपसे संपर्क करेंगे।",
               )}
             </p>
-          </div>
+          </Card>
         </div>
       </div>
-    </section>
+    </Container>
   );
 }
 

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { occasions, packages, guestPresets } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
+import { Button, controlClass } from "@/components/ui";
 
 /** Contact + event detail fields rendered as a two-column grid. */
 const contactFields = [
@@ -72,7 +72,7 @@ export default function BookingForm() {
   const tierMeta = (id: string) => homePackages.tiers.find((x) => x.id === id);
 
   return (
-    <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:py-20">
+    <section id="book" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
       <Reveal className="mx-auto max-w-3xl text-center">
         <h2 className="text-3xl text-ink sm:text-4xl">
           {lang === "hi" ? booking.headingHi : booking.heading}
@@ -84,7 +84,7 @@ export default function BookingForm() {
 
       <Reveal
         variant="scale"
-        className="mx-auto mt-10 max-w-3xl rounded-2xl border border-cream-3 bg-white p-6 shadow-sm sm:mt-12 sm:p-8 lg:p-10"
+        className="mx-auto mt-10 max-w-3xl rounded-card border border-cream-3 bg-white p-6 shadow-card sm:mt-12 sm:p-8 lg:p-10"
       >
         <form className="flex flex-col gap-8">
           {/* Occasion & Guests */}
@@ -135,7 +135,7 @@ export default function BookingForm() {
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
                   autoComplete="off"
-                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                  className={controlClass}
                 />
               </div>
 
@@ -160,7 +160,7 @@ export default function BookingForm() {
                   }}
                   placeholder={t("e.g. 250", "जैसे 250")}
                   autoComplete="off"
-                  className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                  className={controlClass}
                 />
                 <div className="mt-1 flex flex-wrap gap-2">
                   {guestPresets.map((preset) => (
@@ -201,7 +201,7 @@ export default function BookingForm() {
                   <label
                     key={tier.id}
                     className={
-                      "relative flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition-all duration-200 " +
+                      "relative flex cursor-pointer flex-col gap-1 rounded-card border p-4 transition-all duration-200 " +
                       (active
                         ? "border-maroon bg-maroon/[0.04] ring-2 ring-maroon/20"
                         : "border-cream-3 bg-cream/40 hover:border-maroon/40")
@@ -258,7 +258,7 @@ export default function BookingForm() {
                       undefined
                     }
                     autoComplete={field.autoComplete}
-                    className="rounded-lg border border-cream-3 bg-cream/40 px-3 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-all duration-200 focus:border-maroon focus:bg-white focus:ring-2 focus:ring-maroon/20"
+                    className={controlClass}
                   />
                 </div>
               ))}
@@ -266,12 +266,9 @@ export default function BookingForm() {
           </fieldset>
 
           <div>
-            <Link
-              href={bookHref}
-              className="btn-sheen block w-full rounded-lg bg-maroon px-5 py-3 text-center text-base font-semibold text-cream shadow-sm transition-all duration-300 hover:bg-maroon-dark hover:shadow-lg active:scale-[0.98]"
-            >
+            <Button href={bookHref} size="lg" fullWidth>
               {t("Submit Booking Request", "बुकिंग अनुरोध भेजें")}
-            </Link>
+            </Button>
             <p className="mt-3 text-center text-xs text-ink-soft">
               {t(
                 "Your data is safe with us. We will get back to you shortly to confirm your booking.",

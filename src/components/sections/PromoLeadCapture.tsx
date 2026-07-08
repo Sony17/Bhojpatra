@@ -6,6 +6,7 @@ import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { Mail, Phone } from "@/components/icons";
+import { Button } from "@/components/ui";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -79,10 +80,10 @@ export default function PromoLeadCapture() {
 
   return (
     <section id="offers" className="bg-maroon">
-      <div className="mx-auto max-w-7xl px-5 py-7 sm:py-8">
+      <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-8">
         <Reveal
           variant="scale"
-          className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-2xl border border-cream/30 px-5 py-5 text-center sm:flex-row sm:items-center sm:gap-6 sm:px-7 sm:text-left"
+          className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card border border-cream/30 px-5 py-5 text-center sm:flex-row sm:items-center sm:gap-6 sm:px-7 sm:text-left"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -107,7 +108,7 @@ export default function PromoLeadCapture() {
           {status === "success" ? (
             <p
               role="status"
-              className="rounded-lg bg-cream px-4 py-2.5 text-sm font-semibold text-maroon sm:max-w-xs"
+              className="rounded-control bg-cream px-4 py-2.5 text-sm font-semibold text-maroon sm:max-w-xs"
             >
               {message}
             </p>
@@ -117,7 +118,7 @@ export default function PromoLeadCapture() {
               noValidate
               className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
             >
-              <label className="flex items-center gap-2 rounded-lg border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-44">
+              <label className="flex items-center gap-2 rounded-control border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-44">
                 <Mail className="h-4 w-4 shrink-0 text-maroon" />
                 <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
                 <input
@@ -132,7 +133,7 @@ export default function PromoLeadCapture() {
                 />
               </label>
 
-              <label className="flex items-center gap-2 rounded-lg border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-40">
+              <label className="flex items-center gap-2 rounded-control border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-40">
                 <Phone className="h-4 w-4 shrink-0 text-maroon" />
                 <span className="sr-only">{t("Mobile Number", "मोबाइल नंबर")}</span>
                 <input
@@ -148,15 +149,16 @@ export default function PromoLeadCapture() {
                 />
               </label>
 
-              <button
+              <Button
                 type="submit"
-                disabled={status === "submitting"}
-                className="btn-sheen shrink-0 rounded-lg bg-cream px-4 py-2 text-sm font-semibold text-maroon shadow-[0_8px_18px_-10px_rgba(0,0,0,0.6)] transition-all duration-300 hover:bg-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+                variant="inverse"
+                loading={status === "submitting"}
+                className="shrink-0"
               >
                 {status === "submitting"
                   ? t("Signing up…", "साइन अप…")
                   : t("Notify Me", "सूचित करें")}
-              </button>
+              </Button>
 
               {status === "error" && (
                 <p role="alert" className="text-xs font-medium text-cream sm:w-full">

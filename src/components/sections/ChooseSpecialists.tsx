@@ -11,7 +11,7 @@ export default function ChooseSpecialists() {
   return (
     <section
       id="specialists"
-      className="mx-auto max-w-7xl px-5 py-16 sm:py-20"
+      className="mx-auto max-w-7xl px-5 py-16 sm:py-20 sm:px-8"
     >
       <Reveal className="max-w-2xl">
         <h2 className="text-3xl text-ink sm:text-4xl">
@@ -30,7 +30,7 @@ export default function ChooseSpecialists() {
             className={
               "cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 " +
               (i === 0
-                ? "bg-maroon text-cream shadow-[0_8px_18px_-8px_rgba(185,32,37,0.6)]"
+                ? "bg-maroon text-cream shadow-brand"
                 : "bg-cream-2 text-ink-soft hover:bg-cream-3 hover:text-maroon")
             }
           >
@@ -45,7 +45,7 @@ export default function ChooseSpecialists() {
       </Reveal>
 
       {/* Specialist list */}
-      <Reveal stagger from="right" className="mt-6 overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Reveal stagger from="right" className="mt-6 overflow-hidden rounded-card border border-cream-3 bg-white shadow-card">
         {specialists.map((s, i) => {
           const stat = statFor(ratings, s);
           return (
@@ -112,7 +112,7 @@ export default function ChooseSpecialists() {
 
       {/* Save & Continue */}
       <Reveal variant="fade" className="mt-8 flex justify-end">
-        <span className="btn-sheen inline-flex cursor-pointer items-center rounded-full bg-maroon px-7 py-3 text-sm font-medium text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon-dark hover:shadow-lg active:scale-95">
+        <span className="btn-sheen inline-flex cursor-pointer items-center rounded-full bg-maroon px-7 py-3 text-sm font-medium text-cream shadow-brand transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop active:scale-95">
           Save &amp; Continue
         </span>
       </Reveal>

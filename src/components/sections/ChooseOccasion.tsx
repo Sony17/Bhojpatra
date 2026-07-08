@@ -17,7 +17,7 @@ export default function ChooseOccasion() {
   return (
     <section
       id="occasions"
-      className="relative mx-auto max-w-7xl px-5 py-16 sm:py-20"
+      className="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24"
     >
       <Reveal variant="left" className="text-center">
         <h2 className="font-display text-3xl text-maroon sm:text-4xl">
@@ -51,7 +51,7 @@ export default function ChooseOccasion() {
                 <div
                   key={`${occasion.id}-${i}`}
                   aria-hidden={clone}
-                  className="group relative w-[42vw] shrink-0 overflow-hidden rounded-xl sm:w-[30vw] lg:w-60"
+                  className="group relative w-[42vw] shrink-0 overflow-hidden rounded-card sm:w-[30vw] lg:w-60"
                 >
                   {/* Tapping an occasion opens the booking wizard with that
                       occasion pre-selected (the wizard reads `?occasion=`). */}

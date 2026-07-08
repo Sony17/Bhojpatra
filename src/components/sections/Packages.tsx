@@ -8,6 +8,7 @@ import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
 import { useHomeContent } from "@/lib/homeContent";
+import { Button } from "@/components/ui";
 
 export default function Packages() {
   const { lang, t } = useLang();
@@ -76,7 +77,7 @@ export default function Packages() {
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
                     aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full bg-cream px-4 text-[11px] font-semibold tracking-wide text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
+                    className="btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full bg-cream px-4 text-[11px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
                   >
                     <span className="font-display leading-none">
                       {t("Book", "बुक करें")} {tierName}
@@ -94,7 +95,7 @@ export default function Packages() {
 
         {/* Curated-package option — when no tier fits, reach out on WhatsApp. */}
         <Reveal className="mx-auto mt-10 max-w-2xl">
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-maroon/20 bg-cream/40 px-6 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div className="flex flex-col items-center gap-4 rounded-card border border-maroon/20 bg-cream/40 px-6 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
             <p className="text-sm text-ink-soft">
               {t(
                 "None of these fit, or want a package curated just for you?",
@@ -104,23 +105,23 @@ export default function Packages() {
                 {t("Contact Bhojpatra.", "भोजपत्र से संपर्क करें।")}
               </span>
             </p>
-            <a
+            <Button
               href={waLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-sheen inline-flex shrink-0 items-center gap-2 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+              className="shrink-0"
+              leftIcon={<WhatsAppIcon className="h-4 w-4" />}
             >
-              <WhatsAppIcon className="h-4 w-4" />
               <span className="font-display">
                 {t("Chat on WhatsApp", "व्हाट्सएप पर चैट करें")}
               </span>
-            </a>
+            </Button>
           </div>
         </Reveal>
 
         {/* Disclaimer — echoes the reference footer note. */}
         <Reveal className="mx-auto mt-10 max-w-2xl">
-          <p className="rounded-2xl border border-maroon/15 bg-cream/30 px-5 py-3 text-center text-sm text-ink-soft">
+          <p className="rounded-card border border-maroon/15 bg-cream/30 px-5 py-3 text-center text-sm text-ink-soft">
             {t(
               "Prices are approximate. Final price may vary as per menu & vendor selection.",
               "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है।",

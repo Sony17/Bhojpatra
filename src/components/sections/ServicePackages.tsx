@@ -80,7 +80,7 @@ export default function ServicePackages({
 
         {/* Trust bar — the reference's reassurance strip, in brand colours. */}
         <Reveal className="mx-auto mt-12 max-w-5xl">
-          <ul className="grid grid-cols-1 gap-4 rounded-2xl border border-maroon/15 bg-cream/40 p-5 sm:grid-cols-2 sm:gap-5 sm:p-6 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-4 rounded-card border border-maroon/15 bg-cream/40 p-5 sm:grid-cols-2 sm:gap-5 sm:p-6 lg:grid-cols-4">
             {TRUST_ITEMS.map((item) => (
               <li key={item.en} className="flex items-center gap-3">
                 <span
@@ -287,13 +287,13 @@ function ServiceCard({
             },
           }
         : {})}
-      className={`card-lift relative flex h-full flex-col rounded-2xl border p-6 pt-8 shadow-sm transition duration-300 ${variant.card} ${
+      className={`card-lift relative flex h-full flex-col rounded-card border p-6 pt-8 shadow-card transition duration-300 ${variant.card} ${
         selectable ? "cursor-pointer" : ""
       } ${selected ? `ring-2 ${variant.sel}` : ""}`}
     >
       {/* Badge — centred, overlapping the top edge. */}
       <span
-        className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-[0.7rem] font-bold uppercase tracking-wider shadow-sm ${variant.badge}`}
+        className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-[0.7rem] font-bold uppercase tracking-wider shadow-card ${variant.badge}`}
       >
         {pkg.badge}
       </span>
@@ -367,7 +367,7 @@ function ServiceCard({
 
       {/* Price bar — pinned to the card foot so all four align. */}
       <div className="mt-auto pt-6">
-        <div className={`rounded-xl px-4 py-3 text-center ${variant.priceBar}`}>
+        <div className={`rounded-control px-4 py-3 text-center ${variant.priceBar}`}>
           <p className="text-sm">
             {t("Starting from", "शुरुआत")}{" "}
             <span className="font-display font-bold">{priceBand(pkg)}</span>

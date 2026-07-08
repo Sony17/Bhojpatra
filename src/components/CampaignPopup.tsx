@@ -8,15 +8,36 @@ import type { AdminCampaign } from "@/lib/admin/types";
  * Home-page promotional popup. Fetches the currently-running campaign from
  * `GET /api/campaigns/active` (the most recent Active one an admin set in
  * Admin → Campaigns) and shows its picture in a modal covering ~70% of the
- * screen. It appears on every home-page visit; closing it (X / Escape / click
- * outside) only hides it for the current view — reloading or coming back shows
- * it again.
+ * screen. It shows **once per visitor** — the first time someone opens the
+ * site — and is then remembered in `localStorage` so reloads and return visits
+ * don't show it again. Publishing a *new* campaign (new id) shows once more.
  */
 
 /** Absolute URLs (offers on another site) open in a new tab; in-site paths
  *  (`/packages`) navigate in place. */
 function isExternal(url: string): boolean {
   return /^https?:\/\//i.test(url);
+}
+
+/** Per-campaign "already seen" flag. Keyed by id so a freshly-published
+ *  campaign shows once even to visitors who saw the previous one. Guarded so a
+ *  blocked/absent `localStorage` (private mode) simply falls back to showing. */
+const seenKey = (id: string) => `bhojpatra:campaign-seen:${id}`;
+
+function hasSeen(id: string): boolean {
+  try {
+    return window.localStorage.getItem(seenKey(id)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function markSeen(id: string): void {
+  try {
+    window.localStorage.setItem(seenKey(id), "1");
+  } catch {
+    /* ignore — private mode / storage disabled */
+  }
 }
 
 export default function CampaignPopup() {
@@ -33,7 +54,9 @@ export default function CampaignPopup() {
       .then((json) => {
         if (!alive) return;
         const c = json?.campaign as AdminCampaign | null | undefined;
-        if (c?.image) setCampaign(c);
+        // Only load a campaign this visitor hasn't already seen — otherwise it
+        // stays hidden on reloads and return visits.
+        if (c?.image && !hasSeen(c.id)) setCampaign(c);
       })
       .catch(() => {});
     return () => {
@@ -41,10 +64,14 @@ export default function CampaignPopup() {
     };
   }, []);
 
-  // Reveal a moment after the campaign loads so it doesn't fight the first paint.
+  // Reveal a moment after the campaign loads so it doesn't fight the first
+  // paint, and remember it so it won't show again on the next visit.
   useEffect(() => {
     if (!campaign) return;
-    const timer = window.setTimeout(() => setOpen(true), 900);
+    const timer = window.setTimeout(() => {
+      markSeen(campaign.id);
+      setOpen(true);
+    }, 900);
     return () => window.clearTimeout(timer);
   }, [campaign]);
 

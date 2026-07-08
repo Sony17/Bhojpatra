@@ -63,7 +63,7 @@ export default function Hero() {
   // with the CTA on the right edge. On phones the fields tighten and the CTA
   // shrinks to a magnifier; the full label returns from `sm` up.
   const bookingBar = (
-    <div className="flex w-full flex-row items-stretch gap-0 rounded-2xl border border-maroon/20 bg-white p-1.5 shadow-[0_18px_45px_-18px_rgba(185,32,37,0.35)] transition-shadow focus-within:border-maroon/40 sm:p-2.5 lg:rounded-[1.6rem]">
+    <div className="flex w-full flex-row items-stretch gap-0 rounded-card border border-maroon/20 bg-white p-1.5 shadow-card transition-shadow focus-within:border-maroon/40 sm:p-2.5 lg:rounded-[1.6rem]">
       <div className="min-w-0 flex-1 px-1.5 py-2 lg:px-4">
         <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         <BrandSelect
@@ -120,7 +120,7 @@ export default function Hero() {
       <a
         href={bookHref}
         aria-label={t("Find Your Perfect Feast", "अपनी परफेक्ट दावत खोजें")}
-        className="btn-sheen ml-1 flex shrink-0 items-center justify-center self-center rounded-xl bg-maroon px-2.5 py-2.5 text-sm font-semibold text-cream shadow-[0_6px_16px_-6px_rgba(185,32,37,0.6)] transition-all duration-300 hover:bg-maroon-dark hover:shadow-[0_10px_24px_-8px_rgba(185,32,37,0.7)] active:scale-[0.97] sm:self-stretch sm:px-5 sm:py-3.5 lg:ml-2 lg:rounded-[1.15rem]"
+        className="btn-sheen ml-1 flex shrink-0 items-center justify-center self-center rounded-control bg-maroon px-2.5 py-2.5 text-sm font-semibold text-cream shadow-brand transition-all duration-300 hover:shadow-pop active:scale-[0.97] sm:self-stretch sm:px-5 sm:py-3.5 lg:ml-2 lg:rounded-[1.15rem]"
       >
         <svg
           aria-hidden="true"
@@ -218,7 +218,7 @@ export default function Hero() {
                   onChange={(e) => setCustomOccasion(e.target.value)}
                   placeholder={t("Type your occasion", "अपना अवसर लिखें")}
                   aria-label={t("Type your occasion", "अपना अवसर लिखें")}
-                  className="w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
+                  className="w-full rounded-control border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-card outline-none placeholder:text-ink/50 focus:border-maroon/50"
                 />
               )}
               {isOtherCity && (
@@ -228,7 +228,7 @@ export default function Hero() {
                   onChange={(e) => setCustomCity(e.target.value)}
                   placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
                   aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-                  className="w-full rounded-xl border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-sm outline-none placeholder:text-ink/50 focus:border-maroon/50"
+                  className="w-full rounded-control border border-maroon/20 bg-white px-4 py-2.5 text-sm text-ink shadow-card outline-none placeholder:text-ink/50 focus:border-maroon/50"
                 />
               )}
             </div>
@@ -244,7 +244,7 @@ export default function Hero() {
               key={title}
               className="flex flex-col items-center gap-1.5 text-center sm:flex-row sm:items-center sm:gap-3 sm:text-left"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-sm sm:h-10 sm:w-10">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cream bg-white shadow-card sm:h-10 sm:w-10">
                 <Icon className="h-4 w-4 text-maroon" />
               </span>
               <span className="min-w-0 [text-shadow:0_0_6px_rgba(255,255,255,0.95),0_0_14px_rgba(255,255,255,0.85),0_0_26px_rgba(255,255,255,0.7)]">

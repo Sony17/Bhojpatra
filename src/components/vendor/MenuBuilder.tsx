@@ -12,7 +12,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { cities, menuCategories, type DietType } from "@/lib/data";
+import {
+  cities,
+  menuCategories,
+  registrationCuisines,
+  type DietType,
+} from "@/lib/data";
 import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
 
@@ -84,7 +89,7 @@ export default function MenuBuilder() {
   const [business, setBusiness] = useState("");
   const [city, setCity] = useState("");
   const [stateName, setStateName] = useState("");
-  const [cuisinesText, setCuisinesText] = useState("");
+  const [cuisines, setCuisines] = useState<string[]>([]);
   const [about, setAbout] = useState("");
   const [priceFrom, setPriceFrom] = useState("999");
   const [maxCapacity, setMaxCapacity] = useState("");
@@ -139,7 +144,7 @@ export default function MenuBuilder() {
             setBusiness(src.business ?? "");
             setCity(src.city ?? "");
             setStateName(src.state ?? "");
-            setCuisinesText((src.cuisines ?? []).join(", "));
+            setCuisines(src.cuisines ?? []);
             setAbout(src.about ?? "");
             if (src.priceFrom) setPriceFrom(String(src.priceFrom));
             if (src.maxCapacity) setMaxCapacity(String(src.maxCapacity));
@@ -333,10 +338,7 @@ export default function MenuBuilder() {
         business: business.trim(),
         city: city.trim(),
         state: stateName.trim(),
-        cuisines: cuisinesText
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean),
+        cuisines,
         about: about.trim(),
         priceFrom: Number(priceFrom) || 0,
         maxCapacity: Number(maxCapacity) || undefined,
@@ -633,26 +635,28 @@ export default function MenuBuilder() {
             />
           </Field>
           <div className="sm:col-span-2">
-            <Field
-              label={t(
-                "Cuisines (comma-separated)",
-                "व्यंजन शैलियाँ (कॉमा से अलग करें)",
-              )}
-            >
-              <input
-                type="text"
-                value={cuisinesText}
-                onChange={(e) => {
-                  setCuisinesText(e.target.value);
-                  setSaved(false);
-                }}
-                placeholder={t(
-                  "North Indian, Mughlai, Chinese…",
-                  "नॉर्थ इंडियन, मुग़लई, चाइनीज़…",
-                )}
-                className={inputClass}
-              />
-            </Field>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Cuisines", "व्यंजन शैलियाँ")}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(
+                new Set([...registrationCuisines, ...cuisines]),
+              ).map((c) => (
+                <Chip
+                  key={c}
+                  label={c}
+                  active={cuisines.includes(c)}
+                  onClick={() => {
+                    setCuisines((prev) =>
+                      prev.includes(c)
+                        ? prev.filter((v) => v !== c)
+                        : [...prev, c],
+                    );
+                    setSaved(false);
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1106,6 +1110,32 @@ function CategorySection({
         </div>
       )}
     </div>
+  );
+}
+
+function Chip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={
+        "rounded-full px-4 py-2 text-sm transition-colors " +
+        (active
+          ? "bg-maroon text-cream"
+          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+      }
+    >
+      {label}
+    </button>
   );
 }
 

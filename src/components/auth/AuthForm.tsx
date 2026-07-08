@@ -12,11 +12,12 @@ import {
 } from "@/lib/session";
 import { setAdminSession } from "@/lib/adminAuth";
 import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
+import { Button, controlClass } from "@/components/ui";
 
 type Mode = "login" | "signup" | "forgot";
 
-const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+// Every field uses the shared design-system control styling.
+const inputClass = controlClass;
 
 /** Eye / eye-off icon for the password visibility toggle. */
 function EyeIcon({ off }: { off: boolean }) {
@@ -243,7 +244,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </span>
 
         {isPartner && referralCode && (
-          <div className="mt-5 rounded-xl border border-maroon/30 bg-cream px-4 py-4">
+          <div className="mt-5 rounded-card border border-maroon/30 bg-cream px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Your Referral Code", "आपका रेफ़रल कोड")}
             </p>
@@ -254,26 +255,17 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          <Link
-            href={MERGED_DASHBOARD_PATH}
-            className="w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-          >
+          <Button href={MERGED_DASHBOARD_PATH} size="lg" fullWidth>
             {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
-          </Link>
+          </Button>
           {isVendor && (
-            <Link
-              href="/vendor/register"
-              className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
-            >
+            <Button href="/vendor/register" variant="secondary" size="lg" fullWidth>
               {t("Complete Vendor Registration", "वेंडर रजिस्ट्रेशन पूरा करें")}
-            </Link>
+            </Button>
           )}
-          <Link
-            href="/login"
-            className="w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
-          >
+          <Button href="/login" variant="secondary" size="lg" fullWidth>
             {t("Go to Log In", "लॉग इन पर जाएं")}
-          </Link>
+          </Button>
         </div>
       </div>
     );
@@ -296,12 +288,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           )}
         </p>
         <div className="mt-8">
-          <Link
-            href="/login"
-            className="inline-block w-full rounded-lg border border-maroon px-5 py-3 text-base font-semibold text-maroon transition-colors hover:bg-maroon/5"
-          >
+          <Button href="/login" variant="secondary" size="lg" fullWidth>
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
-          </Link>
+          </Button>
         </div>
       </div>
     );
@@ -353,7 +342,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           <div
             role="radiogroup"
             aria-label={t("Registration type", "रजिस्ट्रेशन प्रकार")}
-            className="grid grid-cols-3 gap-2 rounded-xl border border-cream-3 bg-cream/40 p-1.5"
+            className="grid grid-cols-3 gap-2 rounded-card border border-cream-3 bg-cream/40 p-1.5"
           >
             {([
               {
@@ -381,7 +370,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   aria-checked={active}
                   onClick={() => setAccountType(opt.value)}
                   className={
-                    "flex flex-col items-center rounded-lg px-3 py-2.5 text-center transition-colors " +
+                    "focus-ring flex flex-col items-center rounded-control px-3 py-2.5 text-center transition-colors " +
                     (active
                       ? "bg-maroon text-cream shadow-sm"
                       : "text-ink-soft hover:bg-cream-2")
@@ -440,7 +429,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                       aria-checked={active}
                       onClick={() => setPartnerRole(opt.value)}
                       className={
-                        "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors " +
+                        "focus-ring flex items-start gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors " +
                         (active
                           ? "border-maroon bg-maroon text-cream shadow-sm"
                           : "border-cream-3 bg-cream/40 text-ink hover:border-maroon/40 hover:bg-cream-2")
@@ -580,7 +569,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             {!isSignup && (
               <Link
                 href="/forgot-password"
-                className="text-sm font-medium text-maroon hover:text-maroon-dark"
+                className="text-sm font-medium text-maroon hover:underline"
               >
                 {t("Forgot password?", "पासवर्ड भूल गए?")}
               </Link>
@@ -659,11 +648,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             />
             <span>
               {t("I agree to the", "मैं सहमत हूं")}{" "}
-              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:text-maroon-dark">
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:underline">
                 {t("Terms of Service", "सेवा की शर्तें")}
               </Link>{" "}
               {t("and", "और")}{" "}
-              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:text-maroon-dark">
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-maroon hover:underline">
                 {t("Privacy Policy", "गोपनीयता नीति")}
               </Link>
               {t(".", "से।")}
@@ -681,16 +670,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         )}
 
         {error && (
-          <p className="rounded-lg border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
+          <p className="rounded-control border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
             {error}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-1 w-full rounded-lg bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
-        >
+        <Button type="submit" loading={submitting} size="lg" fullWidth className="mt-1">
           {submitting
             ? t("Please wait…", "कृपया प्रतीक्षा करें…")
             : isSignup
@@ -702,14 +687,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : isForgot
                 ? t("Send Reset Link", "रीसेट लिंक भेजें")
                 : t("Log In", "लॉग इन")}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-8 text-center text-sm text-ink-soft">
         {isForgot ? (
           <Link
             href="/login"
-            className="font-semibold text-maroon hover:text-maroon-dark"
+            className="font-semibold text-maroon hover:underline"
           >
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
           </Link>
@@ -720,7 +705,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
             <Link
               href={isSignup ? "/login" : "/signup"}
-              className="font-semibold text-maroon hover:text-maroon-dark"
+              className="font-semibold text-maroon hover:underline"
             >
               {isSignup
                 ? t("Log in", "लॉग इन")
