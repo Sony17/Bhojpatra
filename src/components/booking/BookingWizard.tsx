@@ -73,6 +73,7 @@ import {
 } from "@/lib/locations";
 import {
   useOccasions,
+  occasionLeadFor,
   OTHER_OCCASION_ID,
   type OccasionOption,
 } from "@/lib/occasions";
@@ -741,10 +742,17 @@ export default function BookingWizard() {
     return picked ? lead : DEFAULT_VENDOR_LEAD_DAYS;
   })();
 
-  // Effective advance notice the chosen date must clear: the fixed package lead
-  // for the tiers, the vendor-derived lead for Custom.
-  const effectiveLeadDays =
+  // The occasion carries its own minimum notice (a wedding needs far more lead
+  // than a birthday) — admin-editable per occasion, resolved from the live list.
+  const occasionLead = occasionLeadFor(occasionId, occasionList);
+  // The package's own notice: the fixed tier lead, or the vendor-derived lead
+  // for Custom.
+  const packageLead =
     packageId === "custom" ? customLeadDays : (packageLeadDays[packageId] ?? 0);
+  // Effective advance notice the chosen date must clear — the stricter of the
+  // package and the occasion. Occasion mapping only ever *raises* the floor, so
+  // "Wedding" can no longer be locked in for tomorrow on a short-lead package.
+  const effectiveLeadDays = Math.max(packageLead, occasionLead);
 
   // Does the chosen date clear that notice? Empty date is treated as fine (the
   // guest hasn't committed one yet). When it falls short we warn and block
@@ -752,18 +760,26 @@ export default function BookingWizard() {
   const daysToEvent = daysUntil(eventDate);
   const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
   const earliestDate = isoAfterDays(effectiveLeadDays);
+  // When the occasion is the binding constraint, name it — otherwise the guest
+  // is told "this package needs 30 days" when it's really the wedding.
+  const leadOccasion = occasionLead > packageLead ? resolveOccasion(occasionId) : undefined;
   const leadWarning =
     eventDate === "" || dateMeetsLead
       ? ""
-      : packageId === "custom"
+      : leadOccasion
         ? t(
-            `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
-            `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
+            `A ${leadOccasion.name} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}.`,
+            `${leadOccasion.nameHi} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें।`,
           )
-        : t(
-            `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
-            `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
-          );
+        : packageId === "custom"
+          ? t(
+              `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
+              `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
+            )
+          : t(
+              `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
+              `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
+            );
 
   const preDiscount = subtotal + addOnsTotal;
   const couponDiscount = appliedCoupon

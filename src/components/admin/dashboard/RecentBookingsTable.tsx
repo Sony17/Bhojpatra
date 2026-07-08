@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
@@ -73,12 +73,14 @@ export default function RecentBookingsTable({
       className={className}
       action={
         seeAllHref ? (
-          <Link
+          <Button
+            variant="ghost"
+            size="sm"
             href={seeAllHref}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-maroon hover:underline"
+            rightIcon={<ArrowRight className="h-4 w-4" />}
           >
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
+            See all
+          </Button>
         ) : undefined
       }
     >

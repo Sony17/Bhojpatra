@@ -220,7 +220,7 @@ export default function CustomerManagement() {
 
 function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-cream-2 p-4">
+    <div className="rounded-card bg-cream-2 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{label}</p>
       <p className="mt-1 font-display text-xl font-bold text-ink">{value}</p>
     </div>

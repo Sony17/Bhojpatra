@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui";
 import { inputClass } from "@/components/admin/shared/FormControls";
 import ImageField from "@/components/admin/shared/ImageField";
 import {
@@ -103,29 +104,25 @@ export default function HomePageTab() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-full border border-cream-3 px-4 py-2 text-xs font-semibold text-ink-soft transition-colors hover:bg-cream-2"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={reset}>
             Reset to defaults
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={cancel}
             disabled={!dirty}
-            className="rounded-full border border-cream-3 px-5 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:opacity-50"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="primary"
             onClick={save}
             disabled={!dirty}
-            className="rounded-full bg-maroon px-5 py-2 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-50"
           >
             Save changes
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -914,13 +911,14 @@ function ItemList<T extends { id: string }>({
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
           {label}s ({items.length})
         </p>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => onChange([...items, makeNew()])}
-          className="text-sm font-semibold text-maroon hover:underline"
         >
           + Add {label.toLowerCase()}
-        </button>
+        </Button>
       </div>
 
       {items.map((item, i) => (
@@ -932,13 +930,14 @@ function ItemList<T extends { id: string }>({
             <span className="text-xs font-medium text-ink-soft">
               {label} {i + 1}
             </span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => onChange(items.filter((_, j) => j !== i))}
-              className="text-xs font-semibold text-maroon hover:underline"
             >
               Remove
-            </button>
+            </Button>
           </div>
           {renderItem(item, (p) =>
             onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x))),

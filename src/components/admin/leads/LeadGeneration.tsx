@@ -10,6 +10,7 @@ import EmptyState from "@/components/admin/shared/EmptyState";
 import LoadingSkeleton from "@/components/admin/shared/LoadingSkeleton";
 import { exportCsv } from "@/components/admin/shared/exportCsv";
 import { Megaphone, Users, Calendar } from "@/components/admin/shared/icons";
+import { Button } from "@/components/ui";
 
 /** One captured lead — mirrors the `Lead` shape from `/api/leads`. */
 interface Lead {
@@ -201,21 +202,21 @@ export default function LeadGeneration() {
         title="Lead Generation"
         subtitle="Contacts captured from promo sign-ups, booking intent and support-chat callback requests."
         actions={
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={handleExport}
             disabled={filtered.length === 0}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
           >
             Export CSV
-          </button>
+          </Button>
         }
       />
 
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-maroon/30 bg-cream-2 px-4 py-3 text-sm text-maroon"
+          className="rounded-card border border-maroon/30 bg-cream-2 px-4 py-3 text-sm text-maroon"
         >
           Couldn&apos;t load leads. Please refresh the page.
         </p>

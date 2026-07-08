@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import TierBadges from "@/components/admin/shared/TierBadges";
 import type { PendingVendorApproval } from "@/lib/admin/types";
@@ -59,7 +60,7 @@ export default function PendingApprovalsPanel({
       }
     >
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-cream-3 bg-white/60 p-8 text-center">
+        <div className="rounded-card border border-dashed border-cream-3 bg-white/60 p-8 text-center">
           <p className="font-display text-base text-ink">All caught up 🎉</p>
           <p className="mt-1 text-sm text-ink-soft">No pending approvals.</p>
         </div>
@@ -68,7 +69,7 @@ export default function PendingApprovalsPanel({
           {items.map((v) => (
             <li
               key={v.id}
-              className="flex flex-col gap-3 rounded-xl border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-card border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -83,20 +84,20 @@ export default function PendingApprovalsPanel({
                 </p>
               </div>
               <div className="flex shrink-0 gap-2.5">
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => resolve(v.id, "approved")}
-                  className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
                 >
                   Approve
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => resolve(v.id, "rejected")}
-                  className="rounded-full border border-cream-3 px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2"
                 >
                   Reject
-                </button>
+                </Button>
               </div>
             </li>
           ))}

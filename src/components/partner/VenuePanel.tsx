@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { cities } from "@/lib/data";
+import { Button, Card, controlClass } from "@/components/ui";
 import {
   VENUE_TYPES,
   parseVenuePrice,
@@ -13,8 +13,7 @@ import {
   type VenueRecord,
 } from "@/lib/venues";
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+const inputClass = "mt-1.5 " + controlClass;
 
 interface VenueForm {
   id: string;
@@ -169,7 +168,7 @@ export default function VenuePanel({
 
   if (!code) {
     return (
-      <div className="rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+      <div className="rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
         <p className="font-display text-lg text-ink">
           {t("Venue listing unavailable", "वेन्यू लिस्टिंग उपलब्ध नहीं")}
         </p>
@@ -186,7 +185,7 @@ export default function VenuePanel({
   return (
     <div className="space-y-6">
       {/* Intro + add button */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink">
             {t("My Venues", "मेरे वेन्यू")}
@@ -199,21 +198,17 @@ export default function VenuePanel({
           </p>
         </div>
         {!showForm && (
-          <button
-            type="button"
-            onClick={startNew}
-            className="shrink-0 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-          >
+          <Button type="button" onClick={startNew} className="shrink-0">
             ＋ {t("Add a venue", "वेन्यू जोड़ें")}
-          </button>
+          </Button>
         )}
-      </div>
+      </Card>
 
       {/* Registration / edit form */}
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-maroon/30 bg-white p-5 shadow-sm sm:p-6"
+          className="rounded-card border border-maroon/30 bg-white p-5 shadow-card sm:p-6"
         >
           <h3 className="font-display text-base font-semibold text-ink">
             {form.id
@@ -333,27 +328,23 @@ export default function VenuePanel({
           {error && <p className="mt-4 text-sm font-medium text-maroon">{error}</p>}
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
-            >
+            <Button type="submit" disabled={saving}>
               {saving
                 ? t("Publishing…", "प्रकाशित हो रहा है…")
                 : form.id
                   ? t("Save changes", "बदलाव सहेजें")
                   : t("Publish venue", "वेन्यू प्रकाशित करें")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => {
                 setShowForm(false);
                 setError("");
               }}
-              className="rounded-full border border-maroon px-6 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
             >
               {t("Cancel", "रद्द करें")}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -362,7 +353,7 @@ export default function VenuePanel({
       {loading ? (
         <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
       ) : venues.length === 0 && !showForm ? (
-        <div className="rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+        <div className="rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
           <p className="font-display text-lg text-ink">
             {t("No venues yet", "अभी कोई वेन्यू नहीं")}
           </p>
@@ -379,9 +370,11 @@ export default function VenuePanel({
             {venues.map((v) => {
               const live = v.status !== "Pending" && v.status !== "Hidden";
               return (
-              <li
+              <Card
+                as="li"
                 key={v.id}
-                className="flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm"
+                padding="none"
+                className="flex flex-col overflow-hidden"
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
                   <Image
@@ -433,25 +426,23 @@ export default function VenuePanel({
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => startEdit(v)}
-                        className="rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                       >
                         {t("Edit", "संपादित करें")}
-                      </button>
+                      </Button>
                       {live && (
-                        <Link
-                          href={`/venues/${v.id}`}
-                          className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream transition hover:bg-maroon-dark"
-                        >
+                        <Button href={`/venues/${v.id}`} size="sm">
                           {t("View", "देखें")}
-                        </Link>
+                        </Button>
                       )}
                     </div>
                   </div>
                 </div>
-              </li>
+              </Card>
               );
             })}
           </ul>

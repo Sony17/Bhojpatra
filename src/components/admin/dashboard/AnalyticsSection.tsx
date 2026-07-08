@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 import StatCard from "@/components/admin/shared/StatCard";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
@@ -49,13 +50,9 @@ export default function AnalyticsSection() {
           <h2 className="font-display text-xl font-semibold text-ink">Reports &amp; Analytics</h2>
           <p className="mt-0.5 text-sm text-ink-soft">Revenue, bookings and performance analytics.</p>
         </div>
-        <button
-          type="button"
-          onClick={onExport}
-          className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
-        >
+        <Button type="button" variant="secondary" onClick={onExport}>
           Export CSV
-        </button>
+        </Button>
       </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />

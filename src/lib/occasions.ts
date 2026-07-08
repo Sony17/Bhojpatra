@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { occasions } from "@/lib/data";
+import { occasions, DEFAULT_OCCASION_LEAD_DAYS } from "@/lib/data";
 
 /**
  * Occasions shown in the Hero + booking pickers.
@@ -11,7 +11,15 @@ import { occasions } from "@/lib/data";
  * to id/name/nameHi — the pickers don't need the icon/image) is the fallback so
  * the pickers keep working before the admin customises anything, or offline.
  */
-export type OccasionOption = { id: string; name: string; nameHi: string };
+export type OccasionOption = {
+  id: string;
+  name: string;
+  nameHi: string;
+  /** Admin-set minimum advance-booking notice (in days) for this occasion. The
+   *  booking flow uses `max(packageLead, occasionLead)`; omitted → the default
+   *  (see `occasionLeadFor`). */
+  leadDays?: number;
+};
 
 /** Sentinel id for the free-text "Other" choice — the customer types their own
  *  occasion when it isn't in the list. */
@@ -22,7 +30,25 @@ export const DEFAULT_OCCASIONS: OccasionOption[] = occasions.map((o) => ({
   id: o.id,
   name: o.name,
   nameHi: o.nameHi,
+  leadDays: o.leadDays,
 }));
+
+/**
+ * Advance-booking notice (in days) a chosen occasion requires. A selected
+ * occasion with no explicit lead — an admin row left blank, or the free-text
+ * "Other" (which isn't in `list`) — falls back to `DEFAULT_OCCASION_LEAD_DAYS`.
+ * No occasion selected yet → 0, so only the package's own lead applies.
+ */
+export function occasionLeadFor(
+  occasionId: string,
+  list: OccasionOption[],
+): number {
+  if (!occasionId) return 0;
+  const found = list.find((o) => o.id === occasionId);
+  return typeof found?.leadDays === "number"
+    ? found.leadDays
+    : DEFAULT_OCCASION_LEAD_DAYS;
+}
 
 /** Slug an admin-entered occasion name into a stable, url-safe id. */
 export function slugifyOccasion(name: string): string {

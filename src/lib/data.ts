@@ -23,6 +23,11 @@ export interface Occasion {
   nameHi: string;
   icon: string; // emoji placeholder until real iconography is supplied
   image: string;
+  /** Minimum advance-booking notice (in days) this occasion requires — bigger
+   *  celebrations need more lead time to source and coordinate. Combined with
+   *  the chosen package's own lead via `max()` in the booking flow. Admin-
+   *  editable; omitted → `DEFAULT_OCCASION_LEAD_DAYS`. */
+  leadDays?: number;
 }
 
 export interface Category {
@@ -158,15 +163,23 @@ export const steps: Step[] = [
 ];
 
 export const occasions: Occasion[] = [
-  { id: "wedding", name: "Wedding", nameHi: "शादी", icon: "💍", image: img("photo-1414235077428-338989a2e8c0") },
-  { id: "engagement", name: "Engagement", nameHi: "सगाई", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf") },
-  { id: "tilak", name: "Tilak", nameHi: "तिलक", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7") },
-  { id: "haldi", name: "Haldi", nameHi: "हल्दी", icon: "🌼", image: img("photo-1606491956689-2ea866880c84") },
-  { id: "mehndi", name: "Mehndi", nameHi: "मेहंदी", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c") },
-  { id: "reception", name: "Reception", nameHi: "रिसेप्शन", icon: "🥂", image: img("photo-1565557623262-b51c2513a641") },
-  { id: "birthday", name: "Birthday Party", nameHi: "बर्थडे पार्टी", icon: "🎂", image: img("photo-1530103862676-de8c9debad1d") },
-  { id: "corporate", name: "Corporate Event", nameHi: "कॉर्पोरेट इवेंट", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4") },
+  { id: "wedding", name: "Wedding", nameHi: "शादी", icon: "💍", image: img("photo-1414235077428-338989a2e8c0"), leadDays: 30 },
+  { id: "engagement", name: "Engagement", nameHi: "सगाई", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf"), leadDays: 21 },
+  { id: "tilak", name: "Tilak", nameHi: "तिलक", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7"), leadDays: 14 },
+  { id: "haldi", name: "Haldi", nameHi: "हल्दी", icon: "🌼", image: img("photo-1606491956689-2ea866880c84"), leadDays: 14 },
+  { id: "mehndi", name: "Mehndi", nameHi: "मेहंदी", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c"), leadDays: 14 },
+  { id: "reception", name: "Reception", nameHi: "रिसेप्शन", icon: "🥂", image: img("photo-1565557623262-b51c2513a641"), leadDays: 21 },
+  { id: "birthday", name: "Birthday Party", nameHi: "बर्थडे पार्टी", icon: "🎂", image: img("photo-1530103862676-de8c9debad1d"), leadDays: 7 },
+  { id: "corporate", name: "Corporate Event", nameHi: "कॉर्पोरेट इवेंट", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4"), leadDays: 7 },
 ];
+
+/**
+ * Fallback advance-booking notice (in days) for an occasion without an explicit
+ * `leadDays` — an admin-added occasion left blank, or the free-text "Other"
+ * choice. Weddings/receptions carry longer leads above; anything unspecified
+ * still needs a week's notice.
+ */
+export const DEFAULT_OCCASION_LEAD_DAYS = 7;
 
 /** A crowd-favourite dish surfaced in the "Trending" panel per occasion. */
 export interface TrendingDish {

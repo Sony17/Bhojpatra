@@ -20,6 +20,7 @@ import {
 } from "@/lib/data";
 import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
+import { Button, Card } from "@/components/ui";
 
 const GALLERY_MAX = 8;
 
@@ -384,29 +385,29 @@ export default function MenuBuilder() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-cream-3 bg-white p-12 text-center shadow-sm">
+      <Card padding="none" className="p-12 text-center">
         <p className="text-sm text-ink-soft">{t("Loading your menu…", "आपका मेन्यू लोड हो रहा है…")}</p>
-      </div>
+      </Card>
     );
   }
 
   if (loadError) {
     return (
-      <div className="rounded-2xl border border-cream-3 bg-white p-12 text-center shadow-sm">
+      <Card padding="none" className="p-12 text-center">
         <p className="font-display text-lg text-ink">
           {t("Couldn't load your menu", "आपका मेन्यू लोड नहीं हो सका")}
         </p>
         <p className="mt-1 text-sm text-ink-soft">
           {t("Refresh the page to try again.", "पुनः प्रयास के लिए पेज रीफ़्रेश करें।")}
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Status band */}
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <Card padding="none" className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-semibold text-ink">
             {t("Menu Builder", "मेन्यू बिल्डर")}
@@ -444,10 +445,10 @@ export default function MenuBuilder() {
             "जो कोर्स आप परोसते हैं उन्हें चुनें, अपनी डिश और प्रति-प्लेट मूल्य जोड़ें। यहाँ प्रकाशित सब कुछ ग्राहकों को बुकिंग विज़ार्ड और वेंडर कैटलॉग में दिखता है।",
           )}
         </p>
-      </div>
+      </Card>
 
       {/* Business basics */}
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <Card padding="none" className="p-5 sm:p-6">
         <h3 className="font-display text-base font-semibold text-ink">
           {t("Business Details", "बिज़नेस विवरण")}
         </h3>
@@ -481,18 +482,17 @@ export default function MenuBuilder() {
               className="sr-only"
               aria-label={t("Upload card photo", "कार्ड फ़ोटो अपलोड करें")}
             />
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => photoInputRef.current?.click()}
               disabled={uploadingPhoto}
-              className="rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {uploadingPhoto
                 ? t("Uploading…", "अपलोड हो रहा है…")
                 : image
                   ? t("Change Photo", "फ़ोटो बदलें")
                   : t("Upload Photo", "फ़ोटो अपलोड करें")}
-            </button>
+            </Button>
             <p className="mt-1.5 text-xs text-ink-soft">
               {t(
                 "Shown on your card in the booking wizard and catalog. JPG, PNG or WebP, up to 5 MB.",
@@ -659,10 +659,10 @@ export default function MenuBuilder() {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Gallery */}
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <Card padding="none" className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-display text-base font-semibold text-ink">
@@ -683,16 +683,15 @@ export default function MenuBuilder() {
             className="sr-only"
             aria-label={t("Add gallery photo", "गैलरी फ़ोटो जोड़ें")}
           />
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => galleryInputRef.current?.click()}
             disabled={uploadingGallery || gallery.length >= GALLERY_MAX}
-            className="rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {uploadingGallery
               ? t("Uploading…", "अपलोड हो रहा है…")
               : `+ ${t("Add Photo", "फ़ोटो जोड़ें")}`}
-          </button>
+          </Button>
         </div>
         {gallery.length === 0 ? (
           <p className="mt-4 text-sm text-ink-soft">
@@ -726,7 +725,7 @@ export default function MenuBuilder() {
             {galleryError}
           </p>
         )}
-      </div>
+      </Card>
 
       {/* Course sections */}
       <div className="space-y-4">
@@ -754,17 +753,16 @@ export default function MenuBuilder() {
       </div>
 
       {/* Save bar */}
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-        <button
-          type="button"
+      <Card padding="none" className="flex flex-wrap items-center gap-4 p-5">
+        <Button
+          variant="primary"
           onClick={onSave}
           disabled={saving}
-          className="rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving
             ? t("Publishing…", "प्रकाशित हो रहा है…")
             : t("Save & Publish Menu", "मेन्यू सहेजें और प्रकाशित करें")}
-        </button>
+        </Button>
         <span className="text-sm text-ink-soft">
           {publishedDishes}{" "}
           {t("dishes across", "डिश,")}{" "}
@@ -788,7 +786,7 @@ export default function MenuBuilder() {
             {saveError}
           </span>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -862,7 +860,7 @@ function CategorySection({
   return (
     <div
       className={
-        "rounded-2xl border bg-white p-5 shadow-sm transition sm:p-6 " +
+        "rounded-card border bg-white p-5 shadow-card transition sm:p-6 " +
         (section.enabled ? "border-maroon" : "border-cream-3")
       }
     >
@@ -1098,14 +1096,13 @@ function CategorySection({
               />
               {draftDiet === "veg" ? t("Veg", "वेज") : t("Non-Veg", "नॉन-वेज")}
             </button>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={submitDraft}
               disabled={!draftName.trim() || section.items.length >= 24}
-              className="rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
             >
               + {t("Add Dish", "डिश जोड़ें")}
-            </button>
+            </Button>
           </div>
         </div>
       )}

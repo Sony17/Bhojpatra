@@ -10,7 +10,16 @@ export const dynamic = "force-dynamic";
 
 const SETTINGS_KEY = "occasions";
 
-type OccasionOption = { id: string; name: string; nameHi: string };
+type OccasionOption = {
+  id: string;
+  name: string;
+  nameHi: string;
+  leadDays?: number;
+};
+
+// Guard against an admin fat-fingering an absurd lead time; a year of notice is
+// well past any real celebration.
+const MAX_LEAD_DAYS = 365;
 
 function slugify(name: string): string {
   return name
@@ -20,10 +29,20 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Coerce an admin-entered lead to a whole, non-negative day count, or `undefined`
+ *  (left blank / invalid) so the booking flow applies its default. */
+function normalizeLead(raw: unknown): number | undefined {
+  if (raw === "" || raw === null || raw === undefined) return undefined;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.min(MAX_LEAD_DAYS, Math.round(n));
+}
+
 const SEED: OccasionOption[] = occasions.map((o) => ({
   id: o.id,
   name: o.name,
   nameHi: o.nameHi,
+  leadDays: o.leadDays,
 }));
 
 async function readOccasions(): Promise<OccasionOption[]> {
@@ -76,7 +95,8 @@ export async function POST(request: Request) {
     let n = 2;
     while (seen.has(id)) id = `${base}-${n++}`;
     seen.add(id);
-    list.push({ id, name, nameHi });
+    const leadDays = normalizeLead(row.leadDays);
+    list.push({ id, name, nameHi, ...(leadDays !== undefined ? { leadDays } : {}) });
   }
 
   if (!list.length) {

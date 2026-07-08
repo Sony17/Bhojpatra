@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import { Bell } from "@/components/admin/shared/icons";
 import type { AdminNotification } from "@/lib/admin/types";
@@ -43,14 +44,14 @@ export default function NotificationsPanel({
             )}
           </h2>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={markAllRead}
           disabled={unread === 0}
-          className="rounded-full border border-maroon px-4 py-1.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Mark all read
-        </button>
+        </Button>
       </div>
 
       <ul className="space-y-3">

@@ -18,6 +18,7 @@ import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
+import { Badge, Button } from "@/components/ui";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { menuCategories } from "@/lib/data";
 import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
@@ -50,22 +51,13 @@ const STATUS_OPTIONS = [
 const CATEGORY_NAME = new Map(menuCategories.map((c) => [c.id, c.name]));
 
 function ModerationBadge({ status }: { status: ModerationStatus }) {
-  const cls =
+  const tone =
     status === "Approved"
-      ? "bg-maroon text-cream"
+      ? "solid"
       : status === "Pending"
-        ? "border border-maroon text-maroon"
-        : "bg-cream-2 text-ink-soft";
-  return (
-    <span
-      className={
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold " +
-        cls
-      }
-    >
-      {status}
-    </span>
-  );
+        ? "outline"
+        : "muted";
+  return <Badge tone={tone}>{status}</Badge>;
 }
 
 export default function MenuModerationConsole() {
@@ -280,22 +272,20 @@ export default function MenuModerationConsole() {
         footer={
           selected && (
             <>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => setModeration(selected.id, "Hidden")}
                 disabled={selected.moderation === "Hidden"}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Hide from Customers
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => setModeration(selected.id, "Approved")}
                 disabled={selected.moderation === "Approved"}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Approve Menu
-              </button>
+              </Button>
             </>
           )
         }

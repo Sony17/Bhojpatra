@@ -8,6 +8,7 @@ import Modal from "@/components/admin/shared/Modal";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { Field, inputClass, Toggle } from "@/components/admin/shared/FormControls";
 import { StarSolid } from "@/components/admin/shared/icons";
+import { Button } from "@/components/ui";
 import type { ContentBanner, ContentTestimonial, ContentFaq } from "@/lib/admin/types";
 import PagesTab from "./PagesTab";
 import ContactInfoTab from "./ContactInfoTab";
@@ -118,7 +119,7 @@ function BannersTab() {
               <label className="flex items-center gap-2 text-xs text-ink-soft">
                 <Toggle checked={b.active} onChange={() => toggle(b.id, b.active)} label={`Toggle ${b.title}`} /> Active
               </label>
-              <button type="button" onClick={() => setDraft(b)} className="text-sm font-semibold text-maroon hover:underline">Edit</button>
+              <Button variant="ghost" size="sm" onClick={() => setDraft(b)}>Edit</Button>
             </div>
           </div>
         </WidgetCard>
@@ -173,7 +174,7 @@ function TestimonialsTab() {
             </label>
           </div>
           <p className="mt-2 text-sm text-ink-soft">&ldquo;{t.quote}&rdquo;</p>
-          <button type="button" onClick={() => setDraft(t)} className="mt-3 text-sm font-semibold text-maroon hover:underline">Edit</button>
+          <Button variant="ghost" size="sm" onClick={() => setDraft(t)} className="mt-3">Edit</Button>
         </WidgetCard>
       ))}
 
@@ -226,7 +227,7 @@ function FaqTab() {
               <Toggle checked={f.visible} onChange={() => toggle(f.id, f.visible)} label={`Toggle FAQ`} /> Visible
             </label>
           </div>
-          <button type="button" onClick={() => setDraft(f)} className="mt-3 text-sm font-semibold text-maroon hover:underline">Edit</button>
+          <Button variant="ghost" size="sm" onClick={() => setDraft(f)} className="mt-3">Edit</Button>
         </WidgetCard>
       ))}
 
@@ -250,8 +251,8 @@ function FaqTab() {
 function SaveCancel({ onCancel, onSave }: { onCancel: () => void; onSave: () => void }) {
   return (
     <>
-      <button type="button" onClick={onCancel} className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2">Cancel</button>
-      <button type="button" onClick={onSave} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark">Save changes</button>
+      <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+      <Button variant="primary" onClick={onSave}>Save changes</Button>
     </>
   );
 }

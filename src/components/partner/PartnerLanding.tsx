@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
-import ThemedSelect from "@/components/ThemedSelect";
+import { Button, Card, Input, Textarea, Select } from "@/components/ui";
 import {
   partnerBenefits,
   partnerSteps,
@@ -13,9 +13,6 @@ import {
   type PartnerStep,
   type PartnerType,
 } from "@/lib/data";
-
-const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
 
 interface EnquiryForm {
   fullName: string;
@@ -123,18 +120,12 @@ export default function PartnerLanding() {
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/signup?type=partner"
-                className="btn-sheen rounded-full bg-maroon px-6 py-3 text-center text-sm font-semibold text-cream shadow-[0_10px_30px_-12px_rgba(185,32,37,0.6)] transition hover:-translate-y-0.5 hover:bg-maroon-dark"
-              >
+              <Button href="/signup?type=partner" variant="primary">
                 {t("Become a Partner", "अभी जुड़ें")}
-              </Link>
-              <Link
-                href="/signup?type=vendor"
-                className="rounded-full border border-maroon/60 bg-white/60 px-6 py-3 text-center text-sm font-semibold text-maroon backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white"
-              >
+              </Button>
+              <Button href="/signup?type=vendor" variant="secondary">
                 {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}
-              </Link>
+              </Button>
             </div>
 
             {/* Quick stat pills */}
@@ -179,13 +170,13 @@ export default function PartnerLanding() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => selectType(type.title)}
-                  className={`flex h-full w-full flex-col rounded-2xl border border-cream-3 bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-6 ${
+                  className={`flex h-full w-full flex-col rounded-card border border-cream-3 bg-white p-4 text-left shadow-card transition hover:-translate-y-1 hover:shadow-pop sm:p-6 ${
                     selected ? "ring-2 ring-maroon" : ""
                   }`}
                 >
                   <span
                     aria-hidden="true"
-                    className="flex h-14 w-14 items-center justify-center rounded-full border border-cream-3 bg-cream/40 text-2xl shadow-sm"
+                    className="flex h-14 w-14 items-center justify-center rounded-full border border-cream-3 bg-cream/40 text-2xl shadow-card"
                   >
                     {type.icon}
                   </span>
@@ -225,13 +216,16 @@ export default function PartnerLanding() {
 
           <ul className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {partnerBenefits.map((benefit: PartnerBenefit) => (
-              <li
+              <Card
+                as="li"
+                interactive
+                padding="none"
                 key={benefit.title}
-                className="flex flex-col rounded-2xl border border-cream-3 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-6"
+                className="flex flex-col p-4 hover:-translate-y-1 sm:p-6"
               >
                 <span
                   aria-hidden="true"
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-cream-3 bg-cream/40 text-2xl shadow-sm [background-image:radial-gradient(circle_at_30%_25%,var(--color-gold-soft)_0%,transparent_70%)]"
+                  className="flex h-14 w-14 items-center justify-center rounded-full border border-cream-3 bg-cream/40 text-2xl shadow-card [background-image:radial-gradient(circle_at_30%_25%,var(--color-gold-soft)_0%,transparent_70%)]"
                 >
                   {benefit.icon}
                 </span>
@@ -241,7 +235,7 @@ export default function PartnerLanding() {
                 <p className="mt-2 text-sm text-ink-soft">
                   {benefit.description}
                 </p>
-              </li>
+              </Card>
             ))}
           </ul>
         </section>
@@ -275,7 +269,7 @@ export default function PartnerLanding() {
               key={step.n}
               className="relative flex flex-col items-center text-center"
             >
-              <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-xl font-bold text-cream shadow-sm ring-4 ring-surface-beige">
+              <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-maroon text-xl font-bold text-cream shadow-card ring-4 ring-surface-beige">
                 {step.n}
               </span>
               <h3 className="font-display mt-5 text-lg font-semibold text-ink">
@@ -311,7 +305,7 @@ export default function PartnerLanding() {
               </p>
             </div>
 
-            <div className="mt-10 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
+            <Card padding="none" className="mt-10 p-4 sm:p-6 lg:p-8">
               {submitted ? (
                 <div className="flex flex-col items-center py-10 text-center">
                   <span
@@ -329,16 +323,16 @@ export default function PartnerLanding() {
                       "हमारी ऑनबोर्डिंग टीम 24 घंटों के भीतर आपको WhatsApp करेगी।"
                     )}
                   </p>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    className="mt-6"
                     onClick={() => {
                       setSubmitted(false);
                       setForm(emptyForm);
                     }}
-                    className="mt-6 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                   >
                     {t("Submit another enquiry", "एक और पूछताछ भेजें")}
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -350,7 +344,7 @@ export default function PartnerLanding() {
                       >
                         {t("Full Name", "पूरा नाम")}
                       </label>
-                      <input
+                      <Input
                         id="fullName"
                         name="fullName"
                         type="text"
@@ -359,7 +353,6 @@ export default function PartnerLanding() {
                         placeholder={t("Enter your full name", "अपना पूरा नाम दर्ज करें")}
                         value={form.fullName}
                         onChange={(e) => update("fullName", e.target.value)}
-                        className={inputClass}
                       />
                     </div>
 
@@ -370,7 +363,7 @@ export default function PartnerLanding() {
                       >
                         {t("Business Name", "व्यवसाय का नाम")}
                       </label>
-                      <input
+                      <Input
                         id="businessName"
                         name="businessName"
                         type="text"
@@ -379,7 +372,6 @@ export default function PartnerLanding() {
                         onChange={(e) =>
                           update("businessName", e.target.value)
                         }
-                        className={inputClass}
                       />
                     </div>
 
@@ -390,7 +382,7 @@ export default function PartnerLanding() {
                       >
                         {t("I want to partner as", "मैं जुड़ना चाहता/चाहती हूँ")}
                       </label>
-                      <ThemedSelect
+                      <Select
                         id="partnerType"
                         name="partnerType"
                         required
@@ -404,7 +396,6 @@ export default function PartnerLanding() {
                           "I want to partner as",
                           "मैं जुड़ना चाहता/चाहती हूँ",
                         )}
-                        buttonClassName={inputClass}
                         options={partnerTypes.map((type) => ({
                           value: type.title,
                           label: type.title,
@@ -416,7 +407,7 @@ export default function PartnerLanding() {
                       <label htmlFor="city" className="text-sm text-ink-soft">
                         {t("City", "शहर")}
                       </label>
-                      <input
+                      <Input
                         id="city"
                         name="city"
                         type="text"
@@ -425,7 +416,6 @@ export default function PartnerLanding() {
                         placeholder={t("Your city", "आपका शहर")}
                         value={form.city}
                         onChange={(e) => update("city", e.target.value)}
-                        className={inputClass}
                       />
                     </div>
 
@@ -436,7 +426,7 @@ export default function PartnerLanding() {
                       >
                         {t("Cuisine / Speciality", "व्यंजन / विशेषता")}
                       </label>
-                      <input
+                      <Input
                         id="speciality"
                         name="speciality"
                         type="text"
@@ -445,7 +435,6 @@ export default function PartnerLanding() {
                         onChange={(e) =>
                           update("speciality", e.target.value)
                         }
-                        className={inputClass}
                       />
                     </div>
 
@@ -456,7 +445,7 @@ export default function PartnerLanding() {
                       >
                         {t("Mobile", "मोबाइल नंबर")}
                       </label>
-                      <input
+                      <Input
                         id="mobile"
                         name="mobile"
                         type="tel"
@@ -465,7 +454,6 @@ export default function PartnerLanding() {
                         placeholder={t("10-digit mobile number", "10 अंकों का मोबाइल नंबर")}
                         value={form.mobile}
                         onChange={(e) => update("mobile", e.target.value)}
-                        className={inputClass}
                       />
                     </div>
 
@@ -476,7 +464,7 @@ export default function PartnerLanding() {
                       >
                         {t("Email", "ईमेल")}
                       </label>
-                      <input
+                      <Input
                         id="email"
                         name="email"
                         type="email"
@@ -485,7 +473,6 @@ export default function PartnerLanding() {
                         placeholder="you@example.com"
                         value={form.email}
                         onChange={(e) => update("email", e.target.value)}
-                        className={inputClass}
                       />
                     </div>
 
@@ -496,7 +483,7 @@ export default function PartnerLanding() {
                       >
                         {t("Message", "संदेश")}
                       </label>
-                      <textarea
+                      <Textarea
                         id="message"
                         name="message"
                         rows={3}
@@ -506,7 +493,6 @@ export default function PartnerLanding() {
                         )}
                         value={form.message}
                         onChange={(e) => update("message", e.target.value)}
-                        className={inputClass}
                       />
                     </div>
                   </div>
@@ -519,24 +505,21 @@ export default function PartnerLanding() {
                   </p>
 
                   <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="submit"
-                      className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-                    >
+                    <Button type="submit" variant="primary">
                       {t("Submit Enquiry", "पूछताछ भेजें")}
-                    </button>
-                    <a
+                    </Button>
+                    <Button
+                      variant="secondary"
                       href={waLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full border border-maroon px-6 py-3 text-center text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                     >
                       {t("Enquire on WhatsApp", "WhatsApp पर पूछताछ करें")}
-                    </a>
+                    </Button>
                   </div>
                 </form>
               )}
-            </div>
+            </Card>
           </div>
         </section>
       </div>
@@ -554,12 +537,9 @@ export default function PartnerLanding() {
             )}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/signup?type=partner"
-              className="rounded-full bg-cream px-6 py-3 text-center text-sm font-semibold text-maroon shadow-sm transition hover:bg-cream-2"
-            >
+            <Button href="/signup?type=partner" variant="inverse">
               {t("Become a Partner", "अभी जुड़ें")}
-            </Link>
+            </Button>
             <Link
               href="/signup?type=vendor"
               className="rounded-full border border-cream px-6 py-3 text-center text-sm font-semibold text-cream transition hover:bg-cream/10"

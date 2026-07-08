@@ -21,6 +21,7 @@ import {
 } from "@/lib/referralRates";
 import type { BookingStatus } from "@/lib/data";
 import VenuePanel from "@/components/partner/VenuePanel";
+import { Badge, Button, Card, type BadgeTone } from "@/components/ui";
 
 /** All partner roles, in display order — used to offer the ones not yet held. */
 const ALL_ROLES: PartnerRole[] = ["planner", "individual", "venue"];
@@ -303,7 +304,7 @@ function RoleSwitcher({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute left-0 z-10 mt-2 w-56 overflow-hidden rounded-xl border border-cream-3 bg-white p-1 shadow-md"
+                className="absolute left-0 z-10 mt-2 w-56 overflow-hidden rounded-card border border-cream-3 bg-white p-1 shadow-pop"
               >
                 {addable.map((r) => (
                   <button
@@ -314,7 +315,7 @@ function RoleSwitcher({
                       setMenuOpen(false);
                       onAdd(r);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-cream-2"
+                    className="flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-cream-2"
                   >
                     <span aria-hidden="true">{ROLE_ICON[r]}</span>
                     {PARTNER_ROLE_LABEL[r]}
@@ -334,7 +335,7 @@ function RoleSwitcher({
 function DashboardHeader({ name, role }: { name?: string; role: string }) {
   const { t } = useLang();
   return (
-    <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+    <Card padding="none" className="p-5 sm:p-6">
       <p className="eyebrow text-sm font-medium text-gold">
         {t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
       </p>
@@ -342,9 +343,9 @@ function DashboardHeader({ name, role }: { name?: string; role: string }) {
         <h1 className="font-display text-2xl text-ink sm:text-3xl">
           {name || t("Welcome", "स्वागत है")}
         </h1>
-        <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+        <Badge tone="solid">
           <span aria-hidden="true">★</span> {role}
-        </span>
+        </Badge>
       </div>
       <p className="font-script mt-2 text-lg text-ink-soft">
         {t(
@@ -352,7 +353,7 @@ function DashboardHeader({ name, role }: { name?: string; role: string }) {
           "भोज रेफ़र करें, बुकिंग ट्रैक करें, अपनी कमाई पाएं।",
         )}
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -429,10 +430,7 @@ function OverviewPanel({
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm"
-          >
+          <Card key={stat.label}>
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-cream text-xl">
               <span aria-hidden="true">{stat.icon}</span>
             </span>
@@ -441,25 +439,21 @@ function OverviewPanel({
             </p>
             <p className="mt-1 text-sm font-medium text-ink">{stat.label}</p>
             <p className="mt-0.5 text-xs text-ink-soft">{stat.sub}</p>
-          </div>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Recent referrals */}
-        <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm lg:col-span-2">
+        <Card className="lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold text-ink">
               {t("Recent Referrals", "हाल के रेफ़रल")}
             </h2>
             {recent.length > 0 && (
-              <button
-                type="button"
-                onClick={onSeeAll}
-                className="text-sm font-semibold text-maroon hover:underline"
-              >
+              <Button variant="ghost" size="sm" onClick={onSeeAll}>
                 {t("See all", "सभी देखें")}
-              </button>
+              </Button>
             )}
           </div>
           {recent.length === 0 ? (
@@ -489,25 +483,26 @@ function OverviewPanel({
               ))}
             </ul>
           )}
-        </div>
+        </Card>
 
         {/* Share card */}
-        <div className="flex flex-col rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+        <Card className="flex flex-col">
           <h2 className="font-display text-lg font-semibold text-ink">
             {t("Your Referral Code", "आपका रेफ़रल कोड")}
           </h2>
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream px-4 py-3">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-control border border-maroon/30 bg-cream px-4 py-3">
             <span className="font-display text-2xl font-bold tracking-wider text-maroon">
               {code || "—"}
             </span>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={copyCode}
               disabled={!code}
-              className="shrink-0 rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:opacity-50"
+              className="shrink-0"
             >
               {copied ? t("Copied!", "कॉपी हुआ!") : t("Copy", "कॉपी करें")}
-            </button>
+            </Button>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
             {t(
@@ -515,14 +510,15 @@ function OverviewPanel({
               "अपना लिंक साझा करें — इससे बुक हर भोज आपके खाते में जुड़ेगा।",
             )}
           </p>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            fullWidth
             onClick={onShare}
-            className="mt-auto w-full rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+            className="mt-auto"
           >
             {t("Share & Earn", "शेयर करें और कमाएं")}
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
     </div>
   );
@@ -558,7 +554,7 @@ function SharePanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+      <Card padding="none" className="p-5 sm:p-6">
         <h2 className="font-display text-lg font-semibold text-ink">
           {t("Share your referral", "अपना रेफ़रल साझा करें")}
         </h2>
@@ -575,16 +571,12 @@ function SharePanel({
             {t("Referral code", "रेफ़रल कोड")}
           </label>
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <span className="font-display rounded-lg border border-maroon/30 bg-cream px-4 py-2 text-xl font-bold tracking-wider text-maroon">
+            <span className="font-display rounded-control border border-maroon/30 bg-cream px-4 py-2 text-xl font-bold tracking-wider text-maroon">
               {code || "—"}
             </span>
-            <button
-              type="button"
-              onClick={() => copy(code, "code")}
-              className="rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-            >
+            <Button variant="secondary" size="sm" onClick={() => copy(code, "code")}>
               {copied === "code" ? t("Copied!", "कॉपी हुआ!") : t("Copy code", "कोड कॉपी करें")}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -597,21 +589,21 @@ function SharePanel({
             <input
               readOnly
               value={link}
-              className="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none sm:flex-1"
+              className="w-full rounded-control border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none sm:flex-1"
             />
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => copy(link, "link")}
-              className="shrink-0 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              className="shrink-0"
             >
               {copied === "link" ? t("Copied!", "कॉपी हुआ!") : t("Copy link", "लिंक कॉपी करें")}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Settlement — earnings are reconciled with the Bhojpatra team. */}
-      <div className="rounded-2xl border border-maroon/30 bg-maroon-soft/30 p-5 sm:p-6">
+      <div className="rounded-card border border-maroon/30 bg-maroon-soft/30 p-5 sm:p-6">
         <h2 className="font-display text-lg font-semibold text-ink">
           {t("Settle your earnings", "अपनी कमाई पाएं")}
         </h2>
@@ -639,15 +631,16 @@ function SharePanel({
                 "आपका कमीशन पुष्ट बुकिंग पर तय होता है। अपना भुगतान पाने के लिए WhatsApp पर Bhojpatra टीम से जुड़ें।",
               )}
         </p>
-        <a
+        <Button
+          variant="primary"
           href={referralPayoutHref(code || "—", name)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+          className="mt-4"
+          leftIcon={<span aria-hidden="true">💬</span>}
         >
-          <span aria-hidden="true">💬</span>
           {t("Connect with Bhojpatra", "Bhojpatra से जुड़ें")}
-        </a>
+        </Button>
       </div>
     </div>
   );
@@ -657,11 +650,11 @@ function SharePanel({
 
 function ReferralStatusBadge({ status }: { status: BookingStatus }) {
   const { t } = useLang();
-  const styles: Record<BookingStatus, string> = {
-    Confirmed: "bg-maroon text-cream",
-    Completed: "bg-maroon text-cream",
-    Pending: "border border-maroon text-maroon",
-    Cancelled: "bg-cream-2 text-ink-soft",
+  const tones: Record<BookingStatus, BadgeTone> = {
+    Confirmed: "solid",
+    Completed: "solid",
+    Pending: "outline",
+    Cancelled: "muted",
   };
   const label: Record<BookingStatus, string> = {
     Confirmed: t("Confirmed", "पुष्ट"),
@@ -669,16 +662,7 @@ function ReferralStatusBadge({ status }: { status: BookingStatus }) {
     Pending: t("Pending", "पेंडिंग"),
     Cancelled: t("Cancelled", "रद्द"),
   };
-  return (
-    <span
-      className={
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold " +
-        styles[status]
-      }
-    >
-      {label[status]}
-    </span>
-  );
+  return <Badge tone={tones[status]}>{label[status]}</Badge>;
 }
 
 function ReferralsPanel({ orders }: { orders: ReferredOrder[] }) {
@@ -687,7 +671,7 @@ function ReferralsPanel({ orders }: { orders: ReferredOrder[] }) {
 
   if (orders.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+      <div className="rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
         <p className="font-display text-lg text-ink">
           {t("No referrals yet", "अभी कोई रेफ़रल नहीं")}
         </p>
@@ -703,16 +687,16 @@ function ReferralsPanel({ orders }: { orders: ReferredOrder[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+      <Card>
         <p className="text-sm font-medium text-ink-soft">
           {t("Total referred value", "कुल रेफ़र मूल्य")}
         </p>
         <p className="mt-1 font-display text-2xl font-bold text-maroon">
           {money(total)}
         </p>
-      </div>
+      </Card>
 
-      <div className="overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
+      <Card padding="none" className="overflow-hidden">
         <div className="hidden grid-cols-12 gap-3 border-b border-cream-3 bg-cream-2 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-soft sm:grid">
           <span className="col-span-4">{t("Customer", "ग्राहक")}</span>
           <span className="col-span-3">{t("Occasion", "अवसर")}</span>
@@ -745,7 +729,7 @@ function ReferralsPanel({ orders }: { orders: ReferredOrder[] }) {
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
     </div>
   );
 }

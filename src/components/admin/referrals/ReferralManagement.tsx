@@ -22,6 +22,7 @@ import {
 } from "@/lib/referralRates";
 import type { PartnerRole } from "@/lib/session";
 import type { BookingStatus } from "@/lib/data";
+import { Button } from "@/components/ui";
 
 /* ── Data shapes (mirror the /api/partners and /api/bookings responses) ───── */
 
@@ -323,14 +324,14 @@ export default function ReferralManagement() {
         title="Referrals"
         subtitle="Track who's driving bookings — Event Planners, Individual Referrers and Venue Owners."
         actions={
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onExport}
             disabled={filtered.length === 0}
-            className="rounded-lg border border-maroon px-4 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5 disabled:opacity-50"
           >
             Export CSV
-          </button>
+          </Button>
         }
       />
 

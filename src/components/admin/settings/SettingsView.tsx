@@ -5,6 +5,7 @@ import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
+import { Button } from "@/components/ui";
 import { adminProfile, businessDetails } from "@/lib/admin/mockData";
 import type { BusinessDetails } from "@/lib/admin/types";
 import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
@@ -35,12 +36,14 @@ export default function SettingsView() {
         <NameListTab
           dataKey="occasions"
           title="Occasions"
-          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Hindi is optional — it defaults to the English name."
+          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Hindi is optional — it defaults to the English name. Lead (days) is the minimum advance notice to book that occasion (weddings need more than a birthday); it’s combined with the package’s own lead — leave blank to use the default (7 days)."
           endpoint="/api/admin/occasions"
           addLabel="+ Add occasion"
           namePlaceholder="e.g. Anniversary"
           nameHiPlaceholder="e.g. सालगिरह"
           emptyError="Add at least one occasion."
+          withLead
+          leadPlaceholder="e.g. 30"
         />
       )}
       {tab === "locations" && (
@@ -82,7 +85,7 @@ function ProfileTab() {
         <Field label="Role"><input className={inputClass} value={adminProfile.role} disabled /></Field>
       </div>
       <div className="mt-5 flex items-center gap-4">
-        <button type="button" onClick={() => setSaved(true)} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark">Save changes</button>
+        <Button type="button" onClick={() => setSaved(true)}>Save changes</Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>
@@ -174,14 +177,13 @@ function ChangePasswordTab() {
       </div>
       {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
       <div className="mt-5 flex items-center gap-4">
-        <button
+        <Button
           type="button"
           disabled={saving}
           onClick={save}
-          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
         >
           {saving ? "Updating…" : "Update password"}
-        </button>
+        </Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>
@@ -207,19 +209,21 @@ function BusinessTab() {
         </div>
       </div>
       <div className="mt-5 flex items-center gap-4">
-        <button type="button" onClick={() => setSaved(true)} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark">Save changes</button>
+        <Button type="button" onClick={() => setSaved(true)}>Save changes</Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>
   );
 }
 
-type NameRow = { id: string; name: string; nameHi: string };
+type NameRow = { id: string; name: string; nameHi: string; leadDays?: number };
 
 /**
  * Reusable editor for a simple admin-managed name list (Occasions, Locations).
  * Loads from `endpoint` (GET returns `{ [dataKey]: NameRow[] }`), lets the admin
  * add / edit / remove rows, and POSTs the cleaned list back under the same key.
+ * When `withLead` is set (Occasions), each row also carries an optional numeric
+ * "Lead (days)" — the minimum advance notice to book that occasion.
  */
 function NameListTab({
   dataKey,
@@ -230,6 +234,8 @@ function NameListTab({
   namePlaceholder,
   nameHiPlaceholder,
   emptyError,
+  withLead = false,
+  leadPlaceholder = "e.g. 7",
 }: {
   dataKey: "occasions" | "locations";
   title: string;
@@ -239,6 +245,8 @@ function NameListTab({
   namePlaceholder: string;
   nameHiPlaceholder: string;
   emptyError: string;
+  withLead?: boolean;
+  leadPlaceholder?: string;
 }) {
   const [rows, setRows] = useState<NameRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -266,6 +274,16 @@ function NameListTab({
 
   const update = (i: number, key: "name" | "nameHi", value: string) => {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)));
+    setSaved(false);
+    setError("");
+  };
+  // Lead is optional and numeric — a blank field clears it so the booking flow
+  // falls back to the default notice.
+  const updateLead = (i: number, value: string) => {
+    const n =
+      value.trim() === "" ? undefined : Math.max(0, Math.round(Number(value)));
+    const leadDays = n !== undefined && Number.isFinite(n) ? n : undefined;
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, leadDays } : r)));
     setSaved(false);
     setError("");
   };
@@ -304,6 +322,11 @@ function NameListTab({
     }
   };
 
+  // Occasions carry an extra numeric lead column; locations keep two columns.
+  const gridCols = withLead
+    ? "sm:grid-cols-[1fr_1fr_7rem_auto]"
+    : "sm:grid-cols-[1fr_1fr_auto]";
+
   return (
     <WidgetCard title={title}>
       <p className="mb-4 text-sm text-ink-soft">{description}</p>
@@ -311,13 +334,16 @@ function NameListTab({
         <p className="text-sm text-ink-soft">Loading…</p>
       ) : (
         <div className="space-y-3">
-          <div className="hidden gap-3 px-1 sm:grid sm:grid-cols-[1fr_1fr_auto]">
+          <div className={"hidden gap-3 px-1 sm:grid " + gridCols}>
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Name (English)</span>
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Name (Hindi)</span>
+            {withLead && (
+              <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Lead (days)</span>
+            )}
             <span className="sr-only">Actions</span>
           </div>
           {rows.map((row, i) => (
-            <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+            <div key={i} className={"grid grid-cols-1 gap-3 sm:items-center " + gridCols}>
               <input
                 className={inputClass}
                 value={row.name}
@@ -332,35 +358,46 @@ function NameListTab({
                 aria-label="Name (Hindi)"
                 onChange={(e) => update(i, "nameHi", e.target.value)}
               />
-              <button
+              {withLead && (
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  className={inputClass}
+                  value={row.leadDays ?? ""}
+                  placeholder={leadPlaceholder}
+                  aria-label={`Lead time in days for ${row.name || "occasion"}`}
+                  onChange={(e) => updateLead(i, e.target.value)}
+                />
+              )}
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => removeRow(i)}
                 aria-label={`Remove ${row.name || "row"}`}
-                className="rounded-full border border-maroon/30 px-4 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
               >
                 Remove
-              </button>
+              </Button>
             </div>
           ))}
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={addRow}
-            className="rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
           >
             {addLabel}
-          </button>
+          </Button>
         </div>
       )}
       {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
       <div className="mt-5 flex items-center gap-4">
-        <button
+        <Button
           type="button"
           disabled={saving}
           onClick={save}
-          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>
@@ -486,10 +523,10 @@ function PaymentsTab() {
             <img
               src={qrImage}
               alt="Uploaded payment QR"
-              className="h-40 w-40 shrink-0 rounded-xl border border-cream-3 bg-white p-2 object-contain"
+              className="h-40 w-40 shrink-0 rounded-card border border-cream-3 bg-white p-2 object-contain"
             />
           ) : (
-            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-3 text-center text-xs text-ink-soft">
+            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-card border border-dashed border-cream-3 bg-cream-2/40 px-3 text-center text-xs text-ink-soft">
               No custom QR — the generated QR is shown to customers.
             </div>
           )}
@@ -507,17 +544,18 @@ function PaymentsTab() {
               />
             </label>
             {qrImage && (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                className="w-fit"
                 onClick={() => {
                   setQrImage("");
                   setSaved(false);
                   setError("");
                 }}
-                className="w-fit rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
               >
                 Remove
-              </button>
+              </Button>
             )}
             <p className="max-w-xs text-xs text-ink-soft">
               PNG, JPEG or WebP up to 400 KB. This is a mock — payments aren’t
@@ -529,9 +567,9 @@ function PaymentsTab() {
 
       {error && <p role="alert" className="mt-3 text-sm font-medium text-maroon">{error}</p>}
       <div className="mt-5 flex items-center gap-4">
-        <button type="button" disabled={saving} onClick={save} className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60">
+        <Button type="button" disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>

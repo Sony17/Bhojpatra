@@ -208,7 +208,7 @@ export default function BookingManagement() {
               )}
             </dl>
 
-            <div className="rounded-xl bg-cream-2 p-4">
+            <div className="rounded-card bg-cream-2 p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-ink-soft">Paid</span>
                 <span className="font-medium text-ink">{money(selected.paid)} / {money(selected.amount)}</span>

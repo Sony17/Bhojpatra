@@ -5,12 +5,14 @@ import {
 import {
   packageLeadDays,
   customOrderLeadDays,
+  occasions as seedOccasions,
+  DEFAULT_OCCASION_LEAD_DAYS,
   type BookingStatus,
 } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
 import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
-import { createStore } from "@/lib/store";
+import { createStore, readSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import type { PartnerRecord } from "@/app/api/partners/route";
@@ -187,10 +189,16 @@ export async function POST(request: Request) {
           .map((v) => (v && typeof v.id === "string" ? v.id : ""))
           .filter(Boolean)
       : [];
-    const requiredLead =
+    const packageOrVendorLead =
       fixedLead !== undefined && packageId !== "custom"
         ? fixedLead
         : customOrderLeadDays(vendorIds);
+    // The stricter of the package/vendor lead and the occasion's own notice —
+    // mirrors the wizard's `max(packageLead, occasionLead)`.
+    const requiredLead = Math.max(
+      packageOrVendorLead,
+      await occasionLeadFromName(typeof occasion === "string" ? occasion : ""),
+    );
     const days = daysUntilISO(iso);
     if (days !== null && days < requiredLead) {
       return Response.json(
@@ -329,6 +337,25 @@ function daysUntilISO(dateStr: string): number | null {
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   return Math.round((target - today) / 86_400_000);
+}
+
+/** The occasion's minimum advance notice (days), matched by name against the
+ *  admin-managed occasions list (falling back to the seed). Server-side backstop
+ *  for the wizard's occasion→date gate, so a wedding can't be slipped past its
+ *  lead by a hand-crafted payload. A free-text / unknown occasion matches
+ *  nothing → 0, deferring entirely to the package/vendor lead. */
+async function occasionLeadFromName(name: string): Promise<number> {
+  const key = name.trim().toLowerCase();
+  if (!key) return 0;
+  const stored = await readSingleton<{
+    occasions: { name?: string; leadDays?: number }[];
+  }>("occasions");
+  const list = stored?.occasions?.length ? stored.occasions : seedOccasions;
+  const match = list.find((o) => (o.name ?? "").trim().toLowerCase() === key);
+  if (!match) return 0;
+  return typeof match.leadDays === "number"
+    ? match.leadDays
+    : DEFAULT_OCCASION_LEAD_DAYS;
 }
 
 /** Shape-check for the chosen service package posted from the booking wizard. */

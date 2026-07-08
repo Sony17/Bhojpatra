@@ -14,6 +14,7 @@ import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import ImageField from "@/components/admin/shared/ImageField";
 import { Rocket } from "@/components/admin/shared/icons";
+import { Button } from "@/components/ui";
 import { isUnoptimized } from "@/lib/homeContent";
 import type { AdminCampaign, CampaignStatus } from "@/lib/admin/types";
 
@@ -177,20 +178,12 @@ export default function CampaignManager() {
       header: "",
       cell: (c) => (
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setDraft(c)}
-            className="text-sm font-semibold text-maroon hover:underline"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setDraft(c)}>
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => setDeleteId(c.id)}
-            className="text-sm font-semibold text-ink-soft hover:underline"
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setDeleteId(c.id)}>
             Delete
-          </button>
+          </Button>
         </div>
       ),
       className: "text-right",
@@ -206,13 +199,9 @@ export default function CampaignManager() {
         title="Campaigns"
         subtitle="Upload a picture to run a popup on the home page. The most recent Active campaign is shown to every visitor."
         actions={
-          <button
-            type="button"
-            onClick={() => setDraft({ ...emptyDraft })}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-          >
+          <Button variant="primary" onClick={() => setDraft({ ...emptyDraft })}>
             + New Campaign
-          </button>
+          </Button>
         }
       />
 
@@ -268,25 +257,21 @@ export default function CampaignManager() {
         footer={
           draft && (
             <>
-              <button
-                type="button"
-                onClick={() => setDraft(null)}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2"
-              >
+              <Button variant="secondary" onClick={() => setDraft(null)}>
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => save(draft)}
-                disabled={saving || !draft.name.trim() || !draft.image.trim()}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
+                loading={saving}
+                disabled={!draft.name.trim() || !draft.image.trim()}
               >
                 {saving
                   ? "Saving…"
                   : editing
                     ? "Save changes"
                     : "Create campaign"}
-              </button>
+              </Button>
             </>
           )
         }

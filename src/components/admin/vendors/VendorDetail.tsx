@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
@@ -52,12 +53,9 @@ export default function VendorDetail({ vendor }: { vendor: AdminVendor | null })
           title="We couldn't find that vendor"
           message="The vendor may have been removed or the link is incorrect."
           action={
-            <Link
-              href="/admin/vendors"
-              className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream transition-colors hover:bg-maroon-dark"
-            >
+            <Button href="/admin/vendors" variant="primary">
               Back to Vendors
-            </Link>
+            </Button>
           }
         />
       </div>
@@ -141,39 +139,23 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
               </span>
             )}
             {status !== "Verified" && (
-              <button
-                type="button"
-                onClick={verify}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-              >
+              <Button variant="primary" onClick={verify}>
                 Verify
-              </button>
+              </Button>
             )}
             {status !== "Rejected" && (
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "reject" })}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2"
-              >
+              <Button variant="secondary" onClick={() => setDialog({ kind: "reject" })}>
                 Reject
-              </button>
+              </Button>
             )}
             {suspended ? (
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "reactivate" })}
-                className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
-              >
+              <Button variant="secondary" onClick={() => setDialog({ kind: "reactivate" })}>
                 Reactivate
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "suspend" })}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2"
-              >
+              <Button variant="secondary" onClick={() => setDialog({ kind: "suspend" })}>
                 Suspend
-              </button>
+              </Button>
             )}
           </div>
         }
@@ -353,22 +335,22 @@ function KycTab({
               <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
             </div>
             <div className="flex shrink-0 gap-2.5">
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => onSetDoc(d.kind, "Verified")}
                 disabled={d.status === "Verified"}
-                className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Verify
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => onSetDoc(d.kind, "Rejected")}
                 disabled={d.status === "Rejected"}
-                className="rounded-full border border-cream-3 px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Reject
-              </button>
+              </Button>
             </div>
           </li>
         ))}

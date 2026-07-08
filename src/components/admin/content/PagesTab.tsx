@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Modal from "@/components/admin/shared/Modal";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
@@ -46,21 +47,23 @@ export default function PagesTab() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-4">
-              <a
+              <Button
+                variant="ghost"
+                size="sm"
                 href={`/${page.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-semibold text-ink-soft hover:underline"
               >
                 View page
-              </a>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={() => setDraft(structuredClone(page))}
-                className="text-sm font-semibold text-maroon hover:underline"
               >
                 Edit
-              </button>
+              </Button>
             </div>
           </div>
         </WidgetCard>
@@ -145,31 +148,33 @@ function PageForm({
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Sections
           </p>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={addSection}
-            className="text-sm font-semibold text-maroon hover:underline"
           >
             + Add section
-          </button>
+          </Button>
         </div>
 
         {draft.sections.map((section, i) => (
           <div
             key={section.id}
-            className="space-y-3 rounded-lg border border-cream-3 bg-cream/30 p-4"
+            className="space-y-3 rounded-card border border-cream-3 bg-cream/30 p-4"
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-ink-soft">
                 Section {i + 1}
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={() => removeSection(section.id)}
-                className="text-xs font-semibold text-maroon hover:underline"
               >
                 Remove
-              </button>
+              </Button>
             </div>
             <Field label="Heading">
               <input
@@ -206,20 +211,12 @@ function SaveCancel({
 }) {
   return (
     <>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2"
-      >
+      <Button variant="secondary" type="button" onClick={onCancel}>
         Cancel
-      </button>
-      <button
-        type="button"
-        onClick={onSave}
-        className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-      >
+      </Button>
+      <Button variant="primary" type="button" onClick={onSave}>
         Save changes
-      </button>
+      </Button>
     </>
   );
 }

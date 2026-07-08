@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import { Field, Toggle, inputClass } from "@/components/admin/shared/FormControls";
+import { Button } from "@/components/ui";
 import type { ServicePackage } from "@/lib/data";
 
 /**
@@ -189,13 +190,9 @@ export default function ServicesView() {
               key={i}
               title={row.name.trim() || `Package ${i + 1}`}
               action={
-                <button
-                  type="button"
-                  onClick={() => removeRow(i)}
-                  className="rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
-                >
+                <Button variant="secondary" size="sm" onClick={() => removeRow(i)}>
                   Remove
-                </button>
+                </Button>
               }
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -318,13 +315,9 @@ export default function ServicesView() {
             </WidgetCard>
           ))}
 
-          <button
-            type="button"
-            onClick={addRow}
-            className="rounded-full border border-maroon/30 px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5"
-          >
+          <Button variant="secondary" size="sm" onClick={addRow}>
             + Add service package
-          </button>
+          </Button>
         </div>
       )}
 
@@ -334,14 +327,9 @@ export default function ServicesView() {
         </p>
       )}
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={save}
-          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
-        >
+        <Button variant="primary" disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
         {saved && (
           <span
             role="status"

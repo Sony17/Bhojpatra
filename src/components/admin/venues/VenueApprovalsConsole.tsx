@@ -18,6 +18,7 @@ import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
+import { Button } from "@/components/ui";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import {
   venueCityName,
@@ -271,22 +272,20 @@ export default function VenueApprovalsConsole() {
         footer={
           selected && (
             <>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => setVenueStatus(selected.id, "Hidden")}
                 disabled={selected.status === "Hidden"}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Hide from Customers
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => setVenueStatus(selected.id, "Approved")}
                 disabled={selected.status === "Approved"}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Approve Venue
-              </button>
+              </Button>
             </>
           )
         }

@@ -33,7 +33,7 @@ async function uploadReviewPhoto(file: File): Promise<string> {
 }
 
 const thumbBox =
-  "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-cream-3 bg-cream-2";
+  "relative h-16 w-16 shrink-0 overflow-hidden rounded-control border border-cream-3 bg-cream-2";
 
 export function ReviewPhotoEditor({
   images,
@@ -93,7 +93,7 @@ export function ReviewPhotoEditor({
               type="button"
               onClick={() => onChange(images.filter((u) => u !== url))}
               aria-label={t("Remove photo", "फ़ोटो हटाएं")}
-              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-maroon text-cream shadow-sm"
+              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-maroon text-cream shadow-card"
             >
               <span aria-hidden="true" className="text-xs leading-none">×</span>
             </button>
@@ -102,7 +102,7 @@ export function ReviewPhotoEditor({
         {images.length < REVIEW_IMAGES_MAX && (
           <label
             className={
-              "flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-cream-3 text-maroon transition-colors hover:bg-cream-2 " +
+              "flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-control border border-dashed border-cream-3 text-maroon transition-colors hover:bg-cream-2 " +
               (busy ? "pointer-events-none opacity-60" : "")
             }
           >

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
   cities,
   indianStates,
@@ -11,11 +10,12 @@ import {
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import ThemedSelect from "@/components/ThemedSelect";
+import { Badge, Button, Card, Chip as UIChip } from "@/components/ui";
 
 const WHATSAPP = "https://wa.me/919918359017";
 
 const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+  "w-full rounded-control border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
 
 const labelClass = "text-sm text-ink-soft";
 
@@ -61,19 +61,9 @@ function Chip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "rounded-full px-4 py-2 text-sm transition-colors " +
-        (active
-          ? "bg-maroon text-cream"
-          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-      }
-    >
+    <UIChip selected={active} onClick={onClick}>
       {label}
-    </button>
+    </UIChip>
   );
 }
 
@@ -111,14 +101,14 @@ function CustomAdder({
         placeholder={placeholder}
         className={inputClass + " max-w-xs"}
       />
-      <button
+      <Button
         type="button"
+        variant="secondary"
         onClick={submit}
         disabled={!draft.trim()}
-        className="rounded-full border border-maroon px-5 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40"
       >
         + {t("Add", "जोड़ें")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -514,7 +504,7 @@ export default function VendorRegister() {
   if (submitted) {
     return (
       <section className="mx-auto max-w-3xl px-5 py-12 sm:py-16">
-        <div className="rounded-2xl border border-cream-3 bg-white p-8 text-center shadow-sm sm:p-12">
+        <Card padding="none" className="p-8 text-center sm:p-12">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
             ✓
           </div>
@@ -534,22 +524,20 @@ export default function VendorRegister() {
             </span>
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/vendor/dashboard"
-              className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-            >
+            <Button href="/vendor/dashboard" variant="primary" size="lg">
               {t("Go to Dashboard", "डैशबोर्ड पर जाएं")}
-            </Link>
-            <a
+            </Button>
+            <Button
               href={WHATSAPP}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+              variant="secondary"
+              size="lg"
             >
               {t("Contact Support on WhatsApp", "व्हाट्सएप पर सहायता से संपर्क करें")}
-            </a>
+            </Button>
           </div>
-        </div>
+        </Card>
       </section>
     );
   }
@@ -574,7 +562,7 @@ export default function VendorRegister() {
       </header>
 
       {/* Free / admin-controlled note */}
-      <div className="mt-6 rounded-2xl border border-cream-3 bg-surface-beige p-5 shadow-sm">
+      <div className="mt-6 rounded-card border border-cream-3 bg-surface-beige p-5 shadow-card">
         <p className="font-display text-sm font-semibold text-ink">
           {t("Registration is free", "रजिस्ट्रेशन निःशुल्क है")}
         </p>
@@ -627,7 +615,7 @@ export default function VendorRegister() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-6 lg:p-8"
+        className="mt-8 rounded-card border border-cream-3 bg-white p-4 shadow-card sm:p-6 lg:p-8"
       >
         {/* ── STEP 1 ── */}
         {step === 0 && (
@@ -755,7 +743,7 @@ export default function VendorRegister() {
 
             {/* Optional Google reputation — surfaced as a "Google" badge on the
                 caterer's card so a new listing isn't a blank "New". */}
-            <div className="flex flex-col gap-2 rounded-xl border border-cream-3 bg-cream/30 p-4">
+            <div className="flex flex-col gap-2 rounded-card border border-cream-3 bg-cream/30 p-4">
               <span className={labelClass}>
                 {t("Google Reviews (optional)", "गूगल रिव्यू (वैकल्पिक)")}
               </span>
@@ -822,7 +810,7 @@ export default function VendorRegister() {
                     <label
                       htmlFor={`doc-${doc.key}`}
                       className={
-                        "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center transition-colors hover:border-maroon hover:bg-cream/60 " +
+                        "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-control border border-dashed px-4 py-6 text-center transition-colors hover:border-maroon hover:bg-cream/60 " +
                         (failed
                           ? "border-maroon bg-maroon/5"
                           : "border-cream-3 bg-cream/40")
@@ -889,16 +877,16 @@ export default function VendorRegister() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 rounded-lg bg-cream/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="flex flex-col gap-2 rounded-card bg-cream/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <p className="text-sm text-ink-soft">
                 {t(
                   "Your documents are reviewed by the Bhojpatra admin for verification.",
                   "वेरिफिकेशन के लिए आपके दस्तावेज़ों की समीक्षा भोजपत्र एडमिन द्वारा की जाती है।",
                 )}
               </p>
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream-3 px-3 py-1 text-xs font-semibold text-ink">
+              <Badge tone="soft" className="shrink-0">
                 {t("Verification Status: Pending", "वेरिफिकेशन स्थिति: पेंडिंग")}
-              </span>
+              </Badge>
             </div>
             <p className="text-xs text-ink-soft/70">
               {t(
@@ -920,7 +908,7 @@ export default function VendorRegister() {
               {packages.map((pkg, i) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-cream-3 bg-cream/30 p-4"
+                  className="rounded-card border border-cream-3 bg-cream/30 p-4"
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-ink">
@@ -986,13 +974,14 @@ export default function VendorRegister() {
                 </div>
               ))}
 
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={addPackage}
-                className="self-start rounded-full border border-maroon px-6 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+                className="self-start"
               >
                 {t("+ Add Package", "+ पैकेज जोड़ें")}
-              </button>
+              </Button>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -1064,7 +1053,7 @@ export default function VendorRegister() {
               <span className={labelClass}>{t("Photo Gallery", "फ़ोटो गैलरी")}</span>
               <label
                 htmlFor="gallery"
-                className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-cream-3 bg-cream/40 px-4 py-8 text-center transition-colors hover:border-maroon hover:bg-cream/60"
+                className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-control border border-dashed border-cream-3 bg-cream/40 px-4 py-8 text-center transition-colors hover:border-maroon hover:bg-cream/60"
               >
                 <span aria-hidden="true" className="text-2xl text-maroon">
                   🖼
@@ -1247,7 +1236,7 @@ export default function VendorRegister() {
               />
             </dl>
 
-            <div className="rounded-lg bg-cream/40 px-4 py-3">
+            <div className="rounded-card bg-cream/40 px-4 py-3">
               <p className="text-sm text-ink-soft">
                 {t("By submitting, your application enters the admin review queue. Verification status starts as", "सबमिट करने पर, आपका आवेदन एडमिन समीक्षा कतार में आ जाता है। वेरिफिकेशन स्थिति शुरू होती है")}{" "}
                 <span className="font-semibold text-ink">
@@ -1261,40 +1250,49 @@ export default function VendorRegister() {
 
         {/* error */}
         {error && (
-          <p className="mt-5 rounded-lg bg-maroon/10 px-4 py-2.5 text-sm font-medium text-maroon">
+          <p className="mt-5 rounded-control bg-maroon/10 px-4 py-2.5 text-sm font-medium text-maroon">
             {error}
           </p>
         )}
 
         {/* nav */}
         <div className="mt-8 flex flex-col gap-2 border-t border-cream-3 pt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="lg"
+            fullWidth
             onClick={back}
             disabled={step === 0}
-            className="w-full rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+            className="sm:w-auto"
           >
             {t("Back", "पीछे")}
-          </button>
+          </Button>
 
           {step < STEPS.length - 1 ? (
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="lg"
+              fullWidth
               onClick={next}
-              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:w-auto"
+              className="sm:w-auto"
             >
               {t("Next", "आगे")}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
               disabled={submitting}
-              className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="sm:w-auto"
             >
               {submitting
                 ? t("Submitting…", "सबमिट हो रहा है…")
                 : t("Submit Application", "आवेदन सबमिट करें")}
-            </button>
+            </Button>
           )}
         </div>
       </form>

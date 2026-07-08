@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { decodeInvoice, downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
+import { Button } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
 
 /**
@@ -31,12 +31,9 @@ export default function InvoiceViewer() {
             "यह इनवॉइस लिंक अधूरा या समाप्त हो गया है। कृपया नया लिंक माँगें।",
           )}
         </p>
-        <Link
-          href="/"
-          className="mt-6 inline-block rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream transition hover:bg-maroon-dark"
-        >
+        <Button href="/" variant="primary" className="mt-6">
           {t("Back to Bhojpatra", "भोजपत्र पर वापस")}
-        </Link>
+        </Button>
       </div>
     );
   }
@@ -59,21 +56,21 @@ export default function InvoiceViewer() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => downloadInvoice(data)}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
           >
             {t("Download PDF", "PDF डाउनलोड")}
-          </button>
-          <a
+          </Button>
+          <Button
             href={waHref}
+            variant="secondary"
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
           >
             {t("Share", "साझा करें")}
-          </a>
+          </Button>
         </div>
       </div>
 

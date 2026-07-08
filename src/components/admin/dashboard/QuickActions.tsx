@@ -23,7 +23,7 @@ export default function QuickActions({ actions, className }: QuickActionsProps) 
             <Link
               key={a.label}
               href={a.href}
-              className="group flex items-center gap-3 rounded-xl border border-cream-3 px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-maroon/40 hover:bg-cream-2"
+              className="group flex items-center gap-3 rounded-card border border-cream-3 px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-maroon/40 hover:bg-cream-2"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cream text-maroon">
                 <Icon className="h-4 w-4" />

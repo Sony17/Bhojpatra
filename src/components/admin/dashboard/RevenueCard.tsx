@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import { money } from "@/components/admin/shared/money";
 import type { RevenueSummary } from "@/lib/admin/types";
@@ -30,16 +30,13 @@ export default function RevenueCard({
       className={className}
       action={
         detailsHref ? (
-          <Link
-            href={detailsHref}
-            className="text-sm font-semibold text-maroon hover:underline"
-          >
+          <Button variant="ghost" size="sm" href={detailsHref}>
             Details
-          </Link>
+          </Button>
         ) : undefined
       }
     >
-      <div className="rounded-xl bg-cream-2 p-4">
+      <div className="rounded-card bg-cream-2 p-4">
         <p className="text-sm text-ink-soft">Total Revenue</p>
         <p className="mt-1 font-display text-3xl font-bold text-ink">
           {money(data.total)}

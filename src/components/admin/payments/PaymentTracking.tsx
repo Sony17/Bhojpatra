@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -230,13 +231,9 @@ function SettlementsTab() {
       header: "",
       cell: (s) =>
         s.status === "Pending" ? (
-          <button
-            type="button"
-            onClick={() => settle(s.id)}
-            className="rounded-full bg-maroon px-4 py-1.5 text-xs font-semibold text-cream transition-colors hover:bg-maroon-dark"
-          >
+          <Button variant="primary" size="sm" onClick={() => settle(s.id)}>
             Settle
-          </button>
+          </Button>
         ) : (
           <span className="text-xs text-ink-soft">—</span>
         ),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import {
@@ -143,14 +144,13 @@ export default function ReferralRatesCard({
         </p>
       )}
       <div className="mt-5 flex items-center gap-4">
-        <button
-          type="button"
+        <Button
+          variant="primary"
           disabled={saving || loading}
           onClick={save}
-          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
         {saved && (
           <span
             role="status"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import {
@@ -128,13 +129,9 @@ export default function ContactInfoTab() {
       </div>
 
       <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          onClick={save}
-          className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-        >
+        <Button type="button" variant="primary" onClick={save}>
           Save changes
-        </button>
+        </Button>
       </div>
     </WidgetCard>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -298,22 +299,22 @@ export default function ApprovalsConsole() {
         footer={
           selected && (
             <>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setAppStatus(selected.id, "Rejected")}
                 disabled={selected.status === "Rejected"}
-                className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Reject
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary"
                 onClick={() => setAppStatus(selected.id, "Verified")}
                 disabled={selected.status === "Verified"}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Approve Vendor
-              </button>
+              </Button>
             </>
           )
         }
@@ -352,7 +353,7 @@ export default function ApprovalsConsole() {
                   return (
                     <label
                       key={t}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-control border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
                     >
                       <input
                         type="checkbox"
@@ -376,7 +377,7 @@ export default function ApprovalsConsole() {
                 {selected.documents.map((d) => (
                   <li
                     key={d.kind}
-                    className="flex flex-col gap-3 rounded-xl border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-card border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -386,22 +387,24 @@ export default function ApprovalsConsole() {
                       <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
                     </div>
                     <div className="flex shrink-0 gap-2.5">
-                      <button
+                      <Button
                         type="button"
+                        variant="primary"
+                        size="sm"
                         onClick={() => setDocStatus(selected.id, d.kind, "Verified")}
                         disabled={d.status === "Verified"}
-                        className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Verify
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setDocStatus(selected.id, d.kind, "Rejected")}
                         disabled={d.status === "Rejected"}
-                        className="rounded-full border border-cream-3 px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Reject
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}

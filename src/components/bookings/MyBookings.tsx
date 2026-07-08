@@ -17,6 +17,14 @@ import {
 import type { EmiPlan } from "@/lib/emi";
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
+import {
+  Button,
+  type ButtonVariant,
+  Card,
+  Chip,
+  Input,
+  Textarea,
+} from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
 import StarInput from "@/components/reviews/StarInput";
 
@@ -219,20 +227,13 @@ export default function MyBookings() {
       {/* Filter chips */}
       <div className="mt-8 flex flex-wrap gap-2.5">
         {FILTERS.map((f) => (
-          <button
+          <Chip
             key={f}
-            type="button"
+            selected={filter === f}
             onClick={() => setFilter(f)}
-            aria-pressed={filter === f}
-            className={
-              "rounded-full px-5 py-2 text-sm font-medium transition-colors " +
-              (filter === f
-                ? "bg-maroon text-cream"
-                : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-            }
           >
             {t(f, STATUS_HI[f])}
-          </button>
+          </Chip>
         ))}
       </div>
 
@@ -249,7 +250,7 @@ export default function MyBookings() {
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-12 text-center">
+        <div className="mt-6 rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
           <p className="font-display text-lg text-ink">
             {t("No bookings here", "यहाँ कोई बुकिंग नहीं")}
           </p>
@@ -280,14 +281,14 @@ export default function MyBookings() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+    <Card>
       <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
         {label}
       </p>
       <p className="font-display mt-2 text-2xl font-semibold text-maroon">
         {value}
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -383,29 +384,27 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
               ? t("Mark this event as complete?", "इस इवेंट को पूर्ण चिह्नित करें?")
               : t("Reopen this booking?", "इस बुकिंग को फिर से खोलें?")}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={apply}
             disabled={busy}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
           >
             {busy
               ? t("Saving…", "सहेज रहे हैं…")
               : completing
                 ? t("Yes, it's done", "हाँ, हो गया")
                 : t("Yes, reopen", "हाँ, फिर से खोलें")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => {
               setConfirming(false);
               setError("");
             }}
             disabled={busy}
-            className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline disabled:opacity-60"
           >
             {t("Not yet", "अभी नहीं")}
-          </button>
+          </Button>
         </div>
         {error && <p className="text-xs font-medium text-maroon">{error}</p>}
       </div>
@@ -413,21 +412,15 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant={completing ? "primary" : "secondary"}
       onClick={() => setConfirming(true)}
-      className={
-        "inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-sm font-semibold transition " +
-        (completing
-          ? "bg-maroon text-cream shadow-sm hover:bg-maroon-dark"
-          : "border border-maroon text-maroon hover:bg-maroon/5")
-      }
+      leftIcon={<span aria-hidden="true">{completing ? "✓" : "↩"}</span>}
     >
-      <span aria-hidden="true">{completing ? "✓" : "↩"}</span>
       {completing
         ? t("Mark as Complete", "पूर्ण चिह्नित करें")
         : t("Reopen booking", "बुकिंग फिर से खोलें")}
-    </button>
+    </Button>
   );
 }
 
@@ -481,49 +474,36 @@ function ConfirmAction({
       <div className="flex flex-col items-start gap-1.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="text-sm text-ink-soft">{prompt}</span>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={apply}
             disabled={busy}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
           >
             {busy ? t("Saving…", "सहेज रहे हैं…") : confirmLabel}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => {
               setConfirming(false);
               setError("");
             }}
             disabled={busy}
-            className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline disabled:opacity-60"
           >
             {t("Not yet", "अभी नहीं")}
-          </button>
+          </Button>
         </div>
         {error && <p className="text-xs font-medium text-maroon">{error}</p>}
       </div>
     );
   }
 
-  const triggerCls =
-    tone === "solid"
-      ? "bg-maroon text-cream shadow-sm hover:bg-maroon-dark"
-      : tone === "outline"
-        ? "border border-maroon text-maroon hover:bg-maroon/5"
-        : "text-ink-soft hover:bg-cream-2";
+  const triggerVariant: ButtonVariant =
+    tone === "solid" ? "primary" : tone === "outline" ? "secondary" : "ghost";
 
   return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      className={
-        "inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-sm font-semibold transition " +
-        triggerCls
-      }
-    >
+    <Button variant={triggerVariant} onClick={() => setConfirming(true)}>
       {triggerLabel}
-    </button>
+    </Button>
   );
 }
 
@@ -633,12 +613,7 @@ function BookingCard({
       : 0;
 
   return (
-    <li
-      className={
-        "rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6 " +
-        (cancelled ? "opacity-75" : "")
-      }
-    >
+    <Card as="li" className={"sm:p-6 " + (cancelled ? "opacity-75" : "")}>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         {/* Details */}
         <div className="min-w-0 flex-1">
@@ -739,13 +714,9 @@ function BookingCard({
       {/* Actions */}
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-cream-3 pt-4">
         {booking.status === "Pending" && <PayBalanceButton booking={booking} />}
-        <button
-          type="button"
-          onClick={onView}
-          className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-        >
+        <Button variant="secondary" onClick={onView}>
           {t("View Details", "विवरण देखें")}
-        </button>
+        </Button>
         <DownloadMenu booking={booking} />
         {(booking.status === "Pending" || booking.status === "Confirmed") && (
           <CancelBookingButton booking={booking} />
@@ -764,28 +735,23 @@ function BookingCard({
                     `आपने 5 में से ${booking.review.rating} स्टार दिए`,
                   )}
                 />
-                <button
-                  type="button"
-                  onClick={onReview}
-                  className="text-sm font-semibold text-maroon underline-offset-2 transition hover:underline"
-                >
+                <Button variant="ghost" onClick={onReview}>
                   {t("Edit review", "समीक्षा संपादित करें")}
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={onReview}
-                className="inline-flex items-center gap-1.5 rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+                leftIcon={<span aria-hidden="true">★</span>}
               >
-                <span aria-hidden="true">★</span>
                 {t("Rate your experience", "अपना अनुभव रेट करें")}
-              </button>
+              </Button>
             ))}
           <CompleteToggle booking={booking} />
         </div>
       </div>
-    </li>
+    </Card>
   );
 }
 
@@ -818,11 +784,6 @@ function DownloadMenu({
     };
   }, [open]);
 
-  const trigger =
-    variant === "solid"
-      ? "bg-maroon text-cream shadow-sm hover:bg-maroon-dark"
-      : "border border-maroon text-maroon hover:bg-maroon/5";
-
   const choose = (fn: () => void) => () => {
     fn();
     setOpen(false);
@@ -830,25 +791,23 @@ function DownloadMenu({
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
+      <Button
+        variant={variant === "solid" ? "primary" : "secondary"}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={
-          "inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition " +
-          trigger
+        rightIcon={
+          <span aria-hidden="true" className="text-xs">
+            ▾
+          </span>
         }
       >
         {t("Download", "डाउनलोड")}
-        <span aria-hidden="true" className="text-xs">
-          ▾
-        </span>
-      </button>
+      </Button>
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-cream-3 bg-white py-1 shadow-lg"
+          className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-card border border-cream-3 bg-white py-1 shadow-modal"
         >
           {/* Transaction ID — the reference for the online payment on this
               order, shown for quick copy. Absent on COD / unpaid orders. */}
@@ -961,11 +920,11 @@ function BookingDetailsModal({
       onClick={onClose}
     >
       <div
-        className="relative my-4 w-full max-w-2xl rounded-2xl bg-white shadow-2xl"
+        className="relative my-4 w-full max-w-2xl rounded-card bg-white shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sticky header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-t-2xl border-b border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-t-card border-b border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="font-display truncate text-xl font-semibold text-ink">
@@ -1036,33 +995,25 @@ function BookingDetailsModal({
 
         {/* Footer actions */}
         {!editing && (
-          <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-b-2xl border-t border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+          <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-b-card border-t border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
             <DownloadMenu booking={booking} variant="solid" />
-            <a
+            <Button
+              variant="secondary"
               href={waHref}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+              leftIcon={<span aria-hidden="true">🟢</span>}
             >
-              <span aria-hidden="true">🟢</span>
               {t("Share on WhatsApp", "व्हाट्सएप पर साझा करें")}
-            </a>
-            <button
-              type="button"
-              onClick={copyLink}
-              className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={copyLink}>
               {copied ? t("Link copied ✓", "लिंक कॉपी ✓") : t("Copy link", "लिंक कॉपी करें")}
-            </button>
+            </Button>
             <div className="ml-auto flex flex-wrap items-center gap-3">
               {editable && (
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-                >
+                <Button variant="secondary" onClick={() => setEditing(true)}>
                   {t("Edit Booking", "बुकिंग संपादित करें")}
-                </button>
+                </Button>
               )}
               {booking.status === "Pending" && (
                 <PayBalanceButton booking={booking} />
@@ -1133,8 +1084,6 @@ function EditBookingForm({
     onDone();
   };
 
-  const fieldCls =
-    "mt-1 w-full rounded-lg border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
   const labelCls =
     "text-[11px] font-semibold uppercase tracking-wide text-maroon";
 
@@ -1146,55 +1095,55 @@ function EditBookingForm({
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block">
           <span className={labelCls}>{t("Occasion", "अवसर")}</span>
-          <input
+          <Input
             type="text"
             value={occasion}
             onChange={(e) => setOccasion(e.target.value)}
-            className={fieldCls}
+            className="mt-1"
           />
         </label>
         <label className="block">
           <span className={labelCls}>{t("Event Date", "इवेंट तिथि")}</span>
-          <input
+          <Input
             type="date"
             value={dateISO}
             onChange={(e) => setDateISO(e.target.value)}
-            className={fieldCls}
+            className="mt-1"
           />
         </label>
         <label className="block">
           <span className={labelCls}>{t("Guests", "मेहमान")}</span>
-          <input
+          <Input
             type="number"
             min={1}
             value={guests}
             onChange={(e) => setGuests(e.target.value)}
-            className={fieldCls}
+            className="mt-1"
           />
         </label>
         <label className="block">
           <span className={labelCls}>{t("City", "शहर")}</span>
-          <input
+          <Input
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className={fieldCls}
+            className="mt-1"
           />
         </label>
         <label className="block sm:col-span-2">
           <span className={labelCls}>{t("Venue", "वेन्यू")}</span>
-          <input
+          <Input
             type="text"
             value={venue}
             onChange={(e) => setVenue(e.target.value)}
-            className={fieldCls}
+            className="mt-1"
           />
         </label>
         <label className="block sm:col-span-2">
           <span className={labelCls}>
             {t("Special Requests", "विशेष अनुरोध")}
           </span>
-          <textarea
+          <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
@@ -1202,7 +1151,7 @@ function EditBookingForm({
               "Dietary notes, timing, decor preferences…",
               "आहार संबंधी नोट्स, समय, सजावट प्राथमिकताएँ…",
             )}
-            className={fieldCls + " resize-none"}
+            className="mt-1 resize-none"
           />
         </label>
       </div>
@@ -1217,20 +1166,12 @@ function EditBookingForm({
       {error && <p className="mt-2 text-sm font-medium text-maroon">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={save}
-          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-        >
+        <Button variant="primary" onClick={save}>
           {t("Save Changes", "बदलाव सहेजें")}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
-        >
+        </Button>
+        <Button variant="secondary" onClick={onDone}>
           {t("Cancel", "रद्द करें")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1388,8 +1329,6 @@ function ReviewModal({
     }
   };
 
-  const fieldCls =
-    "mt-1 w-full rounded-lg border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
   const labelCls =
     "text-[11px] font-semibold uppercase tracking-wide text-maroon";
 
@@ -1402,7 +1341,7 @@ function ReviewModal({
       onClick={onClose}
     >
       <div
-        className="relative my-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+        className="relative my-4 w-full max-w-lg rounded-card bg-white shadow-modal"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -1457,7 +1396,7 @@ function ReviewModal({
                       }
                     />
                   </div>
-                  <textarea
+                  <Textarea
                     value={draft.comment}
                     onChange={(e) => setComment(key, e.target.value)}
                     rows={2}
@@ -1466,7 +1405,7 @@ function ReviewModal({
                       "Add a note (optional)",
                       "एक नोट जोड़ें (वैकल्पिक)",
                     )}
-                    className={fieldCls + " resize-none"}
+                    className="mt-1 resize-none"
                   />
                 </div>
               );
@@ -1475,12 +1414,12 @@ function ReviewModal({
 
           <label className="mt-5 block">
             <span className={labelCls}>{t("Your name", "आपका नाम")}</span>
-            <input
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("e.g. Priya S.", "उदा. प्रिया एस.")}
-              className={fieldCls}
+              className="mt-1"
             />
           </label>
 
@@ -1496,23 +1435,18 @@ function ReviewModal({
           )}
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={submit}
               disabled={status === "submitting"}
-              className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
             >
               {status === "submitting"
                 ? t("Submitting…", "सबमिट हो रहा है…")
                 : t("Submit review", "समीक्षा सबमिट करें")}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
-            >
+            </Button>
+            <Button variant="secondary" onClick={onClose}>
               {t("Cancel", "रद्द करें")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

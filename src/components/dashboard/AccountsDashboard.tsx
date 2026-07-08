@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Button, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import {
   useSession,
@@ -31,7 +32,7 @@ const money = new Intl.NumberFormat("en-IN", {
 /** A single labelled figure inside an account section. */
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-maroon/10 bg-cream/40 px-4 py-3">
+    <div className="rounded-card border border-maroon/10 bg-cream/40 px-4 py-3">
       <p className="font-display text-xl font-bold text-ink sm:text-2xl">{value}</p>
       <p className="mt-0.5 text-xs font-medium text-ink-soft">{label}</p>
     </div>
@@ -53,7 +54,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-maroon/15 bg-white p-5 shadow-sm shadow-maroon/5 sm:p-6">
+    <Card as="section" padding="none" className="p-5 sm:p-6">
       <header className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <h2 className="font-display text-lg text-ink sm:text-xl">{title}</h2>
@@ -61,15 +62,12 @@ function SectionCard({
             {badge}
           </span>
         </div>
-        <Link
-          href={href}
-          className="shrink-0 text-sm font-semibold text-maroon transition-colors hover:text-maroon-dark"
-        >
+        <Button variant="ghost" size="sm" href={href} className="shrink-0">
           {cta} →
-        </Link>
+        </Button>
       </header>
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -178,7 +176,7 @@ export default function AccountsDashboard() {
                 "You haven't booked a feast yet.",
                 "आपने अभी तक कोई भोज बुक नहीं किया है।",
               )}{" "}
-              <Link href="/vendors" className="font-semibold text-maroon hover:text-maroon-dark">
+              <Link href="/vendors" className="font-semibold text-maroon">
                 {t("Browse caterers", "कैटरर्स ब्राउज़ करें")}
               </Link>
             </p>
@@ -198,12 +196,14 @@ export default function AccountsDashboard() {
                 <Stat key={s.label} label={s.label} value={s.value} />
               ))}
             </div>
-            <Link
+            <Button
+              variant="ghost"
+              size="sm"
               href="/vendor/register"
-              className="mt-4 inline-block text-sm font-medium text-maroon hover:text-maroon-dark"
+              className="mt-4"
             >
               {t("Complete business profile & KYC", "बिज़नेस प्रोफ़ाइल और केवाईसी पूरी करें")} →
-            </Link>
+            </Button>
           </SectionCard>
         )}
 
@@ -220,7 +220,7 @@ export default function AccountsDashboard() {
                 {memberships.map((m) => (
                   <li
                     key={m.type}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-maroon/10 bg-cream/40 px-4 py-3"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-maroon/10 bg-cream/40 px-4 py-3"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink">
@@ -249,7 +249,7 @@ export default function AccountsDashboard() {
 
         {/* Add the accounts they don't have yet. */}
         {addable.length > 0 && (
-          <section className="rounded-2xl border border-dashed border-maroon/25 bg-cream/30 p-5 sm:p-6">
+          <section className="rounded-card border border-dashed border-maroon/25 bg-cream/30 p-5 sm:p-6">
             <h2 className="font-display text-lg text-ink sm:text-xl">
               {t("Add another account", "एक और अकाउंट जोड़ें")}
             </h2>
@@ -261,14 +261,17 @@ export default function AccountsDashboard() {
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {addable.map((o) => (
-                <Link
+                <Card
                   key={o.type}
+                  as={Link}
                   href={o.href}
-                  className="rounded-xl border border-maroon/20 bg-white px-4 py-3.5 transition-colors hover:border-maroon/50 hover:bg-cream-2"
+                  interactive
+                  padding="none"
+                  className="px-4 py-3.5"
                 >
                   <p className="text-sm font-semibold text-maroon">{o.title}</p>
                   <p className="mt-0.5 text-xs text-ink-soft">{o.hint}</p>
-                </Link>
+                </Card>
               ))}
             </div>
           </section>

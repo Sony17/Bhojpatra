@@ -13,6 +13,7 @@ import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Ticket } from "@/components/admin/shared/icons";
+import { Button } from "@/components/ui";
 import type { AdminCoupon, CouponStatus } from "@/lib/admin/types";
 
 const STATUS_OPTIONS = [
@@ -159,8 +160,8 @@ export default function CouponManager() {
       header: "",
       cell: (c) => (
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={() => setDraft(c)} className="text-sm font-semibold text-maroon hover:underline">Edit</button>
-          <button type="button" onClick={() => setDeleteId(c.id)} className="text-sm font-semibold text-ink-soft hover:underline">Delete</button>
+          <Button variant="ghost" size="sm" onClick={() => setDraft(c)}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={() => setDeleteId(c.id)}>Delete</Button>
         </div>
       ),
       className: "text-right",
@@ -176,13 +177,9 @@ export default function CouponManager() {
         title="Discount & Coupons"
         subtitle="Create discount rules and track their usage."
         actions={
-          <button
-            type="button"
-            onClick={() => setDraft({ ...emptyDraft })}
-            className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark"
-          >
+          <Button variant="primary" onClick={() => setDraft({ ...emptyDraft })}>
             + New Coupon
-          </button>
+          </Button>
         }
       />
 
@@ -228,19 +225,18 @@ export default function CouponManager() {
         footer={
           draft && (
             <>
-              <button type="button" onClick={() => setDraft(null)} className="rounded-full border border-cream-3 px-5 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-cream-2">Cancel</button>
-              <button
-                type="button"
+              <Button variant="secondary" onClick={() => setDraft(null)}>Cancel</Button>
+              <Button
+                variant="primary"
                 onClick={() => save({ ...draft, code: draft.code.toUpperCase() })}
                 disabled={saving || !draft.code.trim() || !draft.label.trim()}
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving
                   ? "Saving…"
                   : editing
                     ? "Save changes"
                     : "Create coupon"}
-              </button>
+              </Button>
             </>
           )
         }

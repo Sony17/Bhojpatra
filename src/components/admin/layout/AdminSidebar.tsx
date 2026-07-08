@@ -83,7 +83,7 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
           type="button"
           onClick={onClose}
           aria-label="Close menu"
-          className="flex h-9 w-9 items-center justify-center rounded-md text-cream/80 transition-colors hover:bg-maroon-dark hover:text-cream lg:hidden"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream lg:hidden"
         >
           <Close className="h-5 w-5" />
         </button>
@@ -109,7 +109,7 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
                     "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors " +
                     (active
                       ? "bg-cream/15 font-semibold text-cream"
-                      : "font-medium text-cream/80 hover:bg-maroon-dark hover:text-cream")
+                      : "font-medium text-cream/80 hover:bg-cream/10 hover:text-cream")
                   }
                 >
                   <Icon className="h-5 w-5 shrink-0" />
@@ -125,7 +125,7 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
       <div className="border-t border-cream/15 p-3">
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-cream/80 transition-colors hover:bg-maroon-dark hover:text-cream"
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-cream/80 transition-colors hover:bg-cream/10 hover:text-cream"
         >
           <LogOut className="h-5 w-5 shrink-0" />
           <span>Back to site</span>

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
@@ -37,7 +37,7 @@ export default function BainaBoxSpecial({
 
   return (
     <section
-      className="overflow-hidden rounded-3xl border border-cream-3 bg-cream/40 shadow-sm ring-1 ring-cream"
+      className="overflow-hidden rounded-card border border-cream-3 bg-cream/40 shadow-card ring-1 ring-cream"
       aria-label={heading}
     >
       <div
@@ -92,12 +92,13 @@ export default function BainaBoxSpecial({
             {body}
           </p>
           <div>
-            <Link
+            <Button
               href={BAINA_HREF}
-              className="btn-sheen mt-6 inline-flex items-center justify-center rounded-full border border-maroon px-7 py-2.5 text-sm font-semibold text-maroon transition-all duration-300 hover:-translate-y-0.5 hover:bg-maroon hover:text-cream hover:shadow-lg active:scale-95"
+              variant="secondary"
+              className="btn-sheen mt-6"
             >
               {cta}
-            </Link>
+            </Button>
           </div>
         </div>
       </div>

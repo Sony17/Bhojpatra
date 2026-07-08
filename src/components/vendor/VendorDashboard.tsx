@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import MenuBuilder from "@/components/vendor/MenuBuilder";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
+import { Badge, Card } from "@/components/ui";
 import { sortTiers, type VendorTier } from "@/lib/admin/types";
 
 /** Header summary drawn from GET /api/vendor/menu (the vendor's live record). */
@@ -93,7 +94,7 @@ function DashboardHeader({
   const tiers = summary?.tiers ? sortTiers(summary.tiers) : [];
 
   return (
-    <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+    <Card className="sm:p-6">
       <p className="eyebrow text-sm font-medium text-gold">
         {t("Vendor Dashboard", "वेंडर डैशबोर्ड")}
       </p>
@@ -104,26 +105,23 @@ function DashboardHeader({
 
         {!loading &&
           (summary?.verified ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+            <Badge tone="solid">
               <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
-            </span>
+            </Badge>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-cream-3 bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
+            <Badge tone="muted">
               {t("Pending verification", "सत्यापन लंबित")}
-            </span>
+            </Badge>
           ))}
 
         {/* Marketplace tier(s) assigned by an admin at approval. */}
         {tiers.map((tier) => (
-          <span
-            key={tier}
-            className="inline-flex items-center gap-1 rounded-full border border-cream-3 bg-cream-2 px-3 py-1 text-xs font-semibold text-ink"
-          >
+          <Badge key={tier} tone="soft">
             <span aria-hidden="true" className="text-gold">
               ◆
             </span>{" "}
             {t(tier, TIER_HI[tier])}
-          </span>
+          </Badge>
         ))}
       </div>
       <p className="font-script mt-2 text-lg text-ink-soft">
@@ -132,6 +130,6 @@ function DashboardHeader({
           "वापसी पर स्वागत है — आज क्या पक रहा है, यहाँ देखें।",
         )}
       </p>
-    </div>
+    </Card>
   );
 }

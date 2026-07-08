@@ -2,6 +2,7 @@
 
 import type { InvoiceData } from "@/lib/invoice";
 import BrandIcon from "@/components/BrandIcon";
+import { Card } from "@/components/ui";
 
 /**
  * On-screen, branded rendering of an invoice — the visual twin of the PDF in
@@ -21,7 +22,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
   const balance = Math.max(0, Math.round(data.grandTotal) - Math.round(data.paid));
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm">
+    <Card padding="none" className="overflow-hidden">
       {/* Masthead */}
       <div className="bg-maroon px-6 py-5 sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -61,7 +62,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
 
         {/* Charges */}
         <Section title="Charges">
-          <div className="overflow-hidden rounded-xl border border-cream-3">
+          <div className="overflow-hidden rounded-card border border-cream-3">
             <div className="flex items-center justify-between bg-cream/60 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-maroon">
               <span>Description</span>
               <span>Amount</span>
@@ -97,7 +98,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
         </Section>
 
         {/* Grand total band */}
-        <div className="flex items-center justify-between gap-4 rounded-xl bg-maroon px-6 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-card bg-maroon px-6 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cream">
               Grand Total
@@ -111,7 +112,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
 
         {/* Paid / balance */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="rounded-xl border border-cream-3 px-4 py-3">
+          <div className="rounded-card border border-cream-3 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-maroon">
               Amount Paid
             </p>
@@ -120,7 +121,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
             </p>
           </div>
           {balance > 0 ? (
-            <div className="rounded-xl bg-maroon px-4 py-3">
+            <div className="rounded-card bg-maroon px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-cream">
                 Balance Due
               </p>
@@ -129,7 +130,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-cream-3 px-4 py-3">
+            <div className="rounded-card border border-cream-3 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-maroon">
                 Balance Due
               </p>
@@ -171,7 +172,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
           required.
         </p>
       </div>
-    </div>
+    </Card>
   );
 }
 
