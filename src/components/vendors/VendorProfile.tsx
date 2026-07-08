@@ -28,7 +28,7 @@ export default function VendorProfile({
   const allPhotos = [profile.image, ...profile.gallery.filter((g) => g !== profile.image)];
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
+    <section className="mx-auto max-w-7xl px-5 py-12 pb-28 sm:py-16 lg:pb-16">
       {/* Breadcrumb back to the catalog */}
       <Link
         href="/vendors"

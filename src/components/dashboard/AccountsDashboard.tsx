@@ -33,7 +33,7 @@ const money = new Intl.NumberFormat("en-IN", {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-card border border-maroon/10 bg-cream/40 px-4 py-3">
-      <p className="font-display text-xl font-bold text-ink sm:text-2xl">{value}</p>
+      <p className="font-display text-lg font-bold text-ink break-words sm:text-2xl">{value}</p>
       <p className="mt-0.5 text-xs font-medium text-ink-soft">{label}</p>
     </div>
   );
@@ -156,7 +156,7 @@ export default function AccountsDashboard() {
           href={DASHBOARD_PATH.customer}
           cta={t("View all bookings", "सभी बुकिंग देखें")}
         >
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat
               label={t("Total", "कुल")}
               value={loading ? "—" : String(bookingCounts.total)}

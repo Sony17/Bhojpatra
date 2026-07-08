@@ -56,7 +56,7 @@ export default function AuthLayout({
               alt="Bhojpatra"
               width={894}
               height={226}
-              className="h-20 w-auto"
+              className="h-14 w-auto max-w-full sm:h-20"
             />
           </Link>
 

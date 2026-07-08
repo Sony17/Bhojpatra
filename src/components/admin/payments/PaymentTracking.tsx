@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -10,15 +9,10 @@ import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
-import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import { money } from "@/components/admin/shared/money";
 import { Wallet } from "@/components/admin/shared/icons";
-import {
-  adminPayments,
-  paymentsSummary,
-  vendorSettlements as seedSettlements,
-} from "@/lib/admin/mockData";
-import type { AdminPayment, VendorSettlement } from "@/lib/admin/types";
+import { adminPayments, paymentsSummary } from "@/lib/admin/mockData";
+import type { AdminPayment } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
 
@@ -56,11 +50,6 @@ function toAdminPayment(p: LivePayment): AdminPayment {
   };
 }
 
-const TABS: TabItem[] = [
-  { id: "transactions", label: "Transactions" },
-  { id: "settlements", label: "Vendor Settlements" },
-];
-
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "All" },
   { label: "Settled", value: "Settled" },
@@ -77,7 +66,6 @@ const METHOD_OPTIONS = [
 ];
 
 export default function PaymentTracking() {
-  const [tab, setTab] = useState("transactions");
   const [live, setLive] = useState<AdminPayment[]>([]);
 
   // Pull in advances collected through the live UPI checkout.
@@ -101,19 +89,15 @@ export default function PaymentTracking() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Payment Tracking"
-        subtitle="Monitor collections, settlements and refunds."
+        subtitle="Monitor customer advance collections."
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <StatCard icon={Wallet} label="Collected" value={money(paymentsSummary.collected + liveCollected)} />
         <StatCard icon={Wallet} label="Advance" value={money(paymentsSummary.advance + liveCollected)} />
-        <StatCard icon={Wallet} label="Settled to Vendors" value={money(paymentsSummary.settled)} />
-        <StatCard icon={Wallet} label="Pending" value={money(paymentsSummary.pending)} />
       </div>
 
-      <Tabs tabs={TABS} active={tab} onChange={setTab} />
-
-      {tab === "transactions" ? <TransactionsTab live={live} /> : <SettlementsTab />}
+      <TransactionsTab live={live} />
     </div>
   );
 }
@@ -196,58 +180,5 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
 
       <Pagination page={result.page} pageSize={result.pageSize} total={result.total} onPageChange={setPage} />
     </div>
-  );
-}
-
-/* ── Settlements ──────────────────────────────────────────────────────────── */
-
-function SettlementsTab() {
-  const [rows, setRows] = useState<VendorSettlement[]>(seedSettlements);
-
-  const settle = (id: string) =>
-    setRows((prev) => prev.map((s) => (s.id === id ? { ...s, status: "Settled" } : s)));
-
-  const columns: Column<VendorSettlement>[] = [
-    {
-      key: "vendor",
-      header: "Vendor",
-      cell: (s) => (
-        <div className="min-w-0">
-          <p className="font-medium text-ink">{s.vendor}</p>
-          <p className="text-xs text-ink-soft">{s.period} · {s.bookings} bookings</p>
-        </div>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      cell: (s) => <span className="font-display font-semibold text-ink">{money(s.amount)}</span>,
-      className: "text-right",
-      headerClassName: "text-right",
-    },
-    { key: "status", header: "Status", cell: (s) => <StatusBadge status={s.status} /> },
-    {
-      key: "action",
-      header: "",
-      cell: (s) =>
-        s.status === "Pending" ? (
-          <Button variant="primary" size="sm" onClick={() => settle(s.id)}>
-            Settle
-          </Button>
-        ) : (
-          <span className="text-xs text-ink-soft">—</span>
-        ),
-      className: "text-right",
-    },
-  ];
-
-  return (
-    <DataTable
-      columns={columns}
-      rows={rows}
-      getRowKey={(s) => s.id}
-      minWidthClass="min-w-[600px]"
-      empty={<EmptyState title="No settlements" />}
-    />
   );
 }

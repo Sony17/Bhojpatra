@@ -6,8 +6,6 @@ import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { Button } from "@/components/ui";
-import { adminProfile, businessDetails } from "@/lib/admin/mockData";
-import type { BusinessDetails } from "@/lib/admin/types";
 import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
 
 /** Cap the uploaded QR file so its base64 form stays within the settings row's
@@ -15,23 +13,19 @@ import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
 const MAX_QR_FILE_BYTES = 400 * 1024;
 
 const TABS: TabItem[] = [
-  { id: "profile", label: "Admin Profile" },
   { id: "password", label: "Change Password" },
-  { id: "business", label: "Business" },
   { id: "occasions", label: "Occasions" },
   { id: "locations", label: "Locations" },
   { id: "payments", label: "Payments (UPI)" },
 ];
 
 export default function SettingsView() {
-  const [tab, setTab] = useState("profile");
+  const [tab, setTab] = useState("password");
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Admin Panel" title="Settings" subtitle="Platform configuration and admin profile." />
+      <PageHeader eyebrow="Admin Panel" title="Settings" subtitle="Platform configuration." />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
-      {tab === "profile" && <ProfileTab />}
       {tab === "password" && <ChangePasswordTab />}
-      {tab === "business" && <BusinessTab />}
       {tab === "occasions" && (
         <NameListTab
           dataKey="occasions"
@@ -69,26 +63,6 @@ function SavedChip({ show }: { show: boolean }) {
     <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3.5 py-1.5 text-sm font-medium text-ink">
       <span aria-hidden="true" className="text-maroon">✓</span> Saved
     </span>
-  );
-}
-
-function ProfileTab() {
-  const [name, setName] = useState(adminProfile.name);
-  const [email, setEmail] = useState("admin@bhojpatra.co.in");
-  const [saved, setSaved] = useState(false);
-
-  return (
-    <WidgetCard title="Admin Profile">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Full Name"><input className={inputClass} value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} /></Field>
-        <Field label="Email"><input type="email" className={inputClass} value={email} onChange={(e) => { setEmail(e.target.value); setSaved(false); }} /></Field>
-        <Field label="Role"><input className={inputClass} value={adminProfile.role} disabled /></Field>
-      </div>
-      <div className="mt-5 flex items-center gap-4">
-        <Button type="button" onClick={() => setSaved(true)}>Save changes</Button>
-        <SavedChip show={saved} />
-      </div>
-    </WidgetCard>
   );
 }
 
@@ -184,32 +158,6 @@ function ChangePasswordTab() {
         >
           {saving ? "Updating…" : "Update password"}
         </Button>
-        <SavedChip show={saved} />
-      </div>
-    </WidgetCard>
-  );
-}
-
-function BusinessTab() {
-  const [biz, setBiz] = useState<BusinessDetails>(businessDetails);
-  const [saved, setSaved] = useState(false);
-  const set = (k: keyof BusinessDetails, v: string) => { setBiz({ ...biz, [k]: v }); setSaved(false); };
-
-  return (
-    <WidgetCard title="Business Details">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Business Name"><input className={inputClass} value={biz.name} onChange={(e) => set("name", e.target.value)} /></Field>
-        <Field label="Tagline"><input className={inputClass} value={biz.tagline} onChange={(e) => set("tagline", e.target.value)} /></Field>
-        <Field label="Phone / WhatsApp"><input className={inputClass} value={biz.phone} onChange={(e) => set("phone", e.target.value)} /></Field>
-        <Field label="Email"><input className={inputClass} value={biz.email} onChange={(e) => set("email", e.target.value)} /></Field>
-        <Field label="Hours"><input className={inputClass} value={biz.hours} onChange={(e) => set("hours", e.target.value)} /></Field>
-        <Field label="Instagram"><input className={inputClass} value={biz.instagram} onChange={(e) => set("instagram", e.target.value)} /></Field>
-        <div className="sm:col-span-2">
-          <Field label="Address"><input className={inputClass} value={biz.address} onChange={(e) => set("address", e.target.value)} /></Field>
-        </div>
-      </div>
-      <div className="mt-5 flex items-center gap-4">
-        <Button type="button" onClick={() => setSaved(true)}>Save changes</Button>
         <SavedChip show={saved} />
       </div>
     </WidgetCard>

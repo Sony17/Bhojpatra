@@ -27,15 +27,15 @@ export default function BrandRibbon() {
 
   return (
     <section className="border-t border-maroon/10 bg-cream">
-      <div className="mx-auto max-w-7xl px-5 py-5 sm:py-6 sm:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-8">
         {heading && (
-          <p className="eyebrow mb-4 text-center text-xs font-semibold text-maroon sm:text-sm">
+          <p className="eyebrow shrink-0 text-left text-xs font-semibold text-maroon sm:max-w-[14rem] sm:text-sm">
             {heading}
           </p>
         )}
 
         {/* Ribbon — edges fade via the mask; pauses on hover. */}
-        <div className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+        <div className="marquee-pause relative min-w-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
           <ul className="animate-marquee flex w-max items-center">
             {[...brands, ...brands].map((brand, i) => {
               const name = lang === "hi" ? brand.nameHi : brand.name;

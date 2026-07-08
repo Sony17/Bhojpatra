@@ -1,74 +1,111 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
-import KpiGrid from "./KpiGrid";
+import StatCard from "@/components/admin/shared/StatCard";
+import { Calendar, ShieldCheck, Wallet } from "@/components/admin/shared/icons";
+import { money } from "@/components/admin/shared/money";
 import RecentBookingsTable from "./RecentBookingsTable";
-import RevenueCard from "./RevenueCard";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
-import QuickActions from "./QuickActions";
-import NotificationsPanel from "./NotificationsPanel";
-import AnalyticsSection from "./AnalyticsSection";
-import {
-  adminProfile,
-  adminKpis,
-  recentBookings,
-  revenueSummary,
-  pendingApprovals,
-  quickActions,
-  adminNotifications,
-} from "@/lib/admin/mockData";
+import type {
+  AdminBookingRow,
+  BookingStatus,
+  PendingVendorApproval,
+  VendorApplication,
+} from "@/lib/admin/types";
+
+/** Map a persisted order (from `GET /api/bookings`) to the dashboard row shape. */
+function toBookingRow(o: Record<string, unknown>): AdminBookingRow {
+  return {
+    id: String(o.id),
+    customer: typeof o.customer === "string" ? o.customer : "Online Booking",
+    occasion: typeof o.occasion === "string" ? o.occasion : "Feast",
+    date: typeof o.date === "string" ? o.date : "",
+    vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
+    city: typeof o.city === "string" ? o.city : "—",
+    amount: Number(o.amount) || 0,
+    status: (o.status as BookingStatus) ?? "Confirmed",
+  };
+}
 
 /**
- * Dashboard composition (LAYOUT layer). A server component that reads data from
- * the mock layer and passes it as typed props to presentation widgets — no
- * data is hardcoded in any widget, and each widget is API-swappable.
- *
- * Generous `space-y-8` between rows + a clear row grid leave room for future
- * widgets (charts, analytics) to slot in as new rows without a redesign. See the
- * EXTENSION POINT comments below.
+ * Admin dashboard (landing). Reads only real, persisted data: recent bookings
+ * from `/api/bookings`, pending vendor applications from
+ * `/api/vendors/applications`, and collected advances from `/api/payments`.
+ * There are no fabricated KPIs, charts or notifications — every figure here is
+ * live, and the panels link through to the full consoles.
  */
 export default function AdminDashboard() {
-  const firstName = adminProfile.name.split(" ")[0];
+  const [bookings, setBookings] = useState<AdminBookingRow[]>([]);
+  const [pending, setPending] = useState<PendingVendorApproval[]>([]);
+  const [collected, setCollected] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [bRes, aRes, pRes] = await Promise.all([
+          fetch("/api/bookings", { cache: "no-store" }),
+          fetch("/api/vendors/applications", { cache: "no-store" }),
+          fetch("/api/payments", { cache: "no-store" }),
+        ]);
+        if (bRes.ok) {
+          const { orders } = (await bRes.json()) as {
+            orders?: Record<string, unknown>[];
+          };
+          if (active && Array.isArray(orders)) setBookings(orders.map(toBookingRow));
+        }
+        if (aRes.ok) {
+          const { applications } = (await aRes.json()) as {
+            applications?: VendorApplication[];
+          };
+          if (active && Array.isArray(applications))
+            setPending(applications.filter((a) => a.status === "Pending"));
+        }
+        if (pRes.ok) {
+          const { payments } = (await pRes.json()) as {
+            payments?: { amount?: number }[];
+          };
+          if (active && Array.isArray(payments))
+            setCollected(payments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
+        }
+      } catch {
+        // Network/parse failure — the empty states below stand in.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Admin Panel"
         title="Dashboard"
-        subtitle={`Welcome back, ${firstName} — here's your marketplace at a glance.`}
-        /*
-         * EXTENSION POINT (later phase): pass `actions={<DashboardToolbar />}`
-         * here to mount the global search, date-range selector, filters and an
-         * export button. Designed for, not implemented in, Phase 1B.
-         */
+        subtitle="Your marketplace at a glance."
       />
 
-      {/* Row 1 — KPI cards */}
-      <KpiGrid kpis={adminKpis} />
-
-      {/* Analytics row — Reports merged into the dashboard (revenue, bookings, vendors). */}
-      <AnalyticsSection />
-
-      {/* Row 2 — recent bookings (wide) + revenue summary */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <RecentBookingsTable
-          rows={recentBookings}
-          seeAllHref="/admin/customers?tab=bookings"
-          className="lg:col-span-2"
+      {/* Live headline figures */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <StatCard icon={Calendar} label="Total Bookings" value={String(bookings.length)} />
+        <StatCard
+          icon={ShieldCheck}
+          label="Pending Vendor Approvals"
+          value={String(pending.length)}
         />
-        <RevenueCard data={revenueSummary} detailsHref="/admin/payments" />
+        <StatCard icon={Wallet} label="Advance Collected" value={money(collected)} />
       </div>
 
-      {/* Row 3 — pending approvals (wide) + quick actions */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <PendingApprovalsPanel
-          approvals={pendingApprovals}
-          seeAllHref="/admin/vendor-approvals"
-          className="lg:col-span-2"
-        />
-        <QuickActions actions={quickActions} />
-      </div>
+      <RecentBookingsTable
+        rows={bookings.slice(0, 6)}
+        seeAllHref="/admin/customers?tab=bookings"
+      />
 
-      {/* Row 4 — notifications (full width) */}
-      <NotificationsPanel notifications={adminNotifications} />
+      <PendingApprovalsPanel
+        approvals={pending.slice(0, 5)}
+        seeAllHref="/admin/vendor-approvals"
+      />
     </div>
   );
 }

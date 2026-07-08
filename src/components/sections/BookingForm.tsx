@@ -5,7 +5,18 @@ import { occasions, packages, guestPresets } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
+import { useOccasions, occasionLeadFor } from "@/lib/occasions";
 import { Button, controlClass } from "@/components/ui";
+
+/** Soonest bookable `YYYY-MM-DD` given a lead time in days — the date input's
+ *  `min`. Computed at render (client component), matching the booking wizard. */
+function isoAfterDays(lead: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.max(0, lead));
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
 
 /** Contact + event detail fields rendered as a two-column grid. */
 const contactFields = [
@@ -50,7 +61,12 @@ const contactFields = [
 export default function BookingForm() {
   const { lang, t } = useLang();
   const { booking, packages: homePackages } = useHomeContent();
+  // Admin-managed occasions carry a per-occasion lead time; the pills below stay
+  // on the static seed list (they need icons), but the earliest bookable date
+  // honours the admin-configured notice for the chosen occasion.
+  const occasionList = useOccasions();
   const [occasion, setOccasion] = useState<string>(occasions[0].id);
+  const minDate = isoAfterDays(occasionLeadFor(occasion, occasionList));
   const [guests, setGuests] = useState<string>(String(guestPresets[2]));
   const [selectedPackage, setSelectedPackage] = useState<string>(
     packages.find((p) => p.popular)?.id ?? packages[0].id,
@@ -133,6 +149,7 @@ export default function BookingForm() {
                   name="eventDate"
                   type="date"
                   value={eventDate}
+                  min={minDate}
                   onChange={(e) => setEventDate(e.target.value)}
                   autoComplete="off"
                   className={controlClass}

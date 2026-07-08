@@ -404,7 +404,7 @@ function VenueBooking({
 
   return (
     <>
-    <section className="mx-auto max-w-6xl px-5 py-10 sm:py-14">
+    <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
       <Link
         href="/venues"
         className="text-sm font-semibold text-maroon hover:underline"
@@ -412,7 +412,7 @@ function VenueBooking({
         ← {t("All Venues", "सभी वेन्यू")}
       </Link>
 
-      <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mt-5 grid gap-8 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr]">
         {/* ── Venue showcase ─────────────────────────────────────────── */}
         <div>
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-card border border-cream-3 bg-cream-2 shadow-card">

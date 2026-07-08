@@ -507,7 +507,7 @@ export default function MenuBuilder() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={t("Business Name", "बिज़नेस का नाम")}>
             <input
               type="text"
@@ -634,7 +634,7 @@ export default function MenuBuilder() {
               className={inputClass}
             />
           </Field>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-3">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Cuisines", "व्यंजन शैलियाँ")}
             </span>

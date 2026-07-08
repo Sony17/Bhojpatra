@@ -96,7 +96,7 @@ export default function ContactPage() {
         </p>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
         {/* LEFT — enquiry form */}
         <Card padding="lg" className="sm:p-8">
           <h2 className="font-display text-xl font-semibold text-ink">

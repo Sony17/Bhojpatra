@@ -34,6 +34,7 @@ export default function DatePicker({
   direction = "down",
   align = "left",
   defaultDaysAhead,
+  minDaysAhead = 0,
   onChange,
 }: {
   placeholder?: string;
@@ -47,6 +48,10 @@ export default function DatePicker({
   align?: "left" | "center" | "right";
   /** Pre-select a date this many days from today (computed client-side). */
   defaultDaysAhead?: number;
+  /** Minimum advance notice, in days — dates before `today + minDaysAhead` are
+   *  disabled (e.g. a wedding that needs 30 days' lead). `0` disables only past
+   *  dates, preserving the original behaviour. */
+  minDaysAhead?: number;
   onChange?: (date: Date) => void;
 }) {
   const { lang, t } = useLang();
@@ -63,6 +68,14 @@ export default function DatePicker({
 
   const today = useMemo(() => startOfDay(new Date()), []);
 
+  // The earliest selectable day — today plus the required advance notice. Dates
+  // before this are disabled in the grid.
+  const minDate = useMemo(() => {
+    const d = startOfDay(new Date());
+    d.setDate(d.getDate() + Math.max(0, minDaysAhead));
+    return d;
+  }, [minDaysAhead]);
+
   // Pre-select a default date `defaultDaysAhead` days out. Done in an effect
   // (not a lazy initializer) so the server render and first client render
   // match — `new Date()` would otherwise diverge and trip hydration.
@@ -76,6 +89,20 @@ export default function DatePicker({
     // Run once on mount for the given offset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultDaysAhead]);
+
+  // If the minimum notice grows past the current pick — the guest switched to an
+  // occasion that needs more lead, or the default landed below it — nudge the
+  // selection forward to the earliest still-valid date instead of leaving a
+  // now-disabled date chosen (and keep the parent in sync via onChange).
+  useEffect(() => {
+    if (selected && selected < minDate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelected(minDate);
+      setView(new Date(minDate.getFullYear(), minDate.getMonth(), 1));
+      onChange?.(minDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minDate, selected]);
 
   // Close on outside click or Escape.
   useEffect(() => {
@@ -108,10 +135,11 @@ export default function DatePicker({
     return out;
   }, [view]);
 
-  // Can't page earlier than the current month.
+  // Can't page earlier than the earliest selectable month (today, or the first
+  // month that contains a date meeting the required lead).
   const atFirstMonth =
-    view.getFullYear() === today.getFullYear() &&
-    view.getMonth() === today.getMonth();
+    new Date(view.getFullYear(), view.getMonth(), 1) <=
+    new Date(minDate.getFullYear(), minDate.getMonth(), 1);
 
   function shiftMonth(delta: number) {
     setView((v) => new Date(v.getFullYear(), v.getMonth() + delta, 1));
@@ -190,7 +218,9 @@ export default function DatePicker({
           <div className="grid grid-cols-7 gap-0.5">
             {cells.map((date, i) => {
               if (!date) return <div key={i} className="h-9" />;
-              const isPast = date < today;
+              // Disabled = before the earliest allowed date (past days, plus any
+              // that fall short of the occasion's required lead time).
+              const isDisabled = date < minDate;
               const isToday = date.getTime() === today.getTime();
               const isSel =
                 selected !== null && date.getTime() === selected.getTime();
@@ -198,7 +228,7 @@ export default function DatePicker({
                 <button
                   key={i}
                   type="button"
-                  disabled={isPast}
+                  disabled={isDisabled}
                   aria-pressed={isSel}
                   onClick={() => {
                     setSelected(date);
@@ -208,7 +238,7 @@ export default function DatePicker({
                   className={`flex h-9 items-center justify-center rounded-lg text-sm transition-colors ${
                     isSel
                       ? "bg-maroon font-semibold text-cream"
-                      : isPast
+                      : isDisabled
                         ? "cursor-not-allowed text-ink/25"
                         : isToday
                           ? "font-semibold text-maroon hover:bg-cream/60"

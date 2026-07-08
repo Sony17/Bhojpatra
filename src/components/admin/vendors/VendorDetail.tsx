@@ -10,19 +10,15 @@ import TierBadges from "@/components/admin/shared/TierBadges";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import EmptyState from "@/components/admin/shared/EmptyState";
-import ConfirmDialog from "@/components/admin/shared/ConfirmDialog";
 import { money } from "@/components/admin/shared/money";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
 import { getBookingsByVendor } from "@/lib/admin/mockData";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import {
-  TIER_ORDER,
   sortTiers,
   type AdminVendor,
   type VendorDocument,
-  type VendorTier,
-  type VerificationStatus,
 } from "@/lib/admin/types";
 
 const TABS: TabItem[] = [
@@ -32,17 +28,12 @@ const TABS: TabItem[] = [
   { id: "bookings", label: "Bookings" },
 ];
 
-type Dialog =
-  | { kind: "reject" }
-  | { kind: "suspend" }
-  | { kind: "reactivate" }
-  | null;
-
 /**
- * Vendor detail page. Receives the vendor (looked up by the route) and seeds
- * local state so mock verify / reject / suspend / tier actions feel real. When
- * the API lands, replace the local mutations with calls + refetch; the layout
- * and props are unchanged. Renders a friendly not-found state for bad ids.
+ * Vendor detail page (read-only). Shows the vendor's profile, tiers, KYC
+ * documents and bookings as looked up by the route. Verification and status
+ * changes are made in the Vendor Approvals console, which persists them — this
+ * view intentionally has no action buttons so nothing here silently no-ops.
+ * Renders a friendly not-found state for bad ids.
  */
 export default function VendorDetail({ vendor }: { vendor: AdminVendor | null }) {
   if (!vendor) {
@@ -67,52 +58,7 @@ export default function VendorDetail({ vendor }: { vendor: AdminVendor | null })
 
 function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
   const [tab, setTab] = useState("overview");
-  const [status, setStatus] = useState<VerificationStatus>(vendor.status);
-  const [tiers, setTiers] = useState<VendorTier[]>(sortTiers(vendor.tiers));
-  const [suspended, setSuspended] = useState(vendor.suspended);
-  const [docs, setDocs] = useState<VendorDocument[]>(vendor.documents);
-  const [dialog, setDialog] = useState<Dialog>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const flash = (msg: string) => setToast(msg);
-
-  // A vendor can sit in several tiers at once — toggle bands on/off, but never
-  // leave them with none.
-  const toggleTier = (t: VendorTier) => {
-    setTiers((prev) => {
-      const next = prev.includes(t)
-        ? prev.filter((x) => x !== t)
-        : [...prev, t];
-      if (next.length === 0) return prev;
-      flash("Tiers updated");
-      return sortTiers(next);
-    });
-  };
-
-  const verify = () => {
-    setStatus("Verified");
-    setDocs((prev) => prev.map((d) => ({ ...d, status: "Verified" })));
-    flash("Vendor verified");
-  };
-
-  const confirmDialog = () => {
-    if (dialog?.kind === "reject") {
-      setStatus("Rejected");
-      flash("Vendor rejected");
-    } else if (dialog?.kind === "suspend") {
-      setSuspended(true);
-      flash("Vendor suspended");
-    } else if (dialog?.kind === "reactivate") {
-      setSuspended(false);
-      flash("Vendor reactivated");
-    }
-    setDialog(null);
-  };
-
-  const setDocStatus = (kind: string, next: VerificationStatus) =>
-    setDocs((prev) =>
-      prev.map((d) => (d.kind === kind ? { ...d, status: next } : d)),
-    );
+  const tiers = sortTiers(vendor.tiers);
 
   return (
     <div className="space-y-6">
@@ -127,53 +73,19 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
         eyebrow={vendor.id}
         title={vendor.business}
         subtitle={`${vendor.owner} · ${vendor.city}, ${vendor.state}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2.5">
-            {toast && (
-              <span
-                role="status"
-                className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-medium text-ink"
-              >
-                <span aria-hidden="true" className="text-maroon">✓</span>
-                {toast}
-              </span>
-            )}
-            {status !== "Verified" && (
-              <Button variant="primary" onClick={verify}>
-                Verify
-              </Button>
-            )}
-            {status !== "Rejected" && (
-              <Button variant="secondary" onClick={() => setDialog({ kind: "reject" })}>
-                Reject
-              </Button>
-            )}
-            {suspended ? (
-              <Button variant="secondary" onClick={() => setDialog({ kind: "reactivate" })}>
-                Reactivate
-              </Button>
-            ) : (
-              <Button variant="secondary" onClick={() => setDialog({ kind: "suspend" })}>
-                Suspend
-              </Button>
-            )}
-          </div>
-        }
       />
 
       {/* Status row */}
       <div className="flex flex-wrap items-center gap-2.5">
         <TierBadges tiers={tiers} />
-        <StatusBadge status={status} />
-        {suspended && <StatusBadge status="Suspended" />}
+        <StatusBadge status={vendor.status} />
+        {vendor.suspended && <StatusBadge status="Suspended" />}
       </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === "overview" && (
-        <OverviewTab vendor={vendor} tiers={tiers} onToggleTier={toggleTier} />
-      )}
-      {tab === "kyc" && <KycTab docs={docs} onSetDoc={setDocStatus} />}
+      {tab === "overview" && <OverviewTab vendor={vendor} tiers={tiers} />}
+      {tab === "kyc" && <KycTab docs={vendor.documents} />}
       {tab === "menu" && (
         <EmptyState
           title="Menu management is coming"
@@ -187,33 +99,6 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
           emptyMessage="This vendor has no bookings yet."
         />
       )}
-
-      <ConfirmDialog
-        open={dialog?.kind === "reject"}
-        title="Reject this vendor?"
-        message="The vendor will be marked as rejected and won't appear to customers."
-        confirmLabel="Reject vendor"
-        tone="danger"
-        onConfirm={confirmDialog}
-        onCancel={() => setDialog(null)}
-      />
-      <ConfirmDialog
-        open={dialog?.kind === "suspend"}
-        title="Suspend this vendor?"
-        message="A suspended vendor is hidden from customers until reactivated."
-        confirmLabel="Suspend vendor"
-        tone="danger"
-        onConfirm={confirmDialog}
-        onCancel={() => setDialog(null)}
-      />
-      <ConfirmDialog
-        open={dialog?.kind === "reactivate"}
-        title="Reactivate this vendor?"
-        message="The vendor will be visible to customers again."
-        confirmLabel="Reactivate"
-        onConfirm={confirmDialog}
-        onCancel={() => setDialog(null)}
-      />
     </div>
   );
 }
@@ -223,11 +108,9 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
 function OverviewTab({
   vendor,
   tiers,
-  onToggleTier,
 }: {
   vendor: AdminVendor;
-  tiers: VendorTier[];
-  onToggleTier: (t: VendorTier) => void;
+  tiers: AdminVendor["tiers"];
 }) {
   // Real customer ratings, matched to this vendor by name (best-effort).
   const ratings = useVendorRatings();
@@ -266,32 +149,11 @@ function OverviewTab({
 
         <WidgetCard title="Tiers">
           <p className="text-sm text-ink-soft">
-            Assign every marketplace tier this vendor serves — a caterer can sit
-            in more than one band.
+            Marketplace tiers this vendor serves. Tiers are assigned during
+            review in Vendor Approvals.
           </p>
           <div className="mt-3">
             <TierBadges tiers={tiers} />
-          </div>
-          <div className="mt-4 space-y-2">
-            {TIER_ORDER.map((t) => {
-              const active = tiers.includes(t);
-              const last = active && tiers.length === 1;
-              return (
-                <label
-                  key={t}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-maroon"
-                    checked={active}
-                    disabled={last}
-                    onChange={() => onToggleTier(t)}
-                  />
-                  {t}
-                </label>
-              );
-            })}
           </div>
         </WidgetCard>
       </div>
@@ -312,13 +174,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 /* ── KYC tab ──────────────────────────────────────────────────────────────── */
 
-function KycTab({
-  docs,
-  onSetDoc,
-}: {
-  docs: VendorDocument[];
-  onSetDoc: (kind: string, status: VerificationStatus) => void;
-}) {
+function KycTab({ docs }: { docs: VendorDocument[] }) {
   return (
     <WidgetCard title="KYC & Documents">
       <ul className="space-y-3">
@@ -333,24 +189,6 @@ function KycTab({
                 <StatusBadge status={d.status} />
               </div>
               <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
-            </div>
-            <div className="flex shrink-0 gap-2.5">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => onSetDoc(d.kind, "Verified")}
-                disabled={d.status === "Verified"}
-              >
-                Verify
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onSetDoc(d.kind, "Rejected")}
-                disabled={d.status === "Rejected"}
-              >
-                Reject
-              </Button>
             </div>
           </li>
         ))}

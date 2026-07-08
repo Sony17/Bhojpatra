@@ -22,7 +22,7 @@ export default function WhyChoose() {
           as="ul"
           stagger
           from="alt"
-          className="mt-12 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-5"
+          className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5"
         >
           {whyChoose.map((item: ValueProp) => (
             <li

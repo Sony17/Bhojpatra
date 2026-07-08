@@ -8,7 +8,11 @@ import { ShieldCheck, PriceTag, ClipboardCheck, Headset } from "@/components/ico
 import { occasions, cities } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
-import { useOccasions, OTHER_OCCASION_ID } from "@/lib/occasions";
+import {
+  useOccasions,
+  occasionLeadFor,
+  OTHER_OCCASION_ID,
+} from "@/lib/occasions";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
 /** Local YYYY-MM-DD (matches the <input type="date"> value on /book). */
@@ -41,6 +45,11 @@ export default function Hero() {
   const [cityId, setCityId] = useState(cities[0].id);
   const [customCity, setCustomCity] = useState("");
   const [date, setDate] = useState<Date | null>(null);
+
+  // The chosen occasion's minimum advance notice — a wedding needs far more
+  // lead than a birthday. Drives the date picker's earliest selectable day so a
+  // too-soon date can't be picked here in the hero either.
+  const occasionLead = occasionLeadFor(occasionId, occasionList);
 
   const isOtherOccasion = occasionId === OTHER_OCCASION_ID;
   const isOtherCity = cityId === OTHER_LOCATION_ID;
@@ -93,7 +102,11 @@ export default function Hero() {
           iconClassName="right-1"
           direction="up"
           align="center"
-          defaultDaysAhead={21}
+          // Pre-select — and floor at — the earliest bookable day for the chosen
+          // occasion (today + its lead). Re-picks the new earliest whenever the
+          // occasion (and thus its required notice) changes.
+          defaultDaysAhead={occasionLead}
+          minDaysAhead={occasionLead}
           onChange={(d) => setDate(d)}
         />
       </div>

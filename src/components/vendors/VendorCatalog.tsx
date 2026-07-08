@@ -490,7 +490,7 @@ export default function VendorCatalog() {
                     onClick={() => setDiet(dietValue)}
                     aria-pressed={diet === dietValue}
                     className={
-                      "rounded-full px-4 py-1.5 text-sm font-medium transition-colors " +
+                      "rounded-full px-4 py-2.5 text-sm font-medium transition-colors sm:py-1.5 " +
                       (diet === dietValue
                         ? "bg-maroon text-cream"
                         : "text-ink-soft hover:text-ink")

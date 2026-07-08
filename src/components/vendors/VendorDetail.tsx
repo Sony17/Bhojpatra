@@ -234,7 +234,7 @@ function VendorProfile({
     <section
       className={
         "mx-auto max-w-6xl px-5 py-10 sm:py-14 " +
-        (compareCount > 0 ? "pb-32 sm:pb-36" : "")
+        (compareCount > 0 ? "pb-32 sm:pb-36" : "pb-28 lg:pb-14")
       }
     >
       <Link
