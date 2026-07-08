@@ -1550,6 +1550,17 @@ export const vendorListings: VendorListing[] = [
   { id: "vl-13", name: "Ram Asrey", tiers: ["Gold", "Platinum"], rating: 4.9, reviews: 356, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 749, verified: true, image: img("photo-1631452180519-c014fe946bc7", 500) },
   { id: "vl-14", name: "Chhappan Bhog", tiers: ["Gold", "Platinum"], rating: 4.8, reviews: 289, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 699, verified: true, image: img("photo-1606491956689-2ea866880c84", 500) },
   { id: "vl-15", name: "Hazelnut Factory", tiers: ["Silver", "Gold"], rating: 4.7, reviews: 214, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Baina Boxes", "Sweets"], mealTypes: ["Desserts"], diet: "Veg", priceFrom: 599, verified: true, image: img("photo-1549465220-1a8b9238cd48", 500) },
+  // Placeholder specialists so the home page's Chaat / Beverage / Decor service
+  // cards land on a populated catalog (each card deep-links to /vendors filtered
+  // by the matching cuisine). Dummy data for now — swap for real onboarded
+  // vendors as the categories fill out.
+  { id: "vl-16", name: "Chowk Chaat Bhandar", tiers: ["Silver"], rating: 4.8, reviews: 176, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Chaat"], mealTypes: ["Starters", "Live Counters"], diet: "Veg", priceFrom: 399, verified: true, image: img("photo-1601050690597-df0568f70950", 500) },
+  { id: "vl-17", name: "Bombay Chaat Company", tiers: ["Silver", "Gold"], rating: 4.6, reviews: 132, city: "Mumbai", state: "Maharashtra", cuisines: ["Chaat"], mealTypes: ["Starters", "Live Counters"], diet: "Veg", priceFrom: 449, verified: true, image: img("photo-1606491956689-2ea866880c84", 500) },
+  { id: "vl-18", name: "Dilli Chaat Junction", tiers: ["Silver"], rating: 4.7, reviews: 98, city: "Delhi", state: "Delhi", cuisines: ["Chaat"], mealTypes: ["Starters"], diet: "Veg", priceFrom: 379, verified: false, image: img("photo-1601050690597-df0568f70950", 500) },
+  { id: "vl-19", name: "Sharbat-e-Awadh", tiers: ["Silver"], rating: 4.7, reviews: 88, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Beverages"], mealTypes: ["Live Counters"], diet: "Veg", priceFrom: 199, verified: true, image: img("photo-1437418747212-8d9709afab22", 500) },
+  { id: "vl-20", name: "MojoBar Live Beverages", tiers: ["Silver", "Gold"], rating: 4.5, reviews: 64, city: "Bengaluru", state: "Karnataka", cuisines: ["Beverages"], mealTypes: ["Live Counters"], diet: "Veg", priceFrom: 249, verified: true, image: img("photo-1437418747212-8d9709afab22", 500) },
+  { id: "vl-21", name: "Utsav Decor & Events", tiers: ["Silver", "Gold"], rating: 4.7, reviews: 112, city: "Jaipur", state: "Rajasthan", cuisines: ["Decor"], mealTypes: [], diet: "Veg", priceFrom: 299, verified: true, image: img("photo-1519225421980-715cb0215aed", 500) },
+  { id: "vl-22", name: "Bandhan Mandap Decor", tiers: ["Gold", "Platinum"], rating: 4.8, reviews: 143, city: "Delhi", state: "Delhi", cuisines: ["Decor"], mealTypes: [], diet: "Veg", priceFrom: 349, verified: true, image: img("photo-1519225421980-715cb0215aed", 500) },
 ];
 
 /**

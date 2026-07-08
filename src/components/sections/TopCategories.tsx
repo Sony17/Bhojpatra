@@ -7,6 +7,25 @@ import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
+// Maps a service category to a pre-filtered vendor-catalog deep-link: caterers →
+// the whole catalog, Live Counters → the matching serve-type, and the cuisine-
+// backed categories (Sweets, Chaat, Beverages, Decor) → their vendor cuisine.
+// Any admin-added category falls back to a name search so the catalog still opens
+// focused. Filter values must match the catalog's vocab (`mealTypeOptions`,
+// vendor `cuisines`) exactly.
+const CATEGORY_HREF: Record<string, string> = {
+  caterers: "/vendors",
+  "live-counters": "/vendors?meal=Live+Counters",
+  sweets: "/vendors?cuisine=Sweets",
+  chaat: "/vendors?cuisine=Chaat",
+  beverages: "/vendors?cuisine=Beverages",
+  decor: "/vendors?cuisine=Decor",
+};
+
+function serviceCategoryHref(id: string, name: string): string {
+  return CATEGORY_HREF[id] ?? `/vendors?q=${encodeURIComponent(name)}`;
+}
+
 export default function TopCategories() {
   const { lang } = useLang();
   const { services } = useHomeContent();
@@ -16,14 +35,15 @@ export default function TopCategories() {
   // card can be tapped; hovering pauses it on desktop via `.marquee-pause`.
   const [paused, setPaused] = useState(false);
 
-  // CMS service categories (each opens the booking wizard) with the curated,
-  // admin-editable Baina Box card slotted into the middle. Baina Box links to
-  // its own catalogue instead of the wizard.
+  // CMS service categories — each opens the vendor catalog pre-filtered to that
+  // category (not the booking wizard), so a tap lands the guest on the relevant
+  // caterer listing. The curated, admin-editable Baina Box card is slotted into
+  // the middle and links to its own catalogue search.
   const serviceCards = services.categories.map((c) => ({
     id: c.id,
     name: lang === "hi" ? c.nameHi : c.name,
     image: c.image,
-    href: "/book",
+    href: serviceCategoryHref(c.id, c.name),
   }));
   const bainaCard = {
     id: services.bainaBox.id,
@@ -73,8 +93,9 @@ export default function TopCategories() {
                     aria-hidden={clone}
                     className="group relative w-[42vw] shrink-0 overflow-hidden rounded-card sm:w-[30vw] lg:w-60"
                   >
-                    {/* Tapping a service card opens the booking wizard — the same
-                        "tap a card to begin" gesture as the occasion cards. */}
+                    {/* Tapping a service card opens the vendor catalog filtered
+                        to that category — the same "tap a card to browse" gesture
+                        as the occasion cards. */}
                     <Link
                       href={card.href}
                       aria-label={card.name}

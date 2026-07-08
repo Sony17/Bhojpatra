@@ -144,17 +144,34 @@ export default function VendorCatalog() {
     }
   };
 
-  // Seed the search box from `?q=` so other pages can deep-link a pre-filtered
-  // catalog (e.g. the home page's Baina Box CTA → /vendors?q=Baina+Box).
+  // Seed every filter from URL params so other pages can deep-link a pre-filtered
+  // catalog — the home page's Baina Box CTA (`/vendors?q=Baina+Box`) and the
+  // service-category cards (`/vendors?meal=Live+Counters`, `?cuisine=Sweets`, …).
+  // Unrecognised values fall back to the default so a stray param can't wedge a
+  // filter into an invalid state.
   const searchParams = useSearchParams();
   const [query, setQuery] = useState<string>(() => searchParams.get("q") ?? "");
-  const [city, setCity] = useState<string>(ALL);
-  const [state, setState] = useState<string>(ALL);
-  const [cuisine, setCuisine] = useState<string>(ALL);
-  const [diet, setDiet] = useState<DietFilter>(ALL);
-  const [tier, setTier] = useState<TierFilter>(ALL);
-  const [price, setPrice] = useState<PriceRange>(ALL);
-  const [meals, setMeals] = useState<string[]>([]);
+  const [city, setCity] = useState<string>(() => searchParams.get("city") ?? ALL);
+  const [state, setState] = useState<string>(() => searchParams.get("state") ?? ALL);
+  const [cuisine, setCuisine] = useState<string>(
+    () => searchParams.get("cuisine") ?? ALL,
+  );
+  const [diet, setDiet] = useState<DietFilter>(() => {
+    const d = searchParams.get("diet");
+    return DIET_OPTIONS.includes(d as DietFilter) ? (d as DietFilter) : ALL;
+  });
+  const [tier, setTier] = useState<TierFilter>(() => {
+    const tv = searchParams.get("tier");
+    return TIER_OPTIONS.includes(tv as TierFilter) ? (tv as TierFilter) : ALL;
+  });
+  const [price, setPrice] = useState<PriceRange>(() => {
+    const p = searchParams.get("price");
+    return PRICE_RANGES.some((r) => r.value === p) ? (p as PriceRange) : ALL;
+  });
+  const [meals, setMeals] = useState<string[]>(() => {
+    const m = searchParams.get("meal");
+    return m && mealTypeOptions.includes(m) ? [m] : [];
+  });
   const [sort, setSort] = useState<SortKey>("relevance");
 
   // Real customer ratings, matched to these listings by name (best-effort).
