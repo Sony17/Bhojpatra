@@ -598,7 +598,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   ? t("Hide password", "पासवर्ड छिपाएं")
                   : t("Show password", "पासवर्ड दिखाएं")
               }
-              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-soft transition-colors hover:text-maroon"
+              className="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-control text-ink-soft transition-colors hover:text-maroon"
             >
               <EyeIcon off={showPassword} />
             </button>
@@ -630,7 +630,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                     ? t("Hide password", "पासवर्ड छिपाएं")
                     : t("Show password", "पासवर्ड दिखाएं")
                 }
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-soft transition-colors hover:text-maroon"
+                className="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-control text-ink-soft transition-colors hover:text-maroon"
               >
                 <EyeIcon off={showConfirm} />
               </button>

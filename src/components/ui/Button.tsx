@@ -105,7 +105,9 @@ export default function Button({
     // Default external _blank links to a safe rel unless one was given.
     const relResolved =
       rel ?? (target === "_blank" ? "noopener noreferrer" : undefined);
-    const external = /^(https?:|mailto:|tel:|#)/.test(href);
+    // Anything with a URI scheme (https:, mailto:, tel:, upi:, whatsapp:, …) or
+    // a hash is a plain <a> — only same-origin route paths use next/link.
+    const external = /^([a-z][a-z0-9+.-]*:|#)/i.test(href);
     if (external) {
       return (
         <a

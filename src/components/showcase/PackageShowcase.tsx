@@ -276,7 +276,7 @@ function StatStrip() {
               {stats.map((s) => (
                 <div
                   key={s.l}
-                  className={`rounded-xl px-2 py-3 text-center ${
+                  className={`rounded-control px-2 py-3 text-center ${
                     t.id === "platinum" ? "bg-[rgba(255,255,255,0.12)]" : "bg-[rgba(185,32,37,0.06)]"
                   }`}
                 >

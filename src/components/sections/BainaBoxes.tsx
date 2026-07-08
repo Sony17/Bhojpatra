@@ -32,7 +32,7 @@ export default function BainaBoxes() {
     <section className="bg-white">
       <div className="mx-auto max-w-7xl px-5 py-16 sm:py-20 sm:px-8">
         <Reveal variant="scale">
-          <div className="grid items-center gap-10 rounded-3xl bg-cream/40 p-8 ring-1 ring-cream sm:p-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12">
+          <div className="grid items-center gap-10 rounded-card bg-cream/40 p-8 ring-1 ring-cream sm:p-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12">
             {/* Left — heading, lede, CTA */}
             <div className="text-center lg:text-left">
               <h2 className="font-display text-3xl leading-tight text-ink sm:text-4xl">

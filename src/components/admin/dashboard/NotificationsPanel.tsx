@@ -59,7 +59,7 @@ export default function NotificationsPanel({
           <li
             key={n.id}
             className={
-              "flex items-start gap-3 rounded-xl border border-cream-3 p-4 " +
+              "flex items-start gap-3 rounded-card border border-cream-3 p-4 " +
               (n.unread ? "border-l-4 border-l-maroon" : "")
             }
           >
