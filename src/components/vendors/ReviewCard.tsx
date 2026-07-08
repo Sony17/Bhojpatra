@@ -19,6 +19,7 @@ import {
   ReviewPhotoEditor,
   ReviewPhotoStrip,
 } from "@/components/reviews/ReviewPhotos";
+import { Button } from "@/components/ui";
 
 /** The review shape this card renders — a subset of the stored review. */
 export interface ReviewCardData {
@@ -58,7 +59,7 @@ export default function ReviewCard({
   const initial = (review.name.trim()[0] || "★").toUpperCase();
 
   const cardCls =
-    "rounded-2xl border bg-white p-5 shadow-sm " +
+    "rounded-card border bg-white p-5 shadow-card " +
     (editable ? "border-maroon/30" : "border-cream-3");
 
   const startEdit = () => {
@@ -105,11 +106,11 @@ export default function ReviewCard({
   // ── Inline editor (author only) ─────────────────────────────────────────
   if (editable && mode === "edit") {
     const fieldCls =
-      "mt-1 w-full rounded-lg border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
+      "mt-1 w-full rounded-control border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
     const labelCls =
       "text-[11px] font-semibold uppercase tracking-wide text-maroon";
     return (
-      <li className="rounded-2xl border border-maroon/30 bg-cream/40 p-5 shadow-sm">
+      <li className="rounded-card border border-maroon/30 bg-cream/40 p-5 shadow-card">
         <p className="font-display text-lg text-ink">
           {t("Edit your review", "अपनी समीक्षा संपादित करें")}
         </p>
@@ -156,26 +157,26 @@ export default function ReviewCard({
         )}
 
         <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="lg"
             onClick={save}
             disabled={status === "submitting"}
-            className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
           >
             {status === "submitting"
               ? t("Saving…", "सहेजा जा रहा है…")
               : t("Update review", "समीक्षा अपडेट करें")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
             onClick={() => {
               setError("");
               setMode("view");
             }}
-            className="rounded-full border border-cream-3 px-6 py-3 text-sm font-semibold text-ink-soft transition hover:bg-cream-2"
           >
             {t("Cancel", "रद्द करें")}
-          </button>
+          </Button>
         </div>
       </li>
     );
@@ -248,13 +249,14 @@ export default function ReviewCard({
           </>
         )}
         {editable && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={startEdit}
-            className="ml-auto rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+            className="ml-auto"
           >
             {t("Edit", "संपादित करें")}
-          </button>
+          </Button>
         )}
       </div>
     </li>

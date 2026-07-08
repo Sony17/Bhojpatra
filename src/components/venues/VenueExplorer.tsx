@@ -13,7 +13,7 @@ import {
 import { useLang, type Lang, type Translate } from "@/lib/i18n";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
-import ThemedSelect from "@/components/ThemedSelect";
+import { Card, Container, Select } from "@/components/ui";
 
 const ALL = "all";
 
@@ -82,7 +82,7 @@ export default function VenueExplorer() {
   };
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
+    <Container size="lg" className="py-12 sm:py-16">
       <div className="max-w-2xl">
         <p className="eyebrow text-sm font-medium text-gold">
           {t("Venues", "वेन्यू")}
@@ -99,7 +99,7 @@ export default function VenueExplorer() {
       </div>
 
       {/* Filter bar */}
-      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+      <Card padding="none" className="mt-8 p-4 sm:p-5 lg:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
           {/* City dropdown */}
           <div className="flex w-full flex-col gap-2 sm:max-w-xs">
@@ -109,12 +109,11 @@ export default function VenueExplorer() {
             >
               {t("City", "शहर")}
             </label>
-            <ThemedSelect
+            <Select
               id="venue-city"
               value={city}
               onChange={onCityChange}
               ariaLabel={t("City", "शहर")}
-              buttonClassName="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium transition-colors"
               options={[
                 { value: ALL, label: t("All Cities", "सभी शहर") },
                 ...cityOptions.map((c) => ({ value: c.id, label: c.name })),
@@ -130,12 +129,11 @@ export default function VenueExplorer() {
             >
               {t("Location", "स्थान")}
             </label>
-            <ThemedSelect
+            <Select
               id="venue-location"
               value={location}
               onChange={setLocation}
               ariaLabel={t("Location", "स्थान")}
-              buttonClassName="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm font-medium transition-colors"
               options={[
                 { value: ALL, label: t("All Locations", "सभी स्थान") },
                 ...locationOptions.map((loc) => ({ value: loc, label: loc })),
@@ -143,7 +141,7 @@ export default function VenueExplorer() {
             />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Results summary */}
       <p className="mt-8 text-sm text-ink-soft">
@@ -178,7 +176,7 @@ export default function VenueExplorer() {
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
+        <div className="mt-6 rounded-card border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
           <p className="font-display text-lg text-ink">
             {t("No venues found", "कोई वेन्यू नहीं मिला")}
           </p>
@@ -190,7 +188,7 @@ export default function VenueExplorer() {
           </p>
         </div>
       )}
-    </section>
+    </Container>
   );
 }
 
@@ -216,7 +214,7 @@ function VenueCard({
     <li className="group flex">
       <Link
         href={`/venues/${venue.id}`}
-        className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+        className="flex flex-1 flex-col overflow-hidden rounded-card border border-cream-3 bg-white shadow-card transition hover:-translate-y-1 hover:shadow-pop"
       >
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
           <Image
@@ -259,7 +257,7 @@ function VenueCard({
                 {venue.priceFrom}
               </p>
             </div>
-            <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md">
+            <span className="inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-pop">
               {t("View & Book", "देखें और बुक करें")}
             </span>
           </div>

@@ -12,6 +12,7 @@ import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
 import StickyBookingBar from "@/components/StickyBookingBar";
+import { Button, Card, Badge } from "@/components/ui";
 
 const inr = new Intl.NumberFormat("en-IN");
 
@@ -39,7 +40,7 @@ export default function VendorProfile({
       <div className="mt-5 grid grid-cols-1 gap-8 lg:grid-cols-5">
         {/* Photos */}
         <div className="lg:col-span-3">
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-cream-3 bg-cream-2">
+          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-card border border-cream-3 bg-cream-2">
             <Image
               src={heroUrl}
               alt={profile.business}
@@ -73,15 +74,15 @@ export default function VendorProfile({
 
         {/* Summary card */}
         <div className="lg:col-span-2">
-          <div className="rounded-2xl border border-cream-3 bg-white p-6 shadow-sm">
+          <Card padding="lg">
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="font-display text-2xl text-ink sm:text-3xl">
                 {profile.business}
               </h1>
               {profile.verified && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+                <Badge tone="solid">
                   <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
-                </span>
+                </Badge>
               )}
             </div>
 
@@ -148,19 +149,22 @@ export default function VendorProfile({
               </span>
             </p>
 
-            <Link
+            <Button
               href="/book"
-              className="mt-5 block rounded-full bg-maroon px-6 py-3 text-center text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="mt-5"
             >
               {t("Start a Booking", "बुकिंग शुरू करें")}
-            </Link>
+            </Button>
             <p className="mt-2 text-center text-xs text-ink-soft">
               {t(
                 "Pick this caterer while building your menu in the booking wizard.",
                 "बुकिंग विज़ार्ड में मेन्यू बनाते समय इस कैटरर को चुनें।",
               )}
             </p>
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -171,9 +175,10 @@ export default function VendorProfile({
         </h2>
         <div className="mt-5 space-y-5">
           {profile.menu.map((course) => (
-            <div
+            <Card
               key={course.categoryId}
-              className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6"
+              padding="none"
+              className="p-5 sm:p-6"
             >
               <div className="flex flex-wrap items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cream text-lg">
@@ -208,7 +213,7 @@ export default function VendorProfile({
                   </span>
                 ))}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </div>

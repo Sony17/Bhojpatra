@@ -19,6 +19,7 @@ import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
+import { Button } from "@/components/ui";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -87,12 +88,9 @@ export default function VendorDetail({ id }: { id: string }) {
             "यह कैटरर हटाया जा चुका हो सकता है। सभी कैटरर देखें।",
           )}
         </p>
-        <Link
-          href="/vendors"
-          className="mt-6 inline-block rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-        >
+        <Button href="/vendors" variant="primary" size="lg" className="mt-6">
           {t("Back to Caterers", "कैटरर पर वापस")}
-        </Link>
+        </Button>
       </section>
     );
   }
@@ -335,31 +333,31 @@ function VendorProfile({
               )}
             </p>
 
-            <Link
+            <Button
               href={bookHref}
-              className="mt-5 block w-full rounded-full bg-maroon px-6 py-3 text-center text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="mt-5"
             >
               {t("Book this caterer", "यह कैटरर बुक करें")} →
-            </Link>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant={inCompare ? "primary" : "secondary"}
+              size="lg"
+              fullWidth
               onClick={() => toggle(vendor.id)}
               disabled={compareDisabled}
               aria-pressed={inCompare}
-              className={
-                "mt-3 flex w-full items-center justify-center gap-1.5 rounded-full border px-6 py-3 text-center text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 " +
-                (inCompare
-                  ? "border-maroon bg-maroon text-cream hover:bg-maroon-dark"
-                  : "border-maroon text-maroon hover:bg-maroon/5")
-              }
+              className="mt-3"
+              leftIcon={<span aria-hidden="true">{inCompare ? "✓" : "+"}</span>}
             >
-              <span aria-hidden="true">{inCompare ? "✓" : "+"}</span>
               {inCompare
                 ? t("Added to compare", "तुलना में जोड़ा")
                 : compareDisabled
                   ? t("Compare list is full", "तुलना सूची भर गई है")
                   : t("Add to compare", "तुलना में जोड़ें")}
-            </button>
+            </Button>
             {compareCount > 0 && (
               <Link
                 href="/compare"

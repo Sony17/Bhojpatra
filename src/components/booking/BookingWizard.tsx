@@ -78,6 +78,7 @@ import {
 } from "@/lib/occasions";
 import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
+import { Button, Stepper } from "@/components/ui";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -1358,6 +1359,23 @@ export default function BookingWizard() {
         </p>
       </div>
 
+      {/* Progress rail — shows where the guest is in the 5-step flow. Hidden on
+          the confirmed success screen. */}
+      {!confirmed && (
+        <div className="mt-6">
+          <Stepper
+            current={step - 1}
+            steps={[
+              t("Package", "पैकेज"),
+              t("Menu", "मेन्यू"),
+              t("Details", "विवरण"),
+              t("Services", "सेवाएँ"),
+              t("Review", "समीक्षा"),
+            ]}
+          />
+        </div>
+      )}
+
       {/* Event bar — occasion / date / city carried from the Hero booking bar,
           editable up top on every step. It stays visible on the Add Extras step
           (3) too, since occasion / date / guests gate the "Next" button there —
@@ -1594,7 +1612,7 @@ export default function BookingWizard() {
             <button
               type="button"
               onClick={() => setActiveCat(Math.max(0, firstIncompleteCat))}
-              className="mb-4 flex w-full items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
+              className="focus-ring mb-4 flex w-full items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
             >
               <span aria-hidden="true" className="text-maroon">
                 ★
@@ -1620,7 +1638,7 @@ export default function BookingWizard() {
           {/* Whole menu skipped — reassure the guest they're not stuck: the order
               will be built from live counters & extras on the next step. */}
           {menuFullySkipped && (
-            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+            <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
               <span aria-hidden="true" className="text-maroon">
                 ★
               </span>
@@ -1633,62 +1651,41 @@ export default function BookingWizard() {
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={menuPrev}
-              className="rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-            >
+            <Button variant="secondary" onClick={menuPrev}>
               ←{" "}
               {activeCat > 0
                 ? t("Prev Category", "पिछली श्रेणी")
                 : t("Back", "पीछे")}
-            </button>
+            </Button>
             {/* Single Stall lets a guest opt out of a course entirely — skip it
                 and slide to the next stall, or undo if they skipped by mistake. */}
             {singleStall &&
               (isSkipped(activeCategories[activeCat]?.id ?? "") ? (
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     const cur = activeCategories[activeCat];
                     if (cur) unskipCat(cur.id);
                   }}
-                  className="rounded-full border border-maroon bg-cream-2/60 px-5 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
                 >
                   {t("Undo skip", "छोड़ना पूर्ववत करें")}
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
-                  onClick={skipCurrentStall}
-                  className="rounded-full border border-maroon px-5 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-                >
+                <Button variant="secondary" onClick={skipCurrentStall}>
                   {t("Skip this stall", "यह स्टॉल छोड़ें")}
-                </button>
+                </Button>
               ))}
             {activeCat < activeCategories.length - 1 ? (
-              <button
-                type="button"
-                onClick={menuNext}
-                className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-              >
+              <Button onClick={menuNext}>
                 {singleStall
                   ? t("Next stall", "अगला स्टॉल")
                   : t("Next Category", "अगली श्रेणी")}{" "}
                 →
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={menuNext}
-                disabled={!allComplete}
-                className={
-                  "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
-                  (!allComplete ? "cursor-not-allowed opacity-50" : "")
-                }
-              >
+              <Button onClick={menuNext} disabled={!allComplete}>
                 {t("Continue to Details", "विवरण तक जारी रखें")} →
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -1697,7 +1694,7 @@ export default function BookingWizard() {
           {/* Spell out what's blocking "Next" so the disabled arrow isn't a
               dead end with no explanation. */}
           {nextBlockers.length > 0 && (
-            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+            <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
               <span aria-hidden="true" className="text-maroon">
                 ★
               </span>
@@ -1710,28 +1707,21 @@ export default function BookingWizard() {
             </div>
           )}
           <div className="flex items-center justify-between">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={goBack}
               disabled={step === 1}
-              className={
-                "rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 " +
-                (step === 1 ? "pointer-events-none opacity-40" : "")
-              }
+              aria-label={t("Back", "पीछे")}
             >
               ←
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={goNext}
               disabled={!canNext}
-              className={
-                "rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark " +
-                (!canNext ? "cursor-not-allowed opacity-50" : "")
-              }
+              aria-label={t("Next", "आगे")}
             >
               →
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

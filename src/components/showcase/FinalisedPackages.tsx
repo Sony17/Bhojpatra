@@ -19,9 +19,9 @@
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { packages, packageCategoryItems, type PackageTier, type PackageFeature } from "@/lib/data";
 import Reveal from "@/components/Reveal";
+import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
 
@@ -61,7 +61,7 @@ function spec(id: string) {
 function surface(id: TierId) {
   if (id === "platinum") return "bg-maroon border border-maroon text-cream";
   if (id === "gold")
-    return "bg-cream/50 border border-maroon/30 ring-2 ring-maroon/60 shadow-[0_24px_60px_-30px_rgba(185,32,37,0.55)]";
+    return "bg-cream/50 border border-maroon/30 ring-2 ring-maroon/60 shadow-brand";
   return "bg-white border border-maroon/12";
 }
 function badgeChip(id: TierId) {
@@ -243,11 +243,11 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
   return (
     <article
       aria-label={`${name} ${t("package", "पैकेज")}`}
-      className={`card-lift relative flex h-full flex-col rounded-3xl p-6 sm:p-7 ${dark ? "isolate" : ""} ${surface(id)}`}
+      className={`card-lift relative flex h-full flex-col rounded-card p-6 sm:p-7 ${dark ? "isolate" : ""} ${surface(id)}`}
     >
       {/* Premium shimmer on the Platinum card, behind the text */}
       {dark && (
-        <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+        <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-card">
           <span
             className="absolute inset-0 animate-[bp-shimmer_3.4s_linear_infinite] motion-reduce:animate-none"
             style={{
@@ -338,16 +338,16 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
   return (
     <div>
       <div className="mb-4 flex justify-center">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setHighlight((v) => !v)}
           aria-pressed={highlight}
-          className="btn-sheen rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
         >
           {highlight ? t("Hide upgrades", "अपग्रेड छुपाएँ") : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
-        </button>
+        </Button>
       </div>
-      <div className="no-scrollbar overflow-x-auto rounded-3xl border border-maroon/15">
+      <div className="no-scrollbar overflow-x-auto rounded-card border border-maroon/15">
         <table className="w-full min-w-[440px] border-collapse text-sm">
           <caption className="sr-only">{t("What each package includes, by course", "हर पैकेज में क्या शामिल है")}</caption>
           <thead>
@@ -386,13 +386,6 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
 }
 
 /* ── Section ─────────────────────────────────────────────────────────────── */
-
-const ctaClass = (platinum: boolean) =>
-  `btn-sheen inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-    platinum
-      ? "bg-cream text-maroon focus-visible:ring-cream focus-visible:ring-offset-maroon"
-      : "bg-maroon text-cream focus-visible:ring-maroon"
-  }`;
 
 export default function FinalisedPackages() {
   const { lang, t } = useLang();
@@ -442,14 +435,15 @@ export default function FinalisedPackages() {
                 <TierCard
                   tier={tier}
                   cta={
-                    <Link
+                    <Button
                       href={`/book?package=${tier.id}&step=menu`}
+                      variant={tier.id === "platinum" ? "inverse" : "primary"}
+                      fullWidth
                       aria-label={`${t("Book the", "बुक करें")} ${tierName} ${t("package", "पैकेज")}`}
-                      className={ctaClass(tier.id === "platinum")}
+                      rightIcon={<span aria-hidden="true">→</span>}
                     >
                       <span className="font-display leading-none">{t("Book", "बुक करें")} {tierName}</span>
-                      <span aria-hidden="true">→</span>
-                    </Link>
+                    </Button>
                   }
                 />
               </div>
@@ -479,7 +473,7 @@ export default function FinalisedPackages() {
         {/* Single Stall — the flexible, à-la-carte option */}
         {custom && (
           <Reveal className="mx-auto mt-12 max-w-3xl">
-            <div className="flex flex-col items-start gap-4 rounded-3xl border border-dashed border-maroon/40 bg-cream/20 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col items-start gap-4 rounded-card border border-dashed border-maroon/40 bg-cream/20 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-display text-xl text-maroon">
                   {t("Just one stall?", "सिर्फ़ एक स्टॉल?")}{" "}
@@ -492,20 +486,21 @@ export default function FinalisedPackages() {
                   )}
                 </p>
               </div>
-              <Link
+              <Button
                 href="/book?package=custom&step=menu"
-                className="btn-sheen inline-flex shrink-0 items-center gap-2 rounded-full border border-maroon px-6 py-3 text-sm font-semibold text-maroon transition-all duration-300 hover:bg-maroon hover:text-cream active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
+                variant="secondary"
+                className="shrink-0"
+                rightIcon={<span aria-hidden="true">→</span>}
               >
                 <span className="font-display">{t("Build your own", "अपना बनाएँ")}</span>
-                <span aria-hidden="true">→</span>
-              </Link>
+              </Button>
             </div>
           </Reveal>
         )}
 
         {/* Trust / help footer — pricing note + custom-package help, merged */}
         <Reveal className="mx-auto mt-8 max-w-3xl">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-maroon/15 bg-cream/30 px-6 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div className="flex flex-col items-center gap-3 rounded-card border border-maroon/15 bg-cream/30 px-6 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
             <p className="text-sm text-ink-soft">
               {t(
                 "Prices are approximate — the final price depends on your menu, guests & vendors.",

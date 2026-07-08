@@ -36,6 +36,7 @@ import { saveVendorReview } from "@/lib/reviews";
 import type { VendorListing } from "@/lib/data";
 import StarInput from "@/components/reviews/StarInput";
 import { ReviewPhotoEditor } from "@/components/reviews/ReviewPhotos";
+import { Button } from "@/components/ui";
 
 /** True when a completed order lists this caterer (by catalogue id or name). */
 function bookingHasVendor(b: StoredBooking, vendor: VendorListing): boolean {
@@ -151,12 +152,12 @@ export default function VendorReviewPanel({
   };
 
   const fieldCls =
-    "mt-1 w-full rounded-lg border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
+    "mt-1 w-full rounded-control border border-cream-3 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-maroon";
   const labelCls =
     "text-[11px] font-semibold uppercase tracking-wide text-maroon";
 
   return (
-    <div className="mt-6 rounded-2xl border border-maroon/20 bg-cream/40 p-5 sm:p-6">
+    <div className="mt-6 rounded-card border border-maroon/20 bg-cream/40 p-5 sm:p-6">
       <p className="font-display text-lg text-ink">
         {t("Rate this caterer", "इस कैटरर को रेट करें")}
       </p>
@@ -214,16 +215,16 @@ export default function VendorReviewPanel({
       {error && <p className="mt-3 text-sm font-medium text-maroon">{error}</p>}
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="lg"
           onClick={submit}
           disabled={status === "submitting"}
-          className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
         >
           {status === "submitting"
             ? t("Submitting…", "सबमिट हो रहा है…")
             : t("Submit review", "समीक्षा सबमिट करें")}
-        </button>
+        </Button>
       </div>
     </div>
   );

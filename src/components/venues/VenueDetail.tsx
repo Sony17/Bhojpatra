@@ -34,6 +34,7 @@ import {
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
 import VenueReviews from "@/components/venues/VenueReviews";
+import { Button, Card, Container, Input, Select } from "@/components/ui";
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(Math.round(n))}`;
@@ -84,15 +85,15 @@ export default function VenueDetail({ id }: { id: string }) {
 
   if (venue === undefined) {
     return (
-      <section className="mx-auto max-w-5xl px-5 py-16">
+      <Container size="md" className="py-16">
         <p className="text-sm text-ink-soft">{t("Loading venue…", "वेन्यू लोड हो रहा है…")}</p>
-      </section>
+      </Container>
     );
   }
 
   if (venue === null) {
     return (
-      <section className="mx-auto max-w-5xl px-5 py-16 text-center">
+      <Container size="md" className="py-16 text-center">
         <h1 className="font-display text-2xl text-ink">
           {t("Venue not found", "वेन्यू नहीं मिला")}
         </h1>
@@ -102,13 +103,10 @@ export default function VenueDetail({ id }: { id: string }) {
             "यह वेन्यू हटाया जा चुका हो सकता है। सभी वेन्यू देखें।",
           )}
         </p>
-        <Link
-          href="/venues"
-          className="mt-6 inline-block rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-        >
+        <Button href="/venues" variant="primary" size="lg" className="mt-6">
           {t("Back to Venues", "वेन्यू पर वापस")}
-        </Link>
-      </section>
+        </Button>
+      </Container>
     );
   }
 
@@ -392,8 +390,6 @@ function VenueBooking({
   };
 
   const online = isOnlineMethod(payMethod);
-  const fieldClass =
-    "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
 
   /* ── Catering hand-off ("Both" flows) — carry the venue into /book ───── */
   const cateringHref = (() => {
@@ -419,7 +415,7 @@ function VenueBooking({
       <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
         {/* ── Venue showcase ─────────────────────────────────────────── */}
         <div>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-cream-3 bg-cream-2 shadow-sm">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-card border border-cream-3 bg-cream-2 shadow-card">
             <Image
               src={venue.image}
               alt={venue.name}
@@ -459,7 +455,7 @@ function VenueBooking({
               </p>
             )}
 
-            <div className="mt-5 rounded-2xl border border-cream-3 bg-cream-2/40 p-4">
+            <div className="mt-5 rounded-card border border-cream-3 bg-cream-2/40 p-4">
               <p className="text-xs text-ink-soft">{t("Booking fee from", "बुकिंग शुल्क")}</p>
               <p className="font-display text-2xl font-bold text-maroon">
                 {venue.priceFrom}
@@ -473,12 +469,14 @@ function VenueBooking({
             </div>
 
             {/* Want catering at this venue too? Carry it into the feast wizard. */}
-            <Link
+            <Button
               href={cateringHref}
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+              variant="secondary"
+              leftIcon={<span aria-hidden="true">🍽️</span>}
+              className="mt-4"
             >
-              🍽️ {t("Add catering for this venue", "इस वेन्यू के लिए कैटरिंग जोड़ें")}
-            </Link>
+              {t("Add catering for this venue", "इस वेन्यू के लिए कैटरिंग जोड़ें")}
+            </Button>
           </div>
         </div>
 
@@ -497,7 +495,7 @@ function VenueBooking({
               onDownload={() => downloadInvoice(buildInvoice(paidAmount))}
             />
           ) : (
-            <div className="rounded-3xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+            <Card padding="none" className="p-5 sm:p-6">
               {/* Step indicator */}
               <div className="flex items-center gap-2 text-xs font-semibold">
                 <span
@@ -533,48 +531,49 @@ function VenueBooking({
                       <span className="text-xs font-medium text-ink-soft">
                         {t("Your name", "आपका नाम")}
                       </span>
-                      <input
+                      <Input
                         type="text"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
                         placeholder={t("Full name", "पूरा नाम")}
-                        className={fieldClass}
+                        className="mt-1.5"
                       />
                     </label>
                     <label className="block sm:col-span-2">
                       <span className="text-xs font-medium text-ink-soft">
                         {t("Phone", "फ़ोन")}
                       </span>
-                      <input
+                      <Input
                         type="tel"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
                         placeholder="+91 …"
-                        className={fieldClass}
+                        className="mt-1.5"
                       />
                     </label>
                     <label className="block">
                       <span className="text-xs font-medium text-ink-soft">
                         {t("Occasion", "अवसर")}
                       </span>
-                      <select
+                      <Select
                         value={occasionId}
-                        onChange={(e) => setOccasionId(e.target.value)}
-                        className={fieldClass}
-                      >
-                        <option value="">{t("Select", "चुनें")}</option>
-                        {occasions.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {lang === "hi" ? o.nameHi : o.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setOccasionId}
+                        ariaLabel={t("Occasion", "अवसर")}
+                        buttonClassName="mt-1.5"
+                        options={[
+                          { value: "", label: t("Select", "चुनें") },
+                          ...occasions.map((o) => ({
+                            value: o.id,
+                            label: lang === "hi" ? o.nameHi : o.name,
+                          })),
+                        ]}
+                      />
                     </label>
                     <label className="block">
                       <span className="text-xs font-medium text-ink-soft">
                         {t("Guests", "मेहमान")}
                       </span>
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         value={guests}
@@ -582,19 +581,19 @@ function VenueBooking({
                         onBlur={(e) =>
                           setGuests(Math.max(1, Math.round(Number(e.target.value) || 1)))
                         }
-                        className={fieldClass}
+                        className="mt-1.5"
                       />
                     </label>
                     <label className="block sm:col-span-2">
                       <span className="text-xs font-medium text-ink-soft">
                         {t("Event date", "इवेंट की तारीख़")}
                       </span>
-                      <input
+                      <Input
                         type="date"
                         value={eventDate}
                         min={todayISO()}
                         onChange={(e) => setEventDate(e.target.value)}
-                        className={fieldClass}
+                        className="mt-1.5"
                       />
                     </label>
                   </div>
@@ -611,13 +610,16 @@ function VenueBooking({
                     advanceAmount={advanceAmount}
                   />
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    fullWidth
                     onClick={goToPay}
-                    className="mt-5 w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+                    rightIcon={<span aria-hidden="true">→</span>}
+                    className="mt-5"
                   >
-                    {t("Continue to payment", "भुगतान तक जारी रखें")} →
-                  </button>
+                    {t("Continue to payment", "भुगतान तक जारी रखें")}
+                  </Button>
                 </div>
               ) : sessionStatus === undefined ? (
                 /* Client session still loading — hold the panel to avoid a
@@ -664,7 +666,7 @@ function VenueBooking({
                           aria-pressed={active}
                           onClick={() => setPayMethod(m)}
                           className={
-                            "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
+                            "flex flex-col rounded-card border px-4 py-3 text-left transition " +
                             (active
                               ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
                               : "border-cream-3 bg-white hover:bg-cream-2")
@@ -682,7 +684,7 @@ function VenueBooking({
                   </div>
 
                   {paidAmount > 0 ? (
-                    <div className="mt-4 rounded-2xl border border-maroon bg-white p-4">
+                    <div className="mt-4 rounded-card border border-maroon bg-white p-4">
                       <p className="font-display text-sm font-semibold text-maroon">
                         ✓ {t("Payment received", "भुगतान प्राप्त हुआ")}: {money(paidAmount)}
                       </p>
@@ -711,7 +713,7 @@ function VenueBooking({
                               aria-pressed={active}
                               onClick={() => setChoice(id)}
                               className={
-                                "flex items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-left transition " +
+                                "flex items-center justify-between gap-2 rounded-card border px-4 py-3 text-left transition " +
                                 (active
                                   ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
                                   : "border-cream-3 bg-white hover:bg-cream-2")
@@ -734,7 +736,7 @@ function VenueBooking({
                             alt={t("UPI payment QR", "UPI भुगतान QR")}
                             width={176}
                             height={176}
-                            className="h-44 w-44 rounded-xl border border-cream-3 bg-white p-2 object-contain"
+                            className="h-44 w-44 rounded-control border border-cream-3 bg-white p-2 object-contain"
                           />
                           {merchant.qrImage && (
                             <p className="text-xs text-ink-soft">
@@ -745,12 +747,14 @@ function VenueBooking({
                             </p>
                           )}
                           <p className="text-sm font-semibold text-ink">{merchant.vpa}</p>
-                          <a
+                          <Button
                             href={upiUri}
-                            className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:hidden"
+                            variant="secondary"
+                            size="sm"
+                            className="sm:hidden"
                           >
                             {t("Open UPI app", "UPI ऐप खोलें")}
-                          </a>
+                          </Button>
                         </div>
                       ) : (
                         <div className="mt-4">
@@ -758,27 +762,24 @@ function VenueBooking({
                             {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
+                            <span className="rounded-control border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
                               {merchant.vpa}
                             </span>
-                            <button
-                              type="button"
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => {
                                 navigator.clipboard?.writeText(merchant.vpa).then(
                                   () => setCopied(true),
                                   () => {},
                                 );
                               }}
-                              className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
                             >
                               {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
-                            </button>
-                            <a
-                              href={upiUri}
-                              className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon-dark"
-                            >
+                            </Button>
+                            <Button href={upiUri} variant="primary" size="sm">
                               {t("Open UPI app", "UPI ऐप खोलें")}
-                            </a>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -793,7 +794,7 @@ function VenueBooking({
                         >
                           {t("UPI Transaction ID", "UPI लेनदेन आईडी")}
                         </label>
-                        <input
+                        <Input
                           id="venue-upi-txn-id"
                           type="text"
                           inputMode="numeric"
@@ -804,7 +805,7 @@ function VenueBooking({
                             "12-digit UPI reference / UTR",
                             "12-अंकों का UPI रेफ़रेंस / UTR",
                           )}
-                          className="mt-1.5 w-full rounded-xl border border-cream-3 bg-white px-4 py-2.5 text-sm text-ink outline-none transition focus:border-maroon focus:ring-2 focus:ring-maroon/30"
+                          className="mt-1.5"
                         />
                         <p className="mt-1.5 text-xs text-ink-soft">
                           {t(
@@ -818,16 +819,18 @@ function VenueBooking({
                         <p className="mt-3 text-sm font-medium text-maroon">{payError}</p>
                       )}
 
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        fullWidth
                         onClick={markPaid}
+                        loading={paying}
                         disabled={paying || !isValidTxnId(txnId)}
-                        className="mt-4 w-full rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark disabled:opacity-60"
+                        className="mt-4"
                       >
                         {paying
                           ? t("Recording…", "दर्ज हो रहा है…")
                           : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
-                      </button>
+                      </Button>
                       <p className="mt-2 text-xs text-ink-soft">
                         {t(
                           "Optional — you can also confirm now and pay later.",
@@ -836,7 +839,7 @@ function VenueBooking({
                       </p>
                     </>
                   ) : (
-                    <div className="mt-4 rounded-2xl border border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
+                    <div className="mt-4 rounded-card border border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
                       {t(
                         "No payment now — confirm and our team will call you to arrange the most convenient way to pay.",
                         "अभी कोई भुगतान नहीं — पुष्टि करें और हमारी टीम भुगतान का सुविधाजनक तरीका तय करने के लिए कॉल करेगी।",
@@ -844,19 +847,22 @@ function VenueBooking({
                     </div>
                   )}
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
                     onClick={handleConfirm}
+                    loading={confirming}
                     disabled={confirming}
-                    className="mt-4 w-full rounded-full border border-maroon bg-white px-6 py-3 text-sm font-semibold text-maroon shadow-sm transition hover:bg-maroon/5 disabled:opacity-60"
+                    className="mt-4"
                   >
                     {confirming
                       ? t("Confirming…", "पुष्टि हो रही है…")
                       : t("Confirm booking", "बुकिंग पुष्ट करें")}
-                  </button>
+                  </Button>
                 </div>
               )}
-            </div>
+            </Card>
           )}
         </div>
       </div>
@@ -896,7 +902,7 @@ function PriceBreakdown({
   advanceAmount: number;
 }) {
   return (
-    <div className="mt-5 space-y-2 rounded-2xl border border-cream-3 bg-cream-2/30 p-4">
+    <div className="mt-5 space-y-2 rounded-card border border-cream-3 bg-cream-2/30 p-4">
       <Row label={t("Venue fee", "वेन्यू शुल्क")} value={money(subtotal)} />
       <Row label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
       <div className="my-1 h-px bg-cream-3" />
@@ -950,7 +956,7 @@ function DonePanel({
 }) {
   const balance = Math.max(0, Math.round(grandTotal) - paidAmount);
   return (
-    <div className="rounded-3xl border border-maroon bg-white p-6 shadow-sm">
+    <div className="rounded-card border border-maroon bg-white p-6 shadow-card">
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-maroon-soft text-3xl">
         🎉
       </span>
@@ -962,7 +968,7 @@ function DonePanel({
         <span className="font-semibold text-maroon">{bookingId}</span>
       </p>
 
-      <dl className="mt-5 space-y-2 rounded-2xl border border-cream-3 bg-cream-2/30 p-4 text-sm">
+      <dl className="mt-5 space-y-2 rounded-card border border-cream-3 bg-cream-2/30 p-4 text-sm">
         <div className="flex justify-between">
           <dt className="text-ink-soft">{t("Venue", "वेन्यू")}</dt>
           <dd className="font-medium text-ink">{venue.name}</dd>
@@ -1000,19 +1006,18 @@ function DonePanel({
       </dl>
 
       <div className="mt-5 flex flex-col gap-3">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={onDownload}
-          className="w-full rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
+          leftIcon={<span aria-hidden="true">⬇</span>}
         >
-          ⬇ {t("Download invoice", "इनवॉइस डाउनलोड करें")}
-        </button>
-        <Link
-          href="/bookings"
-          className="w-full rounded-full border border-maroon px-6 py-3 text-center text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-        >
+          {t("Download invoice", "इनवॉइस डाउनलोड करें")}
+        </Button>
+        <Button href="/bookings" variant="secondary" size="lg" fullWidth>
           {t("View in My Dashboard", "मेरे डैशबोर्ड में देखें")}
-        </Link>
+        </Button>
       </div>
     </div>
   );

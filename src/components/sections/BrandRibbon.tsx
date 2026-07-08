@@ -27,9 +27,9 @@ export default function BrandRibbon() {
 
   return (
     <section className="border-t border-maroon/10 bg-cream">
-      <div className="mx-auto max-w-7xl px-5 py-10 sm:py-12 sm:px-8">
+      <div className="mx-auto max-w-7xl px-5 py-5 sm:py-6 sm:px-8">
         {heading && (
-          <p className="eyebrow mb-8 text-center text-xs font-semibold text-maroon sm:text-sm">
+          <p className="eyebrow mb-4 text-center text-xs font-semibold text-maroon sm:text-sm">
             {heading}
           </p>
         )}

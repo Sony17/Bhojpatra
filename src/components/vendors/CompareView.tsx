@@ -10,6 +10,7 @@ import {
   statFor,
   type VendorRatings,
 } from "@/lib/vendorRatings";
+import { Button } from "@/components/ui";
 
 /** Localise the small fixed vocabularies (diet / tier / meal) for display. */
 function useLocalize() {
@@ -77,12 +78,9 @@ export default function CompareView() {
             "कैटरर को साथ-साथ तुलना करने के लिए जोड़ें।",
           )}
         </p>
-        <Link
-          href="/vendors"
-          className="mt-6 inline-block rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-        >
+        <Button href="/vendors" variant="primary" size="lg" className="mt-6">
           {t("Browse caterers", "कैटरर ब्राउज़ करें")}
-        </Link>
+        </Button>
       </section>
     );
   }
@@ -102,24 +100,17 @@ export default function CompareView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/vendors"
-            className="rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-          >
+          <Button href="/vendors" variant="secondary" size="sm">
             + {t("Add more", "और जोड़ें")}
-          </Link>
-          <button
-            type="button"
-            onClick={clear}
-            className="rounded-full px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:text-maroon"
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clear}>
             {t("Clear all", "सभी हटाएं")}
-          </button>
+          </Button>
         </div>
       </div>
 
       {vendors.length < 2 && (
-        <p className="mt-4 rounded-2xl border border-dashed border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
+        <p className="mt-4 rounded-card border border-dashed border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
           {t(
             "Add at least one more caterer to see a side-by-side comparison.",
             "साथ-साथ तुलना देखने के लिए कम से कम एक और कैटरर जोड़ें।",
@@ -136,7 +127,7 @@ export default function CompareView() {
         </p>
       )}
 
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-cream-3 sm:mt-6">
+      <div className="mt-4 overflow-x-auto rounded-card border border-cream-3 sm:mt-6">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
@@ -247,18 +238,12 @@ export default function CompareView() {
               {vendors.map((v) => (
                 <td key={v.id} className="bg-cream-2/40 p-2.5 align-top sm:p-4">
                   <div className="flex flex-col gap-2">
-                    <Link
-                      href={bookHref(v)}
-                      className="rounded-full bg-maroon px-3 py-2 text-center text-xs font-semibold text-cream shadow-sm transition hover:bg-maroon-dark sm:px-4"
-                    >
+                    <Button href={bookHref(v)} variant="primary" size="sm" fullWidth>
                       {t("Book", "बुक करें")}
-                    </Link>
-                    <Link
-                      href={`/vendors/${v.id}`}
-                      className="rounded-full border border-maroon px-3 py-2 text-center text-xs font-semibold text-maroon transition hover:bg-maroon/5 sm:px-4"
-                    >
+                    </Button>
+                    <Button href={`/vendors/${v.id}`} variant="secondary" size="sm" fullWidth>
                       {t("View", "देखें")}
-                    </Link>
+                    </Button>
                   </div>
                 </td>
               ))}

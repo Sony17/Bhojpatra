@@ -20,6 +20,7 @@ import { useLang } from "@/lib/i18n";
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
+import { Button, Card, Chip } from "@/components/ui";
 
 const ALL = "all";
 
@@ -352,7 +353,7 @@ export default function VendorCatalog() {
       )}
 
       {/* Filter bar */}
-      <div className="mt-8 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+      <Card padding="none" className="mt-8 p-4 sm:p-5 lg:p-6">
         {/* Search — prominent, Swiggy/Zomato-style with icon, sort & clear */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="group relative flex-1">
@@ -509,16 +510,17 @@ export default function VendorCatalog() {
                 {mealTypeOptions.map((meal) => (
                   <Chip
                     key={meal}
-                    label={mealLabel(meal)}
-                    active={meals.includes(meal)}
+                    selected={meals.includes(meal)}
                     onClick={() => toggleMeal(meal)}
-                  />
+                  >
+                    {mealLabel(meal)}
+                  </Chip>
                 ))}
               </div>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Results summary */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
@@ -564,7 +566,7 @@ export default function VendorCatalog() {
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
+        <div className="mt-6 rounded-card border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
           <p className="font-display text-lg text-ink">
             {t("No vendors found", "कोई वेंडर नहीं मिला")}
           </p>
@@ -575,13 +577,14 @@ export default function VendorCatalog() {
             )}
           </p>
           {hasActiveFilters && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={resetFilters}
-              className="mt-4 inline-flex items-center rounded-full border border-maroon px-5 py-2 text-sm font-medium text-maroon transition-shadow hover:shadow-md"
+              className="mt-4"
             >
               {t("Clear all", "सभी हटाएं")}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -636,36 +639,10 @@ function FilterSelect({
         value={value}
         onChange={onChange}
         ariaLabel={label}
-        buttonClassName="w-full rounded-lg border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
+        buttonClassName="w-full rounded-control border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
         options={options}
       />
     </div>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:px-5 sm:py-2 " +
-        (active
-          ? "bg-maroon text-cream"
-          : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-      }
-    >
-      {label}
-    </button>
   );
 }
 
@@ -729,7 +706,12 @@ function VendorCard({
   };
 
   return (
-    <li className="group relative flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition-shadow duration-200 hover:shadow-lg">
+    <Card
+      as="li"
+      interactive
+      padding="none"
+      className="group relative flex flex-col overflow-hidden"
+    >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
         <Image
           src={vendor.image}
@@ -876,14 +858,16 @@ function VendorCard({
           {/* Every caterer has a public profile page: live vendors show their
               gallery + full menu, curated listings show details, reviews and a
               "Book this caterer" CTA. */}
-          <Link
+          <Button
             href={`/vendors/${vendor.id}`}
-            className="relative z-10 inline-flex items-center rounded-full border border-maroon px-4 py-2 text-sm font-medium text-maroon transition-shadow group-hover:shadow-md"
+            variant="secondary"
+            size="sm"
+            className="relative z-10 group-hover:shadow-md"
           >
             {vendor.id.startsWith("VEN-")
               ? t("View Menu & Photos", "मेन्यू और फ़ोटो देखें")
               : t("View Details", "विवरण देखें")}
-          </Link>
+          </Button>
         </div>
       </div>
 
@@ -893,13 +877,13 @@ function VendorCard({
       <Link
         href={`/vendors/${vendor.id}`}
         aria-label={t(`View ${vendor.name}`, `${vendor.name} देखें`)}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+        className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
         tabIndex={-1}
       >
         <span className="sr-only">
           {t(`View ${vendor.name}`, `${vendor.name} देखें`)}
         </span>
       </Link>
-    </li>
+    </Card>
   );
 }

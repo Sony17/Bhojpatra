@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { Button } from "@/components/ui";
 
 /* ── Demo tier data ─────────────────────────────────────────────────────── */
 
@@ -264,7 +265,7 @@ function StatStrip() {
           { n: t.spec.sweets, l: "Sweets" },
         ];
         return (
-          <div key={t.id} className={`rounded-2xl p-5 ${cardSurface(t.id)}`}>
+          <div key={t.id} className={`rounded-card p-5 ${cardSurface(t.id)}`}>
             <div className="flex items-baseline justify-between">
               <h3 className="text-xl">{t.name}</h3>
               <span className="text-sm">
@@ -296,7 +297,7 @@ function Cumulative() {
   return (
     <div className="grid gap-5 sm:grid-cols-3">
       {NUMERIC.map((t, i) => (
-        <div key={t.id} className={`rounded-2xl p-5 ${cardSurface(t.id)}`}>
+        <div key={t.id} className={`rounded-card p-5 ${cardSurface(t.id)}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xl">{t.name}</h3>
             <span className="text-sm font-semibold">{t.price}</span>
@@ -360,13 +361,15 @@ function CompareGrid() {
   const [highlight, setHighlight] = useState(true);
   return (
     <div>
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mb-4"
         onClick={() => setHighlight((v) => !v)}
-        className="mb-4 rounded-full border border-maroon px-4 py-1.5 text-sm font-semibold text-maroon transition-colors hover:bg-maroon hover:text-cream"
       >
         {highlight ? "Hide upgrades" : "Highlight upgrades"}
-      </button>
-      <div className="overflow-hidden rounded-2xl border border-[rgba(0,0,0,0.1)]">
+      </Button>
+      <div className="overflow-hidden rounded-card border border-[rgba(0,0,0,0.1)]">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-maroon text-cream">
@@ -418,7 +421,7 @@ function FillMeters() {
   return (
     <div className="grid gap-5 sm:grid-cols-3">
       {NUMERIC.map((t) => (
-        <div key={t.id} className={`rounded-2xl p-5 ${cardSurface(t.id)}`}>
+        <div key={t.id} className={`rounded-card p-5 ${cardSurface(t.id)}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xl">{t.name}</h3>
             <span className={`text-sm ${muted(t.id)}`}>{t.fill}% of a full feast</span>
@@ -441,7 +444,7 @@ function OnlyHere() {
   return (
     <div className="grid gap-5 sm:grid-cols-3">
       {NUMERIC.map((t) => (
-        <div key={t.id} className={`overflow-hidden rounded-2xl ${cardSurface(t.id)}`}>
+        <div key={t.id} className={`overflow-hidden rounded-card ${cardSurface(t.id)}`}>
           <div
             className={`px-5 py-3 text-sm font-semibold ${
               t.id === "platinum" ? "bg-cream text-maroon" : "bg-maroon text-cream"
@@ -467,7 +470,7 @@ function DishPreview() {
   return (
     <div className="grid gap-5 sm:grid-cols-3">
       {NUMERIC.map((t) => (
-        <div key={t.id} className={`rounded-2xl p-5 ${cardSurface(t.id)}`}>
+        <div key={t.id} className={`rounded-card p-5 ${cardSurface(t.id)}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-xl">{t.name}</h3>
             <span className="text-sm font-semibold">{t.price}</span>
@@ -492,7 +495,7 @@ function GuestFit() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {all.map((t) => (
-        <div key={t.id} className={`rounded-2xl p-5 ${cardSurface(t.id)}`}>
+        <div key={t.id} className={`rounded-card p-5 ${cardSurface(t.id)}`}>
           <Badge tier={t} />
           <h3 className="mt-3 text-xl">{t.name}</h3>
           <div
@@ -540,7 +543,7 @@ function PriceJump() {
               </span>
             </div>
           )}
-          <div className={`flex-1 rounded-2xl p-5 ${cardSurface(t.id)}`}>
+          <div className={`flex-1 rounded-card p-5 ${cardSurface(t.id)}`}>
             <h3 className="text-lg">{t.name}</h3>
             <div className="mt-1 text-2xl font-bold">{t.price}</div>
             <p className={`mt-2 text-sm ${muted(t.id)}`}>
@@ -561,7 +564,7 @@ function RoleBadges() {
       {all.map((t) => (
         <div
           key={t.id}
-          className={`flex flex-col items-start gap-3 rounded-2xl p-5 ${cardSurface(t.id)}`}
+          className={`flex flex-col items-start gap-3 rounded-card p-5 ${cardSurface(t.id)}`}
         >
           <Badge tier={t} />
           <div>

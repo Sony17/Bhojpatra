@@ -28,6 +28,7 @@ import type { BookableVenue } from "@/lib/venues";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import VenueReviewPanel from "@/components/venues/VenueReviewPanel";
+import { Card } from "@/components/ui";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -158,7 +159,7 @@ export default function VenueReviews({ venue }: { venue: BookableVenue }) {
 
       {/* Summary — headline score alongside the star breakdown (or, until written
           reviews land, the reasons the rating can be trusted). */}
-      <div className="mt-6 overflow-hidden rounded-3xl border border-cream-3 bg-white shadow-sm">
+      <Card padding="none" className="mt-6 overflow-hidden">
         <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[minmax(0,auto)_1fr] md:gap-10">
           <div className="flex flex-col items-center justify-center text-center md:min-w-52 md:border-r md:border-cream-3 md:pr-10">
             <p className="font-display text-6xl leading-none text-ink">
@@ -236,7 +237,7 @@ export default function VenueReviews({ venue }: { venue: BookableVenue }) {
             </ul>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Signed-in customers who've completed a booking for this venue can rate it
           right here — mirrors the My Bookings review flow. */}
@@ -273,7 +274,7 @@ export default function VenueReviews({ venue }: { venue: BookableVenue }) {
           </ul>
         </>
       ) : (
-        <div className="mt-8 rounded-3xl border border-dashed border-cream-3 bg-white p-10 text-center">
+        <div className="mt-8 rounded-card border border-dashed border-cream-3 bg-white p-10 text-center">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cream-2">
             <StarIcon className="h-6 w-6 text-maroon" />
           </span>

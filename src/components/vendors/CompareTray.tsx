@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useLang } from "@/lib/i18n";
 import { vendorListings } from "@/lib/data";
 import { useCompare, COMPARE_MAX } from "@/lib/compare";
 import { setCompareTrayState } from "@/lib/compareTray";
+import { Button } from "@/components/ui";
 
 /**
  * Sticky bottom tray listing the caterers a guest has ticked to compare, with a
@@ -49,7 +49,7 @@ export default function CompareTray() {
       ref={ref}
       className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 px-3 pb-2 sm:px-5 lg:bottom-0 lg:pb-5"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-cream-3 bg-white/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm sm:flex-row sm:items-center sm:p-4">
+      <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-card border border-cream-3 bg-white/95 p-3 shadow-pop-up backdrop-blur-sm sm:flex-row sm:items-center sm:p-4">
         {/* Label + actions share one justified row on mobile; on desktop
             `sm:contents` flattens this wrapper so they split to the ends. */}
         <div className="flex items-center justify-between gap-3 sm:contents">
@@ -61,20 +61,13 @@ export default function CompareTray() {
           </p>
 
           <div className="flex shrink-0 items-center gap-2 sm:order-last">
-            <button
-              type="button"
-              onClick={clear}
-              className="rounded-full px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:text-maroon"
-            >
+            <Button variant="ghost" size="sm" onClick={clear}>
               {t("Clear", "साफ़ करें")}
-            </button>
+            </Button>
             {canCompare ? (
-              <Link
-                href="/compare"
-                className="rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark"
-              >
+              <Button href="/compare" variant="primary" size="sm">
                 {t("Compare", "तुलना करें")} →
-              </Link>
+              </Button>
             ) : (
               <span className="rounded-full bg-cream-2 px-4 py-2.5 text-xs font-medium text-ink-soft">
                 {t("Add one more", "एक और जोड़ें")}
