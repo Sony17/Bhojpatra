@@ -353,7 +353,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
         nameHi: "द ग्रैंड पवेलियन",
         logo: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=200&h=200&q=80",
         image:
-          "https://images.unsplash.com/photo-1519167758481-83f29da8c2a4?auto=format&fit=crop&w=600&h=600&q=80",
+          "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=600&h=600&q=80",
         location: "Lucknow",
         locationHi: "लखनऊ",
         rating: 4.8,
