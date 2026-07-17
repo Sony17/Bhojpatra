@@ -160,7 +160,7 @@ export default function AppLocationBar({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              "block text-[10px] font-semibold uppercase tracking-[0.14em]",
+              "block truncate text-[9px] font-semibold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.14em]",
               onDark
                 ? "text-cream [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]"
                 : "text-maroon",
@@ -168,7 +168,7 @@ export default function AppLocationBar({
           >
             {t("Celebrating in", "उत्सव यहाँ")}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex min-w-0 items-center gap-1">
             <span
               className={cn(
                 "truncate text-sm font-bold",

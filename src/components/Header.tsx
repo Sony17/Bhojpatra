@@ -49,7 +49,7 @@ function LogoMark() {
         width={894}
         height={226}
         priority
-        className="h-11 w-auto sm:h-12 lg:h-14"
+        className="h-9 w-auto sm:h-12 lg:h-14"
       />
     </Link>
   );
