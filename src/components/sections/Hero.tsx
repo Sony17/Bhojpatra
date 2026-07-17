@@ -11,7 +11,6 @@ import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
 import {
   LOCATION_CHANGED_EVENT,
-  markManualLocation,
   useDetectedLocation,
   type StoredLocation,
 } from "@/lib/detectedLocation";
@@ -55,13 +54,10 @@ export default function Hero() {
     { id: OTHER_OCCASION_ID, name: t("Other", "अन्य"), nameHi: "अन्य" },
   ];
   const locations = useLocations();
-  const locationOptions = [
-    ...locations,
-    { id: OTHER_LOCATION_ID, name: t("Other", "अन्य"), nameHi: "अन्य" },
-  ];
 
-  const { status: locationStatus, match: detectedMatch, detect } =
-    useDetectedLocation(locations);
+  // Location is chosen from the header bar now — the hero just consumes the
+  // detected/selected city to pre-fill the Book / Find-caterers links.
+  const { match: detectedMatch } = useDetectedLocation(locations);
 
   const [occasionId, setOccasionId] = useState(occasions[0].id);
   const [customOccasion, setCustomOccasion] = useState("");
@@ -149,56 +145,6 @@ export default function Hero() {
   const slotInputClass =
     "mt-0.5 w-full bg-transparent py-0.5 pr-1 text-sm font-semibold text-ink outline-none placeholder:text-ink/55";
 
-  const locationSelect = (
-    <BrandSelect
-      className={isOtherCity ? "absolute inset-y-0 right-0 w-7" : "mt-1"}
-      options={locationOptions}
-      placeholder={
-        locationStatus === "detecting"
-          ? t("Detecting… or pick a city", "पता लग रहा है… या शहर चुनें")
-          : t("Select Location", "लोकेशन चुनें")
-      }
-      ariaLabel={
-        isOtherCity
-          ? t("Change location", "लोकेशन बदलें")
-          : t("Select Location", "लोकेशन चुनें")
-      }
-      icon="mapPin"
-      buttonClassName={
-        isOtherCity
-          ? "h-full w-full p-0 text-[0px] leading-none"
-          : "py-0.5 pr-5 text-sm font-medium lg:pr-8"
-      }
-      iconClassName={isOtherCity ? "right-0" : "right-1"}
-      direction="up"
-      align={isOtherCity ? "right" : "left"}
-      menuClassName={isOtherCity ? "w-52" : "w-full"}
-      defaultId={cities[0].id}
-      valueId={cityId}
-      displayLabel={isOtherCity ? "\u00A0" : undefined}
-      actionLabel={
-        locationStatus === "detecting"
-          ? t("Detecting your location…", "लोकेशन पता लगाई जा रही है…")
-          : t("Use my current location", "मेरी मौजूदा लोकेशन इस्तेमाल करें")
-      }
-      actionDisabled={locationStatus === "detecting"}
-      onAction={() => {
-        locationTouched.current = false;
-        seededFromDetection.current = false;
-        void detect();
-      }}
-      onChange={(c) => {
-        locationTouched.current = true;
-        markManualLocation(
-          c.id,
-          c.id === OTHER_LOCATION_ID ? customCity : undefined,
-        );
-        setCityId(c.id);
-        if (c.id !== OTHER_LOCATION_ID) setCustomCity("");
-      }}
-    />
-  );
-
   const bookingBar = (
     <div className="grid w-full grid-cols-2 overflow-visible rounded-[1.5rem] border border-white/40 bg-white/95 p-1.5 shadow-[0_24px_64px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-shadow focus-within:border-cream sm:flex sm:items-stretch sm:rounded-[1.25rem] sm:p-1">
       <div className="min-w-0 flex-1 border-b border-r border-maroon/10 px-3 py-2.5 sm:border-b-0 sm:border-r-0 sm:px-3 sm:py-2.5 lg:px-4">
@@ -269,40 +215,6 @@ export default function Hero() {
           minDaysAhead={occasionLead}
           onChange={(d) => setDate(d)}
         />
-      </div>
-
-      {divider}
-
-      <div className="relative z-40 col-span-2 hidden min-w-0 flex-[1.15] overflow-visible border-b border-maroon/10 px-3 py-2.5 sm:block sm:border-b-0 sm:px-3 sm:py-2.5 lg:px-4">
-        <span className={fieldLabel}>
-          {t("Location", "लोकेशन")}
-          {locationStatus === "detecting" && (
-            <span className="ml-2 font-medium normal-case tracking-normal text-maroon/65">
-              {t("detecting…", "पता लग रहा है…")}
-            </span>
-          )}
-        </span>
-        {isOtherCity ? (
-          <div className="relative z-40 mt-1 flex min-w-0 items-center">
-            <input
-              type="text"
-              value={customCity}
-              onChange={(e) => {
-                const value = e.target.value;
-                locationTouched.current = true;
-                setCustomCity(value);
-                markManualLocation(OTHER_LOCATION_ID, value);
-              }}
-              placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              className={`${slotInputClass} mt-0 pr-7`}
-              autoFocus={!isOtherOccasion}
-            />
-            {locationSelect}
-          </div>
-        ) : (
-          locationSelect
-        )}
       </div>
 
       <div className="relative z-0 col-span-2 m-1 grid shrink-0 grid-cols-2 gap-2 sm:m-0 sm:ml-1 sm:flex sm:self-stretch sm:items-stretch">
@@ -389,52 +301,6 @@ export default function Hero() {
 
         <div className="animate-rise delay-4 mt-5 max-w-5xl sm:mt-9">
           {bookingBar}
-          {(locationStatus === "detecting" ||
-            locationStatus === "failed" ||
-            locationStatus === "denied") && (
-            <p className="mt-2.5 hidden text-xs text-ink/65 sm:block">
-              {locationStatus === "detecting" && (
-                <>
-                  {t(
-                    "Detecting your location…",
-                    "आपकी लोकेशन पता लगाई जा रही है…",
-                  )}{" "}
-                  <span className="font-medium text-maroon">
-                    {t(
-                      "You can still pick or edit a city anytime.",
-                      "आप अभी भी शहर चुन या बदल सकते हैं।",
-                    )}
-                  </span>
-                </>
-              )}
-              {(locationStatus === "failed" || locationStatus === "denied") && (
-                <>
-                  {t(
-                    "We couldn't detect your city automatically.",
-                    "हम आपका शहर अपने आप नहीं पहचान पाए।",
-                  )}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      locationTouched.current = false;
-                      seededFromDetection.current = false;
-                      void detect();
-                    }}
-                    className="font-semibold text-maroon underline-offset-2 hover:underline"
-                  >
-                    {t("Use my location", "मेरी लोकेशन इस्तेमाल करें")}
-                  </button>
-                  {" · "}
-                  <span>
-                    {t(
-                      "Or choose a city from the list above.",
-                      "या ऊपर सूची से शहर चुनें।",
-                    )}
-                  </span>
-                </>
-              )}
-            </p>
-          )}
         </div>
 
         <ul className="animate-rise delay-5 mt-6 grid grid-cols-4 gap-0 divide-x divide-maroon/10 border-t border-maroon/10 pt-4 sm:mt-12 sm:pt-7">

@@ -233,15 +233,15 @@ export default function Header() {
       {/* Desktop nav bar */}
       <div
         className={
-          "animate-fade relative mx-auto hidden h-[72px] w-[calc(100%-40px)] max-w-[1240px] items-center justify-between rounded-[18px] px-6 lg:flex " +
+          "animate-fade relative mx-auto hidden h-[72px] w-[calc(100%-40px)] max-w-[1240px] items-center rounded-[18px] px-6 lg:flex " +
           navSurface
         }
       >
-        <div className="flex min-w-0 items-center">
+        <div className="flex flex-1 min-w-0 items-center">
           <LogoMark />
         </div>
 
-        <nav className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-10">
+        <nav className="flex flex-1 items-center justify-center gap-10">
           {navLinks.map((link) => {
             const active = isNavActive(link.href);
             return (
@@ -313,7 +313,16 @@ export default function Header() {
           })}
         </nav>
 
-        <div className="flex items-center">
+        <div className="flex flex-1 min-w-0 items-center justify-end gap-3">
+          <AppLocationBar
+            compact
+            onDark={false}
+            className="hidden min-w-0 max-w-[11rem] lg:flex"
+          />
+          <span
+            aria-hidden="true"
+            className="hidden h-8 w-px shrink-0 bg-maroon/10 lg:block"
+          />
           <ProfileMenu onLight />
         </div>
       </div>
