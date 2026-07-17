@@ -178,7 +178,11 @@ export default function PromoLeadCapture() {
               />
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 border-t border-cream/40 bg-maroon/90 p-2 backdrop-blur-sm sm:p-3">
+            {/* Gradient scrim so the lead form floats over the artwork
+                instead of sitting in a hard slab — reads more premium. */}
+            <div className="promo-overlay-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
+
+            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
               <div className="mx-auto flex w-full max-w-5xl items-center gap-1.5 sm:gap-2">
                 <div className="min-w-0 flex-1">{leadForm}</div>
                 <WhatsAppShareButton
