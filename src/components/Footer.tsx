@@ -4,8 +4,11 @@ import Link from "next/link";
 import { navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
-import BrandRibbon from "@/components/sections/BrandRibbon";
 
+/**
+ * Desktop keeps the full marketing footer. Mobile gets a compact app-style
+ * strip (legal + essentials) so list screens feel like a food app, not a site.
+ */
 export default function Footer() {
   const { lang, t } = useLang();
   const { contact } = useSiteContent();
@@ -36,7 +39,7 @@ export default function Footer() {
           />
         </div>
       </section>
-      <section className="bg-white text-black">
+      <section className="hidden bg-white text-black lg:block">
         <div className="mx-auto grid max-w-7xl [zoom:0.75] items-center gap-24 px-5 py-7 sm:py-8 lg:grid-cols-2 lg:gap-48">
           <div className="text-center lg:text-right">
             <span className="inline-flex items-center gap-2 rounded-full bg-maroon px-3 py-1 text-xs font-semibold tracking-wide text-cream">
@@ -76,121 +79,144 @@ export default function Footer() {
             </div>
           </div>
           <div className="flex h-[260px] items-start justify-center overflow-hidden px-10 pt-10 lg:justify-start">
-            {/* tilted phone — cropped to show top half */}
             <div className="relative h-[420px] w-[210px] -rotate-[8deg] rounded-[2.5rem] bg-black p-1.5 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.55)]">
               <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
               <div className="flex h-full w-full flex-col items-center overflow-hidden rounded-[2rem] bg-white px-5 pt-12 text-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/bhojpatra-logo.png"
-                    alt="bhojpatra"
-                    width={910}
-                    height={250}
-                    className="h-8 w-auto"
-                  />
-                  <p className="mt-1 text-[11px] text-black/60">
-                    {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
-                  </p>
-                  <div className="mt-5 w-full space-y-2.5">
-                    <div className="h-9 rounded-xl bg-maroon/10" />
-                    <div className="h-9 rounded-xl bg-maroon/10" />
-                    <div className="h-9 rounded-xl bg-maroon/10" />
-                    <div className="mt-4 h-10 rounded-xl bg-maroon" />
-                  </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/bhojpatra-logo.png"
+                  alt="bhojpatra"
+                  width={910}
+                  height={250}
+                  className="h-8 w-auto"
+                />
+                <p className="mt-1 text-[11px] text-black/60">
+                  {t("Your Celebrations, Now in Your Pocket", "आपके उत्सव, अब आपकी जेब में")}
+                </p>
+                <div className="mt-5 w-full space-y-2.5">
+                  <div className="h-9 rounded-xl bg-maroon/10" />
+                  <div className="h-9 rounded-xl bg-maroon/10" />
+                  <div className="h-9 rounded-xl bg-maroon/10" />
+                  <div className="mt-4 h-10 rounded-xl bg-maroon" />
                 </div>
               </div>
             </div>
           </div>
+        </div>
       </section>
 
-      {/* Prestigious brands Bhojpatra serves — a moving "trusted by" band. */}
-      <BrandRibbon />
+      {/* Mobile compact footer — app-style legal strip */}
+      <footer className="border-t border-maroon/8 bg-white pb-[calc(var(--tab-bar-h)+var(--safe-bottom))] text-ink lg:hidden">
+        <div className="mx-auto max-w-lg px-4 py-6">
+          <nav
+            aria-label={t("Company", "कंपनी")}
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] font-semibold text-ink/55"
+          >
+            <Link href="/about" className="tap inline-flex items-center hover:text-maroon">
+              {t("About", "हमारे बारे में")}
+            </Link>
+            <Link href="/contact" className="tap inline-flex items-center hover:text-maroon">
+              {t("Help", "मदद")}
+            </Link>
+            <Link href="/terms" className="tap inline-flex items-center hover:text-maroon">
+              {t("Terms", "नियम")}
+            </Link>
+            <Link href="/refund" className="tap inline-flex items-center hover:text-maroon">
+              {t("Refunds", "रिफंड")}
+            </Link>
+          </nav>
+          <p className="mt-4 text-center text-[11px] text-ink/40">
+            © {new Date().getFullYear()} Bhojpatra
+          </p>
+        </div>
+      </footer>
 
-    <footer className="bg-maroon-dark pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-cream/80 lg:pb-0">
-      <div className="mx-auto max-w-7xl px-5 py-12">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-6">
-          <div className="flex flex-col items-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/bhojpatra-logo1.png"
-              alt="bhojpatra"
-              width={460}
-              height={543}
-              className="h-auto w-32"
-            />
-            <a
-              href={`https://www.instagram.com/${contact.instagram.replace(/^@/, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-2 text-sm text-cream/70 hover:text-cream"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-                aria-hidden="true"
+      {/* Desktop full footer */}
+      <footer className="hidden bg-maroon-dark text-cream/80 lg:block">
+        <div className="mx-auto max-w-7xl px-5 py-12">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-6">
+            <div className="flex flex-col items-start">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/bhojpatra-logo1.png"
+                alt="bhojpatra"
+                width={460}
+                height={543}
+                className="h-auto w-32"
+              />
+              <a
+                href={`https://www.instagram.com/${contact.instagram.replace(/^@/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 text-sm text-cream/70 hover:text-cream"
               >
-                <rect x="2" y="2" width="20" height="20" rx="5" />
-                <circle cx="12" cy="12" r="4" />
-                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-              </svg>
-              @bhojpatraofficial
-            </a>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
+                @bhojpatraofficial
+              </a>
+            </div>
+
+            <div>
+              <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Explore", "एक्सप्लोर")}</p>
+              <ul className="space-y-2 text-sm">
+                {navLinks.map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="hover:text-cream">
+                      {lang === "hi" ? link.labelHi : link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Company", "कंपनी")}</p>
+              <ul className="space-y-2 text-sm">
+                <li><Link href="/about" className="hover:text-cream">{t("About Us", "हमारे बारे में")}</Link></li>
+                <li><Link href="/careers" className="hover:text-cream">{t("Careers", "करियर")}</Link></li>
+                <li><Link href="/contact" className="hover:text-cream">{t("Contact", "संपर्क")}</Link></li>
+                <li><Link href="/terms" className="hover:text-cream">{t("Terms & Privacy", "नियम और गोपनीयता")}</Link></li>
+                <li><Link href="/refund" className="hover:text-cream">{t("Refund Policy", "रिफंड नीति")}</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Get in touch", "संपर्क करें")}</p>
+              <a href={`mailto:${contact.email}`} className="block text-sm text-cream/70 hover:text-cream">
+                {contact.email}
+              </a>
+              <a href={`tel:+${contact.whatsapp}`} className="mt-1 block text-sm text-cream/70 hover:text-cream">
+                {contact.phoneDisplay}
+              </a>
+              <a
+                href={`https://${contact.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 block text-sm text-cream/70 hover:text-cream"
+              >
+                {contact.website}
+              </a>
+              <p className="mt-1 text-sm text-cream/70">{contact.address}</p>
+            </div>
           </div>
 
-          <div className="hidden sm:block">
-            <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Explore", "एक्सप्लोर")}</p>
-            <ul className="space-y-2 text-sm">
-              {navLinks.map((link) => (
-                <li key={link.label}>
-                  <Link href={link.href} className="hover:text-cream">
-                    {lang === "hi" ? link.labelHi : link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Company", "कंपनी")}</p>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/about" className="hover:text-cream">{t("About Us", "हमारे बारे में")}</Link></li>
-              <li><Link href="/careers" className="hover:text-cream">{t("Careers", "करियर")}</Link></li>
-              <li><Link href="/contact" className="hover:text-cream">{t("Contact", "संपर्क")}</Link></li>
-              <li><Link href="/terms" className="hover:text-cream">{t("Terms & Privacy", "नियम और गोपनीयता")}</Link></li>
-              <li><Link href="/refund" className="hover:text-cream">{t("Refund Policy", "रिफंड नीति")}</Link></li>
-            </ul>
-          </div>
-
-          <div className="hidden sm:col-span-1 sm:block">
-            <p className="eyebrow mb-3 text-xs font-semibold text-cream">{t("Get in touch", "संपर्क करें")}</p>
-            <a href={`mailto:${contact.email}`} className="block text-sm text-cream/70 hover:text-cream">
-              {contact.email}
-            </a>
-            <a href={`tel:+${contact.whatsapp}`} className="mt-1 block text-sm text-cream/70 hover:text-cream">
-              {contact.phoneDisplay}
-            </a>
-            <a
-              href={`https://${contact.website}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 block text-sm text-cream/70 hover:text-cream"
-            >
-              {contact.website}
-            </a>
-            <p className="mt-1 text-sm text-cream/70">{contact.address}</p>
+          <div className="mt-10 border-t border-cream/10 pt-6 text-center text-xs text-cream/50">
+            © {new Date().getFullYear()} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
           </div>
         </div>
-
-        <div className="mt-10 border-t border-cream/10 pt-6 text-center text-xs text-cream/50">
-          © {new Date().getFullYear()} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
-        </div>
-      </div>
-    </footer>
+      </footer>
     </>
   );
 }

@@ -5,12 +5,17 @@
  * so the floating chat launcher can lift itself clear of the tray instead of
  * covering its "Compare" CTA. Module-level state + subscribers — mirrors the
  * pattern in `lib/accountMenu.ts`, no context provider needed.
+ *
+ * Also carries a same-tab "open the comparison table" request so detail-page
+ * CTAs can open the tray's modal without navigating away.
  */
 import { useEffect, useState } from "react";
 
 let visible = false;
 let height = 0;
 const listeners = new Set<() => void>();
+
+const OPEN_TABLE_EVENT = "bhojpatra:compare-open-table";
 
 function emit(): void {
   for (const l of listeners) l();
@@ -38,4 +43,19 @@ export function useCompareTrayState(): { visible: boolean; height: number } {
     };
   }, []);
   return { visible, height };
+}
+
+/** Ask the mounted CompareTray to open the side-by-side table modal. */
+export function openCompareTable(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(OPEN_TABLE_EVENT));
+}
+
+/** Subscribe the tray to external "open table" requests (detail-page CTAs). */
+export function useCompareTableOpenRequest(onOpen: () => void): void {
+  useEffect(() => {
+    const handler = () => onOpen();
+    window.addEventListener(OPEN_TABLE_EVENT, handler);
+    return () => window.removeEventListener(OPEN_TABLE_EVENT, handler);
+  }, [onOpen]);
 }

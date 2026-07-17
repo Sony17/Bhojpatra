@@ -1,18 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Reveal from "@/components/Reveal";
+import SectionIntro from "@/components/SectionIntro";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
-// Maps a service category to a pre-filtered vendor-catalog deep-link: caterers →
-// the whole catalog, Live Counters → the matching serve-type, and the cuisine-
-// backed categories (Sweets, Chaat, Beverages, Decor) → their vendor cuisine.
-// Any admin-added category falls back to a name search so the catalog still opens
-// focused. Filter values must match the catalog's vocab (`mealTypeOptions`,
-// vendor `cuisines`) exactly.
+// Maps a service category to a pre-filtered vendor-catalog deep-link.
 const CATEGORY_HREF: Record<string, string> = {
   caterers: "/vendors",
   "live-counters": "/vendors?meal=Live+Counters",
@@ -26,30 +20,28 @@ function serviceCategoryHref(id: string, name: string): string {
   return CATEGORY_HREF[id] ?? `/vendors?q=${encodeURIComponent(name)}`;
 }
 
+/**
+ * Category rail under "Single stall, one Bhojpatra Experience…" —
+ * large occasion-style portrait tiles in a continuous right→left marquee.
+ */
 export default function TopCategories() {
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const { services } = useHomeContent();
 
-  // Continuous-marquee twin of the "moments when we set tables" occasion strip,
-  // so the two sections read as a matched pair. Touch pauses the slide so a
-  // card can be tapped; hovering pauses it on desktop via `.marquee-pause`.
-  const [paused, setPaused] = useState(false);
-
-  // CMS service categories — each opens the vendor catalog pre-filtered to that
-  // category (not the booking wizard), so a tap lands the guest on the relevant
-  // caterer listing. The curated, admin-editable Baina Box card is slotted into
-  // the middle and links to its own catalogue search.
+  const showPrices = services.showPrices;
   const serviceCards = services.categories.map((c) => ({
     id: c.id,
     name: lang === "hi" ? c.nameHi : c.name,
     image: c.image,
     href: serviceCategoryHref(c.id, c.name),
+    priceFrom: c.priceFrom ?? "",
   }));
   const bainaCard = {
     id: services.bainaBox.id,
     name: lang === "hi" ? services.bainaBox.nameHi : services.bainaBox.name,
     image: services.bainaBox.image,
     href: "/vendors?q=Baina+Box",
+    priceFrom: services.bainaBox.priceFrom ?? "",
   };
   const mid = Math.floor(serviceCards.length / 2);
   const cards = [
@@ -59,73 +51,61 @@ export default function TopCategories() {
   ];
 
   return (
-    <section className="bg-white">
-      <div className="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
-        <Reveal variant="left" className="text-center">
-          <h2 className="font-display text-3xl text-maroon sm:text-4xl">
-            {lang === "hi" ? services.headingHi : services.heading}
-          </h2>
-          <p className="font-script mx-auto mt-4 max-w-2xl text-[0.9375rem] text-ink-soft sm:text-lg">
-            {lang === "hi" ? services.subtitleHi : services.subtitle}
-          </p>
-        </Reveal>
+    <section
+      id="services"
+      className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16"
+    >
+      <SectionIntro
+        eyebrow={t("What's on your mind?", "क्या मन है?")}
+        title={lang === "hi" ? services.headingHi : services.heading}
+        subtitle={lang === "hi" ? services.subtitleHi : services.subtitle}
+      />
 
-        <Reveal as="div" variant="up" className="mt-12">
-          {/* Continuous marquee — the service cards slide sideways forever;
-              hovering (desktop) or touching (mobile) pauses the strip so a card
-              can be tapped. The doubled track makes the -50% loop seamless, and
-              the motion is gated behind `prefers-reduced-motion`. */}
-          <div
-            className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_5%,#000_95%,transparent)]"
-            onTouchStart={() => setPaused(true)}
-            onTouchEnd={() => setPaused(false)}
-            onTouchCancel={() => setPaused(false)}
-          >
-            <div
-              className="animate-marquee flex w-max gap-4 motion-reduce:!animate-none sm:gap-6"
-              style={paused ? { animationPlayState: "paused" } : undefined}
-            >
-              {[...cards, ...cards].map((card, i) => {
-                const clone = i >= cards.length;
-                return (
-                  <div
-                    key={`${card.id}-${i}`}
-                    aria-hidden={clone}
-                    className="group relative w-[42vw] shrink-0 overflow-hidden rounded-card sm:w-[30vw] lg:w-60"
-                  >
-                    {/* Tapping a service card opens the vendor catalog filtered
-                        to that category — the same "tap a card to browse" gesture
-                        as the occasion cards. */}
-                    <Link
-                      href={card.href}
-                      aria-label={card.name}
-                      tabIndex={clone ? -1 : undefined}
-                      className="relative block aspect-[9/10] w-full"
-                    >
-                      <Image
-                        src={card.image}
-                        alt={clone ? "" : card.name}
-                        fill
-                        sizes="(min-width: 1024px) 240px, (min-width: 640px) 30vw, 42vw"
-                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
-                        unoptimized={isUnoptimized(card.image)}
-                      />
-                      {/* Black overtone — a full veil for a consistent moody
-                          tint, plus a bottom gradient so the name stays legible. */}
-                      <div className="absolute inset-0 bg-black/40" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                      <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
-                        <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
-                          {card.name}
-                        </span>
-                      </div>
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Reveal>
+      <div className="marquee-pause relative -mx-5 mt-8 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)] sm:-mx-8 sm:mt-10">
+        <div className="animate-marquee flex w-max gap-3 px-5 py-1 motion-reduce:!animate-none sm:gap-4 sm:px-8">
+          {[0, 1].map((copy) =>
+            cards.map((card) => (
+              <Link
+                key={`${card.id}-${copy}`}
+                href={card.href}
+                aria-label={copy === 0 ? card.name : undefined}
+                aria-hidden={copy === 1 || undefined}
+                tabIndex={copy === 1 ? -1 : undefined}
+                className="group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl shadow-card ring-1 ring-maroon/8 transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-[11rem]"
+              >
+                <span className="relative block aspect-[3/4] w-full bg-cream">
+                  <Image
+                    src={card.image}
+                    alt={copy === 0 ? card.name : ""}
+                    fill
+                    sizes="176px"
+                    className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.03]"
+                    unoptimized={isUnoptimized(card.image)}
+                  />
+                  <span aria-hidden className="absolute inset-0 bg-black/45" />
+                  <span className="media-veil absolute inset-0" />
+                  <span className="absolute inset-x-0 bottom-0 px-3 pb-3.5">
+                    <span className="block font-sans text-[14px] font-bold leading-tight text-cream sm:text-[15px]">
+                      {card.name}
+                    </span>
+                    {showPrices && card.priceFrom ? (
+                      <span className="mt-1 block text-[11px] font-medium text-cream/85">
+                        {lang === "hi"
+                          ? `${card.priceFrom} से`
+                          : `From ${card.priceFrom}`}
+                      </span>
+                    ) : (
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
+                        {t("Explore", "देखें")}
+                        <span aria-hidden>→</span>
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </Link>
+            )),
+          )}
+        </div>
       </div>
     </section>
   );

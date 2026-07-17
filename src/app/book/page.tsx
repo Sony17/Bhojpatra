@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import FloatingChat from "@/components/FloatingChat";
+import PublicShell from "@/components/app/PublicShell";
 import BookingWizard from "@/components/booking/BookingWizard";
 
 export const metadata: Metadata = {
@@ -12,13 +10,8 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
-    <>
-      <Header />
-      <main className="flex-1 pt-28 sm:pt-32">
-        <BookingWizard />
-      </main>
-      <Footer />
-      <FloatingChat />
-    </>
+    <PublicShell>
+      <BookingWizard />
+    </PublicShell>
   );
 }

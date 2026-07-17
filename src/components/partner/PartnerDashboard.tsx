@@ -21,7 +21,7 @@ import {
 } from "@/lib/referralRates";
 import type { BookingStatus } from "@/lib/data";
 import VenuePanel from "@/components/partner/VenuePanel";
-import { Badge, Button, Card, type BadgeTone } from "@/components/ui";
+import { Badge, AppBar, Button, Card, EmptyState, type BadgeTone } from "@/components/ui";
 
 /** All partner roles, in display order — used to offer the ones not yet held. */
 const ALL_ROLES: PartnerRole[] = ["planner", "individual", "venue"];
@@ -167,7 +167,13 @@ export default function PartnerDashboard() {
   const reward = Math.round((confirmedValue * rewardPercent) / 100);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
+    <>
+      <AppBar
+        title={t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
+        backHref="/"
+        className="lg:hidden"
+      />
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-5 sm:py-12 lg:py-16">
       <DashboardHeader name={session?.name} role={partnerLabel} />
 
       {/* Role switcher — one dashboard per partner role this person holds. */}
@@ -232,6 +238,7 @@ export default function PartnerDashboard() {
         )}
       </div>
     </section>
+    </>
   );
 }
 
@@ -457,12 +464,19 @@ function OverviewPanel({
             )}
           </div>
           {recent.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-soft">
-              {t(
-                "No referrals yet. Share your link to get started.",
-                "अभी कोई रेफ़रल नहीं। शुरू करने के लिए अपना लिंक साझा करें।",
+            <EmptyState
+              className="mt-4 border-0 bg-cream/40 py-6 shadow-none"
+              title={t("No referrals yet", "अभी कोई रेफ़रल नहीं")}
+              message={t(
+                "Share your link to get started.",
+                "शुरू करने के लिए अपना लिंक साझा करें।",
               )}
-            </p>
+              action={
+                <Button variant="primary" size="sm" onClick={onShare}>
+                  {t("Share & Earn", "शेयर करें और कमाएं")}
+                </Button>
+              }
+            />
           ) : (
             <ul className="mt-4 divide-y divide-cream-3">
               {recent.map((o) => (
@@ -671,17 +685,13 @@ function ReferralsPanel({ orders }: { orders: ReferredOrder[] }) {
 
   if (orders.length === 0) {
     return (
-      <div className="rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
-        <p className="font-display text-lg text-ink">
-          {t("No referrals yet", "अभी कोई रेफ़रल नहीं")}
-        </p>
-        <p className="mt-1 text-sm text-ink-soft">
-          {t(
-            "Share your link or code — referred bookings show up here.",
-            "अपना लिंक या कोड साझा करें — रेफ़र की गई बुकिंग यहाँ दिखेंगी।",
-          )}
-        </p>
-      </div>
+      <EmptyState
+        title={t("No referrals yet", "अभी कोई रेफ़रल नहीं")}
+        message={t(
+          "Share your link or code — referred bookings show up here.",
+          "अपना लिंक या कोड साझा करें — रेफ़र की गई बुकिंग यहाँ दिखेंगी।",
+        )}
+      />
     );
   }
 

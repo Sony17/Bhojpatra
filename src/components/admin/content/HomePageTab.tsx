@@ -9,6 +9,7 @@ import {
   saveHomeContent,
   resetHomeContent,
   DEFAULT_HOME_CONTENT,
+  isBrokenHeroImage,
   type HomeContent,
   type HomeCategory,
   type HomeOccasion,
@@ -16,7 +17,12 @@ import {
   type HomeRibbonBrand,
   type HomeGalleryItem,
   type HomeTestimonial,
+  type HomeTrustBadge,
+  type HomeTrustBadgeIcon,
 } from "@/lib/homeContent";
+import { useOccasions } from "@/lib/occasions";
+import { useLocations } from "@/lib/locations";
+import { heroEventImages, heroLocationImages } from "@/lib/data";
 
 /**
  * Admin editor for the public home page. Every section's copy (English +
@@ -28,6 +34,8 @@ import {
  */
 export default function HomePageTab() {
   const content = useHomeContent();
+  const occasionList = useOccasions();
+  const locationList = useLocations();
   const [draft, setDraft] = useState<HomeContent>(() =>
     structuredClone(content),
   );
@@ -149,20 +157,157 @@ export default function HomePageTab() {
           onEn={(v) => patch("hero", { lede: v })}
           onHi={(v) => patch("hero", { ledeHi: v })}
         />
+        <TextRow
+          label={'Hero search button (e.g. "Find Your Feast")'}
+          en={draft.hero.cta}
+          hi={draft.hero.ctaHi}
+          onEn={(v) => patch("hero", { cta: v })}
+          onHi={(v) => patch("hero", { ctaHi: v })}
+        />
         <ImageField
-          label="Background image"
+          label="Default background image"
           value={draft.hero.background}
-          hint="Shown behind the headline."
+          hint="Fallback when no occasion or location override matches."
           onChange={(v) => patch("hero", { background: v })}
+        />
+        <Toggle
+          label="Prioritize location backgrounds"
+          checked={draft.hero.backgroundPriority === "location"}
+          onChange={(on) =>
+            patch("hero", {
+              backgroundPriority: on ? "location" : "occasion",
+            })
+          }
+        />
+        <p className="text-xs text-ink-soft">
+          {draft.hero.backgroundPriority === "location"
+            ? "The selected city image is shown in the hero (event image is the fallback). Use this to preview and test location backgrounds."
+            : "The selected event image is shown in the hero (city image is the fallback). This is the default."}
+        </p>
+        <SubCard title="Background by event (occasion)">
+          <p className="text-xs text-ink-soft">
+            Each event type gets its own hero image when selected in the booking
+            bar. Curated defaults are pre-filled — upload to replace. Ids match{" "}
+            <a href="/admin/settings" className="font-semibold text-maroon hover:underline">
+              Settings → Occasions
+            </a>
+            .
+          </p>
+          {occasionList.map((o) => {
+            const saved = draft.hero.backgroundsByOccasion?.[o.id];
+            const effective = saved ?? heroEventImages[o.id] ?? "";
+            return (
+              <ImageField
+                key={o.id}
+                label={o.name}
+                value={effective}
+                hint={
+                  saved
+                    ? `Shown when "${o.name}" is selected.`
+                    : heroEventImages[o.id]
+                      ? `Curated default for "${o.name}" — upload to replace.`
+                      : `Optional — shown when "${o.name}" is selected.`
+                }
+                onChange={(v) => {
+                  const next = { ...(draft.hero.backgroundsByOccasion ?? {}) };
+                  if (v) next[o.id] = v;
+                  else delete next[o.id];
+                  patch("hero", { backgroundsByOccasion: next });
+                }}
+              />
+            );
+          })}
+        </SubCard>
+        <SubCard title="Background by location">
+          <p className="text-xs text-ink-soft">
+            City-specific hero images when no event override matches. Curated
+            defaults are pre-filled for major cities. Ids match{" "}
+            <a href="/admin/settings" className="font-semibold text-maroon hover:underline">
+              Settings → Locations
+            </a>
+            .
+          </p>
+          {locationList.map((loc) => {
+            const saved = draft.hero.backgroundsByLocation?.[loc.id];
+            const defaultUrl = heroLocationImages[loc.id] ?? "";
+            const effective =
+              saved && !isBrokenHeroImage(saved) ? saved : defaultUrl;
+            return (
+              <ImageField
+                key={loc.id}
+                label={loc.name}
+                value={effective}
+                hint={
+                  saved && effective === saved
+                    ? `Shown when "${loc.name}" is selected.`
+                    : defaultUrl
+                      ? `Curated default for "${loc.name}" — upload to replace.`
+                      : `Optional — shown when "${loc.name}" is selected.`
+                }
+                onChange={(v) => {
+                  const next = { ...(draft.hero.backgroundsByLocation ?? {}) };
+                  if (v) next[loc.id] = v;
+                  else delete next[loc.id];
+                  patch("hero", { backgroundsByLocation: next });
+                }}
+              />
+            );
+          })}
+        </SubCard>
+        <ItemList
+          label="Trust badge"
+          items={draft.hero.trustBadges}
+          onChange={(trustBadges) => patch("hero", { trustBadges })}
+          makeNew={(): HomeTrustBadge => ({
+            id: `trust-${Date.now()}`,
+            icon: "shield",
+            title: "New badge",
+            titleHi: "नया बैज",
+            sub: "",
+            subHi: "",
+          })}
+          renderItem={(badge, set) => (
+            <>
+              <Field label="Icon">
+                <select
+                  className={inputClass}
+                  value={badge.icon}
+                  onChange={(e) =>
+                    set({ icon: e.target.value as HomeTrustBadgeIcon })
+                  }
+                >
+                  <option value="shield">Shield — verified / trust</option>
+                  <option value="price">Price tag — pricing</option>
+                  <option value="clipboard">Clipboard — booking</option>
+                  <option value="headset">Headset — support</option>
+                </select>
+              </Field>
+              <TextRow
+                label="Title"
+                en={badge.title}
+                hi={badge.titleHi}
+                onEn={(v) => set({ title: v })}
+                onHi={(v) => set({ titleHi: v })}
+              />
+              <TextRow
+                label="Subtitle"
+                en={badge.sub}
+                hi={badge.subHi}
+                onEn={(v) => set({ sub: v })}
+                onHi={(v) => set({ subHi: v })}
+              />
+            </>
+          )}
         />
       </SectionCard>
 
       {/* ── Brand Ribbon ────────────────────────────────────────────────── */}
       <SectionCard title="Brand Ribbon">
         <p className="text-xs text-ink-soft">
-          The moving ribbon under the hero showing the prestigious brands
-          Bhojpatra serves. Chips scroll continuously; upload each brand&apos;s
-          logo, or leave it empty to show the name&apos;s initials.
+          Featured-brands carousel (footer). Each card shows a cover photo,
+          logo badge, name, category, location, specialty, starting price,
+          rating and an optional &ldquo;Featured&rdquo; ribbon. Reorder with ↑ /
+          ↓ — list order is carousel order.
         </p>
         <Toggle
           label="Show the brand ribbon"
@@ -185,6 +330,18 @@ export default function HomePageTab() {
             name: "New brand",
             nameHi: "नया ब्रांड",
             logo: "",
+            image: "",
+            location: "",
+            locationHi: "",
+            rating: 0,
+            reviewCount: 0,
+            category: "",
+            categoryHi: "",
+            specialty: "",
+            specialtyHi: "",
+            priceFrom: 0,
+            since: 0,
+            featured: false,
           })}
           renderItem={(b, set) => (
             <>
@@ -195,11 +352,116 @@ export default function HomePageTab() {
                 onEn={(v) => set({ name: v })}
                 onHi={(v) => set({ nameHi: v })}
               />
+              <TextRow
+                label="Location"
+                en={b.location}
+                hi={b.locationHi}
+                onEn={(v) => set({ location: v })}
+                onHi={(v) => set({ locationHi: v })}
+              />
+              <ImageField
+                label="Cover photo"
+                value={b.image}
+                hint="Full-bleed background on the carousel card."
+                onChange={(v) => set({ image: v })}
+              />
               <ImageField
                 label="Brand logo"
                 value={b.logo}
-                hint="Shown in the chip's circle. Leave empty to use the name's initials."
+                hint="Shown in the white badge. Leave empty to use the name's initials."
                 onChange={(v) => set({ logo: v })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Rating (0 hides)">
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    className={inputClass}
+                    value={b.rating}
+                    onChange={(e) =>
+                      set({
+                        rating: Math.min(
+                          5,
+                          Math.max(0, Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Review count">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={inputClass}
+                    value={b.reviewCount}
+                    onChange={(e) =>
+                      set({
+                        reviewCount: Math.max(
+                          0,
+                          Math.round(Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+              <TextRow
+                label="Category (e.g. Caterer / Venue / Halwai)"
+                en={b.category}
+                hi={b.categoryHi}
+                onEn={(v) => set({ category: v })}
+                onHi={(v) => set({ categoryHi: v })}
+              />
+              <TextRow
+                label="Specialty (e.g. Awadhi · Mughlai)"
+                en={b.specialty}
+                hi={b.specialtyHi}
+                onEn={(v) => set({ specialty: v })}
+                onHi={(v) => set({ specialtyHi: v })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Price from ₹ (0 hides)">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={inputClass}
+                    value={b.priceFrom}
+                    onChange={(e) =>
+                      set({
+                        priceFrom: Math.max(
+                          0,
+                          Math.round(Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Serving since (year, 0 hides)">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={inputClass}
+                    value={b.since}
+                    onChange={(e) =>
+                      set({
+                        since: Math.max(
+                          0,
+                          Math.round(Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+              <Toggle
+                label="Show a 'Featured' ribbon"
+                checked={b.featured}
+                onChange={(featured) => set({ featured })}
               />
             </>
           )}
@@ -230,6 +492,12 @@ export default function HomePageTab() {
           onHi={(v) => patch("services", { ctaHi: v })}
         />
 
+        <Toggle
+          label="Show prices on category cards"
+          checked={draft.services.showPrices}
+          onChange={(showPrices) => patch("services", { showPrices })}
+        />
+
         <ItemList
           label="Category"
           items={draft.services.categories}
@@ -239,6 +507,7 @@ export default function HomePageTab() {
             name: "New category",
             nameHi: "नई कैटेगरी",
             image: "",
+            priceFrom: "",
           })}
           renderItem={(c, set) => (
             <>
@@ -249,6 +518,14 @@ export default function HomePageTab() {
                 onEn={(v) => set({ name: v })}
                 onHi={(v) => set({ nameHi: v })}
               />
+              <Field label="Starting price">
+                <input
+                  className={inputClass}
+                  value={c.priceFrom ?? ""}
+                  placeholder="e.g. ₹999 / plate"
+                  onChange={(e) => set({ priceFrom: e.target.value })}
+                />
+              </Field>
               <ImageField
                 value={c.image}
                 onChange={(v) => set({ image: v })}
@@ -277,6 +554,21 @@ export default function HomePageTab() {
               })
             }
           />
+          <Field label="Starting price">
+            <input
+              className={inputClass}
+              value={draft.services.bainaBox.priceFrom ?? ""}
+              placeholder="e.g. ₹599 / box"
+              onChange={(e) =>
+                patch("services", {
+                  bainaBox: {
+                    ...draft.services.bainaBox,
+                    priceFrom: e.target.value,
+                  },
+                })
+              }
+            />
+          </Field>
           <ImageField
             value={draft.services.bainaBox.image}
             onChange={(v) =>
@@ -660,6 +952,18 @@ export default function HomePageTab() {
 
       {/* ── Promo banner ────────────────────────────────────────────────── */}
       <SectionCard title="Promotional Banner">
+        <p className="text-xs text-ink-soft">
+          The offer band under the hero. Upload a wide banner image (headline
+          and artwork baked into the design). The subtitle appears in the lead
+          strip below the banner; heading is used for accessibility.
+        </p>
+        <ImageField
+          label="Banner image"
+          value={draft.promo.image}
+          highQuality
+          hint="Full-width banner shown under the hero. Upload a wide, high-resolution JPG/PNG (≈1600px+ wide) — it's kept crisp for large screens. Or paste a URL. Leave empty for the text-only invitation layout."
+          onChange={(v) => patch("promo", { image: v })}
+        />
         <TextRow
           label="Heading"
           en={draft.promo.heading}
@@ -891,7 +1195,7 @@ function AreaRow({
   );
 }
 
-/** A reorderable-free list of editable items with add / remove. */
+/** Editable list with add / remove and ↑ / ↓ reorder. */
 function ItemList<T extends { id: string }>({
   label,
   items,
@@ -905,6 +1209,14 @@ function ItemList<T extends { id: string }>({
   makeNew: () => T;
   renderItem: (item: T, set: (patch: Partial<T>) => void) => ReactNode;
 }) {
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= items.length) return;
+    const next = [...items];
+    const [row] = next.splice(from, 1);
+    next.splice(to, 0, row);
+    onChange(next);
+  };
+
   return (
     <div className="space-y-3 border-t border-cream-3 pt-4">
       <div className="flex items-center justify-between">
@@ -926,18 +1238,40 @@ function ItemList<T extends { id: string }>({
           key={item.id}
           className="space-y-3 rounded-lg border border-cream-3 bg-cream/30 p-4"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-ink-soft">
               {label} {i + 1}
             </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
-            >
-              Remove
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={i === 0}
+                aria-label={`Move ${label.toLowerCase()} up`}
+                onClick={() => move(i, i - 1)}
+              >
+                ↑
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={i === items.length - 1}
+                aria-label={`Move ${label.toLowerCase()} down`}
+                onClick={() => move(i, i + 1)}
+              >
+                ↓
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+              >
+                Remove
+              </Button>
+            </div>
           </div>
           {renderItem(item, (p) =>
             onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x))),

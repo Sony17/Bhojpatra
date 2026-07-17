@@ -16,7 +16,11 @@ import { createStore, readSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import type { PartnerRecord } from "@/app/api/partners/route";
-import { sendOrderAlert, siteBaseUrl } from "@/lib/email";
+import {
+  sendBookingConfirmation,
+  sendOrderAlert,
+  siteBaseUrl,
+} from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
@@ -32,11 +36,22 @@ export interface StoredOrder {
   userId?: string;
   customer: string;
   phone: string;
+  /** Contact email captured at booking time (alongside name/phone). Absent on
+   *  legacy orders saved before it was collected. */
+  email?: string;
   occasion: string;
   date: string;
+  /** Meal period the feast is served at (Breakfast / Lunch / Dinner). Absent on
+   *  legacy orders saved before serving time was captured. */
+  mealTime?: string;
+  /** Exact serving clock time as a 24-hour `HH:MM` string, when the guest set
+   *  one alongside the meal period. */
+  eventTime?: string;
   guests: number;
   vendor: string;
   city: string;
+  /** The event venue the guest chose in the wizard, when one was set. */
+  venue?: string;
   amount: number;
   paid: number;
   paymentMethod: OrderPaymentMethod;
@@ -140,13 +155,17 @@ export async function POST(request: Request) {
     id,
     customer,
     phone,
+    email,
     occasion,
     date,
+    mealTime,
+    eventTime,
     eventDateISO,
     packageId,
     guests,
     vendor,
     city,
+    venue,
     amount,
     paid,
     paymentMethod,
@@ -251,11 +270,23 @@ export async function POST(request: Request) {
         ? customer.trim()
         : "Online Booking",
     phone: typeof phone === "string" ? phone.trim() : "",
+    ...(typeof email === "string" && email.trim()
+      ? { email: email.trim() }
+      : {}),
     occasion: typeof occasion === "string" ? occasion : "Feast",
     date: typeof date === "string" ? date : "",
+    ...(typeof mealTime === "string" && mealTime.trim()
+      ? { mealTime: mealTime.trim() }
+      : {}),
+    ...(typeof eventTime === "string" && /^\d{1,2}:\d{2}$/.test(eventTime.trim())
+      ? { eventTime: eventTime.trim() }
+      : {}),
     guests: Number.isFinite(Number(guests)) ? Math.round(Number(guests)) : 0,
     vendor: typeof vendor === "string" ? vendor : "Bhojpatra",
     city: typeof city === "string" ? city : "—",
+    ...(typeof venue === "string" && venue.trim()
+      ? { venue: venue.trim() }
+      : {}),
     amount: Math.round(amt),
     paid: Number.isFinite(paidAmt) && paidAmt > 0 ? Math.round(paidAmt) : 0,
     paymentMethod,
@@ -300,7 +331,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Alert the owners on a brand-new order (not on idempotent repeat confirms).
+  // Email on a brand-new order (not on idempotent repeat confirms):
+  // owners get an alert, the signed-in customer gets a confirmation.
   // The client sends only the invoice token; we rebuild the URL from our own
   // trusted origin so this public endpoint can't inject an arbitrary link.
   if (!existing) {
@@ -312,7 +344,10 @@ export async function POST(request: Request) {
         : "";
     const base = siteBaseUrl();
     const invoiceUrl = token && base ? `${base}/bookings/invoice?d=${token}` : null;
-    await sendOrderAlert(merged, invoiceUrl);
+    await Promise.all([
+      sendOrderAlert(merged, invoiceUrl),
+      sendBookingConfirmation(merged, user.email, invoiceUrl),
+    ]);
   }
 
   return Response.json({ ok: true, order: merged }, { status: existing ? 200 : 201 });

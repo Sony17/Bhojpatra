@@ -28,6 +28,9 @@ export interface InvoiceData {
   dateLabel: string;
   occasion: string;
   eventDate: string;
+  /** Meal period + clock time the feast is served at (e.g. "Dinner · 7:30 PM"),
+   *  when the guest set one. Absent on orders saved before serving time. */
+  servingTime?: string;
   city: string;
   venue: string;
   guests: number;
@@ -127,10 +130,46 @@ class Pdf {
   private pages: string[] = [];
   private ops = "";
   private images: { w: number; h: number; data: string }[] = [];
+  private alphas: number[] = []; // distinct fill-alpha values → ExtGState names
+  private wm: { s: string; size: number; color: RGB; alpha: number } | null = null;
   y = PAGE_H;
 
   private rgb(c: RGB, stroke = false): string {
     return `${c[0]} ${c[1]} ${c[2]} ${stroke ? "RG" : "rg"}`;
+  }
+
+  /** Register a fill/stroke alpha and return its ExtGState resource name. */
+  private gsName(alpha: number): string {
+    let i = this.alphas.indexOf(alpha);
+    if (i < 0) {
+      i = this.alphas.length;
+      this.alphas.push(alpha);
+    }
+    return `GS${i}`;
+  }
+
+  /** Enable a faint 45° watermark drawn behind the content of every page. It is
+   *  stamped immediately (for the current page) and re-stamped on every newPage. */
+  setWatermark(s: string, size: number, color: RGB, alpha: number) {
+    this.wm = { s, size, color, alpha };
+    this.stampWatermark();
+  }
+
+  private stampWatermark() {
+    if (!this.wm) return;
+    const { s, size, color, alpha } = this.wm;
+    const cos = Math.SQRT1_2; // cos 45°
+    const sin = Math.SQRT1_2; // sin 45° (rotate CCW, bottom-left → top-right)
+    const w = measure(s, F_BOLD, size);
+    const midY = size * 0.34; // ~half cap-height, to centre vertically
+    const cx = PAGE_W / 2;
+    const cy = PAGE_H / 2;
+    const e = cx - (w / 2) * cos + midY * sin;
+    const f = cy - (w / 2) * sin - midY * cos;
+    this.ops +=
+      `q /${this.gsName(alpha)} gs BT /${F_BOLD} ${size} Tf 0 Tc ${this.rgb(color)} ` +
+      `${cos.toFixed(5)} ${sin.toFixed(5)} ${(-sin).toFixed(5)} ${cos.toFixed(5)} ` +
+      `${e.toFixed(2)} ${f.toFixed(2)} Tm (${escapePdfText(toLatin1(s))}) Tj ET Q\n`;
   }
 
   /** Absolute-positioned text (origin bottom-left; `y` is the baseline). */
@@ -197,6 +236,7 @@ class Pdf {
     this.pages.push(this.ops);
     this.ops = "";
     this.y = PAGE_H - 56;
+    this.stampWatermark();
   }
 
   finish(): Uint8Array<ArrayBuffer> {
@@ -217,6 +257,13 @@ class Pdf {
         " >> "
       : "";
 
+    // Alpha graphics states (inline dicts) for the faint watermark.
+    const xgs = this.alphas.length
+      ? "/ExtGState << " +
+        this.alphas.map((a, i) => `/GS${i} << /ca ${a} /CA ${a} >>`).join(" ") +
+        " >> "
+      : "";
+
     const pageNums: number[] = [];
     this.pages.forEach((stream, i) => {
       const contentNum = 6 + i * 2;
@@ -226,7 +273,7 @@ class Pdf {
         `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
       objects[pageNum - 1] =
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
-        `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> ${xobj}>> ` +
+        `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> ${xobj}${xgs}>> ` +
         `/Contents ${contentNum} 0 R >>`;
     });
 
@@ -268,6 +315,10 @@ export function buildInvoicePdf(
   logo?: LogoBitmap | null,
 ): Uint8Array<ArrayBuffer> {
   const p = new Pdf();
+
+  /* Faint diagonal brand watermark, sat behind every page's content. Maroon at
+     6% alpha — a real brand hex with only opacity applied (per the brand rules). */
+  p.setWatermark("bhojpatra", 92, MAROON, 0.06);
 
   /* Masthead — full-bleed maroon band with an inset cream frame. */
   const HEAD = 116;
@@ -311,6 +362,10 @@ export function buildInvoicePdf(
   p.y -= 30;
   field(MX, "CITY", data.city);
   field(COL2, "VENUE", data.venue);
+  if (data.servingTime) {
+    p.y -= 30;
+    field(MX, "SERVING TIME", data.servingTime);
+  }
   p.y -= 34;
 
   /* Itemised charges table. */

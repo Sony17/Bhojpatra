@@ -1,6 +1,6 @@
 import type { PartnerRole } from "@/lib/session";
 import { createStore } from "@/lib/store";
-import { parseListQuery } from "@/lib/validate";
+import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendPartnerAlert } from "@/lib/email";
 
 // Referral partners are written at signup to Postgres (Neon) so the booking
@@ -89,6 +89,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid partner type." }, { status: 400 });
   }
 
+  const gstValue = gst !== undefined ? normalizeGst(str(gst) ?? "") : undefined;
+  if (type === "venue" && !isValidGst(gstValue ?? "")) {
+    return Response.json(
+      { error: "Please enter a valid 15-digit GST number." },
+      { status: 400 },
+    );
+  }
+
   const partner: PartnerRecord = {
     code,
     name: str(name) ?? "Bhojpatra Partner",
@@ -97,7 +105,7 @@ export async function POST(request: Request) {
     phone: str(phone),
     email: str(email),
     city: str(city),
-    gst: str(gst),
+    gst: gstValue,
     createdAt: new Date().toISOString(),
   };
 

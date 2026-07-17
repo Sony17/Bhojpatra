@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
+import { Card } from "@/components/ui";
 
 /**
  * Shared shell for the auth routes (/login, /signup).
@@ -18,7 +19,7 @@ export default function AuthLayout({
 }) {
   const { t } = useLang();
   return (
-    <main className="flex min-h-screen flex-col bg-surface-beige lg:flex-row-reverse">
+    <main className="flex min-h-screen flex-col bg-surface-beige pt-[var(--safe-top)] pb-[var(--safe-bottom)] lg:flex-row-reverse">
       {/* Brand panel */}
       <aside className="relative hidden flex-col justify-end overflow-hidden bg-maroon px-12 py-12 text-cream lg:flex lg:w-[44%] xl:w-[40%]">
         {/* Background imagery — keeps its own color */}
@@ -47,20 +48,21 @@ export default function AuthLayout({
       </aside>
 
       {/* Form column */}
-      <div className="flex flex-1 flex-col px-5 py-8 sm:px-8 lg:py-12">
-        {/* Logo + form centered together as one block, logo directly above the form */}
+      <div className="flex flex-1 flex-col px-4 py-6 sm:px-8 lg:py-12">
         <div className="flex flex-1 flex-col items-center justify-center">
-          <Link href="/" className="mb-10 inline-flex w-fit">
+          <Link href="/" className="mb-6 inline-flex w-fit sm:mb-10">
             <Image
               src="/bhojpatra-logo.png"
               alt="Bhojpatra"
               width={894}
               height={226}
-              className="h-14 w-auto max-w-full sm:h-20"
+              className="h-10 w-auto max-w-full sm:h-14 lg:h-20"
             />
           </Link>
 
-          <div className="w-full max-w-md">{children}</div>
+          <Card padding="lg" className="w-full max-w-md sm:p-8 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+            {children}
+          </Card>
         </div>
       </div>
     </main>

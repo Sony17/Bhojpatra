@@ -19,11 +19,15 @@
  */
 
 import { useState } from "react";
+import Image from "next/image";
 import { packages, packageCategoryItems, type PackageTier, type PackageFeature } from "@/lib/data";
 import Reveal from "@/components/Reveal";
+import SectionIntro from "@/components/SectionIntro";
 import { Button } from "@/components/ui";
+import { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
+import { isUnoptimized } from "@/lib/homeContent";
 
 type TierId = "silver" | "gold" | "platinum";
 type Bi = [en: string, hi: string];
@@ -243,11 +247,38 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
   return (
     <article
       aria-label={`${name} ${t("package", "पैकेज")}`}
-      className={`card-lift relative flex h-full flex-col rounded-card p-6 sm:p-7 ${dark ? "isolate" : ""} ${surface(id)}`}
+      className={`card-lift relative flex h-full flex-col overflow-hidden rounded-card ${dark ? "isolate" : ""} ${surface(id)}`}
     >
+      {/* Feast photography header — luxury cue before the pricing story */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
+        <Image
+          src={tier.image}
+          alt=""
+          aria-hidden
+          fill
+          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 90vw"
+          className="object-cover"
+          unoptimized={isUnoptimized(tier.image)}
+        />
+        <span aria-hidden className="media-veil absolute inset-0" />
+        {dark && (
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-maroon/35"
+          />
+        )}
+        <span
+          className={`absolute left-4 top-4 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] shadow-card ${badgeChip(id)}`}
+        >
+          {recommended && <span aria-hidden className="mr-1">★</span>}
+          {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
+        </span>
+      </div>
+
+      <div className="relative flex flex-1 flex-col p-6 sm:p-7">
       {/* Premium shimmer on the Platinum card, behind the text */}
       {dark && (
-        <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-card">
+        <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <span
             className="absolute inset-0 animate-[bp-shimmer_3.4s_linear_infinite] motion-reduce:animate-none"
             style={{
@@ -259,14 +290,8 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
         </span>
       )}
 
-      {/* Badge (single recommended/role flag) */}
-      <span className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${badgeChip(id)}`}>
-        {recommended && <span aria-hidden className="mr-1">★</span>}
-        {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
-      </span>
-
       {/* Name + positioning */}
-      <h3 className={`mt-4 font-display text-[2rem] leading-none ${accent(id)}`}>{name}</h3>
+      <h3 className={`font-display text-[2rem] leading-none ${accent(id)}`}>{name}</h3>
       {bestFor && <p className={`mt-2 text-[13px] leading-snug ${muted(id)}`}>{bestFor}</p>}
 
       {/* Price */}
@@ -301,6 +326,7 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
       {footnote && footnote.length > 0 && (
         <p className={`mt-auto pt-6 text-xs leading-snug ${muted(id)}`}>{footnote.join(" ")}</p>
       )}
+      </div>
     </article>
   );
 }
@@ -341,10 +367,13 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
         <Button
           variant="secondary"
           size="sm"
+          className="whitespace-nowrap"
           onClick={() => setHighlight((v) => !v)}
           aria-pressed={highlight}
         >
-          {highlight ? t("Hide upgrades", "अपग्रेड छुपाएँ") : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
+          {highlight
+            ? t("Hide upgrades", "अपग्रेड छुपाएँ")
+            : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
         </Button>
       </div>
       <div className="no-scrollbar overflow-x-auto rounded-card border border-maroon/15">
@@ -385,6 +414,112 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
   );
 }
 
+/**
+ * Compact post-tier footer — compare, single stall, chat, and share sit on
+ * one line so the section doesn't trail off into scattered blocks.
+ */
+function PackageFooter({
+  tiers,
+  custom,
+  waLink,
+}: {
+  tiers: PackageTier[];
+  custom: (typeof packages)[number] | undefined;
+  waLink: string;
+}) {
+  const { lang, t } = useLang();
+  const [open, setOpen] = useState(false);
+  const customName = custom ? (lang === "hi" ? custom.nameHi : custom.name) : null;
+
+  const linkClass =
+    "inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-maroon underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2";
+
+  return (
+    <div className="text-center">
+      <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-ink-soft">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className={linkClass}
+        >
+          {open
+            ? t("Hide comparison", "तुलना छुपाएँ")
+            : t("Compare every tier", "हर टियर की तुलना करें")}
+          <span
+            aria-hidden
+            className={`text-base leading-none transition-transform duration-200 ${open ? "rotate-45" : ""}`}
+          >
+            +
+          </span>
+        </button>
+
+        {custom && (
+          <>
+            <span aria-hidden className="text-maroon/30">
+              ·
+            </span>
+            <a
+              href="/book?package=custom&step=menu"
+              className={linkClass}
+              title={t(
+                "Build your own menu, one vendor — and pay only for what you pick.",
+                "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
+              )}
+            >
+              {customName}
+              <span aria-hidden>→</span>
+            </a>
+          </>
+        )}
+
+        <span aria-hidden className="text-maroon/30">
+          ·
+        </span>
+        <a
+          href={waLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          <WhatsAppIcon className="h-3.5 w-3.5" />
+          {t("Chat with us", "हमसे बात करें")}
+        </a>
+
+        <span aria-hidden className="text-maroon/30">
+          ·
+        </span>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(
+            `${t(
+              "Check out Bhojpatra's ready-made feast packages — Silver, Gold & Platinum:",
+              "भोजपत्र के तैयार फीस्ट पैकेज देखें — सिल्वर, गोल्ड और प्लैटिनम:",
+            )} ${SITE_ORIGIN}/#packages`,
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          {t("Share packages", "पैकेज शेयर करें")}
+        </a>
+      </div>
+
+      <p className="mt-3 text-xs text-ink-soft">
+        {t(
+          "Prices are approximate — final price depends on your menu, guests & vendors.",
+          "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
+        )}
+      </p>
+
+      {open && (
+        <div className="mt-7">
+          <CompareGrid tiers={tiers} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Section ─────────────────────────────────────────────────────────────── */
 
 export default function FinalisedPackages() {
@@ -406,20 +541,34 @@ export default function FinalisedPackages() {
   ];
 
   return (
-    <section id="packages" className="relative overflow-hidden py-16 sm:py-20">
-      <div className="w-full px-5 sm:px-8 lg:px-12">
-        {/* Heading */}
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="font-display text-3xl text-maroon sm:text-4xl">
-            {t("Find your feast tier", "अपना दावत टियर चुनें")}
-          </h2>
-          <p className="font-script mt-4 text-[0.84375rem] text-ink-soft sm:text-[0.9375rem]">
-            {t(
+    <section id="packages" className="relative overflow-hidden bg-white py-16 sm:py-20">
+      {/* Soft feast wash behind packages — atmosphere without competing with cards */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] overflow-hidden opacity-[0.14]"
+      >
+        <Image
+          src={tiers[1]?.image ?? tiers[0].image}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          unoptimized={isUnoptimized(tiers[1]?.image ?? tiers[0].image)}
+        />
+        <span className="absolute inset-0 bg-gradient-to-b from-white via-white/80 to-white" />
+      </div>
+      <div className="relative w-full px-5 sm:px-8 lg:px-12">
+        <Reveal>
+          <SectionIntro
+            eyebrow={t("Packages", "पैकेज")}
+            title={t("Find your feast tier", "अपना दावत टियर चुनें")}
+            subtitle={t(
               "Each tier includes everything below it — so you only pay up for what you actually add.",
               "हर टियर में उसके नीचे वाला सब शामिल है — आप सिर्फ़ उसी के लिए ज़्यादा देते हैं जो आप जोड़ते हैं।",
             )}
-          </p>
-          <Ornament className="mx-auto mt-6 text-maroon/40" />
+          >
+            <Ornament className="mx-auto mt-6 text-maroon/35" />
+          </SectionIntro>
         </Reveal>
 
         {/* Tier cards — full-width snap carousel on mobile, grid on sm+ */}
@@ -461,62 +610,13 @@ export default function FinalisedPackages() {
           ))}
         </Reveal>
 
-        {/* Deep-dive comparison (progressive disclosure) */}
-        <Reveal className="mx-auto mt-16 max-w-4xl">
-          <div className="mb-7 text-center">
-            <h3 className="font-display text-2xl text-maroon">{t("Compare every tier", "हर टियर की तुलना करें")}</h3>
-            <Ornament className="mx-auto mt-3 text-maroon/40" />
-          </div>
-          <CompareGrid tiers={tiers} />
-        </Reveal>
-
-        {/* Single Stall — the flexible, à-la-carte option */}
-        {custom && (
-          <Reveal className="mx-auto mt-12 max-w-3xl">
-            <div className="flex flex-col items-start gap-4 rounded-card border border-dashed border-maroon/40 bg-cream/20 p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-display text-xl text-maroon">
-                  {t("Just one stall?", "सिर्फ़ एक स्टॉल?")}{" "}
-                  <span className="text-ink">{lang === "hi" ? custom.nameHi : custom.name}</span>
-                </h3>
-                <p className="mt-1 text-sm text-ink-soft">
-                  {t(
-                    "Build your own menu, one vendor — and pay only for what you pick.",
-                    "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
-                  )}
-                </p>
-              </div>
-              <Button
-                href="/book?package=custom&step=menu"
-                variant="secondary"
-                className="shrink-0"
-                rightIcon={<span aria-hidden="true">→</span>}
-              >
-                <span className="font-display">{t("Build your own", "अपना बनाएँ")}</span>
-              </Button>
-            </div>
-          </Reveal>
-        )}
-
-        {/* Trust / help footer — pricing note + custom-package help, merged */}
-        <Reveal className="mx-auto mt-8 max-w-3xl">
-          <div className="flex flex-col items-center gap-3 rounded-card border border-maroon/15 bg-cream/30 px-6 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
-            <p className="text-sm text-ink-soft">
-              {t(
-                "Prices are approximate — the final price depends on your menu, guests & vendors.",
-                "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
-              )}
-            </p>
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-maroon underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2"
-            >
-              <WhatsAppIcon className="h-4 w-4" />
-              {t("Need something custom? Chat with us", "कुछ कस्टम चाहिए? हमसे बात करें")}
-            </a>
-          </div>
+        {/* One footer line: compare · single stall · chat · share */}
+        <Reveal className="mx-auto mt-12 max-w-4xl">
+          <PackageFooter
+            tiers={tiers}
+            custom={custom}
+            waLink={waLink}
+          />
         </Reveal>
       </div>
     </section>

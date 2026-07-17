@@ -73,7 +73,8 @@ export default function Reveal({
           }
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
+      // Reveal early so content is visible as it enters — no late pop-in.
+      { threshold: 0.01, rootMargin: "120px 0px 80px 0px" }
     );
 
     observer.observe(node);

@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useLang, type Lang } from "@/lib/i18n";
-import { useAccountMenuState } from "@/lib/accountMenu";
 import { useCompareTrayState } from "@/lib/compareTray";
 import { useBookingBarState } from "@/lib/bookingBar";
 import { Button, Chip } from "@/components/ui";
@@ -141,15 +146,41 @@ function PhoneIcon({ className }: { className?: string }) {
 
 export default function FloatingChat() {
   const { lang, t } = useLang();
-  const accountMenu = useAccountMenuState();
   const compareTray = useCompareTrayState();
   const bookingBar = useBookingBarState();
-  // A sticky dock pinned above the tab bar — the compare tray or the booking
-  // bar (never both at once). Lift the launcher clear of whichever is taller.
+  // On mobile the launcher lives at the top-right (see container classes),
+  // clear of the bottom tab bar and every sticky dock — so it needs no lift
+  // there. Only on desktop does it sit bottom-right, where it must clear the
+  // compare tray / booking dock; lift it by whichever is taller. `isDesktop`
+  // gates the lift so a top-anchored mobile launcher is never shoved up into
+  // the header.
   const dockLift = Math.max(
     compareTray.visible ? compareTray.height : 0,
     bookingBar.visible ? bookingBar.height : 0,
   );
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [launcherPosition, setLauncherPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    width: number;
+    height: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressLauncherClick = useRef(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"chat" | "callback">("chat");
   const [messages, setMessages] = useState<Message[]>([
@@ -262,23 +293,77 @@ export default function FloatingChat() {
     setFaqOpen(false);
   }
 
+  function startLauncherDrag(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (isDesktop || open || e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function moveLauncher(e: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    const deltaX = e.clientX - drag.startX;
+    const deltaY = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 5) return;
+    drag.moved = true;
+    e.preventDefault();
+
+    const edge = 8;
+    setLauncherPosition({
+      x: Math.min(
+        Math.max(edge, drag.originX + deltaX),
+        window.innerWidth - drag.width - edge,
+      ),
+      y: Math.min(
+        Math.max(edge, drag.originY + deltaY),
+        window.innerHeight - drag.height - edge,
+      ),
+    });
+  }
+
+  function finishLauncherDrag(e: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    suppressLauncherClick.current = drag.moved;
+    dragRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }
+
   return (
     <div
-      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex flex-col items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
+      className="fixed bottom-[calc(var(--tab-bar-h)+var(--safe-bottom)+0.75rem)] right-3 z-[60] flex flex-col-reverse items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
       style={
-        accountMenu.open
+        !isDesktop && launcherPosition
           ? {
-              transform: `translateY(calc(-${accountMenu.height}px - env(safe-area-inset-bottom) - 1rem))`,
+              left: launcherPosition.x,
+              top: launcherPosition.y,
+              right: "auto",
+              bottom: "auto",
             }
-          : dockLift > 0
-            ? { transform: `translateY(-${dockLift + 8}px)` }
-            : undefined
+          : isDesktop && dockLift > 0
+          ? { transform: `translateY(-${dockLift + 8}px)` }
+          : undefined
       }
     >
-      {/* ── Chat panel — scaled to 96% from the bottom-right so it grows up
-          from the launcher without nudging the launcher off the corner. ── */}
+      {/* ── Chat panel — scaled to 96% from the launcher's corner. On mobile the
+          launcher sits top-right, so the panel grows DOWNWARD from the top-right
+          (capped clear of the bottom tab bar); on desktop it sits bottom-right
+          and grows up. ── */}
       {open && (
-        <div className="animate-rise flex h-[28rem] max-h-[calc(100dvh-6rem)] w-[20rem] max-w-[calc(100vw-1.5rem)] origin-bottom-right scale-[0.96] flex-col overflow-hidden rounded-card border border-cream-3 bg-white shadow-modal [animation-duration:0.4s] sm:h-[32rem] sm:max-h-[calc(100dvh-7rem)] sm:w-[22rem]">
+        <div className="animate-rise fixed inset-x-3 bottom-[calc(var(--tab-bar-h)+var(--safe-bottom)+4.5rem)] flex h-[28rem] max-h-[calc(100dvh-var(--tab-bar-h)-var(--safe-bottom)-6rem)] w-auto origin-bottom-right scale-[0.96] flex-col overflow-hidden rounded-hero border border-maroon/8 bg-white shadow-modal [animation-duration:0.25s] sm:left-auto sm:right-3 sm:h-[32rem] sm:w-[22rem] lg:static lg:inset-auto lg:max-h-[calc(100dvh-7rem)]">
           {/* Header */}
           <div className="flex items-center gap-3 bg-maroon px-4 py-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream/20 text-cream ring-1 ring-cream/40">
@@ -569,22 +654,34 @@ export default function FloatingChat() {
       )}
 
       {/* ── Launcher bubble ─────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
-        className="relative flex h-[2.7rem] w-[2.7rem] items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:scale-95 sm:h-[2.8rem] sm:w-[2.8rem]"
-      >
-        {!open && <span className="absolute inset-0 animate-ping rounded-2xl bg-maroon/40" />}
-        {open ? (
-          <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-[1.2rem] sm:w-[1.2rem]" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        ) : (
-          <HeadsetIcon className="relative h-[1.4rem] w-[1.4rem] sm:h-[1.6rem] sm:w-[1.6rem]" />
-        )}
-      </button>
+      <div className={open ? undefined : "animate-float lg:animate-none"}>
+        <button
+          type="button"
+          onClick={() => {
+            if (suppressLauncherClick.current) {
+              suppressLauncherClick.current = false;
+              return;
+            }
+            setOpen((v) => !v);
+          }}
+          onPointerDown={startLauncherDrag}
+          onPointerMove={moveLauncher}
+          onPointerUp={finishLauncherDrag}
+          onPointerCancel={finishLauncherDrag}
+          aria-expanded={open}
+          aria-label={open ? t("Close chat", "चैट बंद करें") : t("Chat with Bhojpatra", "भोजपत्र से चैट करें")}
+          className="relative flex h-[2.7rem] w-[2.7rem] cursor-grab touch-none items-center justify-center rounded-2xl bg-maroon text-cream shadow-[0_8px_24px_rgba(185,32,37,0.45)] ring-2 ring-cream transition-transform hover:scale-105 active:cursor-grabbing active:scale-95 sm:h-[2.8rem] sm:w-[2.8rem] lg:cursor-pointer"
+        >
+          {!open && <span className="absolute inset-0 animate-ping rounded-2xl bg-maroon/40" />}
+          {open ? (
+            <svg viewBox="0 0 24 24" className="relative h-4 w-4 sm:h-[1.2rem] sm:w-[1.2rem]" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          ) : (
+            <HeadsetIcon className="relative h-[1.4rem] w-[1.4rem] sm:h-[1.6rem] sm:w-[1.6rem]" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

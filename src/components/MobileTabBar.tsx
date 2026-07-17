@@ -7,16 +7,25 @@ import { useLang } from "@/lib/i18n";
 import { setAccountMenuState } from "@/lib/accountMenu";
 import AccountMenuPanel from "./AccountMenuPanel";
 
-/** Primary destinations surfaced as an app-style bottom tab bar on mobile.
- *  On mobile the header nav is hidden, so "Partner With Us" rides here as a
- *  dedicated tab. The tab for the page you're currently on is dropped, so the
- *  bar always shows five slots: four of these plus the account menu (below). */
+/** App-style bottom tabs — always visible, active state highlighted.
+ *  Same destinations; finish matches Zomato/Swiggy chrome. */
 const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNode }[] = [
   {
     label: "Home",
     labelHi: "होम",
     href: "/",
     icon: <path d="M4 11.5 12 4l8 7.5M6 10v9h12v-9M9.5 19v-5h5v5" />,
+  },
+  {
+    label: "Brands",
+    labelHi: "ब्रांड",
+    href: "/vendors",
+    icon: (
+      <>
+        <path d="M4 9.5 5 5h14l1 4.5M4 9.5h16M4 9.5a2.2 2.2 0 0 0 4 1 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4-1" />
+        <path d="M5.5 11v8h13v-8" />
+      </>
+    ),
   },
   {
     label: "Book",
@@ -31,40 +40,22 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
     ),
   },
   {
-    label: "Vendors",
-    labelHi: "वेंडर",
-    href: "/vendors",
+    label: "Bookings",
+    labelHi: "बुकिंग",
+    href: "/bookings",
     icon: (
       <>
-        <path d="M4 9.5 5 5h14l1 4.5M4 9.5h16M4 9.5a2.2 2.2 0 0 0 4 1 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4-1" />
-        <path d="M5.5 11v8h13v-8" />
-      </>
-    ),
-  },
-  {
-    label: "Venues",
-    labelHi: "वेन्यू",
-    href: "/venues",
-    icon: (
-      <>
-        <path d="M5 20V6.5L12 4l7 2.5V20" />
-        <path d="M3.5 20h17M9 20v-4h6v4M9 9h1.5M13.5 9H15M9 12.5h1.5M13.5 12.5H15" />
-      </>
-    ),
-  },
-  {
-    label: "Partner",
-    labelHi: "पार्टनर",
-    href: "/partner",
-    icon: (
-      <>
-        <circle cx="8.5" cy="8" r="3" />
-        <path d="M3 19a5.5 5.5 0 0 1 11 0" />
-        <path d="M15.5 5.2a3 3 0 0 1 0 5.6M16.5 13.4A5.5 5.5 0 0 1 21 18.8" />
+        <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-13Z" />
+        <path d="M8 2.5v3M16 2.5v3M5 9h14M9 13h6M9 16.5h4" />
       </>
     ),
   },
 ];
+
+function tabActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export default function MobileTabBar() {
   const pathname = usePathname();
@@ -91,8 +82,6 @@ export default function MobileTabBar() {
     };
   }, [accountOpen]);
 
-  // Publish the popup's open state + measured height so the floating chat
-  // launcher can lift itself clear of the menu instead of overlapping it.
   useEffect(() => {
     if (accountOpen && popupRef.current) {
       setAccountMenuState(true, popupRef.current.offsetHeight);
@@ -101,18 +90,14 @@ export default function MobileTabBar() {
     }
   }, [accountOpen]);
 
-  // Make sure the signal is cleared if the bar unmounts while open.
   useEffect(() => () => setAccountMenuState(false), []);
 
   return (
     <nav
       ref={navRef}
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-maroon/10 bg-cream-2/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(185,32,37,0.08)] backdrop-blur-md lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-maroon/8 bg-white/96 pb-[var(--safe-bottom)] shadow-pop-up backdrop-blur-xl lg:hidden"
     >
-      {/* Account popup opens upward, above the bar, anchored to the right by the
-          Account tab. It stays at the bar's z-50 — below the floating chat
-          launcher (z-[60]) — so the chat button remains on top. */}
       {accountOpen && (
         <div
           ref={popupRef}
@@ -122,27 +107,33 @@ export default function MobileTabBar() {
         </div>
       )}
 
-      <ul className="mx-auto flex max-w-md items-stretch justify-around">
-        {tabs
-          .filter((tab) =>
-            tab.href === "/"
-              ? pathname !== "/"
-              : !pathname.startsWith(tab.href),
-          )
-          .map((tab) => (
+      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-1">
+        {tabs.map((tab) => {
+          const active = tabActive(pathname, tab.href);
+          return (
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
                 onClick={() => setAccountOpen(false)}
-                className="focus-ring flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold text-ink-soft transition-colors hover:text-maroon"
+                aria-current={active ? "page" : undefined}
+                className={
+                  "focus-ring tap relative flex min-h-12 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition duration-200 active:scale-95 touch-manipulation " +
+                  (active ? "text-maroon" : "text-ink/55 hover:text-maroon")
+                }
               >
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 h-0.5 w-8 rounded-full bg-maroon"
+                  />
+                )}
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
-                  className="h-6 w-6"
+                  className="h-[22px] w-[22px]"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.6"
+                  strokeWidth={active ? "2" : "1.6"}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -151,26 +142,32 @@ export default function MobileTabBar() {
                 {lang === "hi" ? tab.labelHi : tab.label}
               </Link>
             </li>
-          ))}
+          );
+        })}
 
-        {/* Account — opens the shared account/language menu upward. */}
         <li className="flex-1">
           <button
             type="button"
             onClick={() => setAccountOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={accountOpen}
-            className={`focus-ring flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors ${
-              accountOpen ? "text-maroon" : "text-ink-soft hover:text-maroon"
+            className={`focus-ring tap relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition duration-200 active:scale-95 touch-manipulation ${
+              accountOpen ? "text-maroon" : "text-ink/55 hover:text-maroon"
             }`}
           >
+            {accountOpen && (
+              <span
+                aria-hidden
+                className="absolute top-0 h-0.5 w-8 rounded-full bg-maroon"
+              />
+            )}
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
-              className="h-6 w-6"
+              className="h-[22px] w-[22px]"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.6"
+              strokeWidth={accountOpen ? "2" : "1.6"}
               strokeLinecap="round"
               strokeLinejoin="round"
             >

@@ -118,7 +118,7 @@ export default function ThemedSelect({
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={onButtonKeyDown}
-        className={`flex w-full cursor-pointer items-center justify-between gap-2 text-left outline-none disabled:cursor-not-allowed disabled:opacity-60 ${buttonClassName} ${
+        className={`flex min-w-0 cursor-pointer items-center justify-between gap-1.5 text-left outline-none disabled:cursor-not-allowed disabled:opacity-60 ${buttonClassName} ${
           selected ? "text-ink" : "text-ink/55"
         }`}
       >

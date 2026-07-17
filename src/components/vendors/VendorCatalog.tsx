@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  vendorListings,
+  cities,
   indianStates,
   mealTypeOptions,
   type VendorListing,
@@ -16,11 +16,28 @@ import {
   type VendorRatingSummary,
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
+import { useAllVendors } from "@/lib/useAllVendors";
 import { useLang } from "@/lib/i18n";
+import { useLocations } from "@/lib/locations";
+import {
+  LOCATION_CHANGED_EVENT,
+  readStoredLocation,
+  resolveLocationDisplayName,
+  type StoredLocation,
+} from "@/lib/detectedLocation";
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
-import { Button, Card, Chip } from "@/components/ui";
+import {
+  AppSearchBar,
+  Button,
+  Card,
+  CategoryChip,
+  CategoryChips,
+  Drawer,
+  EmptyState,
+  PullToRefresh,
+} from "@/components/ui";
 
 const ALL = "all";
 
@@ -69,6 +86,7 @@ const tierBadgeClass = (tier: Tier): string => {
 
 export default function VendorCatalog() {
   const { t } = useLang();
+  const locations = useLocations();
 
   // Display-only translations for small fixed vocabularies. Underlying values
   // stay English (used for filtering/keys); only the label shown is localized.
@@ -173,6 +191,7 @@ export default function VendorCatalog() {
     return m && mealTypeOptions.includes(m) ? [m] : [];
   });
   const [sort, setSort] = useState<SortKey>("relevance");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Real customer ratings, matched to these listings by name (best-effort).
   const ratings = useVendorRatings();
@@ -181,27 +200,13 @@ export default function VendorCatalog() {
   // bottom — pad the section so the last row of cards clears it.
   const { count: compareCount } = useCompare();
 
-  // Live vendors who published a menu from the vendor dashboard — appended to
-  // the curated static listings. Best-effort: the catalog renders the static
-  // set immediately and on any fetch failure.
-  const [liveVendors, setLiveVendors] = useState<VendorListing[]>([]);
-  useEffect(() => {
-    let live = true;
-    fetch("/api/vendors")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { vendors?: VendorListing[] } | null) => {
-        if (live && d?.vendors) setLiveVendors(d.vendors);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
+  // Curated static listings + live dashboard-published vendors.
+  const [refreshToken, setRefreshToken] = useState(0);
+  const allVendors = useAllVendors(refreshToken);
+  const onPullRefresh = useCallback(async () => {
+    setRefreshToken((n) => n + 1);
+    await new Promise((r) => setTimeout(r, 350));
   }, []);
-
-  const allVendors = useMemo(
-    () => [...vendorListings, ...liveVendors],
-    [liveVendors],
-  );
 
   const toggleMeal = (meal: string) =>
     setMeals((prev) =>
@@ -219,6 +224,29 @@ export default function VendorCatalog() {
     () => Array.from(new Set(allVendors.map((v) => v.city))),
     [allVendors],
   );
+
+  useEffect(() => {
+    if (searchParams.get("city")) return;
+
+    function applyStored(stored: StoredLocation | null) {
+      if (!stored?.cityId) return;
+      const name = resolveLocationDisplayName(
+        stored.cityId,
+        locations,
+        stored.customCity,
+      );
+      if (!name || !cityOptions.includes(name)) return;
+      setCity(name);
+    }
+
+    applyStored(readStoredLocation());
+
+    function onChanged(e: Event) {
+      applyStored((e as CustomEvent<StoredLocation>).detail);
+    }
+    window.addEventListener(LOCATION_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(LOCATION_CHANGED_EVENT, onChanged);
+  }, [cityOptions, locations, searchParams]);
 
   // Distinct cuisines, sorted alphabetically.
   const cuisineOptions = useMemo(
@@ -305,6 +333,17 @@ export default function VendorCatalog() {
     price !== ALL ||
     meals.length > 0;
 
+  /** Count of sheet filters (excludes search) — drives the Filters chip badge. */
+  const activeFilterCount = [
+    city !== ALL,
+    state !== ALL,
+    cuisine !== ALL,
+    diet !== ALL,
+    tier !== ALL,
+    price !== ALL,
+    meals.length > 0,
+  ].filter(Boolean).length;
+
   const resetFilters = () => {
     setQuery("");
     setCity(ALL);
@@ -317,126 +356,234 @@ export default function VendorCatalog() {
     setSort("relevance");
   };
 
+  const chipClass = (active: boolean) =>
+    "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors " +
+    (active
+      ? "border-maroon bg-cream text-ink"
+      : "border-maroon/15 bg-white text-ink/70");
+
+  const selectChipClass = (active: boolean) =>
+    chipClass(active) + " !w-auto gap-1 pr-2";
+
   return (
+    <PullToRefresh onRefresh={onPullRefresh}>
     <section
       className={
-        "mx-auto max-w-7xl px-5 py-12 sm:py-16 " +
+        "relative bg-transparent px-4 pb-12 pt-2 sm:px-5 sm:pb-16 sm:pt-4 " +
         (compareCount > 0 ? "pb-32 sm:pb-36" : "")
       }
     >
-      <div className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">
+      <div className="mx-auto max-w-7xl">
+      <div className="max-w-xl px-1">
+        <p className="eyebrow text-[11px] font-semibold text-maroon">
           {isBainaSearch
             ? t("Baina Boxes", "बैना बॉक्स")
-            : t("Vendor Catalog", "वेंडर कैटलॉग")}
+            : t("Near you", "आपके पास")}
         </p>
         {isBainaSearch ? (
           <>
-            <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-              {t("Gift Boxes of", "मिठास और प्यार")}
-              <br />
-              {t("Sweetness & Love", "के गिफ्ट बॉक्स")}
+            <h1 className="mt-2 text-app-title text-ink">
+              {t("Gift Boxes of Sweetness & Love", "मिठास और प्यार के गिफ्ट बॉक्स")}
             </h1>
-            <p className="font-script mt-3 text-xl text-ink-soft">
+            <p className="mt-2 text-body text-ink/55">
               {t(
-                "Curated Baina Boxes — filter by city & price, then order the perfect gift.",
-                "चुनिंदा बैना बॉक्स — शहर और कीमत से फ़िल्टर करें, फिर बेहतरीन तोहफ़ा ऑर्डर करें।",
+                "Filter by city & price, then order.",
+                "शहर और कीमत से फ़िल्टर करें, फिर ऑर्डर करें।",
               )}
             </p>
           </>
         ) : (
           <>
-            <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-              {t("Compare Verified", "वेरिफाइड कैटरर्स की")}
-              <br />
-              {t("Caterers", "तुलना करें")}
+            <h1 className="mt-2 text-app-title text-ink">
+              {t("Find your caterer", "अपना कैटरर चुनें")}
             </h1>
-            <p className="font-script mt-3 text-xl text-ink-soft">
+            <p className="mt-2 text-body text-ink/55">
               {t(
-                "Search by cuisine or name, filter by city, diet & tier — then compare the best.",
-                "व्यंजन या नाम से खोजें, शहर, डाइट और टियर से फ़िल्टर करें — फिर सर्वश्रेष्ठ की तुलना करें।",
+                "Search, filter, book — verified caterers near you.",
+                "खोजें, फ़िल्टर करें, बुक करें — आपके पास वेरिफाइड कैटरर।",
               )}
             </p>
           </>
         )}
       </div>
 
-      {/* "Baina Box, specially by Bhojpatra" — signature block shown atop a
-          Baina Box search. Admin-editable; hidden when switched off. */}
       {isBainaSearch && (
-        <div className="mt-8">
+        <div className="mt-6">
           <BainaBoxSpecial variant="search" />
         </div>
       )}
 
-      {/* Filter bar */}
-      <Card padding="none" className="mt-8 p-4 sm:p-5 lg:p-6">
-        {/* Search — prominent, Swiggy/Zomato-style with icon, sort & clear */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="group relative flex-1">
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-soft transition-colors group-focus-within:text-maroon"
+      {/* Sticky app chrome — search + chip row */}
+      <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">
+        <div className="mx-auto max-w-7xl">
+          <AppSearchBar
+            id="vendor-search"
+            value={query}
+            onChange={setQuery}
+            aria-label={t("Search caterers", "कैटरर खोजें")}
+            placeholder={t(
+              "Search for caterers or cuisine",
+              "कैटरर या व्यंजन खोजें",
+            )}
+          />
+
+          <CategoryChips
+            className="mt-3"
+            label={t("Filters", "फ़िल्टर")}
+          >
+            <CategoryChip
+              selected={activeFilterCount > 0}
+              onClick={() => setFiltersOpen(true)}
+              count={activeFilterCount > 0 ? activeFilterCount : undefined}
+              leftIcon={<FilterGlyph />}
             >
-              <SearchIcon />
-            </span>
-            <input
-              id="vendor-search"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label={t("Search caterers", "कैटरर खोजें")}
-              placeholder={t(
-                "Search caterers, cuisines, dishes…",
-                "कैटरर, व्यंजन, डिश खोजें…",
-              )}
-              className="w-full rounded-full border border-cream-3 bg-cream-2/40 py-3.5 pl-12 pr-11 text-base text-ink shadow-sm outline-none transition-colors placeholder:text-ink-soft/70 focus:border-maroon focus:bg-white [&::-webkit-search-cancel-button]:appearance-none"
+              {t("Filters", "फ़िल्टर")}
+            </CategoryChip>
+
+            <ThemedSelect
+              id="vendor-sort-chip"
+              value={sort}
+              onChange={(v) => setSort(v as SortKey)}
+              ariaLabel={t("Sort by", "क्रम")}
+              className="w-auto shrink-0"
+              buttonClassName={selectChipClass(sort !== "relevance")}
+              options={[
+                { value: "relevance", label: t("Sort", "क्रम") },
+                { value: "rating", label: t("Rating", "रेटिंग") },
+                { value: "price-asc", label: t("Price ↑", "कीमत ↑") },
+                { value: "price-desc", label: t("Price ↓", "कीमत ↓") },
+              ]}
             />
-            {query !== "" && (
+
+            <ThemedSelect
+              id="vendor-city-chip"
+              value={city}
+              onChange={setCity}
+              ariaLabel={t("City", "शहर")}
+              className="w-auto max-w-[9rem] shrink-0"
+              buttonClassName={selectChipClass(city !== ALL)}
+              options={[
+                { value: ALL, label: t("City", "शहर") },
+                ...cityOptions.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+
+            <ThemedSelect
+              id="vendor-price-chip"
+              value={price}
+              onChange={(v) => setPrice(v as PriceRange)}
+              ariaLabel={t("Price", "कीमत")}
+              className="w-auto shrink-0"
+              buttonClassName={selectChipClass(price !== ALL)}
+              options={PRICE_RANGES.map((r) => ({
+                value: r.value,
+                label:
+                  r.value === ALL ? t("Price", "कीमत") : priceLabel(r.value),
+              }))}
+            />
+
+            {!isBainaSearch &&
+              DIET_OPTIONS.filter((d) => d !== ALL).map((dietValue) => (
+                <CategoryChip
+                  key={dietValue}
+                  selected={diet === dietValue}
+                  onClick={() =>
+                    setDiet((prev) => (prev === dietValue ? ALL : dietValue))
+                  }
+                >
+                  {dietLabel(dietValue)}
+                </CategoryChip>
+              ))}
+
+            {hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => setQuery("")}
-                aria-label={t("Clear search", "खोज साफ़ करें")}
-                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-cream-2 hover:text-maroon"
+                onClick={resetFilters}
+                className="shrink-0 px-2 text-[12px] font-semibold text-maroon"
               >
-                <span aria-hidden="true" className="text-lg leading-none">×</span>
+                {t("Clear", "हटाएँ")}
               </button>
             )}
+          </CategoryChips>
+
+          {/* Desktop-only expanded dropdowns */}
+          <div
+            className={
+              "mt-3 hidden gap-2 lg:grid " +
+              (isBainaSearch ? "lg:grid-cols-3" : "lg:grid-cols-5")
+            }
+          >
+            <FilterSelect
+              id="vendor-city"
+              label={t("City", "शहर")}
+              value={city}
+              onChange={setCity}
+              options={[
+                { value: ALL, label: t("All Cities", "सभी शहर") },
+                ...cityOptions.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+            <FilterSelect
+              id="vendor-state"
+              label={t("State", "राज्य")}
+              value={state}
+              onChange={setState}
+              options={[
+                { value: ALL, label: t("All States", "सभी राज्य") },
+                ...indianStates.map((s) => ({ value: s, label: s })),
+              ]}
+            />
+            {!isBainaSearch && (
+              <FilterSelect
+                id="vendor-cuisine"
+                label={t("Cuisine", "व्यंजन")}
+                value={cuisine}
+                onChange={setCuisine}
+                options={[
+                  { value: ALL, label: t("All Cuisines", "सभी व्यंजन") },
+                  ...cuisineOptions.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+            )}
+            {!isBainaSearch && (
+              <FilterSelect
+                id="vendor-tier"
+                label={t("Tier", "टियर")}
+                value={tier}
+                onChange={(v) => setTier(v as TierFilter)}
+                options={TIER_OPTIONS.map((tv) => ({
+                  value: tv,
+                  label: tv === ALL ? t("All Tiers", "सभी टियर") : tierLabel(tv),
+                }))}
+              />
+            )}
+            <FilterSelect
+              id="vendor-price"
+              label={
+                isBainaSearch
+                  ? t("Price / box", "कीमत / बॉक्स")
+                  : t("Price / plate", "कीमत / प्लेट")
+              }
+              value={price}
+              onChange={(v) => setPrice(v as PriceRange)}
+              options={PRICE_RANGES.map((r) => ({
+                value: r.value,
+                label: priceLabel(r.value),
+              }))}
+            />
           </div>
-
-          {/* Sort */}
-          <ThemedSelect
-            id="vendor-sort"
-            value={sort}
-            onChange={(v) => setSort(v as SortKey)}
-            ariaLabel={t("Sort by", "क्रम")}
-            className="shrink-0"
-            buttonClassName="rounded-full border border-cream-3 bg-cream-2/40 py-3.5 pl-5 pr-5 text-sm font-medium transition-colors"
-            options={[
-              { value: "relevance", label: t("Sort: Relevance", "क्रम: प्रासंगिकता") },
-              { value: "rating", label: t("Sort: Rating", "क्रम: रेटिंग") },
-              {
-                value: "price-asc",
-                label: t("Sort: Price (low → high)", "क्रम: कीमत (कम → अधिक)"),
-              },
-              {
-                value: "price-desc",
-                label: t("Sort: Price (high → low)", "क्रम: कीमत (अधिक → कम)"),
-              },
-            ]}
-          />
         </div>
+      </div>
 
-        {/* Compact dropdown row — City, State, Price (+ Cuisine & Tier for
-            the full catalog; hidden for a focused Baina Box search). */}
-        <div
-          className={
-            "mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 " +
-            (isBainaSearch ? "lg:grid-cols-3" : "lg:grid-cols-5")
-          }
-        >
+      {/* Mobile filter sheet */}
+      <Drawer
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title={t("Filters", "फ़िल्टर")}
+      >
+        <div className="space-y-5">
           <FilterSelect
-            id="vendor-city"
+            id="sheet-city"
             label={t("City", "शहर")}
             value={city}
             onChange={setCity}
@@ -446,7 +593,7 @@ export default function VendorCatalog() {
             ]}
           />
           <FilterSelect
-            id="vendor-state"
+            id="sheet-state"
             label={t("State", "राज्य")}
             value={state}
             onChange={setState}
@@ -457,7 +604,7 @@ export default function VendorCatalog() {
           />
           {!isBainaSearch && (
             <FilterSelect
-              id="vendor-cuisine"
+              id="sheet-cuisine"
               label={t("Cuisine", "व्यंजन")}
               value={cuisine}
               onChange={setCuisine}
@@ -469,7 +616,7 @@ export default function VendorCatalog() {
           )}
           {!isBainaSearch && (
             <FilterSelect
-              id="vendor-tier"
+              id="sheet-tier"
               label={t("Tier", "टियर")}
               value={tier}
               onChange={(v) => setTier(v as TierFilter)}
@@ -480,8 +627,12 @@ export default function VendorCatalog() {
             />
           )}
           <FilterSelect
-            id="vendor-price"
-            label={isBainaSearch ? t("Price / box", "कीमत / बॉक्स") : t("Price / plate", "कीमत / प्लेट")}
+            id="sheet-price"
+            label={
+              isBainaSearch
+                ? t("Price / box", "कीमत / बॉक्स")
+                : t("Price / plate", "कीमत / प्लेट")
+            }
             value={price}
             onChange={(v) => setPrice(v as PriceRange)}
             options={PRICE_RANGES.map((r) => ({
@@ -489,64 +640,66 @@ export default function VendorCatalog() {
               label: priceLabel(r.value),
             }))}
           />
-        </div>
 
-        {/* Quick filters — Diet (segmented) + Serves (multi-select chips).
-            Neither applies to Baina Boxes, so the whole row is hidden there. */}
-        {!isBainaSearch && (
-          <div className="mt-5 flex flex-col gap-4 border-t border-cream-3 pt-5 lg:flex-row lg:items-start lg:gap-8">
-            <div className="shrink-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                {t("Diet", "डाइट")}
-              </p>
-              <div className="mt-3 inline-flex rounded-full border border-cream-3 bg-cream-2/40 p-1">
-                {DIET_OPTIONS.map((dietValue) => (
-                  <button
-                    key={dietValue}
-                    type="button"
-                    onClick={() => setDiet(dietValue)}
-                    aria-pressed={diet === dietValue}
-                    className={
-                      "rounded-full px-4 py-2.5 text-sm font-medium transition-colors sm:py-1.5 " +
-                      (diet === dietValue
-                        ? "bg-maroon text-cream"
-                        : "text-ink-soft hover:text-ink")
-                    }
-                  >
-                    {dietLabel(dietValue)}
-                  </button>
-                ))}
+          {!isBainaSearch && (
+            <>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                  {t("Diet", "डाइट")}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DIET_OPTIONS.map((dietValue) => (
+                    <button
+                      key={dietValue}
+                      type="button"
+                      onClick={() => setDiet(dietValue)}
+                      aria-pressed={diet === dietValue}
+                      className={chipClass(diet === dietValue)}
+                    >
+                      {dietLabel(dietValue)}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                  {t("Serves", "परोसता है")}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {mealTypeOptions.map((meal) => (
+                    <button
+                      key={meal}
+                      type="button"
+                      onClick={() => toggleMeal(meal)}
+                      aria-pressed={meals.includes(meal)}
+                      className={chipClass(meals.includes(meal))}
+                    >
+                      {mealLabel(meal)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                {t("Serves", "परोसता है")}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2.5">
-                {mealTypeOptions.map((meal) => (
-                  <Chip
-                    key={meal}
-                    selected={meals.includes(meal)}
-                    onClick={() => toggleMeal(meal)}
-                  >
-                    {mealLabel(meal)}
-                  </Chip>
-                ))}
-              </div>
-            </div>
+          <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-maroon/10 bg-white px-5 py-3">
+            <Button variant="secondary" fullWidth onClick={resetFilters}>
+              {t("Clear all", "सभी हटाएं")}
+            </Button>
+            <Button fullWidth onClick={() => setFiltersOpen(false)}>
+              {t("Show", "दिखाएँ")} {results.length}
+            </Button>
           </div>
-        )}
-      </Card>
+        </div>
+      </Drawer>
 
       {/* Results summary */}
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-soft">
-          {t("Showing", "दिखा रहे हैं")}{" "}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1">
+        <p className="text-[13px] text-ink/55">
           <span className="font-semibold text-ink">{results.length}</span>{" "}
           {results.length === 1
-            ? t("verified caterer", "वेरिफाइड कैटरर")
-            : t("verified caterers", "वेरिफाइड कैटरर्स")}
+            ? t("caterer", "कैटरर")
+            : t("caterers", "कैटरर")}
           {city !== ALL && (
             <>
               {" "}
@@ -556,24 +709,16 @@ export default function VendorCatalog() {
           )}
           {cuisine !== ALL && (
             <>
-              {" "}— <span className="font-medium text-maroon">{cuisine}</span>
+              {" "}
+              — <span className="font-medium text-maroon">{cuisine}</span>
             </>
           )}
         </p>
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="text-sm font-medium text-maroon underline-offset-4 hover:underline"
-          >
-            {t("Clear all", "सभी हटाएं")}
-          </button>
-        )}
       </div>
 
-      {/* Vendor grid */}
+      {/* Vendor grid — denser app spacing */}
       {results.length > 0 ? (
-        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+        <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {results.map((vendor) => (
             <VendorCard
               key={vendor.id}
@@ -583,49 +728,44 @@ export default function VendorCatalog() {
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-card border border-dashed border-cream-3 bg-white/60 p-6 text-center sm:p-12">
-          <p className="font-display text-lg text-ink">
-            {t("No vendors found", "कोई वेंडर नहीं मिला")}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">
-            {t(
-              "Try a different search or relax your filters.",
-              "अलग खोज आज़माएं या अपने फ़िल्टर हटाएं।",
-            )}
-          </p>
-          {hasActiveFilters && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={resetFilters}
-              className="mt-4"
-            >
-              {t("Clear all", "सभी हटाएं")}
-            </Button>
+        <EmptyState
+          className="mt-4"
+          title={t("No vendors found", "कोई वेंडर नहीं मिला")}
+          message={t(
+            "Try a different search or relax your filters.",
+            "अलग खोज आज़माएं या अपने फ़िल्टर हटाएं।",
           )}
-        </div>
+          action={
+            hasActiveFilters ? (
+              <Button variant="secondary" size="sm" onClick={resetFilters}>
+                {t("Clear all", "सभी हटाएं")}
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       <CompareTray />
+      </div>
     </section>
+    </PullToRefresh>
   );
 }
 
-function SearchIcon() {
+function FilterGlyph() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="11" cy="11" r="7" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <path d="M4 6h16M7 12h10M10 18h4" />
     </svg>
   );
 }
@@ -674,6 +814,8 @@ function VendorCard({
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
+  const cityId = cities.find((c) => c.name === vendor.city)?.id;
+  const bookHref = `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
@@ -729,168 +871,158 @@ function VendorCard({
       padding="none"
       className="group relative flex flex-col overflow-hidden"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2">
+      {/* Image — Zomato-style media plane with rating chip on the photo */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream">
         <Image
           src={vendor.image}
           alt={vendor.name}
           fill
           sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
         />
-        <span className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-          {vendor.tiers.map((tier) => (
-            <span
-              key={tier}
-              className={
-                "rounded-full px-3 py-1 text-xs font-semibold shadow-sm " +
-                tierBadgeClass(tier)
-              }
-            >
-              {tierBadgeLabel(tier)}
-            </span>
-          ))}
-        </span>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 via-black/15 to-transparent"
+        />
+
         {vendor.verified && (
-          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
-            <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
+          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-white/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm backdrop-blur-sm">
+            <span aria-hidden="true">✓</span>
+            {t("Verified", "वेरिफाइड")}
           </span>
         )}
+
         <button
           type="button"
           onClick={() => toggle(vendor.id)}
           disabled={compareDisabled}
           aria-pressed={inCompare}
+          aria-label={
+            inCompare
+              ? t("Remove from compare", "तुलना से हटाएँ")
+              : t("Add to compare", "तुलना में जोड़ें")
+          }
           title={
             compareDisabled
               ? t("Compare list is full", "तुलना सूची भर गई है")
               : undefined
           }
           className={
-            "absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 " +
+            "absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
             (inCompare
               ? "bg-maroon text-cream"
-              : "bg-white/90 text-ink hover:text-maroon")
+              : "bg-white/95 text-ink hover:text-maroon")
           }
         >
-          <span aria-hidden="true">{inCompare ? "✓" : "+"}</span>
-          {inCompare
-            ? t("Added to compare", "तुलना में जोड़ा")
-            : t("Add to compare", "तुलना में जोड़ें")}
+          <span aria-hidden="true" className="text-sm font-bold leading-none">
+            {inCompare ? "✓" : "+"}
+          </span>
         </button>
-      </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-display text-lg font-semibold text-ink">
-            {vendor.name}
-          </h3>
-          {vendor.reviews > 0 ? (
+        {/* Rating on image — Swiggy/Zomato signature chip */}
+        <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1.5">
+          {vendor.reviews > 0 || stats ? (
             <Link
               href={`/vendors/${vendor.id}#reviews`}
+              className="relative z-10 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm"
               aria-label={t(
-                `Read ${vendor.reviews} reviews for ${vendor.name}`,
-                `${vendor.name} की ${vendor.reviews} समीक्षाएँ पढ़ें`,
+                `Rated ${stats?.rating ?? vendor.rating}`,
+                `रेटिंग ${stats?.rating ?? vendor.rating}`,
               )}
-              className="relative z-10 inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-ink-soft transition-colors hover:text-maroon"
             >
-              <span className="inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 font-bold text-cream">
-                {vendor.rating}
-                <span aria-hidden="true">★</span>
-              </span>
-              ({vendor.reviews})
+              {(stats?.rating ?? vendor.rating).toFixed(1)}
+              <span aria-hidden="true">★</span>
             </Link>
           ) : vendor.googleRating ? (
-            // Vendor-declared Google reputation — a distinct badge that shows
-            // alongside any Bhojpatra "verified reviews" line below.
-            <span
-              aria-label={t(
-                `Rated ${vendor.googleRating} on Google${vendor.googleReviews ? ` from ${vendor.googleReviews} reviews` : ""}`,
-                `गूगल पर ${vendor.googleRating} रेटिंग${vendor.googleReviews ? `, ${vendor.googleReviews} रिव्यू` : ""}`,
-              )}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cream-3 bg-cream-2 px-2 py-0.5 text-xs font-medium text-ink"
-            >
-              <span aria-hidden="true" className="text-maroon">★</span>
-              <span className="font-bold">{vendor.googleRating}</span>
-              <span className="text-ink-soft">
-                {t("Google", "गूगल")}
-                {vendor.googleReviews ? ` (${vendor.googleReviews})` : ""}
+            <span className="inline-flex items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[11px] font-bold text-ink shadow-sm">
+              {vendor.googleRating}
+              <span aria-hidden="true" className="text-maroon">
+                ★
               </span>
             </span>
           ) : (
-            !stats && (
-              <span className="inline-flex shrink-0 items-center rounded-full border border-maroon px-2.5 py-1 text-xs font-semibold text-maroon">
-                {t("New", "नया")}
-              </span>
-            )
-          )}
-        </div>
-
-        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
-          <span aria-hidden="true">📍</span>
-          {vendor.city}, {vendor.state}
-        </p>
-
-        {stats && (
-          <Link
-            href={`/vendors/${vendor.id}#reviews`}
-            className="relative z-10 mt-1.5 inline-flex w-fit items-center gap-1 text-sm font-semibold text-maroon hover:underline"
-          >
-            <span aria-hidden="true">★</span> {stats.rating} ·{" "}
-            {t(
-              `${stats.count} verified ${stats.count === 1 ? "review" : "reviews"}`,
-              `${stats.count} सत्यापित समीक्षाएँ`,
-            )}
-          </Link>
-        )}
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {vendor.cuisines.map((c) => (
-            <span
-              key={c}
-              className="rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink-soft"
-            >
-              {c}
+            <span className="rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
+              {t("New", "नया")}
             </span>
-          ))}
-          <span className="rounded-full bg-surface-beige px-2.5 py-1 text-xs font-medium text-ink-soft">
-            {dietBadgeLabel(vendor.diet)}
-          </span>
-        </div>
-
-        <p className="mt-2.5 flex items-start gap-1.5 text-xs text-ink-soft">
-          <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>
-          <span>{vendor.mealTypes.map(mealBadgeLabel).join(" · ")}</span>
-        </p>
-
-        <div className="mt-4 flex items-end justify-between border-t border-cream-3 pt-4">
-          <div>
-            <p className="text-xs text-ink-soft">{t("From", "से")}</p>
-            <p className="font-display text-lg font-semibold text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
-              <span className="text-sm font-normal text-ink-soft">
-                / {t("plate", "प्लेट")}
-              </span>
-            </p>
-          </div>
-          {/* Every caterer has a public profile page: live vendors show their
-              gallery + full menu, curated listings show details, reviews and a
-              "Book this caterer" CTA. */}
-          <Button
-            href={`/vendors/${vendor.id}`}
-            variant="secondary"
-            size="sm"
-            className="relative z-10 group-hover:shadow-md"
-          >
-            {vendor.id.startsWith("VEN-")
-              ? t("View Menu & Photos", "मेन्यू और फ़ोटो देखें")
-              : t("View Details", "विवरण देखें")}
-          </Button>
+          )}
+          {vendor.tiers[0] && (
+            <span
+              className={
+                "rounded px-1.5 py-0.5 text-[10px] font-semibold shadow-sm " +
+                tierBadgeClass(vendor.tiers[0])
+              }
+            >
+              {tierBadgeLabel(vendor.tiers[0])}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Whole-card click target → the caterer's profile page. Sits beneath the
-          interactive controls above (compare, rating, View), which carry a
-          higher z-index so they stay independently clickable. */}
+      {/* Dense info block — app card body */}
+      <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
+        <div className="flex items-start gap-2">
+          {/* Diet mark — brand-only semantic square */}
+          <span
+            aria-label={dietBadgeLabel(vendor.diet)}
+            title={dietBadgeLabel(vendor.diet)}
+            className={
+              "mt-1 h-3.5 w-3.5 shrink-0 rounded-[2px] border-2 " +
+              (vendor.diet === "Non-Veg"
+                ? "border-maroon bg-maroon"
+                : vendor.diet === "Veg"
+                  ? "border-maroon bg-cream"
+                  : "border-maroon bg-white")
+            }
+          />
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-sans text-[15px] font-bold leading-snug tracking-tight text-ink">
+              {vendor.name}
+            </h3>
+            <p className="mt-0.5 truncate text-[12px] leading-snug text-ink/55">
+              {vendor.cuisines.slice(0, 3).join(" · ")}
+              {vendor.cuisines.length > 3 ? "…" : ""}
+            </p>
+            <p className="mt-0.5 truncate text-[12px] leading-snug text-ink/45">
+              {vendor.city}
+              <span aria-hidden className="mx-1 text-ink/25">
+                ·
+              </span>
+              {vendor.mealTypes.slice(0, 2).map(mealBadgeLabel).join(", ")}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-maroon/8 pt-2.5">
+          <p className="min-w-0 font-sans text-[13px] font-semibold text-ink">
+            <span className="text-maroon">
+              ₹{vendor.priceFrom.toLocaleString("en-IN")}
+            </span>
+            <span className="font-normal text-ink/45">
+              {" "}
+              {t("/ plate", "/ प्लेट")}
+            </span>
+          </p>
+          <div className="relative z-10 flex shrink-0 items-center gap-1.5">
+            <Button
+              href={`/vendors/${vendor.id}`}
+              variant="ghost"
+              size="sm"
+              className="min-h-8 px-2.5 text-[11px]"
+            >
+              {t("View", "देखें")}
+            </Button>
+            <Button
+              href={bookHref}
+              variant="primary"
+              size="sm"
+              className="min-h-8 px-3.5 text-[11px] shadow-brand"
+            >
+              {t("Book", "बुक")}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <Link
         href={`/vendors/${vendor.id}`}
         aria-label={t(`View ${vendor.name}`, `${vendor.name} देखें`)}

@@ -85,12 +85,14 @@ export default function ContactPage() {
   }
 
   return (
-    <Container size="lg" className="py-12 sm:py-16">
-      <div className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">
+    <Container size="lg" className="px-4 py-6 sm:px-5 sm:py-12 lg:py-16">
+      <div className="max-w-xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-maroon">
           {contact.eyebrow}
         </p>
-        <h1 className="mt-2 text-3xl text-ink sm:text-4xl">{contact.title}</h1>
+        <h1 className="mt-1.5 font-sans text-2xl font-bold tracking-tight text-ink sm:mt-2 sm:font-display sm:text-3xl sm:font-normal lg:text-4xl">
+          {contact.title}
+        </h1>
         <p className="font-script mt-3 text-xl text-ink-soft">
           {contact.intro}
         </p>

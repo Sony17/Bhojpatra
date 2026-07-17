@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import PublicShell from "@/components/app/PublicShell";
 import PackageShowcase from "@/components/showcase/PackageShowcase";
 
 export const metadata: Metadata = {
@@ -11,12 +10,8 @@ export const metadata: Metadata = {
 
 export default function ShowcasePage() {
   return (
-    <>
-      <Header />
-      <main className="flex-1 pt-28 sm:pt-32">
-        <PackageShowcase />
-      </main>
-      <Footer />
-    </>
+    <PublicShell chat={false}>
+      <PackageShowcase />
+    </PublicShell>
   );
 }

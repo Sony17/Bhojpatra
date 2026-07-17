@@ -11,13 +11,31 @@ import { inputClass } from "./FormControls";
  * re-encoded to a compact data URL on the client so they stay small when saved
  * with the rest of the content (persisted to the database) and render via
  * next/image.
+ *
+ * The default profile (1280px JPEG) suits thumbnails and logos. Pass
+ * `highQuality` for images shown large — e.g. the full-width promotional banner
+ * — to keep more resolution (2000px), skip the lossy JPEG re-encode for PNG
+ * artwork (crisp text / flat colour, no ringing), and only fall back to a
+ * high-quality JPEG when a PNG would be too heavy to store inline.
  */
 
-const MAX_DIM = 1280; // longest edge, px
+const MAX_DIM = 1280; // longest edge, px (default profile)
 const QUALITY = 0.82;
 
-/** Read a File, downscale to MAX_DIM and return a JPEG data URL. */
-function fileToDataUrl(file: File): Promise<string> {
+const HQ_MAX_DIM = 2000; // longest edge for the high-quality profile
+const HQ_QUALITY = 0.92;
+// Cap for a high-quality PNG data URL (~1.35 MB of bytes once base64-decoded).
+// Beyond this a lossless PNG is too heavy to inline in the content singleton,
+// so we fall back to a high-quality JPEG instead.
+const HQ_PNG_MAX_CHARS = 1_800_000;
+
+/** Read a File, downscale to fit `maxDim` and return a compact data URL. In
+ *  high-quality mode a PNG source stays PNG (lossless) unless that would be too
+ *  large to inline, in which case it re-encodes to a high-quality JPEG. */
+function fileToDataUrl(
+  file: File,
+  { maxDim, highQuality }: { maxDim: number; highQuality: boolean },
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("read-failed"));
@@ -25,7 +43,7 @@ function fileToDataUrl(file: File): Promise<string> {
       const img = new window.Image();
       img.onerror = () => reject(new Error("decode-failed"));
       img.onload = () => {
-        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
@@ -34,7 +52,19 @@ function fileToDataUrl(file: File): Promise<string> {
         const ctx = canvas.getContext("2d");
         if (!ctx) return reject(new Error("no-context"));
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", QUALITY));
+
+        if (highQuality && file.type === "image/png") {
+          const png = canvas.toDataURL("image/png");
+          resolve(
+            png.length <= HQ_PNG_MAX_CHARS
+              ? png
+              : canvas.toDataURL("image/jpeg", HQ_QUALITY),
+          );
+          return;
+        }
+        resolve(
+          canvas.toDataURL("image/jpeg", highQuality ? HQ_QUALITY : QUALITY),
+        );
       };
       img.src = reader.result as string;
     };
@@ -47,11 +77,15 @@ export default function ImageField({
   value,
   onChange,
   hint,
+  highQuality = false,
 }: {
   label?: string;
   value: string;
   onChange: (next: string) => void;
   hint?: string;
+  /** Keep more resolution and skip the lossy JPEG re-encode for PNG artwork.
+   *  Use for images displayed large (e.g. the full-width promotional banner). */
+  highQuality?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const fieldId = useId();
@@ -63,7 +97,12 @@ export default function ImageField({
     setBusy(true);
     setError(null);
     try {
-      onChange(await fileToDataUrl(file));
+      onChange(
+        await fileToDataUrl(file, {
+          maxDim: highQuality ? HQ_MAX_DIM : MAX_DIM,
+          highQuality,
+        }),
+      );
     } catch {
       setError("Couldn't process that image. Try a JPG or PNG.");
     } finally {

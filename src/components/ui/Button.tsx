@@ -27,7 +27,7 @@ export type ButtonVariant =
 export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
-  "focus-ring group relative inline-flex items-center justify-center gap-2 rounded-control font-semibold whitespace-nowrap transition duration-200 ease-out disabled:pointer-events-none disabled:opacity-50 active:scale-[.98]";
+  "focus-ring group relative inline-flex items-center justify-center gap-2 rounded-control font-semibold whitespace-nowrap transition duration-200 ease-out disabled:pointer-events-none disabled:opacity-50 active:scale-[.98] touch-manipulation";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
@@ -42,8 +42,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: "min-h-9 gap-1.5 px-4 py-2 text-xs",
-  md: "tap px-5 py-2.5 text-sm",
+  sm: "min-h-10 gap-1.5 px-4 py-2 text-xs",
+  md: "tap min-h-11 px-5 py-2.5 text-sm",
   lg: "tap min-h-12 px-7 py-3 text-base",
 };
 

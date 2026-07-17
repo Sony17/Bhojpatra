@@ -1,5 +1,6 @@
 import { findUserByEmail, saveUser } from "@/lib/users";
 import { hashPassword, makeResetToken, hashToken } from "@/lib/auth";
+import { sendPasswordResetEmail, siteBaseUrl } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,15 @@ export async function POST(request: Request) {
     user.resetTokenHash = hash;
     user.resetExpires = new Date(Date.now() + RESET_TTL_MS).toISOString();
     await saveUser(user);
+
+    // Email the reset link. Fall back to the request's own origin when neither
+    // SITE_URL nor the Vercel URL is configured, so the link is always absolute.
+    const base = siteBaseUrl() || new URL(request.url).origin;
+    const resetUrl =
+      `${base}/reset-password?token=${encodeURIComponent(rawToken)}` +
+      `&email=${encodeURIComponent(email)}`;
+    await sendPasswordResetEmail(email, resetUrl);
+
     if (!IS_PROD) devToken = rawToken;
   }
 

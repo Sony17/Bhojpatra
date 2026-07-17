@@ -309,6 +309,34 @@ export const cities: { id: string; name: string; nameHi: string }[] = [
   { id: "pune", name: "Pune", nameHi: "पुणे" },
 ];
 
+/** Wide cinematic hero backdrops for each booking-bar event / occasion type.
+ *  Curated for the Bhojpatra brand — warm golden feasts, mithai, and elegant
+ *  celebration spreads (never cold / off-brand stock). */
+export const heroEventImages: Record<string, string> = {
+  wedding: img("photo-1414235077428-338989a2e8c0", 1400),
+  engagement: img("photo-1519671482749-fd09be7ccebf", 1400),
+  tilak: img("photo-1631452180519-c014fe946bc7", 1400),
+  haldi: img("photo-1606491956689-2ea866880c84", 1400),
+  mehndi: img("photo-1546069901-ba9599a7e63c", 1400),
+  reception: img("photo-1565557623262-b51c2513a641", 1400),
+  birthday: img("photo-1530103862676-de8c9debad1d", 1400),
+  corporate: img("photo-1517248135467-4c7edcad34c4", 1400),
+};
+
+/** Wide cinematic hero backdrops for each serviceable city / location.
+ *  Verified Unsplash ids only — each city gets a distinct, on-brand feast /
+ *  celebration image until an admin uploads a city-specific photo. */
+export const heroLocationImages: Record<string, string> = {
+  lucknow: img("photo-1631452180519-c014fe946bc7", 1400),
+  delhi: img("photo-1565557623262-b51c2513a641", 1400),
+  mumbai: img("photo-1414235077428-338989a2e8c0", 1400),
+  bengaluru: img("photo-1517248135467-4c7edcad34c4", 1400),
+  kolkata: img("photo-1606491956689-2ea866880c84", 1400),
+  hyderabad: img("photo-1563379091339-03b21ab4a4f8", 1400),
+  jaipur: img("photo-1519225421980-715cb0215aed", 1400),
+  pune: img("photo-1546069901-ba9599a7e63c", 1400),
+};
+
 export const categories: Category[] = [
   { id: "caterers", name: "Caterers", nameHi: "केटरर्स", icon: "🍲", image: img("photo-1599487488170-d11ec9c172f0", 500) },
   { id: "live-counters", name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍳", image: img("photo-1565895405227-31cffbe0cf86", 500) },
@@ -817,7 +845,7 @@ export const navLinks: {
   hasDropdown?: boolean;
   items?: DropdownItem[];
 }[] = [
-  { label: "Vendors", labelHi: "वेंडर", href: "/vendors" },
+  { label: "Brands", labelHi: "ब्रांड", href: "/vendors" },
   { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
   { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
 ];
@@ -1442,6 +1470,24 @@ export const packageCategories: Record<string, string[]> = {
 };
 
 /**
+ * Menu category ids that are **live stations** (cooked-to-order in front of
+ * guests), not plated courses. The booking wizard pulls these out of the
+ * "Menu building" step and gathers them into a dedicated "Live Stall" step, so
+ * a guest builds their plated menu first, then chooses live counters. Any
+ * category id NOT in this set is treated as a plated course.
+ */
+export const LIVE_STALL_CATEGORY_IDS = [
+  "live",
+  "chaat",
+  "chinese",
+  "south-indian",
+] as const;
+
+/** True when a menu category id is a live-station segment (see above). */
+export const isLiveStallCategory = (id: string): boolean =>
+  (LIVE_STALL_CATEGORY_IDS as readonly string[]).includes(id);
+
+/**
  * How many items each package includes per category id. Drives the
  * "Sweets ×3" allowance strip and the "3/3 picked" counters in Step B.
  * Keys are kept in step with `packageCategories` above.
@@ -1527,6 +1573,37 @@ export const mealTypeOptions: string[] = [
   "Desserts", "Live Counters",
 ];
 
+/** Serving-time meal periods a guest picks in the booking wizard — the feast is
+ *  served at one of these, alongside an exact clock time (see `formatClockTime`
+ *  / `servingTimeLabel`). Kept to the three core meals; the clock time refines
+ *  the slot within the meal. */
+export const bookingMealTimes: { id: string; name: string; nameHi: string }[] = [
+  { id: "Breakfast", name: "Breakfast", nameHi: "नाश्ता" },
+  { id: "Lunch", name: "Lunch", nameHi: "दोपहर का भोजन" },
+  { id: "Dinner", name: "Dinner", nameHi: "रात्रि भोज" },
+];
+
+/** A 24-hour `HH:MM` clock string → a friendly 12-hour label (e.g. "19:30" →
+ *  "7:30 PM"). Empty / malformed input returns "" so callers can `.filter`. */
+export function formatClockTime(hhmm?: string): string {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "";
+  const period = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Combine the meal period and clock time a guest chose into one display string
+ *  (e.g. "Dinner · 7:30 PM"). Either part may be missing; returns "" when both
+ *  are. Used across the receipt, invoice, WhatsApp share and admin/My-Bookings
+ *  views so the serving time reads identically everywhere. */
+export function servingTimeLabel(mealTime?: string, eventTime?: string): string {
+  return [mealTime?.trim() || "", formatClockTime(eventTime)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export const indianStates: string[] = [
   "Uttar Pradesh", "Delhi", "Maharashtra", "Karnataka", "West Bengal",
   "Telangana", "Rajasthan", "Tamil Nadu",
@@ -1603,6 +1680,12 @@ export interface Booking {
   id: string;
   occasion: string;
   date: string;
+  /** Meal period the feast is served at (Breakfast / Lunch / Dinner). Absent on
+   *  legacy orders saved before serving time was captured. */
+  mealTime?: string;
+  /** Exact serving clock time as a 24-hour `HH:MM` string, when the guest set
+   *  one alongside the meal period. Absent when only the meal was chosen. */
+  eventTime?: string;
   guests: number;
   vendor: string;
   city: string;

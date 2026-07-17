@@ -1,47 +1,42 @@
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import FloatingChat from "@/components/FloatingChat";
+import PublicShell from "@/components/app/PublicShell";
 import CampaignPopup from "@/components/CampaignPopup";
-import SectionDivider from "@/components/SectionDivider";
 import Hero from "@/components/sections/Hero";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import BainaBoxes from "@/components/sections/BainaBoxes";
-import PackageSectionSwitcher from "@/components/showcase/PackageSectionSwitcher";
+import FinalisedPackages from "@/components/showcase/FinalisedPackages";
 import Gallery from "@/components/sections/Gallery";
+import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
 import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
 
+/**
+ * Conversion-first home funnel:
+ * 1. Hero — location + book / find caterers
+ * 2. Promo — offer banner + lead capture
+ * 3. Occasions → /book
+ * 4. Categories → /vendors
+ * 5. Packages → book
+ * 6. Baina → order path
+ * 7. Social proof
+ */
 export default function Home() {
   return (
-    <>
-      <Header />
-      <main className="flex-1">
-        <Hero />
-        <SectionDivider className="py-6 sm:py-8" />
-        <ChooseOccasion />
-        <SectionDivider className="py-6 sm:py-8" />
-        {/* Beige bands alternate (base ↔ deeper) so each section reads as a
-            distinct zone flowing out of the hero — never white. The base
-            tone comes from the page body; alt sections sit on a full-bleed
-            deeper-beige band. */}
-        <div className="bg-surface-beige-2">
-          <TopCategories />
-        </div>
-        <SectionDivider className="py-6 sm:py-8" />
-        <BainaBoxes />
-        <SectionDivider className="py-6 sm:py-8" />
-        <PackageSectionSwitcher />
-        <SectionDivider className="py-6 sm:py-8" />
+    <PublicShell hero>
+      <Hero />
+      <PromoLeadCapture />
+      <ChooseOccasion />
+      <div className="home-band-cream">
+        <TopCategories />
+      </div>
+      <FinalisedPackages />
+      <BainaBoxes />
+      <div className="home-band-cream">
         <Gallery />
-        <SectionDivider className="py-6 sm:py-8" />
-        <Testimonials />
-        <SectionDivider className="py-6 sm:py-8" />
-        <PromoLeadCapture />
-      </main>
-      <Footer />
-      <FloatingChat />
+      </div>
+      <BrandRibbon />
+      <Testimonials />
       <CampaignPopup />
-    </>
+    </PublicShell>
   );
 }

@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card } from "@/components/ui";
+import { AppBar, Button, Card, EmptyState } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import {
   useSession,
@@ -122,10 +122,16 @@ export default function AccountsDashboard() {
   ).filter((o) => !session.accounts.includes(o.type));
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 pb-16 sm:px-6">
+    <div className="mx-auto w-full max-w-5xl">
+      <AppBar
+        title={t("My Dashboard", "मेरा डैशबोर्ड")}
+        backHref="/"
+        className="lg:hidden"
+      />
+      <div className="px-4 pb-16 sm:px-6">
       {/* Greeting + the accounts this person holds. */}
-      <header className="mb-6">
-        <h1 className="font-display text-2xl text-ink sm:text-3xl lg:text-4xl">
+      <header className="mb-6 pt-4 lg:pt-0">
+        <h1 className="text-app-title hidden text-ink lg:block">
           {name
             ? t(`Welcome back, ${name}`, `वापसी पर स्वागत है, ${name}`)
             : t("Welcome back", "वापसी पर स्वागत है")}
@@ -171,15 +177,19 @@ export default function AccountsDashboard() {
             />
           </div>
           {!loading && bookingCounts.total === 0 && (
-            <p className="mt-4 text-sm text-ink-soft">
-              {t(
+            <EmptyState
+              className="mt-4 border-0 bg-cream/40 py-6 shadow-none"
+              title={t("No bookings yet", "अभी कोई बुकिंग नहीं")}
+              message={t(
                 "You haven't booked a feast yet.",
                 "आपने अभी तक कोई भोज बुक नहीं किया है।",
-              )}{" "}
-              <Link href="/vendors" className="font-semibold text-maroon">
-                {t("Browse caterers", "कैटरर्स ब्राउज़ करें")}
-              </Link>
-            </p>
+              )}
+              action={
+                <Button href="/vendors" variant="primary" size="sm">
+                  {t("Browse caterers", "कैटरर्स ब्राउज़ करें")}
+                </Button>
+              }
+            />
           )}
         </SectionCard>
 
@@ -249,7 +259,7 @@ export default function AccountsDashboard() {
 
         {/* Add the accounts they don't have yet. */}
         {addable.length > 0 && (
-          <section className="rounded-card border border-dashed border-maroon/25 bg-cream/30 p-5 sm:p-6">
+          <Card as="section" padding="lg" className="border-dashed border-maroon/25 bg-cream/30">
             <h2 className="font-display text-lg text-ink sm:text-xl">
               {t("Add another account", "एक और अकाउंट जोड़ें")}
             </h2>
@@ -274,8 +284,9 @@ export default function AccountsDashboard() {
                 </Card>
               ))}
             </div>
-          </section>
+          </Card>
         )}
+      </div>
       </div>
     </div>
   );

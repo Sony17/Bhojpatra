@@ -14,6 +14,8 @@ import {
   galleryItems,
   testimonials,
   occasions,
+  heroEventImages,
+  heroLocationImages,
 } from "@/lib/data";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
@@ -23,6 +25,9 @@ export interface HomeCategory {
   name: string;
   nameHi: string;
   image: string;
+  /** "Starting from" price shown on the card (free text, e.g. "₹999 / plate").
+   *  Only rendered when `services.showPrices` is on; empty hides it. */
+  priceFrom?: string;
 }
 
 export interface HomeOccasion {
@@ -46,9 +51,54 @@ export interface HomeRibbonBrand {
   id: string;
   name: string;
   nameHi: string;
-  /** Brand logo (upload or URL) shown in the moving ribbon. When empty, the
-   *  chip falls back to the brand name's initials. */
+  /** Brand logo (upload or URL) shown in the white badge on the card. When
+   *  empty, the card falls back to the brand name's initials. */
   logo: string;
+  /** Full-bleed cover photo behind the logo and text. */
+  image: string;
+  /** City / area shown under the brand name. */
+  location: string;
+  locationHi: string;
+  /** Star rating shown on the card (e.g. 4.8). Hide when 0. */
+  rating: number;
+  /** Review count shown beside the rating (e.g. 256). Hide when 0. */
+  reviewCount: number;
+  /** Brand type tag on the card (e.g. "Caterer", "Venue", "Halwai"). Hide when empty. */
+  category: string;
+  categoryHi: string;
+  /** Short specialty / cuisine line (e.g. "Awadhi · Mughlai"). Hide when empty. */
+  specialty: string;
+  specialtyHi: string;
+  /** Starting price per plate in ₹ (e.g. 899). Rendered as "from ₹899". Hide when 0. */
+  priceFrom: number;
+  /** Founding / "serving since" year (e.g. 1998). Hide when 0. */
+  since: number;
+  /** When true, shows a "Featured" ribbon for prestige. */
+  featured: boolean;
+}
+
+/** Fill missing fields on a stored ribbon brand so older CMS saves keep working. */
+export function normalizeRibbonBrand(
+  brand: Partial<HomeRibbonBrand> & Pick<HomeRibbonBrand, "id" | "name">,
+): HomeRibbonBrand {
+  return {
+    id: brand.id,
+    name: brand.name,
+    nameHi: brand.nameHi ?? brand.name,
+    logo: brand.logo ?? "",
+    image: brand.image ?? "",
+    location: brand.location ?? "",
+    locationHi: brand.locationHi ?? "",
+    rating: typeof brand.rating === "number" ? brand.rating : 0,
+    reviewCount: typeof brand.reviewCount === "number" ? brand.reviewCount : 0,
+    category: brand.category ?? "",
+    categoryHi: brand.categoryHi ?? "",
+    specialty: brand.specialty ?? "",
+    specialtyHi: brand.specialtyHi ?? "",
+    priceFrom: typeof brand.priceFrom === "number" ? brand.priceFrom : 0,
+    since: typeof brand.since === "number" ? brand.since : 0,
+    featured: brand.featured ?? false,
+  };
 }
 
 export interface HomePackage {
@@ -75,6 +125,20 @@ export interface HomeTestimonial {
   quote: string;
   quoteHi: string;
   rating: number;
+  /** Optional portrait — falls back to initials when empty. */
+  avatar?: string;
+}
+
+/** Icon keys for the hero trust strip — mapped to components in `Hero.tsx`. */
+export type HomeTrustBadgeIcon = "shield" | "price" | "clipboard" | "headset";
+
+export interface HomeTrustBadge {
+  id: string;
+  icon: HomeTrustBadgeIcon;
+  title: string;
+  titleHi: string;
+  sub: string;
+  subHi: string;
 }
 
 export interface HomeContent {
@@ -85,12 +149,26 @@ export interface HomeContent {
     headlineBottomHi: string;
     lede: string;
     ledeHi: string;
-    /** Static backdrop used by the default (Original / Minimal) hero look. */
+    /** Booking-bar CTA label (e.g. "Find Your Perfect Feast"). */
+    cta: string;
+    ctaHi: string;
+    /** Fallback backdrop when no occasion/location override matches. */
     background: string;
+    /** Per-occasion hero backdrops — keys match admin Settings → Occasions ids.
+     *  Takes priority over location overrides and the default background. */
+    backgroundsByOccasion?: Record<string, string>;
+    /** Per-location hero backdrops — keys match admin Settings → Locations ids.
+     *  Used when the selected occasion has no override. */
+    backgroundsByLocation?: Record<string, string>;
+    /** Which booking-bar selection drives the hero image when both have a match.
+     *  `occasion` (default) — event image wins; `location` — city image wins. */
+    backgroundPriority?: "occasion" | "location";
+    /** Trust strip beneath the booking bar. */
+    trustBadges: HomeTrustBadge[];
   };
-  /** Moving "trusted by" ribbon of the prestigious / famous brands Bhojpatra
-   *  serves. Scrolls continuously beneath the hero; fully admin-managed
-   *  (enable toggle, heading and the brand chips). */
+  /** Featured-brands carousel of the prestigious / famous brands Bhojpatra
+   *  serves. Horizontal snap slider with cover photo, logo, location and
+   *  rating; fully admin-managed (enable toggle, heading and brand cards). */
   brandRibbon: {
     enabled: boolean;
     heading: string;
@@ -104,6 +182,9 @@ export interface HomeContent {
     subtitleHi: string;
     cta: string;
     ctaHi: string;
+    /** Whether each service-category card shows its "from" price. Admins can
+     *  turn this off to hide prices across the whole section. */
+    showPrices: boolean;
     categories: HomeCategory[];
     /** The curated Baina Box card, shown among the service categories and
      *  linking to its own catalogue rather than the booking wizard. */
@@ -182,6 +263,10 @@ export interface HomeContent {
     headingHi: string;
     subtitle: string;
     subtitleHi: string;
+    /** Optional full-width banner artwork (uploaded via admin). When set, the
+     *  image is shown edge-to-edge and the heading/subtitle are used for alt
+     *  text and the lead-capture strip below. */
+    image: string;
   };
   booking: {
     heading: string;
@@ -193,6 +278,18 @@ export interface HomeContent {
 
 /* ── Defaults (seed content, derived from data.ts) ────────────────────────── */
 
+/** Default "from" price shown on each service-category card. Fully editable in
+ *  Admin → Content → Home Page; a category not listed here seeds an empty price
+ *  (card shows no price until an admin sets one). */
+const CATEGORY_PRICE_FROM: Record<string, string> = {
+  caterers: "₹999 / plate",
+  "live-counters": "₹90 / plate",
+  chaat: "₹60 / plate",
+  sweets: "₹599 / box",
+  beverages: "₹45 / plate",
+  decor: "₹35,000",
+};
+
 export const DEFAULT_HOME_CONTENT: HomeContent = {
   hero: {
     headlineTop: "Book Verified Caterers, Food Stalls & Famous Vendors.",
@@ -202,78 +299,222 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     lede: "Compare curated menus, customize your feast and book trusted celebration partners in minutes.",
     ledeHi:
       "क्यूरेटेड मेन्यू की तुलना करें, अपनी दावत कस्टमाइज़ करें और मिनटों में भरोसेमंद सेलिब्रेशन पार्टनर बुक करें।",
+    cta: "Find Your Perfect Feast",
+    ctaHi: "अपनी परफेक्ट दावत खोजें",
     background: "/hero-bg.webp",
+    backgroundsByOccasion: { ...heroEventImages },
+    backgroundsByLocation: { ...heroLocationImages },
+    backgroundPriority: "occasion",
+    trustBadges: [
+      {
+        id: "trust-verified",
+        icon: "shield",
+        title: "Verified Partners",
+        titleHi: "वेरिफाइड पार्टनर्स",
+        sub: "Quality you can trust",
+        subHi: "क्वालिटी जिस पर भरोसा हो",
+      },
+      {
+        id: "trust-pricing",
+        icon: "price",
+        title: "Transparent Pricing",
+        titleHi: "पारदर्शी कीमतें",
+        sub: "No hidden surprises",
+        subHi: "कोई छिपा खर्च नहीं",
+      },
+      {
+        id: "trust-booking",
+        icon: "clipboard",
+        title: "Easy Booking",
+        titleHi: "आसान बुकिंग",
+        sub: "In just a few clicks",
+        subHi: "बस कुछ क्लिक में",
+      },
+      {
+        id: "trust-support",
+        icon: "headset",
+        title: "Dedicated Support",
+        titleHi: "समर्पित सपोर्ट",
+        sub: "We're here for you",
+        subHi: "हम आपके साथ हैं",
+      },
+    ],
   },
   brandRibbon: {
     enabled: true,
     heading: "Proudly serving India's finest brands",
     headingHi: "गर्व से भारत के बेहतरीन ब्रांड्स की सेवा में",
-    // Dummy placeholders — an admin replaces these with the real brands (and
-    // uploads their logos) via Admin → Content Control → Home Page → Brand
-    // Ribbon. With no logo a chip shows the brand's initials.
+    // Dummy seed with realistic Unsplash covers + square logo crops — replace
+    // via Admin → Content Control → Home Page → Brand Ribbon.
     brands: [
       {
         id: "brand-grand-pavilion",
         name: "The Grand Pavilion",
         nameHi: "द ग्रैंड पवेलियन",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1519167758481-83f29da8c2a4?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Lucknow",
+        locationHi: "लखनऊ",
+        rating: 4.8,
+        reviewCount: 256,
+        category: "Banquet Venue",
+        categoryHi: "बैंक्वेट वेन्यू",
+        specialty: "Awadhi Fine Dining",
+        specialtyHi: "अवधी फ़ाइन डाइनिंग",
+        priceFrom: 1499,
+        since: 1998,
+        featured: true,
       },
       {
-        id: "brand-royal-rasoi",
-        name: "Royal Rasoi",
-        nameHi: "रॉयल रसोई",
-        logo: "",
+        id: "brand-royal-rajasthan",
+        name: "Royal Rajasthan",
+        nameHi: "रॉयल राजस्थान",
+        logo: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Jaipur",
+        locationHi: "जयपुर",
+        rating: 4.9,
+        reviewCount: 412,
+        category: "Caterer",
+        categoryHi: "कैटरर",
+        specialty: "Rajasthani · Marwari",
+        specialtyHi: "राजस्थानी · मारवाड़ी",
+        priceFrom: 1199,
+        since: 2005,
+        featured: true,
       },
       {
         id: "brand-saffron-court",
         name: "Saffron Court",
         nameHi: "सैफ्रॉन कोर्ट",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1478146896981-b80fe463b330?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Delhi",
+        locationHi: "दिल्ली",
+        rating: 4.7,
+        reviewCount: 189,
+        category: "Banquet Venue",
+        categoryHi: "बैंक्वेट वेन्यू",
+        specialty: "Mughlai · Continental",
+        specialtyHi: "मुगलई · कॉन्टिनेंटल",
+        priceFrom: 1699,
+        since: 2011,
+        featured: false,
       },
       {
         id: "brand-heritage-halwai",
         name: "Heritage Halwai",
         nameHi: "हेरिटेज हलवाई",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Kanpur",
+        locationHi: "कानपुर",
+        rating: 4.6,
+        reviewCount: 98,
+        category: "Halwai",
+        categoryHi: "हलवाई",
+        specialty: "Traditional Mithai · Sweets",
+        specialtyHi: "पारंपरिक मिठाई · स्वीट्स",
+        priceFrom: 649,
+        since: 1972,
+        featured: false,
       },
       {
         id: "brand-maharaja-caterers",
         name: "Maharaja Caterers",
         nameHi: "महाराजा कैटरर्स",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Varanasi",
+        locationHi: "वाराणसी",
+        rating: 4.8,
+        reviewCount: 321,
+        category: "Caterer",
+        categoryHi: "कैटरर",
+        specialty: "Banarasi · North Indian",
+        specialtyHi: "बनारसी · नॉर्थ इंडियन",
+        priceFrom: 999,
+        since: 1989,
+        featured: true,
       },
       {
         id: "brand-golden-spoon",
         name: "Golden Spoon",
         nameHi: "गोल्डन स्पून",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Agra",
+        locationHi: "आगरा",
+        rating: 4.5,
+        reviewCount: 147,
+        category: "Caterer",
+        categoryHi: "कैटरर",
+        specialty: "Mughlai · Tandoor",
+        specialtyHi: "मुगलई · तंदूर",
+        priceFrom: 899,
+        since: 2014,
+        featured: false,
       },
       {
         id: "brand-silver-platter",
         name: "Silver Platter",
         nameHi: "सिल्वर प्लैटर",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Noida",
+        locationHi: "नोएडा",
+        rating: 4.7,
+        reviewCount: 203,
+        category: "Caterer",
+        categoryHi: "कैटरर",
+        specialty: "Multi-cuisine · Live Counters",
+        specialtyHi: "मल्टी-क्विज़ीन · लाइव काउंटर",
+        priceFrom: 1099,
+        since: 2016,
+        featured: false,
       },
       {
         id: "brand-nawabs-kitchen",
         name: "Nawab's Kitchen",
         nameHi: "नवाब्स किचन",
-        logo: "",
+        logo: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=200&h=200&q=80",
+        image:
+          "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&h=600&q=80",
+        location: "Lucknow",
+        locationHi: "लखनऊ",
+        rating: 4.9,
+        reviewCount: 478,
+        category: "Caterer",
+        categoryHi: "कैटरर",
+        specialty: "Awadhi · Kebabs · Biryani",
+        specialtyHi: "अवधी · कबाब · बिरयानी",
+        priceFrom: 1299,
+        since: 2001,
+        featured: true,
       },
     ],
   },
   services: {
-    heading: "Services",
-    headingHi: "सेवाएं",
+    heading: "Single stall, one Bhojpatra Experience...",
+    headingHi: "सिंगल स्टॉल, एक भोजपत्र अनुभव...",
     subtitle: "Handpicked specialists across every flavour of your celebration.",
     subtitleHi: "आपके उत्सव के हर स्वाद के लिए चुनिंदा स्पेशलिस्ट।",
     cta: "View All Categories",
     ctaHi: "सभी कैटेगरी देखें",
+    showPrices: true,
     categories: categories.map((c) => ({
       id: c.id,
       name: c.name,
       nameHi: c.nameHi,
       image: c.image,
+      priceFrom: CATEGORY_PRICE_FROM[c.id] ?? "",
     })),
     bainaBox: {
       id: "baina-box",
@@ -281,6 +522,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       nameHi: "बैना बॉक्स",
       image:
         "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=500&q=70",
+      priceFrom: "₹599 / box",
     },
   },
   occasions: {
@@ -418,15 +660,17 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       quote: t.quote,
       quoteHi: t.quoteHi,
       rating: t.rating,
+      avatar: t.avatar,
     })),
   },
   promo: {
-    heading: "Get Promotional Offers First",
-    headingHi: "प्रोमोशनल ऑफर सबसे पहले पाएं",
+    heading: "This Raksha Bandhan, Gift Something Timeless",
+    headingHi: "इस रक्षा बंधन, कुछ अनमोल उपहार दें",
     subtitle:
-      "Seasonal discounts, early-bird deals & festive menu offers — straight to you.",
+      "Unique gifts made from real Bhojpatra for your loved ones — get offer updates first.",
     subtitleHi:
-      "सीज़नल छूट, अर्ली-बर्ड डील और त्योहारी मेन्यू ऑफर — सीधे आपके पास।",
+      "अपनों के लिए असली भोजपत्र से बने अनोखे उपहार — ऑफर अपडेट सबसे पहले पाएं।",
+    image: "/promo-baina-box.png",
   },
   booking: {
     heading: "Book Your Celebration",
@@ -438,18 +682,82 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
 
 /* ── Reconcile (merge stored content over defaults) ───────────────────────── */
 
+/** Unsplash photo ids that 404 — drop stored hero overrides that reference them
+ *  so saved CMS data self-heals after catalog fixes. */
+const BROKEN_HERO_PHOTO_IDS = [
+  "photo-1599669300163-7e84be7172c",
+  "photo-1587427296010-57d8f2d7d1ac",
+  "photo-1564507592333-c606332012b5",
+  "photo-1596178060521-6a8d08d3f7c8",
+  "photo-1558981403-c5f9899a28ea",
+  "photo-1587474260584-136574529e8e",
+];
+
+export function isBrokenHeroImage(url: string): boolean {
+  return BROKEN_HERO_PHOTO_IDS.some((id) => url.includes(id));
+}
+function mergeHeroImageMap(
+  defaults: Record<string, string>,
+  stored?: Record<string, string>,
+): Record<string, string> {
+  const merged = { ...defaults };
+  if (!stored) return merged;
+  for (const [key, url] of Object.entries(stored)) {
+    if (url && !isBrokenHeroImage(url)) merged[key] = url;
+  }
+  return merged;
+}
+
 /** Per-section shallow merge so newly-added fields keep a default value, while
  *  a saved array (categories, items…) replaces the default wholesale. */
 export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
   if (!stored) return DEFAULT_HOME_CONTENT;
   const d = DEFAULT_HOME_CONTENT;
   return {
-    hero: { ...d.hero, ...stored.hero },
+    hero: {
+      ...d.hero,
+      ...stored.hero,
+      backgroundsByOccasion: mergeHeroImageMap(
+        d.hero.backgroundsByOccasion ?? {},
+        stored.hero?.backgroundsByOccasion,
+      ),
+      backgroundsByLocation: mergeHeroImageMap(
+        d.hero.backgroundsByLocation ?? {},
+        stored.hero?.backgroundsByLocation,
+      ),
+      trustBadges: stored.hero?.trustBadges?.length
+        ? stored.hero.trustBadges
+        : d.hero.trustBadges,
+    },
     brandRibbon: {
       ...d.brandRibbon,
       ...stored.brandRibbon,
       brands: stored.brandRibbon?.brands?.length
-        ? stored.brandRibbon.brands
+        ? stored.brandRibbon.brands.map((item, index) => {
+            const normalized = normalizeRibbonBrand(item);
+            const seed =
+              d.brandRibbon.brands.find((s) => s.id === item.id) ??
+              d.brandRibbon.brands[index % d.brandRibbon.brands.length];
+            if (!seed) return normalized;
+            // Backfill every empty display field from realistic dummy content.
+            // The positional fallback also migrates older cards whose ids no
+            // longer match the current seed list.
+            return {
+              ...normalized,
+              logo: normalized.logo || seed.logo,
+              image: normalized.image || seed.image,
+              location: normalized.location || seed.location,
+              locationHi: normalized.locationHi || seed.locationHi,
+              rating: normalized.rating || seed.rating,
+              reviewCount: normalized.reviewCount || seed.reviewCount,
+              category: normalized.category || seed.category,
+              categoryHi: normalized.categoryHi || seed.categoryHi,
+              specialty: normalized.specialty || seed.specialty,
+              specialtyHi: normalized.specialtyHi || seed.specialtyHi,
+              priceFrom: normalized.priceFrom || seed.priceFrom,
+              since: normalized.since || seed.since,
+            };
+          })
         : d.brandRibbon.brands,
     },
     services: {
@@ -513,12 +821,74 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
       ...d.testimonials,
       ...stored.testimonials,
       items: stored.testimonials?.items?.length
-        ? stored.testimonials.items
+        ? stored.testimonials.items.map((item) => {
+            const seed = d.testimonials.items.find((s) => s.id === item.id);
+            return {
+              ...item,
+              avatar: item.avatar || seed?.avatar,
+            };
+          })
         : d.testimonials.items,
     },
     promo: { ...d.promo, ...stored.promo },
     booking: { ...d.booking, ...stored.booking },
   };
+}
+
+/* ── Hero background resolution ───────────────────────────────────────────── */
+
+/** Pick the hero backdrop for the current booking-bar selections. Priority is
+ *  admin-configurable (`backgroundPriority`); within each tier the same
+ *  fallbacks apply (CMS override → seed catalog). */
+export function resolveHeroBackground(
+  hero: HomeContent["hero"],
+  occasionId: string,
+  locationId: string,
+  homeOccasions?: HomeOccasion[],
+): string {
+  const occasionBg = (() => {
+    const byOcc = hero.backgroundsByOccasion?.[occasionId];
+    if (byOcc) return byOcc;
+    const cmsOcc = homeOccasions?.find((o) => o.id === occasionId);
+    if (cmsOcc?.image) return cmsOcc.image;
+    return heroEventImages[occasionId];
+  })();
+
+  const locationBg = (() => {
+    const byLoc = hero.backgroundsByLocation?.[locationId];
+    if (byLoc) return byLoc;
+    return heroLocationImages[locationId];
+  })();
+
+  const priority = hero.backgroundPriority ?? "occasion";
+  if (priority === "location") {
+    if (locationBg) return locationBg;
+    if (occasionBg) return occasionBg;
+  } else {
+    if (occasionBg) return occasionBg;
+    if (locationBg) return locationBg;
+  }
+
+  return hero.background;
+}
+
+/** Every distinct hero backdrop that may appear — used to preload/crossfade. */
+export function collectHeroBackgroundUrls(
+  content: Pick<HomeContent, "hero" | "occasions">,
+): string[] {
+  const urls = new Set<string>();
+  const push = (src?: string) => {
+    if (src) urls.add(src);
+  };
+
+  push(content.hero.background);
+  Object.values(content.hero.backgroundsByOccasion ?? {}).forEach(push);
+  Object.values(content.hero.backgroundsByLocation ?? {}).forEach(push);
+  content.occasions.items.forEach((o) => push(o.image));
+  Object.values(heroEventImages).forEach(push);
+  Object.values(heroLocationImages).forEach(push);
+
+  return [...urls];
 }
 
 /* ── Image helper ─────────────────────────────────────────────────────────── */

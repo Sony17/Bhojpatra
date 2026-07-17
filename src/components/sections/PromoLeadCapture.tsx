@@ -1,37 +1,47 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Image from "next/image";
 import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
-import { useHomeContent } from "@/lib/homeContent";
+import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { Mail, Phone } from "@/components/icons";
-import { Button } from "@/components/ui";
+import { Button, useToast } from "@/components/ui";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import ShareOffer from "./ShareOffer";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
+/**
+ * Promotional lead-capture under the hero.
+ * Banner art is the focus; email/phone + sharing sit in a premium panel beneath.
+ */
 export default function PromoLeadCapture() {
   const { lang, t } = useLang();
   const { promo } = useHomeContent();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
+  const hasImage = Boolean(promo.image);
+  const heading = lang === "hi" ? promo.headingHi : promo.heading;
+  const subtitle = lang === "hi" ? promo.subtitleHi : promo.subtitle;
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (status === "submitting") return;
 
-    // Mirror the server's rule (email OR phone) so an incomplete submission
-    // shows an inline message instead of firing a request that's sure to 400.
     if (!isValidEmail(email) && !isValidPhone(phone)) {
-      setStatus("error");
-      setMessage(
-        t(
-          "Please enter a valid email address or mobile number.",
-          "कृपया एक मान्य ईमेल पता या मोबाइल नंबर दर्ज करें।",
-        ),
+      const msg = t(
+        "Please enter a valid email address or mobile number.",
+        "कृपया एक मान्य ईमेल पता या मोबाइल नंबर दर्ज करें।",
       );
+      setStatus("error");
+      setMessage(msg);
+      toast(msg, { tone: "error" });
       return;
     }
 
@@ -47,126 +57,171 @@ export default function PromoLeadCapture() {
       const data = (await res.json()) as { ok?: boolean; error?: string };
 
       if (!res.ok || !data.ok) {
-        setStatus("error");
-        setMessage(
+        const msg =
           data.error ??
-            t(
-              "Something went wrong. Please try again.",
-              "कुछ गलत हो गया। कृपया फिर से कोशिश करें।",
-            ),
-        );
+          t(
+            "Something went wrong. Please try again.",
+            "कुछ गलत हो गया। कृपया फिर से कोशिश करें।",
+          );
+        setStatus("error");
+        setMessage(msg);
+        toast(msg, { tone: "error" });
         return;
       }
 
       setStatus("success");
       setMessage(
-        t(
-          "You're on the list! Watch your inbox for exclusive offers.",
-          "आप लिस्ट में शामिल हो गए! खास ऑफर के लिए अपना इनबॉक्स देखें।",
-        ),
+        t("You're on the list!", "आप लिस्ट में शामिल हो गए!"),
       );
       setEmail("");
       setPhone("");
     } catch {
-      setStatus("error");
-      setMessage(
-        t(
-          "Network error. Please try again.",
-          "नेटवर्क त्रुटि। कृपया फिर से कोशिश करें।",
-        ),
+      const msg = t(
+        "Network error. Please try again.",
+        "नेटवर्क त्रुटि। कृपया फिर से कोशिश करें।",
       );
+      setStatus("error");
+      setMessage(msg);
+      toast(msg, { tone: "error" });
     }
   }
 
-  return (
-    <section id="offers" className="bg-maroon">
-      <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-8">
-        <Reveal
-          variant="scale"
-          className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card border border-cream/30 px-5 py-5 text-center sm:flex-row sm:items-center sm:gap-6 sm:px-7 sm:text-left"
+  const leadForm = (
+    <>
+      {status === "success" ? (
+        <p
+          role="status"
+          className="rounded-control border border-cream/40 bg-cream px-3 py-2 text-center text-xs font-semibold text-maroon shadow-card"
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/watermark-pot.png"
-              alt=""
-              width={28}
-              height={28}
-              className="h-7 w-auto object-contain"
+          {message}
+        </p>
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-stretch gap-1.5 sm:gap-2"
+        >
+          <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2 py-1.5 transition focus-within:border-cream sm:gap-2 sm:px-2.5">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
+              <Mail className="h-3 w-3" />
+            </span>
+            <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
+            <input
+              type="email"
+              name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder={t("Email", "ईमेल")}
+              autoComplete="email"
+              className="w-full min-w-0 bg-transparent text-xs text-ink outline-none placeholder:text-ink/50"
             />
-          </span>
+          </label>
 
-          <div className="flex flex-col gap-0.5 sm:flex-1">
-            <h2 className="text-lg text-cream sm:text-xl">
-              {lang === "hi" ? promo.headingHi : promo.heading}
-            </h2>
-            <p className="text-xs text-cream/80">
-              {lang === "hi" ? promo.subtitleHi : promo.subtitle}
-            </p>
+          <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2 py-1.5 transition focus-within:border-cream sm:gap-2 sm:px-2.5">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
+              <Phone className="h-3 w-3" />
+            </span>
+            <span className="sr-only">{t("Mobile Number", "मोबाइल नंबर")}</span>
+            <input
+              type="tel"
+              name="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              placeholder={t("Mobile", "मोबाइल")}
+              autoComplete="tel"
+              inputMode="numeric"
+              className="w-full min-w-0 bg-transparent text-xs text-ink outline-none placeholder:text-ink/50"
+            />
+          </label>
+
+          <Button
+            type="submit"
+            variant="inverse"
+            size="sm"
+            loading={status === "submitting"}
+            className="w-auto shrink-0 px-2.5 sm:px-5"
+          >
+            {status === "submitting"
+              ? t("…", "…")
+              : (
+                  <>
+                    <span className="sm:hidden">{t("Notify", "सूचित")}</span>
+                    <span className="hidden sm:inline">
+                      {t("Notify Me", "सूचित करें")}
+                    </span>
+                  </>
+                )}
+          </Button>
+        </form>
+      )}
+    </>
+  );
+
+  if (hasImage) {
+    const promoLine = `${heading} — ${subtitle}`;
+
+    return (
+      <section id="offers" aria-label="Promotional offers" className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+          <Reveal className="relative aspect-[2.54/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10">
+            <div className="absolute inset-0">
+              <Image
+                src={promo.image}
+                alt={heading}
+                fill
+                sizes="(min-width: 1280px) 1280px, calc(100vw - 32px)"
+                className="object-cover object-center"
+                unoptimized={isUnoptimized(promo.image)}
+                priority
+              />
+            </div>
+
+            <div className="absolute inset-x-0 bottom-0 border-t border-cream/40 bg-maroon/90 p-2 backdrop-blur-sm sm:p-3">
+              <div className="mx-auto flex w-full max-w-5xl items-center gap-1.5 sm:gap-2">
+                <div className="min-w-0 flex-1">{leadForm}</div>
+                <WhatsAppShareButton
+                  path="/#offers"
+                  message={promoLine}
+                  messageHi={promoLine}
+                  label=""
+                  labelHi=""
+                  variant="inverse"
+                  size="sm"
+                  className="shrink-0 px-3"
+                />
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section id="offers" aria-label="Promotional offers" className="bg-white">
+      <div className="mx-auto max-w-7xl px-5 py-3 sm:px-8 sm:py-4">
+        <Reveal className="overflow-hidden rounded-card bg-maroon shadow-card">
+          <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-5 sm:px-6 sm:py-3.5">
+            <div className="min-w-0 shrink sm:max-w-xs lg:max-w-sm">
+              <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
+                {t("Offer", "ऑफर")}
+              </p>
+              <h2 className="font-display mt-0.5 truncate text-base leading-snug text-cream sm:text-lg">
+                {heading}
+              </h2>
+              <p className="mt-0.5 line-clamp-1 text-xs text-cream/70">
+                {subtitle}
+              </p>
+            </div>
+
+            <div className="min-w-0 flex-1">{leadForm}</div>
+
+            <div className="hidden shrink-0 lg:block">
+              <ShareOffer heading={heading} subtitle={subtitle} compact />
+            </div>
           </div>
-
-          {status === "success" ? (
-            <p
-              role="status"
-              className="rounded-control bg-cream px-4 py-2.5 text-sm font-semibold text-maroon sm:max-w-xs"
-            >
-              {message}
-            </p>
-          ) : (
-            <form
-              onSubmit={handleSubmit}
-              noValidate
-              className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
-            >
-              <label className="flex items-center gap-2 rounded-control border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-44">
-                <Mail className="h-4 w-4 shrink-0 text-maroon" />
-                <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
-                <input
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  className="w-full bg-transparent text-sm text-ink placeholder:text-ink/50 outline-none"
-                />
-              </label>
-
-              <label className="flex items-center gap-2 rounded-control border border-cream/40 bg-white px-3 py-2 transition-colors focus-within:border-cream focus-within:ring-2 focus-within:ring-cream/40 sm:w-40">
-                <Phone className="h-4 w-4 shrink-0 text-maroon" />
-                <span className="sr-only">{t("Mobile Number", "मोबाइल नंबर")}</span>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  placeholder={t("Mobile number", "मोबाइल नंबर")}
-                  autoComplete="tel"
-                  inputMode="numeric"
-                  className="w-full bg-transparent text-sm text-ink placeholder:text-ink/50 outline-none"
-                />
-              </label>
-
-              <Button
-                type="submit"
-                variant="inverse"
-                loading={status === "submitting"}
-                className="shrink-0"
-              >
-                {status === "submitting"
-                  ? t("Signing up…", "साइन अप…")
-                  : t("Notify Me", "सूचित करें")}
-              </Button>
-
-              {status === "error" && (
-                <p role="alert" className="text-xs font-medium text-cream sm:w-full">
-                  {message}
-                </p>
-              )}
-            </form>
-          )}
         </Reveal>
       </div>
     </section>

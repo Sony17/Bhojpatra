@@ -9,6 +9,7 @@ import {
 } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
+import { isValidGst } from "@/lib/validate";
 import ThemedSelect from "@/components/ThemedSelect";
 import { Badge, Button, Card, Chip as UIChip } from "@/components/ui";
 
@@ -363,10 +364,22 @@ export default function VendorRegister() {
       }
     }
     if (step === 1) {
-      if (!gstNumber.trim() || !fssaiNumber.trim()) {
+      if (!gstNumber.trim()) {
         return t(
-          "Please enter your GST and FSSAI numbers.",
-          "कृपया अपने जीएसटी और एफएसएसएआई नंबर दर्ज करें।",
+          "Please enter your GST number.",
+          "कृपया अपना जीएसटी नंबर दर्ज करें।",
+        );
+      }
+      if (!isValidGst(gstNumber)) {
+        return t(
+          "Please enter a valid 15-digit GST number.",
+          "कृपया एक मान्य 15-अंकीय जीएसटी नंबर दर्ज करें।",
+        );
+      }
+      if (!fssaiNumber.trim()) {
+        return t(
+          "Please enter your FSSAI number.",
+          "कृपया अपना एफएसएसएआई नंबर दर्ज करें।",
         );
       }
       if (Object.values(docFiles).some((d) => d.status === "uploading")) {
@@ -851,11 +864,13 @@ export default function VendorRegister() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="gstNumber" className={labelClass}>
-                  {t("GST Number", "जीएसटी नंबर")}
+                  {t("GST Number", "जीएसटी नंबर")} *
                 </label>
                 <input
                   id="gstNumber"
                   type="text"
+                  required
+                  autoCapitalize="characters"
                   value={gstNumber}
                   onChange={(e) => setGstNumber(e.target.value)}
                   placeholder="22AAAAA0000A1Z5"

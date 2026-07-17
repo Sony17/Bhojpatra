@@ -22,9 +22,19 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
   const balance = Math.max(0, Math.round(data.grandTotal) - Math.round(data.paid));
 
   return (
-    <Card padding="none" className="overflow-hidden">
+    <Card padding="none" className="relative overflow-hidden">
+      {/* Faint diagonal brand watermark, behind the content (twin of the PDF). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
+      >
+        <span className="select-none whitespace-nowrap font-display text-[70px] font-semibold leading-none text-maroon/[0.06] sm:text-[130px] -rotate-45">
+          bhojpatra
+        </span>
+      </div>
+
       {/* Masthead */}
-      <div className="bg-maroon px-6 py-5 sm:px-8">
+      <div className="relative z-10 bg-maroon px-6 py-5 sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -47,13 +57,16 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
         </div>
       </div>
 
-      <div className="space-y-7 px-6 py-6 sm:px-8">
+      <div className="relative z-10 space-y-7 px-6 py-6 sm:px-8">
         {/* Event details */}
         <Section title="Event Details">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
             <Field label="Occasion" value={data.occasion} />
             <Field label="Package" value={data.packageName} />
             <Field label="Event Date" value={data.eventDate} />
+            {data.servingTime && (
+              <Field label="Serving" value={data.servingTime} />
+            )}
             <Field label="Guests" value={String(data.guests)} />
             <Field label="City" value={data.city} />
             <Field label="Venue" value={data.venue} />
@@ -163,7 +176,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
       </div>
 
       {/* Footer band */}
-      <div className="border-t border-cream-3 bg-cream/60 px-6 py-4 text-center sm:px-8">
+      <div className="relative z-10 border-t border-cream-3 bg-cream/60 px-6 py-4 text-center sm:px-8">
         <p className="font-display text-sm font-semibold text-maroon">
           Thank you for choosing Bhojpatra
         </p>

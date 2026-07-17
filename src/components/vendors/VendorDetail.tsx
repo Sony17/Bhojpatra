@@ -14,12 +14,14 @@ import {
 } from "@/lib/bookings";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
+import { openCompareTable } from "@/lib/compareTray";
 import CompareTray from "@/components/vendors/CompareTray";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
-import { Button } from "@/components/ui";
+import { Button, AppBar } from "@/components/ui";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -233,21 +235,32 @@ function VendorProfile({
   return (
     <section
       className={
-        "mx-auto max-w-6xl px-5 py-10 sm:py-14 " +
-        (compareCount > 0 ? "pb-32 sm:pb-36" : "pb-28 lg:pb-14")
+        "app-bottom-safe mx-auto max-w-6xl sm:px-5 sm:py-6 lg:py-10 " +
+        (compareCount > 0 ? "pb-32 sm:pb-36" : "")
       }
     >
-      <Link
-        href="/vendors"
-        className="text-sm font-semibold text-maroon hover:underline"
-      >
-        ← {t("All Caterers", "सभी कैटरर")}
-      </Link>
+      <AppBar
+        title={vendor.name}
+        subtitle={`${vendor.city}, ${vendor.state}`}
+        backHref="/vendors"
+        className="mb-2 sm:rounded-b-hero"
+        trailing={
+          <WhatsAppShareButton
+            path={`/vendors/${vendor.id}`}
+            message={`Check out ${vendor.name} on Bhojpatra`}
+            messageHi={`भोजपत्र पर ${vendor.name} देखें`}
+            variant="ghost"
+            size="sm"
+            label=""
+            labelHi=""
+          />
+        }
+      />
 
-      <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mt-2 grid gap-6 px-4 lg:mt-4 lg:grid-cols-[1.1fr_1fr] lg:gap-8 lg:px-0">
         {/* ── Showcase ──────────────────────────────────────────────── */}
         <div>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-cream-3 bg-cream-2 shadow-sm">
+          <div className="relative -mx-4 aspect-[16/10] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[4/3] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
             <Image
               src={vendor.image}
               alt={vendor.name}
@@ -256,12 +269,16 @@ function VendorProfile({
               sizes="(min-width: 1024px) 600px, 100vw"
               className="object-cover"
             />
-            <span className="absolute left-4 top-4 flex flex-wrap gap-1.5">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/50 to-transparent sm:hidden"
+            />
+            <span className="absolute left-3 top-3 flex flex-wrap gap-1.5 sm:left-4 sm:top-4">
               {vendor.tiers.map((tier) => (
                 <span
                   key={tier}
                   className={
-                    "rounded-full px-3 py-1 text-xs font-semibold shadow-sm " +
+                    "rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-sm sm:px-3 sm:text-xs " +
                     tierBadgeClass(tier)
                   }
                 >
@@ -270,19 +287,27 @@ function VendorProfile({
               ))}
             </span>
             {vendor.verified && (
-              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-maroon shadow-sm backdrop-blur-sm sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
                 <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
               </span>
             )}
+            <a
+              href="#reviews"
+              className="absolute bottom-3 left-3 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm sm:hidden"
+            >
+              {shownRating}
+              <span aria-hidden>★</span>
+            </a>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4 sm:mt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="font-display text-3xl text-ink">{vendor.name}</h1>
-              {/* Rating badge — jumps to the reviews section below. */}
+              <h1 className="font-sans text-xl font-bold tracking-tight text-ink sm:font-display sm:text-3xl sm:font-normal">
+                {vendor.name}
+              </h1>
               <a
                 href="#reviews"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-cream-3"
+                className="hidden shrink-0 items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-cream-3 sm:inline-flex"
               >
                 <StarIcon className="h-4 w-4 text-maroon" />
                 {shownRating}
@@ -290,28 +315,27 @@ function VendorProfile({
               </a>
             </div>
 
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft">
-              <span aria-hidden="true">📍</span>
+            <p className="mt-1.5 text-[13px] text-ink/55 sm:mt-2 sm:text-sm sm:text-ink-soft">
               {vendor.city}, {vendor.state}
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4">
               {vendor.cuisines.map((c) => (
                 <span
                   key={c}
-                  className="rounded-full bg-cream-2 px-3 py-1 text-xs font-medium text-ink-soft"
+                  className="rounded-full bg-cream px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs sm:text-ink-soft"
                 >
                   {c}
                 </span>
               ))}
-              <span className="rounded-full bg-surface-beige px-3 py-1 text-xs font-medium text-ink-soft">
+              <span className="rounded-full border border-maroon/15 px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs">
                 {localize(vendor.diet)}
               </span>
             </div>
 
-            <p className="mt-3 flex flex-wrap items-start gap-1.5 text-sm text-ink-soft">
-              <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>
-              <span>{vendor.mealTypes.map(localize).join(" · ")}</span>
+            <p className="mt-2.5 text-[12px] text-ink/50 sm:mt-3 sm:text-sm sm:text-ink-soft">
+              <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>{" "}
+              {vendor.mealTypes.map(localize).join(" · ")}
             </p>
           </div>
         </div>
@@ -358,17 +382,30 @@ function VendorProfile({
                   ? t("Compare list is full", "तुलना सूची भर गई है")
                   : t("Add to compare", "तुलना में जोड़ें")}
             </Button>
-            {compareCount > 0 && (
-              <Link
-                href="/compare"
-                className="mt-2 block text-center text-sm font-semibold text-maroon hover:underline"
+            {compareCount >= 2 && (
+              <button
+                type="button"
+                onClick={openCompareTable}
+                className="mt-2 block w-full text-center text-sm font-semibold text-maroon hover:underline"
               >
                 {t(
                   `Compare ${compareCount} selected →`,
                   `${compareCount} चुने हुए की तुलना करें →`,
                 )}
-              </Link>
+              </button>
             )}
+
+            {/* Spread the word — forward this caterer to friends on WhatsApp. */}
+            <WhatsAppShareButton
+              path={`/vendors/${vendor.id}`}
+              variant="ghost"
+              fullWidth
+              className="mt-3"
+              label="Share this caterer"
+              labelHi="यह कैटरर शेयर करें"
+              message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
+              messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
+            />
 
             <dl className="mt-5 space-y-2 border-t border-cream-3 pt-4 text-sm">
               <div className="flex items-center justify-between">

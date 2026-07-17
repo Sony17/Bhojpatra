@@ -364,7 +364,7 @@ function CompareGrid() {
       <Button
         variant="secondary"
         size="sm"
-        className="mb-4"
+        className="mb-4 whitespace-nowrap"
         onClick={() => setHighlight((v) => !v)}
       >
         {highlight ? "Hide upgrades" : "Highlight upgrades"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
@@ -10,6 +10,7 @@ import {
   type PartnerRole,
 } from "@/lib/session";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
+import { isValidEmail } from "@/lib/validate";
 import {
   DEFAULT_REFERRAL_RATES,
   customerPercentFor,
@@ -53,6 +54,7 @@ import {
   menuCategories,
   packageCategories,
   packageCategoryItems,
+  isLiveStallCategory,
   packageBasePerPlate,
   packageLeadDays,
   DEFAULT_VENDOR_LEAD_DAYS,
@@ -71,6 +73,7 @@ import {
   OTHER_LOCATION_ID,
   type LocationOption,
 } from "@/lib/locations";
+import { readStoredLocation } from "@/lib/detectedLocation";
 import {
   useOccasions,
   occasionLeadFor,
@@ -79,7 +82,8 @@ import {
 } from "@/lib/occasions";
 import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
-import { Button, Stepper } from "@/components/ui";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { Button, Stepper, QuantitySelector } from "@/components/ui";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -88,8 +92,10 @@ const GST_RATE = 0.18;
 // Advance booking fee — guests can lock a date by paying this share of the
 // grand total up front (the rest is settled later with our team).
 const ADVANCE_RATE = 0.1;
-// Package (1) · Menu (2) · Details + add-ons (3) · Service package (4) · Confirm (5).
-const TOTAL_STEPS = 5;
+// Package (1) · Menu (2) · Live Stall (3) · Add-ons + details (4) · Essentials /
+// service package (5) · Confirm (6). The live-station courses live in their own
+// step so a guest builds their plated menu first, then picks live counters.
+const TOTAL_STEPS = 6;
 
 // Large functions (1000+ guests) may split a single segment across vendors.
 const MULTI_VENDOR_MIN = 1000;
@@ -179,8 +185,10 @@ export default function BookingWizard() {
     packages.find((p) => p.popular)?.id ?? packages[0].id,
   );
 
-  // Step 2 — Menu (per-category vendor + items)
+  // Step 2 — Menu (per-category vendor + items). `activeCat` walks the plated
+  // courses; `liveCat` walks the Live Stall step's live-station courses (Step 3).
   const [activeCat, setActiveCat] = useState<number>(0);
+  const [liveCat, setLiveCat] = useState<number>(0);
   const [categoryVendor, setCategoryVendor] = useState<VendorMap>({});
   const [categoryItems, setCategoryItems] = useState<ItemMap>({});
   // Single Stall (custom) plan only — the stalls a guest chose to skip. A
@@ -326,6 +334,16 @@ export default function BookingWizard() {
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
 
+  // When the Hero didn't pass a city, reuse the Google-detected / persisted city.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("city") || sp.get("loc")) return;
+    const stored = readStoredLocation();
+    if (!stored?.cityId) return;
+    setCityId(stored.cityId);
+    if (stored.customCity) setCustomCity(stored.customCity);
+  }, []);
+
   // Resolve a venue passed by id (/book?venue=ID from the venue catalogue) to
   // its name + booking fee, so the feast order folds the venue in. An unknown
   // or free-text venue keeps the raw value with no fee.
@@ -400,6 +418,18 @@ export default function BookingWizard() {
   // orders are actionable for our team in the admin console.
   const [customerName, setCustomerName] = useState<string>("");
   const [customerPhone, setCustomerPhone] = useState<string>("");
+  // Contact email — captured alongside name/phone so a booking's customer
+  // details carry a written address (the team can email the invoice / follow
+  // up). Prefilled from the signed-in account below, but fully editable.
+  const [customerEmail, setCustomerEmail] = useState<string>("");
+
+  // Prefill name/email from the signed-in account once the session loads (only
+  // when the field is still blank, so we never clobber what the guest typed).
+  useEffect(() => {
+    if (!sessionStatus) return;
+    if (sessionStatus.name) setCustomerName((n) => n || sessionStatus.name!);
+    if (sessionStatus.email) setCustomerEmail((e) => e || sessionStatus.email!);
+  }, [sessionStatus]);
 
   // A booking can't credit its own booker. Two ways that happens, both dropped:
   //  • same account — the applied code is one of this signed-in account's codes;
@@ -504,13 +534,33 @@ export default function BookingWizard() {
       }));
   }, [packageId, liveMenuCategories, cityId]);
 
-  // Switching to a package with fewer segments can leave the active tab index
-  // past the end of the new list — pull it back into range.
-  useEffect(() => {
-    if (activeCat > activeCategories.length - 1) setActiveCat(0);
-  }, [activeCategories, activeCat]);
+  // The package's segments split across two wizard steps: plated courses build
+  // in "Menu" (Step 2), live-station courses in "Live Stall" (Step 3). Both are
+  // derived from the same `activeCategories`, so pricing / order building (which
+  // still read the whole list) are untouched — only the UI is split.
+  const menuStepCategories = useMemo(
+    () => activeCategories.filter((c) => !isLiveStallCategory(c.id)),
+    [activeCategories],
+  );
+  const liveStallCategories = useMemo(
+    () => activeCategories.filter((c) => isLiveStallCategory(c.id)),
+    [activeCategories],
+  );
+  // Whether the chosen package includes any live stalls at all (Silver doesn't).
+  const hasLiveStalls = liveStallCategories.length > 0;
 
-  const allowanceFor = (catId: string): number =>
+  // Switching to a package with fewer segments can leave either active tab index
+  // past the end of the new list — pull each back into range.
+  useEffect(() => {
+    if (activeCat > menuStepCategories.length - 1) setActiveCat(0);
+  }, [menuStepCategories, activeCat]);
+  useEffect(() => {
+    if (liveCat > liveStallCategories.length - 1) setLiveCat(0);
+  }, [liveStallCategories, liveCat]);
+
+  // The base per-course dish quota from the package config — the number of
+  // dishes allowed from ONE vendor for this course (e.g. one welcome drink).
+  const baseAllowanceFor = (catId: string): number =>
     packageCategoryItems[packageId]?.[catId] ?? 1;
 
   // Selections are filtered at read time against the vendors currently shown
@@ -531,11 +581,34 @@ export default function BookingWizard() {
     );
   };
 
+  // The vendor an item id belongs to. Ids are `${vendorId}-${i}`, but a vendor
+  // id may itself contain hyphens, so match against the chosen vendors rather
+  // than splitting on "-".
+  const vendorOfItem = (catId: string, itemId: string): string | undefined =>
+    vendorsFor(catId).find((vid) => itemId.startsWith(`${vid}-`));
+
+  // Items chosen from a single vendor within a course.
+  const vendorPicks = (catId: string, vendorId: string): string[] =>
+    itemsFor(catId).filter((id) => id.startsWith(`${vendorId}-`));
+
+  // Effective course allowance. Multi-vendor tiers (Platinum always, big Gold
+  // functions) give EACH chosen vendor its own quota — e.g. one welcome drink
+  // from every vendor — so the course total scales with the vendors picked.
+  // Single-vendor tiers keep the flat quota. Drives the "N/N PICKED" counter.
+  const allowanceFor = (catId: string): number => {
+    const base = baseAllowanceFor(catId);
+    if (!multiVendor) return base;
+    return base * Math.max(1, vendorsFor(catId).length);
+  };
+
   const categoryComplete = (cat: MenuCategory): boolean => {
-    return (
-      vendorsFor(cat.id).length > 0 &&
-      itemsFor(cat.id).length >= allowanceFor(cat.id)
-    );
+    const chosen = vendorsFor(cat.id);
+    if (chosen.length === 0) return false;
+    const base = baseAllowanceFor(cat.id);
+    // Multi-vendor: every chosen vendor must contribute its own full quota.
+    if (multiVendor)
+      return chosen.every((vid) => vendorPicks(cat.id, vid).length >= base);
+    return itemsFor(cat.id).length >= base;
   };
 
   // The Single Stall (custom) plan lets a guest skip courses they don't want.
@@ -554,19 +627,32 @@ export default function BookingWizard() {
   // a Single Stall guest may skip every stall and build an add-ons-only order.
   // Enforced on the details/extras step, where add-ons are chosen.
   const orderHasItems = builtCount > 0 || selectedAddOns.length > 0;
-  // "Menu step done" = every stall resolved (built or skipped). Skipping the
-  // whole menu is allowed — the guest just moves on to pick live counters &
-  // extras. On the fixed tiers nothing is skippable, so this reduces to "every
-  // course complete".
-  const allComplete = activeCategories.every(categoryResolved);
-  // Single Stall guest who skipped every stall — the menu is empty and they'll
-  // build the order entirely from add-ons on the next step.
-  const menuFullySkipped = singleStall && allComplete && builtCount === 0;
-  // Courses still needing a decision (not built and not skipped) — used to tell
-  // the guest exactly what's left before "Continue" and to jump them there.
-  const incompleteCategories = activeCategories.filter((c) => !categoryResolved(c));
-  const firstIncompleteCat = activeCategories.findIndex((c) => !categoryResolved(c));
-  const incompleteCategoryNames = incompleteCategories.map((c) =>
+  // "Step done" = every stall on that step resolved (built or skipped). Skipping
+  // is allowed on Custom — the guest just moves on. On the fixed tiers nothing is
+  // skippable, so these reduce to "every course complete". `menuComplete` gates
+  // the Menu step (2); `liveComplete` gates the Live Stall step (3) and is
+  // trivially true when the package has no live stalls (Silver).
+  const menuComplete = menuStepCategories.every(categoryResolved);
+  const liveComplete = liveStallCategories.every(categoryResolved);
+  // Single Stall guest who skipped every plated course on the Menu step — none
+  // built, all resolved-by-skip. Drives the step-2 reassurance banner (they'll
+  // still pick live counters / add-ons on the next steps). Scoped to the plated
+  // courses now that live stalls live on their own step.
+  const menuFullySkipped =
+    singleStall &&
+    menuComplete &&
+    menuStepCategories.every((c) => !categoryComplete(c));
+  // Courses still needing a decision (not built and not skipped), per step — used
+  // to tell the guest exactly what's left before "Continue" and to jump them
+  // there. Kept separate so each step only nags about its own courses.
+  const menuIncompleteCats = menuStepCategories.filter((c) => !categoryResolved(c));
+  const firstMenuIncomplete = menuStepCategories.findIndex((c) => !categoryResolved(c));
+  const menuIncompleteNames = menuIncompleteCats.map((c) =>
+    lang === "hi" ? c.nameHi : c.name,
+  );
+  const liveIncompleteCats = liveStallCategories.filter((c) => !categoryResolved(c));
+  const firstLiveIncomplete = liveStallCategories.findIndex((c) => !categoryResolved(c));
+  const liveIncompleteNames = liveIncompleteCats.map((c) =>
     lang === "hi" ? c.nameHi : c.name,
   );
 
@@ -611,10 +697,17 @@ export default function BookingWizard() {
     const cur = itemsFor(catId);
     if (cur.includes(itemId)) {
       setCategoryItems((m) => ({ ...m, [catId]: cur.filter((x) => x !== itemId) }));
-    } else {
-      if (cur.length >= allowanceFor(catId)) return; // at the package cap
-      setCategoryItems((m) => ({ ...m, [catId]: [...cur, itemId] }));
+      return;
     }
+    const base = baseAllowanceFor(catId);
+    if (multiVendor) {
+      // Per-vendor cap — each vendor may fill its own quota independently.
+      const vid = vendorOfItem(catId, itemId);
+      if (vid && vendorPicks(catId, vid).length >= base) return;
+    } else if (cur.length >= base) {
+      return; // at the package cap
+    }
+    setCategoryItems((m) => ({ ...m, [catId]: [...cur, itemId] }));
   };
 
   /* ─── Derived pricing ──────────────────────────────────────────────── */
@@ -824,8 +917,13 @@ export default function BookingWizard() {
       case 1:
         return packageId !== "";
       case 2:
-        return allComplete;
+        // Menu step — every plated course resolved.
+        return menuComplete;
       case 3:
+        // Live Stall step — every live-station course resolved. Packages with no
+        // live stalls (Silver) are trivially done, so Continue is never blocked.
+        return liveComplete;
+      case 4:
         return (
           occasionId !== "" &&
           guests >= paxMin &&
@@ -836,7 +934,7 @@ export default function BookingWizard() {
           // extra here, so a booking is never entirely empty.
           orderHasItems
         );
-      case 4:
+      case 5:
         // A service package is mandatory — but never dead-end the guest if the
         // admin has somehow cleared the list.
         return services.length === 0 || serviceId !== "";
@@ -853,7 +951,7 @@ export default function BookingWizard() {
     if (step === 1) {
       return [t("Choose a package", "एक पैकेज चुनें")];
     }
-    if (step === 3) {
+    if (step === 4) {
       const out: string[] = [];
       if (!orderHasItems)
         out.push(
@@ -875,7 +973,7 @@ export default function BookingWizard() {
       }
       return out;
     }
-    if (step === 4) {
+    if (step === 5) {
       return serviceId === ""
         ? [t("Choose a service package", "एक सर्विस पैकेज चुनें")]
         : [];
@@ -1126,7 +1224,8 @@ export default function BookingWizard() {
         : `\nAdvance to confirm (10%): ${money(advance)}`;
     const contactLines =
       (customerName.trim() ? `Name: ${customerName.trim()}\n` : "") +
-      (customerPhone.trim() ? `Phone: ${customerPhone.trim()}\n` : "");
+      (customerPhone.trim() ? `Phone: ${customerPhone.trim()}\n` : "") +
+      (customerEmail.trim() ? `Email: ${customerEmail.trim()}\n` : "");
     const emiPlan = buildEmiPlanForOrder();
     const emiLines = emiPlan ? `\nPayment Plan (EMI):\n${formatEmiPlanText(emiPlan)}` : "";
     return (
@@ -1156,31 +1255,50 @@ export default function BookingWizard() {
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
-  // Menu-step category navigation that spills into wizard steps at the edges.
+  // Menu-step (2) course navigation that spills into wizard steps at the edges:
+  // back off the first course returns to Package; past the last advances to the
+  // Live Stall step.
   const menuPrev = () => {
     if (activeCat > 0) setActiveCat((c) => c - 1);
     else goBack();
   };
   const menuNext = () => {
-    if (activeCat < activeCategories.length - 1) setActiveCat((c) => c + 1);
-    else if (allComplete) goNext();
+    if (activeCat < menuStepCategories.length - 1) setActiveCat((c) => c + 1);
+    else if (menuComplete) goNext();
+  };
+  // Live Stall-step (3) navigation — the same walk over the live-station courses.
+  // Back off the first returns to Menu; past the last advances to Add-ons.
+  const livePrev = () => {
+    if (liveCat > 0) setLiveCat((c) => c - 1);
+    else goBack();
+  };
+  const liveNext = () => {
+    if (liveCat < liveStallCategories.length - 1) setLiveCat((c) => c + 1);
+    else if (liveComplete) goNext();
   };
   // Single Stall: skip the current stall and slide on to the next one. On the
   // last stall there's nowhere to advance — skipping just resolves it so the
-  // Continue button below can light up.
+  // Continue button below can light up. Works for either step's course list.
   const skipCurrentStall = () => {
-    const cat = activeCategories[activeCat];
+    const cat = menuStepCategories[activeCat];
     if (!cat) return;
     skipCat(cat.id);
-    if (activeCat < activeCategories.length - 1) setActiveCat((c) => c + 1);
+    if (activeCat < menuStepCategories.length - 1) setActiveCat((c) => c + 1);
+  };
+  const skipCurrentLiveStall = () => {
+    const cat = liveStallCategories[liveCat];
+    if (!cat) return;
+    skipCat(cat.id);
+    if (liveCat < liveStallCategories.length - 1) setLiveCat((c) => c + 1);
   };
   // Single Stall: skip the whole menu in one go and jump to the extras step to
-  // build an add-ons-only order. Skips every stall (so nothing is billed from
-  // the menu), then advances past the menu step.
+  // build an add-ons-only order. Skips every course (plated + live, so nothing
+  // is billed from the menu), then jumps straight to Add-ons (Step 4).
   const skipMenuEntirely = () => {
     activeCategories.forEach((c) => skipCat(c.id));
     setActiveCat(0);
-    goNext();
+    setLiveCat(0);
+    setStep(4);
   };
 
   // Confirm the request and save it so it shows up on the My Bookings page and,
@@ -1203,6 +1321,12 @@ export default function BookingWizard() {
     if (customerPhone.replace(/\D/g, "").length < 10) {
       setConfirmError(
         t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+      );
+      return;
+    }
+    if (!isValidEmail(customerEmail)) {
+      setConfirmError(
+        t("Please enter a valid email address.", "कृपया सही ईमेल पता दर्ज करें।"),
       );
       return;
     }
@@ -1276,6 +1400,7 @@ export default function BookingWizard() {
           id: bookingId,
           customer: customerName.trim(),
           phone: customerPhone.trim(),
+          email: customerEmail.trim(),
           occasion: occ?.name ?? "Feast",
           date: formatEventDate(eventDate),
           // Raw ISO date + package/lead so the server can re-check the
@@ -1286,6 +1411,7 @@ export default function BookingWizard() {
           guests,
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
+          venue: venue.trim() || undefined,
           amount: Math.round(grandTotal),
           paid: orderPaid,
           paymentMethod: payMethod,
@@ -1351,44 +1477,95 @@ export default function BookingWizard() {
   };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
-  // Package (1) and event details (3) show their content on the left with the
-  // order-summary rail on the right; the confirm step (5) keeps it until paid.
-  // The full-width menu builder (2) and the service comparison (4) have no rail
-  // — the service cards each show their own computed feast price instead.
-  const showSummary = step === 1 || step === 3 || (step === 5 && !confirmed);
+  // Package (1) and the add-ons / details step (4) show their content on the
+  // left with the order-summary rail on the right; the confirm step (6) keeps it
+  // until paid. The full-width builders — Menu (2) and Live Stall (3) — and the
+  // Essentials comparison (5) have no rail (the service cards each show their own
+  // computed feast price instead).
+  const showSummary = step === 1 || step === 4 || (step === 6 && !confirmed);
+
+  // Step names, shared by the progress rail and the "up next" cue so a guest
+  // always knows what they're on and what's coming. Order mirrors the flow:
+  // Package → Menu → Live Stall → Add-ons → Essentials → Review.
+  const stepLabels = [
+    t("Package", "पैकेज"),
+    t("Menu", "मेन्यू"),
+    t("Live Stall", "लाइव स्टॉल"),
+    t("Add-ons", "एक्स्ट्रा"),
+    t("Essentials", "ज़रूरी सेवाएँ"),
+    t("Review", "समीक्षा"),
+  ];
+  // The step a guest moves to next (empty on the final Review step).
+  const nextStepLabel = step < TOTAL_STEPS ? stepLabels[step] : "";
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
-      {/* Header */}
-      <div>
-        <p className="eyebrow text-sm font-medium text-gold">
-          {t("BOOK A FEAST", "भोज बुक करें")}
-        </p>
-        <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-          {t("Plan Your Celebration", "अपना उत्सव प्लान करें")}
-        </h1>
-        <p className="font-script mt-3 text-xl text-ink-soft">
-          {t(
-            "a few guided steps to your perfect feast",
-            "कुछ आसान चरणों में आपका परफेक्ट भोज",
-          )}
-        </p>
+    <section className="app-bottom-safe relative mx-auto max-w-[90rem] overflow-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+      {/* A rich editorial opening gives the utility-heavy flow a premium moment. */}
+      <div className="relative overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
+        <span
+          aria-hidden="true"
+          className="absolute -right-12 -top-20 h-56 w-56 rounded-full border-[34px] border-cream/15"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-20 right-[22%] h-44 w-44 rounded-full bg-cream/10"
+        />
+        <div className="relative max-w-3xl">
+          <div className="flex items-center gap-3">
+            <span className="h-px w-8 bg-cream" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cream sm:text-xs">
+              {t("BOOK A FEAST", "भोज बुक करें")}
+            </p>
+          </div>
+          <h1 className="mt-3 font-display text-[2rem] font-normal leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            {t("Plan Your Celebration", "अपना उत्सव प्लान करें")}
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:mt-4 sm:text-lg">
+            {t(
+              "A few thoughtful steps to a feast your guests will remember.",
+              "कुछ आसान चरणों में ऐसा भोज, जिसे आपके मेहमान याद रखें।",
+            )}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-cream sm:mt-6 sm:text-xs">
+            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+              {t("6 guided steps", "6 आसान चरण")}
+            </span>
+            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+              {t("Curated menus", "चुने हुए मेन्यू")}
+            </span>
+            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+              {t("Verified partners", "सत्यापित पार्टनर")}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Progress rail — shows where the guest is in the 5-step flow. Hidden on
-          the confirmed success screen. */}
+      {/* Progress rail — shows where the guest is in the 6-step flow, plus a
+          plain-language "you're here / next up" line so they always know what
+          they're picking now and what comes after. Hidden on the confirmed
+          success screen. */}
       {!confirmed && (
-        <div className="mt-6">
-          <Stepper
-            current={step - 1}
-            steps={[
-              t("Package", "पैकेज"),
-              t("Menu", "मेन्यू"),
-              t("Details", "विवरण"),
-              t("Services", "सेवाएँ"),
-              t("Review", "समीक्षा"),
-            ]}
-          />
+        <div className="app-sticky-chrome relative z-20 mx-2 -mt-3 rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:rounded-2xl sm:px-6 sm:py-5 lg:mx-8">
+          <Stepper current={step - 1} steps={stepLabels} />
+          <p className="mt-2 text-[12px] text-ink/55 sm:mt-3 sm:text-sm sm:text-ink-soft">
+            {t(
+              `Step ${step} of ${TOTAL_STEPS}`,
+              `चरण ${step} / ${TOTAL_STEPS}`,
+            )}{" "}
+            ·{" "}
+            <span className="font-semibold text-maroon">{stepLabels[step - 1]}</span>
+            {nextStepLabel && (
+              <>
+                {" "}
+                <span className="hidden text-ink-soft/70 sm:inline">
+                  {t("· Next: ", "· आगे: ")}
+                </span>
+                <span className="hidden font-semibold text-ink sm:inline">
+                  {nextStepLabel}
+                </span>
+              </>
+            )}
+          </p>
         </div>
       )}
 
@@ -1417,17 +1594,19 @@ export default function BookingWizard() {
         paxMax={paxMax}
         minDate={earliestDate}
         leadWarning={leadWarning}
-        // The confirm step (5) locks the headcount and echoes it in the order
+        // The confirm step (6) locks the headcount and echoes it in the order
         // summary, so the editable Guests field is redundant there — hide it.
-        // It stays on the service step (4), where the price scales with guests.
-        showGuests={step !== 5}
+        // It stays on the Essentials step (5), where the price scales with guests.
+        showGuests={step !== 6}
       />
 
       {/* Layout */}
-      {step === 2 ? (
-        // Vendor/menu step — the chosen package is pinned on the left, vendor &
-        // item selection on the right. Picking a package on Step 1 lands here
-        // automatically, so guests flow straight from package → vendors.
+      {step === 2 || step === 3 ? (
+        // Full-width builders — Menu (2) and Live Stall (3). The chosen package
+        // is pinned on the left; vendor & item selection fills the right. Menu
+        // builds the plated courses; Live Stall gathers the cook-to-order
+        // stations that used to be mixed into the menu. A package with no live
+        // stalls (Silver) shows an explanatory panel on Step 3 instead.
         <div className="mt-8 grid gap-8 lg:grid-cols-[18rem_1fr]">
           <SelectedPackageRail
             lang={lang}
@@ -1436,30 +1615,66 @@ export default function BookingWizard() {
             basePerPlate={basePerPlate}
             onChange={() => setStep(1)}
           />
-          <StepMenu
-            lang={lang}
-            t={t}
-            multiVendor={multiVendor}
-            maxVendors={packageId === "silver" ? 5 : undefined}
-            categories={activeCategories}
-            activeCat={activeCat}
-            setActiveCat={setActiveCat}
-            categoryVendor={categoryVendor}
-            pickVendor={pickVendor}
-            itemsFor={itemsFor}
-            toggleItem={toggleItem}
-            allowanceFor={allowanceFor}
-            categoryComplete={categoryComplete}
-            isSkipped={isSkipped}
-            unskipCat={unskipCat}
-            onSkipMenu={singleStall ? skipMenuEntirely : undefined}
-            vendorRatings={vendorRatings}
-          />
+          {step === 2 ? (
+            <StepMenu
+              lang={lang}
+              t={t}
+              title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
+              subtitle={t(
+                "Pick vendors and dishes for your plated courses — live counters come next.",
+                "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+              )}
+              multiVendor={multiVendor}
+              maxVendors={packageId === "silver" ? 5 : undefined}
+              categories={menuStepCategories}
+              activeCat={activeCat}
+              setActiveCat={setActiveCat}
+              categoryVendor={categoryVendor}
+              pickVendor={pickVendor}
+              itemsFor={itemsFor}
+              toggleItem={toggleItem}
+              allowanceFor={allowanceFor}
+              baseAllowanceFor={baseAllowanceFor}
+              categoryComplete={categoryComplete}
+              isSkipped={isSkipped}
+              unskipCat={unskipCat}
+              onSkipMenu={singleStall ? skipMenuEntirely : undefined}
+              vendorRatings={vendorRatings}
+            />
+          ) : hasLiveStalls ? (
+            <StepMenu
+              lang={lang}
+              t={t}
+              title={t("Choose Your Live Stalls", "अपने लाइव स्टॉल चुनें")}
+              subtitle={t(
+                "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
+                "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
+              )}
+              multiVendor={multiVendor}
+              categories={liveStallCategories}
+              activeCat={liveCat}
+              setActiveCat={setLiveCat}
+              categoryVendor={categoryVendor}
+              pickVendor={pickVendor}
+              itemsFor={itemsFor}
+              toggleItem={toggleItem}
+              allowanceFor={allowanceFor}
+              baseAllowanceFor={baseAllowanceFor}
+              categoryComplete={categoryComplete}
+              isSkipped={isSkipped}
+              unskipCat={unskipCat}
+              vendorRatings={vendorRatings}
+            />
+          ) : (
+            <LiveStallEmpty t={t} packageName={selectedPackage?.name ?? ""} />
+          )}
         </div>
       ) : (
       <div
         className={
-          showSummary ? "mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]" : "mt-8"
+          showSummary
+            ? "mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : "mt-7"
         }
       >
         {/* min-w-0 lets the package carousel scroll inside this grid column
@@ -1480,7 +1695,7 @@ export default function BookingWizard() {
               shortNotice={shortNotice}
             />
           )}
-          {step === 3 && (
+          {step === 4 && (
             <StepDetails
               lang={lang}
               t={t}
@@ -1495,10 +1710,10 @@ export default function BookingWizard() {
               }
             />
           )}
-          {/* Service step (4) — the mandatory "Choose Your Service Package"
+          {/* Essentials step (5) — the mandatory "Choose Your Service Package"
               comparison. Single-select; the chosen tier's price folds into the
               total (each card shows its own computed feast price). */}
-          {step === 4 && (
+          {step === 5 && (
             <ServicePackages
               packages={services}
               selectedId={serviceId}
@@ -1512,13 +1727,13 @@ export default function BookingWizard() {
               (their in-progress booking stays intact); logging in reveals the
               real Confirm step. A neutral placeholder covers the brief moment
               the client session is still loading, to avoid a sign-in flash. */}
-          {step === 5 && !confirmed && sessionStatus === undefined && (
+          {step === 6 && !confirmed && sessionStatus === undefined && (
             <div className="min-h-[40vh]" />
           )}
-          {step === 5 && !confirmed && sessionStatus === null && (
-            <LoginGate onBack={() => setStep(4)} />
+          {step === 6 && !confirmed && sessionStatus === null && (
+            <LoginGate onBack={() => setStep(5)} />
           )}
-          {step === 5 && !confirmed && sessionStatus != null && (
+          {step === 6 && !confirmed && sessionStatus != null && (
             <StepConfirm
               t={t}
               occasion={resolveOccasion(occasionId)}
@@ -1526,6 +1741,7 @@ export default function BookingWizard() {
               eventDate={eventDate}
               city={resolveCity(cityId)}
               venue={venue}
+              setVenue={setVenue}
               guests={guests}
               categories={activeCategories}
               categoryVendor={categoryVendor}
@@ -1535,8 +1751,8 @@ export default function BookingWizard() {
               serviceName={selectedService?.name}
               serviceTotal={serviceTotal}
               onEditMenu={() => setStep(2)}
-              onEditExtras={() => setStep(3)}
-              onEditService={() => setStep(4)}
+              onEditExtras={() => setStep(4)}
+              onEditService={() => setStep(5)}
               couponInput={couponInput}
               setCouponInput={setCouponInput}
               applyCoupon={applyCoupon}
@@ -1562,6 +1778,8 @@ export default function BookingWizard() {
               setCustomerName={setCustomerName}
               customerPhone={customerPhone}
               setCustomerPhone={setCustomerPhone}
+              customerEmail={customerEmail}
+              setCustomerEmail={setCustomerEmail}
               referralCode={referralCode}
               setReferralCode={setReferralCode}
               referrerName={referrerName}
@@ -1576,7 +1794,7 @@ export default function BookingWizard() {
               whatsappHref={whatsappHref}
             />
           )}
-          {step === 5 && confirmed && (
+          {step === 6 && confirmed && (
             <StepDone
               t={t}
               bookingId={bookingId}
@@ -1620,97 +1838,75 @@ export default function BookingWizard() {
 
       {/* Nav buttons */}
       {step === 2 ? (
-        <div className="mt-10">
-          {/* When the menu isn't finished, name the unfinished courses and let
-              the guest jump straight to the first one — a silently-disabled
-              Continue gives no clue what's left to pick. */}
-          {!allComplete && (
-            <button
-              type="button"
-              onClick={() => setActiveCat(Math.max(0, firstIncompleteCat))}
-              className="focus-ring mb-4 flex w-full items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
-            >
-              <span aria-hidden="true" className="text-maroon">
-                ★
-              </span>
-              <span>
-                {t("Still to finish:", "अभी बाकी:")}{" "}
-                <span className="font-semibold text-maroon">
-                  {incompleteCategoryNames.join(", ")}
+        <MenuStepNav
+          t={t}
+          categories={menuStepCategories}
+          activeCat={activeCat}
+          setActiveCat={setActiveCat}
+          allResolved={menuComplete}
+          incompleteNames={menuIncompleteNames}
+          firstIncomplete={firstMenuIncomplete}
+          singleStall={singleStall}
+          isSkipped={isSkipped}
+          unskipCat={unskipCat}
+          onPrev={menuPrev}
+          onNext={menuNext}
+          onSkipCurrent={skipCurrentStall}
+          continueLabel={t("Continue to Live Stall", "लाइव स्टॉल तक जारी रखें")}
+          extraBanner={
+            menuFullySkipped ? (
+              <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+                <span aria-hidden="true" className="text-maroon">
+                  ★
                 </span>
-                {". "}
-                {singleStall
-                  ? t(
-                      "Tap to jump there, or skip the stalls you don't want.",
-                      "वहाँ जाने के लिए टैप करें, या जो स्टॉल नहीं चाहिए उन्हें छोड़ दें।",
-                    )
-                  : t(
-                      "Tap to jump to the next course and pick the rest.",
-                      "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
-                    )}
-              </span>
-            </button>
-          )}
-          {/* Whole menu skipped — reassure the guest they're not stuck: the order
-              will be built from live counters & extras on the next step. */}
-          {menuFullySkipped && (
-            <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
-              <span aria-hidden="true" className="text-maroon">
-                ★
-              </span>
-              <span>
-                {t(
-                  "You've skipped every stall. Continue to add live counters & extras — you'll pick at least one there to complete your order.",
-                  "आपने हर स्टॉल छोड़ दिया है। लाइव काउंटर और एक्स्ट्रा जोड़ने के लिए जारी रखें — ऑर्डर पूरा करने के लिए वहाँ कम से कम एक चुनें।",
-                )}
-              </span>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button variant="secondary" onClick={menuPrev}>
-              ←{" "}
-              {activeCat > 0
-                ? t("Prev Category", "पिछली श्रेणी")
-                : t("Back", "पीछे")}
+                <span>
+                  {t(
+                    "You've skipped every stall. Continue to live counters & extras — you'll pick at least one there to complete your order.",
+                    "आपने हर स्टॉल छोड़ दिया है। लाइव काउंटर और एक्स्ट्रा तक जारी रखें — ऑर्डर पूरा करने के लिए वहाँ कम से कम एक चुनें।",
+                  )}
+                </span>
+              </div>
+            ) : undefined
+          }
+        />
+      ) : step === 3 ? (
+        hasLiveStalls ? (
+          <MenuStepNav
+            t={t}
+            categories={liveStallCategories}
+            activeCat={liveCat}
+            setActiveCat={setLiveCat}
+            allResolved={liveComplete}
+            incompleteNames={liveIncompleteNames}
+            firstIncomplete={firstLiveIncomplete}
+            singleStall={singleStall}
+            isSkipped={isSkipped}
+            unskipCat={unskipCat}
+            onPrev={livePrev}
+            onNext={liveNext}
+            onSkipCurrent={skipCurrentLiveStall}
+            continueLabel={t("Continue to Add-ons", "एक्स्ट्रा तक जारी रखें")}
+          />
+        ) : (
+          // Package with no live stalls (Silver) — nothing to pick here, so just
+          // step back to the menu or move on to add-ons.
+          <div className="mt-10 flex items-center justify-between">
+            <Button
+              variant="secondary"
+              onClick={goBack}
+              aria-label={t("Back", "पीछे")}
+            >
+              ←
             </Button>
-            {/* Single Stall lets a guest opt out of a course entirely — skip it
-                and slide to the next stall, or undo if they skipped by mistake. */}
-            {singleStall &&
-              (isSkipped(activeCategories[activeCat]?.id ?? "") ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    const cur = activeCategories[activeCat];
-                    if (cur) unskipCat(cur.id);
-                  }}
-                >
-                  {t("Undo skip", "छोड़ना पूर्ववत करें")}
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={skipCurrentStall}>
-                  {t("Skip this stall", "यह स्टॉल छोड़ें")}
-                </Button>
-              ))}
-            {activeCat < activeCategories.length - 1 ? (
-              <Button onClick={menuNext}>
-                {singleStall
-                  ? t("Next stall", "अगला स्टॉल")
-                  : t("Next Category", "अगली श्रेणी")}{" "}
-                →
-              </Button>
-            ) : (
-              <Button onClick={menuNext} disabled={!allComplete}>
-                {t("Continue to Details", "विवरण तक जारी रखें")} →
-              </Button>
-            )}
+            <Button onClick={goNext}>
+              {t("Continue to Add-ons", "एक्स्ट्रा तक जारी रखें")} →
+            </Button>
           </div>
-        </div>
+        )
       ) : step < TOTAL_STEPS ? (
-        <div className="mt-10">
-          {/* Spell out what's blocking "Next" so the disabled arrow isn't a
-              dead end with no explanation. */}
+        <div className="mt-8 sm:mt-10">
           {nextBlockers.length > 0 && (
-            <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-maroon/30 bg-cream/40 px-3 py-2.5 text-[13px] text-ink/70 sm:rounded-card sm:px-4 sm:py-3 sm:text-sm sm:text-ink-soft">
               <span aria-hidden="true" className="text-maroon">
                 ★
               </span>
@@ -1722,22 +1918,50 @@ export default function BookingWizard() {
               </span>
             </div>
           )}
-          <div className="flex items-center justify-between">
+          {/* Desktop nav */}
+          <div className="hidden items-center justify-between md:flex">
             <Button
               variant="secondary"
               onClick={goBack}
               disabled={step === 1}
               aria-label={t("Back", "पीछे")}
             >
-              ←
+              {t("Back", "पीछे")}
             </Button>
             <Button
               onClick={goNext}
               disabled={!canNext}
               aria-label={t("Next", "आगे")}
             >
-              →
+              {nextStepLabel
+                ? `${t("Continue", "आगे")} · ${nextStepLabel} →`
+                : `${t("Continue", "आगे")} →`}
             </Button>
+          </div>
+          {/* Mobile sticky checkout chrome */}
+          <div className="app-sticky-cta md:hidden">
+            <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={goBack}
+                disabled={step === 1}
+                aria-label={t("Back", "पीछे")}
+                className="min-h-11 px-4"
+              >
+                ←
+              </Button>
+              <Button
+                onClick={goNext}
+                disabled={!canNext}
+                fullWidth
+                className="min-h-11"
+              >
+                {nextStepLabel
+                  ? `${t("Continue", "आगे")} · ${nextStepLabel}`
+                  : t("Continue", "आगे")}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1754,9 +1978,180 @@ function SectionHead({
   sub?: string;
 }) {
   return (
-    <div className="mb-6">
-      <h1 className="text-2xl text-ink sm:text-3xl">{title}</h1>
-      {sub && <p className="mt-1 text-sm text-ink-soft">{sub}</p>}
+    <div className="mb-5 sm:mb-7">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-px w-7 bg-maroon" aria-hidden="true" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-maroon">
+          Curated for you
+        </span>
+      </div>
+      <h2 className="font-display text-3xl leading-tight text-ink sm:text-4xl">
+        {title}
+      </h2>
+      {sub && (
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink/55 sm:text-base">
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ─── Course-step nav (Menu · Live Stall) ────────────────────────────────
+   Walks a step's courses tab-by-tab and spills into the wizard at the edges:
+   Back off the first course returns to the previous step, Continue past the
+   last advances to the next. Shared by the Menu (2) and Live Stall (3) steps so
+   both behave identically — a "still to finish" jump banner, per-stall skip on
+   the Single Stall plan, and a Continue that names where it leads. */
+function MenuStepNav({
+  t,
+  categories,
+  activeCat,
+  setActiveCat,
+  allResolved,
+  incompleteNames,
+  firstIncomplete,
+  singleStall,
+  isSkipped,
+  unskipCat,
+  onPrev,
+  onNext,
+  onSkipCurrent,
+  continueLabel,
+  extraBanner,
+}: {
+  t: (en: string, hi: string) => string;
+  categories: MenuCategory[];
+  activeCat: number;
+  setActiveCat: (n: number) => void;
+  allResolved: boolean;
+  incompleteNames: string[];
+  firstIncomplete: number;
+  singleStall: boolean;
+  isSkipped: (catId: string) => boolean;
+  unskipCat: (catId: string) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onSkipCurrent: () => void;
+  continueLabel: string;
+  extraBanner?: ReactNode;
+}) {
+  const atLast = activeCat >= categories.length - 1;
+  const activeId = categories[activeCat]?.id ?? "";
+  return (
+    <div className="mt-10">
+      {/* When the step isn't finished, name the unfinished courses and let the
+          guest jump straight to the first — a silently-disabled Continue gives
+          no clue what's left to pick. */}
+      {!allResolved && incompleteNames.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setActiveCat(Math.max(0, firstIncomplete))}
+          className="focus-ring mb-4 flex w-full items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
+        >
+          <span aria-hidden="true" className="text-maroon">
+            ★
+          </span>
+          <span>
+            {t("Still to finish:", "अभी बाकी:")}{" "}
+            <span className="font-semibold text-maroon">
+              {incompleteNames.join(", ")}
+            </span>
+            {". "}
+            {singleStall
+              ? t(
+                  "Tap to jump there, or skip the stalls you don't want.",
+                  "वहाँ जाने के लिए टैप करें, या जो स्टॉल नहीं चाहिए उन्हें छोड़ दें।",
+                )
+              : t(
+                  "Tap to jump to the next course and pick the rest.",
+                  "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
+                )}
+          </span>
+        </button>
+      )}
+      {extraBanner}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button variant="secondary" onClick={onPrev}>
+          ←{" "}
+          {activeCat > 0
+            ? t("Prev Category", "पिछली श्रेणी")
+            : t("Back", "पीछे")}
+        </Button>
+        {/* Single Stall lets a guest opt out of a course entirely — skip it and
+            slide to the next stall, or undo if they skipped by mistake. */}
+        {singleStall &&
+          (isSkipped(activeId) ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (activeId) unskipCat(activeId);
+              }}
+            >
+              {t("Undo skip", "छोड़ना पूर्ववत करें")}
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={onSkipCurrent}>
+              {t("Skip this stall", "यह स्टॉल छोड़ें")}
+            </Button>
+          ))}
+        {!atLast ? (
+          <Button onClick={onNext}>
+            {singleStall
+              ? t("Next stall", "अगला स्टॉल")
+              : t("Next Category", "अगली श्रेणी")}{" "}
+            →
+          </Button>
+        ) : (
+          <Button onClick={onNext} disabled={!allResolved}>
+            {continueLabel} →
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Live Stall step · empty state ──────────────────────────────────────
+   Shown on Step 3 when the chosen package (e.g. Silver) includes no live
+   stations. Honest about it and points the guest at the next step, where live
+   counters can still be added as extras — so the flow stays a consistent six
+   steps for every package. */
+function LiveStallEmpty({
+  t,
+  packageName,
+}: {
+  t: (en: string, hi: string) => string;
+  packageName: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <SectionHead
+        title={t("Live Stalls", "लाइव स्टॉल")}
+        sub={t(
+          "Cook-to-order counters, made fresh in front of your guests.",
+          "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर।",
+        )}
+      />
+      <div className="flex items-start gap-3 rounded-2xl border border-maroon/30 bg-cream/40 px-5 py-6 text-sm text-ink-soft">
+        <span aria-hidden="true" className="text-lg text-maroon">
+          🔥
+        </span>
+        <div>
+          <p className="font-semibold text-ink">
+            {t(
+              `Your ${packageName || "package"} doesn't include live stalls.`,
+              `आपके ${packageName || "पैकेज"} में लाइव स्टॉल शामिल नहीं हैं।`,
+            )}
+          </p>
+          <p className="mt-1">
+            {t(
+              "No problem — you can add live counters (chaat, chinese, dosa, pizza & more) as add-ons on the next step, or go back and pick a higher package.",
+              "कोई बात नहीं — अगले चरण में आप लाइव काउंटर (चाट, चाइनीज़, डोसा, पिज़्ज़ा वग़ैरह) एक्स्ट्रा के रूप में जोड़ सकते हैं, या पीछे जाकर बड़ा पैकेज चुनें।",
+            )}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1810,25 +2205,39 @@ function EventBar({
   showGuests?: boolean;
 }) {
   const fieldClass =
-    "mt-1.5 w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-maroon";
+    "mt-1.5 min-h-12 w-full rounded-control border border-cream bg-white px-3 py-2.5 text-sm text-ink shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
   // Trigger styling for the themed dropdowns — mirrors `fieldClass` minus the
   // wrapper spacing (which sits on the ThemedSelect root instead).
   const selectButtonClass =
-    "w-full rounded-lg border border-cream-3 bg-white px-3 py-2 text-sm outline-none transition-colors";
+    "min-h-12 w-full rounded-control border border-cream bg-white px-3 py-2.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
 
   return (
-    <div className="mt-6 rounded-2xl border border-maroon/30 bg-cream-2/40 p-4 shadow-sm sm:p-5">
-      <p className="eyebrow text-xs font-semibold text-gold">
-        {t("YOUR EVENT", "आपका इवेंट")}
-      </p>
+    <div className="relative mt-5 overflow-hidden rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:mt-7 sm:p-6">
+      <span className="absolute inset-y-0 left-0 w-1 bg-maroon" aria-hidden="true" />
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="eyebrow text-[10px] font-bold text-maroon sm:text-xs">
+            {t("YOUR EVENT", "आपका इवेंट")}
+          </p>
+          <p className="mt-1 text-xs text-ink/50 sm:text-sm">
+            {t(
+              "Tell us the essentials — you can edit these anytime.",
+              "ज़रूरी जानकारी दें — इसे कभी भी बदल सकते हैं।",
+            )}
+          </p>
+        </div>
+        <span className="hidden rounded-full bg-cream/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-maroon sm:inline">
+          {t("Event brief", "इवेंट ब्रीफ़")}
+        </span>
+      </div>
       <div
         className={
-          "mt-3 grid gap-4 sm:grid-cols-2 " +
+          "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 " +
           (showGuests ? "lg:grid-cols-4" : "lg:grid-cols-3")
         }
       >
         <label className="block">
-          <span className="text-xs font-medium text-ink-soft">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
             {t("Occasion", "अवसर")}
           </span>
           <ThemedSelect
@@ -1859,7 +2268,7 @@ function EventBar({
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-soft">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
             {t("Date", "तारीख")}
           </span>
           <input
@@ -1880,7 +2289,7 @@ function EventBar({
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-soft">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
             {t("City / Location", "शहर / लोकेशन")}
           </span>
           <ThemedSelect
@@ -1911,25 +2320,24 @@ function EventBar({
         </label>
 
         {showGuests && (
-          <label className="block">
-            <span className="text-xs font-medium text-ink-soft">
-              {t("Guests", "मेहमान")} ({inr.format(paxMin)}–{inr.format(paxMax)})
-            </span>
-            <input
-              type="number"
+          <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-control border border-cream bg-cream/20 px-4 py-2.5 shadow-soft">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-maroon">
+                {t("Guests", "मेहमान")}
+              </p>
+              <p className="mt-0.5 text-caption text-ink/50">
+                {inr.format(paxMin)}–{inr.format(paxMax)}
+              </p>
+            </div>
+            <QuantitySelector
+              value={guests || paxMin}
+              onChange={setGuests}
               min={paxMin}
               max={paxMax}
-              value={guests}
-              onChange={(e) => setGuests(Number(e.target.value))}
-              onBlur={(e) => {
-                const v = Number(e.target.value);
-                setGuests(
-                  Math.max(paxMin, Math.min(paxMax, Math.round(v || paxMin))),
-                );
-              }}
-              className={fieldClass}
+              step={10}
+              label={t("Number of guests", "मेहमानों की संख्या")}
             />
-          </label>
+          </div>
         )}
       </div>
     </div>
@@ -2011,7 +2419,7 @@ function StepPackage({
         className={
           // pt keeps the Popular/Premium ribbons (which float above the cards)
           // clear of the availability notice above the grid.
-          "no-scrollbar flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto pb-4 pt-7 sm:snap-none sm:grid sm:gap-7 sm:overflow-visible sm:pb-0 sm:pt-6 " +
+          "no-scrollbar -mx-3 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-3 pb-5 pt-7 sm:mx-0 sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
           (available.length === 1
             ? "sm:grid-cols-1"
             : available.length === 2
@@ -2027,7 +2435,7 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="w-[85vw] max-w-[345px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+              className="w-[82vw] max-w-[360px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
             >
             <PackageScrollCard
               tier={tier}
@@ -2041,7 +2449,7 @@ function StepPackage({
                     e.stopPropagation();
                     setPackageId(tier.id);
                   }}
-                  className="btn-sheen inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-3 text-[10px] font-semibold tracking-wide text-maroon shadow-sm ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
+                  className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-[10px] font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
                 >
                   <span className="font-display leading-none">
                     {selected
@@ -2063,6 +2471,8 @@ function StepPackage({
 function StepMenu({
   lang,
   t,
+  title,
+  subtitle,
   multiVendor,
   maxVendors,
   categories,
@@ -2073,6 +2483,7 @@ function StepMenu({
   itemsFor,
   toggleItem,
   allowanceFor,
+  baseAllowanceFor,
   categoryComplete,
   isSkipped,
   unskipCat,
@@ -2081,6 +2492,9 @@ function StepMenu({
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
+  /** Step heading + sub — differs for the Menu (2) vs Live Stall (3) steps. */
+  title?: string;
+  subtitle?: string;
   multiVendor: boolean;
   maxVendors?: number;
   categories: MenuCategory[];
@@ -2090,7 +2504,10 @@ function StepMenu({
   pickVendor: (catId: string, vendorId: string) => void;
   itemsFor: (catId: string) => string[];
   toggleItem: (catId: string, itemId: string) => void;
+  /** Effective course allowance — scaled by vendor count on multi-vendor tiers. */
   allowanceFor: (catId: string) => number;
+  /** Per-vendor dish quota (the package's base, unscaled). */
+  baseAllowanceFor: (catId: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
   isSkipped: (catId: string) => boolean;
   unskipCat: (catId: string) => void;
@@ -2119,19 +2536,24 @@ function StepMenu({
   const visibleVendors = maxVendors
     ? [...seedVendors.slice(0, cap), ...cat.vendors.filter((v) => v.live)]
     : cat.vendors;
-  const allowance = allowanceFor(cat.id);
+  const allowance = allowanceFor(cat.id); // effective total (scaled per vendor)
+  const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
   const selectedIds = categoryVendor[cat.id] ?? [];
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
   const picks = itemsFor(cat.id);
   // Whether this package lets a guest pick more than one dish in at least one
   // course. Package-wide (not the active course) so the capability note shows
   // the moment the menu opens — the first course (e.g. Welcome) may allow only
-  // one dish even on tiers that open a wide spread elsewhere.
-  const multiDish = categories.some((c) => allowanceFor(c.id) > 1);
+  // one dish even on tiers that open a wide spread elsewhere. Uses the base
+  // (per-vendor) quota so multi-vendor scaling doesn't skew the note.
+  const multiDish = categories.some((c) => baseAllowanceFor(c.id) > 1);
 
   return (
     <div className="min-w-0">
-      <SectionHead title={t("Build Your Menu", "अपना मेन्यू बनाएं")} />
+      <SectionHead
+        title={title ?? t("Build Your Menu", "अपना मेन्यू बनाएं")}
+        sub={subtitle}
+      />
 
       {/* Single Stall only — a guest who just wants live counters & extras can
           bypass the courses entirely and jump to the add-ons step. */}
@@ -2255,7 +2677,7 @@ function StepMenu({
       )}
 
       {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
-      <h3 className="mt-7 font-display text-lg font-semibold text-maroon">
+      <h3 className="mt-7 font-sans text-2xl font-semibold text-maroon">
         {multiVendor
           ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
           : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
@@ -2289,7 +2711,7 @@ function StepMenu({
                 />
               </div>
               <div className="flex flex-1 flex-col p-4">
-                <h4 className="font-display text-sm font-semibold text-maroon">
+                <h4 className="font-sans text-sm font-semibold text-maroon">
                   {v.name}
                 </h4>
                 {v.reviews > 0 ? (
@@ -2403,7 +2825,7 @@ function StepMenu({
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-display text-lg font-semibold text-maroon">
+              <h3 className="font-sans text-2xl font-semibold text-maroon">
                 {multiVendor
                   ? t("Step B · Pick items across your vendors", "चरण B · अपने वेंडरों से आइटम चुनें")
                   : t("Step B · Pick items from their menu", "चरण B · उनके मेन्यू से आइटम चुनें")}
@@ -2418,17 +2840,56 @@ function StepMenu({
               </span>
             </div>
 
+            {/* Multi-vendor tiers give each vendor its own quota, so the guest
+                can take the full course from every vendor they picked (e.g. a
+                welcome drink from each). Spell that out so the per-vendor
+                counters below read as intended, not as one shared cap. */}
+            {multiVendor && selectedVendors.length > 1 && (
+              <p className="mt-2 text-xs text-ink-soft">
+                {base === 1
+                  ? t(
+                      "You can pick one dish from each vendor for this course.",
+                      "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                    )
+                  : t(
+                      `You can pick up to ${base} dishes from each vendor for this course.`,
+                      `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
+                    )}
+              </p>
+            )}
+
             {/* One menu block per selected vendor — a single block for most
                 tiers, several for Platinum's multi-vendor segments. */}
-            {selectedVendors.map((vendor) => (
+            {selectedVendors.map((vendor) => {
+              // On multi-vendor tiers each vendor fills its OWN quota, so the
+              // cap (and counter) are scoped to this vendor's picks.
+              const vendorItemPicks = picks.filter((id) =>
+                id.startsWith(`${vendor.id}-`),
+              );
+              const vendorFull = vendorItemPicks.length >= base;
+              return (
               <div key={vendor.id} className="mt-4">
-                <p className="eyebrow text-xs font-semibold text-gold">
-                  {vendor.name}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="eyebrow text-xs font-semibold text-gold">
+                    {vendor.name}
+                  </p>
+                  {multiVendor && (
+                    <span
+                      className={
+                        "eyebrow text-[10px] font-semibold " +
+                        (vendorFull ? "text-maroon" : "text-ink-soft")
+                      }
+                    >
+                      {vendorItemPicks.length}/{base}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {vendor.items.map((it: CategoryItem) => {
                       const active = picks.includes(it.id);
-                      const atCap = !active && picks.length >= allowance;
+                      const atCap =
+                        !active &&
+                        (multiVendor ? vendorFull : picks.length >= allowance);
                       return (
                         <button
                           key={it.id}
@@ -2470,7 +2931,8 @@ function StepMenu({
                     })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </>
         )}
       </div>
@@ -2682,7 +3144,13 @@ function StepDetails({
                                 {v.name}
                               </span>
                               <span className="mt-0.5 block text-xs text-ink-soft">
-                                {v.city} · ★ {v.rating}
+                                {v.city} · ★ {v.rating} ·{" "}
+                                <span className="font-semibold text-ink">
+                                  {t(
+                                    `from ${money(v.priceFrom)} / plate`,
+                                    `${money(v.priceFrom)} / प्लेट से`,
+                                  )}
+                                </span>
                               </span>
                             </span>
                             <span
@@ -2745,6 +3213,7 @@ function PaymentBox({
   onPaid,
   customerName,
   customerPhone,
+  customerEmail,
   payMethod,
   setPayMethod,
   eventDate,
@@ -2758,6 +3227,7 @@ function PaymentBox({
   onPaid: (amount: number, txnRef: string) => void;
   customerName: string;
   customerPhone: string;
+  customerEmail: string;
   payMethod: OrderPaymentMethod;
   setPayMethod: (m: OrderPaymentMethod) => void;
   eventDate: string;
@@ -2811,11 +3281,13 @@ function PaymentBox({
     emiSelected > 1
       ? buildEmiPlan(balanceAmount, emiSelected, eventDate)
       : null;
-  // Contact (name + phone) must be captured before we take money, so the paid
-  // order is actionable and the auto-confirm that follows the advance succeeds.
+  // Contact (name + phone + a valid email) must be captured before we take
+  // money, so the paid order is actionable and the auto-confirm that follows the
+  // advance succeeds (handleConfirm enforces the same three fields).
   const contactReady =
     customerName.trim().length > 0 &&
-    customerPhone.replace(/\D/g, "").length >= 10;
+    customerPhone.replace(/\D/g, "").length >= 10 &&
+    isValidEmail(customerEmail);
   // A stable ref for the advance so a retry stays idempotent on the txn key.
   const txnRef = upiTxnRef(bookingId, "ADVANCE");
   const note = `Bhojpatra ${bookingId}`;
@@ -3204,8 +3676,8 @@ function PaymentBox({
           {!contactReady && (
             <p className="mt-2 text-xs font-medium text-maroon">
               {t(
-                "Enter your name and phone above to confirm your booking.",
-                "अपनी बुकिंग पक्की करने के लिए ऊपर अपना नाम और फ़ोन दर्ज करें।",
+                "Enter your name, phone and email above to confirm your booking.",
+                "अपनी बुकिंग पक्की करने के लिए ऊपर अपना नाम, फ़ोन और ईमेल दर्ज करें।",
               )}
             </p>
           )}
@@ -3241,6 +3713,7 @@ function StepConfirm({
   eventDate,
   city,
   venue,
+  setVenue,
   guests,
   categories,
   categoryVendor,
@@ -3271,6 +3744,8 @@ function StepConfirm({
   setCustomerName,
   customerPhone,
   setCustomerPhone,
+  customerEmail,
+  setCustomerEmail,
   referralCode,
   setReferralCode,
   referrerName,
@@ -3290,6 +3765,7 @@ function StepConfirm({
   eventDate: string;
   city: City | undefined;
   venue: string;
+  setVenue: (v: string) => void;
   guests: number;
   categories: MenuCategory[];
   categoryVendor: VendorMap;
@@ -3320,6 +3796,8 @@ function StepConfirm({
   setCustomerName: (v: string) => void;
   customerPhone: string;
   setCustomerPhone: (v: string) => void;
+  customerEmail: string;
+  setCustomerEmail: (v: string) => void;
   referralCode: string;
   setReferralCode: (v: string) => void;
   referrerName: string;
@@ -3650,6 +4128,38 @@ function StepConfirm({
               className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
             />
           </div>
+          <div>
+            <label className="text-xs font-medium text-ink-soft">
+              {t("Email", "ईमेल")}
+            </label>
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder={t("you@example.com", "you@example.com")}
+              autoComplete="email"
+              inputMode="email"
+              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            />
+          </div>
+          {/* Venue — usually pre-filled from the Hero booking bar or the venue
+              catalogue, but editable here so it's captured even when the guest
+              reached the wizard without one. Spans the full row. */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-ink-soft">
+              {t("Venue", "वेन्यू")}
+            </label>
+            <input
+              type="text"
+              value={venue}
+              onChange={(e) => setVenue(e.target.value)}
+              placeholder={t(
+                "e.g. Grand Palace Lawn, Gomti Nagar",
+                "उदा. ग्रैंड पैलेस लॉन, गोमती नगर",
+              )}
+              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            />
+          </div>
         </div>
       </div>
 
@@ -3741,6 +4251,7 @@ function StepConfirm({
         onPaid={onPaid}
         customerName={customerName}
         customerPhone={customerPhone}
+        customerEmail={customerEmail}
         payMethod={payMethod}
         setPayMethod={setPayMethod}
         eventDate={eventDate}
@@ -3925,6 +4436,21 @@ function StepDone({
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>
       </div>
+
+      {/* Turn a happy booking into word-of-mouth — promote Bhojpatra to friends. */}
+      <p className="mt-8 text-sm text-ink-soft">
+        {t("Loved planning with us? Tell a friend.", "हमारे साथ प्लानिंग पसंद आई? किसी दोस्त को बताएं।")}
+      </p>
+      <div className="mt-2 flex justify-center">
+        <WhatsAppShareButton
+          variant="ghost"
+          size="sm"
+          label="Share Bhojpatra"
+          labelHi="भोजपत्र शेयर करें"
+          message="I just booked my celebration on Bhojpatra — verified caterers & venues, all in one place. Plan yours:"
+          messageHi="मैंने अभी Bhojpatra पर अपना उत्सव बुक किया — वेरिफाइड कैटरर और वेन्यू, सब एक जगह। आप भी प्लान करें:"
+        />
+      </div>
     </div>
   );
 }
@@ -4072,11 +4598,17 @@ function SummaryPanel({
   grandTotal: number;
 }) {
   return (
-    <aside className="lg:sticky lg:top-32 lg:self-start">
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-        <h3 className="font-display text-base font-semibold text-ink">
-          {t("Order Summary", "ऑर्डर सारांश")}
-        </h3>
+    <aside className="xl:sticky xl:top-28 xl:self-start">
+      <div className="overflow-hidden rounded-[1.5rem] border border-cream bg-white shadow-pop">
+        <div className="bg-maroon px-5 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cream">
+            {t("Live estimate", "लाइव अनुमान")}
+          </p>
+          <h3 className="mt-1 font-display text-xl font-normal text-white">
+            {t("Order Summary", "ऑर्डर सारांश")}
+          </h3>
+        </div>
+        <div className="p-5">
         {packageName && (
           <div className="mt-3 flex items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2">
             <span className="text-xs font-medium text-ink-soft">
@@ -4148,12 +4680,13 @@ function SummaryPanel({
               {money(grandTotal)}
             </span>
           </div>
-          <p className="pt-1 text-xs text-ink-soft">
+          <p className="mt-2 rounded-xl bg-cream/30 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
             {t(
               `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) to lock your date — or book now, pay later.`,
               `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
             )}
           </p>
+        </div>
         </div>
       </div>
     </aside>

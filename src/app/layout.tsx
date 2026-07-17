@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Open_Sans } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -6,6 +6,8 @@ import { LanguageProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui";
 import ScrollWatermark from "@/components/ScrollWatermark";
 import SiteLoader from "@/components/SiteLoader";
+import PwaRegister from "@/components/PwaRegister";
+import { brand } from "@/lib/design-tokens";
 
 /* The Bhojpatra brand uses exactly two typefaces (per the brand guidelines):
    - Open Sans          → primary UI / body font
@@ -31,6 +33,32 @@ export const metadata: Metadata = {
   title: "Bhojpatra — India's Feast Booking Platform",
   description:
     "Plan your perfect celebration with the best feast specialists from your city, state, or across India. Verified specialists, transparent pricing, easy booking.",
+  applicationName: "Bhojpatra",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Bhojpatra",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: "/bhojpatra-icon.png",
+    apple: "/bhojpatra-icon.png",
+  },
+};
+
+/** PWA / mobile viewport — cover safe areas for notch devices. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: brand.red },
+    { media: "(prefers-color-scheme: dark)", color: brand.black },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -43,7 +71,7 @@ export default function RootLayout({
       lang="en"
       className={`${openSans.variable} ${anandaNeptouch.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col overflow-x-hidden bg-white text-ink">
+      <body className="flex min-h-full flex-col overflow-x-hidden bg-bg text-ink">
         <LanguageProvider>
           <ToastProvider>
             {children}
@@ -51,6 +79,7 @@ export default function RootLayout({
           </ToastProvider>
         </LanguageProvider>
         <SiteLoader />
+        <PwaRegister />
       </body>
     </html>
   );

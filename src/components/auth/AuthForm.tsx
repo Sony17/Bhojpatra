@@ -12,9 +12,10 @@ import {
 } from "@/lib/session";
 import { setAdminSession } from "@/lib/adminAuth";
 import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
+import { isValidGst, isValidEmail, isValidPhone } from "@/lib/validate";
 import { Button, controlClass } from "@/components/ui";
 
-type Mode = "login" | "signup" | "forgot";
+type Mode = "login" | "signup" | "forgot" | "reset";
 
 // Every field uses the shared design-system control styling.
 const inputClass = controlClass;
@@ -53,6 +54,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const isSignup = mode === "signup";
   const isForgot = mode === "forgot";
+  const isReset = mode === "reset";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [accountType, setAccountType] = useState<AccountType>("customer");
@@ -61,7 +63,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fullName, setFullName] = useState("");
+  const [mobile, setMobile] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  // Reset flow: the emailed link carries the one-time token + the account email
+  // in its query string. Read after mount (see the signup-type effect below) so
+  // server and first client render match. `resetReady` guards the invalid-link
+  // screen until we've actually looked.
+  const [resetToken, setResetToken] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetReady, setResetReady] = useState(false);
 
   const isVendor = accountType === "vendor";
   const isPartner = accountType === "partner";
@@ -77,12 +87,67 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (type === "vendor" || type === "partner") setAccountType(type);
   }, [isSignup]);
 
+  // Pull the token + email out of the reset link (/reset-password?token=…&email=…).
+  useEffect(() => {
+    if (!isReset) return;
+    const params = new URLSearchParams(window.location.search);
+    setResetToken(params.get("token")?.trim() ?? "");
+    setResetEmail((params.get("email")?.trim() ?? "").toLowerCase());
+    setResetReady(true);
+  }, [isReset]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (submitting) return;
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
+
+    // ── Reset password (complete) ────────────────────────────────────────
+    if (isReset) {
+      const confirm = String(form.get("confirmPassword") ?? "");
+      if (password !== confirm) {
+        setError(t("Passwords don't match.", "पासवर्ड मेल नहीं खाते।"));
+        return;
+      }
+      setSubmitting(true);
+      setError("");
+      try {
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: resetEmail,
+            token: resetToken,
+            password,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { reset?: boolean; error?: string }
+          | null;
+        if (!res.ok || !json?.reset) {
+          setError(
+            json?.error ??
+              t(
+                "This reset link is invalid or has expired.",
+                "यह रीसेट लिंक अमान्य है या समाप्त हो गया है।",
+              ),
+          );
+          return;
+        }
+        setSubmitted(true);
+      } catch {
+        setError(
+          t(
+            "Couldn't reset your password. Please try again.",
+            "आपका पासवर्ड रीसेट नहीं हो सका। कृपया पुनः प्रयास करें।",
+          ),
+        );
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     // ── Forgot password ──────────────────────────────────────────────────
     if (isForgot) {
@@ -102,9 +167,41 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (isSignup) {
       const name = fullName.trim();
       const confirm = String(form.get("confirmPassword") ?? "");
+      // Validate contact details up front so no account is created with a
+      // malformed email or a mobile number that isn't a real 10-digit number.
+      if (!isValidEmail(email)) {
+        setError(
+          t(
+            "Please enter a valid email address.",
+            "कृपया एक मान्य ईमेल पता दर्ज करें।",
+          ),
+        );
+        return;
+      }
+      if (!isValidPhone(mobile)) {
+        setError(
+          t(
+            "Please enter a valid 10-digit mobile number.",
+            "कृपया एक मान्य 10-अंकों का मोबाइल नंबर दर्ज करें।",
+          ),
+        );
+        return;
+      }
       if (password !== confirm) {
         setError(t("Passwords don't match.", "पासवर्ड मेल नहीं खाते।"));
         return;
+      }
+      if (isVenuePartner) {
+        const gst = String(form.get("gst") ?? "");
+        if (!isValidGst(gst)) {
+          setError(
+            t(
+              "Please enter a valid 15-digit GST number.",
+              "कृपया एक मान्य 15-अंकीय जीएसटी नंबर दर्ज करें।",
+            ),
+          );
+          return;
+        }
       }
       // A referral partner gets a unique code they share to attribute bookings.
       const code = isPartner ? makeReferralCode(name) : "";
@@ -205,7 +302,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
           ✓
         </div>
-        <h1 className="font-display mt-6 text-2xl text-ink sm:text-3xl">
+        <h1 className="font-display mt-6 text-app-title text-ink sm:text-3xl">
           {isVendor
             ? t("Vendor account created!", "वेंडर अकाउंट बन गया!")
             : isPartner
@@ -278,7 +375,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
           ✓
         </div>
-        <h1 className="font-display mt-6 text-2xl text-ink sm:text-3xl">
+        <h1 className="font-display mt-6 text-app-title text-ink sm:text-3xl">
           {t("Check your email", "अपना ईमेल देखें")}
         </h1>
         <p className="mt-3 text-base text-ink-soft">
@@ -296,15 +393,72 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     );
   }
 
+  // ── Reset-password success ─────────────────────────────────────────────
+  if (isReset && submitted) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
+          ✓
+        </div>
+        <h1 className="font-display mt-6 text-app-title text-ink sm:text-3xl">
+          {t("Password updated", "पासवर्ड अपडेट हो गया")}
+        </h1>
+        <p className="mt-3 text-base text-ink-soft">
+          {t(
+            "Your password has been changed. You can now log in with your new password.",
+            "आपका पासवर्ड बदल दिया गया है। अब आप अपने नए पासवर्ड से लॉग इन कर सकते हैं।",
+          )}
+        </p>
+        <div className="mt-8">
+          <Button href="/login" size="lg" fullWidth>
+            {t("Go to Log In", "लॉग इन पर जाएं")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Reset link is missing/broken ───────────────────────────────────────
+  // Both halves of the link are required — the server matches the token against
+  // the account named by `email`, so a link missing either is unusable.
+  if (isReset && resetReady && (!resetToken || !resetEmail)) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon/10 text-3xl text-maroon">
+          !
+        </div>
+        <h1 className="font-display mt-6 text-app-title text-ink sm:text-3xl">
+          {t("Reset link is invalid", "रीसेट लिंक अमान्य है")}
+        </h1>
+        <p className="mt-3 text-base text-ink-soft">
+          {t(
+            "This password-reset link is incomplete or has expired. Request a fresh one to continue.",
+            "यह पासवर्ड-रीसेट लिंक अधूरा है या समाप्त हो गया है। जारी रखने के लिए एक नया लिंक अनुरोध करें।",
+          )}
+        </p>
+        <div className="mt-8 flex flex-col gap-3">
+          <Button href="/forgot-password" size="lg" fullWidth>
+            {t("Request a new link", "नया लिंक अनुरोध करें")}
+          </Button>
+          <Button href="/login" variant="secondary" size="lg" fullWidth>
+            {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <header className="mb-8">
-        <h1 className="font-display text-2xl text-ink sm:text-3xl lg:text-4xl">
+        <h1 className="font-display text-app-title text-ink sm:text-3xl lg:text-4xl">
           {isSignup
             ? t("Create your account", "अपना अकाउंट बनाएं")
             : isForgot
               ? t("Reset your password", "अपना पासवर्ड रीसेट करें")
-              : t("Welcome back", "वापसी पर स्वागत है")}
+              : isReset
+                ? t("Choose a new password", "नया पासवर्ड चुनें")
+                : t("Welcome back", "वापसी पर स्वागत है")}
         </h1>
         <p className="mt-2 text-base text-ink-soft">
           {isSignup
@@ -327,10 +481,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   "Enter your email and we'll send you a reset link.",
                   "अपना ईमेल दर्ज करें और हम आपको रीसेट लिंक भेजेंगे।"
                 )
-              : t(
-                  "Log in to manage your celebrations.",
-                  "अपने समारोह प्रबंधित करने के लिए लॉग इन करें।"
-                )}
+              : isReset
+                ? resetEmail
+                  ? t(
+                      `Set a new password for ${resetEmail}.`,
+                      `${resetEmail} के लिए नया पासवर्ड सेट करें।`
+                    )
+                  : t(
+                      "Set a new password for your account.",
+                      "अपने अकाउंट के लिए नया पासवर्ड सेट करें।"
+                    )
+                : t(
+                    "Log in to manage your celebrations.",
+                    "अपने समारोह प्रबंधित करने के लिए लॉग इन करें।"
+                  )}
         </p>
       </header>
 
@@ -513,7 +677,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="gst" className="text-sm text-ink-soft">
-                {t("GST Number", "GST नंबर")}
+                {t("GST Number", "GST नंबर")} *
               </label>
               <input
                 id="gst"
@@ -528,20 +692,22 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           </>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm text-ink-soft">
-            {t("Email Address", "ईमेल पता")}
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="you@example.com"
-            className={inputClass}
-          />
-        </div>
+        {!isReset && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="email" className="text-sm text-ink-soft">
+              {t("Email Address", "ईमेल पता")}
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="you@example.com"
+              className={inputClass}
+            />
+          </div>
+        )}
 
         {isSignup && (
           <div className="flex flex-col gap-1.5">
@@ -553,7 +719,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               name="mobile"
               type="tel"
               required
+              inputMode="numeric"
               autoComplete="tel"
+              maxLength={13}
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/[^\d+]/g, ""))}
               placeholder={t("10-digit mobile number", "10 अंकों का मोबाइल नंबर")}
               className={inputClass}
             />
@@ -564,9 +734,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="text-sm text-ink-soft">
-              {t("Password", "पासवर्ड")}
+              {isReset
+                ? t("New Password", "नया पासवर्ड")
+                : t("Password", "पासवर्ड")}
             </label>
-            {!isSignup && (
+            {!isSignup && !isReset && (
               <Link
                 href="/forgot-password"
                 className="text-sm font-medium text-maroon hover:underline"
@@ -582,9 +754,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               type={showPassword ? "text" : "password"}
               required
               minLength={8}
-              autoComplete={isSignup ? "new-password" : "current-password"}
+              autoComplete={isSignup || isReset ? "new-password" : "current-password"}
               placeholder={
-                isSignup
+                isSignup || isReset
                   ? t("At least 8 characters", "कम से कम 8 अक्षर")
                   : t("Enter your password", "अपना पासवर्ड दर्ज करें")
               }
@@ -598,7 +770,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   ? t("Hide password", "पासवर्ड छिपाएं")
                   : t("Show password", "पासवर्ड दिखाएं")
               }
-              className="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-control text-ink-soft transition-colors hover:text-maroon"
+              className="focus-ring tap absolute inset-y-0 right-0 flex min-h-12 w-12 items-center justify-center rounded-r-control text-ink-soft transition duration-200 active:scale-95 hover:text-maroon"
             >
               <EyeIcon off={showPassword} />
             </button>
@@ -606,10 +778,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </div>
         )}
 
-        {isSignup && (
+        {(isSignup || isReset) && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="confirmPassword" className="text-sm text-ink-soft">
-              {t("Confirm Password", "पासवर्ड की पुष्टि करें")}
+              {isReset
+                ? t("Confirm New Password", "नए पासवर्ड की पुष्टि करें")
+                : t("Confirm Password", "पासवर्ड की पुष्टि करें")}
             </label>
             <div className="relative">
               <input
@@ -630,7 +804,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                     ? t("Hide password", "पासवर्ड छिपाएं")
                     : t("Show password", "पासवर्ड दिखाएं")
                 }
-                className="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-control text-ink-soft transition-colors hover:text-maroon"
+                className="focus-ring tap absolute inset-y-0 right-0 flex min-h-12 w-12 items-center justify-center rounded-r-control text-ink-soft transition duration-200 active:scale-95 hover:text-maroon"
               >
                 <EyeIcon off={showConfirm} />
               </button>
@@ -658,7 +832,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               {t(".", "से।")}
             </span>
           </label>
-        ) : isForgot ? null : (
+        ) : isForgot || isReset ? null : (
           <label className="flex items-center gap-2.5 text-sm text-ink-soft">
             <input
               type="checkbox"
@@ -686,12 +860,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   : t("Create Account", "अकाउंट बनाएं")
               : isForgot
                 ? t("Send Reset Link", "रीसेट लिंक भेजें")
-                : t("Log In", "लॉग इन")}
+                : isReset
+                  ? t("Update Password", "पासवर्ड अपडेट करें")
+                  : t("Log In", "लॉग इन")}
         </Button>
       </form>
 
       <p className="mt-8 text-center text-sm text-ink-soft">
-        {isForgot ? (
+        {isForgot || isReset ? (
           <Link
             href="/login"
             className="font-semibold text-maroon hover:underline"

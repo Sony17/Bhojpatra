@@ -2,37 +2,45 @@
 
 import { useEffect, useState } from "react";
 
+const FADE_MS = 1000;
+const REMOVE_MS = 1500;
+
 /**
- * Brand splash / loader shown on the initial page load. The Bhojpatra scroll
- * logo pops in and gently floats over a clean white field while three brand-red
- * dots pulse, then the whole overlay fades away to reveal the site.
- *
- * It is part of the server-rendered tree so it covers the page from the very
- * first paint (no flash of unstyled content). After a short beat it fades out
- * and removes itself from the DOM. Motion is skipped for `prefers-reduced-motion`.
+ * Brand splash on first paint. React timers remove it after hydration; CSS
+ * `site-loader-auto-hide` still fades it out if the client bundle never runs.
  */
 export default function SiteLoader() {
   const [done, setDone] = useState(false);
   const [removed, setRemoved] = useState(false);
 
   useEffect(() => {
-    const fade = setTimeout(() => setDone(true), 1800);
-    const drop = setTimeout(() => setRemoved(true), 2450);
+    const fade = window.setTimeout(() => setDone(true), FADE_MS);
+    const drop = window.setTimeout(() => setRemoved(true), REMOVE_MS);
     return () => {
-      clearTimeout(fade);
-      clearTimeout(drop);
+      window.clearTimeout(fade);
+      window.clearTimeout(drop);
     };
   }, []);
 
   if (removed) return null;
 
   return (
-    <div className={`site-loader${done ? " is-done" : ""}`} aria-hidden>
+    <div
+      id="site-loader"
+      className={`site-loader${done ? " is-done" : ""}`}
+      aria-hidden
+      onAnimationEnd={(e) => {
+        if (e.animationName === "site-loader-auto-hide") setRemoved(true);
+      }}
+      onTransitionEnd={(e) => {
+        if (done && e.propertyName === "opacity") setRemoved(true);
+      }}
+    >
       <div className="site-loader__art">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/bhojpatra-loader.png"
-          alt="bhojpatra"
+          alt=""
           width={493}
           height={506}
           className="site-loader__logo"

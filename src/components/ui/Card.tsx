@@ -10,10 +10,9 @@ type LinkableProps = {
 };
 
 /**
- * The one Card. Single radius (`rounded-card` = 16px), single border
- * (`border-cream-3`), single resting shadow (`shadow-card`). Set `interactive`
- * for hover-lift cards (links, selectable items) — it adds the shared
- * `.card-lift` motion and deepens to `shadow-pop`.
+ * The one Card. Soft food-app surface: `rounded-hero` (24px) by default,
+ * minimal border, soft shadow. Set `interactive` for hover-lift (links /
+ * selectable items). Prefer ListingCard for media catalogs.
  *
  * `padding`: none | sm (p-4) | md (p-5, default) | lg (p-6 → p-7 on sm+).
  */
@@ -44,7 +43,7 @@ export default function Card({
   return (
     <Tag
       className={cn(
-        "rounded-card border border-cream-3 bg-white shadow-card",
+        "rounded-hero border border-maroon/6 bg-white shadow-card",
         PADDING[padding],
         interactive &&
           "card-lift cursor-pointer transition-shadow duration-200 hover:shadow-pop",

@@ -132,6 +132,65 @@ export function venueCityName(id: string): string {
   return cities.find((c) => c.id === id)?.name ?? id;
 }
 
+/** City id → Hindi display name (falls back to the English name / id). */
+export function venueCityNameHi(id: string): string {
+  const c = cities.find((c) => c.id === id);
+  return c?.nameHi ?? c?.name ?? id;
+}
+
+/** Hindi labels for the fixed venue-type vocabulary, keyed by English value. */
+export const VENUE_TYPE_HI: Record<string, string> = {
+  "Banquet Hall": "बैंक्वेट हॉल",
+  "Open Lawn": "खुला लॉन",
+  "Convention Center": "कन्वेंशन सेंटर",
+  "Hotel Ballroom": "होटल बॉलरूम",
+  Resort: "रिज़ॉर्ट",
+  "Heritage Venue": "हेरिटेज वेन्यू",
+};
+
+/** Localised venue-type label — the English value stays the source of truth. */
+export function venueTypeLabel(type: string, lang: "en" | "hi"): string {
+  return lang === "hi" ? (VENUE_TYPE_HI[type] ?? type) : type;
+}
+
+/** A bookable space/facility listed on a venue page. `subject` flags a space
+ *  offered on request rather than guaranteed (e.g. guest rooms). */
+export interface VenueSpace {
+  en: string;
+  hi: string;
+  icon: string;
+  subject?: boolean;
+}
+
+/** The standard spaces every venue lists — a landscaped lawn, an indoor banquet
+ *  hall and guest rooms (offered subject to availability). */
+export const VENUE_SPACES: VenueSpace[] = [
+  { en: "Open Lawn", hi: "खुला लॉन", icon: "🌿" },
+  { en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️" },
+  { en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", subject: true },
+];
+
+/**
+ * A readable, bilingual venue description generated from the venue's own fields
+ * (type, locality, city, capacity). Every venue — seed or owner-listed — gets
+ * sensible copy without hand-writing a description per venue.
+ */
+export function venueDescription(venue: Venue, lang: "en" | "hi"): string {
+  const type = venueTypeLabel(venue.type, lang).toLowerCase();
+  const locality = venue.location ? `${venue.location}, ` : "";
+  if (lang === "hi") {
+    const cap = venue.capacity
+      ? `, जिसमें ${venue.capacity.replace(/Guests/gi, "मेहमान")} की क्षमता है`
+      : "";
+    return `${venue.name}, ${locality}${venueCityNameHi(venue.city)} में एक ${type} है${cap}। यहाँ खुला लॉन, वातानुकूलित बैंक्वेट हॉल और (उपलब्धता अनुसार) अतिथि कक्ष उपलब्ध हैं — शादी, रिसेप्शन और पारिवारिक आयोजनों के लिए उपयुक्त।`;
+  }
+  const article = /^[aeiou]/i.test(type) ? "an" : "a";
+  const cap = venue.capacity
+    ? ` with room for ${venue.capacity.replace(/Guests/gi, "guests")}`
+    : "";
+  return `${venue.name} is ${article} ${type} in ${locality}${venueCityName(venue.city)}${cap}. It offers a landscaped open lawn, an air-conditioned banquet hall and guest rooms on request — a versatile setting for weddings, receptions and family celebrations.`;
+}
+
 /** Make any seed/record venue bookable — derive the numeric fee when absent. */
 export function toBookable(
   v: Venue & Partial<Pick<BookableVenue, "price" | "ownerCode" | "ownerName" | "phone" | "registered">>,

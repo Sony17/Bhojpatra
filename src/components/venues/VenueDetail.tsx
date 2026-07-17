@@ -11,6 +11,8 @@ import { occasions } from "@/lib/data";
 import {
   fetchVenueById,
   venueCityName,
+  venueDescription,
+  VENUE_SPACES,
   VENUE_GST_RATE,
   VENUE_ADVANCE_RATE,
   type BookableVenue,
@@ -34,7 +36,8 @@ import {
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
 import VenueReviews from "@/components/venues/VenueReviews";
-import { Button, Card, Container, Input, Select } from "@/components/ui";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { Button, Card, Container, Input, Select, AppBar } from "@/components/ui";
 
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(Math.round(n))}`;
@@ -404,18 +407,29 @@ function VenueBooking({
 
   return (
     <>
-    <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
-      <Link
-        href="/venues"
-        className="text-sm font-semibold text-maroon hover:underline"
-      >
-        ← {t("All Venues", "सभी वेन्यू")}
-      </Link>
+    <section className="app-bottom-safe mx-auto max-w-6xl sm:px-8 sm:py-6 lg:py-10">
+      <AppBar
+        title={venue.name}
+        subtitle={`${venue.location} · ${venueCityName(venue.city)}`}
+        backHref="/venues"
+        className="mb-2 sm:rounded-b-hero"
+        trailing={
+          <WhatsAppShareButton
+            path={`/venues/${venue.id}`}
+            message={`Check out ${venue.name} on Bhojpatra`}
+            messageHi={`भोजपत्र पर ${venue.name} देखें`}
+            variant="ghost"
+            size="sm"
+            label=""
+            labelHi=""
+          />
+        }
+      />
 
-      <div className="mt-5 grid gap-8 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mt-2 grid gap-8 px-4 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] lg:px-0">
         {/* ── Venue showcase ─────────────────────────────────────────── */}
         <div>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-card border border-cream-3 bg-cream-2 shadow-card">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-hero border border-maroon/6 bg-cream shadow-card">
             <Image
               src={venue.image}
               alt={venue.name}
@@ -468,16 +482,29 @@ function VenueBooking({
               </p>
             </div>
 
-            {/* Want catering at this venue too? Carry it into the feast wizard. */}
-            <Button
-              href={cateringHref}
-              variant="secondary"
-              leftIcon={<span aria-hidden="true">🍽️</span>}
-              className="mt-4"
-            >
-              {t("Add catering for this venue", "इस वेन्यू के लिए कैटरिंग जोड़ें")}
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {/* Want catering at this venue too? Carry it into the feast wizard. */}
+              <Button
+                href={cateringHref}
+                variant="secondary"
+                leftIcon={<span aria-hidden="true">🍽️</span>}
+              >
+                {t("Add catering for this venue", "इस वेन्यू के लिए कैटरिंग जोड़ें")}
+              </Button>
+              {/* Spread the word — forward this venue to friends on WhatsApp. */}
+              <WhatsAppShareButton
+                path={`/venues/${venue.id}`}
+                variant="ghost"
+                label="Share this venue"
+                labelHi="यह वेन्यू शेयर करें"
+                message={`Check out ${venue.name}${cityLabel ? ` in ${cityLabel}` : ""} on Bhojpatra — a ${venue.type} for your celebration, booking from ${venue.priceFrom}.`}
+                messageHi={`${venue.name}${cityLabel ? `, ${cityLabel}` : ""} को Bhojpatra पर देखें — आपके उत्सव के लिए ${venue.type}, बुकिंग ${venue.priceFrom} से।`}
+              />
+            </div>
           </div>
+
+          {/* Description, spaces & availability — the venue's story. */}
+          <VenueAbout venue={venue} t={t} lang={lang} />
         </div>
 
         {/* ── Booking panel ──────────────────────────────────────────── */}
@@ -888,6 +915,96 @@ function VenueBooking({
   );
 }
 
+/**
+ * Below-the-fold venue story: a generated description, the spaces on offer
+ * (lawn / banquet hall / rooms — the last subject to availability) and an
+ * availability note that points the guest at the booking form's date picker.
+ */
+function VenueAbout({
+  venue,
+  t,
+  lang,
+}: {
+  venue: BookableVenue;
+  t: (en: string, hi: string) => string;
+  lang: "en" | "hi";
+}) {
+  const scrollToBooking = () =>
+    document
+      .getElementById("venue-booking")
+      ?.scrollIntoView({ behavior: "smooth" });
+
+  return (
+    <div className="mt-8 space-y-6">
+      {/* About */}
+      <section>
+        <h2 className="font-display text-lg font-semibold text-ink">
+          {t("About this venue", "इस वेन्यू के बारे में")}
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          {venueDescription(venue, lang)}
+        </p>
+      </section>
+
+      {/* Spaces */}
+      <section>
+        <h2 className="font-display text-lg font-semibold text-ink">
+          {t("Spaces available", "उपलब्ध स्थान")}
+        </h2>
+        <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          {VENUE_SPACES.map((space) => (
+            <li
+              key={space.en}
+              className="flex items-start gap-2.5 rounded-card border border-cream-3 bg-cream-2/30 p-3"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">
+                {space.icon}
+              </span>
+              <span>
+                <span className="block text-sm font-medium text-ink">
+                  {lang === "hi" ? space.hi : space.en}
+                </span>
+                {space.subject && (
+                  <span className="mt-0.5 block text-xs text-ink-soft">
+                    {t("Subject to availability", "उपलब्धता के अधीन")}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Availability — a note tied to the booking form's date picker. */}
+      <section className="rounded-card border border-cream-3 bg-cream-2/30 p-4">
+        <div className="flex items-start gap-3">
+          <span aria-hidden="true" className="text-lg leading-none">
+            📅
+          </span>
+          <div>
+            <h2 className="font-display text-base font-semibold text-ink">
+              {t("Availability", "उपलब्धता")}
+            </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              {t(
+                "Lawn, banquet hall and rooms are subject to availability — dates fill fast. Pick your event date in the booking form to check and reserve.",
+                "लॉन, बैंक्वेट हॉल और कमरे उपलब्धता के अधीन हैं — तारीख़ें जल्दी भर जाती हैं। जाँचने और आरक्षित करने के लिए बुकिंग फ़ॉर्म में अपनी तारीख़ चुनें।",
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={scrollToBooking}
+              className="mt-2 text-sm font-semibold text-maroon hover:underline"
+            >
+              {t("Check your date →", "अपनी तारीख़ जाँचें →")}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function PriceBreakdown({
   t,
   subtotal,
@@ -1018,6 +1135,21 @@ function DonePanel({
         <Button href="/bookings" variant="secondary" size="lg" fullWidth>
           {t("View in My Dashboard", "मेरे डैशबोर्ड में देखें")}
         </Button>
+      </div>
+
+      {/* Turn a happy booking into word-of-mouth — promote Bhojpatra to friends. */}
+      <p className="mt-5 text-center text-xs text-ink-soft">
+        {t("Loved planning with us? Tell a friend.", "हमारे साथ प्लानिंग पसंद आई? किसी दोस्त को बताएं।")}
+      </p>
+      <div className="mt-2 flex justify-center">
+        <WhatsAppShareButton
+          variant="ghost"
+          size="sm"
+          label="Share Bhojpatra"
+          labelHi="भोजपत्र शेयर करें"
+          message="I just booked my celebration on Bhojpatra — verified caterers & venues, all in one place. Plan yours:"
+          messageHi="मैंने अभी Bhojpatra पर अपना उत्सव बुक किया — वेरिफाइड कैटरर और वेन्यू, सब एक जगह। आप भी प्लान करें:"
+        />
       </div>
     </div>
   );

@@ -3,14 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
-import { vendorListings, cities, type VendorListing } from "@/lib/data";
+import { cities, type VendorListing } from "@/lib/data";
 import { useCompare } from "@/lib/compare";
+import { useAllVendors } from "@/lib/useAllVendors";
 import {
   useVendorRatings,
   statFor,
   type VendorRatings,
 } from "@/lib/vendorRatings";
-import { Button } from "@/components/ui";
+import { AppBar, Button, EmptyState } from "@/components/ui";
 
 /** Localise the small fixed vocabularies (diet / tier / meal) for display. */
 function useLocalize() {
@@ -55,59 +56,126 @@ function bookHref(vendor: VendorListing): string {
   return `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
 }
 
-export default function CompareView() {
+export default function CompareView({
+  embedded = false,
+  onClose,
+}: {
+  /** When true, skip the standalone page chrome (used inside the tray modal). */
+  embedded?: boolean;
+  onClose?: () => void;
+}) {
   const { t } = useLang();
   const localize = useLocalize();
   const { ids, remove, clear } = useCompare();
   const ratings = useVendorRatings();
+  const allVendors = useAllVendors();
 
-  // Resolve picks to listings in selection order.
+  // Resolve picks to listings in selection order (static + live).
   const vendors = ids
-    .map((id) => vendorListings.find((v) => v.id === id))
+    .map((id) => allVendors.find((v) => v.id === id))
     .filter((v): v is VendorListing => Boolean(v));
 
   if (vendors.length === 0) {
     return (
-      <section className="mx-auto max-w-5xl px-5 py-16 text-center">
-        <h1 className="font-display text-2xl text-ink">
-          {t("Nothing to compare yet", "तुलना के लिए कुछ नहीं")}
-        </h1>
-        <p className="mt-2 text-sm text-ink-soft">
-          {t(
-            "Add caterers to compare them side-by-side.",
-            "कैटरर को साथ-साथ तुलना करने के लिए जोड़ें।",
-          )}
-        </p>
-        <Button href="/vendors" variant="primary" size="lg" className="mt-6">
-          {t("Browse caterers", "कैटरर ब्राउज़ करें")}
-        </Button>
-      </section>
+      <>
+        {!embedded && (
+          <AppBar
+            title={t("Compare Caterers", "कैटरर की तुलना")}
+            backHref="/vendors"
+          />
+        )}
+        <section
+          className={
+            embedded
+              ? "px-5 py-12"
+              : "mx-auto max-w-5xl px-4 py-8 sm:px-5 sm:py-12"
+          }
+        >
+          <EmptyState
+            title={t("Nothing to compare yet", "तुलना के लिए कुछ नहीं")}
+            message={t(
+              "Add caterers to compare them side-by-side.",
+              "कैटरर को साथ-साथ तुलना करने के लिए जोड़ें।",
+            )}
+            action={
+              <Button href="/vendors" variant="primary" size="lg" onClick={onClose}>
+                {t("Browse caterers", "कैटरर ब्राउज़ करें")}
+              </Button>
+            }
+          />
+        </section>
+      </>
     );
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-5 sm:py-14">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl text-ink sm:text-3xl">
-            {t("Compare Caterers", "कैटरर की तुलना")}
-          </h1>
-          <p className="mt-1 text-sm text-ink-soft">
+    <>
+      {!embedded && (
+        <AppBar
+          title={t("Compare Caterers", "कैटरर की तुलना")}
+          backHref="/vendors"
+        />
+      )}
+      <section
+        className={
+          embedded
+            ? "px-4 py-6 sm:px-5 sm:py-8"
+            : "mx-auto max-w-6xl px-4 py-4 sm:px-5 sm:py-10"
+        }
+      >
+      {!embedded && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+          <div className="hidden sm:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-maroon">
+              {t("Compare", "तुलना")}
+            </p>
+            <p className="mt-1 text-[13px] text-ink/55">
+              {t(
+                `Comparing ${vendors.length} caterers side-by-side.`,
+                `${vendors.length} कैटरर की साथ-साथ तुलना।`,
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button href="/vendors" variant="secondary" size="sm">
+              + {t("Add more", "और जोड़ें")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clear}>
+              {t("Clear all", "सभी हटाएं")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {embedded && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-soft">
             {t(
               `Comparing ${vendors.length} caterers side-by-side.`,
               `${vendors.length} कैटरर की साथ-साथ तुलना।`,
             )}
           </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onClose}
+            >
+              + {t("Add more", "और जोड़ें")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clear();
+                onClose?.();
+              }}
+            >
+              {t("Clear all", "सभी हटाएं")}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button href="/vendors" variant="secondary" size="sm">
-            + {t("Add more", "और जोड़ें")}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={clear}>
-            {t("Clear all", "सभी हटाएं")}
-          </Button>
-        </div>
-      </div>
+      )}
 
       {vendors.length < 2 && (
         <p className="mt-4 rounded-card border border-dashed border-cream-3 bg-cream-2/40 p-4 text-sm text-ink-soft">
@@ -127,12 +195,27 @@ export default function CompareView() {
         </p>
       )}
 
-      <div className="mt-4 overflow-x-auto rounded-card border border-cream-3 sm:mt-6">
-        <table className="w-full border-collapse text-sm">
+      <div
+        className={
+          embedded
+            ? "mt-2 overflow-x-auto rounded-card border border-cream-3"
+            : "mt-4 overflow-x-auto rounded-card border border-cream-3 sm:mt-6"
+        }
+      >
+        <table
+          className="w-full table-fixed border-collapse text-sm"
+          style={{ minWidth: `calc(5.5rem + ${vendors.length} * 10rem)` }}
+        >
+          <colgroup>
+            <col className="w-[5.5rem] sm:w-[8.5rem]" />
+            {vendors.map((v) => (
+              <col key={v.id} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {/* Sticky corner label */}
-              <th className="sticky left-0 z-10 min-w-[5rem] border-b border-r border-cream-3 bg-white p-2.5 text-left align-bottom sm:min-w-[8.5rem] sm:p-4">
+              <th className="sticky left-0 z-10 border-b border-r border-cream-3 bg-white p-2.5 text-left align-bottom sm:p-4">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                   {t("Caterer", "कैटरर")}
                 </span>
@@ -140,18 +223,21 @@ export default function CompareView() {
               {vendors.map((v) => (
                 <th
                   key={v.id}
-                  className="min-w-[8.5rem] border-b border-cream-3 bg-white p-2.5 align-top sm:min-w-[13rem] sm:p-4"
+                  className="border-b border-cream-3 bg-white p-2.5 align-top sm:p-4"
                 >
-                  <div className="relative">
+                  <div className="relative flex flex-col">
                     <button
                       type="button"
                       onClick={() => remove(v.id)}
                       aria-label={t(`Remove ${v.name}`, `${v.name} हटाएं`)}
-                      className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-full bg-cream-2 text-ink-soft transition-colors hover:bg-cream-3 hover:text-maroon"
+                      className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-ink-soft transition-colors hover:bg-cream hover:text-maroon"
                     >
-                      <span aria-hidden="true" className="leading-none">×</span>
+                      <span aria-hidden="true" className="leading-none">
+                        ×
+                      </span>
                     </button>
-                    <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-cream-2">
+                    {/* Fixed box — table cells ignore aspect-ratio otherwise */}
+                    <span className="relative block h-24 w-full overflow-hidden rounded-xl bg-cream sm:h-32">
                       <Image
                         src={v.image}
                         alt={v.name}
@@ -162,7 +248,8 @@ export default function CompareView() {
                     </span>
                     <Link
                       href={`/vendors/${v.id}`}
-                      className="mt-2.5 block font-display text-sm font-semibold text-ink hover:text-maroon sm:mt-3 sm:text-base"
+                      onClick={onClose}
+                      className="mt-2.5 block min-h-[2.75rem] font-display text-sm font-semibold leading-snug text-ink hover:text-maroon sm:mt-3 sm:min-h-[3rem] sm:text-base"
                     >
                       {v.name}
                     </Link>
@@ -198,23 +285,31 @@ export default function CompareView() {
             <Row
               label={t("Tiers", "टियर")}
               vendors={vendors}
-              render={(v) => <span className="text-ink">{v.tiers.map(localize).join(", ")}</span>}
+              render={(v) => (
+                <span className="text-ink">{v.tiers.map(localize).join(", ")}</span>
+              )}
             />
             <Row
               label={t("Cuisines", "व्यंजन")}
               vendors={vendors}
-              render={(v) => <span className="text-ink">{v.cuisines.join(", ")}</span>}
+              render={(v) => (
+                <span className="text-ink">{v.cuisines.join(", ")}</span>
+              )}
             />
             <Row
               label={t("Diet", "डाइट")}
               vendors={vendors}
-              render={(v) => <span className="text-ink">{localize(v.diet)}</span>}
+              render={(v) => (
+                <span className="text-ink">{localize(v.diet)}</span>
+              )}
             />
             <Row
               label={t("Serves", "परोसता है")}
               vendors={vendors}
               render={(v) => (
-                <span className="text-ink">{v.mealTypes.map(localize).join(" · ")}</span>
+                <span className="text-ink">
+                  {v.mealTypes.map(localize).join(" · ")}
+                </span>
               )}
             />
             <Row
@@ -222,7 +317,9 @@ export default function CompareView() {
               vendors={vendors}
               render={(v) =>
                 v.verified ? (
-                  <span className="font-semibold text-maroon">✓ {t("Verified", "वेरिफाइड")}</span>
+                  <span className="font-semibold text-maroon">
+                    ✓ {t("Verified", "वेरिफाइड")}
+                  </span>
                 ) : (
                   <span className="text-ink-soft">—</span>
                 )
@@ -238,10 +335,22 @@ export default function CompareView() {
               {vendors.map((v) => (
                 <td key={v.id} className="bg-cream-2/40 p-2.5 align-top sm:p-4">
                   <div className="flex flex-col gap-2">
-                    <Button href={bookHref(v)} variant="primary" size="sm" fullWidth>
+                    <Button
+                      href={bookHref(v)}
+                      variant="primary"
+                      size="sm"
+                      fullWidth
+                      onClick={onClose}
+                    >
                       {t("Book", "बुक करें")}
                     </Button>
-                    <Button href={`/vendors/${v.id}`} variant="secondary" size="sm" fullWidth>
+                    <Button
+                      href={`/vendors/${v.id}`}
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
+                      onClick={onClose}
+                    >
                       {t("View", "देखें")}
                     </Button>
                   </div>
@@ -252,6 +361,7 @@ export default function CompareView() {
         </table>
       </div>
     </section>
+    </>
   );
 }
 
@@ -273,7 +383,10 @@ function Row({
         </span>
       </th>
       {vendors.map((v) => (
-        <td key={v.id} className="border-b border-cream-3 p-2.5 align-top sm:p-4">
+        <td
+          key={v.id}
+          className="border-b border-cream-3 p-2.5 align-top sm:p-4"
+        >
           {render(v)}
         </td>
       ))}
@@ -295,7 +408,9 @@ function RatingCell({
   const count = stats?.count ?? vendor.reviews;
   return (
     <span className="inline-flex items-center gap-1 text-ink">
-      <span aria-hidden="true" className="text-gold">⭐</span>
+      <span aria-hidden="true" className="text-gold">
+        ⭐
+      </span>
       <span className="font-semibold">{rating}</span>
       <span className="text-ink-soft">
         ({count}

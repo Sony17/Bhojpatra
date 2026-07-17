@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { type BookingStatus } from "@/lib/data";
 import {
   fetchMyBookings,
@@ -22,7 +29,9 @@ import {
   type ButtonVariant,
   Card,
   Chip,
+  EmptyState,
   Input,
+  PullToRefresh,
   Textarea,
 } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
@@ -146,6 +155,11 @@ export default function MyBookings() {
     [bookings, reviewId],
   );
 
+  const loadBookings = useCallback(async () => {
+    const list = await fetchMyBookings();
+    setBookings(list);
+  }, []);
+
   useEffect(() => {
     // Bookings come from the API (the customer's own orders). The server runs
     // the past-event auto-complete sweep, so we just fetch the list and re-fetch
@@ -188,82 +202,91 @@ export default function MyBookings() {
   );
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16">
-      <div className="max-w-2xl">
-        <p className="eyebrow text-sm font-medium text-gold">
+    <section className="mx-auto max-w-7xl px-4 py-6 sm:px-5 sm:py-12 lg:py-16">
+      <div className="max-w-xl px-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-maroon">
           {t("Your Account", "आपका खाता")}
         </p>
-        <h1 className="mt-2 text-3xl text-ink sm:text-4xl">
-          {t("My Dashboard", "मेरा डैशबोर्ड")}
+        <h1 className="mt-1.5 font-sans text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+          {t("My Bookings", "मेरी बुकिंग")}
         </h1>
-        <p className="font-script mt-3 text-xl text-ink-soft">
+        <p className="mt-1.5 text-sm text-ink/55">
           {t(
-            "Track your celebrations, payments & confirmations — all in one place.",
-            "अपने समारोह, भुगतान और कन्फर्मेशन — सब एक ही जगह पर ट्रैक करें।",
+            "Track celebrations, payments & confirmations.",
+            "समारोह, भुगतान और कन्फर्मेशन ट्रैक करें।",
           )}
         </p>
       </div>
 
-      {/* Summary stats */}
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard
-          label={t("Total Bookings", "कुल बुकिंग")}
-          value={String(counts.total)}
-        />
-        <StatCard
-          label={t("Confirmed", "कन्फर्म्ड")}
-          value={String(counts.confirmed)}
-        />
-        <StatCard
-          label={t("Amount Due", "बकाया राशि")}
-          value={formatINR(counts.dueAmount)}
-        />
-        <StatCard
-          label={t("Completed", "पूर्ण")}
-          value={String(counts.completed)}
-        />
-      </div>
-
-      {/* Filter chips */}
-      <div className="mt-8 flex flex-wrap gap-2.5">
-        {FILTERS.map((f) => (
-          <Chip
-            key={f}
-            selected={filter === f}
-            onClick={() => setFilter(f)}
-          >
-            {t(f, STATUS_HI[f])}
-          </Chip>
-        ))}
-      </div>
-
-      {/* Bookings list */}
-      {results.length > 0 ? (
-        <ul className="mt-6 flex flex-col gap-5">
-          {results.map((booking) => (
-            <BookingCard
-              key={booking.id}
-              booking={booking}
-              onView={() => setActiveId(booking.id)}
-              onReview={() => setReviewId(booking.id)}
-            />
-          ))}
-        </ul>
-      ) : (
-        <div className="mt-6 rounded-card border border-dashed border-cream-3 bg-white/60 p-12 text-center">
-          <p className="font-display text-lg text-ink">
-            {t("No bookings here", "यहाँ कोई बुकिंग नहीं")}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">
-            {filter === ALL
-              ? t("No bookings yet", "अभी कोई बुकिंग नहीं")
-              : t(
-                  `You have no ${filter.toLowerCase()} bookings yet.`,
-                  `अभी कोई ${STATUS_HI[filter]} बुकिंग नहीं।`,
-                )}
-          </p>
+      <PullToRefresh onRefresh={loadBookings}>
+        {/* Summary stats — denser on mobile */}
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-4 lg:grid-cols-4">
+          <StatCard
+            label={t("Total Bookings", "कुल बुकिंग")}
+            value={String(counts.total)}
+          />
+          <StatCard
+            label={t("Confirmed", "कन्फर्म्ड")}
+            value={String(counts.confirmed)}
+          />
+          <StatCard
+            label={t("Amount Due", "बकाया राशि")}
+            value={formatINR(counts.dueAmount)}
+          />
+          <StatCard
+            label={t("Completed", "पूर्ण")}
+            value={String(counts.completed)}
+          />
         </div>
-      )}
+
+        {/* Sticky status chips */}
+        <div className="app-sticky-chrome -mx-4 mt-5 px-4 py-2.5 sm:static sm:mx-0 sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-0.5">
+            {FILTERS.map((f) => (
+              <Chip
+                key={f}
+                selected={filter === f}
+                onClick={() => setFilter(f)}
+                className="shrink-0"
+              >
+                {t(f, STATUS_HI[f])}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {/* Bookings list */}
+        {results.length > 0 ? (
+          <ul className="mt-4 flex flex-col gap-3 sm:mt-6 sm:gap-5">
+            {results.map((booking) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                onView={() => setActiveId(booking.id)}
+                onReview={() => setReviewId(booking.id)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            className="mt-4 sm:mt-6"
+            title={t("No bookings here", "यहाँ कोई बुकिंग नहीं")}
+            message={
+              filter === ALL
+                ? t("No bookings yet", "अभी कोई बुकिंग नहीं")
+                : t(
+                    `You have no ${filter.toLowerCase()} bookings yet.`,
+                    `अभी कोई ${STATUS_HI[filter]} बुकिंग नहीं।`,
+                  )
+            }
+            action={
+              <Button href="/book" variant="primary">
+                {t("Book now", "अभी बुक करें")}
+              </Button>
+            }
+          />
+        )}
+      </PullToRefresh>
 
       {active && (
         <BookingDetailsModal booking={active} onClose={() => setActiveId(null)} />

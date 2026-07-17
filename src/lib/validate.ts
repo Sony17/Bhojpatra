@@ -9,6 +9,10 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Indian mobile: 10 digits starting 6–9. Run `normalizePhone` first. */
 export const PHONE_RE = /^[6-9]\d{9}$/;
 
+/** Indian GSTIN: 15 chars — state (2) + PAN (10) + entity (1) + Z + check (1). */
+export const GST_RE =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
 /** Strip spaces/dashes and an optional +91 / 0091 / 91 / 0 prefix. */
 export function normalizePhone(raw: string): string {
   return raw.replace(/[\s-]/g, "").replace(/^(\+91|0091|91|0)/, "");
@@ -21,6 +25,16 @@ export function isValidEmail(v: unknown): v is string {
 /** Accepts a raw phone string; validates after normalizing. */
 export function isValidPhone(v: unknown): v is string {
   return typeof v === "string" && PHONE_RE.test(normalizePhone(v.trim()));
+}
+
+/** Uppercase and strip spaces from a GSTIN. */
+export function normalizeGst(raw: string): string {
+  return raw.replace(/\s/g, "").toUpperCase();
+}
+
+/** Accepts a raw GSTIN string; validates after normalizing. */
+export function isValidGst(v: unknown): v is string {
+  return typeof v === "string" && GST_RE.test(normalizeGst(v.trim()));
 }
 
 /** Parse the shared list-query params (`?q&status&city&method&tier&page&pageSize`)

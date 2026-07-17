@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import FloatingChat from "@/components/FloatingChat";
+import PublicShell from "@/components/app/PublicShell";
 import AccountsDashboard from "@/components/dashboard/AccountsDashboard";
 import RequireSession from "@/components/auth/RequireSession";
 
@@ -13,19 +11,10 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   return (
-    <>
-      <Header />
-      {/* No hero on this page, so pad the top to clear the fixed nav bar. */}
-      <main className="flex-1 pt-28 sm:pt-32">
-        {/* Any signed-in person can reach the hub — customer is universal, so a
-            "customer" gate is exactly "is signed in". The sections inside adapt
-            to whichever accounts (vendor / referral) they also hold. */}
-        <RequireSession role="customer">
-          <AccountsDashboard />
-        </RequireSession>
-      </main>
-      <Footer />
-      <FloatingChat />
-    </>
+    <PublicShell>
+      <RequireSession role="customer">
+        <AccountsDashboard />
+      </RequireSession>
+    </PublicShell>
   );
 }

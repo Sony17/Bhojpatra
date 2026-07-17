@@ -2,89 +2,70 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import Reveal from "@/components/Reveal";
+import SectionIntro from "@/components/SectionIntro";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
+/**
+ * First section under the hero — no scroll-reveal so the handoff feels
+ * instant while scrolling (food-app velocity).
+ */
 export default function ChooseOccasion() {
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const { occasions } = useHomeContent();
-  // Touch pauses the slide so a card can be tapped; hovering pauses it on
-  // desktop via `.marquee-pause`. Auto-resumes on lift.
-  const [paused, setPaused] = useState(false);
 
   return (
     <section
       id="occasions"
-      className="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24"
+      className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16"
     >
-      <Reveal variant="left" className="text-center">
-        <h2 className="font-display text-3xl text-maroon sm:text-4xl">
-          {lang === "hi" ? occasions.headingHi : occasions.heading}
-        </h2>
-        <p className="font-script mx-auto mt-4 max-w-2xl text-[0.9375rem] text-ink-soft sm:text-lg">
-          {lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
-        </p>
-      </Reveal>
+      <SectionIntro
+        eyebrow={t("Occasions", "अवसर")}
+        title={lang === "hi" ? occasions.headingHi : occasions.heading}
+        subtitle={lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
+      />
 
-      <Reveal as="div" variant="up" className="mt-12">
-        {/* Continuous marquee — the occasion cards slide sideways forever;
-            hovering (desktop) or touching (mobile) pauses the strip so a card
-            can be tapped. The track holds two identical copies, so the -50%
-            loop lands seamlessly on the start of the second copy. Motion is
-            gated behind `prefers-reduced-motion` by the utility class. */}
-        <div
-          className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_5%,#000_95%,transparent)]"
-          onTouchStart={() => setPaused(true)}
-          onTouchEnd={() => setPaused(false)}
-          onTouchCancel={() => setPaused(false)}
-        >
-          <div
-            className="animate-marquee flex w-max gap-4 motion-reduce:!animate-none sm:gap-6"
-            style={paused ? { animationPlayState: "paused" } : undefined}
-          >
-            {[...occasions.items, ...occasions.items].map((occasion, i) => {
+      <div className="marquee-pause relative -mx-5 mt-8 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)] sm:-mx-8 sm:mt-10">
+        <div className="animate-marquee flex w-max gap-3 px-5 py-1 motion-reduce:!animate-none sm:gap-4 sm:px-8">
+          {[0, 1].map((copy) =>
+            occasions.items.map((occasion) => {
               const name = lang === "hi" ? occasion.nameHi : occasion.name;
-              const clone = i >= occasions.items.length;
               return (
-                <div
-                  key={`${occasion.id}-${i}`}
-                  aria-hidden={clone}
-                  className="group relative w-[42vw] shrink-0 overflow-hidden rounded-card sm:w-[30vw] lg:w-60"
+                <Link
+                  key={`${occasion.id}-${copy}`}
+                  href={`/book?occasion=${occasion.id}`}
+                  aria-label={copy === 0 ? `Book — ${name}` : undefined}
+                  aria-hidden={copy === 1 || undefined}
+                  tabIndex={copy === 1 ? -1 : undefined}
+                  className="group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl shadow-card ring-1 ring-maroon/8 transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-[11rem]"
                 >
-                  {/* Tapping an occasion opens the booking wizard with that
-                      occasion pre-selected (the wizard reads `?occasion=`). */}
-                  <Link
-                    href={`/book?occasion=${occasion.id}`}
-                    aria-label={`Book — ${name}`}
-                    tabIndex={clone ? -1 : undefined}
-                    className="relative block aspect-[9/10] w-full"
-                  >
+                  <span className="relative block aspect-[3/4] w-full">
                     <Image
                       src={occasion.image}
-                      alt={clone ? "" : name}
+                      alt={copy === 0 ? name : ""}
                       fill
-                      sizes="(min-width: 1024px) 240px, (min-width: 640px) 30vw, 42vw"
-                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+                      sizes="176px"
+                      className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.03]"
                       unoptimized={isUnoptimized(occasion.image)}
                     />
-                    {/* Black overtone — a full veil for a consistent moody tint,
-                        plus a bottom gradient so the name stays legible. */}
-                    <div className="absolute inset-0 bg-black/40" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 px-3 pb-4 text-center">
-                      <span className="font-sans text-sm font-semibold leading-tight text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">
+                    <span aria-hidden className="absolute inset-0 bg-black/45" />
+                    <span className="media-veil absolute inset-0" />
+                    <span className="absolute inset-x-0 bottom-0 px-3 pb-3.5">
+                      <span className="block font-sans text-[14px] font-bold leading-tight text-cream sm:text-[15px]">
                         {name}
                       </span>
-                    </div>
-                  </Link>
-                </div>
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
+                        {t("Book", "बुक")}
+                        <span aria-hidden>→</span>
+                      </span>
+                    </span>
+                  </span>
+                </Link>
               );
-            })}
-          </div>
+            }),
+          )}
         </div>
-      </Reveal>
+      </div>
     </section>
   );
 }

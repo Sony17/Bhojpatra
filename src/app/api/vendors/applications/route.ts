@@ -15,7 +15,7 @@ import {
   type VendorTier,
 } from "@/lib/admin/types";
 import { cleanGoogleRating, cleanGoogleReviews } from "@/lib/vendorMenus";
-import { parseListQuery } from "@/lib/validate";
+import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendVendorApplicationAlert } from "@/lib/email";
 
 // Applications are submitted at request time and appended to a JSON store on
@@ -90,8 +90,15 @@ export async function POST(request: Request) {
   }
 
   const cuisines = strList(body.cuisines);
-  const gstNumber = str(body.gstNumber);
+  const gstNumber = normalizeGst(str(body.gstNumber));
   const fssaiNumber = str(body.fssaiNumber);
+
+  if (!isValidGst(gstNumber)) {
+    return Response.json(
+      { error: "Please enter a valid 15-digit GST number." },
+      { status: 400 },
+    );
+  }
 
   // Optional self-declared Google reputation — only stored when a valid,
   // positive rating is given (the count alone shows nothing on the card).

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import FloatingChat from "@/components/FloatingChat";
+import PublicShell from "@/components/app/PublicShell";
 import VendorProfile from "@/components/vendors/VendorProfile";
 import VendorDetail from "@/components/vendors/VendorDetail";
 import { vendorListings } from "@/lib/data";
@@ -40,7 +38,6 @@ export async function generateMetadata({
     };
   }
 
-  // Curated static listing (no live menu) still gets a real profile page.
   const listing = vendorListings.find((v) => v.id === id);
   if (listing) {
     return {
@@ -63,32 +60,20 @@ export default async function VendorProfilePage({
   const { id } = await params;
   const profile = await loadProfile(id);
 
-  // Live registered vendor → menu + gallery profile.
   if (profile) {
     return (
-      <>
-        <Header />
-        <main className="flex-1 pt-28 sm:pt-32">
-          <VendorProfile profile={profile} />
-        </main>
-        <Footer />
-        <FloatingChat />
-      </>
+      <PublicShell>
+        <VendorProfile profile={profile} />
+      </PublicShell>
     );
   }
 
-  // Curated static listing → detail page (info, reviews, "Book this caterer").
   const listing = vendorListings.find((v) => v.id === id);
   if (listing) {
     return (
-      <>
-        <Header />
-        <main className="flex-1 pt-28 sm:pt-32">
-          <VendorDetail id={id} />
-        </main>
-        <Footer />
-        <FloatingChat />
-      </>
+      <PublicShell>
+        <VendorDetail id={id} />
+      </PublicShell>
     );
   }
 

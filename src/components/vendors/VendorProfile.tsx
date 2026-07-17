@@ -6,13 +6,12 @@
  * Reached from the /vendors catalog; the CTA hands off to the /book wizard.
  */
 
-import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
 import StickyBookingBar from "@/components/StickyBookingBar";
-import { Button, Card, Badge } from "@/components/ui";
+import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import { Button, Card, Badge, AppBar, ImageCarousel } from "@/components/ui";
 
 const inr = new Intl.NumberFormat("en-IN");
 
@@ -22,54 +21,39 @@ export default function VendorProfile({
   profile: PublicVendorProfile;
 }) {
   const { t, lang } = useLang();
-  // The photo shown large — the card photo by default, or a tapped gallery shot.
-  const [heroUrl, setHeroUrl] = useState(profile.image);
-
   const allPhotos = [profile.image, ...profile.gallery.filter((g) => g !== profile.image)];
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12 pb-28 sm:py-16 lg:pb-16">
-      {/* Breadcrumb back to the catalog */}
-      <Link
-        href="/vendors"
-        className="text-sm font-semibold text-maroon hover:underline"
-      >
-        ← {t("All Caterers", "सभी कैटरर")}
-      </Link>
+    <section className="app-bottom-safe mx-auto max-w-7xl sm:px-5 sm:py-8 lg:py-12">
+      <AppBar
+        title={profile.business}
+        subtitle={[profile.city, profile.state].filter(Boolean).join(", ")}
+        backHref="/vendors"
+        className="mb-2 sm:rounded-b-hero"
+        trailing={
+          <WhatsAppShareButton
+            path={`/vendors/${profile.id}`}
+            message={`Check out ${profile.business} on Bhojpatra`}
+            messageHi={`भोजपत्र पर ${profile.business} देखें`}
+            variant="ghost"
+            size="sm"
+            label=""
+            labelHi=""
+          />
+        }
+      />
 
-      <div className="mt-5 grid grid-cols-1 gap-8 lg:grid-cols-5">
+      <div className="mt-2 grid grid-cols-1 gap-8 px-4 lg:grid-cols-5 lg:px-0">
         {/* Photos */}
         <div className="lg:col-span-3">
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-card border border-cream-3 bg-cream-2">
-            <Image
-              src={heroUrl}
-              alt={profile.business}
-              fill
-              sizes="(min-width: 1024px) 60vw, 100vw"
-              priority
-              className="object-cover"
-            />
-          </div>
-          {allPhotos.length > 1 && (
-            <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
-              {allPhotos.map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => setHeroUrl(url)}
-                  aria-pressed={heroUrl === url}
-                  className={
-                    "relative block h-16 w-24 shrink-0 overflow-hidden rounded-lg border transition " +
-                    (heroUrl === url
-                      ? "border-maroon ring-2 ring-maroon"
-                      : "border-cream-3 hover:border-maroon")
-                  }
-                >
-                  <Image src={url} alt="" fill sizes="96px" className="object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
+          <ImageCarousel
+            slides={allPhotos.map((src) => ({
+              src,
+              alt: profile.business,
+            }))}
+            rounded="rounded-hero"
+            aspect="aspect-[16/10]"
+          />
         </div>
 
         {/* Summary card */}
@@ -164,6 +148,18 @@ export default function VendorProfile({
                 "बुकिंग विज़ार्ड में मेन्यू बनाते समय इस कैटरर को चुनें।",
               )}
             </p>
+
+            {/* Spread the word — forward this caterer to friends on WhatsApp. */}
+            <WhatsAppShareButton
+              path={`/vendors/${profile.id}`}
+              variant="ghost"
+              fullWidth
+              className="mt-3"
+              label="Share this caterer"
+              labelHi="यह कैटरर शेयर करें"
+              message={`Check out ${profile.business} on Bhojpatra — a verified caterer in ${profile.city} from ₹${inr.format(profile.priceFrom)}/plate.`}
+              messageHi={`${profile.business} को Bhojpatra पर देखें — ${profile.city} में एक वेरिफाइड कैटरर, ₹${inr.format(profile.priceFrom)}/प्लेट से।`}
+            />
           </Card>
         </div>
       </div>

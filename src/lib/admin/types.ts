@@ -196,11 +196,20 @@ export interface ApprovalQuery {
 export interface AdminBooking {
   id: string;
   customer: string;
+  /** Customer contact captured at booking time (absent on demo/legacy rows). */
+  phone?: string;
+  email?: string;
   occasion: string;
   date: string;
+  /** Meal period the feast is served at (Breakfast / Lunch / Dinner), when set. */
+  mealTime?: string;
+  /** Exact serving clock time (`HH:MM`, 24-hour) alongside the meal, when set. */
+  eventTime?: string;
   guests: number;
   vendor: string;
   city: string;
+  /** The event venue the guest chose, when one was set. */
+  venue?: string;
   amount: number;
   paid: number;
   status: BookingStatus;

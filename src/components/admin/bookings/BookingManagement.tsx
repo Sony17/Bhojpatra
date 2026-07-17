@@ -13,6 +13,7 @@ import { Field } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Calendar, ShieldCheck, Wallet } from "@/components/admin/shared/icons";
 import { adminBookings, bookingCities, queryBookings } from "@/lib/admin/mockData";
+import { servingTimeLabel } from "@/lib/data";
 import type { AdminBooking, BookingStatus } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
@@ -32,11 +33,16 @@ function toAdminBooking(o: Record<string, unknown>): AdminBooking {
   return {
     id: String(o.id),
     customer: typeof o.customer === "string" ? o.customer : "Online Booking",
+    ...(typeof o.phone === "string" && o.phone ? { phone: o.phone } : {}),
+    ...(typeof o.email === "string" && o.email ? { email: o.email } : {}),
     occasion: typeof o.occasion === "string" ? o.occasion : "Feast",
     date: typeof o.date === "string" ? o.date : "",
+    ...(typeof o.mealTime === "string" && o.mealTime ? { mealTime: o.mealTime } : {}),
+    ...(typeof o.eventTime === "string" && o.eventTime ? { eventTime: o.eventTime } : {}),
     guests: Number(o.guests) || 0,
     vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
     city: typeof o.city === "string" ? o.city : "—",
+    ...(typeof o.venue === "string" && o.venue ? { venue: o.venue } : {}),
     amount: Number(o.amount) || 0,
     paid: Number(o.paid) || 0,
     status: (o.status as AdminBooking["status"]) ?? "Confirmed",
@@ -186,11 +192,23 @@ export default function BookingManagement() {
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <Field label="Customer"><p className="text-sm text-ink">{selected.customer}</p></Field>
+              {selected.phone && (
+                <Field label="Phone"><p className="text-sm text-ink">{selected.phone}</p></Field>
+              )}
+              {selected.email && (
+                <Field label="Email"><p className="text-sm break-all text-ink">{selected.email}</p></Field>
+              )}
               <Field label="Vendor"><p className="text-sm text-ink">{selected.vendor}</p></Field>
               <Field label="Occasion"><p className="text-sm text-ink">{selected.occasion}</p></Field>
               <Field label="Date"><p className="text-sm text-ink">{selected.date}</p></Field>
+              {servingTimeLabel(selected.mealTime, selected.eventTime) && (
+                <Field label="Serving"><p className="text-sm text-ink">{servingTimeLabel(selected.mealTime, selected.eventTime)}</p></Field>
+              )}
               <Field label="Guests"><p className="text-sm text-ink">{selected.guests}</p></Field>
               <Field label="City"><p className="text-sm text-ink">{selected.city}</p></Field>
+              {selected.venue && (
+                <Field label="Venue"><p className="text-sm text-ink">{selected.venue}</p></Field>
+              )}
               <Field label="Amount"><p className="font-display text-sm font-semibold text-ink">{money(selected.amount)}</p></Field>
               <Field label="Balance Due"><p className="font-display text-sm font-semibold text-maroon">{money(selected.amount - selected.paid)}</p></Field>
               {selected.paymentRef && (
