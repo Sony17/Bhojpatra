@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
+import Button from "@/components/ui/Button";
 
 /** Initials fallback when a brand has no uploaded logo. */
 function initials(name: string): string {
@@ -14,25 +15,6 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
-}
-
-function Flourish({ flip = false }: { flip?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 80 10"
-      aria-hidden="true"
-      className={`h-2 w-10 text-maroon/50 sm:w-14 ${flip ? "-scale-x-100" : ""}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      strokeLinecap="round"
-    >
-      <path d="M1 5h40" />
-      <path d="M41 5c4 0 6-2 9-2s5 2 8 2" />
-      <circle cx="66" cy="5" r="1.5" />
-      <path d="M70 5h8" />
-    </svg>
-  );
 }
 
 /**
@@ -67,13 +49,10 @@ export default function BrandRibbon() {
       />
       <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-14">
         <header className="mx-auto max-w-2xl text-center">
-          <div className="flex items-center justify-center gap-2.5">
-            <Flourish />
-            <p className="eyebrow text-[10px] font-semibold tracking-[0.24em] text-maroon sm:text-[11px]">
-              {t("Trusted by India's finest", "भारत के बेहतरीन ब्रांड्स का भरोसा")}
-            </p>
-            <Flourish flip />
-          </div>
+          <p className="eyebrow inline-flex items-center gap-3 text-[10px] font-semibold tracking-[0.26em] text-maroon">
+            <span aria-hidden className="h-px w-6 bg-maroon/50" />
+            {t("Trusted by India's finest", "भारत के बेहतरीन ब्रांड्स का भरोसा")}
+          </p>
           <h2 className="font-display mt-3 text-title text-maroon">
             {t("Our Featured Brands", "हमारे चुनिंदा ब्रांड")}
           </h2>
@@ -90,17 +69,7 @@ export default function BrandRibbon() {
           />
         </header>
 
-        <div className="marquee-pause relative mt-8 overflow-hidden rounded-2xl border border-maroon/10 bg-white/70 px-6 py-5 shadow-[0_18px_50px_-35px_rgba(185,32,37,0.45)] backdrop-blur-sm sm:mt-10 sm:px-12">
-          {/* Edge fades */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute bottom-5 left-6 top-5 z-[5] w-7 bg-gradient-to-r from-white/90 to-transparent sm:left-12"
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute bottom-5 right-6 top-5 z-[5] w-7 bg-gradient-to-l from-white/90 to-transparent sm:right-12"
-          />
-
+        <div className="marquee-pause relative mt-8 overflow-hidden py-3 sm:mt-10 sm:py-4">
           <ul
             aria-label={t("Featured brands", "चुनिंदा ब्रांड")}
             className="animate-marquee-ltr flex w-max items-stretch gap-2"
@@ -216,35 +185,32 @@ export default function BrandRibbon() {
                     </li>
                   );
                 })}
-
-                <li aria-hidden={copy === 1 || undefined} className={cardSize}>
-                  <Link
-                    href="/vendors"
-                    tabIndex={copy === 1 ? -1 : undefined}
-                    className="group flex h-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed border-maroon/25 bg-cream/40 transition-all duration-200 hover:-translate-y-0.5 hover:border-maroon/45 hover:bg-cream/70 active:scale-[0.98]"
-                  >
-                    <span
-                      aria-hidden
-                      className="grid h-6 w-6 place-items-center rounded-full bg-maroon text-cream transition-transform duration-200 group-hover:scale-105"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        className="h-2.5 w-2.5"
-                      >
-                        <path d="M5 12h14M13 6l6 6-6 6" />
-                      </svg>
-                    </span>
-                    <span className="px-1.5 text-center text-[8px] font-semibold tracking-wide text-maroon">
-                      {t("Explore more", "और देखें")}
-                    </span>
-                  </Link>
-                </li>
               </Fragment>
             ))}
           </ul>
+        </div>
+
+        <div className="mt-6 flex justify-center sm:mt-7">
+          <Button
+            href="/vendors"
+            variant="secondary"
+            rightIcon={
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            }
+          >
+            {t("Explore all brands", "सभी ब्रांड देखें")}
+          </Button>
         </div>
       </div>
     </section>
