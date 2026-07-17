@@ -83,7 +83,7 @@ import {
 import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
-import { Button, Stepper, QuantitySelector } from "@/components/ui";
+import { Button, Stepper } from "@/components/ui";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -1533,14 +1533,14 @@ export default function BookingWizard() {
               "कुछ आसान चरणों में ऐसा भोज, जिसे आपके मेहमान याद रखें।",
             )}
           </p>
-          <div className="mt-5 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-cream sm:mt-6 sm:text-xs">
-            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+          <div className="mt-5 flex flex-nowrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-cream sm:mt-6 sm:flex-wrap sm:gap-2 sm:text-xs sm:tracking-[0.12em]">
+            <span className="whitespace-nowrap rounded-full border border-cream/35 bg-black/10 px-2 py-1 sm:px-3 sm:py-1.5">
               {t("6 guided steps", "6 आसान चरण")}
             </span>
-            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+            <span className="whitespace-nowrap rounded-full border border-cream/35 bg-black/10 px-2 py-1 sm:px-3 sm:py-1.5">
               {t("Curated menus", "चुने हुए मेन्यू")}
             </span>
-            <span className="rounded-full border border-cream/35 bg-black/10 px-3 py-1.5">
+            <span className="whitespace-nowrap rounded-full border border-cream/35 bg-black/10 px-2 py-1 sm:px-3 sm:py-1.5">
               {t("Verified partners", "सत्यापित पार्टनर")}
             </span>
           </div>
@@ -2164,6 +2164,44 @@ function LiveStallEmpty({
 }
 
 /* ─── Event bar · always-visible occasion / date / city (from the Hero) ──── */
+/* A single free-text field shown in place of the Occasion / City dropdown once
+ * the guest picks "Other" — one clean text box (never the select AND a box at
+ * once) with a small "Change" chip that drops back to the managed list. */
+function OtherField({
+  value,
+  onChange,
+  onReset,
+  placeholder,
+  changeLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onReset: () => void;
+  placeholder: string;
+  changeLabel: string;
+}) {
+  return (
+    <div className="relative mt-1.5">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="min-h-12 w-full rounded-control border border-maroon/40 bg-white py-2.5 pl-3.5 pr-[4.75rem] text-sm text-ink shadow-soft outline-none transition focus:border-maroon focus:shadow-card"
+      />
+      <button
+        type="button"
+        onClick={onReset}
+        aria-label={changeLabel}
+        className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center rounded-full border border-cream bg-cream/40 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-maroon transition hover:bg-cream active:scale-95"
+      >
+        {changeLabel}
+      </button>
+    </div>
+  );
+}
+
 function EventBar({
   lang,
   t,
@@ -2212,21 +2250,48 @@ function EventBar({
   showGuests?: boolean;
 }) {
   const fieldClass =
-    "mt-1.5 min-h-12 w-full rounded-control border border-cream bg-white px-3 py-2.5 text-sm text-ink shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
+    "mt-1.5 min-h-12 w-full rounded-control border border-cream bg-white px-3.5 py-2.5 text-sm text-ink shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
   // Trigger styling for the themed dropdowns — mirrors `fieldClass` minus the
   // wrapper spacing (which sits on the ThemedSelect root instead).
   const selectButtonClass =
-    "min-h-12 w-full rounded-control border border-cream bg-white px-3 py-2.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
+    "min-h-12 w-full rounded-control border border-cream bg-white px-3.5 py-2.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
+  const labelClass =
+    "text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60";
+
+  // Local editing buffer for the typed headcount, so a guest can clear the box
+  // and type an explicit number without every keystroke snapping to the package
+  // minimum. Re-synced whenever the committed value changes (slider / +/−).
+  const [guestsText, setGuestsText] = useState(String(guests));
+  useEffect(() => setGuestsText(String(guests)), [guests]);
+  const clampGuests = (n: number) => Math.max(paxMin, Math.min(paxMax, n));
+  // While typing we only push *in-range* values up to the parent, so a partial
+  // entry like "2" (below the 150 minimum) isn't snapped up mid-keystroke — it's
+  // held in the text buffer and only clamped into range when the field blurs.
+  const commitGuestsText = (raw: string) => {
+    setGuestsText(raw);
+    const n = Math.round(Number(raw.replace(/[^0-9]/g, "")));
+    if (Number.isFinite(n) && n >= paxMin && n <= paxMax) setGuests(n);
+  };
+  const blurGuests = () => {
+    const n = Math.round(Number(guestsText.replace(/[^0-9]/g, "")));
+    const next = !Number.isFinite(n) || n <= 0 ? guests : clampGuests(n);
+    setGuests(next);
+    setGuestsText(String(next));
+  };
+  const stepGuests = (delta: number) => setGuests(clampGuests(guests + delta));
 
   return (
-    <div className="relative mt-5 overflow-hidden rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:mt-7 sm:p-6">
-      <span className="absolute inset-y-0 left-0 w-1 bg-maroon" aria-hidden="true" />
+    <div className="relative mt-5 rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:mt-7 sm:p-6">
+      <span
+        className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
+        aria-hidden="true"
+      />
       <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="eyebrow text-[10px] font-bold text-maroon sm:text-xs">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
             {t("YOUR EVENT", "आपका इवेंट")}
           </p>
-          <p className="mt-1 truncate text-xs text-ink/50 sm:overflow-visible sm:whitespace-normal sm:text-sm">
+          <p className="min-w-0 truncate text-xs text-ink/50 sm:text-sm">
             {t(
               "Tell us the essentials — you can edit these anytime.",
               "ज़रूरी जानकारी दें — इसे कभी भी बदल सकते हैं।",
@@ -2244,47 +2309,58 @@ function EventBar({
         }
       >
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
-            {t("Occasion", "अवसर")}
-          </span>
-          <ThemedSelect
-            value={occasionId}
-            onChange={setOccasionId}
-            ariaLabel={t("Occasion", "अवसर")}
-            placeholder={t("Select occasion", "अवसर चुनें")}
-            className="mt-1.5"
-            buttonClassName={selectButtonClass}
-            options={[
-              ...occasionList.map((o) => ({
-                value: o.id,
-                label: lang === "hi" ? o.nameHi : o.name,
-              })),
-              { value: OTHER_OCCASION_ID, label: t("Other", "अन्य") },
-            ]}
-          />
-          {occasionId === OTHER_OCCASION_ID && (
-            <input
-              type="text"
+          <span className={labelClass}>{t("Occasion", "अवसर")}</span>
+          {occasionId === OTHER_OCCASION_ID ? (
+            <OtherField
               value={customOccasion}
-              onChange={(e) => setCustomOccasion(e.target.value)}
+              onChange={setCustomOccasion}
+              onReset={() => {
+                setOccasionId("");
+                setCustomOccasion("");
+              }}
               placeholder={t("Type your occasion", "अपना अवसर लिखें")}
-              aria-label={t("Type your occasion", "अपना अवसर लिखें")}
-              className={fieldClass}
+              changeLabel={t("Change", "बदलें")}
+            />
+          ) : (
+            <ThemedSelect
+              value={occasionId}
+              onChange={setOccasionId}
+              ariaLabel={t("Occasion", "अवसर")}
+              placeholder={t("Select occasion", "अवसर चुनें")}
+              className="mt-1.5"
+              buttonClassName={selectButtonClass}
+              options={[
+                ...occasionList.map((o) => ({
+                  value: o.id,
+                  label: lang === "hi" ? o.nameHi : o.name,
+                })),
+                { value: OTHER_OCCASION_ID, label: t("Other", "अन्य") },
+              ]}
             />
           )}
         </label>
 
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
-            {t("Date", "तारीख")}
-          </span>
+          <span className={labelClass}>{t("Date", "तारीख")}</span>
           <input
             type="date"
             value={eventDate}
             min={minDate}
             onChange={(e) => setEventDate(e.target.value)}
+            // Open the calendar on a tap anywhere in the field — native date
+            // inputs otherwise only respond to the tiny indicator, which reads
+            // as "the date won't select".
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker?.();
+              } catch {
+                /* not supported / not user-activated — native click still works */
+              }
+            }}
             className={
-              fieldClass + (leadWarning ? " border-maroon" : "")
+              fieldClass +
+              " cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100" +
+              (leadWarning ? " border-maroon" : "")
             }
           />
           {leadWarning && (
@@ -2296,54 +2372,89 @@ function EventBar({
         </label>
 
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60">
-            {t("City / Location", "शहर / लोकेशन")}
-          </span>
-          <ThemedSelect
-            value={cityId}
-            onChange={setCityId}
-            ariaLabel={t("City / Location", "शहर / लोकेशन")}
-            placeholder={t("Select city", "शहर चुनें")}
-            className="mt-1.5"
-            buttonClassName={selectButtonClass}
-            options={[
-              ...locations.map((c) => ({
-                value: c.id,
-                label: lang === "hi" ? c.nameHi : c.name,
-              })),
-              { value: OTHER_LOCATION_ID, label: t("Other", "अन्य") },
-            ]}
-          />
-          {cityId === OTHER_LOCATION_ID && (
-            <input
-              type="text"
+          <span className={labelClass}>{t("City / Location", "शहर / लोकेशन")}</span>
+          {cityId === OTHER_LOCATION_ID ? (
+            <OtherField
               value={customCity}
-              onChange={(e) => setCustomCity(e.target.value)}
+              onChange={setCustomCity}
+              onReset={() => {
+                setCityId("");
+                setCustomCity("");
+              }}
               placeholder={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              aria-label={t("Type your city or state", "अपना शहर या राज्य लिखें")}
-              className={fieldClass}
+              changeLabel={t("Change", "बदलें")}
+            />
+          ) : (
+            <ThemedSelect
+              value={cityId}
+              onChange={setCityId}
+              ariaLabel={t("City / Location", "शहर / लोकेशन")}
+              placeholder={t("Select city", "शहर चुनें")}
+              className="mt-1.5"
+              buttonClassName={selectButtonClass}
+              options={[
+                ...locations.map((c) => ({
+                  value: c.id,
+                  label: lang === "hi" ? c.nameHi : c.name,
+                })),
+                { value: OTHER_LOCATION_ID, label: t("Other", "अन्य") },
+              ]}
             />
           )}
         </label>
 
         {showGuests && (
-          <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-control border border-cream bg-cream/20 px-4 py-2.5 shadow-soft">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-maroon">
-                {t("Guests", "मेहमान")}
-              </p>
-              <p className="mt-0.5 text-caption text-ink/50">
-                {inr.format(paxMin)}–{inr.format(paxMax)}
-              </p>
+          <div className="flex flex-col justify-center gap-3 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
+                  {t("Guests", "मेहमान")}
+                </p>
+                <p className="mt-0.5 text-caption text-ink/50">
+                  {inr.format(paxMin)}–{inr.format(paxMax)}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => stepGuests(-10)}
+                  disabled={guests <= paxMin}
+                  aria-label={t("Decrease guests", "मेहमान घटाएं")}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-cream bg-white text-lg font-bold leading-none text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={guestsText}
+                  min={paxMin}
+                  max={paxMax}
+                  onChange={(e) => commitGuestsText(e.target.value)}
+                  onBlur={blurGuests}
+                  aria-label={t("Number of guests", "मेहमानों की संख्या")}
+                  className="h-9 w-16 rounded-full border border-cream bg-white text-center text-sm font-bold tabular-nums text-ink shadow-soft outline-none transition focus:border-maroon [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => stepGuests(10)}
+                  disabled={guests >= paxMax}
+                  aria-label={t("Increase guests", "मेहमान बढ़ाएं")}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-cream bg-white text-lg font-bold leading-none text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
+                >
+                  +
+                </button>
+              </div>
             </div>
-            <QuantitySelector
-              value={guests || paxMin}
-              onChange={setGuests}
+            <input
+              type="range"
               min={paxMin}
               max={paxMax}
               step={10}
-              editable
-              label={t("Number of guests", "मेहमानों की संख्या")}
+              value={guests}
+              onChange={(e) => setGuests(clampGuests(Number(e.target.value)))}
+              aria-label={t("Number of guests", "मेहमानों की संख्या")}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-cream outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-maroon [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-maroon [&::-webkit-slider-thumb]:shadow-soft"
             />
           </div>
         )}
@@ -4605,6 +4716,10 @@ function SummaryPanel({
   gst: number;
   grandTotal: number;
 }) {
+  // Bill breakdown collapses by default — like Swiggy/Zomato, the guest sees
+  // just the total and advance up front, and can expand the itemised bill.
+  const [showDetails, setShowDetails] = useState(false);
+  const advance = Math.round(grandTotal * ADVANCE_RATE);
   return (
     <aside className="xl:sticky xl:top-28 xl:self-start">
       <div className="overflow-hidden rounded-[1.5rem] border border-cream bg-white shadow-pop">
@@ -4618,7 +4733,7 @@ function SummaryPanel({
         </div>
         <div className="p-5">
         {packageName && (
-          <div className="mt-3 flex items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2">
+          <div className="flex items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2">
             <span className="text-xs font-medium text-ink-soft">
               {t("Package", "पैकेज")}
             </span>
@@ -4627,74 +4742,124 @@ function SummaryPanel({
             </span>
           </div>
         )}
-        <div className="mt-4 space-y-2">
-          <SummaryRow
-            label={t("Package base / plate", "पैकेज बेस / प्लेट")}
-            value={money(basePerPlate)}
-          />
-          <SummaryRow
-            label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
-            value={`+ ${money(categoryAddTotal)}`}
-          />
-          <SummaryRow
-            label={t("Per plate", "प्रति प्लेट")}
-            value={money(perPlate)}
-            accent
-          />
-          <SummaryRow label={t("Guests", "मेहमान")} value={inr.format(guests)} />
-          <div className="my-2 h-px bg-cream-3" />
-          <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
-          <SummaryRow
-            label={t("Add-ons", "एक्स्ट्रा")}
-            value={money(addOnsTotal)}
-          />
-          {serviceName && (
-            <SummaryRow
-              label={`${t("Service", "सर्विस")} · ${serviceName}`}
-              value={serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
-            />
-          )}
-          {venueFee > 0 && (
-            <SummaryRow
-              label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
-              value={money(venueFee)}
-            />
-          )}
-          {couponDiscount > 0 && (
-            <SummaryRow
-              label={t("Coupon discount", "कूपन छूट")}
-              value={`− ${money(couponDiscount)}`}
-              accent
-            />
-          )}
-          {referralDiscount > 0 && (
-            <SummaryRow
-              label={
-                referrerName
-                  ? `${t("Referral", "रेफ़रल")} · ${referrerName}`
-                  : t("Referral discount", "रेफ़रल छूट")
-              }
-              value={`− ${money(referralDiscount)}`}
-              accent
-            />
-          )}
-          <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
-          <div className="my-2 h-px bg-cream-3" />
-          <div className="flex items-center justify-between">
-            <span className="font-display text-base font-semibold text-ink">
-              {t("Grand Total", "कुल राशि")}
-            </span>
-            <span className="font-display text-lg font-semibold text-maroon">
+
+        {/* Total to pay + advance — always visible, headline of the summary. */}
+        <div className="mt-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+              {t("Total", "कुल")}
+            </p>
+            <p className="font-display text-2xl font-semibold text-maroon">
               {money(grandTotal)}
-            </span>
+            </p>
           </div>
-          <p className="mt-2 rounded-xl bg-cream/30 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
-            {t(
-              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) to lock your date — or book now, pay later.`,
-              `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
-            )}
-          </p>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+              {t("Advance (10%)", "एडवांस (10%)")}
+            </p>
+            <p className="font-display text-2xl font-semibold text-ink">
+              {money(advance)}
+            </p>
+          </div>
         </div>
+
+        {/* Toggle the itemised bill — collapsed by default. */}
+        <button
+          type="button"
+          onClick={() => setShowDetails((v) => !v)}
+          aria-expanded={showDetails}
+          className="mt-4 flex w-full items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-cream-2"
+        >
+          <span>
+            {showDetails
+              ? t("Hide bill details", "बिल विवरण छिपाएं")
+              : t("View bill details", "बिल विवरण देखें")}
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            className={`h-4 w-4 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+
+        {showDetails && (
+          <div className="mt-4 space-y-2">
+            <SummaryRow
+              label={t("Package base / plate", "पैकेज बेस / प्लेट")}
+              value={money(basePerPlate)}
+            />
+            <SummaryRow
+              label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
+              value={`+ ${money(categoryAddTotal)}`}
+            />
+            <SummaryRow
+              label={t("Per plate", "प्रति प्लेट")}
+              value={money(perPlate)}
+              accent
+            />
+            <SummaryRow label={t("Guests", "मेहमान")} value={inr.format(guests)} />
+            <div className="my-2 h-px bg-cream-3" />
+            <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
+            <SummaryRow
+              label={t("Add-ons", "एक्स्ट्रा")}
+              value={money(addOnsTotal)}
+            />
+            {serviceName && (
+              <SummaryRow
+                label={`${t("Service", "सर्विस")} · ${serviceName}`}
+                value={serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
+              />
+            )}
+            {venueFee > 0 && (
+              <SummaryRow
+                label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
+                value={money(venueFee)}
+              />
+            )}
+            {couponDiscount > 0 && (
+              <SummaryRow
+                label={t("Coupon discount", "कूपन छूट")}
+                value={`− ${money(couponDiscount)}`}
+                accent
+              />
+            )}
+            {referralDiscount > 0 && (
+              <SummaryRow
+                label={
+                  referrerName
+                    ? `${t("Referral", "रेफ़रल")} · ${referrerName}`
+                    : t("Referral discount", "रेफ़रल छूट")
+                }
+                value={`− ${money(referralDiscount)}`}
+                accent
+              />
+            )}
+            <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+            <div className="my-2 h-px bg-cream-3" />
+            <div className="flex items-center justify-between">
+              <span className="font-display text-base font-semibold text-ink">
+                {t("Grand Total", "कुल राशि")}
+              </span>
+              <span className="font-display text-lg font-semibold text-maroon">
+                {money(grandTotal)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <p className="mt-4 rounded-xl bg-cream/30 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
+          {t(
+            `Pay a 10% advance (${money(advance)}) to lock your date — or book now, pay later.`,
+            `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(advance)}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
+          )}
+        </p>
         </div>
       </div>
     </aside>
