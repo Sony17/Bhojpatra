@@ -22,10 +22,18 @@ export function Stepper({
         const done = i < current;
         const active = i === current;
         return (
-          <li key={label} className="flex min-w-0 flex-1 items-center gap-2">
-            <span
+          <li key={label} className="relative flex min-w-0 flex-1 items-center gap-2">
+            {/* The number doubles as a tap/hover target: on mobile the step
+                label is hidden to save width, so pressing (or hovering) the
+                number peeks its name via the tooltip below. On sm+ the label
+                sits inline, so the tooltip is hidden there. */}
+            <button
+              type="button"
+              aria-label={`Step ${i + 1}: ${label}${
+                active ? " — current step" : done ? " — done" : ""
+              }`}
               className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-200",
+                "peer flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-maroon/40",
                 active
                   ? "bg-maroon text-cream ring-4 ring-maroon/15"
                   : done
@@ -46,6 +54,12 @@ export function Stepper({
               ) : (
                 i + 1
               )}
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute -top-9 left-0 z-30 whitespace-nowrap rounded-lg bg-maroon px-2 py-1 text-[11px] font-semibold text-cream opacity-0 shadow-pop transition-opacity duration-150 peer-hover:opacity-100 peer-focus:opacity-100 sm:hidden"
+            >
+              {label}
             </span>
             <span
               className={cn(
