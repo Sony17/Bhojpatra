@@ -26,6 +26,10 @@ export interface StoredReview {
    *  reviewer attached (capped). */
   images?: string[];
   createdAt: string;
+  /** Set by an admin (Content → Testimonials) to unpublish this review: hidden
+   *  reviews are excluded from the public feed and from vendor rating averages,
+   *  but kept in the table so the action is reversible. */
+  hidden?: boolean;
 }
 
 // Keyed by the composite `id` (bookingId + vendor) — one review per vendor per
@@ -164,8 +168,9 @@ export async function POST(request: Request) {
 }
 
 // The home testimonials feed reads published reviews here, newest first.
+// Admin-hidden reviews are unpublished, so they never reach any public surface.
 export async function GET() {
-  const reviews = await store.list();
+  const reviews = (await store.list()).filter((r) => !r.hidden);
   reviews.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return Response.json({ reviews });
 }

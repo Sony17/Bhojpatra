@@ -705,8 +705,14 @@ body {
   .animate-marquee-slow {
     animation: bp-marquee 90s linear infinite;
   }
+  /* Featured-brands ribbon — gentle left→right glide (reverse of bp-marquee,
+     which runs right→left). Pair with a doubled, w-max track. Hover to pause. */
+  .animate-marquee-ltr {
+    animation: bp-marquee 40s linear infinite reverse;
+  }
   .marquee-pause:hover .animate-marquee,
-  .marquee-pause:hover .animate-marquee-slow {
+  .marquee-pause:hover .animate-marquee-slow,
+  .marquee-pause:hover .animate-marquee-ltr {
     animation-play-state: paused;
   }
   @media (prefers-reduced-motion: reduce) {

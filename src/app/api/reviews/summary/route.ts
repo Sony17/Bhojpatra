@@ -42,6 +42,7 @@ export async function GET() {
   };
 
   for (const r of reviews) {
+    if (r.hidden) continue; // admin-unpublished — don't count toward ratings
     if (typeof r.rating !== "number") continue;
     if (r.vendorId) add(idSums, r.vendorId, r.rating);
     add(nameSums, slug(r.vendor ?? ""), r.rating);

@@ -102,3 +102,19 @@ export function useHomeContent(): HomeContent {
   }, []);
   return cache;
 }
+
+/** Whether the live content has resolved from the API yet (vs. the seed default
+ *  snapshot shown on first paint). Guards writes that would otherwise persist
+ *  the defaults over stored content before the fetch lands. */
+export function useHomeContentLoaded(): boolean {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const rerender = () => force((n) => n + 1);
+    listeners.add(rerender);
+    ensureLoaded();
+    return () => {
+      listeners.delete(rerender);
+    };
+  }, []);
+  return loaded;
+}

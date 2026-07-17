@@ -853,6 +853,13 @@ export default function BookingWizard() {
   const daysToEvent = daysUntil(eventDate);
   const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
   const earliestDate = isoAfterDays(effectiveLeadDays);
+  // The date picker's floor is just "today" (no past dates) — NOT the lead-time
+  // earliest. A lead-based `min` greys out every near date in the native/desktop
+  // picker, which reads as "I can't select a date" (esp. Gold/Platinum's 21/45-day
+  // leads). Instead we let the guest pick freely and lean on the soft path:
+  // `leadWarning` explains the shortfall inline and `dateMeetsLead` blocks "Next"
+  // on the details step. Keep them in sync — don't re-tighten this to earliestDate.
+  const todayIso = isoAfterDays(0);
   // When the occasion is the binding constraint, name it — otherwise the guest
   // is told "this package needs 30 days" when it's really the wedding.
   const leadOccasion = occasionLead > packageLead ? resolveOccasion(occasionId) : undefined;
@@ -1592,7 +1599,7 @@ export default function BookingWizard() {
         setGuests={setGuests}
         paxMin={paxMin}
         paxMax={paxMax}
-        minDate={earliestDate}
+        minDate={todayIso}
         leadWarning={leadWarning}
         // The confirm step (6) locks the headcount and echoes it in the order
         // summary, so the editable Guests field is redundant there — hide it.
@@ -2215,11 +2222,11 @@ function EventBar({
     <div className="relative mt-5 overflow-hidden rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:mt-7 sm:p-6">
       <span className="absolute inset-y-0 left-0 w-1 bg-maroon" aria-hidden="true" />
       <div className="flex items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow text-[10px] font-bold text-maroon sm:text-xs">
             {t("YOUR EVENT", "आपका इवेंट")}
           </p>
-          <p className="mt-1 text-xs text-ink/50 sm:text-sm">
+          <p className="mt-1 truncate text-xs text-ink/50 sm:overflow-visible sm:whitespace-normal sm:text-sm">
             {t(
               "Tell us the essentials — you can edit these anytime.",
               "ज़रूरी जानकारी दें — इसे कभी भी बदल सकते हैं।",
@@ -2335,6 +2342,7 @@ function EventBar({
               min={paxMin}
               max={paxMax}
               step={10}
+              editable
               label={t("Number of guests", "मेहमानों की संख्या")}
             />
           </div>

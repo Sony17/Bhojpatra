@@ -72,6 +72,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [resetToken, setResetToken] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetReady, setResetReady] = useState(false);
+  // Dev-only: when no email domain is verified (Resend test mode can't deliver
+  // to arbitrary recipients), the API returns the raw token so we can surface a
+  // clickable reset link right here instead of relying on a mail that won't send.
+  const [devResetLink, setDevResetLink] = useState("");
 
   const isVendor = accountType === "vendor";
   const isPartner = accountType === "partner";
@@ -153,11 +157,22 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (isForgot) {
       setSubmitting(true);
       setError("");
-      await fetch("/api/auth/forgot-password", {
+      const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
-      }).catch(() => {});
+      }).catch(() => null);
+      // In dev (no verified email domain) the API returns the raw token so we
+      // can show a working link on the confirmation screen. Never present in prod.
+      const json = (await res?.json().catch(() => null)) as
+        | { devToken?: string }
+        | null;
+      if (json?.devToken) {
+        setDevResetLink(
+          `/reset-password?token=${encodeURIComponent(json.devToken)}` +
+            `&email=${encodeURIComponent(email)}`,
+        );
+      }
       setSubmitting(false);
       setSubmitted(true); // always confirm — don't leak whether the email exists
       return;
@@ -384,6 +399,25 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             "यदि उस ईमेल के लिए कोई अकाउंट मौजूद है, तो हमने पासवर्ड रीसेट करने का लिंक भेज दिया है।",
           )}
         </p>
+        {devResetLink && (
+          <div className="mt-6 rounded-card border border-maroon/30 bg-cream px-4 py-4 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Dev only — email not sent", "केवल डेव — ईमेल नहीं भेजा गया")}
+            </p>
+            <p className="mt-1 text-sm text-ink-soft">
+              {t(
+                "No email domain is verified yet, so open this reset link directly:",
+                "अभी तक कोई ईमेल डोमेन सत्यापित नहीं है, इसलिए इस रीसेट लिंक को सीधे खोलें:",
+              )}
+            </p>
+            <Link
+              href={devResetLink}
+              className="mt-2 block break-all text-sm font-medium text-maroon hover:underline"
+            >
+              {devResetLink}
+            </Link>
+          </div>
+        )}
         <div className="mt-8">
           <Button href="/login" variant="secondary" size="lg" fullWidth>
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
