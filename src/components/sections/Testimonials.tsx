@@ -95,9 +95,9 @@ export default function Testimonials() {
     <li
       key={`${copy}-${t.id}`}
       aria-hidden={copy === 1 ? true : undefined}
-      className="card-lift group flex w-[85vw] shrink-0 flex-col overflow-hidden rounded-card border border-maroon/8 bg-white shadow-card hover:border-maroon/20 hover:shadow-pop sm:w-[380px]"
+      className="card-lift group flex w-[60vw] shrink-0 flex-col overflow-hidden rounded-card border border-maroon/8 bg-white shadow-card hover:border-maroon/20 hover:shadow-pop sm:w-[266px]"
     >
-      <div className="flex flex-1 flex-col p-7 sm:p-8">
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
         <div className="flex items-center justify-between">
           <Stars
             rating={t.rating}
@@ -108,27 +108,27 @@ export default function Testimonials() {
           />
           <span
             aria-hidden="true"
-            className="font-display text-4xl leading-none text-cream transition-transform duration-300 group-hover:scale-110"
+            className="font-display text-2xl leading-none text-cream transition-transform duration-300 group-hover:scale-110"
           >
             &ldquo;
           </span>
         </div>
 
-        <p className="mt-4 flex-1 text-sm leading-relaxed text-ink/75 sm:text-[15px]">
+        <p className="mt-3 flex-1 text-xs leading-relaxed text-ink/75 sm:text-sm">
           {lang === "hi" ? t.quoteHi : t.quote}
         </p>
 
-        <div className="mt-6 flex items-center gap-3 border-t border-maroon/10 pt-5">
+        <div className="mt-4 flex items-center gap-2.5 border-t border-maroon/10 pt-4">
           <span
             aria-hidden="true"
-            className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-maroon text-sm font-semibold text-cream ring-1 ring-maroon/15"
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-maroon text-xs font-semibold text-cream ring-1 ring-maroon/15"
           >
             {t.avatar ? (
               <Image
                 src={t.avatar}
                 alt=""
                 fill
-                sizes="48px"
+                sizes="36px"
                 className="object-cover"
                 unoptimized={isUnoptimized(t.avatar)}
               />
@@ -137,7 +137,7 @@ export default function Testimonials() {
             )}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-ink">
+            <span className="block truncate text-[13px] font-semibold text-ink">
               {t.name}
             </span>
             <span className="block truncate text-xs text-ink/55">
@@ -182,7 +182,7 @@ export default function Testimonials() {
 
       <Reveal variant="up" className="relative mt-10 sm:mt-12">
         <div className="marquee-pause overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
-          <ul className="animate-marquee-slow flex w-max gap-5 px-5 py-2 sm:gap-6 sm:px-8">
+          <ul className="animate-marquee-slow flex w-max gap-3.5 px-5 py-2 sm:gap-4 sm:px-8">
             {[0, 1].map((copy) => items.map((t) => renderCard(t, copy)))}
           </ul>
         </div>
