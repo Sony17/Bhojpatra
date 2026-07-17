@@ -408,25 +408,25 @@ export default function MenuBuilder() {
     <div className="space-y-6">
       {/* Status band */}
       <Card padding="none" className="p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-display text-lg font-semibold text-ink">
+        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+          <h2 className="shrink-0 whitespace-nowrap font-display text-lg font-semibold text-ink">
             {t("Menu Builder", "मेन्यू बिल्डर")}
           </h2>
           {moderation === "Hidden" ? (
-            <span className="inline-flex items-center rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
               {t("Hidden by Bhojpatra", "भोजपत्र द्वारा छिपाया गया")}
             </span>
           ) : isLive && publishedDishes > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
               ● {t("Live for customers", "ग्राहकों के लिए लाइव")}
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-cream-3 bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-cream-3 bg-cream-2 px-3 py-1 text-xs font-semibold text-ink-soft">
               {t("Not published yet", "अभी प्रकाशित नहीं")}
             </span>
           )}
           {moderation === "Pending" && isLive && publishedDishes > 0 && (
-            <span className="inline-flex items-center rounded-full border border-maroon px-3 py-1 text-xs font-semibold text-maroon">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-maroon px-3 py-1 text-xs font-semibold text-maroon">
               {t("Pending review", "समीक्षा लंबित")}
             </span>
           )}
@@ -638,7 +638,7 @@ export default function MenuBuilder() {
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Cuisines", "व्यंजन शैलियाँ")}
             </span>
-            <div className="flex flex-wrap gap-2">
+            <div className="-mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {Array.from(
                 new Set([...registrationCuisines, ...cuisines]),
               ).map((c) => (
@@ -1024,14 +1024,14 @@ function CategorySection({
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
                 {t("Popular picks — tap to add", "लोकप्रिय विकल्प — जोड़ने के लिए टैप करें")}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
                 {visibleSuggestions.map((s) => (
                   <button
                     key={s.name}
                     type="button"
                     onClick={() => onAddItem(s)}
                     disabled={section.items.length >= 24}
-                    className="flex items-center gap-1.5 rounded-full border border-dashed border-cream-3 bg-white px-3.5 py-1.5 text-sm text-ink-soft transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-cream-3 bg-white px-3.5 py-1.5 text-sm text-ink-soft transition hover:border-maroon hover:text-maroon disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <span
                       aria-hidden="true"
@@ -1047,7 +1047,7 @@ function CategorySection({
                   <button
                     type="button"
                     onClick={() => setShowAllSuggestions((v) => !v)}
-                    className="rounded-full px-3.5 py-1.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+                    className="shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
                   >
                     {showAllSuggestions
                       ? t("Show fewer", "कम दिखाएं")
@@ -1125,7 +1125,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "rounded-full px-4 py-2 text-sm transition-colors " +
+        "shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors " +
         (active
           ? "bg-maroon text-cream"
           : "bg-cream-2 text-ink-soft hover:bg-cream-3")

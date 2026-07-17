@@ -34,6 +34,7 @@ export default function DatePicker({
   direction = "down",
   align = "left",
   defaultDaysAhead,
+  valueIso,
   minDaysAhead = 0,
   onChange,
 }: {
@@ -48,6 +49,11 @@ export default function DatePicker({
   align?: "left" | "center" | "right";
   /** Pre-select a date this many days from today (computed client-side). */
   defaultDaysAhead?: number;
+  /** Controlled selection as a `YYYY-MM-DD` string. When supplied, the shown
+   *  date tracks the parent's value (e.g. a booking date carried in from the
+   *  URL); an empty string clears the selection. Leave undefined to run the
+   *  picker uncontrolled (the Hero hero-bar usage). */
+  valueIso?: string;
   /** Minimum advance notice, in days — dates before `today + minDaysAhead` are
    *  disabled (e.g. a wedding that needs 30 days' lead). `0` disables only past
    *  dates, preserving the original behaviour. */
@@ -89,6 +95,23 @@ export default function DatePicker({
     // Run once on mount for the given offset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultDaysAhead]);
+
+  // Controlled mode — mirror the parent's `YYYY-MM-DD` value into the shown
+  // selection (and page the grid to its month). Skipped entirely when the prop
+  // is undefined so the uncontrolled Hero usage is unaffected.
+  useEffect(() => {
+    if (valueIso === undefined) return;
+    if (!valueIso) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelected(null);
+      return;
+    }
+    const [y, m, d] = valueIso.split("-").map(Number);
+    if (!y || !m || !d) return;
+    const dt = startOfDay(new Date(y, m - 1, d));
+    setSelected(dt);
+    setView(new Date(dt.getFullYear(), dt.getMonth(), 1));
+  }, [valueIso]);
 
   // If the minimum notice grows past the current pick — the guest switched to an
   // occasion that needs more lead, or the default landed below it — nudge the

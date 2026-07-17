@@ -371,7 +371,7 @@ export default function ReferralManagement() {
           placeholder="Search by referrer name or code…"
           className="lg:max-w-sm lg:flex-1"
         />
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
           <SelectFilter label="Type" value={type} options={TYPE_OPTIONS} onChange={setType} />
         </div>
       </div>
@@ -402,7 +402,7 @@ export default function ReferralManagement() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <TypeBadge type={selected.type} />
               <span className="font-display text-sm tracking-wider text-maroon">
                 {selected.code}

@@ -76,7 +76,7 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
       />
 
       {/* Status row */}
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
         <TierBadges tiers={tiers} />
         <StatusBadge status={vendor.status} />
         {vendor.suspended && <StatusBadge status="Suspended" />}
@@ -184,7 +184,7 @@ function KycTab({ docs }: { docs: VendorDocument[] }) {
             className="flex flex-col gap-3 rounded-xl border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
                 <p className="font-medium text-ink">{d.kind}</p>
                 <StatusBadge status={d.status} />
               </div>

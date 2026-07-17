@@ -31,7 +31,11 @@ export default function PageHeader({
           <p className="font-script mt-1 text-lg text-ink-soft">{subtitle}</p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap gap-2.5">{actions}</div>}
+      {actions && (
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

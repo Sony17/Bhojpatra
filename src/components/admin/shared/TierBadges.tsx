@@ -9,7 +9,7 @@ export default function TierBadges({ tiers }: { tiers: VendorTier[] }) {
   const ordered = sortTiers(tiers);
   if (ordered.length === 0) return <span className="text-ink-soft">—</span>;
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
       {ordered.map((tier) => (
         <StatusBadge key={tier} status={tier} />
       ))}

@@ -82,6 +82,7 @@ export default function PlanningFor() {
             {t("Planning For", "किसके लिए प्लान कर रहे हैं")}
           </span>
 
+          <div className="no-scrollbar -mx-5 flex w-full flex-nowrap items-center gap-2.5 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:gap-3 sm:overflow-visible sm:contents">
           {planningOccasions.map((o: PlanningOccasion) => {
             const Icon = planningIcons[o.iconKey];
             const active = o.id === selected;
@@ -92,7 +93,7 @@ export default function PlanningFor() {
                 onClick={() => setSelected(o.id)}
                 aria-pressed={active}
                 className={
-                  "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-all duration-300 sm:px-5 sm:py-2.5 " +
+                  "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-all duration-300 sm:px-5 sm:py-2.5 " +
                   (active
                     ? "scale-105 bg-maroon text-cream shadow-[0_8px_20px_-8px_rgba(0,0,0,0.7)]"
                     : "bg-white/15 text-cream ring-1 ring-white/25 hover:-translate-y-0.5 hover:bg-white/25 hover:ring-white/50")
@@ -103,6 +104,7 @@ export default function PlanningFor() {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* Trending dishes — five crowd-favourites for the selected occasion,

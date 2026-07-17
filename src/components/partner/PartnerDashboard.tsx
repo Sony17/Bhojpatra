@@ -188,7 +188,7 @@ export default function PartnerDashboard() {
 
       {/* Tab bar — the Venue-Owner role gets an extra "My Venue" tab where it
           publishes the venues it lists, books and gets paid for. */}
-      <div className="mt-8 flex flex-wrap gap-2.5">
+      <div className="mt-8 flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
         {(active?.type === "venue" ? [...TABS, VENUE_TAB] : TABS).map((tb) => {
           const active = tab === tb.id;
           return (
@@ -198,7 +198,7 @@ export default function PartnerDashboard() {
               onClick={() => setTab(tb.id)}
               aria-pressed={active}
               className={
-                "inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-colors " +
+                "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-colors " +
                 (active
                   ? "bg-maroon text-cream"
                   : "bg-cream-2 text-ink-soft hover:bg-cream-3")
@@ -584,11 +584,11 @@ function SharePanel({
           <label className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
             {t("Referral code", "रेफ़रल कोड")}
           </label>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <span className="font-display rounded-control border border-maroon/30 bg-cream px-4 py-2 text-xl font-bold tracking-wider text-maroon">
+          <div className="mt-1.5 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+            <span className="font-display shrink-0 whitespace-nowrap rounded-control border border-maroon/30 bg-cream px-4 py-2 text-xl font-bold tracking-wider text-maroon">
               {code || "—"}
             </span>
-            <Button variant="secondary" size="sm" onClick={() => copy(code, "code")}>
+            <Button variant="secondary" size="sm" onClick={() => copy(code, "code")} className="shrink-0">
               {copied === "code" ? t("Copied!", "कॉपी हुआ!") : t("Copy code", "कोड कॉपी करें")}
             </Button>
           </div>

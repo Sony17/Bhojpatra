@@ -142,11 +142,11 @@ export default function AccountsDashboard() {
             "आपके सभी अकाउंट, एक ही जगह पर।",
           )}
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="-mx-4 mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar px-4 sm:mx-0 sm:px-0 md:flex-wrap md:overflow-visible">
           {session.accounts.map((a) => (
             <span
               key={a}
-              className="rounded-full border border-maroon/25 bg-cream px-3 py-1 text-xs font-semibold text-maroon"
+              className="shrink-0 whitespace-nowrap rounded-full border border-maroon/25 bg-cream px-3 py-1 text-xs font-semibold text-maroon"
             >
               {t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi)}
             </span>

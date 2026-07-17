@@ -179,14 +179,14 @@ export default function BookingForm() {
                   autoComplete="off"
                   className={controlClass}
                 />
-                <div className="mt-1 flex flex-wrap gap-2">
+                <div className="no-scrollbar mt-1 flex flex-nowrap gap-2 overflow-x-auto md:flex-wrap md:overflow-visible">
                   {guestPresets.map((preset) => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setGuests(String(preset))}
                       className={
-                        "rounded-full px-3 py-1 text-xs font-medium transition-colors " +
+                        "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors " +
                         (guests === String(preset)
                           ? "bg-maroon text-cream"
                           : "bg-cream-2 text-ink-soft hover:bg-cream-3")

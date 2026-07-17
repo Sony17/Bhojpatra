@@ -319,16 +319,16 @@ function VendorProfile({
               {vendor.city}, {vendor.state}
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4">
+            <div className="-mx-4 mt-3 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 no-scrollbar sm:mt-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
               {vendor.cuisines.map((c) => (
                 <span
                   key={c}
-                  className="rounded-full bg-cream px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs sm:text-ink-soft"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-cream px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs sm:text-ink-soft"
                 >
                   {c}
                 </span>
               ))}
-              <span className="rounded-full border border-maroon/15 px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs">
+              <span className="shrink-0 whitespace-nowrap rounded-full border border-maroon/15 px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs">
                 {localize(vendor.diet)}
               </span>
             </div>

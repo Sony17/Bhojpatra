@@ -292,7 +292,7 @@ export default function MenuModerationConsole() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <ModerationBadge status={selected.moderation} />
               {selected.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink">
@@ -327,7 +327,7 @@ export default function MenuModerationConsole() {
                     key={s.categoryId}
                     className="rounded-xl border border-cream-3 p-4"
                   >
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
                       <p className="font-medium text-ink">
                         {CATEGORY_NAME.get(s.categoryId) ?? s.categoryId}
                       </p>

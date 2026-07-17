@@ -23,12 +23,12 @@ export default function ChooseSpecialists() {
       </Reveal>
 
       {/* Category tabs */}
-      <Reveal stagger className="mt-8 flex flex-wrap gap-3">
+      <Reveal stagger className="no-scrollbar -mx-5 mt-8 flex flex-nowrap items-center gap-3 overflow-x-auto px-5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
         {specialistTabs.map((tab, i) => (
           <span
             key={tab}
             className={
-              "cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 " +
+              "shrink-0 cursor-pointer whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 " +
               (i === 0
                 ? "bg-maroon text-cream shadow-brand"
                 : "bg-cream-2 text-ink-soft hover:bg-cream-3 hover:text-maroon")

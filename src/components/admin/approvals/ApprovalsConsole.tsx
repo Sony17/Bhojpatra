@@ -321,7 +321,7 @@ export default function ApprovalsConsole() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <TierBadges tiers={effectiveTiers(selected)} />
               <StatusBadge status={selected.status} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
@@ -380,7 +380,7 @@ export default function ApprovalsConsole() {
                     className="flex flex-col gap-3 rounded-card border border-cream-3 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
                         <p className="font-medium text-ink">{d.kind}</p>
                         <StatusBadge status={d.status} />
                       </div>

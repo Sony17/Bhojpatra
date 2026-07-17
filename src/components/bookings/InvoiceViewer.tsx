@@ -55,11 +55,12 @@ export default function InvoiceViewer() {
             {data.occasion} — {data.id}
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
           <Button
             type="button"
             variant="primary"
             onClick={() => downloadInvoice(data)}
+            className="shrink-0"
           >
             {t("Download PDF", "PDF डाउनलोड")}
           </Button>
@@ -68,6 +69,7 @@ export default function InvoiceViewer() {
             variant="secondary"
             target="_blank"
             rel="noreferrer"
+            className="shrink-0"
           >
             {t("Share", "साझा करें")}
           </Button>

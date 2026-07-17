@@ -62,7 +62,11 @@ function Chip({
   onClick: () => void;
 }) {
   return (
-    <UIChip selected={active} onClick={onClick}>
+    <UIChip
+      selected={active}
+      onClick={onClick}
+      className="shrink-0 whitespace-nowrap"
+    >
       {label}
     </UIChip>
   );
@@ -588,12 +592,12 @@ export default function VendorRegister() {
       </div>
 
       {/* Step progress */}
-      <ol className="mt-8 flex flex-wrap gap-1 sm:gap-2">
+      <ol className="-mx-5 mt-8 flex flex-nowrap gap-1 overflow-x-auto px-5 no-scrollbar sm:gap-2 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
         {stepLabels.map((label, i) => {
           const done = i < step;
           const current = i === step;
           return (
-            <li key={label} className="flex items-center gap-2">
+            <li key={label} className="flex shrink-0 items-center gap-2 whitespace-nowrap">
               <span
                 className={
                   "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors " +
@@ -742,7 +746,7 @@ export default function VendorRegister() {
               <span className={labelClass}>
                 {t("Cuisine Specialities", "व्यंजन विशेषज्ञता")}
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
                 {registrationCuisines.map((c) => (
                   <Chip
                     key={c}
@@ -1124,7 +1128,7 @@ export default function VendorRegister() {
               <span className={labelClass}>
                 {t("Serviceable Cities", "सेवा योग्य शहर")}
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
                 {cities.map((c) => (
                   <Chip
                     key={c.id}
@@ -1159,7 +1163,7 @@ export default function VendorRegister() {
               <span className={labelClass}>
                 {t("Available Add-On Counters", "उपलब्ध ऐड-ऑन काउंटर")}
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
                 {registrationCounters.map((c) => (
                   <Chip
                     key={c}

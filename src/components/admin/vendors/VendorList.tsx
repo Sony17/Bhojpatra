@@ -192,7 +192,7 @@ export default function VendorList() {
           placeholder="Search by business, owner or city…"
           className="lg:max-w-sm lg:flex-1"
         />
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
           <SelectFilter label="Tier" value={tier} options={TIER_OPTIONS} onChange={onFilter(setTier)} />
           <SelectFilter label="Status" value={status} options={STATUS_OPTIONS} onChange={onFilter(setStatus)} />
           <SelectFilter label="City" value={city} options={cityOptions} onChange={onFilter(setCity)} />

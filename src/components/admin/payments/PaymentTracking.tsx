@@ -165,7 +165,7 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <SearchBar value={q} onChange={onFilter(setQ)} placeholder="Search by payment, booking or customer…" className="lg:max-w-sm lg:flex-1" />
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
           <SelectFilter label="Status" value={status} options={STATUS_OPTIONS} onChange={onFilter(setStatus)} />
           <SelectFilter label="Method" value={method} options={METHOD_OPTIONS} onChange={onFilter(setMethod)} />
         </div>

@@ -74,7 +74,7 @@ export default function ShareOffer({
           {t("Loved this offer? Share it", "यह ऑफर पसंद आया? इसे साझा करें")}
         </span>
       )}
-      <div className={cn("flex flex-wrap items-center", compact ? "gap-1.5" : "justify-center gap-2.5")}>
+      <div className={cn("no-scrollbar flex flex-nowrap items-center overflow-x-auto md:flex-wrap md:overflow-visible", compact ? "gap-1.5" : "justify-center gap-2.5")}>
         {canNativeShare && (
           <Button
             type="button"
@@ -83,7 +83,7 @@ export default function ShareOffer({
             leftIcon={<Share className="h-3.5 w-3.5" />}
             onClick={handleNativeShare}
             aria-label={t("Share", "साझा करें")}
-            className={compact ? "px-2" : undefined}
+            className={cn("shrink-0", compact && "px-2")}
           >
             {compact ? null : t("Share", "साझा करें")}
           </Button>
@@ -96,7 +96,7 @@ export default function ShareOffer({
           labelHi="WhatsApp"
           variant="inverse"
           size="sm"
-          className={compact ? "px-3" : undefined}
+          className={cn("shrink-0", compact && "px-3")}
         />
         <Button
           type="button"
@@ -105,7 +105,7 @@ export default function ShareOffer({
           leftIcon={<Copy className="h-3.5 w-3.5" />}
           onClick={handleCopy}
           aria-label={t("Copy link", "लिंक कॉपी करें")}
-          className={compact ? "px-2" : undefined}
+          className={cn("shrink-0", compact && "px-2")}
         >
           {compact ? null : t("Copy link", "लिंक कॉपी करें")}
         </Button>

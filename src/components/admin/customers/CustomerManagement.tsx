@@ -140,7 +140,7 @@ export default function CustomerManagement() {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <SearchBar value={q} onChange={onFilter(setQ)} placeholder="Search by name, email or phone…" className="lg:max-w-sm lg:flex-1" />
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
           <SelectFilter label="City" value={city} options={cityOptions} onChange={onFilter(setCity)} />
           <SelectFilter label="Status" value={status} options={STATUS_OPTIONS} onChange={onFilter(setStatus)} />
         </div>
@@ -173,7 +173,7 @@ export default function CustomerManagement() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <StatusBadge status={selected.status} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>

@@ -400,9 +400,9 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
 
   if (confirming) {
     return (
-      <div className="flex flex-col items-start gap-1.5">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-sm text-ink-soft">
+      <div className="flex shrink-0 flex-col items-start gap-1.5">
+        <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+          <span className="shrink-0 whitespace-nowrap text-sm text-ink-soft">
             {completing
               ? t("Mark this event as complete?", "इस इवेंट को पूर्ण चिह्नित करें?")
               : t("Reopen this booking?", "इस बुकिंग को फिर से खोलें?")}
@@ -411,6 +411,7 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
             variant="primary"
             onClick={apply}
             disabled={busy}
+            className="shrink-0"
           >
             {busy
               ? t("Saving…", "सहेज रहे हैं…")
@@ -425,6 +426,7 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
               setError("");
             }}
             disabled={busy}
+            className="shrink-0"
           >
             {t("Not yet", "अभी नहीं")}
           </Button>
@@ -439,6 +441,7 @@ function CompleteToggle({ booking }: { booking: StoredBooking }) {
       variant={completing ? "primary" : "secondary"}
       onClick={() => setConfirming(true)}
       leftIcon={<span aria-hidden="true">{completing ? "✓" : "↩"}</span>}
+      className="shrink-0"
     >
       {completing
         ? t("Mark as Complete", "पूर्ण चिह्नित करें")
@@ -494,13 +497,14 @@ function ConfirmAction({
 
   if (confirming) {
     return (
-      <div className="flex flex-col items-start gap-1.5">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-sm text-ink-soft">{prompt}</span>
+      <div className="flex shrink-0 flex-col items-start gap-1.5">
+        <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+          <span className="shrink-0 whitespace-nowrap text-sm text-ink-soft">{prompt}</span>
           <Button
             variant="primary"
             onClick={apply}
             disabled={busy}
+            className="shrink-0"
           >
             {busy ? t("Saving…", "सहेज रहे हैं…") : confirmLabel}
           </Button>
@@ -511,6 +515,7 @@ function ConfirmAction({
               setError("");
             }}
             disabled={busy}
+            className="shrink-0"
           >
             {t("Not yet", "अभी नहीं")}
           </Button>
@@ -524,7 +529,11 @@ function ConfirmAction({
     tone === "solid" ? "primary" : tone === "outline" ? "secondary" : "ghost";
 
   return (
-    <Button variant={triggerVariant} onClick={() => setConfirming(true)}>
+    <Button
+      variant={triggerVariant}
+      onClick={() => setConfirming(true)}
+      className="shrink-0"
+    >
       {triggerLabel}
     </Button>
   );
@@ -735,9 +744,9 @@ function BookingCard({
       )}
 
       {/* Actions */}
-      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-cream-3 pt-4">
+      <div className="mt-5 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar border-t border-cream-3 pt-4 md:flex-wrap md:overflow-visible">
         {booking.status === "Pending" && <PayBalanceButton booking={booking} />}
-        <Button variant="secondary" onClick={onView}>
+        <Button variant="secondary" onClick={onView} className="shrink-0">
           {t("View Details", "विवरण देखें")}
         </Button>
         <DownloadMenu booking={booking} />
@@ -747,10 +756,10 @@ function BookingCard({
 
         {/* Status actions, right-aligned: review a completed order plus the
             Confirmed ⇄ Completed toggle. */}
-        <div className="ml-auto flex flex-wrap items-center gap-3">
+        <div className="ml-auto flex flex-nowrap items-center gap-3 md:flex-wrap">
           {booking.status === "Completed" &&
             (booking.review ? (
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <Stars
                   rating={booking.review.rating}
                   label={t(
@@ -758,7 +767,7 @@ function BookingCard({
                     `आपने 5 में से ${booking.review.rating} स्टार दिए`,
                   )}
                 />
-                <Button variant="ghost" onClick={onReview}>
+                <Button variant="ghost" onClick={onReview} className="shrink-0">
                   {t("Edit review", "समीक्षा संपादित करें")}
                 </Button>
               </div>
@@ -767,6 +776,7 @@ function BookingCard({
                 variant="primary"
                 onClick={onReview}
                 leftIcon={<span aria-hidden="true">★</span>}
+                className="shrink-0"
               >
                 {t("Rate your experience", "अपना अनुभव रेट करें")}
               </Button>
@@ -813,7 +823,7 @@ function DownloadMenu({
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <Button
         variant={variant === "solid" ? "primary" : "secondary"}
         onClick={() => setOpen((o) => !o)}
@@ -1018,7 +1028,7 @@ function BookingDetailsModal({
 
         {/* Footer actions */}
         {!editing && (
-          <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-b-card border-t border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+          <div className="sticky bottom-0 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar rounded-b-card border-t border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7 md:flex-wrap md:overflow-visible">
             <DownloadMenu booking={booking} variant="solid" />
             <Button
               variant="secondary"
@@ -1026,15 +1036,16 @@ function BookingDetailsModal({
               target="_blank"
               rel="noreferrer"
               leftIcon={<span aria-hidden="true">🟢</span>}
+              className="shrink-0"
             >
               {t("Share on WhatsApp", "व्हाट्सएप पर साझा करें")}
             </Button>
-            <Button variant="secondary" onClick={copyLink}>
+            <Button variant="secondary" onClick={copyLink} className="shrink-0">
               {copied ? t("Link copied ✓", "लिंक कॉपी ✓") : t("Copy link", "लिंक कॉपी करें")}
             </Button>
-            <div className="ml-auto flex flex-wrap items-center gap-3">
+            <div className="ml-auto flex flex-nowrap items-center gap-3 md:flex-wrap">
               {editable && (
-                <Button variant="secondary" onClick={() => setEditing(true)}>
+                <Button variant="secondary" onClick={() => setEditing(true)} className="shrink-0">
                   {t("Edit Booking", "बुकिंग संपादित करें")}
                 </Button>
               )}
@@ -1188,11 +1199,11 @@ function EditBookingForm({
 
       {error && <p className="mt-2 text-sm font-medium text-maroon">{error}</p>}
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Button variant="primary" onClick={save}>
+      <div className="mt-5 flex flex-nowrap gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+        <Button variant="primary" onClick={save} className="shrink-0">
           {t("Save Changes", "बदलाव सहेजें")}
         </Button>
-        <Button variant="secondary" onClick={onDone}>
+        <Button variant="secondary" onClick={onDone} className="shrink-0">
           {t("Cancel", "रद्द करें")}
         </Button>
       </div>
@@ -1457,17 +1468,18 @@ function ReviewModal({
             <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
           )}
 
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-nowrap gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
             <Button
               variant="primary"
               onClick={submit}
               disabled={status === "submitting"}
+              className="shrink-0"
             >
               {status === "submitting"
                 ? t("Submitting…", "सबमिट हो रहा है…")
                 : t("Submit review", "समीक्षा सबमिट करें")}
             </Button>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose} className="shrink-0">
               {t("Cancel", "रद्द करें")}
             </Button>
           </div>

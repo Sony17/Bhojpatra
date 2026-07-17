@@ -588,7 +588,7 @@ export default function FloatingChat() {
                     <p className="mb-2.5 text-sm font-semibold text-ink">
                       {t("What do you need help with?", "आपको किसमें मदद चाहिए?")}
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="no-scrollbar -mx-3.5 flex flex-nowrap items-center gap-2 overflow-x-auto px-3.5 md:mx-0 md:flex-wrap md:px-0">
                       {CALLBACK_TOPICS.map((tp) => {
                         const active = topic === tp.en;
                         return (
@@ -596,6 +596,7 @@ export default function FloatingChat() {
                             key={tp.en}
                             selected={active}
                             onClick={() => setTopic(active ? "" : tp.en)}
+                            className="shrink-0 whitespace-nowrap"
                           >
                             {lang === "hi" ? tp.hi : tp.en}
                           </Chip>

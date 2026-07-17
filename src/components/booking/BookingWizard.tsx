@@ -18,6 +18,7 @@ import {
 } from "@/lib/referralRates";
 import LoginGate from "@/components/auth/LoginGate";
 import ThemedSelect from "@/components/ThemedSelect";
+import DatePicker from "@/components/DatePicker";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import {
   useVendorRatings,
@@ -73,7 +74,13 @@ import {
   OTHER_LOCATION_ID,
   type LocationOption,
 } from "@/lib/locations";
-import { readStoredLocation } from "@/lib/detectedLocation";
+import {
+  readStoredLocation,
+  markManualLocation,
+  useDetectedLocation,
+  LOCATION_CHANGED_EVENT,
+  type StoredLocation,
+} from "@/lib/detectedLocation";
 import {
   useOccasions,
   occasionLeadFor,
@@ -360,6 +367,38 @@ export default function BookingWizard() {
     return () => {
       active = false;
     };
+  }, []);
+
+  // Keep the header's "Celebrating in" bar and the booking's City/Location in
+  // lockstep — they read/write one shared location store. Booking → header:
+  // whenever the guest changes the city here (or it's carried in from the URL /
+  // a venue), persist it so the header mirrors it. The store compare guards
+  // against re-emitting an already-synced value, which would loop with the
+  // listener below.
+  useEffect(() => {
+    if (!cityId) return;
+    const custom =
+      cityId === OTHER_LOCATION_ID ? customCity.trim() : undefined;
+    if (cityId === OTHER_LOCATION_ID && !custom) return; // incomplete "Other"
+    const stored = readStoredLocation();
+    if (stored?.cityId === cityId && (stored.customCity ?? "") === (custom ?? ""))
+      return; // already in sync — don't re-emit
+    markManualLocation(cityId, custom);
+  }, [cityId, customCity]);
+
+  // Header → booking: when the location changes anywhere else (the header city
+  // picker, its "use my location", or another tab), mirror it into the booking.
+  // Uses the raw setters (no persist) so it never bounces back through the
+  // effect above.
+  useEffect(() => {
+    function onChanged(e: Event) {
+      const d = (e as CustomEvent<StoredLocation>).detail;
+      if (!d?.cityId) return;
+      setCityId(d.cityId);
+      setCustomCity(d.cityId === OTHER_LOCATION_ID ? (d.customCity ?? "") : "");
+    }
+    window.addEventListener(LOCATION_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(LOCATION_CHANGED_EVENT, onChanged);
   }, []);
 
   // Resolve the referral code to the partner's name so the booking can show
@@ -854,12 +893,12 @@ export default function BookingWizard() {
   const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
   const earliestDate = isoAfterDays(effectiveLeadDays);
   // The date picker's floor is just "today" (no past dates) — NOT the lead-time
-  // earliest. A lead-based `min` greys out every near date in the native/desktop
-  // picker, which reads as "I can't select a date" (esp. Gold/Platinum's 21/45-day
-  // leads). Instead we let the guest pick freely and lean on the soft path:
-  // `leadWarning` explains the shortfall inline and `dateMeetsLead` blocks "Next"
-  // on the details step. Keep them in sync — don't re-tighten this to earliestDate.
-  const todayIso = isoAfterDays(0);
+  // earliest (the EventBar's DatePicker uses `minDaysAhead={0}`). A lead-based
+  // floor greys out every near date, which reads as "I can't select a date"
+  // (esp. Gold/Platinum's 21/45-day leads). Instead we let the guest pick freely
+  // and lean on the soft path: `leadWarning` explains the shortfall inline and
+  // `dateMeetsLead` blocks "Next" on the details step. Keep them in sync — don't
+  // re-tighten the picker floor to earliestDate.
   // When the occasion is the binding constraint, name it — otherwise the guest
   // is told "this package needs 30 days" when it's really the wedding.
   const leadOccasion = occasionLead > packageLead ? resolveOccasion(occasionId) : undefined;
@@ -1505,6 +1544,44 @@ export default function BookingWizard() {
   // The step a guest moves to next (empty on the final Review step).
   const nextStepLabel = step < TOTAL_STEPS ? stepLabels[step] : "";
 
+  // Event brief — occasion / date / city / guests carried from the Hero bar,
+  // editable on every step. Same controlled inputs everywhere, but its position
+  // shifts per layout: on most steps it sits up top, while the Menu / Live Stall
+  // builders reorder it below the builder on mobile (see the grid below) so a
+  // guest can start picking dishes right away. `flush` drops its top margin when
+  // the grid gap already supplies the spacing.
+  const renderEventBar = (flush = false) => (
+    <EventBar
+      lang={lang}
+      t={t}
+      occasionId={occasionId}
+      setOccasionId={setOccasionId}
+      customOccasion={customOccasion}
+      setCustomOccasion={setCustomOccasion}
+      occasionList={occasionList}
+      eventDate={eventDate}
+      setEventDate={setEventDate}
+      cityId={cityId}
+      setCityId={setCityId}
+      customCity={customCity}
+      setCustomCity={setCustomCity}
+      locations={locations}
+      guests={guests}
+      setGuests={setGuests}
+      paxMin={paxMin}
+      paxMax={paxMax}
+      leadWarning={leadWarning}
+      // The confirm step (6) locks the headcount and echoes it in the order
+      // summary, so the editable Guests field is redundant there — hide it.
+      // It stays on the Essentials step (5), where the price scales with guests.
+      showGuests={step !== 6}
+      flush={flush}
+      // The reordered mobile layout (Menu / Live Stall steps, where `flush` is
+      // set) collapses the brief to a one-line summary to keep this section tight.
+      collapsible={flush}
+    />
+  );
+
   return (
     <section className="app-bottom-safe relative mx-auto max-w-[90rem] overflow-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
       {/* A rich editorial opening gives the utility-heavy flow a premium moment. */}
@@ -1576,37 +1653,6 @@ export default function BookingWizard() {
         </div>
       )}
 
-      {/* Event bar — occasion / date / city carried from the Hero booking bar,
-          editable up top on every step. It stays visible on the Add Extras step
-          (3) too, since occasion / date / guests gate the "Next" button there —
-          hiding it would leave the guest unable to satisfy the requirement. */}
-      <EventBar
-        lang={lang}
-        t={t}
-        occasionId={occasionId}
-        setOccasionId={setOccasionId}
-        customOccasion={customOccasion}
-        setCustomOccasion={setCustomOccasion}
-        occasionList={occasionList}
-        eventDate={eventDate}
-        setEventDate={setEventDate}
-        cityId={cityId}
-        setCityId={setCityId}
-        customCity={customCity}
-        setCustomCity={setCustomCity}
-        locations={locations}
-        guests={guests}
-        setGuests={setGuests}
-        paxMin={paxMin}
-        paxMax={paxMax}
-        minDate={todayIso}
-        leadWarning={leadWarning}
-        // The confirm step (6) locks the headcount and echoes it in the order
-        // summary, so the editable Guests field is redundant there — hide it.
-        // It stays on the Essentials step (5), where the price scales with guests.
-        showGuests={step !== 6}
-      />
-
       {/* Layout */}
       {step === 2 || step === 3 ? (
         // Full-width builders — Menu (2) and Live Stall (3). The chosen package
@@ -1614,69 +1660,91 @@ export default function BookingWizard() {
         // builds the plated courses; Live Stall gathers the cook-to-order
         // stations that used to be mixed into the menu. A package with no live
         // stalls (Silver) shows an explanatory panel on Step 3 instead.
+        //
+        // Ordering: on desktop the event brief spans the full width up top, with
+        // the package rail (left) and builder (right) below. On mobile the source
+        // order is overridden so the *builder comes first* — guests land straight
+        // on dish-picking — then the event brief, then the package / price rail.
         <div className="mt-8 grid gap-8 lg:grid-cols-[18rem_1fr]">
-          <SelectedPackageRail
-            lang={lang}
-            t={t}
-            tier={selectedPackage}
-            basePerPlate={basePerPlate}
-            onChange={() => setStep(1)}
-          />
-          {step === 2 ? (
-            <StepMenu
+          {/* Event brief — full-width top on desktop; between builder and rail on mobile. */}
+          <div className="order-2 lg:order-none lg:col-span-2 lg:row-start-1">
+            {renderEventBar(true)}
+          </div>
+          {/* Package / price rail — last on mobile, pinned left on desktop. */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:row-start-2">
+            <SelectedPackageRail
               lang={lang}
               t={t}
-              title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
-              subtitle={t(
-                "Pick vendors and dishes for your plated courses — live counters come next.",
-                "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
-              )}
-              multiVendor={multiVendor}
-              maxVendors={packageId === "silver" ? 5 : undefined}
-              categories={menuStepCategories}
-              activeCat={activeCat}
-              setActiveCat={setActiveCat}
-              categoryVendor={categoryVendor}
-              pickVendor={pickVendor}
-              itemsFor={itemsFor}
-              toggleItem={toggleItem}
-              allowanceFor={allowanceFor}
-              baseAllowanceFor={baseAllowanceFor}
-              categoryComplete={categoryComplete}
-              isSkipped={isSkipped}
-              unskipCat={unskipCat}
-              onSkipMenu={singleStall ? skipMenuEntirely : undefined}
-              vendorRatings={vendorRatings}
+              tier={selectedPackage}
+              basePerPlate={basePerPlate}
+              onChange={() => setStep(1)}
+              // Collapse to a one-line summary on mobile so the event brief +
+              // package sit compactly below the builder.
+              collapsible
             />
-          ) : hasLiveStalls ? (
-            <StepMenu
-              lang={lang}
-              t={t}
-              title={t("Choose Your Live Stalls", "अपने लाइव स्टॉल चुनें")}
-              subtitle={t(
-                "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
-                "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
-              )}
-              multiVendor={multiVendor}
-              categories={liveStallCategories}
-              activeCat={liveCat}
-              setActiveCat={setLiveCat}
-              categoryVendor={categoryVendor}
-              pickVendor={pickVendor}
-              itemsFor={itemsFor}
-              toggleItem={toggleItem}
-              allowanceFor={allowanceFor}
-              baseAllowanceFor={baseAllowanceFor}
-              categoryComplete={categoryComplete}
-              isSkipped={isSkipped}
-              unskipCat={unskipCat}
-              vendorRatings={vendorRatings}
-            />
-          ) : (
-            <LiveStallEmpty t={t} packageName={selectedPackage?.name ?? ""} />
-          )}
+          </div>
+          {/* Builder — first on mobile, right column on desktop. */}
+          <div className="order-1 min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
+            {step === 2 ? (
+              <StepMenu
+                lang={lang}
+                t={t}
+                title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
+                subtitle={t(
+                  "Pick vendors and dishes for your plated courses — live counters come next.",
+                  "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                )}
+                multiVendor={multiVendor}
+                maxVendors={packageId === "silver" ? 5 : undefined}
+                categories={menuStepCategories}
+                activeCat={activeCat}
+                setActiveCat={setActiveCat}
+                categoryVendor={categoryVendor}
+                pickVendor={pickVendor}
+                itemsFor={itemsFor}
+                toggleItem={toggleItem}
+                allowanceFor={allowanceFor}
+                baseAllowanceFor={baseAllowanceFor}
+                categoryComplete={categoryComplete}
+                isSkipped={isSkipped}
+                unskipCat={unskipCat}
+                onSkipMenu={singleStall ? skipMenuEntirely : undefined}
+                vendorRatings={vendorRatings}
+              />
+            ) : hasLiveStalls ? (
+              <StepMenu
+                lang={lang}
+                t={t}
+                title={t("Choose Your Live Stalls", "अपने लाइव स्टॉल चुनें")}
+                subtitle={t(
+                  "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
+                  "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
+                )}
+                multiVendor={multiVendor}
+                categories={liveStallCategories}
+                activeCat={liveCat}
+                setActiveCat={setLiveCat}
+                categoryVendor={categoryVendor}
+                pickVendor={pickVendor}
+                itemsFor={itemsFor}
+                toggleItem={toggleItem}
+                allowanceFor={allowanceFor}
+                baseAllowanceFor={baseAllowanceFor}
+                categoryComplete={categoryComplete}
+                isSkipped={isSkipped}
+                unskipCat={unskipCat}
+                vendorRatings={vendorRatings}
+              />
+            ) : (
+              <LiveStallEmpty t={t} packageName={selectedPackage?.name ?? ""} />
+            )}
+          </div>
         </div>
       ) : (
+      <>
+      {/* Event brief sits up top on these steps (Package / Add-ons / Essentials /
+          Review) — no reordering needed. */}
+      {renderEventBar()}
       <div
         className={
           showSummary
@@ -1841,6 +1909,7 @@ export default function BookingWizard() {
           />
         )}
       </div>
+      </>
       )}
 
       {/* Nav buttons */}
@@ -2221,9 +2290,10 @@ function EventBar({
   setGuests,
   paxMin,
   paxMax,
-  minDate,
   leadWarning,
   showGuests = true,
+  flush = false,
+  collapsible = false,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -2243,20 +2313,45 @@ function EventBar({
   setGuests: (v: number) => void;
   paxMin: number;
   paxMax: number;
-  minDate: string;
   leadWarning: string;
   /** The headcount is fixed and echoed in the order summary by the Confirm
    *  step, so the editable field is hidden there to avoid a redundant control. */
   showGuests?: boolean;
+  /** Drops the card's top margin so it can sit inside a grid whose gap already
+   *  supplies the spacing (used when the event brief is reordered on mobile). */
+  flush?: boolean;
+  /** On mobile only, collapse to a one-line summary (all values shown inline)
+   *  that expands on tap. Desktop always renders the full editable card. */
+  collapsible?: boolean;
 }) {
-  const fieldClass =
-    "mt-1.5 min-h-12 w-full rounded-control border border-cream bg-white px-3.5 py-2.5 text-sm text-ink shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
-  // Trigger styling for the themed dropdowns — mirrors `fieldClass` minus the
-  // wrapper spacing (which sits on the ThemedSelect root instead).
+  // Trigger styling for the themed dropdowns — matches the other field boxes
+  // (bordered, cream, shadowed) so the select reads as one of the inputs.
   const selectButtonClass =
     "min-h-12 w-full rounded-control border border-cream bg-white px-3.5 py-2.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
   const labelClass =
     "text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60";
+
+  // GPS "use my location" for the City field. autoDetect is off — the header
+  // bar already runs the silent IP pre-fill, and detecting here persists to the
+  // same shared store, so the header mirrors it (and the parent's location
+  // listener folds the result back into `cityId`).
+  const { status: geoStatus, detect: detectLocation } = useDetectedLocation(
+    locations,
+    { autoDetect: false },
+  );
+  const detecting = geoStatus === "detecting";
+  const geoMessage =
+    geoStatus === "denied"
+      ? t(
+          "Location permission blocked — pick your city below.",
+          "लोकेशन की अनुमति नहीं मिली — नीचे अपना शहर चुनें।",
+        )
+      : geoStatus === "failed" || geoStatus === "unsupported"
+        ? t(
+            "Couldn't detect your location — pick your city below.",
+            "आपकी लोकेशन नहीं मिल पाई — नीचे अपना शहर चुनें।",
+          )
+        : "";
 
   // Local editing buffer for the typed headcount, so a guest can clear the box
   // and type an explicit number without every keystroke snapping to the package
@@ -2280,13 +2375,86 @@ function EventBar({
   };
   const stepGuests = (delta: number) => setGuests(clampGuests(guests + delta));
 
+  // Collapsed one-line summary (mobile only) — every set value is shown inline
+  // so the guest sees their whole event brief without expanding the card.
+  const [open, setOpen] = useState(false);
+  const occasionName =
+    occasionId === OTHER_OCCASION_ID
+      ? customOccasion.trim()
+      : (occasionList.find((x) => x.id === occasionId) &&
+          (lang === "hi"
+            ? occasionList.find((x) => x.id === occasionId)!.nameHi
+            : occasionList.find((x) => x.id === occasionId)!.name)) || "";
+  const cityName =
+    cityId === OTHER_LOCATION_ID
+      ? customCity.trim()
+      : (locations.find((x) => x.id === cityId) &&
+          (lang === "hi"
+            ? locations.find((x) => x.id === cityId)!.nameHi
+            : locations.find((x) => x.id === cityId)!.name)) || "";
+  const dateName = eventDate ? formatEventDate(eventDate) : "";
+  const summaryParts = [
+    occasionName,
+    dateName,
+    cityName,
+    showGuests ? `${guests} ${t("guests", "मेहमान")}` : "",
+  ].filter(Boolean);
+  const summaryLine =
+    summaryParts.length > 0
+      ? summaryParts.join(" · ")
+      : t("Add your event details", "अपने इवेंट की जानकारी जोड़ें");
+
   return (
-    <div className="relative mt-5 rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:mt-7 sm:p-6">
+    <div
+      className={
+        "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 " +
+        (flush ? "" : "mt-5 sm:mt-7")
+      }
+    >
       <span
         className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
         aria-hidden="true"
       />
-      <div className="flex items-center justify-between gap-4">
+      {/* Mobile collapsed summary — the whole brief on one tappable line; hidden
+          on desktop, where the full card is always shown. */}
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-between gap-3 text-left lg:hidden"
+        >
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
+              {t("YOUR EVENT", "आपका इवेंट")}
+            </span>
+            <span className="min-w-0 truncate text-xs text-ink/70">
+              {summaryLine}
+            </span>
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            className={
+              "h-4 w-4 shrink-0 text-maroon transition-transform " +
+              (open ? "rotate-180" : "")
+            }
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      )}
+      <div
+        className={
+          "flex items-center justify-between gap-4 " +
+          (collapsible ? "hidden lg:flex" : "")
+        }
+      >
         <div className="flex min-w-0 items-baseline gap-2">
           <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
             {t("YOUR EVENT", "आपका इवेंट")}
@@ -2305,7 +2473,8 @@ function EventBar({
       <div
         className={
           "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 " +
-          (showGuests ? "lg:grid-cols-4" : "lg:grid-cols-3")
+          (showGuests ? "lg:grid-cols-4 " : "lg:grid-cols-3 ") +
+          (collapsible && !open ? "hidden lg:grid" : "")
         }
       >
         <label className="block">
@@ -2340,28 +2509,32 @@ function EventBar({
           )}
         </label>
 
-        <label className="block">
+        <div className="block">
           <span className={labelClass}>{t("Date", "तारीख")}</span>
-          <input
-            type="date"
-            value={eventDate}
-            min={minDate}
-            onChange={(e) => setEventDate(e.target.value)}
-            // Open the calendar on a tap anywhere in the field — native date
-            // inputs otherwise only respond to the tiny indicator, which reads
-            // as "the date won't select".
-            onClick={(e) => {
-              try {
-                e.currentTarget.showPicker?.();
-              } catch {
-                /* not supported / not user-activated — native click still works */
-              }
-            }}
+          {/* Branded calendar (same on-brand popup as the Hero booking bar)
+              instead of the OS-grey native date control. Controlled by the
+              carried-over event date; the floor is just today (no past dates,
+              `minDaysAhead={0}`) — the lead-time shortfall is surfaced softly by
+              `leadWarning` below, per the date-floor note earlier in this file. */}
+          <DatePicker
             className={
-              fieldClass +
-              " cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100" +
-              (leadWarning ? " border-maroon" : "")
+              "mt-1.5 min-h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
+              (leadWarning ? "border-maroon" : "border-cream focus-within:border-maroon")
             }
+            buttonClassName="min-h-12 w-full px-3.5 py-2.5 pr-11 text-sm"
+            iconClassName="right-3.5"
+            placeholder={t("Select date", "तारीख चुनें")}
+            ariaLabel={t("Event date", "इवेंट की तारीख")}
+            direction="down"
+            align="left"
+            minDaysAhead={0}
+            valueIso={eventDate}
+            onChange={(d) => {
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, "0");
+              const day = String(d.getDate()).padStart(2, "0");
+              setEventDate(`${y}-${m}-${day}`);
+            }}
           />
           {leadWarning && (
             <span className="mt-1.5 flex items-start gap-1.5 text-xs text-maroon">
@@ -2369,10 +2542,35 @@ function EventBar({
               <span>{leadWarning}</span>
             </span>
           )}
-        </label>
+        </div>
 
-        <label className="block">
-          <span className={labelClass}>{t("City / Location", "शहर / लोकेशन")}</span>
+        <div className="block">
+          <div className="flex items-center justify-between gap-2">
+            <span className={labelClass}>{t("City / Location", "शहर / लोकेशन")}</span>
+            <button
+              type="button"
+              onClick={() => void detectLocation()}
+              disabled={detecting}
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.06em] text-maroon transition hover:underline disabled:opacity-60"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+              {detecting
+                ? t("Detecting…", "पता लगा रहे हैं…")
+                : t("Use my location", "मेरी लोकेशन")}
+            </button>
+          </div>
           {cityId === OTHER_LOCATION_ID ? (
             <OtherField
               value={customCity}
@@ -2401,7 +2599,12 @@ function EventBar({
               ]}
             />
           )}
-        </label>
+          {geoMessage && (
+            <span className="mt-1.5 block text-[11px] text-maroon/80">
+              {geoMessage}
+            </span>
+          )}
+        </div>
 
         {showGuests && (
           <div className="flex flex-col justify-center gap-3 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
@@ -2724,7 +2927,7 @@ function StepMenu({
       )}
 
       {/* Category tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {categories.map((c, i) => {
           const active = i === activeCat;
           const complete = categoryComplete(c);
@@ -2735,7 +2938,7 @@ function StepMenu({
               type="button"
               onClick={() => setActiveCat(i)}
               className={
-                "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition " +
+                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition " +
                 (active
                   ? "border-maroon bg-maroon text-cream"
                   : skipped
@@ -2816,7 +3019,7 @@ function StepMenu({
               aria-pressed={selected}
               onClick={() => pickVendor(cat.id, v.id)}
               className={
-                "group relative flex w-56 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md " +
+                "group relative flex w-40 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:w-56 " +
                 (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
@@ -2825,12 +3028,12 @@ function StepMenu({
                   src={v.image}
                   alt={v.name}
                   fill
-                  sizes="224px"
+                  sizes="(min-width: 640px) 224px, 160px"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
-              <div className="flex flex-1 flex-col p-4">
-                <h4 className="font-sans text-sm font-semibold text-maroon">
+              <div className="flex flex-1 flex-col p-3 sm:p-4">
+                <h4 className="font-sans text-xs font-semibold text-maroon sm:text-sm">
                   {v.name}
                 </h4>
                 {v.reviews > 0 ? (
@@ -2865,10 +3068,31 @@ function StepMenu({
                     )}
                   </p>
                 )}
+                {/* Menu preview — list this vendor's dishes row-wise so guests
+                    can gauge the spread before selecting. */}
+                {v.items.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-0.5 border-t border-cream-3 pt-2">
+                    {v.items.map((it: CategoryItem) => (
+                      <span
+                        key={it.id}
+                        className="flex items-center gap-1.5 text-[11px] leading-tight text-ink-soft"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={
+                            "inline-block h-2 w-2 shrink-0 rounded-sm border " +
+                            (it.diet === "veg" ? "border-ink" : "border-maroon")
+                          }
+                        />
+                        <span className="truncate">{it.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <span
                 className={
-                  "block py-2 text-center text-xs font-semibold uppercase tracking-wide transition " +
+                  "block py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide transition sm:py-2 sm:text-xs " +
                   (selected
                     ? "bg-maroon text-cream"
                     : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
@@ -3003,7 +3227,9 @@ function StepMenu({
                     </span>
                   )}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                {/* Swiggy/Zomato-style menu list — one dish per row, thumbnail
+                    on the left, add/added control on the right. */}
+                <div className="mt-2 flex flex-col gap-2">
                   {vendor.items.map((it: CategoryItem) => {
                       const active = picks.includes(it.id);
                       const atCap =
@@ -3015,36 +3241,64 @@ function StepMenu({
                           type="button"
                           onClick={() => toggleItem(cat.id, it.id)}
                           disabled={atCap}
+                          aria-pressed={active}
                           className={
-                            "flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition " +
+                            "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition " +
                             (active
-                              ? "border-maroon bg-maroon text-cream"
+                              ? "border-maroon bg-cream-2 ring-1 ring-maroon"
                               : atCap
-                                ? "cursor-not-allowed border-cream-3 bg-white text-ink-soft/40"
-                                : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                                ? "cursor-not-allowed border-cream-3 bg-white opacity-50"
+                                : "border-cream-3 bg-white hover:bg-cream-2")
                           }
                         >
-                          {it.photo && (
-                            <span className="relative -ml-2 block h-7 w-7 shrink-0 overflow-hidden rounded-full border border-cream-3">
+                          {/* Dish thumbnail — falls back to the course icon when a
+                              seed vendor hasn't uploaded a photo. */}
+                          <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
+                            {it.photo ? (
                               <Image
                                 src={it.photo}
                                 alt=""
                                 fill
-                                sizes="28px"
+                                sizes="64px"
                                 className="object-cover"
                               />
+                            ) : (
+                              <span
+                                aria-hidden="true"
+                                className="flex h-full w-full items-center justify-center text-2xl"
+                              >
+                                {cat.icon}
+                              </span>
+                            )}
+                          </span>
+                          {/* Diet mark + dish name */}
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            <span
+                              aria-hidden="true"
+                              className={
+                                "inline-block h-3.5 w-3.5 shrink-0 rounded-sm border " +
+                                (it.diet === "veg"
+                                  ? "border-ink"
+                                  : "border-maroon")
+                              }
+                            />
+                            <span className="truncate text-sm font-medium text-ink">
+                              {it.name}
                             </span>
-                          )}
+                          </span>
+                          {/* Add / added control */}
                           <span
-                            aria-hidden="true"
                             className={
-                              "inline-block h-2.5 w-2.5 rounded-sm border " +
-                              (it.diet === "veg" ? "border-ink" : "border-maroon") +
-                              (active ? " bg-cream" : "")
+                              "shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition " +
+                              (active
+                                ? "border-maroon bg-maroon text-cream"
+                                : "border-maroon bg-white text-maroon")
                             }
-                          />
-                          {active && "✓ "}
-                          {it.name}
+                          >
+                            {active
+                              ? `✓ ${t("Added", "जोड़ा")}`
+                              : t("Add", "जोड़ें")}
+                          </span>
                         </button>
                       );
                     })}
@@ -3654,20 +3908,20 @@ function PaymentBox({
               <p className="text-sm text-ink-soft">
                 {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
+              <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible">
+                <span className="shrink-0 whitespace-nowrap rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
                   {merchant.vpa}
                 </span>
                 <button
                   type="button"
                   onClick={copyVpa}
-                  className="rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+                  className="shrink-0 whitespace-nowrap rounded-full border border-maroon px-4 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
                 >
                   {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
                 </button>
                 <a
                   href={upiUri}
-                  className="rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon/90"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-maroon px-4 py-2 text-xs font-semibold text-cream transition hover:bg-maroon/90"
                 >
                   {t("Open UPI app", "UPI ऐप खोलें")}
                 </a>
@@ -3720,7 +3974,7 @@ function PaymentBox({
                 `${money(advanceAmount)} एडवांस के बाद, ${money(balanceAmount)} शेष राशि एकमुश्त या आसान EMI में चुकाएं।`,
               )}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible">
               {emiOptions.map((n) => {
                 const active = emiSelected === n;
                 const label =
@@ -3734,7 +3988,7 @@ function PaymentBox({
                     aria-pressed={active}
                     onClick={() => setEmiCount(n)}
                     className={
-                      "rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                      "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition " +
                       (active
                         ? "border-maroon bg-maroon text-cream"
                         : "border-cream-3 bg-white text-ink hover:bg-cream-2")
@@ -4581,18 +4835,70 @@ function SelectedPackageRail({
   tier,
   basePerPlate,
   onChange,
+  collapsible = false,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
   tier: PackageTier | undefined;
   basePerPlate: number;
   onChange: () => void;
+  /** On mobile only, collapse to a one-line summary (package · base price) that
+   *  expands on tap. Desktop always renders the full detail card. */
+  collapsible?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   if (!tier) return null;
+  const tierName = lang === "hi" ? tier.nameHi : tier.name;
+  const summaryLine = `${tierName} · ${money(basePerPlate)} ${t("/ plate", "/ प्लेट")}`;
   return (
     <aside className="lg:sticky lg:top-32 lg:self-start">
       <div className="rounded-2xl border border-maroon bg-white p-5 shadow-sm ring-2 ring-maroon">
-        <p className="eyebrow text-xs font-semibold text-gold">
+        {/* Mobile collapsed summary — package + base price on one tappable line;
+            hidden on desktop, where the full card is always shown. */}
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="flex w-full items-center justify-between gap-3 text-left lg:hidden"
+          >
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="eyebrow shrink-0 text-xs font-semibold text-gold">
+                {t("YOUR PACKAGE", "आपका पैकेज")}
+              </span>
+              <span className="min-w-0 truncate text-xs font-semibold text-ink/70">
+                {summaryLine}
+              </span>
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className={
+                "h-4 w-4 shrink-0 text-maroon transition-transform " +
+                (open ? "rotate-180" : "")
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        )}
+        {/* Full detail — on mobile shown only when expanded; desktop always. */}
+        <div
+          className={
+            collapsible ? (open ? "mt-3 lg:mt-0" : "hidden lg:block") : ""
+          }
+        >
+        <p
+          className={
+            "eyebrow text-xs font-semibold text-gold " +
+            (collapsible ? "hidden lg:block" : "")
+          }
+        >
           {t("YOUR PACKAGE", "आपका पैकेज")}
         </p>
         <div className="mt-2 flex items-center justify-between">
@@ -4654,6 +4960,7 @@ function SelectedPackageRail({
         >
           {t("Change package", "पैकेज बदलें")}
         </button>
+        </div>
       </div>
     </aside>
   );

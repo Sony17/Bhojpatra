@@ -22,7 +22,7 @@ export default function Pagination({
   const to = Math.min(page * pageSize, total);
 
   const btn =
-    "focus-ring inline-flex h-11 min-w-11 items-center justify-center rounded-control border px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:min-w-9";
+    "focus-ring inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-control border px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:min-w-9";
 
   // Windowed page list: first, last and current ±1 with "…" gaps, so a large
   // page count never overflows the row on any screen.
@@ -40,7 +40,7 @@ export default function Pagination({
         <span className="font-medium text-ink">{total}</span>
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
+      <div className="flex flex-nowrap items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
@@ -55,7 +55,7 @@ export default function Pagination({
             <span
               key={`gap-${i}`}
               aria-hidden="true"
-              className="inline-flex h-9 min-w-9 items-center justify-center text-sm text-ink-soft"
+              className="inline-flex h-9 min-w-9 shrink-0 items-center justify-center text-sm text-ink-soft"
             >
               …
             </span>

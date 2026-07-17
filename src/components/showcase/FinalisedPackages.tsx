@@ -24,6 +24,7 @@ import { packages, packageCategoryItems, type PackageTier, type PackageFeature }
 import Reveal from "@/components/Reveal";
 import SectionIntro from "@/components/SectionIntro";
 import { Button } from "@/components/ui";
+import { Share } from "@/components/icons";
 import { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
@@ -414,9 +415,40 @@ function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
   );
 }
 
+/** One tactile pill action inside the footer's ornamented panel. */
+function FooterChip({
+  as = "a",
+  icon,
+  children,
+  ...rest
+}: {
+  as?: "a" | "button";
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+} & React.ComponentPropsWithoutRef<"a"> &
+  React.ComponentPropsWithoutRef<"button">) {
+  const className =
+    "group inline-flex items-center justify-center gap-2 rounded-full border border-maroon/25 bg-white/80 px-4 py-2.5 text-sm font-semibold text-maroon shadow-card transition-colors hover:border-maroon hover:bg-maroon hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2";
+  if (as === "button") {
+    return (
+      <button type="button" className={className} {...rest}>
+        {icon}
+        {children}
+      </button>
+    );
+  }
+  return (
+    <a className={className} {...rest}>
+      {icon}
+      {children}
+    </a>
+  );
+}
+
 /**
- * Compact post-tier footer — compare, single stall, chat, and share sit on
- * one line so the section doesn't trail off into scattered blocks.
+ * Post-tier footer — a framed, ornamented "still deciding?" panel that gathers
+ * compare, single-stall, chat and share into refined pill actions, so the
+ * section resolves on a deliberate closing note instead of trailing off.
  */
 function PackageFooter({
   tiers,
@@ -431,85 +463,94 @@ function PackageFooter({
   const [open, setOpen] = useState(false);
   const customName = custom ? (lang === "hi" ? custom.nameHi : custom.name) : null;
 
-  const linkClass =
-    "inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-maroon underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2";
+  const shareHref = `https://wa.me/?text=${encodeURIComponent(
+    `${t(
+      "Check out Bhojpatra's ready-made feast packages — Silver, Gold & Platinum:",
+      "भोजपत्र के तैयार फीस्ट पैकेज देखें — सिल्वर, गोल्ड और प्लैटिनम:",
+    )} ${SITE_ORIGIN}/#packages`,
+  )}`;
 
   return (
-    <div className="text-center">
-      <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-ink-soft">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className={linkClass}
-        >
-          {open
-            ? t("Hide comparison", "तुलना छुपाएँ")
-            : t("Compare every tier", "हर टियर की तुलना करें")}
-          <span
-            aria-hidden
-            className={`text-base leading-none transition-transform duration-200 ${open ? "rotate-45" : ""}`}
-          >
-            +
-          </span>
-        </button>
+    <div>
+      {/* Ornamented panel — cream ground, double-hairline frame, brand shadow */}
+      <div className="relative overflow-hidden rounded-card border border-maroon/20 bg-cream/35 px-6 py-9 text-center shadow-brand sm:px-10">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-2.5 rounded-[0.5rem] border border-maroon/12"
+        />
 
-        {custom && (
-          <>
-            <span aria-hidden className="text-maroon/30">
-              ·
-            </span>
-            <a
-              href="/book?package=custom&step=menu"
-              className={linkClass}
-              title={t(
-                "Build your own menu, one vendor — and pay only for what you pick.",
-                "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
-              )}
+        <div className="relative flex flex-col items-center">
+          <Ornament className="text-maroon/40" />
+          <h3 className="mt-4 font-display text-2xl leading-tight text-maroon sm:text-[1.6rem]">
+            {t("Still choosing your tier?", "अभी अपना टियर चुन रहे हैं?")}
+          </h3>
+          <p className="mt-2 max-w-md text-sm text-ink-soft">
+            {t(
+              "Compare them side by side, build a single stall, or ask us anything.",
+              "इन्हें साथ-साथ देखें, सिंगल स्टॉल बनाएँ, या हमसे कुछ भी पूछें।",
+            )}
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+            <FooterChip
+              as="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              icon={
+                <span
+                  aria-hidden
+                  className={`text-base leading-none transition-transform duration-200 ${open ? "rotate-45" : ""}`}
+                >
+                  +
+                </span>
+              }
             >
-              {customName}
-              <span aria-hidden>→</span>
-            </a>
-          </>
-        )}
+              {open
+                ? t("Hide comparison", "तुलना छुपाएँ")
+                : t("Compare every tier", "हर टियर की तुलना करें")}
+            </FooterChip>
 
-        <span aria-hidden className="text-maroon/30">
-          ·
-        </span>
-        <a
-          href={waLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          <WhatsAppIcon className="h-3.5 w-3.5" />
-          {t("Chat with us", "हमसे बात करें")}
-        </a>
+            {custom && (
+              <FooterChip
+                href="/book?package=custom&step=menu"
+                title={t(
+                  "Build your own menu, one vendor — and pay only for what you pick.",
+                  "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
+                )}
+              >
+                {customName}
+                <span aria-hidden>→</span>
+              </FooterChip>
+            )}
 
-        <span aria-hidden className="text-maroon/30">
-          ·
-        </span>
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(
-            `${t(
-              "Check out Bhojpatra's ready-made feast packages — Silver, Gold & Platinum:",
-              "भोजपत्र के तैयार फीस्ट पैकेज देखें — सिल्वर, गोल्ड और प्लैटिनम:",
-            )} ${SITE_ORIGIN}/#packages`,
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          {t("Share packages", "पैकेज शेयर करें")}
-        </a>
+            <FooterChip
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              icon={<WhatsAppIcon className="h-4 w-4" />}
+            >
+              {t("Chat with us", "हमसे बात करें")}
+            </FooterChip>
+
+            <FooterChip
+              href={shareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              icon={<Share className="h-4 w-4" />}
+            >
+              {t("Share packages", "पैकेज शेयर करें")}
+            </FooterChip>
+          </div>
+
+          <p className="mt-6 inline-flex items-center gap-2 text-xs text-ink-soft">
+            <span aria-hidden className="h-1.5 w-1.5 rotate-45 bg-maroon/70" />
+            {t(
+              "Prices are approximate — final price depends on your menu, guests & vendors.",
+              "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
+            )}
+          </p>
+        </div>
       </div>
-
-      <p className="mt-3 text-xs text-ink-soft">
-        {t(
-          "Prices are approximate — final price depends on your menu, guests & vendors.",
-          "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
-        )}
-      </p>
 
       {open && (
         <div className="mt-7">
@@ -533,12 +574,6 @@ export default function FinalisedPackages() {
     "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
   );
   const waLink = `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(waText)}`;
-
-  const trust: Bi[] = [
-    ["Verified vendors", "वेरिफाइड वेंडर"],
-    ["Transparent pricing", "पारदर्शी कीमत"],
-    ["Book with a small advance", "छोटे अग्रिम से बुक करें"],
-  ];
 
   return (
     <section id="packages" className="relative overflow-hidden bg-white py-16 sm:py-20">
@@ -598,16 +633,6 @@ export default function FinalisedPackages() {
               </div>
             );
           })}
-        </Reveal>
-
-        {/* Trust strip */}
-        <Reveal className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-soft">
-          {trust.map((item) => (
-            <span key={item[0]} className="inline-flex items-center gap-1.5">
-              <CheckIcon className="h-4 w-4 text-maroon" />
-              {lang === "hi" ? item[1] : item[0]}
-            </span>
-          ))}
         </Reveal>
 
         {/* One footer line: compare · single stall · chat · share */}

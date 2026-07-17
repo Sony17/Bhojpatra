@@ -16,7 +16,7 @@ interface TabsProps {
 
 export default function Tabs({ tabs, active, onChange, className = "" }: TabsProps) {
   return (
-    <div className={"flex flex-wrap gap-2.5 " + className}>
+    <div className={"flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar " + className}>
       {tabs.map((t) => {
         const isActive = t.id === active;
         return (
@@ -26,7 +26,7 @@ export default function Tabs({ tabs, active, onChange, className = "" }: TabsPro
             onClick={() => onChange(t.id)}
             aria-pressed={isActive}
             className={
-              "rounded-full px-5 py-2 text-sm font-medium transition-colors " +
+              "shrink-0 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-colors " +
               (isActive
                 ? "bg-maroon text-cream"
                 : "bg-cream-2 text-ink-soft hover:bg-cream-3")

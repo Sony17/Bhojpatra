@@ -482,11 +482,12 @@ function VenueBooking({
               </p>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="-mx-4 mt-4 flex flex-nowrap items-center gap-3 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
               {/* Want catering at this venue too? Carry it into the feast wizard. */}
               <Button
                 href={cateringHref}
                 variant="secondary"
+                className="shrink-0 whitespace-nowrap"
                 leftIcon={<span aria-hidden="true">🍽️</span>}
               >
                 {t("Add catering for this venue", "इस वेन्यू के लिए कैटरिंग जोड़ें")}
@@ -495,6 +496,7 @@ function VenueBooking({
               <WhatsAppShareButton
                 path={`/venues/${venue.id}`}
                 variant="ghost"
+                className="shrink-0 whitespace-nowrap"
                 label="Share this venue"
                 labelHi="यह वेन्यू शेयर करें"
                 message={`Check out ${venue.name}${cityLabel ? ` in ${cityLabel}` : ""} on Bhojpatra — a ${venue.type} for your celebration, booking from ${venue.priceFrom}.`}
@@ -788,13 +790,14 @@ function VenueBooking({
                           <p className="text-sm text-ink-soft">
                             {t("Pay to this UPI ID", "इस UPI आईडी पर भुगतान करें")}
                           </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="rounded-control border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
+                          <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible">
+                            <span className="shrink-0 whitespace-nowrap rounded-control border border-cream-3 bg-cream-2/40 px-4 py-2 text-sm font-semibold text-ink">
                               {merchant.vpa}
                             </span>
                             <Button
                               variant="secondary"
                               size="sm"
+                              className="shrink-0 whitespace-nowrap"
                               onClick={() => {
                                 navigator.clipboard?.writeText(merchant.vpa).then(
                                   () => setCopied(true),
@@ -804,7 +807,7 @@ function VenueBooking({
                             >
                               {copied ? t("Copied", "कॉपी हो गया") : t("Copy", "कॉपी")}
                             </Button>
-                            <Button href={upiUri} variant="primary" size="sm">
+                            <Button href={upiUri} variant="primary" size="sm" className="shrink-0 whitespace-nowrap">
                               {t("Open UPI app", "UPI ऐप खोलें")}
                             </Button>
                           </div>

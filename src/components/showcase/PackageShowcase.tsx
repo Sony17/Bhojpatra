@@ -475,7 +475,7 @@ function DishPreview() {
             <h3 className="text-xl">{t.name}</h3>
             <span className="text-sm font-semibold">{t.price}</span>
           </div>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="no-scrollbar mt-4 flex flex-nowrap gap-3 overflow-x-auto md:flex-wrap md:overflow-visible">
             {t.dishes.map((d) => (
               <DishThumb key={d.name} name={d.name} img={d.img} onDark={t.id === "platinum"} />
             ))}
@@ -507,11 +507,11 @@ function GuestFit() {
           >
             {t.pax}
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="no-scrollbar mt-3 flex flex-nowrap gap-1.5 overflow-x-auto md:flex-wrap md:overflow-visible">
             {t.occasions.map((o) => (
               <span
                 key={o}
-                className={`rounded-full px-2.5 py-1 text-xs ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${
                   t.id === "platinum"
                     ? "bg-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.9)]"
                     : "bg-[rgba(0,0,0,0.05)] text-[rgba(0,0,0,0.7)]"
@@ -593,7 +593,7 @@ export default function PackageShowcase() {
           every card uses only the four brand colours (surfaces climb white →
           cream → red as the tier climbs).
         </p>
-        <div className="mt-5 flex flex-wrap gap-2 text-xs">
+        <div className="no-scrollbar mt-5 flex flex-nowrap gap-2 overflow-x-auto text-xs md:flex-wrap md:overflow-visible">
           {[
             "1 · Stat strip",
             "2 · Cumulative",
@@ -607,7 +607,7 @@ export default function PackageShowcase() {
           ].map((c) => (
             <span
               key={c}
-              className="rounded-full bg-[rgba(185,32,37,0.08)] px-3 py-1 font-medium text-maroon"
+              className="shrink-0 whitespace-nowrap rounded-full bg-[rgba(185,32,37,0.08)] px-3 py-1 font-medium text-maroon"
             >
               {c}
             </span>

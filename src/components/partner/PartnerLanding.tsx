@@ -129,11 +129,11 @@ export default function PartnerLanding() {
             </div>
 
             {/* Quick stat pills */}
-            <ul className="mt-10 flex flex-wrap gap-3">
+            <ul className="mt-10 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
               {stats.map((s) => (
                 <li
                   key={s.label}
-                  className="rounded-full border border-maroon/20 bg-white/70 px-4 py-2 text-sm backdrop-blur-sm"
+                  className="shrink-0 whitespace-nowrap rounded-full border border-maroon/20 bg-white/70 px-4 py-2 text-sm backdrop-blur-sm"
                 >
                   <span className="font-semibold text-ink">{s.value}</span>{" "}
                   <span className="text-ink-soft">{s.label}</span>

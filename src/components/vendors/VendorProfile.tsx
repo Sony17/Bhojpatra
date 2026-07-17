@@ -107,11 +107,11 @@ export default function VendorProfile({
             )}
 
             {profile.cuisines.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-3 flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
                 {profile.cuisines.map((c) => (
                   <span
                     key={c}
-                    className="rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink-soft"
+                    className="shrink-0 whitespace-nowrap rounded-full bg-cream-2 px-2.5 py-1 text-xs font-medium text-ink-soft"
                   >
                     {c}
                   </span>
@@ -187,11 +187,11 @@ export default function VendorProfile({
                   + ₹{inr.format(course.perPlate)}/{t("plate", "प्लेट")}
                 </span>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="-mx-5 mt-4 flex flex-nowrap gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
                 {course.items.map((it, i) => (
                   <span
                     key={`${it.name}-${i}`}
-                    className="flex items-center gap-1.5 rounded-full border border-cream-3 bg-cream/40 py-1.5 pl-2 pr-4 text-sm text-ink"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cream-3 bg-cream/40 py-1.5 pl-2 pr-4 text-sm text-ink"
                   >
                     {it.photo && (
                       <span className="relative block h-7 w-7 shrink-0 overflow-hidden rounded-full border border-cream-3">
