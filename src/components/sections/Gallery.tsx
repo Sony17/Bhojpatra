@@ -40,7 +40,7 @@ export default function Gallery() {
             className="marquee-pause relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)]"
           >
             <div
-              className="flex w-max gap-2 motion-reduce:!animate-none sm:gap-2.5"
+              className="flex w-max motion-reduce:!animate-none"
               style={{
                 animation: `bp-marquee ${idx === 0 ? 42 : 55}s linear infinite`,
                 animationDirection: reverse ? "reverse" : "normal",
@@ -49,7 +49,7 @@ export default function Gallery() {
               {[...row, ...row].map((item: HomeGalleryItem, i: number) => (
                 <div
                   key={`${item.id}-${i}`}
-                  className="group relative aspect-[4/5] w-[6.5rem] shrink-0 overflow-hidden rounded-card shadow-card ring-1 ring-maroon/10 sm:w-32 lg:w-40"
+                  className="group relative aspect-[4/5] w-[6.5rem] shrink-0 overflow-hidden rounded-card shadow-card ring-1 ring-maroon/10 mr-2 sm:mr-2.5 sm:w-32 lg:w-40"
                 >
                   {item.image && (
                     <Image
@@ -57,6 +57,7 @@ export default function Gallery() {
                       alt={i < row.length ? item.title : ""}
                       fill
                       sizes="(min-width:1024px) 160px, (min-width:640px) 128px, 104px"
+                      loading="eager"
                       className="object-cover transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-105"
                       unoptimized={isUnoptimized(item.image)}
                     />
