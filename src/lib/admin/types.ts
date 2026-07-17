@@ -88,6 +88,10 @@ export interface PendingVendorApproval {
 export interface AdminBookingRow {
   id: string;
   customer: string;
+  /** Customer contact captured at booking time, so staff can reach out straight
+   *  from the dashboard. Absent on demo/legacy rows. */
+  phone?: string;
+  email?: string;
   occasion: string;
   date: string;
   vendor: string;

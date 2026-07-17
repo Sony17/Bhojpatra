@@ -110,6 +110,38 @@ export interface Venue {
 const img = (id: string, w = 800) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
 
+/**
+ * Placeholder dish photography. Seed menu items ship without their own photo,
+ * so the booking menu deterministically borrows from this pool of verified
+ * food shots to stay premium-looking until real dish images are uploaded.
+ * (All ids are already allow-listed via {@link img}.)
+ */
+const DUMMY_DISH_PHOTOS = [
+  "photo-1414235077428-338989a2e8c0",
+  "photo-1437418747212-8d9709afab22",
+  "photo-1473093295043-cdd812d0e601",
+  "photo-1490645935967-10de6ba17061",
+  "photo-1565557623262-b51c2513a641",
+  "photo-1565895405227-31cffbe0cf86",
+  "photo-1567188040759-fb8a883dc6d8",
+  "photo-1578985545062-69928b1d9587",
+  "photo-1585032226651-759b368d7246",
+  "photo-1601050690597-df0568f70950",
+  "photo-1606471191009-63994c53433b",
+  "photo-1606491956689-2ea866880c84",
+  "photo-1630383249896-424e482df921",
+  "photo-1631452180519-c014fe946bc7",
+  "photo-1633945274405-b6c8069047b0",
+];
+
+/** Deterministic dummy dish photo — same seed (item id) always maps to the
+ *  same food shot, so the menu stays stable across renders. */
+export const dummyDishPhoto = (seed: string, w = 240) => {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return img(DUMMY_DISH_PHOTOS[h % DUMMY_DISH_PHOTOS.length], w);
+};
+
 export interface ValueProp {
   title: string;
   description: string;

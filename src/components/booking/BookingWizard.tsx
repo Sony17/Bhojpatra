@@ -61,6 +61,7 @@ import {
   DEFAULT_VENDOR_LEAD_DAYS,
   vendorLeadDays,
   vendorListings,
+  dummyDishPhoto,
   type PackageTier,
   type AddOn,
   type MenuCategory,
@@ -127,6 +128,60 @@ type VendorMap = Record<string, string[]>;
  *  so a category's picks may span several selected vendors. */
 type ItemMap = Record<string, string[]>;
 
+// The wizard's selections live only in React state, so a browser/system "back"
+// (or a reload) that unmounts /book would otherwise wipe a half-built menu.
+// Snapshot the guest's picks to sessionStorage and rehydrate on mount so
+// returning to the wizard resumes exactly where they left off. Scoped to the
+// tab session — a fresh visit (new tab / after a confirmed booking) starts clean.
+const DRAFT_KEY = "bhojpatra:booking:draft:v1";
+
+type BookingDraft = {
+  step: number;
+  packageId: string;
+  activeCat: number;
+  liveCat: number;
+  categoryVendor: VendorMap;
+  categoryItems: ItemMap;
+  skippedCats: string[];
+  occasionId: string;
+  customOccasion: string;
+  guests: number;
+  eventDate: string;
+  venue: string;
+  venueFee: number;
+  selectedAddOns: string[];
+  addOnVendor: Record<string, string[]>;
+  serviceId: string;
+};
+
+function readBookingDraft(): Partial<BookingDraft> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Partial<BookingDraft>) : null;
+  } catch {
+    return null; // storage disabled / corrupt JSON — fall back to a fresh start
+  }
+}
+
+function writeBookingDraft(draft: BookingDraft): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    /* storage full / disabled — persistence is best-effort */
+  }
+}
+
+function clearBookingDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(Math.round(n))}`;
 
@@ -185,6 +240,11 @@ export default function BookingWizard() {
   // signed in — the Confirm step (payment + place order) gates on this.
   const sessionStatus = useSessionStatus();
 
+  // Flipped once the persisted draft (if any) has been read back into state, so
+  // the save effect below doesn't clobber a stored draft with initial defaults
+  // before rehydration runs. See the restore/save effects further down.
+  const hydrated = useRef(false);
+
   const [step, setStep] = useState<number>(1);
 
   // Step 1 — Package
@@ -222,9 +282,11 @@ export default function BookingWizard() {
   // total, invoice and receipt. A free-text venue (Hero bar) carries no fee.
   const [venueFee, setVenueFee] = useState<number>(0);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
-  // add-on id → chosen vendor (catalogue) id. The roster a guest can choose
-  // from is narrowed to the selected package's tier (see PACKAGE_VENDOR_TIERS).
-  const [addOnVendor, setAddOnVendor] = useState<Record<string, string>>({});
+  // add-on id → chosen vendor (catalogue) ids. Single-vendor tiers hold one id;
+  // multi-vendor tiers (Platinum always, big Gold) may split a counter across
+  // several vendors — same "as per package" rule as the plated menu. The roster
+  // a guest picks from is narrowed to the package's tier (PACKAGE_VENDOR_TIERS).
+  const [addOnVendor, setAddOnVendor] = useState<Record<string, string[]>>({});
 
   // Feast-wide service package (Step 4) — a mandatory single-select. The live
   // list is admin-managed (`useServices`, falling back to the seed); the chosen
@@ -296,6 +358,48 @@ export default function BookingWizard() {
     return locations.find((c) => c.id === id) ?? cities.find((c) => c.id === id);
   };
 
+  // Rehydrate a persisted draft (see DRAFT_KEY) BEFORE the URL / location
+  // effects below run: a fresh deep-link's query params (occasion / date /
+  // package / step…) still override a stale draft, while a plain return to
+  // /book — via browser back, reload, or a bounce through login — resumes the
+  // half-built menu instead of starting over. City is intentionally left out;
+  // the location store already persists it (the two effects just below), so
+  // restoring it here would fight that sync.
+  useEffect(() => {
+    const d = readBookingDraft();
+    if (d) {
+      if (typeof d.step === "number") setStep(d.step);
+      if (d.packageId) setPackageId(d.packageId);
+      if (typeof d.activeCat === "number") setActiveCat(d.activeCat);
+      if (typeof d.liveCat === "number") setLiveCat(d.liveCat);
+      if (d.categoryVendor) setCategoryVendor(d.categoryVendor);
+      if (d.categoryItems) setCategoryItems(d.categoryItems);
+      if (d.skippedCats) setSkippedCats(d.skippedCats);
+      if (d.occasionId) setOccasionId(d.occasionId);
+      if (d.customOccasion) setCustomOccasion(d.customOccasion);
+      if (typeof d.guests === "number") setGuests(d.guests);
+      if (d.eventDate) setEventDate(d.eventDate);
+      if (d.venue) setVenue(d.venue);
+      if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
+      if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
+      if (d.addOnVendor) {
+        // Migrate legacy drafts (one vendor id per counter) to the new
+        // multi-vendor shape (an array of vendor ids per counter).
+        const raw = d.addOnVendor as Record<string, string | string[]>;
+        setAddOnVendor(
+          Object.fromEntries(
+            Object.entries(raw).map(([k, v]) => [
+              k,
+              Array.isArray(v) ? v : [v],
+            ]),
+          ),
+        );
+      }
+      if (d.serviceId) setServiceId(d.serviceId);
+    }
+    hydrated.current = true;
+  }, []);
+
   // Prefill occasion / date / city / venue from the Hero booking bar's query
   // params (e.g. /book?occasion=wedding&date=2026-07-19&city=lucknow). Read in
   // an effect so the server and first client render match — and so we don't
@@ -334,12 +438,63 @@ export default function BookingWizard() {
     // A package chosen on the home page's "Select Your Package" section arrives
     // here pre-selected; `step=menu` then drops the guest straight onto vendor
     // selection (Step 2) so they flow into the booking instead of re-picking.
-    if (pkg && packages.some((p) => p.id === pkg)) setPackageId(pkg);
-    if (stepParam === "menu") setStep(2);
+    // But a deep-linked tier is only honoured when it actually clears its lead
+    // time for the passed date — otherwise (e.g. Platinum, which needs 45 days,
+    // for a wedding 30 days out) we'd strand the guest on a too-soon tier's menu
+    // while Step 1 shows that same tier disabled. When it's too soon we skip both
+    // the preselect and the menu jump, keeping the guest on Step 1 where the tier
+    // renders disabled with the date it unlocks.
+    const pkgRequested = pkg !== null && packages.some((p) => p.id === pkg);
+    const pkgTooSoon =
+      pkgRequested && date !== null && !packageAvailable(pkg!, date);
+    if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
+    if (stepParam === "menu" && !pkgTooSoon) setStep(2);
     // A partner's share link (/book?ref=CODE) pre-fills the referral code.
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
+
+  // Persist the draft on every selection change (once the initial rehydrate has
+  // run, so we never overwrite a stored draft with the mount-time defaults).
+  // Best-effort — see writeBookingDraft. Cleared once the booking is confirmed.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    writeBookingDraft({
+      step,
+      packageId,
+      activeCat,
+      liveCat,
+      categoryVendor,
+      categoryItems,
+      skippedCats,
+      occasionId,
+      customOccasion,
+      guests,
+      eventDate,
+      venue,
+      venueFee,
+      selectedAddOns,
+      addOnVendor,
+      serviceId,
+    });
+  }, [
+    step,
+    packageId,
+    activeCat,
+    liveCat,
+    categoryVendor,
+    categoryItems,
+    skippedCats,
+    occasionId,
+    customOccasion,
+    guests,
+    eventDate,
+    venue,
+    venueFee,
+    selectedAddOns,
+    addOnVendor,
+    serviceId,
+  ]);
 
   // When the Hero didn't pass a city, reuse the Google-detected / persisted city.
   useEffect(() => {
@@ -530,6 +685,20 @@ export default function BookingWizard() {
     !shortNotice &&
     (packageId === "platinum" ||
       (packageId === "gold" && guests >= MULTI_VENDOR_MIN));
+
+  // Live counters and add-on counters follow a stricter, Platinum-only rule:
+  // Single Stall / Silver / Gold (even big-Gold) keep a single vendor per
+  // counter. Only Platinum may split a live station or an add-on across
+  // vendors. Gold's "multiple vendors for 1,000+ guests" spread stays on the
+  // plated menu, where `multiVendor` above still applies.
+  const counterMultiVendor = multiVendor && packageId === "platinum";
+
+  // Per-course multi-vendor: plated courses use the general rule; live-stall
+  // courses fall back to the Platinum-only counter rule. Keeps the shared menu
+  // helpers (allowance / completeness / vendor picks) in step with each step's
+  // picker, so a live counter never expects more than one vendor off Platinum.
+  const multiVendorFor = (catId: string): boolean =>
+    isLiveStallCategory(catId) ? counterMultiVendor : multiVendor;
 
   // Vendors & dishes per course come from the vendor store (`/api/menu`):
   // the curated seed specialists plus every live vendor menu published from
@@ -749,6 +918,35 @@ export default function BookingWizard() {
     setCategoryItems((m) => ({ ...m, [catId]: [...cur, itemId] }));
   };
 
+  // Remove one vendor's picks from a course, straight from the review step's
+  // "Your Menu" card — drops the vendor and every item scoped to it (item ids
+  // are `${vendorId}-…`), leaving any other vendors on the course untouched.
+  const removeVendor = (catId: string, vendorId: string) => {
+    setCategoryVendor((m) => ({
+      ...m,
+      [catId]: (m[catId] ?? []).filter((id) => id !== vendorId),
+    }));
+    setCategoryItems((m) => ({
+      ...m,
+      [catId]: (m[catId] ?? []).filter((id) => !id.startsWith(`${vendorId}-`)),
+    }));
+  };
+
+  // Jump from the review step back to the exact course a guest wants to change.
+  // Plated courses live on the Menu step (2), live stations on the Live Stall
+  // step (3) — route to the right step and focus that course's tab.
+  const editCourse = (catId: string) => {
+    if (isLiveStallCategory(catId)) {
+      const i = liveStallCategories.findIndex((c) => c.id === catId);
+      if (i >= 0) setLiveCat(i);
+      setStep(3);
+    } else {
+      const i = menuStepCategories.findIndex((c) => c.id === catId);
+      if (i >= 0) setActiveCat(i);
+      setStep(2);
+    }
+  };
+
   /* ─── Derived pricing ──────────────────────────────────────────────── */
   const selectedPackage: PackageTier | undefined = packages.find(
     (p) => p.id === packageId,
@@ -812,19 +1010,41 @@ export default function BookingWizard() {
       : vendorListings;
   }, [packageId]);
 
-  // The vendor effectively assigned to an add-on. We honour the guest's explicit
-  // pick when it's still valid for the current package tier; otherwise we fall
-  // back to the first eligible vendor. Deriving this at read time (rather than
-  // reconciling stored state in an effect) keeps it correct when the package —
-  // and therefore the eligible roster — changes.
-  const addOnVendorId = (addOnId: string): string | undefined => {
-    const chosen = addOnVendor[addOnId];
-    if (chosen && eligibleAddOnVendors.some((v) => v.id === chosen)) return chosen;
-    return eligibleAddOnVendors[0]?.id;
+  // The vendor(s) effectively assigned to an add-on. We honour the guest's
+  // explicit picks that are still valid for the current package tier; when none
+  // survive we fall back to the first eligible vendor (so a selected counter is
+  // never vendorless). Single-vendor tiers always yield one id; multi-vendor
+  // tiers (Platinum always, big Gold) may yield several. Deriving this at read
+  // time (rather than reconciling stored state in an effect) keeps it correct
+  // when the package — and therefore the eligible roster — changes.
+  const addOnVendorIds = (addOnId: string): string[] => {
+    const chosen = (addOnVendor[addOnId] ?? []).filter((id) =>
+      eligibleAddOnVendors.some((v) => v.id === id),
+    );
+    if (chosen.length) return chosen;
+    const first = eligibleAddOnVendors[0]?.id;
+    return first ? [first] : [];
   };
 
-  const addOnVendorName = (addOnId: string): string | undefined =>
-    eligibleAddOnVendors.find((v) => v.id === addOnVendorId(addOnId))?.name;
+  const addOnVendorNames = (addOnId: string): string[] =>
+    addOnVendorIds(addOnId)
+      .map((id) => eligibleAddOnVendors.find((v) => v.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+
+  // Assign / unassign a vendor to a counter. Single-vendor tiers replace the
+  // pick; multi-vendor tiers (Platinum, big Gold) toggle it in/out but always
+  // keep at least one vendor on a selected counter.
+  const toggleAddOnVendor = (addOnId: string, vendorId: string) => {
+    if (!multiVendor) {
+      setAddOnVendor((m) => ({ ...m, [addOnId]: [vendorId] }));
+      return;
+    }
+    const current = addOnVendorIds(addOnId);
+    const next = current.includes(vendorId)
+      ? current.filter((id) => id !== vendorId)
+      : [...current, vendorId];
+    setAddOnVendor((m) => ({ ...m, [addOnId]: next.length ? next : current }));
+  };
 
   // Toggle an add-on; clearing one also drops any explicit vendor pick for it.
   const toggleAddOn = (id: string) => {
@@ -861,12 +1081,15 @@ export default function BookingWizard() {
         }
       }
     }
-    // Catalogue vendors assigned to selected add-ons / live counters.
+    // Catalogue vendors assigned to selected add-ons / live counters — a counter
+    // may now be split across several vendors, so honour the longest lead.
     for (const addOnId of selectedAddOns) {
-      const v = eligibleAddOnVendors.find((x) => x.id === addOnVendorId(addOnId));
-      if (v) {
-        picked = true;
-        lead = Math.max(lead, vendorLeadDays(v));
+      for (const vId of addOnVendorIds(addOnId)) {
+        const v = eligibleAddOnVendors.find((x) => x.id === vId);
+        if (v) {
+          picked = true;
+          lead = Math.max(lead, vendorLeadDays(v));
+        }
       }
     }
     // Nothing chosen yet → the baseline notice, so an empty Custom order still
@@ -1091,7 +1314,7 @@ export default function BookingWizard() {
     const addOnLines = addOns
       .filter((a) => selectedAddOns.includes(a.id))
       .map((a) => {
-        const vendor = addOnVendorName(a.id);
+        const vendor = addOnVendorNames(a.id).join(", ");
         return vendor ? `  • ${a.name} — ${vendor}` : `  • ${a.name}`;
       })
       .join("\n");
@@ -1175,7 +1398,7 @@ export default function BookingWizard() {
     addOns
       .filter((a) => selectedAddOns.includes(a.id))
       .forEach((a) => {
-        const vendor = addOnVendorName(a.id);
+        const vendor = addOnVendorNames(a.id).join(", ");
         const name = vendor ? `${a.name} — ${vendor}` : a.name;
         lines.push({
           label: a.perPlate
@@ -1208,6 +1431,10 @@ export default function BookingWizard() {
         month: "short",
         year: "numeric",
       }),
+      // Bill To — the customer's contact so the invoice names who it's for.
+      customerName: customerName.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined,
+      customerEmail: customerEmail.trim() || undefined,
       occasion: occ?.name ?? "Feast",
       eventDate: eventDate ? formatEventDate(eventDate) : "-",
       city: cityObj?.name ?? "-",
@@ -1255,7 +1482,7 @@ export default function BookingWizard() {
     const addOnLines = addOns
       .filter((a) => selectedAddOns.includes(a.id))
       .map((a) => {
-        const vendor = addOnVendorName(a.id);
+        const vendor = addOnVendorNames(a.id).join(", ");
         return vendor ? `${a.name} (${vendor})` : a.name;
       })
       .join(", ");
@@ -1391,9 +1618,7 @@ export default function BookingWizard() {
               .filter((v) => chosen.includes(v.id))
               .map((v) => v.name);
           }),
-          ...selectedAddOns
-            .map((id) => addOnVendorName(id))
-            .filter((n): n is string => Boolean(n)),
+          ...selectedAddOns.flatMap((id) => addOnVendorNames(id)),
         ],
       ),
     );
@@ -1411,11 +1636,12 @@ export default function BookingWizard() {
               .filter((v) => chosen.includes(v.id))
               .map((v) => ({ id: v.id, name: v.name }));
           }),
-          ...selectedAddOns.flatMap((id) => {
-            const vId = addOnVendorId(id);
-            const vName = addOnVendorName(id);
-            return vId && vName ? [{ id: vId, name: vName }] : [];
-          }),
+          ...selectedAddOns.flatMap((id) =>
+            addOnVendorIds(id).flatMap((vId) => {
+              const v = eligibleAddOnVendors.find((x) => x.id === vId);
+              return v ? [{ id: v.id, name: v.name }] : [];
+            }),
+          ),
         ].map((v) => [v.id, v] as const),
       ).values(),
     );
@@ -1515,6 +1741,9 @@ export default function BookingWizard() {
 
     setConfirmed(true);
     setConfirming(false);
+    // Order placed — drop the saved draft so a later visit starts fresh rather
+    // than resurrecting this (now-booked) menu.
+    clearBookingDraft();
     // Bring the success screen into view — a paid-and-confirmed booking often
     // triggers from the advance button lower down, so jump back to the top.
     if (typeof window !== "undefined") {
@@ -1778,11 +2007,10 @@ export default function BookingWizard() {
               selectedAddOns={selectedAddOns}
               toggleAddOn={toggleAddOn}
               packageName={selectedPackage?.name ?? ""}
+              multiVendor={multiVendor}
               eligibleVendors={eligibleAddOnVendors}
-              vendorIdFor={addOnVendorId}
-              onVendorChange={(addOnId, vendorId) =>
-                setAddOnVendor((m) => ({ ...m, [addOnId]: vendorId }))
-              }
+              vendorIdsFor={addOnVendorIds}
+              onVendorToggle={toggleAddOnVendor}
             />
           )}
           {/* Essentials step (5) — the mandatory "Choose Your Service Package"
@@ -1822,10 +2050,12 @@ export default function BookingWizard() {
               categoryVendor={categoryVendor}
               itemsFor={itemsFor}
               selectedAddOns={selectedAddOns}
-              addOnVendorName={addOnVendorName}
+              addOnVendorNames={addOnVendorNames}
               serviceName={selectedService?.name}
               serviceTotal={serviceTotal}
               onEditMenu={() => setStep(2)}
+              onEditCourse={editCourse}
+              onRemoveVendor={removeVendor}
               onEditExtras={() => setStep(4)}
               onEditService={() => setStep(5)}
               couponInput={couponInput}
@@ -2686,15 +2916,24 @@ function StepPackage({
   // a tier reads identically here and on the landing page. The menu structure
   // (features / pax / footnote) stays sourced from `data.ts`.
   const { packages: homePackages } = useHomeContent();
-  const available = packages
-    .filter((tier) => packageAvailable(tier.id, eventDate))
-    .map((tier) => {
-      const meta = homePackages.tiers.find((x) => x.id === tier.id);
-      return meta
-        ? { ...tier, name: meta.name, nameHi: meta.nameHi, price: meta.price }
-        : tier;
-    });
-  const hiddenCount = packages.length - available.length;
+  // Every tier is shown — with the same admin name/price overrides — but a tier
+  // whose lead time the chosen date doesn't yet clear renders disabled (dimmed +
+  // inert) with the date it unlocks, rather than silently vanishing. That way a
+  // guest never wonders where e.g. Platinum went for a wedding booked 30 days
+  // out (Platinum needs 45): they see it, greyed, with "available from …".
+  const tiers = packages.map((tier) => {
+    const meta = homePackages.tiers.find((x) => x.id === tier.id);
+    const display = meta
+      ? { ...tier, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+      : tier;
+    const lead = packageLeadDays[tier.id] ?? 0;
+    return {
+      tier: display,
+      tooSoon: !packageAvailable(tier.id, eventDate),
+      lead,
+      unlock: formatEventDate(isoAfterDays(lead)),
+    };
+  });
   return (
     <div>
       <SectionHead
@@ -2705,9 +2944,10 @@ function StepPackage({
         )}
       />
       {/* Short-notice dates can't be sourced for the regular tiers — steer the
-          guest to the Single Stall plan (one vendor per course) + add-ons
-          rather than leaving the lone Single Stall card unexplained. */}
-      {shortNotice ? (
+          guest to the Single Stall plan (one vendor per course) + add-ons.
+          Tiers that just need more notice aren't hidden; each disabled card
+          below spells out its own lead time and unlock date. */}
+      {shortNotice && (
         <p className="mb-4 flex items-start gap-2 rounded-lg border border-maroon/30 bg-cream/40 px-4 py-2.5 text-sm text-ink-soft">
           <span aria-hidden="true" className="text-maroon">
             ★
@@ -2718,17 +2958,6 @@ function StepPackage({
               "यह तारीख़ बहुत नज़दीक है, इसलिए हमारे पूरे पैकेज समय पर तैयार नहीं हो पाएंगे। फिर भी आप सिंगल स्टॉल प्लान से बुक कर सकते हैं — हर कोर्स के लिए एक वेंडर, साथ में ऐड-ऑन और लाइव काउंटर।",
             )}
           </span>
-        </p>
-      ) : hiddenCount > 0 && (
-        <p className="mb-4 rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink-soft">
-          {t(
-            `Showing packages available for your event date. ${hiddenCount} ${
-              hiddenCount === 1 ? "package needs" : "packages need"
-            } more advance notice and ${
-              hiddenCount === 1 ? "is" : "are"
-            } hidden.`,
-            `आपकी इवेंट तारीख़ के लिए उपलब्ध पैकेज दिखाए जा रहे हैं। ${hiddenCount} पैकेज को ज़्यादा अग्रिम समय चाहिए, इसलिए छिपाए गए हैं।`,
-          )}
         </p>
       )}
       {/* Same "patra scroll" cards the home page advertises, so a tier looks
@@ -2742,23 +2971,54 @@ function StepPackage({
           // pt keeps the Popular/Premium ribbons (which float above the cards)
           // clear of the availability notice above the grid.
           "no-scrollbar -mx-3 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-3 pb-5 pt-7 sm:mx-0 sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
-          (available.length === 1
+          (tiers.length === 1
             ? "sm:grid-cols-1"
-            : available.length === 2
+            : tiers.length === 2
               ? "sm:grid-cols-2"
-              : available.length === 3
+              : tiers.length === 3
                 ? "sm:grid-cols-2 lg:grid-cols-3"
                 : "sm:grid-cols-2")
         }
       >
-        {available.map((tier: PackageTier) => {
+        {tiers.map(({ tier, tooSoon, lead, unlock }) => {
           const selected = tier.id === packageId;
           const tierName = lang === "hi" ? tier.nameHi : tier.name;
           return (
             <div
               key={tier.id}
-              className="w-[82vw] max-w-[360px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+              className="relative w-[82vw] max-w-[360px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
             >
+            {tooSoon ? (
+              // Too-soon tier: the full scroll, dimmed and inert (not clickable
+              // or focusable), with a legible notice pinned over the fold naming
+              // its lead time and the date it unlocks. Nothing is silently
+              // dropped, so the guest can pick a later date to reach it.
+              <>
+                <div inert className="select-none opacity-40">
+                  <PackageScrollCard
+                    tier={tier}
+                    selected={false}
+                    onSelect={() => {}}
+                    ctaOnFold
+                    cta={<span aria-hidden="true" />}
+                  />
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-[12%] z-30 flex justify-center px-4">
+                  <div className="rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
+                    <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
+                      <span aria-hidden="true">★</span>
+                      {t(
+                        `${tierName} needs ${lead} days' notice`,
+                        `${tierName} के लिए ${lead} दिन का अग्रिम समय चाहिए`,
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-soft">
+                      {t(`Available from ${unlock}`, `${unlock} से उपलब्ध`)}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
             <PackageScrollCard
               tier={tier}
               selected={selected}
@@ -2781,6 +3041,7 @@ function StepPackage({
                 </button>
               }
             />
+            )}
             </div>
           );
         })}
@@ -3243,33 +3504,24 @@ function StepMenu({
                           disabled={atCap}
                           aria-pressed={active}
                           className={
-                            "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition " +
+                            "flex w-full items-center gap-3 rounded-2xl border p-2 text-left shadow-sm transition sm:gap-4 sm:p-3 " +
                             (active
                               ? "border-maroon bg-cream-2 ring-1 ring-maroon"
                               : atCap
                                 ? "cursor-not-allowed border-cream-3 bg-white opacity-50"
-                                : "border-cream-3 bg-white hover:bg-cream-2")
+                                : "border-cream-3 bg-white hover:-translate-y-0.5 hover:shadow-md")
                           }
                         >
-                          {/* Dish thumbnail — falls back to the course icon when a
-                              seed vendor hasn't uploaded a photo. */}
-                          <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
-                            {it.photo ? (
-                              <Image
-                                src={it.photo}
-                                alt=""
-                                fill
-                                sizes="64px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              <span
-                                aria-hidden="true"
-                                className="flex h-full w-full items-center justify-center text-2xl"
-                              >
-                                {cat.icon}
-                              </span>
-                            )}
+                          {/* Dish thumbnail — real photo when the vendor uploaded
+                              one, otherwise a deterministic premium food shot. */}
+                          <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-20 sm:w-20 sm:rounded-2xl">
+                            <Image
+                              src={it.photo ?? dummyDishPhoto(it.id)}
+                              alt=""
+                              fill
+                              sizes="(min-width: 640px) 80px, 64px"
+                              className="object-cover"
+                            />
                           </span>
                           {/* Diet mark + dish name */}
                           <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -3282,14 +3534,14 @@ function StepMenu({
                                   : "border-maroon")
                               }
                             />
-                            <span className="truncate text-sm font-medium text-ink">
+                            <span className="truncate text-sm font-semibold text-ink sm:text-base">
                               {it.name}
                             </span>
                           </span>
                           {/* Add / added control */}
                           <span
                             className={
-                              "shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition " +
+                              "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition sm:px-5 sm:py-2 sm:text-xs " +
                               (active
                                 ? "border-maroon bg-maroon text-cream"
                                 : "border-maroon bg-white text-maroon")
@@ -3321,9 +3573,10 @@ function StepDetails({
   selectedAddOns,
   toggleAddOn,
   packageName,
+  multiVendor,
   eligibleVendors,
-  vendorIdFor,
-  onVendorChange,
+  vendorIdsFor,
+  onVendorToggle,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -3331,9 +3584,10 @@ function StepDetails({
   selectedAddOns: string[];
   toggleAddOn: (id: string) => void;
   packageName: string;
+  multiVendor: boolean;
   eligibleVendors: VendorListing[];
-  vendorIdFor: (addOnId: string) => string | undefined;
-  onVendorChange: (addOnId: string, vendorId: string) => void;
+  vendorIdsFor: (addOnId: string) => string[];
+  onVendorToggle: (addOnId: string, vendorId: string) => void;
 }) {
   // Free-text filter over the add-on roster. Matches the English/Hindi names,
   // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
@@ -3395,6 +3649,9 @@ function StepDetails({
           const active = selectedAddOns.includes(a.id);
           const lineTotal = a.perPlate ? a.price * guests : a.price;
           const selectId = `addon-vendor-${a.id}`;
+          // Vendors assigned to this counter — one on single-vendor tiers, or
+          // several when the package allows splitting a counter across vendors.
+          const pickedVendorIds = active ? vendorIdsFor(a.id) : [];
           return (
             <div
               key={a.id}
@@ -3472,8 +3729,18 @@ function StepDetails({
                     id={selectId}
                     className="block text-xs font-semibold uppercase tracking-wide text-ink-soft"
                   >
-                    {t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
+                    {multiVendor
+                      ? t("Vendors for this counter", "इस काउंटर के लिए वेंडर")
+                      : t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
                   </span>
+                  {multiVendor && eligibleVendors.length > 0 && (
+                    <p className="mt-1 text-xs text-ink-soft">
+                      {t(
+                        `Split this counter across multiple vendors — ${pickedVendorIds.length} selected.`,
+                        `इस काउंटर को कई वेंडरों में बाँटें — ${pickedVendorIds.length} चुने गए।`,
+                      )}
+                    </p>
+                  )}
                   {eligibleVendors.length === 0 ? (
                     <p className="mt-1 text-sm text-ink-soft">
                       {t(
@@ -3483,19 +3750,19 @@ function StepDetails({
                     </p>
                   ) : (
                     <div
-                      role="radiogroup"
+                      role={multiVendor ? "group" : "radiogroup"}
                       aria-labelledby={selectId}
                       className="mt-2 grid gap-2 sm:grid-cols-2"
                     >
                       {eligibleVendors.map((v) => {
-                        const picked = vendorIdFor(a.id) === v.id;
+                        const picked = pickedVendorIds.includes(v.id);
                         return (
                           <button
                             key={v.id}
                             type="button"
-                            role="radio"
+                            role={multiVendor ? "checkbox" : "radio"}
                             aria-checked={picked}
-                            onClick={() => onVendorChange(a.id, v.id)}
+                            onClick={() => onVendorToggle(a.id, v.id)}
                             className={
                               "flex items-center gap-3 rounded-xl border bg-white p-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm " +
                               (picked
@@ -4092,10 +4359,12 @@ function StepConfirm({
   categoryVendor,
   itemsFor,
   selectedAddOns,
-  addOnVendorName,
+  addOnVendorNames,
   serviceName,
   serviceTotal,
   onEditMenu,
+  onEditCourse,
+  onRemoveVendor,
   onEditExtras,
   onEditService,
   couponInput,
@@ -4144,10 +4413,14 @@ function StepConfirm({
   categoryVendor: VendorMap;
   itemsFor: (catId: string) => string[];
   selectedAddOns: string[];
-  addOnVendorName: (addOnId: string) => string | undefined;
+  addOnVendorNames: (addOnId: string) => string[];
   serviceName?: string;
   serviceTotal: number;
   onEditMenu: () => void;
+  /** Jump back to the build step focused on one course (per-course "Edit"). */
+  onEditCourse: (catId: string) => void;
+  /** Drop one vendor's picks from a course (per-vendor "Remove"). */
+  onRemoveVendor: (catId: string, vendorId: string) => void;
   onEditExtras: () => void;
   onEditService: () => void;
   couponInput: string;
@@ -4240,37 +4513,75 @@ function StepConfirm({
             onClick={onEditMenu}
             className="text-sm font-semibold text-maroon hover:underline"
           >
-            {t("Edit", "बदलें")}
+            {t("Edit all", "सब बदलें")}
           </button>
         </div>
         <div className="mt-3 space-y-3">
-          {categories.map((cat) => {
-            const chosen = categoryVendor[cat.id] ?? [];
-            // One line per selected vendor (several possible on Platinum).
-            const rows = cat.vendors
-              .filter((v) => chosen.includes(v.id))
-              .map((v) => ({
-                vendor: v,
-                picks: v.items
-                  .filter((it) => itemsFor(cat.id).includes(it.id))
-                  .map((it) => it.name),
-              }))
-              .filter((r) => r.picks.length > 0);
-            if (rows.length === 0) return null;
-            return (
+          {(() => {
+            // One card per course that has picks, one row per selected vendor
+            // (several possible on Platinum). Each row can be re-opened on the
+            // build step ("Edit") or dropped from the order ("Remove").
+            const cards = categories
+              .map((cat) => {
+                const chosen = categoryVendor[cat.id] ?? [];
+                const rows = cat.vendors
+                  .filter((v) => chosen.includes(v.id))
+                  .map((v) => ({
+                    vendor: v,
+                    picks: v.items
+                      .filter((it) => itemsFor(cat.id).includes(it.id))
+                      .map((it) => it.name),
+                  }))
+                  .filter((r) => r.picks.length > 0);
+                return { cat, rows };
+              })
+              .filter((c) => c.rows.length > 0);
+            if (cards.length === 0) {
+              return (
+                <p className="text-sm text-ink-soft">
+                  {t("No dishes selected yet.", "अभी तक कोई व्यंजन नहीं चुना गया।")}
+                </p>
+              );
+            }
+            return cards.map(({ cat, rows }) => (
               <div key={cat.id}>
                 {rows.map((r) => (
-                  <div key={r.vendor.id} className="mt-2 first:mt-0">
-                    <p className="text-sm font-semibold text-ink-soft">
-                      {cat.icon} {t(cat.name, cat.nameHi)} ·{" "}
-                      <span className="text-maroon">{r.vendor.name}</span>
-                    </p>
-                    <p className="text-sm text-ink">{r.picks.join(", ")}</p>
+                  <div
+                    key={r.vendor.id}
+                    className="mt-2 flex items-start justify-between gap-3 first:mt-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-soft">
+                        {cat.icon} {t(cat.name, cat.nameHi)} ·{" "}
+                        <span className="text-maroon">{r.vendor.name}</span>
+                      </p>
+                      <p className="text-sm text-ink">{r.picks.join(", ")}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onEditCourse(cat.id)}
+                        className="text-xs font-semibold text-maroon hover:underline"
+                      >
+                        {t("Edit", "बदलें")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveVendor(cat.id, r.vendor.id)}
+                        aria-label={t(
+                          `Remove ${r.vendor.name} from ${cat.name}`,
+                          `${t(cat.name, cat.nameHi)} से ${r.vendor.name} हटाएं`,
+                        )}
+                        className="text-xs font-semibold text-ink-soft transition hover:text-maroon hover:underline"
+                      >
+                        {t("Remove", "हटाएं")}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
       </div>
 
@@ -4295,7 +4606,7 @@ function StepConfirm({
             {addOns
               .filter((a) => selectedAddOns.includes(a.id))
               .map((a) => {
-                const vendor = addOnVendorName(a.id);
+                const vendor = addOnVendorNames(a.id).join(", ");
                 return (
                   <li key={a.id} className="text-sm text-ink">
                     {a.name}

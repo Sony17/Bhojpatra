@@ -34,6 +34,11 @@ export default function RecentBookingsTable({
           <p className="text-xs text-ink-soft">
             {b.occasion} · {b.id}
           </p>
+          {(b.phone || b.email) && (
+            <p className="mt-0.5 truncate text-xs text-ink-soft">
+              {[b.phone, b.email].filter(Boolean).join(" · ")}
+            </p>
+          )}
         </div>
       ),
     },

@@ -4,9 +4,10 @@
  * Renders a branded, boutique "TAX INVOICE" as a real PDF — no third-party
  * library. The builder supports measured text (Helvetica / Helvetica-Bold via
  * embedded AFM widths, so proportional text can be centred and right-aligned
- * exactly), letter-spacing, filled rectangles, stroked frames and rules, with
- * automatic page breaks. The standard-14 fonts only cover Latin-1, so glyphs
- * like ₹ are transliterated (₹ → "Rs ").
+ * exactly), letter-spacing, filled/alpha rectangles, stroked frames and rules,
+ * Bézier circles, filled polygons (ornaments), rotated text, embedded images
+ * and a faint image watermark, with automatic page breaks. The standard-14
+ * fonts only cover Latin-1, so glyphs like ₹ are transliterated (₹ → "Rs ").
  */
 
 /** One billable row in the invoice table. */
@@ -26,6 +27,12 @@ export interface InvoiceMenuGroup {
 export interface InvoiceData {
   id: string;
   dateLabel: string;
+  /** Who the invoice is billed to — the customer's contact, captured at booking
+   *  time. All optional so older stored invoices (saved before contact was on
+   *  the invoice) still render; the "Bill To" block is hidden when all blank. */
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
   occasion: string;
   eventDate: string;
   /** Meal period + clock time the feast is served at (e.g. "Dinner · 7:30 PM"),
@@ -50,7 +57,7 @@ const PAGE_W = 612;
 const PAGE_H = 792;
 const MX = 44; // left/right content margin
 const RIGHT = PAGE_W - MX;
-const BOTTOM = 96; // bottom margin (reserves room for the footer band)
+const BOTTOM = 94; // bottom margin (reserves room for the footer band)
 
 type RGB = [number, number, number];
 const MAROON: RGB = [0.725, 0.125, 0.145]; // #B92025
@@ -132,6 +139,7 @@ class Pdf {
   private images: { w: number; h: number; data: string }[] = [];
   private alphas: number[] = []; // distinct fill-alpha values → ExtGState names
   private wm: { s: string; size: number; color: RGB; alpha: number } | null = null;
+  private wmImg: { idx: number; w: number; h: number; alpha: number } | null = null;
   y = PAGE_H;
 
   private rgb(c: RGB, stroke = false): string {
@@ -148,28 +156,52 @@ class Pdf {
     return `GS${i}`;
   }
 
-  /** Enable a faint 45° watermark drawn behind the content of every page. It is
-   *  stamped immediately (for the current page) and re-stamped on every newPage. */
+  /** Register an image XObject once and return its resource index (so a single
+   *  bitmap — e.g. the watermark — can be painted on many pages without being
+   *  re-embedded per page). */
+  private registerImage(img: { w: number; h: number; data: string }): number {
+    this.images.push(img);
+    return this.images.length - 1;
+  }
+
+  /** Enable a faint 45° text watermark drawn behind the content of every page. */
   setWatermark(s: string, size: number, color: RGB, alpha: number) {
     this.wm = { s, size, color, alpha };
     this.stampWatermark();
   }
 
+  /** Enable a faint brand-mark image (the pot) centred behind every page — the
+   *  same watermark the site uses. Embedded once, re-stamped on every newPage. */
+  setImageWatermark(img: LogoBitmap, targetH: number, alpha: number) {
+    const idx = this.registerImage(img);
+    this.wmImg = { idx, w: targetH * img.ratio, h: targetH, alpha };
+    this.stampWatermark();
+  }
+
   private stampWatermark() {
-    if (!this.wm) return;
-    const { s, size, color, alpha } = this.wm;
-    const cos = Math.SQRT1_2; // cos 45°
-    const sin = Math.SQRT1_2; // sin 45° (rotate CCW, bottom-left → top-right)
-    const w = measure(s, F_BOLD, size);
-    const midY = size * 0.34; // ~half cap-height, to centre vertically
-    const cx = PAGE_W / 2;
-    const cy = PAGE_H / 2;
-    const e = cx - (w / 2) * cos + midY * sin;
-    const f = cy - (w / 2) * sin - midY * cos;
-    this.ops +=
-      `q /${this.gsName(alpha)} gs BT /${F_BOLD} ${size} Tf 0 Tc ${this.rgb(color)} ` +
-      `${cos.toFixed(5)} ${sin.toFixed(5)} ${(-sin).toFixed(5)} ${cos.toFixed(5)} ` +
-      `${e.toFixed(2)} ${f.toFixed(2)} Tm (${escapePdfText(toLatin1(s))}) Tj ET Q\n`;
+    if (this.wmImg) {
+      const { idx, w, h, alpha } = this.wmImg;
+      const x = (PAGE_W - w) / 2;
+      const y = (PAGE_H - h) / 2;
+      this.ops +=
+        `q /${this.gsName(alpha)} gs ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ` +
+        `${x.toFixed(2)} ${y.toFixed(2)} cm /Im${idx} Do Q\n`;
+    }
+    if (this.wm) {
+      const { s, size, color, alpha } = this.wm;
+      const cos = Math.SQRT1_2; // cos 45°
+      const sin = Math.SQRT1_2; // sin 45° (rotate CCW, bottom-left → top-right)
+      const w = measure(s, F_BOLD, size);
+      const midY = size * 0.34; // ~half cap-height, to centre vertically
+      const cx = PAGE_W / 2;
+      const cy = PAGE_H / 2;
+      const e = cx - (w / 2) * cos + midY * sin;
+      const f = cy - (w / 2) * sin - midY * cos;
+      this.ops +=
+        `q /${this.gsName(alpha)} gs BT /${F_BOLD} ${size} Tf 0 Tc ${this.rgb(color)} ` +
+        `${cos.toFixed(5)} ${sin.toFixed(5)} ${(-sin).toFixed(5)} ${cos.toFixed(5)} ` +
+        `${e.toFixed(2)} ${f.toFixed(2)} Tm (${escapePdfText(toLatin1(s))}) Tj ET Q\n`;
+    }
   }
 
   /** Absolute-positioned text (origin bottom-left; `y` is the baseline). */
@@ -205,8 +237,38 @@ class Pdf {
     this.text(cx - measure(s, font, size, tracking) / 2, y, s, size, font, color, tracking);
   }
 
+  /** Text rotated `deg` degrees about its own centre point (cx, cy). */
+  textRotated(
+    cx: number,
+    cy: number,
+    s: string,
+    size: number,
+    font: string,
+    color: RGB,
+    deg: number,
+    tracking = 0,
+  ) {
+    const rad = (deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const w = measure(s, font, size, tracking);
+    const midY = size * 0.34;
+    const e = cx - (w / 2) * cos + midY * sin;
+    const f = cy - (w / 2) * sin - midY * cos;
+    this.ops +=
+      `BT /${font} ${size} Tf ${tracking} Tc ${this.rgb(color)} ` +
+      `${cos.toFixed(5)} ${sin.toFixed(5)} ${(-sin).toFixed(5)} ${cos.toFixed(5)} ` +
+      `${e.toFixed(2)} ${f.toFixed(2)} Tm (${escapePdfText(toLatin1(s))}) Tj ET\n`;
+  }
+
   rect(x: number, y: number, w: number, h: number, color: RGB) {
     this.ops += `${this.rgb(color)} ${x} ${y} ${w} ${h} re f\n`;
+  }
+
+  /** Filled rectangle with a fill alpha — for faint cream tints (zebra rows,
+   *  keylines) that stay a true brand hex with only opacity applied. */
+  rectAlpha(x: number, y: number, w: number, h: number, color: RGB, alpha: number) {
+    this.ops += `q /${this.gsName(alpha)} gs ${this.rgb(color)} ${x} ${y} ${w} ${h} re f Q\n`;
   }
 
   /** Stroked (outline-only) rectangle — for cards and decorative frames. */
@@ -218,11 +280,36 @@ class Pdf {
     this.ops += `${this.rgb(color, true)} ${width} w ${x1} ${y1} m ${x2} ${y2} l S\n`;
   }
 
+  /** Circle via four cubic Béziers — stroked (ring) or filled (dot/seal). */
+  circle(cx: number, cy: number, r: number, color: RGB, width = 0.8, fill = false) {
+    const k = r * 0.5522847498;
+    const f = (n: number) => n.toFixed(2);
+    this.ops +=
+      (fill ? `${this.rgb(color)} ` : `${this.rgb(color, true)} ${width} w `) +
+      `${f(cx + r)} ${f(cy)} m ` +
+      `${f(cx + r)} ${f(cy + k)} ${f(cx + k)} ${f(cy + r)} ${f(cx)} ${f(cy + r)} c ` +
+      `${f(cx - k)} ${f(cy + r)} ${f(cx - r)} ${f(cy + k)} ${f(cx - r)} ${f(cy)} c ` +
+      `${f(cx - r)} ${f(cy - k)} ${f(cx - k)} ${f(cy - r)} ${f(cx)} ${f(cy - r)} c ` +
+      `${f(cx + k)} ${f(cy - r)} ${f(cx + r)} ${f(cy - k)} ${f(cx + r)} ${f(cy)} c ` +
+      (fill ? "f\n" : "S\n");
+  }
+
+  /** Fill a closed polygon (used for the little diamond ornaments). */
+  poly(pts: Array<[number, number]>, color: RGB) {
+    let s = `${this.rgb(color)} ${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)} m `;
+    for (let i = 1; i < pts.length; i++) s += `${pts[i][0].toFixed(2)} ${pts[i][1].toFixed(2)} l `;
+    this.ops += s + "h f\n";
+  }
+
+  /** A small solid diamond ornament centred at (cx, cy). */
+  diamond(cx: number, cy: number, r: number, color: RGB) {
+    this.poly([[cx, cy + r], [cx + r, cy], [cx, cy - r], [cx - r, cy]], color);
+  }
+
   /** Draw a pre-rasterised RGB image; (x, y) is the bottom-left corner and
    *  (w, h) the placement size in points. */
   image(x: number, y: number, w: number, h: number, img: { w: number; h: number; data: string }) {
-    const idx = this.images.length;
-    this.images.push(img);
+    const idx = this.registerImage(img);
     this.ops +=
       `q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im${idx} Do Q\n`;
   }
@@ -257,7 +344,7 @@ class Pdf {
         " >> "
       : "";
 
-    // Alpha graphics states (inline dicts) for the faint watermark.
+    // Alpha graphics states (inline dicts) for the faint watermark and tints.
     const xgs = this.alphas.length
       ? "/ExtGState << " +
         this.alphas.map((a, i) => `/GS${i} << /ca ${a} /CA ${a} >>`).join(" ") +
@@ -313,38 +400,52 @@ class Pdf {
 export function buildInvoicePdf(
   data: InvoiceData,
   logo?: LogoBitmap | null,
+  watermark?: LogoBitmap | null,
 ): Uint8Array<ArrayBuffer> {
   const p = new Pdf();
 
-  /* Faint diagonal brand watermark, sat behind every page's content. Maroon at
-     6% alpha — a real brand hex with only opacity applied (per the brand rules). */
-  p.setWatermark("bhojpatra", 92, MAROON, 0.06);
+  /* Faint brand watermark behind every page. The pot mark (the same one the
+     site uses) when it could be rasterised, else a diagonal wordmark. Both are
+     a real brand hex with only opacity applied (per the brand rules). */
+  if (watermark) p.setImageWatermark(watermark, 400, 0.05);
+  else p.setWatermark("bhojpatra", 92, MAROON, 0.05);
 
-  /* Masthead — full-bleed maroon band with an inset cream frame. */
-  const HEAD = 116;
+  /* Masthead — full-bleed maroon band with a slim cream top rule and a crafted
+     double-hairline inset frame. */
+  const HEAD = 108;
   p.rect(0, PAGE_H - HEAD, PAGE_W, HEAD, MAROON);
-  p.rectS(14, PAGE_H - HEAD + 12, PAGE_W - 28, HEAD - 24, CREAM, 0.8);
+  p.rect(0, PAGE_H - 5, PAGE_W, 3, CREAM); // gilt top edge
+  p.rectS(16, PAGE_H - HEAD + 12, PAGE_W - 32, HEAD - 26, CREAM, 0.8);
+  p.rectS(19, PAGE_H - HEAD + 15, PAGE_W - 38, HEAD - 32, CREAM, 0.3);
 
   /* Brand mark: the cream logo when it could be rasterised, else the wordmark. */
   if (logo) {
     const h = 30;
-    p.image(MX, PAGE_H - 72, h * logo.ratio, h, logo);
+    p.image(MX + 4, PAGE_H - 76, h * logo.ratio, h, logo);
   } else {
-    p.text(MX, PAGE_H - 56, "bhojpatra", 30, F_BOLD, CREAM);
+    p.text(MX + 4, PAGE_H - 60, "bhojpatra", 30, F_BOLD, CREAM);
   }
-  p.text(MX + 2, PAGE_H - 82, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.2);
+  p.text(MX + 6, PAGE_H - 92, "PREMIUM CATERING & FEASTS", 8, F_REG, WHITE, 2.4);
 
-  p.textRight(RIGHT, PAGE_H - 50, "TAX INVOICE", 15, F_BOLD, WHITE);
-  p.textRight(RIGHT, PAGE_H - 70, `Invoice No.  ${data.id}`, 9, F_REG, CREAM);
-  p.textRight(RIGHT, PAGE_H - 84, `Date  ${data.dateLabel}`, 9, F_REG, CREAM);
+  /* Invoice meta (right) with a hairline under the "TAX INVOICE" title. */
+  const titleY = PAGE_H - 54;
+  p.textRight(RIGHT - 4, titleY, "TAX INVOICE", 15, F_BOLD, WHITE);
+  p.line(RIGHT - 4 - measure("TAX INVOICE", F_BOLD, 15), titleY - 6, RIGHT - 4, titleY - 6, CREAM, 0.8);
+  p.textRight(RIGHT - 4, PAGE_H - 76, `Invoice No.  ${data.id}`, 9, F_REG, CREAM);
+  p.textRight(RIGHT - 4, PAGE_H - 90, `Date  ${data.dateLabel}`, 9, F_REG, CREAM);
 
-  p.y = PAGE_H - HEAD - 34;
+  /* Ornamental divider under the masthead — hairline rule split by a diamond. */
+  p.y = PAGE_H - HEAD - 22;
+  ornamentRule(p, p.y);
+  p.y -= 20;
 
-  /* Section helper — small-caps maroon label with a short accent rule. */
+  /* Section helper — a diamond tick, small-caps maroon label, accent underline. */
   const sectionLabel = (s: string) => {
-    p.text(MX, p.y, s, 9, F_BOLD, MAROON, 1.6);
-    p.line(MX, p.y - 6, MX + 34, p.y - 6, MAROON, 1.4);
-    p.y -= 22;
+    p.diamond(MX + 2.5, p.y + 3, 2.4, MAROON);
+    p.text(MX + 11, p.y, s, 9, F_BOLD, MAROON, 1.8);
+    const lw = measure(s, F_BOLD, 9, 1.8);
+    p.line(MX + 11, p.y - 6, MX + 11 + lw, p.y - 6, MAROON, 1.2);
+    p.y -= 21;
   };
 
   /* Event details — balanced two-column grid. */
@@ -356,40 +457,59 @@ export function buildInvoicePdf(
   };
   field(MX, "OCCASION", data.occasion);
   field(COL2, "PACKAGE", data.packageName);
-  p.y -= 30;
+  p.y -= 27;
   field(MX, "EVENT DATE", data.eventDate);
   field(COL2, "GUESTS", nf.format(data.guests));
-  p.y -= 30;
+  p.y -= 27;
   field(MX, "CITY", data.city);
   field(COL2, "VENUE", data.venue);
   if (data.servingTime) {
-    p.y -= 30;
+    p.y -= 27;
     field(MX, "SERVING TIME", data.servingTime);
   }
-  p.y -= 34;
+  p.y -= 27;
 
-  /* Itemised charges table. */
+  /* Bill To — the customer's contact, when captured. Skipped entirely for older
+     invoices that carry no contact so the layout doesn't leave an empty block. */
+  if (data.customerName || data.customerPhone || data.customerEmail) {
+    sectionLabel("BILL TO");
+    if (data.customerName) {
+      p.text(MX, p.y, data.customerName, 11, F_BOLD, BLACK);
+      p.y -= 15;
+    }
+    const contact = [data.customerPhone, data.customerEmail]
+      .filter(Boolean)
+      .join("   -   ");
+    if (contact) {
+      p.text(MX, p.y, contact, 9.5, F_REG, BLACK);
+      p.y -= 15;
+    }
+    p.y -= 17;
+  }
+
+  /* Itemised charges table — cream header, faint cream zebra rows. */
   sectionLabel("CHARGES");
-  p.rect(MX, p.y - 7, RIGHT - MX, 21, CREAM);
-  p.text(MX + 10, p.y, "DESCRIPTION", 8.5, F_BOLD, MAROON, 1);
-  p.textRight(RIGHT - 10, p.y, "AMOUNT", 8.5, F_BOLD, MAROON);
-  p.y -= 25;
+  p.rect(MX, p.y - 7, RIGHT - MX, 22, CREAM);
+  p.text(MX + 12, p.y, "DESCRIPTION", 8.5, F_BOLD, MAROON, 1);
+  p.textRight(RIGHT - 12, p.y, "AMOUNT", 8.5, F_BOLD, MAROON);
+  p.y -= 26;
 
-  data.lines.forEach((ln) => {
-    p.ensure(16);
-    p.text(MX + 10, p.y, ln.label, 9.5, F_REG, BLACK);
-    p.textRight(RIGHT - 10, p.y, money(ln.amount), 9.5, F_REG, BLACK);
-    p.y -= 16;
-    p.line(MX, p.y + 5, RIGHT, p.y + 5, CREAM, 0.4);
+  data.lines.forEach((ln, i) => {
+    p.ensure(17);
+    if (i % 2 === 1) p.rectAlpha(MX, p.y - 5.5, RIGHT - MX, 17, CREAM, 0.35);
+    p.text(MX + 12, p.y, ln.label, 9.5, F_REG, BLACK);
+    p.textRight(RIGHT - 12, p.y, money(ln.amount), 9.5, F_REG, BLACK);
+    p.y -= 17;
   });
-  p.y -= 12;
+  p.line(MX, p.y + 6, RIGHT, p.y + 6, CREAM, 0.8);
+  p.y -= 10;
 
   /* Totals stack (right column). */
   const labelX = 372;
   const totalRow = (label: string, value: string, color: RGB = BLACK) => {
     p.ensure(15);
     p.text(labelX, p.y, label, 9.5, F_REG, color);
-    p.textRight(RIGHT - 10, p.y, value, 9.5, F_REG, color);
+    p.textRight(RIGHT - 12, p.y, value, 9.5, F_REG, color);
     p.y -= 16;
   };
   totalRow("Subtotal", money(data.subtotal));
@@ -398,15 +518,17 @@ export function buildInvoicePdf(
   totalRow("GST (18%)", money(data.gst));
   p.y -= 8;
 
-  /* Grand-total showpiece — full-width maroon band, oversized amount. */
-  p.ensure(70);
+  /* Grand-total showpiece — full-width maroon band with an inner cream keyline
+     and the oversized amount. */
+  p.ensure(72);
   const bandTop = p.y;
-  const BANDH = 52;
+  const BANDH = 54;
   p.rect(MX, bandTop - BANDH, RIGHT - MX, BANDH, MAROON);
-  p.text(MX + 18, bandTop - 21, "GRAND TOTAL", 12, F_BOLD, CREAM, 2);
-  p.text(MX + 18, bandTop - 37, "Total amount for your event", 8, F_REG, WHITE);
-  p.textRight(RIGHT - 18, bandTop - 33, money(data.grandTotal), 27, F_BOLD, WHITE);
-  p.y = bandTop - BANDH - 26;
+  p.rectS(MX + 6, bandTop - BANDH + 6, RIGHT - MX - 12, BANDH - 12, CREAM, 0.4);
+  p.text(MX + 20, bandTop - 22, "GRAND TOTAL", 12, F_BOLD, CREAM, 2.2);
+  p.text(MX + 20, bandTop - 38, "Total amount for your event", 8, F_REG, WHITE);
+  p.textRight(RIGHT - 20, bandTop - 35, money(data.grandTotal), 27, F_BOLD, WHITE);
+  p.y = bandTop - BANDH - 22;
 
   /* Payment status — Paid + Balance cards side by side. */
   const balance = Math.max(0, Math.round(data.grandTotal) - Math.round(data.paid));
@@ -430,35 +552,42 @@ export function buildInvoicePdf(
     p.rectS(balX, cardTop - CARDH, cardW, CARDH, CREAM, 1);
     p.text(balX + 14, cardTop - 16, "BALANCE DUE", 8, F_BOLD, MAROON, 1.4);
     p.text(balX + 14, cardTop - 35, "PAID IN FULL", 13, F_BOLD, MAROON, 1);
+    /* A little tilted brand medallion, stamped like a wax seal. */
+    stampSeal(p, balX + cardW - 30, cardTop - CARDH / 2);
   }
-  p.y = cardTop - CARDH - 28;
+  p.y = cardTop - CARDH - 20;
 
-  /* Menu selections. */
+  /* Menu selections — kept together as one block: if the whole thing won't fit
+     under the payment cards, it breaks cleanly to the next page. */
   if (data.menu.length > 0) {
-    p.ensure(30);
+    let menuH = 21; // section label
+    for (const g of data.menu) menuH += 13 + wrap(g.items, 92).length * 11 + 5;
+    p.ensure(menuH);
     sectionLabel("MENU SELECTIONS");
     data.menu.forEach((g) => {
       p.ensure(16);
       p.rect(MX, p.y - 1, 3, 10, MAROON);
       p.text(MX + 12, p.y, g.heading, 9.5, F_BOLD, BLACK);
-      p.y -= 14;
+      p.y -= 13;
       wrap(g.items, 92).forEach((row) => {
         p.ensure(12);
         p.text(MX + 12, p.y, row, 8.5, F_REG, BLACK);
         p.y -= 11;
       });
-      p.y -= 6;
+      p.y -= 5;
     });
   }
 
-  /* Footer band — anchored to the bottom of the (last) page. */
-  if (p.y < BOTTOM + 20) p.newPage();
-  p.line(0, 78, PAGE_W, 78, CREAM, 0.8);
-  p.rect(0, 30, PAGE_W, 44, CREAM);
-  p.textCenter(PAGE_W / 2, 56, "Thank you for choosing Bhojpatra", 12, F_BOLD, MAROON);
+  /* Footer — a cream band with a brand medallion straddling its top edge,
+     anchored to the bottom of the (last) page. */
+  if (p.y < 100) p.newPage();
+  p.rect(0, 24, PAGE_W, 46, CREAM);
+  p.line(MX, 70, RIGHT, 70, MAROON, 0.4);
+  brandMedallion(p, PAGE_W / 2, 72);
+  p.textCenter(PAGE_W / 2, 46, "Thank you for choosing Bhojpatra", 11.5, F_BOLD, MAROON);
   p.textCenter(
     PAGE_W / 2,
-    41,
+    33,
     "Premium Catering & Feasts   -   This is a computer-generated invoice and needs no signature.",
     8,
     F_REG,
@@ -466,6 +595,32 @@ export function buildInvoicePdf(
   );
 
   return p.finish();
+}
+
+/** Hairline rule across the content width, broken by a centred diamond. */
+function ornamentRule(p: Pdf, y: number) {
+  const cx = PAGE_W / 2;
+  p.line(MX, y, cx - 13, y, MAROON, 0.5);
+  p.line(cx + 13, y, RIGHT, y, MAROON, 0.5);
+  p.diamond(cx - 7, y, 1.8, MAROON);
+  p.diamond(cx + 7, y, 1.8, MAROON);
+  p.diamond(cx, y, 3, MAROON);
+}
+
+/** A small tilted "seal" — concentric rings + monogram, like a wax stamp. */
+function stampSeal(p: Pdf, cx: number, cy: number) {
+  p.circle(cx, cy, 15, MAROON, 1.2);
+  p.circle(cx, cy, 11.5, MAROON, 0.4);
+  p.textRotated(cx, cy - 5, "B", 16, F_BOLD, MAROON, -12);
+}
+
+/** The footer brand medallion — a clean white disc with double maroon rings and
+ *  the "B" monogram, sitting like a wax seal on the band's top edge. */
+function brandMedallion(p: Pdf, cx: number, cy: number) {
+  p.circle(cx, cy, 13, WHITE, 0, true);
+  p.circle(cx, cy, 13, MAROON, 1.1);
+  p.circle(cx, cy, 9.5, MAROON, 0.4);
+  p.textCenter(cx, cy - 4.5, "B", 14, F_BOLD, MAROON);
 }
 
 /** Hard-wrap a string to a max character width. */
@@ -555,6 +710,16 @@ function displayFontFamily(): string {
   return fam || "serif";
 }
 
+/** Load a same-origin image element, resolving once decoded. */
+function loadImageEl(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error(`image load failed: ${src}`));
+    im.src = src;
+  });
+}
+
 /** Rasterise the brand mark — the pot/manuscript icon plus "bhojpatra" set in
  *  Ananda Neptouch — as a cream (#F0D09E) composite over the masthead maroon
  *  (#B92025), so it embeds as an opaque PDF image that blends into the band and
@@ -564,12 +729,7 @@ function displayFontFamily(): string {
 async function loadMastheadLogo(): Promise<LogoBitmap | null> {
   if (typeof document === "undefined") return null;
   try {
-    const icon = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const im = new Image();
-      im.onload = () => resolve(im);
-      im.onerror = () => reject(new Error("icon load failed"));
-      im.src = "/bhojpatra-icon.png";
-    });
+    const icon = await loadImageEl("/bhojpatra-icon.png");
 
     const S = 4; // supersample for crisp edges at ~30pt
     const HPT = 30; // rendered height in points
@@ -636,11 +796,48 @@ async function loadMastheadLogo(): Promise<LogoBitmap | null> {
   }
 }
 
+/** Rasterise the brand pot (the site-wide watermark asset) into a faint maroon
+ *  mark composited over white, using the PNG's own alpha as the coverage mask.
+ *  Embedded once and stamped behind every page at low opacity. Browser-only;
+ *  returns null otherwise so the builder falls back to the text watermark. */
+async function loadWatermarkPot(): Promise<LogoBitmap | null> {
+  if (typeof document === "undefined") return null;
+  try {
+    const img = await loadImageEl("/watermark-pot.png");
+    const h = 300; // faint, so a modest raster keeps the PDF small
+    const w = Math.max(1, Math.round(h * (img.width / img.height)));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let bin = "";
+    for (let i = 0; i < px.length; i += 4) {
+      // Maroon where the pot is opaque, white where it is transparent — the
+      // page paints the whole bitmap at a low alpha, so only the shape shows.
+      const a = px[i + 3] / 255;
+      const r = Math.round(0xb9 * a + 0xff * (1 - a));
+      const g = Math.round(0x20 * a + 0xff * (1 - a));
+      const b = Math.round(0x25 * a + 0xff * (1 - a));
+      bin += String.fromCharCode(r, g, b);
+    }
+    return { w, h, data: bin, ratio: w / h };
+  } catch {
+    return null;
+  }
+}
+
 /** Trigger a browser download of the invoice as a PDF. */
 export async function downloadInvoice(data: InvoiceData): Promise<void> {
   if (typeof window === "undefined") return;
-  const logo = await loadMastheadLogo();
-  const blob = new Blob([buildInvoicePdf(data, logo)], { type: "application/pdf" });
+  const [logo, watermark] = await Promise.all([loadMastheadLogo(), loadWatermarkPot()]);
+  const blob = new Blob([buildInvoicePdf(data, logo, watermark)], {
+    type: "application/pdf",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

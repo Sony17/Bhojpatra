@@ -19,6 +19,8 @@ function toBookingRow(o: Record<string, unknown>): AdminBookingRow {
   return {
     id: String(o.id),
     customer: typeof o.customer === "string" ? o.customer : "Online Booking",
+    ...(typeof o.phone === "string" && o.phone ? { phone: o.phone } : {}),
+    ...(typeof o.email === "string" && o.email ? { email: o.email } : {}),
     occasion: typeof o.occasion === "string" ? o.occasion : "Feast",
     date: typeof o.date === "string" ? o.date : "",
     vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
