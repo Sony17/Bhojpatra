@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import Reveal from "@/components/Reveal";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
@@ -16,6 +15,8 @@ type Status = "idle" | "submitting" | "success" | "error";
 /**
  * Promotional lead-capture under the hero.
  * Banner art is the focus; email/phone + sharing sit in a premium panel beneath.
+ * No scroll-reveal — keeps the hero → promo handoff continuous (same reason as
+ * ChooseOccasion).
  */
 export default function PromoLeadCapture() {
   const { lang, t } = useLang();
@@ -168,7 +169,7 @@ export default function PromoLeadCapture() {
           {/* Mobile stacks the artwork over its own maroon form panel (the wide
               banner is too short to overlay legibly); wide screens keep the
               premium float-over-art layout. */}
-          <Reveal className="overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:relative sm:aspect-[2.54/1]">
+          <div className="overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:relative sm:aspect-[2.54/1]">
             <div className="relative aspect-[2.54/1] sm:absolute sm:inset-0 sm:aspect-auto">
               <Image
                 src={promo.image}
@@ -201,7 +202,7 @@ export default function PromoLeadCapture() {
                 />
               </div>
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
     );
@@ -210,7 +211,7 @@ export default function PromoLeadCapture() {
   return (
     <section id="offers" aria-label="Promotional offers" className="bg-white">
       <div className="mx-auto max-w-7xl px-5 py-3 sm:px-8 sm:py-4">
-        <Reveal className="overflow-hidden rounded-card bg-maroon shadow-card">
+        <div className="overflow-hidden rounded-card bg-maroon shadow-card">
           <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-5 sm:px-6 sm:py-3.5">
             <div className="min-w-0 shrink sm:max-w-xs lg:max-w-sm">
               <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
@@ -230,7 +231,7 @@ export default function PromoLeadCapture() {
               <ShareOffer heading={heading} subtitle={subtitle} compact />
             </div>
           </div>
-        </Reveal>
+        </div>
       </div>
     </section>
   );
