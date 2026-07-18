@@ -160,7 +160,7 @@ export default function AppLocationBar({
         <span className="flex min-w-0 flex-1 items-center gap-1">
           <span
             className={cn(
-              "truncate text-sm font-bold",
+              "truncate text-xs font-bold",
               onDark
                 ? "text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]"
                 : "text-ink",

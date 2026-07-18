@@ -248,35 +248,9 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
   return (
     <article
       aria-label={`${name} ${t("package", "पैकेज")}`}
-      className={`card-lift relative flex h-full flex-col overflow-hidden rounded-card ${dark ? "isolate" : ""} ${surface(id)}`}
+      className={`card-lift relative flex h-full max-w-full flex-col overflow-hidden rounded-card ${dark ? "isolate" : ""} ${surface(id)}`}
     >
-      {/* Feast photography header — luxury cue before the pricing story */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden">
-        <Image
-          src={tier.image}
-          alt=""
-          aria-hidden
-          fill
-          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 90vw"
-          className="object-cover"
-          unoptimized={isUnoptimized(tier.image)}
-        />
-        <span aria-hidden className="media-veil absolute inset-0" />
-        {dark && (
-          <span
-            aria-hidden
-            className="absolute inset-0 bg-maroon/35"
-          />
-        )}
-        <span
-          className={`absolute left-4 top-4 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] shadow-card ${badgeChip(id)}`}
-        >
-          {recommended && <span aria-hidden className="mr-1">★</span>}
-          {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
-        </span>
-      </div>
-
-      <div className="relative flex flex-1 flex-col p-6 sm:p-7">
+      <div className="relative flex flex-1 flex-col p-5 sm:p-7">
       {/* Premium shimmer on the Platinum card, behind the text */}
       {dark && (
         <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -291,24 +265,31 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
         </span>
       )}
 
+      <span
+        className={`mb-3 inline-flex w-fit items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] shadow-card sm:mb-4 ${badgeChip(id)}`}
+      >
+        {recommended && <span aria-hidden className="mr-1">★</span>}
+        {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
+      </span>
+
       {/* Name + positioning */}
-      <h3 className={`font-display text-[2rem] leading-none ${accent(id)}`}>{name}</h3>
-      {bestFor && <p className={`mt-2 text-[13px] leading-snug ${muted(id)}`}>{bestFor}</p>}
+      <h3 className={`font-display text-[1.75rem] leading-none sm:text-[2rem] ${accent(id)}`}>{name}</h3>
+      {bestFor && <p className={`mt-1.5 text-[13px] leading-snug sm:mt-2 ${muted(id)}`}>{bestFor}</p>}
 
       {/* Price */}
-      <p className="mt-5 flex items-baseline gap-1.5">
-        <span className={`text-[2rem] font-bold leading-none ${accent(id)}`}>{tier.price}</span>
+      <p className="mt-4 flex items-baseline gap-1.5 sm:mt-5">
+        <span className={`text-[1.75rem] font-bold leading-none sm:text-[2rem] ${accent(id)}`}>{tier.price}</span>
         <span className={`text-sm ${muted(id)}`}>{unit}</span>
       </p>
-      {pax && <p className={`mt-1.5 text-xs ${muted(id)}`}>{pax}</p>}
+      {pax && <p className={`mt-1 text-xs sm:mt-1.5 ${muted(id)}`}>{pax}</p>}
 
       {/* Primary CTA (kept high so it's always visible) */}
-      <div className="mt-5">{cta}</div>
+      <div className="mt-4 sm:mt-5">{cta}</div>
 
       {/* Cumulative "what you get" — the value story, real numbers, always visible */}
-      <div className={`mt-6 border-t pt-5 ${dark ? "border-cream/20" : "border-maroon/10"}`}>
+      <div className={`mt-5 border-t pt-4 sm:mt-6 sm:pt-5 ${dark ? "border-cream/20" : "border-maroon/10"}`}>
         <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${muted(id)}`}>{includesLabel}</p>
-        <ul className="mt-3 space-y-2.5">
+        <ul className="mt-2.5 space-y-2 sm:mt-3 sm:space-y-2.5">
           {highlights.map((h) => (
             <li key={h} className={`flex items-start gap-2.5 text-sm ${dark ? "text-cream" : "text-ink"}`}>
               <CheckIcon className={`mt-0.5 h-4 w-4 shrink-0 ${accent(id)}`} />
@@ -606,16 +587,20 @@ export default function FinalisedPackages() {
           </SectionIntro>
         </Reveal>
 
-        {/* Tier cards — full-width snap carousel on mobile, grid on sm+ */}
+        {/* Tier cards — snap carousel on mobile (sized to the scrollport, not
+            100vw, so rings/shadows never push past the screen), grid on sm+ */}
         <Reveal
           stagger
           from="right"
-          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-4 pt-4 sm:mx-auto sm:grid sm:max-w-6xl sm:snap-none sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
+          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-5 py-3 sm:mx-auto sm:grid sm:max-w-6xl sm:snap-none sm:grid-cols-2 sm:items-stretch sm:gap-6 sm:overflow-visible sm:px-0 sm:py-0 lg:grid-cols-3"
         >
           {tiers.map((tier) => {
             const tierName = lang === "hi" ? tier.nameHi : tier.name;
             return (
-              <div key={tier.id} className="w-[calc(100vw-2.5rem)] shrink-0 snap-center sm:w-auto sm:shrink">
+              <div
+                key={tier.id}
+                className="w-full max-w-[20.5rem] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+              >
                 <TierCard
                   tier={tier}
                   cta={
