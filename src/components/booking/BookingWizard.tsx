@@ -583,7 +583,7 @@ export default function BookingWizard() {
     };
   }, []);
 
-  // Keep the header's "Celebrating in" bar and the booking's City/Location in
+  // Keep the header's location bar and the booking's City/Location in
   // lockstep — they read/write one shared location store. Booking → header:
   // whenever the guest changes the city here (or it's carried in from the URL /
   // a venue), persist it so the header mirrors it. The store compare guards

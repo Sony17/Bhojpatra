@@ -15,8 +15,8 @@ import Drawer from "./Drawer";
 import { cn } from "./cn";
 
 /**
- * Swiggy/Zomato-style “Celebrating in” control. Opens a city picker sheet so
- * the visitor can change location anytime — not a one-way auto-detect.
+ * Location control. Opens a city picker sheet so the visitor can change
+ * location anytime — not a one-way auto-detect.
  */
 export default function AppLocationBar({
   className,
@@ -157,46 +157,34 @@ export default function AppLocationBar({
             <circle cx="12" cy="10" r="2.5" />
           </svg>
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 flex-1 items-center gap-1">
           <span
             className={cn(
-              "block truncate text-[9px] font-semibold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.14em]",
+              "truncate text-sm font-bold",
               onDark
-                ? "text-cream [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]"
-                : "text-maroon",
+                ? "text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]"
+                : "text-ink",
             )}
           >
-            {t("Celebrating in", "उत्सव यहाँ")}
+            {display}
           </span>
-          <span className="flex min-w-0 items-center gap-1">
-            <span
-              className={cn(
-                "truncate text-sm font-bold",
-                onDark
-                  ? "text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]"
-                  : "text-ink",
-              )}
-            >
-              {display}
-            </span>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 12 12"
-              className={cn(
-                "h-3 w-3 shrink-0 transition-transform duration-200 group-hover:translate-y-px",
-                onDark ? "text-cream" : "text-maroon",
-              )}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path
-                d="M3 4.5 6 7.5 9 4.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 12"
+            className={cn(
+              "h-3 w-3 shrink-0 transition-transform duration-200 group-hover:translate-y-px",
+              onDark ? "text-cream" : "text-maroon",
+            )}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <path
+              d="M3 4.5 6 7.5 9 4.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </span>
       </button>
 
