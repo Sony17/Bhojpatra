@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
+import PeriodPicker from "@/components/admin/shared/PeriodPicker";
 import { Calendar, ShieldCheck, Wallet } from "@/components/admin/shared/icons";
 import { money } from "@/components/admin/shared/money";
+import {
+  computeTrend,
+  defaultPeriod,
+  inPeriod,
+  parseEventDate,
+  periodLabel,
+  previousPeriod,
+  trendCaption,
+  type Period,
+} from "@/lib/admin/bookingPeriods";
 import RecentBookingsTable from "./RecentBookingsTable";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
 import type {
@@ -41,6 +52,11 @@ export default function AdminDashboard() {
   const [bookings, setBookings] = useState<AdminBookingRow[]>([]);
   const [pending, setPending] = useState<PendingVendorApproval[]>([]);
   const [collected, setCollected] = useState(0);
+  // Stable "now" for the period presets/default (avoids re-computing per render).
+  const [today] = useState(() => new Date());
+  // Selected reporting window. Null until bookings load, then defaulted to a
+  // month that actually has data so the dashboard opens populated.
+  const [period, setPeriod] = useState<Period | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,7 +71,14 @@ export default function AdminDashboard() {
           const { orders } = (await bRes.json()) as {
             orders?: Record<string, unknown>[];
           };
-          if (active && Array.isArray(orders)) setBookings(orders.map(toBookingRow));
+          if (active && Array.isArray(orders)) {
+            const rows = orders.map(toBookingRow);
+            setBookings(rows);
+            const dates = rows
+              .map((r) => parseEventDate(r.date))
+              .filter((d): d is Date => d !== null);
+            setPeriod((prev) => prev ?? defaultPeriod(dates, today));
+          }
         }
         if (aRes.ok) {
           const { applications } = (await aRes.json()) as {
@@ -78,7 +101,44 @@ export default function AdminDashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [today]);
+
+  // Each booking paired with its parsed event date (null when unreadable).
+  const dated = useMemo(
+    () => bookings.map((b) => ({ row: b, date: parseEventDate(b.date) })),
+    [bookings],
+  );
+
+  const effectivePeriod: Period = useMemo(
+    () => period ?? { kind: "all" },
+    [period],
+  );
+
+  // Bookings inside the selected window. "All time" keeps everything (including
+  // rows whose event date couldn't be parsed); dated windows require a real date.
+  const periodBookings = useMemo(() => {
+    if (effectivePeriod.kind === "all") return bookings;
+    return dated
+      .filter((x) => x.date && inPeriod(x.date, effectivePeriod))
+      .map((x) => x.row);
+  }, [bookings, dated, effectivePeriod]);
+
+  // Month-over-month (or period-over-period) delta for the Total Bookings card.
+  const bookingsTrend = useMemo(() => {
+    if (effectivePeriod.kind === "all") return undefined;
+    const prev = previousPeriod(effectivePeriod);
+    if (!prev) return undefined;
+    const prevCount = dated.filter(
+      (x) => x.date && inPeriod(x.date, prev),
+    ).length;
+    return (
+      computeTrend(
+        periodBookings.length,
+        prevCount,
+        trendCaption(effectivePeriod),
+      ) ?? undefined
+    );
+  }, [dated, effectivePeriod, periodBookings.length]);
 
   return (
     <div className="space-y-8">
@@ -88,9 +148,30 @@ export default function AdminDashboard() {
         subtitle="Your marketplace at a glance."
       />
 
+      {/* Reporting window — filters Total Bookings + Recent Bookings below. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-soft">
+          Showing{" "}
+          <span className="font-semibold text-ink">
+            {periodLabel(effectivePeriod)}
+          </span>
+        </p>
+        <PeriodPicker value={effectivePeriod} onChange={setPeriod} today={today} />
+      </div>
+
       {/* Live headline figures */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <StatCard icon={Calendar} label="Total Bookings" value={String(bookings.length)} />
+        <StatCard
+          icon={Calendar}
+          label="Total Bookings"
+          value={String(periodBookings.length)}
+          trend={bookingsTrend}
+          sub={
+            effectivePeriod.kind === "all"
+              ? "All time"
+              : periodLabel(effectivePeriod)
+          }
+        />
         <StatCard
           icon={ShieldCheck}
           label="Pending Vendor Approvals"
@@ -100,7 +181,7 @@ export default function AdminDashboard() {
       </div>
 
       <RecentBookingsTable
-        rows={bookings.slice(0, 6)}
+        rows={periodBookings.slice(0, 6)}
         seeAllHref="/admin/customers?tab=bookings"
       />
 

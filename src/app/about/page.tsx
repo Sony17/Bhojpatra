@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <PublicShell>
-      <SitePageView slug="about" />
+      <SitePageView slug="about" hideBar />
       <AboutHighlights />
     </PublicShell>
   );

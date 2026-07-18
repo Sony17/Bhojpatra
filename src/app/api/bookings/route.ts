@@ -41,6 +41,10 @@ export interface StoredOrder {
   email?: string;
   occasion: string;
   date: string;
+  /** Raw event date as `YYYY-MM-DD`, kept alongside the display `date` so the
+   *  admin console can sort by it and the dashboard can tell upcoming events
+   *  from past ones. Absent on legacy orders saved before it was persisted. */
+  eventDateISO?: string;
   /** Meal period the feast is served at (Breakfast / Lunch / Dinner). Absent on
    *  legacy orders saved before serving time was captured. */
   mealTime?: string;
@@ -275,6 +279,9 @@ export async function POST(request: Request) {
       : {}),
     occasion: typeof occasion === "string" ? occasion : "Feast",
     date: typeof date === "string" ? date : "",
+    ...(typeof eventDateISO === "string" && /^\d{4}-\d{2}-\d{2}$/.test(eventDateISO)
+      ? { eventDateISO }
+      : {}),
     ...(typeof mealTime === "string" && mealTime.trim()
       ? { mealTime: mealTime.trim() }
       : {}),

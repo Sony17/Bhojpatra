@@ -20,6 +20,16 @@ create table if not exists payments (
   updated_at timestamptz not null default now()
 );
 
+-- Customer refund requests against bookings. Their own lifecycle
+-- (Requested → Approved → Processed / Declined), distinct from the raw money
+-- movement recorded in `payments`.
+create table if not exists refunds (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Leads are de-duplicated by email (the id-field for this store).
 create table if not exists leads (
   id         text primary key,

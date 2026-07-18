@@ -210,17 +210,17 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
         )}
       </div>
 
-      {/* Footer band with brand medallion */}
+      {/* Footer band with the real brand logo */}
       <div className="relative z-10 border-t border-maroon/30 bg-cream/60 px-6 pb-5 pt-6 text-center sm:px-8">
-        <div
-          className="mb-3 flex items-center justify-center gap-3 text-maroon"
-          aria-hidden="true"
-        >
-          <span className="h-px w-10 bg-maroon/50" />
-          <Diamond className="h-1.5 w-1.5" />
-          <Medallion />
-          <Diamond className="h-1.5 w-1.5" />
-          <span className="h-px w-10 bg-maroon/50" />
+        <div className="mb-3 flex items-center justify-center" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/bhojpatra-logo.png"
+            alt="Bhojpatra"
+            className="h-10 w-auto select-none"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
         <p className="font-display text-sm font-semibold text-maroon">
           Thank you for choosing Bhojpatra
@@ -268,20 +268,6 @@ function Seal() {
       className="grid h-11 w-11 -rotate-12 place-items-center rounded-full border-2 border-maroon"
     >
       <span className="grid h-[30px] w-[30px] place-items-center rounded-full border border-maroon/40 font-display text-lg font-semibold leading-none text-maroon">
-        B
-      </span>
-    </span>
-  );
-}
-
-/** The upright brand medallion in the footer. */
-function Medallion() {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid h-12 w-12 place-items-center rounded-full border-2 border-maroon"
-    >
-      <span className="grid h-[34px] w-[34px] place-items-center rounded-full border border-maroon/40 font-display text-xl font-semibold leading-none text-maroon">
         B
       </span>
     </span>

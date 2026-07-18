@@ -5,8 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  bookingTimeSlots,
   cities,
+  formatClockTime,
   indianStates,
+  mealPeriodForTime,
   mealTypeOptions,
   type VendorListing,
 } from "@/lib/data";
@@ -190,6 +193,14 @@ export default function VendorCatalog() {
     const m = searchParams.get("meal");
     return m && mealTypeOptions.includes(m) ? [m] : [];
   });
+  // Exact serving time (24-hour `HH:MM`, from `bookingTimeSlots`). When set, the
+  // catalog maps it to a meal period via `mealPeriodForTime` and keeps only the
+  // caterers that serve that meal — the same "time → meal" lens the booking
+  // wizard's serving-time picker uses. Empty = no serving-time filter.
+  const [servingTime, setServingTime] = useState<string>(() => {
+    const tm = searchParams.get("time");
+    return tm && Object.values(bookingTimeSlots).flat().includes(tm) ? tm : "";
+  });
   const [sort, setSort] = useState<SortKey>("relevance");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -269,6 +280,14 @@ export default function VendorCatalog() {
         meals.length === 0 ||
         meals.some((m) => v.mealTypes.includes(m));
 
+      // A picked serving time narrows to caterers serving the meal it lands in
+      // (e.g. 8:30 PM → Dinner). Neutral for Baina searches (gift boxes aren't
+      // time-served) and when no time is chosen.
+      const matchesServingTime =
+        isBainaSearch ||
+        servingTime === "" ||
+        v.mealTypes.includes(mealPeriodForTime(servingTime));
+
       return (
         matchesQuery &&
         (city === ALL || v.city === city) &&
@@ -277,7 +296,8 @@ export default function VendorCatalog() {
         (isBainaSearch || matchesDiet(v, diet)) &&
         (isBainaSearch || tier === ALL || v.tiers.includes(tier)) &&
         matchesPrice(v, price) &&
-        matchesMeals
+        matchesMeals &&
+        matchesServingTime
       );
     });
 
@@ -320,6 +340,7 @@ export default function VendorCatalog() {
     tier,
     price,
     meals,
+    servingTime,
     sort,
   ]);
 
@@ -331,7 +352,8 @@ export default function VendorCatalog() {
     diet !== ALL ||
     tier !== ALL ||
     price !== ALL ||
-    meals.length > 0;
+    meals.length > 0 ||
+    servingTime !== "";
 
   /** Count of sheet filters (excludes search) — drives the Filters chip badge. */
   const activeFilterCount = [
@@ -342,6 +364,7 @@ export default function VendorCatalog() {
     tier !== ALL,
     price !== ALL,
     meals.length > 0,
+    servingTime !== "",
   ].filter(Boolean).length;
 
   const resetFilters = () => {
@@ -353,6 +376,7 @@ export default function VendorCatalog() {
     setTier(ALL);
     setPrice(ALL);
     setMeals([]);
+    setServingTime("");
     setSort("relevance");
   };
 
@@ -679,6 +703,37 @@ export default function VendorCatalog() {
                   ))}
                 </div>
               </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                  {t("Serving time", "परोसने का समय")}
+                </p>
+                <div className="mt-2">
+                  <ThemedSelect
+                    value={servingTime}
+                    onChange={setServingTime}
+                    ariaLabel={t("Serving time", "परोसने का समय")}
+                    buttonClassName="w-full rounded-control border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
+                    options={[
+                      { value: "", label: t("Any time", "कोई भी समय") },
+                      ...Object.values(bookingTimeSlots)
+                        .flat()
+                        .map((hhmm) => ({
+                          value: hhmm,
+                          label: formatClockTime(hhmm),
+                        })),
+                    ]}
+                  />
+                  {servingTime && (
+                    <p className="mt-1.5 text-[12px] text-ink/55">
+                      {t("Showing", "दिखा रहे हैं")}{" "}
+                      <span className="font-medium text-maroon">
+                        {mealLabel(mealPeriodForTime(servingTime))}
+                      </span>{" "}
+                      {t("caterers", "कैटरर")}
+                    </p>
+                  )}
+                </div>
+              </div>
             </>
           )}
 
@@ -815,7 +870,12 @@ function VendorCard({
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
+  // "Book" from a brand card starts a Single Stall with this vendor pre-selected
+  // (still changeable in the wizard). Live vendors resolve by id; a curated seed
+  // id absent from the booking menu simply falls back to the tier picker.
+  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
+    vendor.id,
+  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {

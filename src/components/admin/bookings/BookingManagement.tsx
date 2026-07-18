@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
 import SelectFilter from "@/components/admin/shared/SelectFilter";
@@ -157,6 +158,12 @@ export default function BookingManagement() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        eyebrow="Admin Panel"
+        title="Bookings"
+        subtitle="Every feast booking — live customer orders ahead of the demo history."
+      />
+
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Calendar} label="Total Bookings" value={String(stats.total)} />
         <StatCard icon={ShieldCheck} label="Confirmed" value={String(stats.confirmed)} />

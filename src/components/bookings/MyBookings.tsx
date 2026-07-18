@@ -957,7 +957,7 @@ function BookingDetailsModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sticky header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-t-card border-b border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-3 rounded-t-card border-b border-cream-3 bg-white px-5 py-4 sm:px-7">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="font-display truncate text-xl font-semibold text-ink">
@@ -1028,7 +1028,7 @@ function BookingDetailsModal({
 
         {/* Footer actions */}
         {!editing && (
-          <div className="sticky bottom-0 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar rounded-b-card border-t border-cream-3 bg-white/95 px-5 py-4 backdrop-blur sm:px-7 md:flex-wrap md:overflow-visible">
+          <div className="sticky bottom-0 z-20 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar rounded-b-card border-t border-cream-3 bg-white px-5 py-4 sm:px-7 md:flex-wrap md:overflow-visible">
             <DownloadMenu booking={booking} variant="solid" />
             <Button
               variant="secondary"
@@ -1381,7 +1381,7 @@ function ReviewModal({
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-cream-3 px-5 py-4 sm:px-7">
           <div className="min-w-0">
-            <h2 className="font-display text-xl font-semibold text-ink">
+            <h2 className="font-sans text-xl font-semibold text-ink">
               {t("Rate your experience", "अपना अनुभव रेट करें")}
             </h2>
             <p className="mt-0.5 truncate text-sm text-ink-soft">
@@ -1416,7 +1416,7 @@ function ReviewModal({
                   className="rounded-xl border border-cream-3 bg-cream-2/40 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-display text-sm font-semibold text-ink">
+                    <p className="font-sans text-sm font-semibold text-ink">
                       {v.name}
                     </p>
                     <StarInput

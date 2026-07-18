@@ -8,12 +8,28 @@ import {
   MERGED_DASHBOARD_PATH,
   ACCOUNT_LABEL,
   useSession,
+  hasAccount,
 } from "@/lib/session";
 
 /** Language choices surfaced inside the account menu. */
 const LANG_OPTIONS: { id: Lang; full: string }[] = [
   { id: "en", full: "English" },
   { id: "hi", full: "हिंदी" },
+];
+
+/** Signed-in account actions, in the order the profile menu lists them. Each
+ *  routes into the `/account/*` area (see `AccountShell`). `vendorOnly` items
+ *  (Roles) show only for accounts that hold the vendor/caterer type. */
+const ACCOUNT_LINKS: {
+  href: string;
+  en: string;
+  hi: string;
+  vendorOnly?: boolean;
+}[] = [
+  { href: "/account/profile", en: "My Profile", hi: "मेरी प्रोफ़ाइल" },
+  { href: "/account/settings", en: "Settings", hi: "सेटिंग्स" },
+  { href: "/account/password", en: "Change Password", hi: "पासवर्ड बदलें" },
+  { href: "/account/roles", en: "Roles", hi: "भूमिकाएँ", vendorOnly: true },
 ];
 
 /**
@@ -50,16 +66,22 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
   return (
     <ul className="overflow-hidden rounded-card border border-maroon/15 bg-white shadow-pop">
       {session ? (
-        <li className="flex items-center gap-3 border-b border-maroon/10 px-4 py-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream">
-            {initial}
-          </span>
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-semibold text-ink">
-              {displayName}
+        <li className="border-b border-maroon/10">
+          <Link
+            href={MERGED_DASHBOARD_PATH}
+            onClick={onClose}
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-maroon/5"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-sm font-semibold text-cream">
+              {initial}
             </span>
-            <span className="text-xs text-ink/70">{typeLabel}</span>
-          </span>
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-sm font-semibold text-ink">
+                {displayName}
+              </span>
+              <span className="text-xs text-ink/70">{typeLabel}</span>
+            </span>
+          </Link>
         </li>
       ) : (
         <li className="border-b border-maroon/10 px-4 py-3">
@@ -74,15 +96,19 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
 
       {session ? (
         <>
-          <li className="border-b border-maroon/10">
-            <Link
-              href={MERGED_DASHBOARD_PATH}
-              onClick={onClose}
-              className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5"
-            >
-              {t("My Dashboard", "मेरा डैशबोर्ड")}
-            </Link>
-          </li>
+          {ACCOUNT_LINKS.filter(
+            (item) => !item.vendorOnly || hasAccount(session, "vendor"),
+          ).map((item) => (
+            <li key={item.href} className="border-b border-maroon/10">
+              <Link
+                href={item.href}
+                onClick={onClose}
+                className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5"
+              >
+                {t(item.en, item.hi)}
+              </Link>
+            </li>
+          ))}
           <li className="border-b border-maroon/10">
             <button
               type="button"

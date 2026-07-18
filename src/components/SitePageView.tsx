@@ -9,7 +9,13 @@ import { AppBar, Card, EmptyState } from "@/components/ui";
  * Terms & Privacy). Content is read live from the admin-editable store, so a
  * save in Admin → Content Control → Pages shows up here immediately.
  */
-export default function SitePageView({ slug }: { slug: string }) {
+export default function SitePageView({
+  slug,
+  hideBar = false,
+}: {
+  slug: string;
+  hideBar?: boolean;
+}) {
   const page = useSitePage(slug);
   const { lang, t } = useLang();
 
@@ -36,7 +42,7 @@ export default function SitePageView({ slug }: { slug: string }) {
 
   return (
     <>
-      <AppBar title={title} backHref="/" />
+      {!hideBar && <AppBar title={title} backHref="/" />}
       <section className="mx-auto max-w-3xl px-4 py-6 sm:px-5 sm:py-10">
         <header className="max-w-2xl">
           <p className="text-caption font-semibold uppercase tracking-wide text-maroon">

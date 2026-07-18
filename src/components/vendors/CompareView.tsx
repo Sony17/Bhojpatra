@@ -11,7 +11,7 @@ import {
   statFor,
   type VendorRatings,
 } from "@/lib/vendorRatings";
-import { AppBar, Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 
 /** Localise the small fixed vocabularies (diet / tier / meal) for display. */
 function useLocalize() {
@@ -78,12 +78,6 @@ export default function CompareView({
   if (vendors.length === 0) {
     return (
       <>
-        {!embedded && (
-          <AppBar
-            title={t("Compare Caterers", "कैटरर की तुलना")}
-            backHref="/vendors"
-          />
-        )}
         <section
           className={
             embedded
@@ -110,12 +104,6 @@ export default function CompareView({
 
   return (
     <>
-      {!embedded && (
-        <AppBar
-          title={t("Compare Caterers", "कैटरर की तुलना")}
-          backHref="/vendors"
-        />
-      )}
       <section
         className={
           embedded

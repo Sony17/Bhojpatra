@@ -51,6 +51,12 @@ import type {
   VendorPerfRow,
   BusinessDetails,
   AdminRoleInfo,
+  AdminRefund,
+  RefundQuery,
+  SupportTicket,
+  SupportQuery,
+  PermissionRow,
+  AccessLevel,
 } from "./types";
 
 /** Shared helper — slugify a business name for mock emails. Declared at the top
@@ -149,10 +155,16 @@ export const revenueSummary: RevenueSummary = {
 };
 
 export const adminNotifications: AdminNotification[] = [
-  { id: "an1", message: "New vendor application from Royal Tandoor Caterers (Lucknow).", time: "2 min ago", unread: true },
-  { id: "an2", message: "Advance payment of ₹1,68,625 received for BHJ-24871.", time: "1 hr ago", unread: true },
-  { id: "an3", message: "Green Leaf Pure Veg passed FSSAI verification.", time: "3 hrs ago", unread: true },
-  { id: "an4", message: "Booking BHJ-23541 was cancelled by the customer.", time: "Yesterday", unread: false },
+  { id: "an1", message: "New vendor application from Royal Tandoor Caterers (Lucknow).", time: "2 min ago", unread: true, category: "Vendors" },
+  { id: "an2", message: "Advance payment of ₹1,68,625 received for BHJ-24871.", time: "1 hr ago", unread: true, category: "Payments" },
+  { id: "an3", message: "Green Leaf Pure Veg passed FSSAI verification.", time: "3 hrs ago", unread: true, category: "Vendors" },
+  { id: "an4", message: "Booking BHJ-24990 was confirmed by Nawabi Dawat.", time: "4 hrs ago", unread: true, category: "Bookings" },
+  { id: "an5", message: "Refund RFD-4002 for BHJ-23541 was approved.", time: "6 hrs ago", unread: true, category: "Payments" },
+  { id: "an6", message: "Support ticket TCK-7003 raised — payment not reflecting.", time: "9 hrs ago", unread: false, category: "Support" },
+  { id: "an7", message: "Booking BHJ-23541 was cancelled by the customer.", time: "Yesterday", unread: false, category: "Bookings" },
+  { id: "an8", message: "Vendor settlement STL-3002 is due for Bengal Bhoj (Nov 2026).", time: "Yesterday", unread: false, category: "Payments" },
+  { id: "an9", message: "New venue “Utsav Lawns” submitted for approval (Jaipur).", time: "2 days ago", unread: false, category: "Venues" },
+  { id: "an10", message: "Weekly revenue report is ready to download.", time: "3 days ago", unread: false, category: "System" },
 ];
 
 export const quickActions: QuickAction[] = [
@@ -572,3 +584,129 @@ export const adminRoles: AdminRoleInfo[] = [
   { name: "Manager", description: "Manage vendors, bookings, payments and content.", members: 3 },
   { name: "Support", description: "View bookings and customers; respond to enquiries.", members: 5 },
 ];
+
+/** Modules that access is granted against — the roles × modules permission grid. */
+export const permissionModules = [
+  "Dashboard",
+  "Vendors & Approvals",
+  "Bookings",
+  "Customers",
+  "Payments & Settlements",
+  "Refunds",
+  "Coupons & Campaigns",
+  "Support Tickets",
+  "Reports & Analytics",
+  "Content (CMS)",
+  "Settings",
+  "Roles & Permissions",
+] as const;
+
+/** Per-role access to each module. Super Admin has Full everywhere; Manager runs
+ *  operations but can't touch platform settings or roles; Support is read-mostly
+ *  with write access only to tickets. */
+export const permissionRows: PermissionRow[] = permissionModules.map((module) => {
+  const manager: AccessLevel =
+    module === "Settings" || module === "Roles & Permissions" ? "None" : "Full";
+  let support: AccessLevel;
+  switch (module) {
+    case "Support Tickets":
+      support = "Full";
+      break;
+    case "Dashboard":
+    case "Bookings":
+    case "Customers":
+    case "Reports & Analytics":
+      support = "View";
+      break;
+    default:
+      support = "None";
+  }
+  return {
+    module,
+    access: { "Super Admin": "Full", Manager: manager, Support: support },
+  };
+});
+
+/* ───────────────────────────────────────────────────────────────────────
+   REFUNDS
+─────────────────────────────────────────────────────────────────────── */
+
+export const adminRefunds: AdminRefund[] = [
+  { id: "RFD-4001", bookingId: "BHJ-23541", customer: "Meera Nair", amount: 44950, reason: "Event cancelled by customer", method: "UPI", status: "Processed", requestedAt: "16 Jul 2026", processedAt: "19 Jul 2026" },
+  { id: "RFD-4002", bookingId: "BHJ-24501", customer: "Arjun Mehta", amount: 62437, reason: "Duplicate advance payment", method: "QR", status: "Approved", requestedAt: "24 Oct 2026" },
+  { id: "RFD-4003", bookingId: "BHJ-24902", customer: "Neha Joshi", amount: 37960, reason: "Vendor unavailable on the date", method: "UPI", status: "Requested", requestedAt: "05 Mar 2027" },
+  { id: "RFD-4004", bookingId: "BHJ-24120", customer: "Imran Khan", amount: 53955, reason: "Reduced guest count", method: "Card", status: "Requested", requestedAt: "22 Dec 2026" },
+  { id: "RFD-4005", bookingId: "BHJ-24655B", customer: "Sahil Kapoor", amount: 13485, reason: "Menu changed to a lower tier", method: "UPI", status: "Processed", requestedAt: "12 Oct 2026", processedAt: "14 Oct 2026" },
+  { id: "RFD-4006", bookingId: "BHJ-24310", customer: "Pooja Reddy", amount: 35400, reason: "Advance paid twice via QR", method: "QR", status: "Declined", requestedAt: "10 Aug 2026", processedAt: "11 Aug 2026" },
+  { id: "RFD-4007", bookingId: "BHJ-24777", customer: "Vikas Yadav", amount: 105543, reason: "Partial cancellation — one function dropped", method: "Card", status: "Approved", requestedAt: "20 Jan 2027" },
+  { id: "RFD-4008", bookingId: "BHJ-24988", customer: "Anjali Das", amount: 26980, reason: "Overcharged service fee", method: "UPI", status: "Requested", requestedAt: "21 Jan 2027" },
+];
+
+export const refundsSummary = {
+  requested: adminRefunds.filter((r) => r.status === "Requested").length,
+  approved: adminRefunds.filter((r) => r.status === "Approved").length,
+  processed: adminRefunds.filter((r) => r.status === "Processed").length,
+  declined: adminRefunds.filter((r) => r.status === "Declined").length,
+  totalRefunded: adminRefunds
+    .filter((r) => r.status === "Processed")
+    .reduce((s, r) => s + r.amount, 0),
+};
+
+export function queryRefunds(
+  params: RefundQuery = {},
+  source: AdminRefund[] = adminRefunds,
+): Paginated<AdminRefund> {
+  const { q = "", status = "All", page = 1, pageSize = 8 } = params;
+  const needle = q.trim().toLowerCase();
+  const filtered = source.filter((r) => {
+    const matchesQ =
+      !needle ||
+      r.id.toLowerCase().includes(needle) ||
+      r.bookingId.toLowerCase().includes(needle) ||
+      r.customer.toLowerCase().includes(needle);
+    const matchesStatus = status === "All" || r.status === status;
+    return matchesQ && matchesStatus;
+  });
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   SUPPORT TICKETS
+─────────────────────────────────────────────────────────────────────── */
+
+export const supportTickets: SupportTicket[] = [
+  { id: "TCK-7001", subject: "Caterer arrived an hour late", customer: "Ankit Sharma", email: "ankit.sharma@example.com", category: "Vendor", priority: "High", status: "Open", createdAt: "14 Nov 2026", updatedAt: "14 Nov 2026", bookingId: "BHJ-24871", message: "The catering team reached the venue nearly an hour behind schedule. Please look into this." },
+  { id: "TCK-7002", subject: "Need GST invoice for my booking", customer: "Rahul Gupta", email: "rahul.gupta@example.com", category: "Billing", priority: "Low", status: "Resolved", createdAt: "02 Nov 2026", updatedAt: "03 Nov 2026", bookingId: "BHJ-24655", message: "Could you email me a GST invoice for the balance payment I made?" },
+  { id: "TCK-7003", subject: "Payment not reflecting after UPI transfer", customer: "Arjun Mehta", email: "arjun.mehta@example.com", category: "Payment", priority: "High", status: "In Progress", createdAt: "23 Oct 2026", updatedAt: "24 Oct 2026", bookingId: "BHJ-24501", message: "I paid the advance over UPI but the booking still shows as pending." },
+  { id: "TCK-7004", subject: "Want to change the menu before the event", customer: "Pooja Reddy", email: "pooja.reddy@example.com", category: "Booking", priority: "Medium", status: "Open", createdAt: "08 Sep 2026", updatedAt: "08 Sep 2026", bookingId: "BHJ-24310", message: "Can I swap two of the main course dishes? The event is three weeks away." },
+  { id: "TCK-7005", subject: "Requesting a refund for cancelled event", customer: "Meera Nair", email: "meera.nair@example.com", category: "Refund", priority: "Medium", status: "Resolved", createdAt: "16 Jul 2026", updatedAt: "19 Jul 2026", bookingId: "BHJ-23541", message: "We had to cancel the reception. Please process the eligible refund." },
+  { id: "TCK-7006", subject: "App keeps logging me out", customer: "Sahil Kapoor", email: "sahil.kapoor@example.com", category: "Technical", priority: "Low", status: "In Progress", createdAt: "11 Nov 2026", updatedAt: "12 Nov 2026", message: "Every time I open the bookings page I get logged out and have to sign in again." },
+  { id: "TCK-7007", subject: "Vendor unresponsive to my messages", customer: "Neha Joshi", email: "neha.joshi@example.com", category: "Vendor", priority: "High", status: "Open", createdAt: "04 Mar 2027", updatedAt: "04 Mar 2027", bookingId: "BHJ-24902", message: "I've messaged the vendor twice with no reply. My wedding is close." },
+  { id: "TCK-7008", subject: "How do I add live counters?", customer: "Vikas Yadav", email: "vikas.yadav@example.com", category: "General", priority: "Low", status: "Resolved", createdAt: "10 Jan 2027", updatedAt: "10 Jan 2027", bookingId: "BHJ-24777", message: "Where in the booking flow can I add chaat and dessert live counters?" },
+  { id: "TCK-7009", subject: "Double charged for the advance", customer: "Imran Khan", email: "imran.khan@example.com", category: "Payment", priority: "High", status: "In Progress", createdAt: "22 Dec 2026", updatedAt: "22 Dec 2026", bookingId: "BHJ-24120", message: "My card was charged twice for the same advance. Please reverse one." },
+  { id: "TCK-7010", subject: "Feedback: great experience overall", customer: "Kavya Iyer", email: "kavya.iyer@example.com", category: "General", priority: "Low", status: "Resolved", createdAt: "31 May 2026", updatedAt: "31 May 2026", bookingId: "BHJ-23880", message: "Just wanted to say the team was excellent. Thank you!" },
+];
+
+export function querySupport(
+  params: SupportQuery = {},
+  source: SupportTicket[] = supportTickets,
+): Paginated<SupportTicket> {
+  const { q = "", status = "All", priority = "All", page = 1, pageSize = 8 } = params;
+  const needle = q.trim().toLowerCase();
+  const filtered = source.filter((t) => {
+    const matchesQ =
+      !needle ||
+      t.id.toLowerCase().includes(needle) ||
+      t.subject.toLowerCase().includes(needle) ||
+      t.customer.toLowerCase().includes(needle) ||
+      (t.bookingId?.toLowerCase().includes(needle) ?? false);
+    const matchesStatus = status === "All" || t.status === status;
+    const matchesPriority = priority === "All" || t.priority === priority;
+    return matchesQ && matchesStatus && matchesPriority;
+  });
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
+}

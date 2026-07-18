@@ -195,11 +195,15 @@ function VendorProfile({
     }
   };
 
-  // "Book this caterer" drops the guest onto the wizard's vendor-selection step,
-  // pre-filtered to this caterer's city. City is stored by name here but the
-  // wizard keys off the city id, so bridge through the `cities` table.
+  // "Book this caterer" starts a Single Stall with this vendor pre-selected
+  // (still changeable in the wizard). City is stored by name here but the wizard
+  // keys off the city id, so bridge through the `cities` table. Live vendors
+  // resolve by id; a curated seed id absent from the booking menu falls back to
+  // the tier picker.
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
+  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
+    vendor.id,
+  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
 
   // A live aggregate from the reviews just loaded for this vendor, so a rating
   // submitted from the panel below is reflected immediately (the shared

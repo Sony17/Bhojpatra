@@ -57,7 +57,7 @@ const PAGE_W = 612;
 const PAGE_H = 792;
 const MX = 44; // left/right content margin
 const RIGHT = PAGE_W - MX;
-const BOTTOM = 94; // bottom margin (reserves room for the footer band)
+const BOTTOM = 92; // bottom margin (reserves room for the footer band)
 
 type RGB = [number, number, number];
 const MAROON: RGB = [0.725, 0.125, 0.145]; // #B92025
@@ -401,6 +401,7 @@ export function buildInvoicePdf(
   data: InvoiceData,
   logo?: LogoBitmap | null,
   watermark?: LogoBitmap | null,
+  footerLogo?: LogoBitmap | null,
 ): Uint8Array<ArrayBuffer> {
   const p = new Pdf();
 
@@ -578,12 +579,19 @@ export function buildInvoicePdf(
     });
   }
 
-  /* Footer — a cream band with a brand medallion straddling its top edge,
-     anchored to the bottom of the (last) page. */
-  if (p.y < 100) p.newPage();
+  /* Footer — a cream band signed off with the real brand logo sitting on the
+     white page just above the band, anchored to the bottom of the (last) page.
+     Falls back to the "B" medallion when the logo couldn't be rasterised. */
+  if (p.y < 108) p.newPage();
   p.rect(0, 24, PAGE_W, 46, CREAM);
   p.line(MX, 70, RIGHT, 70, MAROON, 0.4);
-  brandMedallion(p, PAGE_W / 2, 72);
+  if (footerLogo) {
+    const lh = 20;
+    const lw = lh * footerLogo.ratio;
+    p.image((PAGE_W - lw) / 2, 76, lw, lh, footerLogo);
+  } else {
+    brandMedallion(p, PAGE_W / 2, 72);
+  }
   p.textCenter(PAGE_W / 2, 46, "Thank you for choosing Bhojpatra", 11.5, F_BOLD, MAROON);
   p.textCenter(
     PAGE_W / 2,
@@ -796,6 +804,81 @@ async function loadMastheadLogo(): Promise<LogoBitmap | null> {
   }
 }
 
+/** Rasterise the brand mark (pot icon + "bhojpatra" wordmark) in MAROON over
+ *  WHITE — the page colour just above the cream footer band — so the invoice is
+ *  signed off with the real logo rather than a generic "B" medallion. The ink /
+ *  paper are swapped versus {@link loadMastheadLogo}. Browser-only; returns null
+ *  otherwise, and the builder keeps the medallion fallback. */
+async function loadFooterLogo(): Promise<LogoBitmap | null> {
+  if (typeof document === "undefined") return null;
+  try {
+    const icon = await loadImageEl("/bhojpatra-icon.png");
+
+    const S = 4; // supersample for crisp edges
+    const HPT = 24; // rendered height in points
+    const iconPx = 24 * S;
+    const gapPx = 7 * S;
+    const fontPx = 21 * S;
+    const heightPx = HPT * S;
+
+    const fam = displayFontFamily();
+    const fontSpec = `${fontPx}px ${fam}`;
+    if (document.fonts?.load) {
+      try {
+        await document.fonts.load(fontSpec, "bhojpatra");
+      } catch {
+        /* fall through to whatever face is ready */
+      }
+    }
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.font = fontSpec;
+    const textPx = Math.ceil(ctx.measureText("bhojpatra").width);
+
+    canvas.width = iconPx + gapPx + textPx;
+    canvas.height = heightPx;
+    // Re-sizing the canvas resets the context, so re-apply everything.
+    ctx.font = fontSpec;
+    ctx.fillStyle = "#FFFFFF"; // white page above the band
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Icon: composite maroon over white by the PNG's own alpha, vertically
+    // centred (a maroon silhouette of the pot mark).
+    const io = document.createElement("canvas");
+    io.width = iconPx;
+    io.height = iconPx;
+    const ictx = io.getContext("2d");
+    if (ictx) {
+      ictx.drawImage(icon, 0, 0, iconPx, iconPx);
+      const px = ictx.getImageData(0, 0, iconPx, iconPx);
+      for (let i = 0; i < px.data.length; i += 4) {
+        const a = px.data[i + 3] / 255;
+        px.data[i] = Math.round(0xb9 * a + 0xff * (1 - a));
+        px.data[i + 1] = Math.round(0x20 * a + 0xff * (1 - a));
+        px.data[i + 2] = Math.round(0x25 * a + 0xff * (1 - a));
+        px.data[i + 3] = 255;
+      }
+      ctx.putImageData(px, 0, Math.round((heightPx - iconPx) / 2));
+    }
+
+    // Wordmark: maroon Ananda text, edges blend against the white fill.
+    ctx.fillStyle = "#B92025";
+    ctx.textBaseline = "middle";
+    ctx.fillText("bhojpatra", iconPx + gapPx, heightPx / 2 + S);
+
+    const all = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let bin = "";
+    for (let i = 0; i < all.length; i += 4) {
+      bin += String.fromCharCode(all[i], all[i + 1], all[i + 2]);
+    }
+    return { w: canvas.width, h: canvas.height, data: bin, ratio: canvas.width / canvas.height };
+  } catch {
+    return null;
+  }
+}
+
 /** Rasterise the brand pot (the site-wide watermark asset) into a faint maroon
  *  mark composited over white, using the PNG's own alpha as the coverage mask.
  *  Embedded once and stamped behind every page at low opacity. Browser-only;
@@ -834,8 +917,12 @@ async function loadWatermarkPot(): Promise<LogoBitmap | null> {
 /** Trigger a browser download of the invoice as a PDF. */
 export async function downloadInvoice(data: InvoiceData): Promise<void> {
   if (typeof window === "undefined") return;
-  const [logo, watermark] = await Promise.all([loadMastheadLogo(), loadWatermarkPot()]);
-  const blob = new Blob([buildInvoicePdf(data, logo, watermark)], {
+  const [logo, watermark, footerLogo] = await Promise.all([
+    loadMastheadLogo(),
+    loadWatermarkPot(),
+    loadFooterLogo(),
+  ]);
+  const blob = new Blob([buildInvoicePdf(data, logo, watermark, footerLogo)], {
     type: "application/pdf",
   });
   const url = URL.createObjectURL(blob);

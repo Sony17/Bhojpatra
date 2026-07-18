@@ -20,6 +20,17 @@ const TONE: Record<string, string> = {
   New: OUTLINE,
   Scheduled: OUTLINE,
   "Advance Received": OUTLINE,
+  Open: OUTLINE,
+  Requested: OUTLINE,
+  "In Progress": SOFT,
+  Processing: SOFT,
+  Processed: SOFT,
+  Resolved: SOLID,
+  Approved: SOLID,
+  // Priority
+  High: SOLID,
+  Medium: OUTLINE,
+  Low: SOFT,
   // Neutral / done
   Completed: SOFT,
   // Tiers

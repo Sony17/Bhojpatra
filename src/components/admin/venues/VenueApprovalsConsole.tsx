@@ -4,8 +4,11 @@
  * Venue Approvals console — the pre-approval review queue for owner-registered
  * venues. A Venue-Owner partner publishes a venue from their dashboard; it lands
  * here as "Pending" and stays off the /venues catalogue, its detail page and the
- * booking flow until an admin Approves it. "Hidden" is a takedown for a venue
- * that was live. Legacy venues saved before approvals show as already Approved.
+ * booking flow until an admin verifies its details and Approves it. The pipeline
+ * is: review the application → verify the details → publish (Approve). Publishing
+ * is gated on verification — a venue can't go live until an admin has confirmed
+ * its details. "Hidden" is a takedown for a venue that was live. Legacy venues
+ * saved before approvals show as already Approved and Verified.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -19,7 +22,7 @@ import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
 import { Button } from "@/components/ui";
-import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
+import { Calendar, ShieldCheck, Rocket, Close } from "@/components/admin/shared/icons";
 import {
   venueCityName,
   formatVenuePrice,
@@ -29,9 +32,11 @@ import {
 
 const PAGE_SIZE = 8;
 
-/** A venue row as returned by GET /api/venues/moderation (status always set). */
+/** A venue row as returned by GET /api/venues/moderation (status + verified
+ *  always set). */
 interface ModerationVenue extends VenueRecord {
   status: VenueStatus;
+  verified: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -39,6 +44,12 @@ const STATUS_OPTIONS = [
   { label: "Pending", value: "Pending" },
   { label: "Approved", value: "Approved" },
   { label: "Hidden", value: "Hidden" },
+];
+
+const VERIFICATION_OPTIONS = [
+  { label: "All", value: "All" },
+  { label: "Verified", value: "Verified" },
+  { label: "Unverified", value: "Unverified" },
 ];
 
 function StatusPill({ status }: { status: VenueStatus }) {
@@ -60,11 +71,25 @@ function StatusPill({ status }: { status: VenueStatus }) {
   );
 }
 
+function VerificationPill({ verified }: { verified: boolean }) {
+  return verified ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+      <ShieldCheck className="h-3.5 w-3.5" />
+      Verified
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full border border-maroon px-3 py-1 text-xs font-semibold text-maroon">
+      Unverified
+    </span>
+  );
+}
+
 export default function VenueApprovalsConsole() {
   const [venues, setVenues] = useState<ModerationVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
+  const [verification, setVerification] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -95,6 +120,7 @@ export default function VenueApprovalsConsole() {
   const counts = useMemo(
     () => ({
       pending: venues.filter((v) => v.status === "Pending").length,
+      unverified: venues.filter((v) => !v.verified && v.status !== "Hidden").length,
       approved: venues.filter((v) => v.status === "Approved").length,
       hidden: venues.filter((v) => v.status === "Hidden").length,
     }),
@@ -110,16 +136,24 @@ export default function VenueApprovalsConsole() {
         venueCityName(v.city).toLowerCase().includes(query) ||
         (v.location ?? "").toLowerCase().includes(query) ||
         (v.ownerName ?? "").toLowerCase().includes(query);
-      return matchesQ && (status === "All" || v.status === status);
+      const matchesVerification =
+        verification === "All" ||
+        (verification === "Verified" ? v.verified : !v.verified);
+      return (
+        matchesQ &&
+        matchesVerification &&
+        (status === "All" || v.status === status)
+      );
     });
-  }, [venues, q, status]);
+  }, [venues, q, status, verification]);
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const selected = selectedId
     ? venues.find((v) => v.id === selectedId) ?? null
     : null;
 
-  // Optimistic status change, rolled back if the request fails.
+  // Optimistic status change, rolled back if the request fails (e.g. the server
+  // rejects publishing an unverified venue).
   const setVenueStatus = (id: string, next: VenueStatus) => {
     const snapshot = venues;
     setVenues((prev) =>
@@ -146,6 +180,36 @@ export default function VenueApprovalsConsole() {
       });
   };
 
+  // Optimistic verification toggle, rolled back if the request fails.
+  const setVenueVerified = (id: string, next: boolean) => {
+    const snapshot = venues;
+    setVenues((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, verified: next } : v)),
+    );
+    setToast(
+      next
+        ? "Details verified — ready to publish"
+        : "Verification removed",
+    );
+    fetch(`/api/venues/moderation/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verified: next }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("request failed");
+      })
+      .catch(() => {
+        setVenues(snapshot);
+        setToast("Couldn't save. Please try again.");
+      });
+  };
+
+  const stop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
   const columns: Column<ModerationVenue>[] = [
     {
       key: "venue",
@@ -157,23 +221,9 @@ export default function VenueApprovalsConsole() {
           </span>
           <div className="min-w-0">
             <p className="truncate font-medium text-ink">{v.name}</p>
-            <p className="text-xs text-ink-soft">
-              {[v.location, venueCityName(v.city)].filter(Boolean).join(", ")}
-            </p>
+            <p className="truncate text-xs text-ink-soft">{v.location || "—"}</p>
           </div>
         </div>
-      ),
-    },
-    {
-      key: "type",
-      header: "Type",
-      cell: (v) => <span className="text-ink-soft">{v.type}</span>,
-    },
-    {
-      key: "price",
-      header: "From",
-      cell: (v) => (
-        <span className="text-ink">{v.priceFrom || formatVenuePrice(v.price)}</span>
       ),
     },
     {
@@ -184,15 +234,72 @@ export default function VenueApprovalsConsole() {
       ),
     },
     {
+      key: "city",
+      header: "City",
+      cell: (v) => <span className="text-ink-soft">{venueCityName(v.city)}</span>,
+    },
+    {
+      key: "capacity",
+      header: "Capacity",
+      cell: (v) => <span className="text-ink-soft">{v.capacity || "—"}</span>,
+    },
+    {
+      key: "type",
+      header: "Type",
+      cell: (v) => <span className="text-ink-soft">{v.type}</span>,
+    },
+    {
+      key: "verification",
+      header: "Verification",
+      cell: (v) => <VerificationPill verified={v.verified} />,
+    },
+    {
       key: "status",
       header: "Status",
       cell: (v) => <StatusPill status={v.status} />,
     },
     {
-      key: "action",
-      header: "",
-      cell: () => <span className="text-sm font-semibold text-maroon">Review</span>,
+      key: "actions",
+      header: "Actions",
       className: "text-right",
+      headerClassName: "text-right",
+      cell: (v) => (
+        <div className="flex items-center justify-end gap-2">
+          {!v.verified ? (
+            <Button
+              size="sm"
+              variant="primary"
+              leftIcon={<ShieldCheck className="h-4 w-4" />}
+              onClick={stop(() => setVenueVerified(v.id, true))}
+            >
+              Verify
+            </Button>
+          ) : v.status !== "Approved" ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={stop(() => setVenueStatus(v.id, "Approved"))}
+            >
+              Publish
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={stop(() => setVenueStatus(v.id, "Hidden"))}
+            >
+              Hide
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={stop(() => setSelectedId(v.id))}
+          >
+            Review
+          </Button>
+        </div>
+      ),
     },
   ];
 
@@ -201,12 +308,13 @@ export default function VenueApprovalsConsole() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Venue Approvals"
-        subtitle="Review venues submitted by owners. A venue stays off /venues until you approve it."
+        subtitle="Review venue applications, verify their details, then publish the approved ones. A venue stays off /venues until you verify and approve it."
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Calendar} label="Pending Review" value={String(counts.pending)} />
-        <StatCard icon={ShieldCheck} label="Approved" value={String(counts.approved)} />
+        <StatCard icon={ShieldCheck} label="Awaiting Verification" value={String(counts.unverified)} />
+        <StatCard icon={Rocket} label="Approved" value={String(counts.approved)} />
         <StatCard icon={Close} label="Hidden" value={String(counts.hidden)} />
       </div>
 
@@ -217,12 +325,20 @@ export default function VenueApprovalsConsole() {
           placeholder="Search by venue, city, area or owner…"
           className="lg:max-w-sm lg:flex-1"
         />
-        <SelectFilter
-          label="Status"
-          value={status}
-          options={STATUS_OPTIONS}
-          onChange={onFilter(setStatus)}
-        />
+        <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
+          <SelectFilter
+            label="Verification"
+            value={verification}
+            options={VERIFICATION_OPTIONS}
+            onChange={onFilter(setVerification)}
+          />
+          <SelectFilter
+            label="Status"
+            value={status}
+            options={STATUS_OPTIONS}
+            onChange={onFilter(setStatus)}
+          />
+        </div>
       </div>
 
       <DataTable
@@ -230,7 +346,7 @@ export default function VenueApprovalsConsole() {
         rows={pageRows}
         getRowKey={(v) => v.id}
         onRowClick={(v) => setSelectedId(v.id)}
-        minWidthClass="min-w-[720px]"
+        minWidthClass="min-w-[1040px]"
         empty={
           loading ? (
             <EmptyState
@@ -274,6 +390,13 @@ export default function VenueApprovalsConsole() {
             <>
               <Button
                 variant="secondary"
+                leftIcon={<ShieldCheck className="h-4 w-4" />}
+                onClick={() => setVenueVerified(selected.id, !selected.verified)}
+              >
+                {selected.verified ? "Mark Unverified" : "Mark Verified"}
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => setVenueStatus(selected.id, "Hidden")}
                 disabled={selected.status === "Hidden"}
               >
@@ -282,9 +405,9 @@ export default function VenueApprovalsConsole() {
               <Button
                 variant="primary"
                 onClick={() => setVenueStatus(selected.id, "Approved")}
-                disabled={selected.status === "Approved"}
+                disabled={selected.status === "Approved" || !selected.verified}
               >
-                Approve Venue
+                Publish Venue
               </Button>
             </>
           )
@@ -303,12 +426,19 @@ export default function VenueApprovalsConsole() {
             </div>
 
             <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
+              <VerificationPill verified={selected.verified} />
               <StatusPill status={selected.status} />
               <span className="inline-flex items-center rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink">
                 {selected.type}
               </span>
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
+
+            {!selected.verified && (
+              <p className="rounded-xl border border-maroon bg-cream-2 px-4 py-3 text-sm text-ink">
+                Verify the venue&rsquo;s details to enable publishing.
+              </p>
+            )}
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <Detail

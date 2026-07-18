@@ -635,6 +635,46 @@ export default function FinalisedPackages() {
           })}
         </Reveal>
 
+        {/* Single Stall — a distinct offering below the three tiers: one vendor,
+            build-your-own, "your price". Kept as its own strip (not a fourth
+            tier card) so the Silver/Gold/Platinum hierarchy stays intact. */}
+        {custom && (
+          <Reveal className="mx-auto mt-8 max-w-6xl">
+            <div className="rounded-card border border-maroon/20 bg-cream/40 px-5 py-6 sm:px-8 sm:py-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-display text-xs uppercase tracking-wide text-maroon">
+                    {lang === "hi" ? custom.taglineHi : custom.tagline}
+                  </p>
+                  <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
+                    {lang === "hi" ? custom.nameHi : custom.name}
+                  </h3>
+                  <p className="mt-1.5 text-sm text-ink-soft">
+                    {t(
+                      "Pick one vendor, build your own menu, and pay only for what you select.",
+                      "एक वेंडर चुनें, अपना मेन्यू बनाएं, और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
+                    )}
+                  </p>
+                </div>
+                <Button
+                  href="/book?package=custom&step=menu"
+                  variant="primary"
+                  rightIcon={<span aria-hidden="true">→</span>}
+                  className="shrink-0"
+                  aria-label={t(
+                    "Build your Single Stall",
+                    "अपना सिंगल स्टॉल बनाएं",
+                  )}
+                >
+                  <span className="font-display leading-none">
+                    {t("Build your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                  </span>
+                </Button>
+              </div>
+            </div>
+          </Reveal>
+        )}
+
         {/* One footer line: compare · single stall · chat · share */}
         <Reveal className="mx-auto mt-12 max-w-4xl">
           <PackageFooter

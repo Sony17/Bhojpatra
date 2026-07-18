@@ -1000,6 +1000,11 @@ export const menuCourses: MenuCourse[] = [
   },
 ];
 
+/** Add-on grouping used by the richer tier filter (Gold/Platinum) on the extras
+ *  step: live food/beverage counters vs whole-event services (staff, tableware,
+ *  decor). */
+export type AddOnCategory = "counter" | "service";
+
 export interface AddOn {
   id: string;
   name: string;
@@ -1013,6 +1018,8 @@ export interface AddOn {
   image: string;
   /** Extra search aliases — matched by the add-on search box, not shown in UI. */
   keywords?: string[];
+  /** Which filter group it belongs to (defaults to a live counter when unset). */
+  category?: AddOnCategory;
 }
 
 export const addOns: AddOn[] = [
@@ -1026,9 +1033,9 @@ export const addOns: AddOn[] = [
   { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨", image: img("photo-1565557623262-b51c2513a641", 600), keywords: ["jalebi", "ice cream", "kulfi", "sweets", "gulab jamun", "mithai"] },
   { id: "coffee", name: "Coffee & Chai Bar", nameHi: "कॉफ़ी और चाय बार", description: "Barista coffee, cutting chai & more.", price: 45, perPlate: true, icon: "☕", image: img("photo-1509042239860-f550ce710b93", 600), keywords: ["coffee", "chai", "tea", "barista", "cappuccino", "beverage"] },
   { id: "mocktail", name: "Mocktail & Juice Bar", nameHi: "मॉकटेल और जूस बार", description: "Fresh juices & mocktails, mixed live.", price: 65, perPlate: true, icon: "🍹", image: img("photo-1544145945-f90425340c7e", 600), keywords: ["mocktail", "juice", "drinks", "beverage", "cooler", "lemonade"] },
-  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600), keywords: ["waiter", "steward", "server", "manpower"] },
-  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600), keywords: ["crockery", "cutlery", "glassware", "plates"] },
-  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600), keywords: ["decor", "flowers", "florals", "lighting", "theme", "stage"] },
+  { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600), keywords: ["waiter", "steward", "server", "manpower"], category: "service" },
+  { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600), keywords: ["crockery", "cutlery", "glassware", "plates"], category: "service" },
+  { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600), keywords: ["decor", "flowers", "florals", "lighting", "theme", "stage"], category: "service" },
 ];
 
 /**
@@ -1276,6 +1283,11 @@ export interface CategoryVendor {
   live?: boolean;
   /** Live vendor's base city; curated seeds are city-agnostic. */
   city?: string;
+  /** Marketplace tier band(s) this vendor sits in — mirrors the catalog's
+   *  price-derived / admin-assigned tiers. Drives the Single Stall tier lens and
+   *  the fixed Silver/Gold rosters. Absent on the static fallback fixture, where
+   *  no tier gate is applied (behaviour stays unchanged until /api/menu answers). */
+  tiers?: ("Silver" | "Gold" | "Platinum")[];
   /** Minimum advance-booking notice (in days) this stall needs before the event —
    *  the "as per vendor specification" rule for the Custom single-stall flow.
    *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */
@@ -1614,6 +1626,41 @@ export const bookingMealTimes: { id: string; name: string; nameHi: string }[] = 
   { id: "Lunch", name: "Lunch", nameHi: "दोपहर का भोजन" },
   { id: "Dinner", name: "Dinner", nameHi: "रात्रि भोज" },
 ];
+
+/** Clock-time slots offered within each meal period, so a guest refines the
+ *  serving time after picking the meal (e.g. Lunch → 1:30 PM). Values are
+ *  24-hour `HH:MM` strings that feed straight into `eventTime` / `formatClockTime`
+ *  (and the invoice's `servingTimeLabel`). Keyed by the `bookingMealTimes` id. */
+export const bookingTimeSlots: Record<string, string[]> = {
+  Breakfast: [
+    "07:00", "07:30", "08:00", "08:30", "09:00",
+    "09:30", "10:00", "10:30", "11:00",
+  ],
+  Lunch: [
+    "11:30", "12:00", "12:30", "13:00", "13:30",
+    "14:00", "14:30", "15:00", "15:30",
+  ],
+  Dinner: [
+    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+    "21:00", "21:30", "22:00", "22:30", "23:00",
+  ],
+};
+
+/** Map an exact `HH:MM` serving time to the meal period it falls in — morning →
+ *  Breakfast, midday/afternoon → Lunch, evening/night → Dinner. The bands line up
+ *  with `bookingTimeSlots`, so every offered slot resolves to its own meal. Lets
+ *  the vendor catalog turn a picked serving time into a "Serves" match: a vendor
+ *  qualifies when its `mealTypes` cover the returned period. Returns "" on empty /
+ *  malformed input so callers can treat it as "no time chosen". */
+export function mealPeriodForTime(hhmm?: string): string {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "";
+  const mins = h * 60 + m;
+  if (mins < 11 * 60 + 15) return "Breakfast"; // up to 11:15
+  if (mins < 17 * 60) return "Lunch"; // 11:15 – 16:59
+  return "Dinner"; // 17:00 onward
+}
 
 /** A 24-hour `HH:MM` clock string → a friendly 12-hour label (e.g. "19:30" →
  *  "7:30 PM"). Empty / malformed input returns "" so callers can `.filter`. */

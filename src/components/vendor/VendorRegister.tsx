@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   cities,
   indianStates,
@@ -170,6 +170,14 @@ export default function VendorRegister() {
   const [step, setStep] = useState<number>(0);
   const [submitted, setSubmitted] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Each step (and the final success screen) should open at the top — the
+  // Next/Back buttons sit low on long steps, so the next step would otherwise
+  // render already scrolled to the bottom.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [step, submitted]);
   /** Application id returned by the server once persisted. */
   const [serverVendorId, setServerVendorId] = useState<string>("");
 

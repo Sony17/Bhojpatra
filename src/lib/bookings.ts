@@ -160,7 +160,12 @@ export function onStoredBookingsChange(listener: () => void): () => void {
  *  invoices existed) so Download / Share / preview always have something real
  *  to render. GST shows as 0 on the fallback since the split isn't stored. */
 export function bookingInvoice(b: StoredBooking): InvoiceData {
-  if (b.invoice) return b.invoice;
+  // Payments accrue after booking (an advance now, the balance later, or the
+  // team collecting each instalment), so the "Amount Paid" must always come
+  // from the live order — never the amount frozen into the invoice snapshot at
+  // booking time (which is 0 on the online-advance path, where the payment is
+  // recorded a tick before the snapshot's `paidAmount` state has flushed).
+  if (b.invoice) return { ...b.invoice, paid: b.paid };
   return {
     id: b.id,
     dateLabel: b.date,

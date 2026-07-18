@@ -32,18 +32,6 @@ const nextConfig: NextConfig = {
     return [
       // `/admin` has no page of its own — send visitors to the dashboard.
       { source: "/admin", destination: "/admin/dashboard", permanent: false },
-      // Booking Management was merged into "Customers & Bookings".
-      {
-        source: "/admin/bookings",
-        destination: "/admin/customers?tab=bookings",
-        permanent: false,
-      },
-      // Reports were merged into the dashboard's analytics section.
-      {
-        source: "/admin/reports",
-        destination: "/admin/dashboard",
-        permanent: false,
-      },
     ];
   },
 };

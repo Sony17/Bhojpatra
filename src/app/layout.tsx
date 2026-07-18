@@ -5,6 +5,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui";
 import ScrollWatermark from "@/components/ScrollWatermark";
+import ScrollToTop from "@/components/ScrollToTop";
 import SiteLoader from "@/components/SiteLoader";
 import PwaRegister from "@/components/PwaRegister";
 import { brand } from "@/lib/design-tokens";
@@ -74,6 +75,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col overflow-x-hidden bg-bg text-ink">
         <LanguageProvider>
           <ToastProvider>
+            <ScrollToTop />
             {children}
             <ScrollWatermark />
           </ToastProvider>

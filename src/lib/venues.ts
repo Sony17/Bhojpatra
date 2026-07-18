@@ -64,6 +64,11 @@ export interface VenueRecord {
   createdAt: string;
   /** Admin approval state (see `VenueStatus`). Absent on legacy records = live. */
   status?: VenueStatus;
+  /** Admin has verified the venue's details (owner identity, location, capacity)
+   *  after reviewing the application. A venue must be verified before it can be
+   *  published (`status` → "Approved"). Absent on legacy records = grandfathered
+   *  as verified so nothing already live is gated. */
+  verified?: boolean;
   /** Soft-deleted by its owner; hidden from the catalogue and lookups. */
   deleted?: boolean;
 }
@@ -153,22 +158,63 @@ export function venueTypeLabel(type: string, lang: "en" | "hi"): string {
   return lang === "hi" ? (VENUE_TYPE_HI[type] ?? type) : type;
 }
 
-/** A bookable space/facility listed on a venue page. `subject` flags a space
- *  offered on request rather than guaranteed (e.g. guest rooms). */
-export interface VenueSpace {
+/**
+ * A bookable space within a venue. The same venue offers more than one — an
+ * indoor banquet hall AND an open lawn (both bookable & priced), plus guest
+ * rooms offered per-room, `subject` to availability rather than booked online.
+ */
+export interface VenueSpaceOption {
+  key: "banquet" | "lawn" | "rooms";
   en: string;
   hi: string;
   icon: string;
+  /** Booking fee for the space in ₹ (a per-room nightly rate for guest rooms). */
+  price: number;
+  /** Offered on request, subject to availability (guest rooms) — not a hall the
+   *  customer commits to and pays for online. */
   subject?: boolean;
 }
 
-/** The standard spaces every venue lists — a landscaped lawn, an indoor banquet
- *  hall and guest rooms (offered subject to availability). */
-export const VENUE_SPACES: VenueSpace[] = [
-  { en: "Open Lawn", hi: "खुला लॉन", icon: "🌿" },
-  { en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️" },
-  { en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", subject: true },
-];
+/** Open lawns run ~20% larger than the indoor hall; guest rooms cost ~5% of the
+ *  hall fee per room / night. Derived from the venue's headline fee so every
+ *  venue — seed or owner-listed — gets sensible per-space pricing for free. */
+export const VENUE_LAWN_PREMIUM = 1.2;
+export const VENUE_ROOM_RATE = 0.05;
+
+/**
+ * The spaces a venue offers, priced off its headline fee: a banquet hall (the
+ * "from" price), an open lawn (a step up), and guest rooms (per room, subject
+ * to availability). Every venue lists all three — matching the generated
+ * description and the seed catalogue's assumption that a venue is multi-space.
+ */
+export function venueSpaceOptions(
+  venue: Venue & { price?: number },
+): VenueSpaceOption[] {
+  const base =
+    typeof venue.price === "number" && venue.price > 0
+      ? venue.price
+      : parseVenuePrice(venue.priceFrom);
+  const rooms = Math.max(2000, Math.round((base * VENUE_ROOM_RATE) / 500) * 500);
+  return [
+    { key: "banquet", en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️", price: base },
+    {
+      key: "lawn",
+      en: "Open Lawn",
+      hi: "खुला लॉन",
+      icon: "🌿",
+      price: Math.round(base * VENUE_LAWN_PREMIUM),
+    },
+    { key: "rooms", en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", price: rooms, subject: true },
+  ];
+}
+
+/** The spaces a customer selects & pays for online (banquet hall, open lawn) —
+ *  everything except the on-request guest rooms. */
+export function bookableSpaces(
+  venue: Venue & { price?: number },
+): VenueSpaceOption[] {
+  return venueSpaceOptions(venue).filter((s) => !s.subject);
+}
 
 /**
  * A readable, bilingual venue description generated from the venue's own fields

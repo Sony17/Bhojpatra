@@ -192,6 +192,10 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             : {}),
           perPlate: section.perPlate,
           image: r.image,
+          // Tier bands: admin-assigned win, else the price-derived default —
+          // identical to the catalog card (`toVendorListing`), so the wizard's
+          // tier lens and the /vendors listing agree on where a vendor sits.
+          tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
           items: section.items.map((it, i) => ({
             id: `${r.id}-${i}`,
             name: it.name,

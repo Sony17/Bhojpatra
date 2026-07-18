@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function CareersPage() {
   return (
     <PublicShell>
-      <SitePageView slug="careers" />
+      <SitePageView slug="careers" hideBar />
     </PublicShell>
   );
 }

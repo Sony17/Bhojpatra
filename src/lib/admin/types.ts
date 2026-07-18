@@ -105,6 +105,9 @@ export interface AdminNotification {
   message: string;
   time: string;
   unread: boolean;
+  /** Coarse grouping for the Notifications page filter (Vendors / Payments /
+   *  Bookings / System). Absent on legacy rows. */
+  category?: string;
 }
 
 export interface RevenueSummary {
@@ -427,4 +430,71 @@ export interface AdminRoleInfo {
   name: string;
   description: string;
   members: number;
+}
+
+/* ── Refunds ─────────────────────────────────────────────────────────────── */
+
+export type RefundStatus = "Requested" | "Approved" | "Processed" | "Declined";
+
+/** A refund against a booking — its own lifecycle (request → approve → process),
+ *  distinct from the raw `AdminPayment` ledger row a processed refund produces. */
+export interface AdminRefund {
+  id: string;
+  bookingId: string;
+  customer: string;
+  amount: number;
+  reason: string;
+  method: PaymentMethod;
+  status: RefundStatus;
+  requestedAt: string;
+  /** Set once the refund reaches a terminal state (Processed / Declined). */
+  processedAt?: string;
+}
+
+export interface RefundQuery {
+  q?: string;
+  status?: RefundStatus | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Support Tickets ─────────────────────────────────────────────────────── */
+
+export type SupportTicketStatus = "Open" | "In Progress" | "Resolved";
+export type SupportPriority = "Low" | "Medium" | "High";
+
+/** A customer support ticket. Distinct from `Enquiries` (pre-sale Contact-form
+ *  messages): a ticket is post-booking, has a lifecycle and a priority, and is
+ *  usually tied to a booking. */
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  customer: string;
+  email: string;
+  category: string;
+  priority: SupportPriority;
+  status: SupportTicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  bookingId?: string;
+  message: string;
+}
+
+export interface SupportQuery {
+  q?: string;
+  status?: SupportTicketStatus | "All";
+  priority?: SupportPriority | "All";
+  page?: number;
+  pageSize?: number;
+}
+
+/* ── Roles & Permissions ─────────────────────────────────────────────────── */
+
+export type AccessLevel = "Full" | "View" | "None";
+
+/** A permission matrix row: one platform module and the access each role has to
+ *  it. Rendered as a roles × modules grid on the Roles & Permissions page. */
+export interface PermissionRow {
+  module: string;
+  access: Record<string, AccessLevel>;
 }

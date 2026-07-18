@@ -36,6 +36,13 @@ const ROLE_ICON: Record<PartnerRole, string> = {
 const inr = new Intl.NumberFormat("en-IN");
 const money = (n: number) => `₹${inr.format(n)}`;
 
+/**
+ * Completed referred bookings a partner must reach before they become a
+ * Verified Bhojpatra Partner and their payout unlocks. Applies to every partner
+ * role. Only fully "Completed" orders count — Pending/Confirmed/Cancelled don't.
+ */
+const VERIFY_THRESHOLD = 3;
+
 /** Referred order shape, as returned by GET /api/bookings. */
 interface ReferredOrder {
   id: string;
@@ -166,6 +173,44 @@ export default function PartnerDashboard() {
   const confirmedValue = confirmed.reduce((s, o) => s + o.amount, 0);
   const reward = Math.round((confirmedValue * rewardPercent) / 100);
 
+  // Verification gate: a partner unlocks payouts once 3 referred feasts are
+  // actually Completed. Until then they're "Pending Verification" and the
+  // earnings figure stays visible but the settlement button is disabled.
+  const completedCount = orders.filter((o) => o.status === "Completed").length;
+  const verified = completedCount >= VERIFY_THRESHOLD;
+
+  // ── Payout summary ──────────────────────────────────────────────────────
+  // Split referred earnings by settlement stage. Event Planners / Individual
+  // Referrers earn a % of confirmed value; a Venue Owner is paid on the bookings
+  // their venue generates, so their earning basis is that booking value (they
+  // carry no referral %). Confirmed events are still accruing ("active payout");
+  // Completed events are payable now ("due").
+  const isVenue = active?.type === "venue";
+  const earningsOf = (list: ReferredOrder[]) => {
+    const value = list.reduce((s, o) => s + o.amount, 0);
+    return isVenue ? value : Math.round((value * rewardPercent) / 100);
+  };
+  const completedOrders = orders.filter((o) => o.status === "Completed");
+  const activePayout = earningsOf(orders.filter((o) => o.status === "Confirmed"));
+  const dueAmount = earningsOf(completedOrders);
+  const totalEarning = activePayout + dueAmount;
+  // Due date: the instant-payout window settles a couple of days after the most
+  // recent completed event. Derived from booking dates (Date.parse is pure), so
+  // it needs no clock during render and can't mismatch SSR hydration. No due
+  // amount (or unparseable dates) → no date to show.
+  const dueDate = (() => {
+    if (dueAmount <= 0) return "—";
+    const times = completedOrders
+      .map((o) => Date.parse(o.date))
+      .filter((n) => !Number.isNaN(n));
+    if (times.length === 0) return "—";
+    return new Date(Math.max(...times) + 2 * 86_400_000).toLocaleDateString(
+      "en-IN",
+      { day: "2-digit", month: "short", year: "numeric" },
+    );
+  })();
+  const roleIcon = active ? ROLE_ICON[active.type] : "★";
+
   return (
     <>
       <AppBar
@@ -174,7 +219,21 @@ export default function PartnerDashboard() {
         className="lg:hidden"
       />
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-5 sm:py-12 lg:py-16">
-      <DashboardHeader name={session?.name} role={partnerLabel} />
+      <DashboardHeader
+        name={session?.name}
+        role={partnerLabel}
+        roleIcon={roleIcon}
+        verified={verified}
+      />
+
+      {/* Verification gate — payouts unlock after 3 completed referred feasts. */}
+      {active && (
+        <VerificationBanner
+          verified={verified}
+          completed={completedCount}
+          threshold={VERIFY_THRESHOLD}
+        />
+      )}
 
       {/* Role switcher — one dashboard per partner role this person holds. */}
       <RoleSwitcher
@@ -214,11 +273,20 @@ export default function PartnerDashboard() {
         {tab === "overview" && (
           <OverviewPanel
             code={code}
+            name={session?.name}
             total={orders.length}
             confirmed={confirmed.length}
             referredValue={referredValue}
-            reward={reward}
-            rewardPercent={rewardPercent}
+            roleType={active?.type ?? null}
+            roleLabel={partnerLabel}
+            roleIcon={roleIcon}
+            verified={verified}
+            payout={{
+              total: totalEarning,
+              active: activePayout,
+              due: dueAmount,
+              dueDate,
+            }}
             onShare={() => setTab("share")}
             onSeeAll={() => setTab("referrals")}
             recent={orders.slice(0, 3)}
@@ -230,6 +298,9 @@ export default function PartnerDashboard() {
             name={session?.name}
             reward={reward}
             rewardPercent={rewardPercent}
+            verified={verified}
+            completed={completedCount}
+            threshold={VERIFY_THRESHOLD}
           />
         )}
         {tab === "referrals" && <ReferralsPanel orders={orders} />}
@@ -339,7 +410,17 @@ function RoleSwitcher({
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
-function DashboardHeader({ name, role }: { name?: string; role: string }) {
+function DashboardHeader({
+  name,
+  role,
+  roleIcon,
+  verified,
+}: {
+  name?: string;
+  role: string;
+  roleIcon: string;
+  verified: boolean;
+}) {
   const { t } = useLang();
   return (
     <Card padding="none" className="p-5 sm:p-6">
@@ -351,8 +432,9 @@ function DashboardHeader({ name, role }: { name?: string; role: string }) {
           {name || t("Welcome", "स्वागत है")}
         </h1>
         <Badge tone="solid">
-          <span aria-hidden="true">★</span> {role}
+          <span aria-hidden="true">{roleIcon}</span> {role}
         </Badge>
+        <VerifyBadge verified={verified} />
       </div>
       <p className="font-script mt-2 text-lg text-ink-soft">
         {t(
@@ -364,25 +446,115 @@ function DashboardHeader({ name, role }: { name?: string; role: string }) {
   );
 }
 
+/* ── Verification gate ──────────────────────────────────────────────────── */
+
+/** Pending / Verified status pill. Cream check on maroon — never a green tick. */
+function VerifyBadge({ verified }: { verified: boolean }) {
+  const { t } = useLang();
+  return verified ? (
+    <Badge tone="solid">
+      <span aria-hidden="true">✓</span>{" "}
+      {t("Verified Bhojpatra Partner", "सत्यापित Bhojpatra पार्टनर")}
+    </Badge>
+  ) : (
+    <Badge tone="outline">
+      {t("Pending Verification", "सत्यापन लंबित")}
+    </Badge>
+  );
+}
+
+/**
+ * The two dashboard states from the partner onboarding flow: a progress banner
+ * counting completed bookings toward the threshold, or an "active" confirmation
+ * once the partner is verified.
+ */
+function VerificationBanner({
+  verified,
+  completed,
+  threshold,
+}: {
+  verified: boolean;
+  completed: number;
+  threshold: number;
+}) {
+  const { t } = useLang();
+
+  if (verified) {
+    return (
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-card border border-maroon/30 bg-maroon-soft/30 p-5 sm:p-6">
+        <VerifyBadge verified />
+        <p className="text-sm font-medium text-ink">
+          {t(
+            "Your payout dashboard is now active.",
+            "आपका पेआउट डैशबोर्ड अब सक्रिय है।",
+          )}
+        </p>
+      </div>
+    );
+  }
+
+  const done = Math.min(completed, threshold);
+  const pct = Math.round((done / threshold) * 100);
+  return (
+    <div className="mt-6 rounded-card border border-cream-3 bg-cream/50 p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <VerifyBadge verified={false} />
+        <span className="text-sm font-medium text-ink-soft">
+          {t(
+            `${done}/${threshold} Bookings Completed`,
+            `${done}/${threshold} बुकिंग पूर्ण`,
+          )}
+        </span>
+      </div>
+      <p className="mt-3 text-sm text-ink">
+        {t(
+          `Complete ${threshold} bookings to activate payouts.`,
+          `पेआउट सक्रिय करने के लिए ${threshold} बुकिंग पूरी करें।`,
+        )}
+      </p>
+      <div
+        className="mt-3 h-2 w-full overflow-hidden rounded-full bg-cream-2"
+        role="progressbar"
+        aria-valuenow={done}
+        aria-valuemin={0}
+        aria-valuemax={threshold}
+      >
+        <div
+          className="h-full rounded-full bg-maroon transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── Overview ───────────────────────────────────────────────────────────── */
 
 function OverviewPanel({
   code,
+  name,
   total,
   confirmed,
   referredValue,
-  reward,
-  rewardPercent,
+  roleType,
+  roleLabel,
+  roleIcon,
+  verified,
+  payout,
   onShare,
   onSeeAll,
   recent,
 }: {
   code: string;
+  name?: string;
   total: number;
   confirmed: number;
   referredValue: number;
-  reward: number;
-  rewardPercent: number;
+  roleType: PartnerRole | null;
+  roleLabel: string;
+  roleIcon: string;
+  verified: boolean;
+  payout: { total: number; active: number; due: number; dueDate: string };
   onShare: () => void;
   onSeeAll: () => void;
   recent: ReferredOrder[];
@@ -418,24 +590,102 @@ function OverviewPanel({
       sub: t("total booking value", "कुल बुकिंग मूल्य"),
       icon: "₹",
     },
-    {
-      label: t("Your Earnings", "आपकी कमाई"),
-      value: money(reward),
-      sub:
-        rewardPercent > 0
-          ? t(
-              `${rewardPercent}% of confirmed value`,
-              `पुष्ट मूल्य का ${rewardPercent}%`,
-            )
-          : t("reward not set yet", "रिवॉर्ड अभी तय नहीं"),
-      icon: "🎁",
-    },
   ];
+
+  // The four payout figures Bhojpatra partners track. "Due amount" carries the
+  // maroon accent as the number they act on; the rest stay ink.
+  const payoutStats = [
+    { label: t("Total earning", "कुल कमाई"), value: money(payout.total), accent: false },
+    { label: t("Active payout", "सक्रिय भुगतान"), value: money(payout.active), accent: false },
+    { label: t("Due amount", "बकाया राशि"), value: money(payout.due), accent: true },
+    { label: t("Due date", "भुगतान तिथि"), value: payout.dueDate, accent: false },
+  ];
+
+  const payoutPitch =
+    roleType === "venue"
+      ? t(
+          "Send your venue bookings through Bhojpatra and get instant payout partner benefits.",
+          "अपनी वेन्यू बुकिंग Bhojpatra से भेजें और तुरंत भुगतान पार्टनर लाभ पाएं।",
+        )
+      : t(
+          "Pass your client bookings to Bhojpatra and get instant payout partner benefits.",
+          "अपनी क्लाइंट बुकिंग Bhojpatra को भेजें और तुरंत भुगतान पार्टनर लाभ पाएं।",
+        );
 
   return (
     <div className="space-y-8">
+      {/* Payout summary — the instant-payout promise with this partner's own
+          numbers. Settlement stays gated on verification, matching Share & Earn. */}
+      <div className="rounded-card border border-maroon/30 bg-maroon-soft/30 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow text-[0.7rem] font-semibold text-maroon">
+              {t("Instant Payouts", "तुरंत भुगतान")}
+            </p>
+            <h2 className="font-display mt-1 text-lg font-semibold text-ink sm:text-xl">
+              {t("Your payouts", "आपके भुगतान")}
+            </h2>
+          </div>
+          <Badge tone="solid">
+            <span aria-hidden="true">{roleIcon}</span> {roleLabel}
+          </Badge>
+        </div>
+        <p className="mt-2 max-w-xl text-sm text-ink-soft">{payoutPitch}</p>
+
+        <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {payoutStats.map((m) => (
+            <div
+              key={m.label}
+              className="rounded-control border border-maroon/15 bg-white p-3.5"
+            >
+              <dt className="text-xs text-ink-soft">{m.label}</dt>
+              <dd
+                className={
+                  "font-display mt-1 text-xl font-bold sm:text-2xl " +
+                  (m.accent ? "text-maroon" : "text-ink")
+                }
+              >
+                {m.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button
+            variant="primary"
+            href={referralPayoutHref(code || "—", name)}
+            disabled={!verified}
+            target="_blank"
+            rel="noopener noreferrer"
+            leftIcon={<span aria-hidden="true">💬</span>}
+            className="w-full sm:w-auto"
+          >
+            {verified
+              ? t("Settle payout", "भुगतान पाएं")
+              : t("Payouts locked", "पेआउट लॉक")}
+          </Button>
+          <p className="text-xs text-ink-soft">
+            {!verified
+              ? t(
+                  "Payouts unlock once you're a Verified Bhojpatra Partner.",
+                  "पेआउट तब अनलॉक होगा जब आप सत्यापित Bhojpatra पार्टनर बनेंगे।",
+                )
+              : payout.due > 0
+                ? t(
+                    `Your due amount settles by ${payout.dueDate} — connect to withdraw instantly.`,
+                    `आपकी बकाया राशि ${payout.dueDate} तक सेटल होगी — तुरंत निकालने के लिए जुड़ें।`,
+                  )
+                : t(
+                    "Confirmed bookings become payable the moment your event completes.",
+                    "इवेंट पूरा होते ही पुष्ट बुकिंग भुगतान-योग्य हो जाती है।",
+                  )}
+          </p>
+        </div>
+      </div>
+
       {/* KPI cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-cream text-xl">
@@ -545,11 +795,17 @@ function SharePanel({
   name,
   reward,
   rewardPercent,
+  verified,
+  completed,
+  threshold,
 }: {
   code: string;
   name?: string;
   reward: number;
   rewardPercent: number;
+  verified: boolean;
+  completed: number;
+  threshold: number;
 }) {
   const { t } = useLang();
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
@@ -645,15 +901,32 @@ function SharePanel({
                 "आपका कमीशन पुष्ट बुकिंग पर तय होता है। अपना भुगतान पाने के लिए WhatsApp पर Bhojpatra टीम से जुड़ें।",
               )}
         </p>
+        {!verified && (
+          <p className="mt-2 text-sm font-medium text-maroon">
+            {t(
+              `Payouts unlock once you're a Verified Bhojpatra Partner — complete ${threshold} bookings (${Math.min(
+                completed,
+                threshold,
+              )}/${threshold} done).`,
+              `पेआउट तब अनलॉक होगा जब आप सत्यापित Bhojpatra पार्टनर बनेंगे — ${threshold} बुकिंग पूरी करें (${Math.min(
+                completed,
+                threshold,
+              )}/${threshold} पूर्ण)।`,
+            )}
+          </p>
+        )}
         <Button
           variant="primary"
           href={referralPayoutHref(code || "—", name)}
+          disabled={!verified}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-4"
           leftIcon={<span aria-hidden="true">💬</span>}
         >
-          {t("Connect with Bhojpatra", "Bhojpatra से जुड़ें")}
+          {verified
+            ? t("Connect with Bhojpatra", "Bhojpatra से जुड़ें")
+            : t("Payouts locked", "पेआउट लॉक")}
         </Button>
       </div>
     </div>

@@ -251,3 +251,67 @@ export function Copy(props: IconProps) {
     </svg>
   );
 }
+
+/* Building — Venues. */
+export function Building(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 21V6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v15" />
+      <path d="M12 21V10a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v11" />
+      <path d="M3 21h18" />
+      <path d="M7 9h1M7 13h1M15 13h1M15 17h1" />
+    </svg>
+  );
+}
+
+/* Banknote — Settlements (vendor payouts). */
+export function Banknote(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="7" width="18" height="10" rx="2" />
+      <circle cx="12" cy="12" r="2.2" />
+      <path d="M6 10v4M18 10v4" />
+    </svg>
+  );
+}
+
+/* Return arrow — Refunds. */
+export function Refund(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 8h11a5 5 0 0 1 0 10H8" />
+      <path d="m6 5-3 3 3 3" />
+    </svg>
+  );
+}
+
+/* Trending up — Analytics. */
+export function TrendingUp(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 15l5-5 3 3 7-7" />
+      <path d="M16 6h4v4" />
+    </svg>
+  );
+}
+
+/* Life buoy — Support Tickets. */
+export function LifeBuoy(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="m6 6 3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18" />
+    </svg>
+  );
+}
+
+/* Key — Roles & Permissions. */
+export function Key(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7.5" cy="12" r="3.5" />
+      <path d="M11 12h9M17 12v3M20 12v2.5" />
+    </svg>
+  );
+}

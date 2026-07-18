@@ -134,7 +134,9 @@ export default function VendorProfile({
             </p>
 
             <Button
-              href="/book"
+              href={`/book?package=custom&vendor=${encodeURIComponent(
+                profile.id,
+              )}&step=menu`}
               variant="primary"
               size="lg"
               fullWidth
@@ -144,8 +146,8 @@ export default function VendorProfile({
             </Button>
             <p className="mt-2 text-center text-xs text-ink-soft">
               {t(
-                "Pick this caterer while building your menu in the booking wizard.",
-                "बुकिंग विज़ार्ड में मेन्यू बनाते समय इस कैटरर को चुनें।",
+                "This caterer is pre-selected — just build your Single Stall menu in the wizard.",
+                "यह कैटरर पहले से चुना हुआ है — बस विज़ार्ड में अपना सिंगल स्टॉल मेन्यू बनाएं।",
               )}
             </p>
 

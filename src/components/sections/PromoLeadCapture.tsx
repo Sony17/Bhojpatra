@@ -165,8 +165,11 @@ export default function PromoLeadCapture() {
     return (
       <section id="offers" aria-label="Promotional offers" className="bg-white">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-          <Reveal className="relative aspect-[2.54/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10">
-            <div className="absolute inset-0">
+          {/* Mobile stacks the artwork over its own maroon form panel (the wide
+              banner is too short to overlay legibly); wide screens keep the
+              premium float-over-art layout. */}
+          <Reveal className="overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:relative sm:aspect-[2.54/1]">
+            <div className="relative aspect-[2.54/1] sm:absolute sm:inset-0 sm:aspect-auto">
               <Image
                 src={promo.image}
                 alt={heading}
@@ -178,11 +181,12 @@ export default function PromoLeadCapture() {
               />
             </div>
 
-            {/* Gradient scrim so the lead form floats over the artwork
-                instead of sitting in a hard slab — reads more premium. */}
-            <div className="promo-overlay-scrim pointer-events-none absolute inset-x-0 bottom-0 h-2/3" />
+            {/* Gradient scrim so the lead form floats over the artwork on wide
+                screens instead of sitting in a hard slab — reads more premium.
+                On mobile the form gets its own maroon panel below, so hide it. */}
+            <div className="promo-overlay-scrim pointer-events-none absolute inset-x-0 bottom-0 hidden h-2/3 sm:block" />
 
-            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
+            <div className="bg-maroon p-3 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:p-4">
               <div className="mx-auto flex w-full max-w-5xl items-center gap-1.5 sm:gap-2">
                 <div className="min-w-0 flex-1">{leadForm}</div>
                 <WhatsAppShareButton

@@ -146,6 +146,37 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Autofill — keep Chrome/Safari on-brand ──────────────────────────────
+   When the browser autofills or you pick a saved value, WebKit paints its
+   own off-brand pale gray/blue background and gray text over the field. Force
+   it back to the brand surface + ink (white/black in light, black/white in
+   dark) so no non-brand grey ever "pops in" while filling a form. The long
+   background-color transition defers WebKit's own tint from ever showing.
+
+   Keep the standard `:autofill` and `:-webkit-autofill` as bare, separate
+   rules — do NOT tack on `:hover/:focus/:active` state suffixes or fold them
+   into one comma list. Tailwind v4's Lightning CSS silently drops the whole
+   rule when it sees a state on the vendor pseudo, which is why an earlier
+   version of this fix never reached the browser. */
+input:autofill,
+textarea:autofill,
+select:autofill {
+  -webkit-text-fill-color: var(--color-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  caret-color: var(--color-ink);
+  transition: background-color 5000s ease-in-out 0s;
+}
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  caret-color: var(--color-ink);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* ── Type system (two brand fonts only) ──────────────────────────────────
    Display / brand  → Ananda Neptouch 2 (--font-display-stack): headings and
                       short, high-impact brand moments. Decorative — never use
@@ -317,6 +348,13 @@ body {
 .app-shell-main {
   flex: 1 1 auto;
   min-height: 0;
+  /* Contain incidental horizontal bleed on mobile — edge-to-edge scroll rows
+     (`-mx-4 … overflow-x-auto`) and negative-margin bleeds sit a few px past the
+     viewport and would otherwise cause a page-wide horizontal scroll. `clip`
+     (x only) keeps overflow-y visible, so it does NOT create a scroll container
+     and never breaks the sticky app header, sticky filter chrome, or downward
+     dropdowns/popovers. */
+  overflow-x: clip;
 }
 
 /* Non-hero pages: breathing room under sticky app header.

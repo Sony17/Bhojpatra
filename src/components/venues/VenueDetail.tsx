@@ -12,10 +12,11 @@ import {
   fetchVenueById,
   venueCityName,
   venueDescription,
-  VENUE_SPACES,
+  venueSpaceOptions,
   VENUE_GST_RATE,
   VENUE_ADVANCE_RATE,
   type BookableVenue,
+  type VenueSpaceOption,
 } from "@/lib/venues";
 import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
@@ -139,6 +140,19 @@ function VenueBooking({
   const [customerPhone, setCustomerPhone] = useState("");
   const [detailsError, setDetailsError] = useState("");
 
+  // The venue offers more than one space — a banquet hall AND an open lawn (both
+  // bookable, each with its own price) plus guest rooms on request. The customer
+  // picks the space they're booking; its price drives the whole order.
+  const spaces = useMemo(() => venueSpaceOptions(venue), [venue]);
+  const bookable = useMemo(() => spaces.filter((s) => !s.subject), [spaces]);
+  const roomsSpace = spaces.find((s) => s.subject);
+  const [spaceKey, setSpaceKey] = useState<string>(bookable[0]?.key ?? "banquet");
+  const [roomsInterest, setRoomsInterest] = useState(false);
+  const selectedSpace =
+    bookable.find((s) => s.key === spaceKey) ?? bookable[0];
+  const spaceLabel = (s: VenueSpaceOption | undefined) =>
+    s ? (lang === "hi" ? s.hi : s.en) : "";
+
   // Step 2 — payment
   const [payMethod, setPayMethod] = useState<OrderPaymentMethod>("UPI");
   const [choice, setChoice] = useState<"advance" | "full">("advance");
@@ -176,8 +190,8 @@ function VenueBooking({
     };
   }, []);
 
-  /* ── Pricing ─────────────────────────────────────────────────────────── */
-  const subtotal = venue.price;
+  /* ── Pricing — driven by the chosen space (banquet hall vs open lawn) ──── */
+  const subtotal = selectedSpace?.price ?? venue.price;
   const gst = subtotal * VENUE_GST_RATE;
   const grandTotal = subtotal + gst;
   const total = Math.round(grandTotal);
@@ -210,9 +224,12 @@ function VenueBooking({
     city: cityLabel,
     venue: venue.name,
     guests,
-    packageName: `${venue.type} — ${t("Venue Booking", "वेन्यू बुकिंग")}`,
+    packageName: `${spaceLabel(selectedSpace)} — ${t("Venue Booking", "वेन्यू बुकिंग")}`,
     lines: [
-      { label: `${venue.name} — ${t("venue booking fee", "वेन्यू बुकिंग शुल्क")}`, amount: subtotal },
+      {
+        label: `${venue.name} — ${spaceLabel(selectedSpace)} ${t("booking fee", "बुकिंग शुल्क")}`,
+        amount: subtotal,
+      },
     ],
     menu: [],
     subtotal,
@@ -230,10 +247,14 @@ function VenueBooking({
       `Booking ID: ${bookingId}`,
       "",
       `Venue:    ${venue.name} (${venue.type})`,
+      `Space:    ${spaceLabel(selectedSpace)}`,
       `Location: ${[venue.location, cityLabel].filter(Boolean).join(", ")}`,
       `Occasion: ${occasionName}`,
       `Date:     ${eventDate ? formatEventDate(eventDate) : "-"}`,
       `Guests:   ${guests}`,
+      ...(roomsInterest && roomsSpace
+        ? [`Rooms:    Requested — ${money(roomsSpace.price)}/room (subject to availability)`]
+        : []),
       "",
       `Venue Fee:   ${money(subtotal)}`,
       `GST (18%):   ${money(gst)}`,
@@ -482,7 +503,7 @@ function VenueBooking({
               </p>
             </div>
 
-            <div className="-mx-4 mt-4 flex flex-nowrap items-center gap-3 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               {/* Want catering at this venue too? Carry it into the feast wizard. */}
               <Button
                 href={cateringHref}
@@ -505,8 +526,16 @@ function VenueBooking({
             </div>
           </div>
 
-          {/* Description, spaces & availability — the venue's story. */}
-          <VenueAbout venue={venue} t={t} lang={lang} />
+          {/* Description, spaces & availability — the venue's story. Picking a
+              space here syncs the booking form's selection and scrolls to it. */}
+          <VenueAbout
+            venue={venue}
+            t={t}
+            lang={lang}
+            spaces={spaces}
+            spaceKey={spaceKey}
+            onSelectSpace={setSpaceKey}
+          />
         </div>
 
         {/* ── Booking panel ──────────────────────────────────────────── */}
@@ -516,6 +545,8 @@ function VenueBooking({
               t={t}
               bookingId={bookingId}
               venue={venue}
+              spaceName={spaceLabel(selectedSpace)}
+              roomsRequested={roomsInterest && !!roomsSpace}
               eventDate={eventDate}
               guests={guests}
               cityLabel={cityLabel}
@@ -627,12 +658,78 @@ function VenueBooking({
                     </label>
                   </div>
 
+                  {/* Which space? The same venue offers a banquet hall and an
+                      open lawn — each priced on its own. */}
+                  {bookable.length > 1 && (
+                    <div className="mt-4">
+                      <span className="text-xs font-medium text-ink-soft">
+                        {t("Choose your space", "अपना स्थान चुनें")}
+                      </span>
+                      <div className="mt-1.5 grid gap-2.5 sm:grid-cols-2">
+                        {bookable.map((s) => {
+                          const active = s.key === spaceKey;
+                          return (
+                            <button
+                              key={s.key}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setSpaceKey(s.key)}
+                              className={
+                                "flex items-center justify-between gap-2 rounded-card border px-4 py-3 text-left transition " +
+                                (active
+                                  ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+                                  : "border-cream-3 bg-white hover:bg-cream-2")
+                              }
+                            >
+                              <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                                <span aria-hidden="true">{s.icon}</span>
+                                {spaceLabel(s)}
+                              </span>
+                              <span className="font-display text-sm font-semibold text-maroon">
+                                {money(s.price)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Guest rooms — offered per room, subject to availability.
+                          A request note only; our team confirms rooms later. */}
+                      {roomsSpace && (
+                        <label className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-card border border-cream-3 bg-cream-2/30 p-3">
+                          <input
+                            type="checkbox"
+                            checked={roomsInterest}
+                            onChange={(e) => setRoomsInterest(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 accent-maroon"
+                          />
+                          <span className="text-sm">
+                            <span className="block font-medium text-ink">
+                              <span aria-hidden="true">{roomsSpace.icon}</span>{" "}
+                              {t("Add guest rooms", "अतिथि कक्ष जोड़ें")}{" "}
+                              <span className="font-normal text-ink-soft">
+                                ({t("subject to availability", "उपलब्धता के अधीन")})
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-xs text-ink-soft">
+                              {t(
+                                `From ${money(roomsSpace.price)} / room — our team confirms rooms on request.`,
+                                `${money(roomsSpace.price)} / कमरा से — हमारी टीम अनुरोध पर कमरे कन्फर्म करती है।`,
+                              )}
+                            </span>
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  )}
+
                   {detailsError && (
                     <p className="mt-3 text-sm font-medium text-maroon">{detailsError}</p>
                   )}
 
                   <PriceBreakdown
                     t={t}
+                    feeLabel={`${spaceLabel(selectedSpace)} ${t("fee", "शुल्क")}`}
                     subtotal={subtotal}
                     gst={gst}
                     grandTotal={grandTotal}
@@ -678,6 +775,7 @@ function VenueBooking({
 
                   <PriceBreakdown
                     t={t}
+                    feeLabel={`${spaceLabel(selectedSpace)} ${t("fee", "शुल्क")}`}
                     subtotal={subtotal}
                     gst={gst}
                     grandTotal={grandTotal}
@@ -900,8 +998,8 @@ function VenueBooking({
       {/* Mobile sticky booking bar — jumps to the booking form; hidden once the
           guest moves past the details step (payment / done). */}
       <StickyBookingBar
-        price={venue.priceFrom}
-        priceNote={t("Booking fee · +18% GST", "बुकिंग शुल्क · +18% जीएसटी")}
+        price={money(subtotal)}
+        priceNote={`${spaceLabel(selectedSpace)} · +18% ${t("GST", "जीएसटी")}`}
         cta={t("Book This Venue", "यह वेन्यू बुक करें")}
         onClick={() =>
           document
@@ -927,15 +1025,27 @@ function VenueAbout({
   venue,
   t,
   lang,
+  spaces,
+  spaceKey,
+  onSelectSpace,
 }: {
   venue: BookableVenue;
   t: (en: string, hi: string) => string;
   lang: "en" | "hi";
+  spaces: VenueSpaceOption[];
+  spaceKey: string;
+  onSelectSpace: (key: string) => void;
 }) {
   const scrollToBooking = () =>
     document
       .getElementById("venue-booking")
       ?.scrollIntoView({ behavior: "smooth" });
+
+  /** Pick a bookable space from the story cards, then jump to the booking form. */
+  const chooseSpace = (key: string) => {
+    onSelectSpace(key);
+    scrollToBooking();
+  };
 
   return (
     <div className="mt-8 space-y-6">
@@ -949,32 +1059,61 @@ function VenueAbout({
         </p>
       </section>
 
-      {/* Spaces */}
+      {/* Spaces — the same venue offers a banquet hall AND an open lawn (both
+          bookable & priced), plus guest rooms subject to availability. Tapping a
+          bookable space selects it in the booking form. */}
       <section>
         <h2 className="font-display text-lg font-semibold text-ink">
           {t("Spaces available", "उपलब्ध स्थान")}
         </h2>
         <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          {VENUE_SPACES.map((space) => (
-            <li
-              key={space.en}
-              className="flex items-start gap-2.5 rounded-card border border-cream-3 bg-cream-2/30 p-3"
-            >
-              <span aria-hidden="true" className="text-lg leading-none">
-                {space.icon}
-              </span>
-              <span>
-                <span className="block text-sm font-medium text-ink">
-                  {lang === "hi" ? space.hi : space.en}
+          {spaces.map((space) => {
+            const name = lang === "hi" ? space.hi : space.en;
+            const active = !space.subject && space.key === spaceKey;
+            const body = (
+              <>
+                <span aria-hidden="true" className="text-lg leading-none">
+                  {space.icon}
                 </span>
-                {space.subject && (
-                  <span className="mt-0.5 block text-xs text-ink-soft">
-                    {t("Subject to availability", "उपलब्धता के अधीन")}
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">{name}</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-maroon">
+                    {space.subject
+                      ? t(`From ${money(space.price)} / room`, `${money(space.price)} / कमरा से`)
+                      : t(`From ${money(space.price)}`, `${money(space.price)} से`)}
                   </span>
+                  {space.subject && (
+                    <span className="mt-0.5 block text-xs text-ink-soft">
+                      {t("Subject to availability", "उपलब्धता के अधीन")}
+                    </span>
+                  )}
+                </span>
+              </>
+            );
+            return (
+              <li key={space.key}>
+                {space.subject ? (
+                  <div className="flex h-full items-start gap-2.5 rounded-card border border-cream-3 bg-cream-2/30 p-3">
+                    {body}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => chooseSpace(space.key)}
+                    className={
+                      "flex h-full w-full items-start gap-2.5 rounded-card border p-3 text-left transition " +
+                      (active
+                        ? "border-maroon bg-maroon-soft/30 ring-2 ring-maroon"
+                        : "border-cream-3 bg-cream-2/30 hover:bg-cream-2")
+                    }
+                  >
+                    {body}
+                  </button>
                 )}
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
@@ -990,8 +1129,8 @@ function VenueAbout({
             </h2>
             <p className="mt-1 text-sm text-ink-soft">
               {t(
-                "Lawn, banquet hall and rooms are subject to availability — dates fill fast. Pick your event date in the booking form to check and reserve.",
-                "लॉन, बैंक्वेट हॉल और कमरे उपलब्धता के अधीन हैं — तारीख़ें जल्दी भर जाती हैं। जाँचने और आरक्षित करने के लिए बुकिंग फ़ॉर्म में अपनी तारीख़ चुनें।",
+                "Popular dates fill fast — your space and date are locked once you pay the 10% advance. Guest rooms are subject to availability. Pick your event date in the booking form to reserve.",
+                "लोकप्रिय तारीख़ें जल्दी भर जाती हैं — 10% एडवांस देते ही आपका स्थान और तारीख़ पक्की हो जाती है। अतिथि कक्ष उपलब्धता के अधीन हैं। आरक्षित करने के लिए बुकिंग फ़ॉर्म में अपनी तारीख़ चुनें।",
               )}
             </p>
             <button
@@ -1010,12 +1149,15 @@ function VenueAbout({
 
 function PriceBreakdown({
   t,
+  feeLabel,
   subtotal,
   gst,
   grandTotal,
   advanceAmount,
 }: {
   t: (en: string, hi: string) => string;
+  /** Label for the fee row — the chosen space, e.g. "Banquet Hall fee". */
+  feeLabel?: string;
   subtotal: number;
   gst: number;
   grandTotal: number;
@@ -1023,7 +1165,7 @@ function PriceBreakdown({
 }) {
   return (
     <div className="mt-5 space-y-2 rounded-card border border-cream-3 bg-cream-2/30 p-4">
-      <Row label={t("Venue fee", "वेन्यू शुल्क")} value={money(subtotal)} />
+      <Row label={feeLabel || t("Venue fee", "वेन्यू शुल्क")} value={money(subtotal)} />
       <Row label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
       <div className="my-1 h-px bg-cream-3" />
       <div className="flex items-center justify-between">
@@ -1057,6 +1199,8 @@ function DonePanel({
   t,
   bookingId,
   venue,
+  spaceName,
+  roomsRequested,
   eventDate,
   guests,
   cityLabel,
@@ -1067,6 +1211,8 @@ function DonePanel({
   t: (en: string, hi: string) => string;
   bookingId: string;
   venue: BookableVenue;
+  spaceName: string;
+  roomsRequested: boolean;
   eventDate: string;
   guests: number;
   cityLabel: string;
@@ -1092,6 +1238,18 @@ function DonePanel({
         <div className="flex justify-between">
           <dt className="text-ink-soft">{t("Venue", "वेन्यू")}</dt>
           <dd className="font-medium text-ink">{venue.name}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-ink-soft">{t("Space", "स्थान")}</dt>
+          <dd className="font-medium text-ink">
+            {spaceName}
+            {roomsRequested && (
+              <span className="font-normal text-ink-soft">
+                {" "}
+                + {t("rooms (on request)", "कमरे (अनुरोध पर)")}
+              </span>
+            )}
+          </dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-ink-soft">{t("Date", "तारीख़")}</dt>

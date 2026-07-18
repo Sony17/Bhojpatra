@@ -61,7 +61,10 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         <Suspense fallback={<div className="h-16 border-b border-cream-3 bg-white" />}>
           <AdminTopbar onMenu={() => setOpen(true)} />
         </Suspense>
-        <main className="px-4 py-6 sm:px-6 lg:px-8">
+        {/* `overflow-x-clip` contains horizontal-scroll tab rows so they never
+            leak a few px of page-wide scroll on mobile (clip keeps overflow-y
+            visible, so sticky/dropdowns are unaffected). */}
+        <main className="overflow-x-clip px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-[1400px]">{children}</div>
         </main>
       </div>

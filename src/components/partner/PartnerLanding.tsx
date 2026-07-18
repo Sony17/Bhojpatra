@@ -254,6 +254,146 @@ export default function PartnerLanding() {
         </section>
       </div>
 
+      {/* ─── 3.5 INSTANT PAYOUTS ──────────────────────────────────────── */}
+      {/* The payout promise, made concrete: the pitch on the left, a preview of
+          the partner payout dashboard on the right so the benefit is tangible. */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          {/* Pitch */}
+          <div>
+            <p className="eyebrow text-[0.7rem] font-semibold text-maroon">
+              {t("Instant Payouts", "तुरंत भुगतान")}
+            </p>
+            <h2 className="font-display mt-3 text-[1.75rem] leading-tight text-ink sm:text-4xl">
+              {t(
+                "Pass your client bookings, get paid instantly",
+                "अपनी क्लाइंट बुकिंग भेजें, तुरंत भुगतान पाएं"
+              )}
+            </h2>
+            <p className="mt-4 max-w-md text-sm text-ink-soft sm:text-base">
+              {t(
+                "Pass your client bookings to Bhojpatra and get instant payout partner benefits. Track every rupee — total earnings, active payouts and what's due — from one simple dashboard.",
+                "अपनी क्लाइंट बुकिंग Bhojpatra को भेजें और तुरंत भुगतान पार्टनर लाभ पाएं। एक ही डैशबोर्ड से हर रुपया ट्रैक करें — कुल कमाई, सक्रिय भुगतान और बकाया।"
+              )}
+            </p>
+
+            <ul className="mt-6 space-y-3">
+              {[
+                t(
+                  "Total earnings, active payouts, due amount & due date at a glance",
+                  "एक नज़र में कुल कमाई, सक्रिय भुगतान, बकाया राशि और भुगतान तिथि"
+                ),
+                t(
+                  "Confirmed bookings turn payable the moment your event completes",
+                  "इवेंट पूरा होते ही पुष्ट बुकिंग भुगतान-योग्य हो जाती है"
+                ),
+                t(
+                  "The same instant-payout dashboard for Event Planners and Venue Partners",
+                  "इवेंट प्लानर और वेन्यू पार्टनर दोनों के लिए एक जैसा तुरंत-भुगतान डैशबोर्ड"
+                ),
+              ].map((line) => (
+                <li
+                  key={line}
+                  className="flex items-start gap-3 text-sm text-ink-soft"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-maroon text-[0.7rem] font-bold text-cream"
+                  >
+                    ✓
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              href="/signup?type=partner"
+              variant="primary"
+              size="lg"
+              className="mt-8 w-full sm:w-auto"
+            >
+              {t("Become a Partner", "अभी जुड़ें")}
+            </Button>
+          </div>
+
+          {/* Payout dashboard preview */}
+          <div>
+            <div className="rounded-hero border border-maroon/15 bg-white p-5 shadow-pop sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-ink-soft">
+                    {t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
+                  </p>
+                  <p className="font-display text-base font-semibold text-ink">
+                    {t("Payouts", "भुगतान")}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
+                  <span aria-hidden="true">📋</span>{" "}
+                  {t("Event Planner", "इवेंट प्लानर")}
+                </span>
+              </div>
+
+              <dl className="mt-5 grid grid-cols-2 gap-3">
+                {[
+                  {
+                    label: t("Total earning", "कुल कमाई"),
+                    value: "₹2,45,000",
+                    accent: false,
+                  },
+                  {
+                    label: t("Active payout", "सक्रिय भुगतान"),
+                    value: "₹48,000",
+                    accent: false,
+                  },
+                  {
+                    label: t("Due amount", "बकाया राशि"),
+                    value: "₹32,500",
+                    accent: true,
+                  },
+                  {
+                    label: t("Due date", "भुगतान तिथि"),
+                    value: "24 Jul 2026",
+                    accent: false,
+                  },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className="rounded-control border border-maroon/15 bg-white p-3.5"
+                  >
+                    <dt className="text-xs text-ink-soft">{m.label}</dt>
+                    <dd
+                      className={`font-display mt-1 text-xl font-bold sm:text-2xl ${
+                        m.accent ? "text-maroon" : "text-ink"
+                      }`}
+                    >
+                      {m.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="mt-5 flex items-center justify-between rounded-control bg-cream/50 px-4 py-3">
+                <span className="text-xs text-ink-soft">
+                  {t("Next payout", "अगला भुगतान")}
+                </span>
+                <span className="font-display text-sm font-semibold text-maroon">
+                  {t("in 2 days", "2 दिन में")}
+                </span>
+              </div>
+            </div>
+
+            <p className="mt-4 text-center text-xs text-ink-soft">
+              {t(
+                "Venue Partners get the same instant-payout view.",
+                "वेन्यू पार्टनर को भी यही तुरंत-भुगतान व्यू मिलता है।"
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ─── 4. HOW IT WORKS ──────────────────────────────────────────── */}
       <section className="mx-auto max-w-5xl px-5 py-20 sm:py-28">
         <SectionHead

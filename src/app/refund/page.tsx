@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function RefundPage() {
   return (
     <PublicShell>
-      <SitePageView slug="refund" />
+      <SitePageView slug="refund" hideBar />
     </PublicShell>
   );
 }

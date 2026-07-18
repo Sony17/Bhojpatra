@@ -53,6 +53,10 @@ import {
   addOns,
   coupons,
   menuCategories,
+  bookingMealTimes,
+  bookingTimeSlots,
+  formatClockTime,
+  servingTimeLabel,
   packageCategories,
   packageCategoryItems,
   isLiveStallCategory,
@@ -64,12 +68,14 @@ import {
   dummyDishPhoto,
   type PackageTier,
   type AddOn,
+  type AddOnCategory,
   type MenuCategory,
   type CategoryItem,
   type Coupon,
   type VendorListing,
   type BookingStatus,
 } from "@/lib/data";
+import { sortTiers, type VendorTier } from "@/lib/admin/types";
 import {
   useLocations,
   OTHER_LOCATION_ID,
@@ -138,6 +144,7 @@ const DRAFT_KEY = "bhojpatra:booking:draft:v1";
 type BookingDraft = {
   step: number;
   packageId: string;
+  stallTier: VendorTier | "";
   activeCat: number;
   liveCat: number;
   categoryVendor: VendorMap;
@@ -147,6 +154,8 @@ type BookingDraft = {
   customOccasion: string;
   guests: number;
   eventDate: string;
+  mealTime: string;
+  eventTime: string;
   venue: string;
   venueFee: number;
   selectedAddOns: string[];
@@ -252,10 +261,34 @@ export default function BookingWizard() {
     packages.find((p) => p.popular)?.id ?? packages[0].id,
   );
 
+  // Single Stall (custom) tier "lens" — which roster the guest browses on the
+  // Menu step: Silver/Gold surface their-city vendors mapped to that band;
+  // Platinum opens every city ("kahin ke bhi") so the premium reach stays
+  // exclusive. Empty until the guest picks one (the tier picker on Step 2). The
+  // fixed tiers derive their lens from the package itself, so this stays inert
+  // for them.
+  const [stallTier, setStallTier] = useState<VendorTier | "">("");
+
+  // A vendor deep-linked from a brand page (/book?package=custom&vendor=ID) —
+  // held until the live menu loads, then pre-selected across the courses it
+  // serves (see the resolve effect below). The guest can still switch vendors.
+  const [pendingVendorId, setPendingVendorId] = useState<string>("");
+
   // Step 2 — Menu (per-category vendor + items). `activeCat` walks the plated
   // courses; `liveCat` walks the Live Stall step's live-station courses (Step 3).
   const [activeCat, setActiveCat] = useState<number>(0);
   const [liveCat, setLiveCat] = useState<number>(0);
+
+  // Every step transition (Next/Back, the review-step "edit" jumps, a deep-
+  // linked/restored step) AND every course-category advance within the Menu (2)
+  // and Live Stall (3) steps should open at the top of the page. The advance
+  // buttons sit low on long steps/courses, so without this the next screen would
+  // render already scrolled to the bottom.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [step, activeCat, liveCat]);
+
   const [categoryVendor, setCategoryVendor] = useState<VendorMap>({});
   const [categoryItems, setCategoryItems] = useState<ItemMap>({});
   // Single Stall (custom) plan only — the stalls a guest chose to skip. A
@@ -272,6 +305,13 @@ export default function BookingWizard() {
   const [customOccasion, setCustomOccasion] = useState<string>("");
   const [guests, setGuests] = useState<number>(100);
   const [eventDate, setEventDate] = useState<string>("");
+  // Serving time — the meal period (Breakfast/Lunch/Dinner) plus an exact clock
+  // slot within it (e.g. Lunch · 1:30 PM). Both optional; when set they travel
+  // onto the order (`mealTime` / `eventTime`), the invoice's "Serving time" line
+  // and the admin/My-Bookings views via `servingTimeLabel`. `eventTime` is a
+  // 24-hour `HH:MM` string from `bookingTimeSlots`, scoped to the chosen meal.
+  const [mealTime, setMealTime] = useState<string>("");
+  const [eventTime, setEventTime] = useState<string>("");
   const [cityId, setCityId] = useState<string>("");
   // Free-text location typed when the customer picks "Other" (their city/state
   // isn't in the admin-managed list).
@@ -370,6 +410,7 @@ export default function BookingWizard() {
     if (d) {
       if (typeof d.step === "number") setStep(d.step);
       if (d.packageId) setPackageId(d.packageId);
+      if (d.stallTier) setStallTier(d.stallTier);
       if (typeof d.activeCat === "number") setActiveCat(d.activeCat);
       if (typeof d.liveCat === "number") setLiveCat(d.liveCat);
       if (d.categoryVendor) setCategoryVendor(d.categoryVendor);
@@ -379,6 +420,8 @@ export default function BookingWizard() {
       if (d.customOccasion) setCustomOccasion(d.customOccasion);
       if (typeof d.guests === "number") setGuests(d.guests);
       if (d.eventDate) setEventDate(d.eventDate);
+      if (d.mealTime) setMealTime(d.mealTime);
+      if (d.eventTime) setEventTime(d.eventTime);
       if (d.venue) setVenue(d.venue);
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
@@ -449,6 +492,16 @@ export default function BookingWizard() {
       pkgRequested && date !== null && !packageAvailable(pkg!, date);
     if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
     if (stepParam === "menu" && !pkgTooSoon) setStep(2);
+    // A brand page ("book this stall") hands off a specific vendor. That's a
+    // Single Stall (one-vendor) order, so force the custom plan and drop the
+    // guest onto the Menu step; the resolve effect pre-selects the vendor and
+    // infers its tier once the live menu loads.
+    const vendorParam = sp.get("vendor")?.trim();
+    if (vendorParam) {
+      setPackageId("custom");
+      setPendingVendorId(vendorParam);
+      setStep(2);
+    }
     // A partner's share link (/book?ref=CODE) pre-fills the referral code.
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
@@ -462,6 +515,7 @@ export default function BookingWizard() {
     writeBookingDraft({
       step,
       packageId,
+      stallTier,
       activeCat,
       liveCat,
       categoryVendor,
@@ -471,6 +525,8 @@ export default function BookingWizard() {
       customOccasion,
       guests,
       eventDate,
+      mealTime,
+      eventTime,
       venue,
       venueFee,
       selectedAddOns,
@@ -480,6 +536,7 @@ export default function BookingWizard() {
   }, [
     step,
     packageId,
+    stallTier,
     activeCat,
     liveCat,
     categoryVendor,
@@ -489,6 +546,8 @@ export default function BookingWizard() {
     customOccasion,
     guests,
     eventDate,
+    mealTime,
+    eventTime,
     venue,
     venueFee,
     selectedAddOns,
@@ -719,6 +778,39 @@ export default function BookingWizard() {
     };
   }, []);
 
+  // Resolve a brand-page vendor hand-off (/book?vendor=ID) once the live menu
+  // arrives: pre-select that vendor in every course it publishes and infer its
+  // tier lens, so the Menu step skips the picker and opens on that vendor's
+  // roster. Unknown ids (e.g. a curated catalog id absent from the booking
+  // menu) fall through — the guest just picks a tier as usual. A resumed draft's
+  // picks win, so returning to a half-built order isn't clobbered.
+  useEffect(() => {
+    if (!pendingVendorId) return;
+    const preset: VendorMap = {};
+    let tiers: VendorTier[] = [];
+    for (const cat of liveMenuCategories) {
+      const v = cat.vendors.find((x) => x.id === pendingVendorId);
+      if (!v) continue;
+      preset[cat.id] = [pendingVendorId];
+      if (v.tiers?.length) tiers = v.tiers as VendorTier[];
+    }
+    if (Object.keys(preset).length === 0) return; // not loaded yet, or unknown id
+    setCategoryVendor((m) => ({ ...preset, ...m }));
+    setStallTier((cur) => cur || sortTiers(tiers)[0] || "Gold");
+    setPendingVendorId("");
+  }, [liveMenuCategories, pendingVendorId]);
+
+  // The tier "lens" that decides which vendors each course surfaces. Fixed tiers
+  // use their own band (Silver shows Silver-mapped vendors, etc.) via the
+  // existing PACKAGE_VENDOR_TIERS map; Single Stall lets the guest pick the lens
+  // on Step 2 (`stallTier`). `null` — an unset Single Stall lens, or a package
+  // with no band — means "no tier gate", so behaviour is unchanged until a lens
+  // applies. Platinum is handled as the premium reach inside the filter below.
+  const effectiveTier: VendorTier | null =
+    packageId === "custom"
+      ? stallTier || null
+      : (PACKAGE_VENDOR_TIERS[packageId]?.[0] ?? null);
+
   // The course tabs the guest sees on this step are driven by the selected
   // package — each tier opens a different set of segments (Silver is a short
   // fixed menu; Gold adds Chaat / Chinese / South Indian; Platinum curates
@@ -736,11 +828,28 @@ export default function BookingWizard() {
       .filter((c): c is MenuCategory => Boolean(c))
       .map((c) => ({
         ...c,
-        vendors: c.vendors.filter(
-          (v) => !v.live || !cityName || v.city?.toLowerCase() === cityName,
-        ),
+        vendors: c.vendors.filter((v) => {
+          // Tier gate: Platinum surfaces every band; Silver/Gold only vendors
+          // mapped to that tier (a vendor's course↔tier mapping). Vendors with
+          // no tier data — the static fallback before /api/menu answers — are
+          // never hidden, so behaviour is unchanged until tiers load.
+          const tierOk =
+            !effectiveTier ||
+            effectiveTier === "Platinum" ||
+            !v.tiers ||
+            v.tiers.includes(effectiveTier);
+          // City gate: Platinum reaches every city (its premium draw, so the
+          // excitement stays intact); Silver/Gold keep the existing rule — live
+          // vendors must match the event city, curated seeds show everywhere.
+          const cityOk =
+            effectiveTier === "Platinum" ||
+            !v.live ||
+            !cityName ||
+            v.city?.toLowerCase() === cityName;
+          return tierOk && cityOk;
+        }),
       }));
-  }, [packageId, liveMenuCategories, cityId]);
+  }, [packageId, effectiveTier, liveMenuCategories, cityId]);
 
   // The package's segments split across two wizard steps: plated courses build
   // in "Menu" (Step 2), live-station courses in "Live Stall" (Step 3). Both are
@@ -805,7 +914,7 @@ export default function BookingWizard() {
   // Single-vendor tiers keep the flat quota. Drives the "N/N PICKED" counter.
   const allowanceFor = (catId: string): number => {
     const base = baseAllowanceFor(catId);
-    if (!multiVendor) return base;
+    if (!multiVendorFor(catId)) return base;
     return base * Math.max(1, vendorsFor(catId).length);
   };
 
@@ -814,7 +923,7 @@ export default function BookingWizard() {
     if (chosen.length === 0) return false;
     const base = baseAllowanceFor(cat.id);
     // Multi-vendor: every chosen vendor must contribute its own full quota.
-    if (multiVendor)
+    if (multiVendorFor(cat.id))
       return chosen.every((vid) => vendorPicks(cat.id, vid).length >= base);
     return itemsFor(cat.id).length >= base;
   };
@@ -879,7 +988,7 @@ export default function BookingWizard() {
     // fold it back into the order.
     if (skippedCats.includes(catId)) unskipCat(catId);
     const current = vendorsFor(catId);
-    if (!multiVendor) {
+    if (!multiVendorFor(catId)) {
       // Single-vendor tiers: switching vendor replaces the choice and its items.
       setCategoryVendor((m) => ({ ...m, [catId]: [vendorId] }));
       setCategoryItems((m) => ({ ...m, [catId]: [] }));
@@ -908,7 +1017,7 @@ export default function BookingWizard() {
       return;
     }
     const base = baseAllowanceFor(catId);
-    if (multiVendor) {
+    if (multiVendorFor(catId)) {
       // Per-vendor cap — each vendor may fill its own quota independently.
       const vid = vendorOfItem(catId, itemId);
       if (vid && vendorPicks(catId, vid).length >= base) return;
@@ -1021,7 +1130,10 @@ export default function BookingWizard() {
     const chosen = (addOnVendor[addOnId] ?? []).filter((id) =>
       eligibleAddOnVendors.some((v) => v.id === id),
     );
-    if (chosen.length) return chosen;
+    // Off Platinum a counter holds a single vendor — trim any extra a prior
+    // Platinum (or big-Gold) selection left behind when the package changed.
+    const capped = counterMultiVendor ? chosen : chosen.slice(0, 1);
+    if (capped.length) return capped;
     const first = eligibleAddOnVendors[0]?.id;
     return first ? [first] : [];
   };
@@ -1031,11 +1143,11 @@ export default function BookingWizard() {
       .map((id) => eligibleAddOnVendors.find((v) => v.id === id)?.name)
       .filter((n): n is string => Boolean(n));
 
-  // Assign / unassign a vendor to a counter. Single-vendor tiers replace the
-  // pick; multi-vendor tiers (Platinum, big Gold) toggle it in/out but always
-  // keep at least one vendor on a selected counter.
+  // Assign / unassign a vendor to a counter. Single-vendor packages replace the
+  // pick; only Platinum toggles it in/out — but always keeps at least one
+  // vendor on a selected counter.
   const toggleAddOnVendor = (addOnId: string, vendorId: string) => {
-    if (!multiVendor) {
+    if (!counterMultiVendor) {
       setAddOnVendor((m) => ({ ...m, [addOnId]: [vendorId] }));
       return;
     }
@@ -1326,6 +1438,7 @@ export default function BookingWizard() {
       `Occasion: ${occ ? occ.name : "-"}`,
       `Package:  ${pkg ? pkg.name : "-"}`,
       `Date:     ${eventDate || "-"}`,
+      `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
       `City:     ${cityObj ? cityObj.name : "-"}`,
       `Venue:    ${venue || "-"}`,
       `Guests:   ${guests}`,
@@ -1361,7 +1474,7 @@ export default function BookingWizard() {
 
   // Itemised invoice data for THIS order — drives the PDF invoice download and
   // is stored on the booking so it can be re-downloaded from My Bookings.
-  const buildInvoice = (): InvoiceData => {
+  const buildInvoice = (paid: number = paidAmount): InvoiceData => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
     const pkg = packages.find((p) => p.id === packageId);
@@ -1437,6 +1550,9 @@ export default function BookingWizard() {
       customerEmail: customerEmail.trim() || undefined,
       occasion: occ?.name ?? "Feast",
       eventDate: eventDate ? formatEventDate(eventDate) : "-",
+      // Meal period + clock time (e.g. "Dinner · 7:30 PM"); omitted when unset so
+      // the invoice's "Serving time" line only shows for orders that carry one.
+      servingTime: servingTimeLabel(mealTime, eventTime) || undefined,
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
@@ -1448,7 +1564,7 @@ export default function BookingWizard() {
       discount,
       gst,
       grandTotal,
-      paid: paidAmount,
+      paid,
     };
   };
 
@@ -1508,6 +1624,9 @@ export default function BookingWizard() {
       `Occasion: ${occ ? occ.name : "-"}\n` +
       `Package: ${pkg ? `${pkg.name} (${pkg.price}${pkg.unit})` : "-"}\n` +
       `Date: ${eventDate || "-"}\n` +
+      (servingTimeLabel(mealTime, eventTime)
+        ? `Serving: ${servingTimeLabel(mealTime, eventTime)}\n`
+        : "") +
       `City: ${city ? city.name : "-"}\n` +
       `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
@@ -1657,7 +1776,10 @@ export default function BookingWizard() {
     // the team collecting each instalment).
     const orderStatus: BookingStatus = emiPlan ? "Pending" : "Confirmed";
 
-    const invoiceData = buildInvoice();
+    // Freeze the snapshot with the amount actually settled this click — the
+    // auto-confirm path passes the advance via `orderPaid` before `paidAmount`
+    // state has flushed, so read it here rather than the (still-stale) state.
+    const invoiceData = buildInvoice(orderPaid);
 
     // Persist to the orders backend — the single source of truth (admin console,
     // the customer's My Bookings, the owner dashboard). The full record is sent,
@@ -1678,6 +1800,11 @@ export default function BookingWizard() {
           // Raw ISO date + package/lead so the server can re-check the
           // advance-booking rule (the `date` above is a display string).
           eventDateISO: eventDate,
+          // Serving time — meal period + clock slot, stored on the order and
+          // shown via `servingTimeLabel` in the admin console / My Bookings.
+          // Sent only when set (the server drops blank / malformed values).
+          ...(mealTime ? { mealTime } : {}),
+          ...(eventTime ? { eventTime } : {}),
           packageId,
           leadDays: effectiveLeadDays,
           guests,
@@ -1752,12 +1879,15 @@ export default function BookingWizard() {
   };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
-  // Package (1) and the add-ons / details step (4) show their content on the
-  // left with the order-summary rail on the right; the confirm step (6) keeps it
-  // until paid. The full-width builders — Menu (2) and Live Stall (3) — and the
-  // Essentials comparison (5) have no rail (the service cards each show their own
-  // computed feast price instead).
-  const showSummary = step === 1 || step === 4 || (step === 6 && !confirmed);
+  // The add-ons / details step (4) shows its content on the left with the
+  // order-summary rail on the right; the confirm step (6) keeps it until paid.
+  // The Package step (1) deliberately omits the rail — a guest is still just
+  // exploring tiers there, so a running "estimate" (carried from the previously
+  // selected package / defaults) reads as a stale, misleading number. Each tier
+  // card already shows its own per-plate price. The full-width builders — Menu
+  // (2) and Live Stall (3) — and the Essentials comparison (5) have no rail
+  // (the service cards each show their own computed feast price instead).
+  const showSummary = step === 4 || (step === 6 && !confirmed);
 
   // Step names, shared by the progress rail and the "up next" cue so a guest
   // always knows what they're on and what's coming. Order mirrors the flow:
@@ -1790,6 +1920,10 @@ export default function BookingWizard() {
       occasionList={occasionList}
       eventDate={eventDate}
       setEventDate={setEventDate}
+      mealTime={mealTime}
+      setMealTime={setMealTime}
+      eventTime={eventTime}
+      setEventTime={setEventTime}
       cityId={cityId}
       setCityId={setCityId}
       customCity={customCity}
@@ -1814,7 +1948,22 @@ export default function BookingWizard() {
   return (
     <section className="app-bottom-safe relative mx-auto max-w-[90rem] overflow-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
       {/* A rich editorial opening gives the utility-heavy flow a premium moment. */}
-      <div className="relative overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
+      <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
+        {/* Feast photo backdrop, dimmed and flooded maroon so the white
+            headline stays legible and the brand red still reads dominant. */}
+        <Image
+          src="/hero-feast.jpg"
+          alt=""
+          aria-hidden="true"
+          fill
+          priority
+          sizes="(max-width: 1440px) 100vw, 1440px"
+          className="absolute inset-0 -z-10 object-cover object-center opacity-30"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-gradient-to-r from-maroon via-maroon/85 to-maroon/40"
+        />
         <span
           aria-hidden="true"
           className="absolute -right-12 -top-20 h-56 w-56 rounded-full border-[34px] border-cream/15"
@@ -1915,7 +2064,25 @@ export default function BookingWizard() {
           {/* Builder — first on mobile, right column on desktop. */}
           <div className="order-1 min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
             {step === 2 ? (
-              <StepMenu
+              singleStall && !stallTier ? (
+                <StallTierPicker
+                  t={t}
+                  lang={lang}
+                  cityLabel={resolveCity(cityId)?.name ?? ""}
+                  current={stallTier}
+                  onPick={setStallTier}
+                />
+              ) : (
+                <>
+                  {singleStall && stallTier ? (
+                    <StallTierBadge
+                      t={t}
+                      lang={lang}
+                      tier={stallTier}
+                      onChange={() => setStallTier("")}
+                    />
+                  ) : null}
+                  <StepMenu
                 lang={lang}
                 t={t}
                 title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
@@ -1939,7 +2106,9 @@ export default function BookingWizard() {
                 unskipCat={unskipCat}
                 onSkipMenu={singleStall ? skipMenuEntirely : undefined}
                 vendorRatings={vendorRatings}
-              />
+                  />
+                </>
+              )
             ) : hasLiveStalls ? (
               <StepMenu
                 lang={lang}
@@ -1949,7 +2118,7 @@ export default function BookingWizard() {
                   "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
                   "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
                 )}
-                multiVendor={multiVendor}
+                multiVendor={counterMultiVendor}
                 categories={liveStallCategories}
                 activeCat={liveCat}
                 setActiveCat={setLiveCat}
@@ -2007,10 +2176,14 @@ export default function BookingWizard() {
               selectedAddOns={selectedAddOns}
               toggleAddOn={toggleAddOn}
               packageName={selectedPackage?.name ?? ""}
-              multiVendor={multiVendor}
+              multiVendor={counterMultiVendor}
               eligibleVendors={eligibleAddOnVendors}
               vendorIdsFor={addOnVendorIds}
               onVendorToggle={toggleAddOnVendor}
+              // Gold & Platinum unlock the full extras filter (browse by
+              // counters vs whole-event services); Single Stall & Silver keep
+              // just the free-text search.
+              fullFilter={packageId === "gold" || packageId === "platinum"}
             />
           )}
           {/* Essentials step (5) — the mandatory "Choose Your Service Package"
@@ -2144,6 +2317,19 @@ export default function BookingWizard() {
 
       {/* Nav buttons */}
       {step === 2 ? (
+        singleStall && !stallTier ? (
+          // Tier not chosen yet — the picker above is the only action; offer a
+          // way back to the package step instead of the course nav.
+          <div className="mt-8 flex">
+            <Button
+              variant="secondary"
+              onClick={() => setStep(1)}
+              aria-label={t("Back", "पीछे")}
+            >
+              ←
+            </Button>
+          </div>
+        ) : (
         <MenuStepNav
           t={t}
           categories={menuStepCategories}
@@ -2175,6 +2361,7 @@ export default function BookingWizard() {
             ) : undefined
           }
         />
+        )
       ) : step === 3 ? (
         hasLiveStalls ? (
           <MenuStepNav
@@ -2279,9 +2466,12 @@ export default function BookingWizard() {
 function SectionHead({
   title,
   sub,
+  nowrap = false,
 }: {
   title: string;
   sub?: string;
+  /** Keep the title on a single line on web (sm+) — used for short headings. */
+  nowrap?: boolean;
 }) {
   return (
     <div className="mb-5 sm:mb-7">
@@ -2291,7 +2481,11 @@ function SectionHead({
           Curated for you
         </span>
       </div>
-      <h2 className="font-display text-3xl leading-tight text-ink sm:text-4xl">
+      <h2
+        className={`font-display text-3xl leading-tight text-ink sm:text-4xl${
+          nowrap ? " sm:whitespace-nowrap" : ""
+        }`}
+      >
         {title}
       </h2>
       {sub && (
@@ -2511,6 +2705,10 @@ function EventBar({
   occasionList,
   eventDate,
   setEventDate,
+  mealTime,
+  setMealTime,
+  eventTime,
+  setEventTime,
   cityId,
   setCityId,
   customCity,
@@ -2534,6 +2732,10 @@ function EventBar({
   occasionList: OccasionOption[];
   eventDate: string;
   setEventDate: (v: string) => void;
+  mealTime: string;
+  setMealTime: (v: string) => void;
+  eventTime: string;
+  setEventTime: (v: string) => void;
   cityId: string;
   setCityId: (v: string) => void;
   customCity: string;
@@ -2593,8 +2795,11 @@ function EventBar({
   // entry like "2" (below the 150 minimum) isn't snapped up mid-keystroke — it's
   // held in the text buffer and only clamped into range when the field blurs.
   const commitGuestsText = (raw: string) => {
-    setGuestsText(raw);
-    const n = Math.round(Number(raw.replace(/[^0-9]/g, "")));
+    // Keep digits only and drop any leading zero(s) so the field never shows a
+    // stray "0" in front of the count (e.g. "0150" → "150", "0" → "0").
+    const cleaned = raw.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
+    setGuestsText(cleaned);
+    const n = Math.round(Number(cleaned));
     if (Number.isFinite(n) && n >= paxMin && n <= paxMax) setGuests(n);
   };
   const blurGuests = () => {
@@ -2623,9 +2828,17 @@ function EventBar({
             ? locations.find((x) => x.id === cityId)!.nameHi
             : locations.find((x) => x.id === cityId)!.name)) || "";
   const dateName = eventDate ? formatEventDate(eventDate) : "";
+  // Serving time for the collapsed summary — the meal's localized name plus the
+  // clock slot (the stored `mealTime` id is English, so we look up its label).
+  const mealObj = bookingMealTimes.find((m) => m.id === mealTime);
+  const mealLabel = mealObj ? (lang === "hi" ? mealObj.nameHi : mealObj.name) : "";
+  const servingName = [mealLabel, formatClockTime(eventTime)]
+    .filter(Boolean)
+    .join(" · ");
   const summaryParts = [
     occasionName,
     dateName,
+    servingName,
     cityName,
     showGuests ? `${guests} ${t("guests", "मेहमान")}` : "",
   ].filter(Boolean);
@@ -2703,7 +2916,12 @@ function EventBar({
       <div
         className={
           "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 " +
-          (showGuests ? "lg:grid-cols-4 " : "lg:grid-cols-3 ") +
+          // Web view keeps the whole brief on one row (serving-time selects
+          // folded in below). Guests gets the widest share so its stepper +
+          // slider bar have room, while Meal/Time are trimmed narrower.
+          (showGuests
+            ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr] "
+            : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr] ") +
           (collapsible && !open ? "hidden lg:grid" : "")
         }
       >
@@ -2891,6 +3109,61 @@ function EventBar({
             />
           </div>
         )}
+
+        {/* Serving time — the meal period plus a clock slot within it. Folded
+            into the grid above so the whole brief sits on one row in web view;
+            each select carries its own label. Optional; when set it rides onto
+            the order, invoice ("Serving time") and admin/My-Bookings via
+            `servingTimeLabel`. */}
+        <div className="block">
+          <span className={labelClass}>
+            {t("Meal", "भोजन")}{" "}
+            <span className="font-medium normal-case tracking-normal text-ink/40">
+              ({t("optional", "वैकल्पिक")})
+            </span>
+          </span>
+          {/* Meal period — Breakfast / Lunch / Dinner. */}
+          <ThemedSelect
+            value={mealTime}
+            onChange={(v) => {
+              setMealTime(v);
+              // Clock slots are scoped to the meal, so drop a slot that no
+              // longer falls within the newly chosen period.
+              if (!(bookingTimeSlots[v] ?? []).includes(eventTime))
+                setEventTime("");
+            }}
+            ariaLabel={t("Meal period", "भोजन अवधि")}
+            placeholder={t("Select meal", "भोजन चुनें")}
+            className="mt-1.5"
+            buttonClassName={selectButtonClass}
+            options={bookingMealTimes.map((m) => ({
+              value: m.id,
+              label: lang === "hi" ? m.nameHi : m.name,
+            }))}
+          />
+        </div>
+
+        <div className="block">
+          <span className={labelClass}>{t("Time", "समय")}</span>
+          {/* Time slot within the chosen meal — enabled once a meal is picked. */}
+          <ThemedSelect
+            value={eventTime}
+            onChange={setEventTime}
+            disabled={!mealTime}
+            ariaLabel={t("Time slot", "समय स्लॉट")}
+            placeholder={
+              mealTime
+                ? t("Select time slot", "समय स्लॉट चुनें")
+                : t("Pick a meal first", "पहले भोजन चुनें")
+            }
+            className="mt-1.5"
+            buttonClassName={selectButtonClass}
+            options={(bookingTimeSlots[mealTime] ?? []).map((hhmm) => ({
+              value: hhmm,
+              label: formatClockTime(hhmm),
+            }))}
+          />
+        </div>
       </div>
     </div>
   );
@@ -2937,6 +3210,7 @@ function StepPackage({
   return (
     <div>
       <SectionHead
+        nowrap
         title={t("Choose a package", "पैकेज चुनें")}
         sub={t(
           "Sets your base plate price and how many items each course includes.",
@@ -2977,7 +3251,7 @@ function StepPackage({
               ? "sm:grid-cols-2"
               : tiers.length === 3
                 ? "sm:grid-cols-2 lg:grid-cols-3"
-                : "sm:grid-cols-2")
+                : "sm:grid-cols-2 lg:grid-cols-4")
         }
       >
         {tiers.map(({ tier, tooSoon, lead, unlock }) => {
@@ -2992,9 +3266,12 @@ function StepPackage({
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
               // or focusable), with a legible notice pinned over the fold naming
               // its lead time and the date it unlocks. Nothing is silently
-              // dropped, so the guest can pick a later date to reach it.
+              // dropped, so the guest can pick a later date to reach it. The card
+              // stays only lightly muted (not near-invisible) and carries a
+              // "Locked" badge pinned to the top so the tier reads as present but
+              // temporarily unavailable — never as if it had gone missing.
               <>
-                <div inert className="select-none opacity-40">
+                <div inert className="select-none opacity-60">
                   <PackageScrollCard
                     tier={tier}
                     selected={false}
@@ -3002,6 +3279,12 @@ function StepPackage({
                     ctaOnFold
                     cta={<span aria-hidden="true" />}
                   />
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center px-4">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cream shadow-card">
+                    <span aria-hidden="true">🔒</span>
+                    {t("Locked", "लॉक")}
+                  </span>
                 </div>
                 <div className="pointer-events-none absolute inset-x-0 bottom-[12%] z-30 flex justify-center px-4">
                   <div className="rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
@@ -3046,6 +3329,129 @@ function StepPackage({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ─── Step 2 · Single Stall tier lens ────────────────────────────────────────
+ * Before a Single Stall guest builds their menu they pick a tier "lens": Silver
+ * / Gold browse their own city's stalls (mapped to that band); Platinum opens
+ * every city, keeping the premium reach exclusive. The pick sets `stallTier`,
+ * which drives `effectiveTier` and the vendor filter on the Menu step. */
+const STALL_TIER_LENSES: {
+  id: VendorTier;
+  nameHi: string;
+  descEn: (city: string) => string;
+  descHi: (city: string) => string;
+}[] = [
+  {
+    id: "Silver",
+    nameHi: "सिल्वर",
+    descEn: (c) => `${c || "Your city"}'s Silver stalls`,
+    descHi: (c) => `${c || "आपके शहर"} के सिल्वर स्टॉल`,
+  },
+  {
+    id: "Gold",
+    nameHi: "गोल्ड",
+    descEn: (c) => `${c || "Your city"}'s Gold stalls`,
+    descHi: (c) => `${c || "आपके शहर"} के गोल्ड स्टॉल`,
+  },
+  {
+    id: "Platinum",
+    nameHi: "प्लेटिनम",
+    descEn: () => "Stalls from every city — the full roster",
+    descHi: () => "हर शहर के स्टॉल — पूरा रोस्टर",
+  },
+];
+
+function StallTierPicker({
+  t,
+  lang,
+  cityLabel,
+  current,
+  onPick,
+}: {
+  t: (en: string, hi: string) => string;
+  lang: Lang;
+  cityLabel: string;
+  current: VendorTier | "";
+  onPick: (tier: VendorTier) => void;
+}) {
+  return (
+    <section className="rounded-card border border-maroon/15 bg-white p-5 sm:p-6">
+      <h2 className="font-display text-xl text-ink">
+        {t("Choose your stall tier", "अपना स्टॉल टियर चुनें")}
+      </h2>
+      <p className="mt-1 text-sm text-ink-soft">
+        {t(
+          "Your tier decides which stalls you browse. Silver & Gold show your city's stalls; Platinum opens every city.",
+          "आपका टियर तय करता है कि आप कौन-से स्टॉल देखेंगे। सिल्वर और गोल्ड आपके शहर के स्टॉल दिखाते हैं; प्लेटिनम हर शहर खोलता है।",
+        )}
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        {STALL_TIER_LENSES.map((tier) => {
+          const active = current === tier.id;
+          return (
+            <button
+              key={tier.id}
+              type="button"
+              onClick={() => onPick(tier.id)}
+              className={`rounded-card border p-4 text-left transition ${
+                active
+                  ? "border-maroon bg-cream/50"
+                  : "border-maroon/15 bg-white hover:border-maroon/40"
+              }`}
+            >
+              <span className="font-display text-lg text-maroon">
+                {lang === "hi" ? tier.nameHi : tier.id}
+              </span>
+              <span className="mt-1 block text-sm text-ink-soft">
+                {lang === "hi"
+                  ? tier.descHi(cityLabel)
+                  : tier.descEn(cityLabel)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function StallTierBadge({
+  t,
+  lang,
+  tier,
+  onChange,
+}: {
+  t: (en: string, hi: string) => string;
+  lang: Lang;
+  tier: VendorTier;
+  onChange: () => void;
+}) {
+  const nameHi: Record<VendorTier, string> = {
+    Silver: "सिल्वर",
+    Gold: "गोल्ड",
+    Platinum: "प्लेटिनम",
+  };
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-card border border-maroon/15 bg-cream/40 px-4 py-2.5 text-sm">
+      <span className="text-ink-soft">
+        {t("Stall tier", "स्टॉल टियर")}:{" "}
+        <span className="font-semibold text-maroon">
+          {lang === "hi" ? nameHi[tier] : tier}
+        </span>
+        {tier === "Platinum"
+          ? t(" · every city", " · हर शहर")
+          : t(" · your city", " · आपका शहर")}
+      </span>
+      <button
+        type="button"
+        onClick={onChange}
+        className="font-semibold text-maroon underline underline-offset-2"
+      >
+        {t("Change", "बदलें")}
+      </button>
     </div>
   );
 }
@@ -3268,7 +3674,10 @@ function StepMenu({
       <div className="relative mt-3">
       <div
         ref={vendorScrollRef}
-        className="flex snap-x gap-4 overflow-x-auto pb-3"
+        // px/pt + matching -mx give the hover-lift and the selected ring-2 room
+        // inside the scroller — overflow-x-auto otherwise clips them (the cards
+        // looked cropped from the top and the red selected ring vanished).
+        className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2"
       >
         {visibleVendors.map((v) => {
           const selected = selectedIds.includes(v.id);
@@ -3280,7 +3689,7 @@ function StepMenu({
               aria-pressed={selected}
               onClick={() => pickVendor(cat.id, v.id)}
               className={
-                "group relative flex w-40 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:w-56 " +
+                "group relative flex w-36 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:w-[202px] " +
                 (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
               }
             >
@@ -3289,11 +3698,11 @@ function StepMenu({
                   src={v.image}
                   alt={v.name}
                   fill
-                  sizes="(min-width: 640px) 224px, 160px"
+                  sizes="(min-width: 640px) 202px, 144px"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
-              <div className="flex flex-1 flex-col p-3 sm:p-4">
+              <div className="flex flex-1 flex-col p-2.5 sm:p-3.5">
                 <h4 className="font-sans text-xs font-semibold text-maroon sm:text-sm">
                   {v.name}
                 </h4>
@@ -3328,27 +3737,6 @@ function StepMenu({
                       `${stat.count} सत्यापित`,
                     )}
                   </p>
-                )}
-                {/* Menu preview — list this vendor's dishes row-wise so guests
-                    can gauge the spread before selecting. */}
-                {v.items.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-0.5 border-t border-cream-3 pt-2">
-                    {v.items.map((it: CategoryItem) => (
-                      <span
-                        key={it.id}
-                        className="flex items-center gap-1.5 text-[11px] leading-tight text-ink-soft"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={
-                            "inline-block h-2 w-2 shrink-0 rounded-sm border " +
-                            (it.diet === "veg" ? "border-ink" : "border-maroon")
-                          }
-                        />
-                        <span className="truncate">{it.name}</span>
-                      </span>
-                    ))}
-                  </div>
                 )}
               </div>
               <span
@@ -3496,6 +3884,16 @@ function StepMenu({
                       const atCap =
                         !active &&
                         (multiVendor ? vendorFull : picks.length >= allowance);
+                      // Veg → green, non-veg → brand maroon. The card border and
+                      // Add control take the diet colour so a dish reads as veg /
+                      // non-veg at a glance (green = #1a7f37, standard veg green).
+                      const veg = it.diet === "veg";
+                      const dietBorder = veg
+                        ? "border-[#1a7f37]"
+                        : "border-maroon";
+                      const dietRing = veg ? "ring-[#1a7f37]" : "ring-maroon";
+                      const dietBg = veg ? "bg-[#1a7f37]" : "bg-maroon";
+                      const dietText = veg ? "text-[#1a7f37]" : "text-maroon";
                       return (
                         <button
                           key={it.id}
@@ -3504,22 +3902,23 @@ function StepMenu({
                           disabled={atCap}
                           aria-pressed={active}
                           className={
-                            "flex w-full items-center gap-3 rounded-2xl border p-2 text-left shadow-sm transition sm:gap-4 sm:p-3 " +
+                            "flex w-full items-center gap-3 rounded-2xl border p-1.5 text-left shadow-sm transition sm:gap-4 sm:p-2.5 " +
+                            dietBorder + " " +
                             (active
-                              ? "border-maroon bg-cream-2 ring-1 ring-maroon"
+                              ? "bg-cream-2 ring-1 " + dietRing
                               : atCap
-                                ? "cursor-not-allowed border-cream-3 bg-white opacity-50"
-                                : "border-cream-3 bg-white hover:-translate-y-0.5 hover:shadow-md")
+                                ? "cursor-not-allowed bg-white opacity-50"
+                                : "bg-white hover:-translate-y-0.5 hover:shadow-md")
                           }
                         >
                           {/* Dish thumbnail — real photo when the vendor uploaded
                               one, otherwise a deterministic premium food shot. */}
-                          <span className="relative block h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-20 sm:w-20 sm:rounded-2xl">
+                          <span className="relative block h-[51px] w-[51px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-16 sm:w-16 sm:rounded-2xl">
                             <Image
                               src={it.photo ?? dummyDishPhoto(it.id)}
                               alt=""
                               fill
-                              sizes="(min-width: 640px) 80px, 64px"
+                              sizes="(min-width: 640px) 64px, 51px"
                               className="object-cover"
                             />
                           </span>
@@ -3529,9 +3928,7 @@ function StepMenu({
                               aria-hidden="true"
                               className={
                                 "inline-block h-3.5 w-3.5 shrink-0 rounded-sm border " +
-                                (it.diet === "veg"
-                                  ? "border-ink"
-                                  : "border-maroon")
+                                dietBorder
                               }
                             />
                             <span className="truncate text-sm font-semibold text-ink sm:text-base">
@@ -3542,9 +3939,10 @@ function StepMenu({
                           <span
                             className={
                               "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition sm:px-5 sm:py-2 sm:text-xs " +
+                              dietBorder + " " +
                               (active
-                                ? "border-maroon bg-maroon text-cream"
-                                : "border-maroon bg-white text-maroon")
+                                ? dietBg + " text-cream"
+                                : "bg-white " + dietText)
                             }
                           >
                             {active
@@ -3577,6 +3975,7 @@ function StepDetails({
   eligibleVendors,
   vendorIdsFor,
   onVendorToggle,
+  fullFilter,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -3588,22 +3987,73 @@ function StepDetails({
   eligibleVendors: VendorListing[];
   vendorIdsFor: (addOnId: string) => string[];
   onVendorToggle: (addOnId: string, vendorId: string) => void;
+  /** Gold/Platinum unlock the richer category filter; the lower tiers get just
+   *  the free-text search. */
+  fullFilter: boolean;
 }) {
   // Free-text filter over the add-on roster. Matches the English/Hindi names,
   // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
   // Chaat Station). Selections live in the parent, so filtering never drops a
   // chosen add-on from the order — it only hides its card.
   const [addOnQuery, setAddOnQuery] = useState("");
+  // Category filter — only the full-filter tiers (Gold/Platinum) can narrow the
+  // roster to live counters vs whole-event services. We derive the effective
+  // category from `fullFilter` (rather than resetting stored state in an effect)
+  // so switching down to a search-only tier never leaves a stale category
+  // silently hiding cards with no chip left to clear it.
+  const [addOnCat, setAddOnCat] = useState<"all" | AddOnCategory>("all");
+  const activeCat = fullFilter ? addOnCat : "all";
   const query = addOnQuery.trim().toLowerCase();
-  const visibleAddOns = query
-    ? addOns.filter(
-        (a) =>
-          a.name.toLowerCase().includes(query) ||
-          a.nameHi.includes(query) ||
-          a.description.toLowerCase().includes(query) ||
-          (a.keywords ?? []).some((k) => k.toLowerCase().includes(query)),
-      )
-    : addOns;
+  const catOf = (a: AddOn): AddOnCategory => a.category ?? "counter";
+  const visibleAddOns = addOns.filter((a) => {
+    const matchesCat = activeCat === "all" || catOf(a) === activeCat;
+    const matchesQuery =
+      !query ||
+      a.name.toLowerCase().includes(query) ||
+      a.nameHi.includes(query) ||
+      a.description.toLowerCase().includes(query) ||
+      (a.keywords ?? []).some((k) => k.toLowerCase().includes(query));
+    return matchesCat && matchesQuery;
+  });
+  // A counter's real cost depends on which vendor runs the station, so each card
+  // shows a price *range* rather than one figure: the counter's base price
+  // scaled across the eligible vendors' spread — cheapest → priciest, anchored
+  // on the roster average (so the base price sits inside the band). The roster
+  // narrows with the package tier, so the range tightens/shifts to match who's
+  // actually available. A counter's price swings far less than a caterer's full
+  // menu price (a ₹199-vs-₹1349 menu gap doesn't mean a 7× chaat-counter gap),
+  // so we dampen the raw menu spread toward 1 — otherwise the extremes produce
+  // implausible figures. With <2 eligible vendors there's no spread: flat price.
+  const SPREAD_DAMP = 0.45;
+  const vendorPlates = eligibleVendors
+    .map((v) => v.priceFrom)
+    .filter((n) => n > 0);
+  const priceSpread =
+    vendorPlates.length >= 2
+      ? (() => {
+          const avg =
+            vendorPlates.reduce((s, n) => s + n, 0) / vendorPlates.length;
+          const rawLo = Math.min(...vendorPlates) / avg;
+          const rawHi = Math.max(...vendorPlates) / avg;
+          return {
+            lo: 1 - SPREAD_DAMP * (1 - rawLo),
+            hi: 1 + SPREAD_DAMP * (rawHi - 1),
+          };
+        })()
+      : null;
+  const priceRange = (base: number): { min: number; max: number } =>
+    priceSpread
+      ? {
+          min: Math.round(base * priceSpread.lo),
+          max: Math.round(base * priceSpread.hi),
+        }
+      : { min: base, max: base };
+  // The category chips shown on the full-filter tiers.
+  const catChips: { id: "all" | AddOnCategory; label: string }[] = [
+    { id: "all", label: t("All", "सभी") },
+    { id: "counter", label: t("Live Counters", "लाइव काउंटर") },
+    { id: "service", label: t("Services", "सर्विसेज़") },
+  ];
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3644,10 +4094,50 @@ function StepDetails({
         />
       </div>
 
+      {/* Full-filter tiers (Gold/Platinum) can browse by category — live food /
+          beverage counters vs whole-event services. The lower tiers (Single
+          Stall / Silver) keep just the free-text search above. */}
+      {fullFilter && (
+        <div
+          role="group"
+          aria-label={t("Filter add-ons", "ऐड-ऑन फ़िल्टर करें")}
+          className="mt-3 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible"
+        >
+          {catChips.map((c) => {
+            const active = addOnCat === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setAddOnCat(c.id)}
+                className={
+                  "shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-semibold transition " +
+                  (active
+                    ? "border-maroon bg-maroon text-cream"
+                    : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                }
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mt-5 flex flex-col gap-4">
         {visibleAddOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
-          const lineTotal = a.perPlate ? a.price * guests : a.price;
+          // Per-unit range across eligible vendors, and the same range projected
+          // over the headcount for the "≈ … for N guests" estimate.
+          const { min: unitMin, max: unitMax } = priceRange(a.price);
+          const hasRange = unitMin !== unitMax;
+          const unitLabel = hasRange
+            ? `${money(unitMin)}–${money(unitMax)}`
+            : money(unitMin);
+          const guestsLabel = hasRange
+            ? `${money(unitMin * guests)}–${money(unitMax * guests)}`
+            : money(unitMin * guests);
           const selectId = `addon-vendor-${a.id}`;
           // Vendors assigned to this counter — one on single-vendor tiers, or
           // several when the package allows splitting a counter across vendors.
@@ -3679,8 +4169,8 @@ function StepDetails({
                   />
                   <span className="absolute bottom-2 left-2 rounded-full bg-maroon px-2.5 py-1 text-xs font-semibold text-cream shadow-sm">
                     {a.perPlate
-                      ? `${money(a.price)} / ${t("plate", "प्लेट")}`
-                      : money(a.price)}
+                      ? `${unitLabel} / ${t("plate", "प्लेट")}`
+                      : unitLabel}
                   </span>
                 </div>
                 <div className="flex flex-1 items-start gap-3 p-4">
@@ -3700,8 +4190,8 @@ function StepDetails({
                     <p className="mt-1.5 text-xs text-ink-soft">
                       {a.perPlate
                         ? t(
-                            `≈ ${money(lineTotal)} for ${guests} guests`,
-                            `${guests} मेहमानों के लिए ≈ ${money(lineTotal)}`,
+                            `≈ ${guestsLabel} for ${guests} guests`,
+                            `${guests} मेहमानों के लिए ≈ ${guestsLabel}`,
                           )
                         : t("One-time charge", "एकमुश्त शुल्क")}
                     </p>
@@ -3822,10 +4312,15 @@ function StepDetails({
       </div>
       {visibleAddOns.length === 0 && (
         <p className="mt-5 rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-4 py-6 text-center text-sm text-ink-soft">
-          {t(
-            `No add-ons match "${addOnQuery.trim()}".`,
-            `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
-          )}
+          {query
+            ? t(
+                `No add-ons match "${addOnQuery.trim()}".`,
+                `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
+              )
+            : t(
+                "No add-ons in this category.",
+                "इस श्रेणी में कोई ऐड-ऑन नहीं।",
+              )}
         </p>
       )}
     </div>

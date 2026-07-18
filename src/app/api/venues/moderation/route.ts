@@ -25,6 +25,9 @@ export async function GET() {
         ...v,
         image: sanitizeVenueImage(v.image),
         status: (v.status ?? "Approved") as VenueStatus,
+        // Legacy records predate verification; treat them as already verified so
+        // nothing already live is retroactively gated behind a review.
+        verified: v.verified ?? v.status === undefined,
       }))
       .reverse();
     return Response.json({ venues });
