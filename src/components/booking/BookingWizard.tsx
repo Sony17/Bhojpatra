@@ -3512,6 +3512,7 @@ function StepMenu({
   // so the roster doesn't stay expanded on a package that never capped it.
   const [showAllVendors, setShowAllVendors] = useState(false);
   useEffect(() => setShowAllVendors(false), [maxVendors]);
+  const [vendorSearch, setVendorSearch] = useState("");
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
   const cat = categories[activeCat] ?? categories[0];
@@ -3527,6 +3528,20 @@ function StepMenu({
   const visibleVendors = maxVendors
     ? [...seedVendors.slice(0, cap), ...cat.vendors.filter((v) => v.live)]
     : cat.vendors;
+  const vSearchQuery = vendorSearch.trim().toLowerCase();
+  const filteredVendors = visibleVendors.filter((v) => {
+    if (!vSearchQuery) return true;
+    const nameMatch = v.name.toLowerCase().includes(vSearchQuery);
+    const itemMatch = v.items?.some((item) =>
+      item.name.toLowerCase().includes(vSearchQuery),
+    );
+    const cuisineMatch = Array.isArray((v as any).cuisines)
+      ? (v as any).cuisines.some((c: string) => c.toLowerCase().includes(vSearchQuery))
+      : typeof (v as any).cuisine === "string"
+        ? (v as any).cuisine.toLowerCase().includes(vSearchQuery)
+        : false;
+    return nameMatch || itemMatch || cuisineMatch;
+  });
   const allowance = allowanceFor(cat.id); // effective total (scaled per vendor)
   const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
   const selectedIds = categoryVendor[cat.id] ?? [];
@@ -3594,6 +3609,41 @@ function StepMenu({
           </span>
         </p>
       )}
+
+      {/* Search Bar — filter vendors live by name or cuisine */}
+      <div className="relative mb-5">
+        <input
+          type="search"
+          value={vendorSearch}
+          onChange={(e) => setVendorSearch(e.target.value)}
+          placeholder={t(
+            "Search vendors by name or cuisine...",
+            "नाम या व्यंजन से वेंडर खोजें...",
+          )}
+          aria-label={t(
+            "Search vendors by name or cuisine",
+            "नाम या व्यंजन से वेंडर खोजें",
+          )}
+          className="w-full rounded-2xl border border-cream-3 bg-white px-4 py-2.5 pr-10 text-sm text-ink shadow-sm transition placeholder:text-ink-soft/60 focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
+        />
+        {vendorSearch ? (
+          <button
+            type="button"
+            onClick={() => setVendorSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-soft transition hover:text-maroon"
+            aria-label={t("Clear search", "खोज साफ़ करें")}
+          >
+            ✕
+          </button>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-soft/50"
+          >
+            🔍
+          </span>
+        )}
+      </div>
 
       {/* Category tabs */}
       <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
@@ -3674,6 +3724,14 @@ function StepMenu({
           : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
       </h3>
       <div className="relative mt-3">
+      {filteredVendors.length === 0 ? (
+        <p className="py-8 text-center text-sm font-medium text-ink-soft">
+          {t(
+            `No vendors matching "${vendorSearch}" in this category.`,
+            `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
+          )}
+        </p>
+      ) : (
       <div
         ref={vendorScrollRef}
         // px/pt + matching -mx give the hover-lift and the selected ring-2 room
@@ -3681,7 +3739,7 @@ function StepMenu({
         // looked cropped from the top and the red selected ring vanished).
         className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2"
       >
-        {visibleVendors.map((v) => {
+        {filteredVendors.map((v) => {
           const selected = selectedIds.includes(v.id);
           const stat = statFor(vendorRatings, v);
           return (
@@ -3755,9 +3813,10 @@ function StepMenu({
           );
         })}
       </div>
+      )}
 
         {/* Scroll hint — more vendors than fit; nudge the guest to scroll. */}
-        {visibleVendors.length > 5 && (
+        {filteredVendors.length > 5 && (
           <>
             <div
               aria-hidden="true"
