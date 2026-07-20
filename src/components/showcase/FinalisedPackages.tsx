@@ -24,10 +24,7 @@ import { packages, packageCategoryItems, type PackageTier, type PackageFeature }
 import Reveal from "@/components/Reveal";
 import SectionIntro from "@/components/SectionIntro";
 import { Button } from "@/components/ui";
-import { Share } from "@/components/icons";
-import { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
 import { useLang } from "@/lib/i18n";
-import { useSiteContent } from "@/lib/sitePages";
 import { isUnoptimized } from "@/lib/homeContent";
 
 type TierId = "silver" | "gold" | "platinum";
@@ -39,11 +36,6 @@ const BADGE: Record<TierId, Bi> = {
   silver: ["Best value", "बेस्ट वैल्यू"],
   gold: ["Most popular", "सबसे लोकप्रिय"],
   platinum: ["Premium", "प्रीमियम"],
-};
-const VENDORS: Record<TierId, Bi> = {
-  silver: ["Single vendor", "एक वेंडर"],
-  gold: ["Multiple vendors", "कई वेंडर"],
-  platinum: ["Famous vendors", "मशहूर वेंडर"],
 };
 
 /** Real per-course quota /book uses (packageCategoryItems → allowanceFor()). */
@@ -84,14 +76,6 @@ function CheckIcon({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
       <path d="M4.5 10.5l3.4 3.4 7.6-8.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function WhatsAppIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
-      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.06 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.41.25-.69.25-1.28.17-1.41-.07-.13-.27-.2-.57-.35zM12.04 21.5h-.01a9.46 9.46 0 01-4.82-1.32l-.35-.21-3.58.94.96-3.49-.23-.36a9.45 9.45 0 01-1.45-5.04c0-5.22 4.25-9.47 9.48-9.47 2.53 0 4.91.99 6.7 2.78a9.42 9.42 0 012.77 6.7c0 5.22-4.25 9.47-9.47 9.47zm8.06-17.53A11.36 11.36 0 0012.04.5C5.76.5.65 5.61.65 11.89c0 2.01.53 3.98 1.53 5.71L.5 23.5l6.05-1.59a11.35 11.35 0 005.49 1.4h.01c6.28 0 11.39-5.11 11.39-11.39 0-3.04-1.18-5.9-3.34-8.05z" />
     </svg>
   );
 }
@@ -313,248 +297,12 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
   );
 }
 
-/* ── Comparison grid — the single exhaustive per-course comparison ───────── */
-
-type Row = { key: keyof ReturnType<typeof spec> | "vendors"; label: Bi };
-const ROWS: Row[] = [
-  { key: "starters", label: ["Starters", "स्टार्टर"] },
-  { key: "live", label: ["Live counters", "लाइव काउंटर"] },
-  { key: "chaat", label: ["Chaat", "चाट"] },
-  { key: "chinese", label: ["Chinese", "चाइनीज़"] },
-  { key: "south-indian", label: ["South Indian", "साउथ इंडियन"] },
-  { key: "main", label: ["Main course", "मेन कोर्स"] },
-  { key: "sweets", label: ["Sweets", "मिठाई"] },
-  { key: "vendors", label: ["Vendors", "वेंडर"] },
-];
-
-function CompareGrid({ tiers }: { tiers: PackageTier[] }) {
-  const { lang, t } = useLang();
-  const [highlight, setHighlight] = useState(true);
-  const bi = (v: Bi) => (lang === "hi" ? v[1] : v[0]);
-
-  const cellFor = (tier: PackageTier, key: Row["key"]) => {
-    if (key === "vendors") return bi(VENDORS[tier.id as TierId]);
-    const v = spec(tier.id)[key];
-    return v === 0 ? "—" : String(v);
-  };
-  const upgraded = (key: Row["key"], i: number) => {
-    if (!highlight || i === 0) return false;
-    if (key === "vendors") return true;
-    return spec(tiers[i].id)[key] > spec(tiers[i - 1].id)[key];
-  };
-
-  return (
-    <div>
-      <div className="mb-4 flex justify-center">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="whitespace-nowrap"
-          onClick={() => setHighlight((v) => !v)}
-          aria-pressed={highlight}
-        >
-          {highlight
-            ? t("Hide upgrades", "अपग्रेड छुपाएँ")
-            : t("Highlight upgrades", "अपग्रेड दिखाएँ")}
-        </Button>
-      </div>
-      <div className="no-scrollbar overflow-x-auto rounded-card border border-maroon/15">
-        <table className="w-full min-w-[440px] border-collapse text-sm">
-          <caption className="sr-only">{t("What each package includes, by course", "हर पैकेज में क्या शामिल है")}</caption>
-          <thead>
-            <tr className="bg-maroon text-cream">
-              <th scope="col" className="p-3 text-left font-semibold">{t("What you get", "आपको क्या मिलता है")}</th>
-              {tiers.map((tier) => (
-                <th key={tier.id} scope="col" className="p-3 text-center font-semibold">
-                  <div className="font-display text-base">{lang === "hi" ? tier.nameHi : tier.name}</div>
-                  <div className="text-[11px] font-normal text-cream/85">{tier.price}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((row, r) => (
-              <tr key={String(row.key)} className={r % 2 ? "bg-cream/20" : "bg-white"}>
-                <th scope="row" className="p-3 text-left font-medium text-ink">{bi(row.label)}</th>
-                {tiers.map((tier, i) => {
-                  const up = upgraded(row.key, i);
-                  return (
-                    <td key={tier.id} className={`p-3 text-center ${up ? "font-bold text-maroon" : "text-ink"}`}>
-                      <span className="inline-flex items-center gap-1">
-                        {up && <span aria-hidden>↑</span>}
-                        {cellFor(tier, row.key)}
-                      </span>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/** One tactile pill action inside the footer's ornamented panel. */
-function FooterChip({
-  as = "a",
-  icon,
-  children,
-  ...rest
-}: {
-  as?: "a" | "button";
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-} & React.ComponentPropsWithoutRef<"a"> &
-  React.ComponentPropsWithoutRef<"button">) {
-  const className =
-    "group inline-flex items-center justify-center gap-2 rounded-full border border-maroon/25 bg-white/80 px-4 py-2.5 text-sm font-semibold text-maroon shadow-card transition-colors hover:border-maroon hover:bg-maroon hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon focus-visible:ring-offset-2";
-  if (as === "button") {
-    return (
-      <button type="button" className={className} {...rest}>
-        {icon}
-        {children}
-      </button>
-    );
-  }
-  return (
-    <a className={className} {...rest}>
-      {icon}
-      {children}
-    </a>
-  );
-}
-
-/**
- * Post-tier footer — a framed, ornamented "still deciding?" panel that gathers
- * compare, single-stall, chat and share into refined pill actions, so the
- * section resolves on a deliberate closing note instead of trailing off.
- */
-function PackageFooter({
-  tiers,
-  custom,
-  waLink,
-}: {
-  tiers: PackageTier[];
-  custom: (typeof packages)[number] | undefined;
-  waLink: string;
-}) {
-  const { lang, t } = useLang();
-  const [open, setOpen] = useState(false);
-  const customName = custom ? (lang === "hi" ? custom.nameHi : custom.name) : null;
-
-  const shareHref = `https://wa.me/?text=${encodeURIComponent(
-    `${t(
-      "Check out Bhojpatra's ready-made feast packages — Silver, Gold & Platinum:",
-      "भोजपत्र के तैयार फीस्ट पैकेज देखें — सिल्वर, गोल्ड और प्लैटिनम:",
-    )} ${SITE_ORIGIN}/#packages`,
-  )}`;
-
-  return (
-    <div>
-      {/* Ornamented panel — cream ground, double-hairline frame, brand shadow */}
-      <div className="relative overflow-hidden rounded-card border border-maroon/20 bg-cream/35 px-6 py-9 text-center shadow-brand sm:px-10">
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-2.5 rounded-[0.5rem] border border-maroon/12"
-        />
-
-        <div className="relative flex flex-col items-center">
-          <Ornament className="text-maroon/40" />
-          <h3 className="mt-4 font-display text-2xl leading-tight text-maroon sm:text-[1.6rem]">
-            {t("Still choosing your tier?", "अभी अपना टियर चुन रहे हैं?")}
-          </h3>
-          <p className="mt-2 max-w-md text-sm text-ink-soft">
-            {t(
-              "Compare them side by side, build a single stall, or ask us anything.",
-              "इन्हें साथ-साथ देखें, सिंगल स्टॉल बनाएँ, या हमसे कुछ भी पूछें।",
-            )}
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
-            <FooterChip
-              as="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              icon={
-                <span
-                  aria-hidden
-                  className={`text-base leading-none transition-transform duration-200 ${open ? "rotate-45" : ""}`}
-                >
-                  +
-                </span>
-              }
-            >
-              {open
-                ? t("Hide comparison", "तुलना छुपाएँ")
-                : t("Compare every tier", "हर टियर की तुलना करें")}
-            </FooterChip>
-
-            {custom && (
-              <FooterChip
-                href="/book?package=custom&step=menu"
-                title={t(
-                  "Build your own menu, one vendor — and pay only for what you pick.",
-                  "अपना मेन्यू बनाएँ, एक वेंडर — और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
-                )}
-              >
-                {customName}
-                <span aria-hidden>→</span>
-              </FooterChip>
-            )}
-
-            <FooterChip
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              icon={<WhatsAppIcon className="h-4 w-4" />}
-            >
-              {t("Chat with us", "हमसे बात करें")}
-            </FooterChip>
-
-            <FooterChip
-              href={shareHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              icon={<Share className="h-4 w-4" />}
-            >
-              {t("Share packages", "पैकेज शेयर करें")}
-            </FooterChip>
-          </div>
-
-          <p className="mt-6 inline-flex items-center gap-2 text-xs text-ink-soft">
-            <span aria-hidden className="h-1.5 w-1.5 rotate-45 bg-maroon/70" />
-            {t(
-              "Prices are approximate — final price depends on your menu, guests & vendors.",
-              "कीमतें अनुमानित हैं — अंतिम कीमत आपके मेन्यू, मेहमानों और वेंडरों पर निर्भर करती है।",
-            )}
-          </p>
-        </div>
-      </div>
-
-      {open && (
-        <div className="mt-7">
-          <CompareGrid tiers={tiers} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ── Section ─────────────────────────────────────────────────────────────── */
 
 export default function FinalisedPackages() {
   const { lang, t } = useLang();
-  const { contact } = useSiteContent();
   const tiers = packages.filter((p) => p.id !== "custom") as PackageTier[];
   const custom = packages.find((p) => p.id === "custom");
-
-  const waText = t(
-    "Hi Bhojpatra, none of the packages quite fit my event — I'd like a curated package.",
-    "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
-  );
-  const waLink = `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(waText)}`;
 
   return (
     <section id="packages" className="relative overflow-hidden bg-white py-16 sm:py-20">
@@ -659,15 +407,6 @@ export default function FinalisedPackages() {
             </div>
           </Reveal>
         )}
-
-        {/* One footer line: compare · single stall · chat · share */}
-        <Reveal className="mx-auto mt-12 max-w-4xl">
-          <PackageFooter
-            tiers={tiers}
-            custom={custom}
-            waLink={waLink}
-          />
-        </Reveal>
       </div>
     </section>
   );

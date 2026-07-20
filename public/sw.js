@@ -1,6 +1,6 @@
 /* Bhojpatra PWA service worker — shell + icons only.
    Never cache Next.js hashed JS/CSS chunks (breaks deploys / HMR). */
-const CACHE = "bhojpatra-shell-v2";
+const CACHE = "bhojpatra-shell-v3";
 const PRECACHE = ["/", "/bhojpatra-icon.png", "/bhojpatra-logo.png"];
 
 self.addEventListener("install", (event) => {
@@ -31,6 +31,8 @@ self.addEventListener("fetch", (event) => {
 
   if (!isAsset && !isNav) return;
 
+  // Pages: network-first so a deploy shows up on the next visit; the cache is
+  // only the offline fallback. Assets: cache-first, refreshed in the background.
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)
@@ -42,7 +44,7 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => cached || caches.match("/"));
-      return cached || network;
+      return isNav ? network : cached || network;
     }),
   );
 });

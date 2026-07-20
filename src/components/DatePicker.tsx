@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
 import { Calendar, ChevronDown } from "@/components/icons";
 import { useLang } from "@/lib/i18n";
 
@@ -71,6 +80,68 @@ export default function DatePicker({
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const rootRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // The popup renders in a body-level portal (position: fixed) so it can sit
+  // above the fixed site header — an `absolute` popup is trapped inside
+  // ancestor stacking contexts (the hero's `isolate`, the booking bar's
+  // backdrop-blur) and paints underneath it no matter its z-index.
+  const [popupStyle, setPopupStyle] = useState<CSSProperties | null>(null);
+
+  const positionPopup = useCallback(() => {
+    const anchor = rootRef.current;
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Trigger scrolled out of view — dismiss rather than leave the panel
+    // glued to a point outside the screen.
+    if (r.bottom < 0 || r.top > vh) {
+      setOpen(false);
+      return;
+    }
+    const margin = 12; // minimum gutter to the viewport edges
+    const width = Math.min(304, vw - margin * 2); // 19rem panel, capped on tiny screens
+    let left =
+      align === "right"
+        ? r.right - width
+        : align === "center"
+          ? r.left + r.width / 2 - width / 2
+          : r.left;
+    left = Math.min(Math.max(left, margin), vw - width - margin);
+    const style: CSSProperties = { left, width };
+    // Flip to whichever side of the trigger still has room once scrolling
+    // squeezes the preferred one — an unchecked `maxHeight` would go negative
+    // there (invalid CSS, so no cap at all) and the panel would spill past the
+    // viewport edge.
+    const spaceUp = r.top - 8 - margin;
+    const spaceDown = vh - r.bottom - 8 - margin;
+    const MIN_PANEL = 240;
+    let up = direction === "up";
+    if (up && spaceUp < MIN_PANEL && spaceDown > spaceUp) up = false;
+    else if (!up && spaceDown < MIN_PANEL && spaceUp > spaceDown) up = true;
+    if (up) {
+      style.bottom = vh - r.top + 8;
+      style.maxHeight = Math.max(spaceUp, 120);
+    } else {
+      style.top = r.bottom + 8;
+      style.maxHeight = Math.max(spaceDown, 120);
+    }
+    setPopupStyle(style);
+  }, [align, direction]);
+
+  // Position before paint on open; track scroll/resize while open so the
+  // fixed-position panel stays glued to its trigger.
+  useLayoutEffect(() => {
+    if (!open) return;
+    positionPopup();
+    window.addEventListener("resize", positionPopup);
+    window.addEventListener("scroll", positionPopup, true);
+    return () => {
+      window.removeEventListener("resize", positionPopup);
+      window.removeEventListener("scroll", positionPopup, true);
+    };
+  }, [open, positionPopup]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
 
@@ -127,21 +198,30 @@ export default function DatePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minDate, selected]);
 
-  // Close on outside click or Escape.
+  // Close on outside press or Escape. `pointerdown` (not `mousedown`) — iOS
+  // Safari doesn't synthesize mouse events for taps on non-interactive
+  // elements, so a mousedown-only listener never fires and the panel sticks
+  // open on real phones. Same pattern as BrandSelect.
   useEffect(() => {
     if (!open) return;
-    function onPointer(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+    function onPointer(e: PointerEvent) {
+      const target = e.target as Node;
+      // The popup lives in a body portal, so check both the trigger and it.
+      if (
+        rootRef.current?.contains(target) ||
+        popupRef.current?.contains(target)
+      ) {
+        return;
       }
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
@@ -185,22 +265,16 @@ export default function DatePicker({
         className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-maroon/70 ${iconClassName}`}
       />
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={ariaLabel}
-          className={`animate-rise absolute z-50 w-[19rem] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)] ${
-            align === "right"
-              ? "right-0"
-              : align === "center"
-                ? "left-1/2 -ml-[9.5rem]"
-                : "left-0"
-          } ${
-            direction === "up"
-              ? "bottom-[calc(100%+0.5rem)]"
-              : "top-[calc(100%+0.5rem)]"
-          }`}
-        >
+      {open &&
+        popupStyle &&
+        createPortal(
+          <div
+            ref={popupRef}
+            role="dialog"
+            aria-label={ariaLabel}
+            style={popupStyle}
+            className="animate-rise fixed z-[70] overflow-y-auto rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)]"
+          >
           {/* Month navigation */}
           <div className="mb-2 flex items-center justify-between px-1">
             <button
@@ -273,8 +347,9 @@ export default function DatePicker({
               );
             })}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -17,15 +17,16 @@ const LANG_OPTIONS: { id: Lang; full: string }[] = [
   { id: "hi", full: "हिंदी" },
 ];
 
-/** Signed-in account actions, in the order the profile menu lists them. Each
- *  routes into the `/account/*` area (see `AccountShell`). `vendorOnly` items
- *  (Roles) show only for accounts that hold the vendor/caterer type. */
+/** Signed-in account actions, in the order the profile menu lists them.
+ *  `vendorOnly` items (Roles) show only for accounts that hold the
+ *  vendor/caterer type. */
 const ACCOUNT_LINKS: {
   href: string;
   en: string;
   hi: string;
   vendorOnly?: boolean;
 }[] = [
+  { href: "/bookings", en: "My Bookings", hi: "मेरी बुकिंग" },
   { href: "/account/profile", en: "My Profile", hi: "मेरी प्रोफ़ाइल" },
   { href: "/account/settings", en: "Settings", hi: "सेटिंग्स" },
   { href: "/account/password", en: "Change Password", hi: "पासवर्ड बदलें" },

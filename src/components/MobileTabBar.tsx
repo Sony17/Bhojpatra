@@ -28,6 +28,17 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
     ),
   },
   {
+    label: "Venues",
+    labelHi: "वेन्यू",
+    href: "/venues",
+    icon: (
+      <>
+        <path d="M5 20V6.5L12 4l7 2.5V20" />
+        <path d="M3.5 20h17M9 20v-4h6v4M9 9h1.5M13.5 9H15M9 12.5h1.5M13.5 12.5H15" />
+      </>
+    ),
+  },
+  {
     label: "Book",
     labelHi: "बुक",
     href: "/book",
@@ -36,17 +47,6 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
         <path d="M5 3v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3" />
         <path d="M7 11v10" />
         <path d="M19 14V3a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h2Zm0 0v7" />
-      </>
-    ),
-  },
-  {
-    label: "Bookings",
-    labelHi: "बुकिंग",
-    href: "/bookings",
-    icon: (
-      <>
-        <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5v13A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-13Z" />
-        <path d="M8 2.5v3M16 2.5v3M5 9h14M9 13h6M9 16.5h4" />
       </>
     ),
   },

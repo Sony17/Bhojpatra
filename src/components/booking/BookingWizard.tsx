@@ -1988,7 +1988,7 @@ export default function BookingWizard() {
               "कुछ आसान चरणों में ऐसा भोज, जिसे आपके मेहमान याद रखें।",
             )}
           </p>
-          <div className="mt-5 flex flex-nowrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-cream sm:mt-6 sm:flex-wrap sm:gap-2 sm:text-xs sm:tracking-[0.12em]">
+          <div className="mt-5 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-cream sm:mt-6 sm:gap-2 sm:text-xs sm:tracking-[0.12em]">
             <span className="whitespace-nowrap rounded-full border border-cream/35 bg-black/10 px-2 py-1 sm:px-3 sm:py-1.5">
               {t("6 guided steps", "6 आसान चरण")}
             </span>

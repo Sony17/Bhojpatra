@@ -3,17 +3,15 @@
 import { useEffect, useState } from "react";
 
 /**
- * Site-wide brand watermark — fades in after scroll. Desktop only: the blurred
- * full-viewport layer costs too much while scrolling on mobile.
+ * Site-wide brand watermark (the भोजपत्र handi) — fades in after scroll.
+ * Kept as a single unblurred fixed layer so it stays cheap to composite on
+ * phones; the earlier jank came from a blurred full-viewport layer.
  */
 export default function ScrollWatermark() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Skip on phones — compositing a blurred full-screen image while scrolling
-    // is a common source of jank on the home → occasions handoff.
-    if (window.matchMedia("(max-width: 1023px)").matches) return;
 
     let ticking = false;
     const onScroll = () => {
@@ -32,7 +30,7 @@ export default function ScrollWatermark() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 hidden items-center justify-center select-none transition-opacity duration-300 ease-out motion-reduce:transition-none lg:flex"
+      className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center select-none transition-opacity duration-300 ease-out motion-reduce:transition-none"
       style={{ opacity: scrolled ? 0.035 : 0 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

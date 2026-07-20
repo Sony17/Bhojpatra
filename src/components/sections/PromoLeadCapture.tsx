@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
@@ -8,15 +8,12 @@ import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { Mail, Phone } from "@/components/icons";
 import { Button, useToast } from "@/components/ui";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
-import ShareOffer from "./ShareOffer";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
 /**
- * Promotional lead-capture under the hero.
- * Banner art is the focus; email/phone + sharing sit in a premium panel beneath.
- * No scroll-reveal — keeps the hero → promo handoff continuous (same reason as
- * ChooseOccasion).
+ * Promo under the hero — banner art and lead capture as two separate strips.
+ * No scroll-reveal — keeps the hero → promo handoff continuous.
  */
 export default function PromoLeadCapture() {
   const { lang, t } = useLang();
@@ -30,6 +27,7 @@ export default function PromoLeadCapture() {
   const hasImage = Boolean(promo.image);
   const heading = lang === "hi" ? promo.headingHi : promo.heading;
   const subtitle = lang === "hi" ? promo.subtitleHi : promo.subtitle;
+  const promoLine = `${heading} — ${subtitle}`;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,36 +85,26 @@ export default function PromoLeadCapture() {
     }
   }
 
-  function renderLeadForm(shareAction?: ReactNode) {
-    if (status === "success") {
-      return (
-        <p
-          role="status"
-          className="rounded-control border border-cream/40 bg-cream px-3 py-2 text-center text-xs font-semibold text-maroon shadow-card"
-        >
-          {message}
-        </p>
-      );
-    }
-
-    return (
+  const leadForm =
+    status === "success" ? (
+      <p
+        role="status"
+        className="rounded-control border border-cream/40 bg-cream px-3 py-2 text-center text-xs font-semibold text-maroon shadow-card"
+      >
+        {message}
+      </p>
+    ) : (
       <form
         onSubmit={handleSubmit}
         noValidate
-        className={
-          shareAction
-            ? "grid w-full grid-cols-2 gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-stretch sm:gap-2"
-            : "grid w-full grid-cols-2 gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-stretch sm:gap-2"
-        }
+        className="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-stretch sm:gap-2"
       >
-        <label className="focus-within:shadow-brand flex min-h-8 min-w-0 items-center gap-1 rounded-control border border-cream/50 bg-white px-2 py-1 transition focus-within:border-cream sm:min-h-10 sm:gap-2 sm:px-2.5 sm:py-1.5">
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cream text-maroon sm:h-6 sm:w-6">
+        <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2.5 py-1.5 transition focus-within:border-cream">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
             <Mail className="h-3 w-3" />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-0">
-            <span className="sr-only">
-              {t("Email Address", "ईमेल पता")}
-            </span>
+            <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
             <input
               type="email"
               name="email"
@@ -130,14 +118,12 @@ export default function PromoLeadCapture() {
           </span>
         </label>
 
-        <label className="focus-within:shadow-brand flex min-h-8 min-w-0 items-center gap-1 rounded-control border border-cream/50 bg-white px-2 py-1 transition focus-within:border-cream sm:min-h-10 sm:gap-2 sm:px-2.5 sm:py-1.5">
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cream text-maroon sm:h-6 sm:w-6">
+        <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2.5 py-1.5 transition focus-within:border-cream">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
             <Phone className="h-3 w-3" />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-0">
-            <span className="sr-only">
-              {t("Mobile Number", "मोबाइल नंबर")}
-            </span>
+            <span className="sr-only">{t("Mobile Number", "मोबाइल नंबर")}</span>
             <input
               type="tel"
               name="phone"
@@ -152,46 +138,39 @@ export default function PromoLeadCapture() {
           </span>
         </label>
 
-        <div className="col-span-2 flex items-stretch gap-1 sm:col-span-1 sm:contents sm:gap-1.5">
+        <div className="col-span-2 flex items-stretch gap-1.5 sm:col-span-1 sm:contents">
           <Button
             type="submit"
             variant="inverse"
             size="sm"
             loading={status === "submitting"}
-            className="min-h-8 min-w-0 flex-1 px-3 sm:min-h-10 sm:w-auto sm:flex-none sm:px-5"
+            className="min-h-10 min-w-0 flex-1 px-3 sm:w-auto sm:flex-none sm:px-5"
           >
             {status === "submitting"
               ? t("…", "…")
               : t("Notify Me", "सूचित करें")}
           </Button>
-          {shareAction}
+          <WhatsAppShareButton
+            path="/#offers"
+            message={promoLine}
+            messageHi={promoLine}
+            label=""
+            labelHi=""
+            variant="inverse"
+            size="sm"
+            className="min-h-10 shrink-0 px-3"
+          />
         </div>
       </form>
     );
-  }
 
-  if (hasImage) {
-    const promoLine = `${heading} — ${subtitle}`;
-    const shareAction = (
-      <WhatsAppShareButton
-        path="/#offers"
-        message={promoLine}
-        messageHi={promoLine}
-        label=""
-        labelHi=""
-        variant="inverse"
-        size="sm"
-        className="min-h-8 shrink-0 px-3 sm:min-h-10"
-      />
-    );
-
-    return (
-      <section id="offers" aria-label="Promotional offers" className="bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-          {/* Mobile: image box matches the banner’s natural ratio so art fits
-              edge-to-edge; form sits below. Wide screens keep the float-over-art layout. */}
-          <div className="overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:relative sm:aspect-[2.54/1]">
-            <div className="relative aspect-[2.54/1] w-full sm:absolute sm:inset-0 sm:aspect-auto">
+  return (
+    <>
+      {/* ── 1. Promo banner (art only) ───────────────────────────────────── */}
+      {hasImage && (
+        <section id="offers" aria-label="Promotional offers" className="bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+            <div className="relative aspect-[2.54/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10">
               <Image
                 src={promo.image}
                 alt={heading}
@@ -202,48 +181,42 @@ export default function PromoLeadCapture() {
                 priority
               />
             </div>
+          </div>
+        </section>
+      )}
 
-            {/* Gradient scrim so the lead form floats over the artwork on wide
-                screens instead of sitting in a hard slab — reads more premium.
-                On mobile the form gets its own maroon panel below, so hide it. */}
-            <div className="promo-overlay-scrim pointer-events-none absolute inset-x-0 bottom-0 hidden h-2/3 sm:block" />
-
-            <div className="bg-maroon px-2 py-1.5 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:p-4">
-              <div className="mx-auto w-full max-w-5xl">
-                {renderLeadForm(shareAction)}
+      {/* ── 2. Lead capture (separate strip) ─────────────────────────────── */}
+      <section
+        id={hasImage ? "notify" : "offers"}
+        aria-label={t("Get notified", "सूचित रहें")}
+        className="bg-white"
+      >
+        <div
+          className={
+            hasImage
+              ? "mx-auto max-w-7xl px-4 pb-3 sm:px-6 sm:pb-4 lg:px-8"
+              : "mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8"
+          }
+        >
+          <div className="overflow-hidden rounded-card bg-maroon shadow-card">
+            <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-5 sm:px-6 sm:py-3.5">
+              <div className="min-w-0 shrink sm:max-w-xs lg:max-w-sm">
+                <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
+                  {t("Offer", "ऑफर")}
+                </p>
+                <h2 className="font-display mt-0.5 truncate text-base leading-snug text-cream sm:text-lg">
+                  {heading}
+                </h2>
+                <p className="mt-0.5 line-clamp-1 text-xs text-cream/70">
+                  {subtitle}
+                </p>
               </div>
+
+              <div className="min-w-0 flex-1">{leadForm}</div>
             </div>
           </div>
         </div>
       </section>
-    );
-  }
-
-  return (
-    <section id="offers" aria-label="Promotional offers" className="bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-3 sm:px-8 sm:py-4">
-        <div className="overflow-hidden rounded-card bg-maroon shadow-card">
-          <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-5 sm:px-6 sm:py-3.5">
-            <div className="min-w-0 shrink sm:max-w-xs lg:max-w-sm">
-              <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
-                {t("Offer", "ऑफर")}
-              </p>
-              <h2 className="font-display mt-0.5 truncate text-base leading-snug text-cream sm:text-lg">
-                {heading}
-              </h2>
-              <p className="mt-0.5 line-clamp-1 text-xs text-cream/70">
-                {subtitle}
-              </p>
-            </div>
-
-            <div className="min-w-0 flex-1">{renderLeadForm()}</div>
-
-            <div className="hidden shrink-0 lg:block">
-              <ShareOffer heading={heading} subtitle={subtitle} compact />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    </>
   );
 }
