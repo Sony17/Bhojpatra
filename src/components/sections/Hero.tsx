@@ -212,7 +212,7 @@ export default function Hero() {
           direction="up"
           align="center"
           defaultDaysAhead={occasionLead}
-          minDaysAhead={occasionLead}
+          minDaysAhead={1}
           onChange={(d) => setDate(d)}
         />
       </div>
