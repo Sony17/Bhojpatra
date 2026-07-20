@@ -66,7 +66,7 @@ export default function BookingForm() {
   // honours the admin-configured notice for the chosen occasion.
   const occasionList = useOccasions();
   const [occasion, setOccasion] = useState<string>(occasions[0].id);
-  const minDate = isoAfterDays(occasionLeadFor(occasion, occasionList));
+  const minDate = isoAfterDays(1);
   const [guests, setGuests] = useState<string>(String(guestPresets[2]));
   const [selectedPackage, setSelectedPackage] = useState<string>(
     packages.find((p) => p.popular)?.id ?? packages[0].id,

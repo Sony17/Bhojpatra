@@ -44,7 +44,7 @@ export default function DatePicker({
   align = "left",
   defaultDaysAhead,
   valueIso,
-  minDaysAhead = 0,
+  minDaysAhead = 1,
   onChange,
 }: {
   placeholder?: string;
@@ -64,8 +64,7 @@ export default function DatePicker({
    *  picker uncontrolled (the Hero hero-bar usage). */
   valueIso?: string;
   /** Minimum advance notice, in days — dates before `today + minDaysAhead` are
-   *  disabled (e.g. a wedding that needs 30 days' lead). `0` disables only past
-   *  dates, preserving the original behaviour. */
+   *  disabled (e.g. a wedding that needs 30 days' lead). Defaults to 1 (tomorrow). */
   minDaysAhead?: number;
   onChange?: (date: Date) => void;
 }) {
@@ -146,10 +145,10 @@ export default function DatePicker({
   const today = useMemo(() => startOfDay(new Date()), []);
 
   // The earliest selectable day — today plus the required advance notice. Dates
-  // before this are disabled in the grid.
+  // before this are disabled in the grid (defaults to tomorrow).
   const minDate = useMemo(() => {
     const d = startOfDay(new Date());
-    d.setDate(d.getDate() + Math.max(0, minDaysAhead));
+    d.setDate(d.getDate() + Math.max(1, minDaysAhead));
     return d;
   }, [minDaysAhead]);
 
