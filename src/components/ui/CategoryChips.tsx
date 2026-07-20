@@ -31,6 +31,7 @@ export default function CategoryChips({
 }
 
 export function CategoryChip({
+  id,
   selected,
   children,
   onClick,
@@ -38,6 +39,7 @@ export function CategoryChip({
   leftIcon,
   className,
 }: {
+  id?: string;
   selected?: boolean;
   children: ReactNode;
   onClick?: () => void;
@@ -47,6 +49,7 @@ export function CategoryChip({
 }) {
   return (
     <Chip
+      id={id}
       selected={selected}
       onClick={onClick}
       leftIcon={leftIcon}
