@@ -345,28 +345,28 @@ export const cities: { id: string; name: string; nameHi: string }[] = [
  *  Curated for the Bhojpatra brand — warm golden feasts, mithai, and elegant
  *  celebration spreads (never cold / off-brand stock). */
 export const heroEventImages: Record<string, string> = {
-  wedding: img("photo-1414235077428-338989a2e8c0", 1400),
-  engagement: img("photo-1519671482749-fd09be7ccebf", 1400),
-  tilak: img("photo-1631452180519-c014fe946bc7", 1400),
-  haldi: img("photo-1606491956689-2ea866880c84", 1400),
-  mehndi: img("photo-1546069901-ba9599a7e63c", 1400),
-  reception: img("photo-1565557623262-b51c2513a641", 1400),
-  birthday: img("photo-1530103862676-de8c9debad1d", 1400),
-  corporate: img("photo-1517248135467-4c7edcad34c4", 1400),
+  wedding: img("photo-1414235077428-338989a2e8c0", 2000),
+  engagement: img("photo-1519671482749-fd09be7ccebf", 2000),
+  tilak: img("photo-1631452180519-c014fe946bc7", 2000),
+  haldi: img("photo-1606491956689-2ea866880c84", 2000),
+  mehndi: img("photo-1546069901-ba9599a7e63c", 2000),
+  reception: img("photo-1565557623262-b51c2513a641", 2000),
+  birthday: img("photo-1530103862676-de8c9debad1d", 2000),
+  corporate: img("photo-1517248135467-4c7edcad34c4", 2000),
 };
 
 /** Wide cinematic hero backdrops for each serviceable city / location.
  *  Verified Unsplash ids only — each city gets a distinct, on-brand feast /
  *  celebration image until an admin uploads a city-specific photo. */
 export const heroLocationImages: Record<string, string> = {
-  lucknow: img("photo-1631452180519-c014fe946bc7", 1400),
-  delhi: img("photo-1565557623262-b51c2513a641", 1400),
-  mumbai: img("photo-1414235077428-338989a2e8c0", 1400),
-  bengaluru: img("photo-1517248135467-4c7edcad34c4", 1400),
-  kolkata: img("photo-1606491956689-2ea866880c84", 1400),
-  hyderabad: img("photo-1563379091339-03b21ab4a4f8", 1400),
-  jaipur: img("photo-1519225421980-715cb0215aed", 1400),
-  pune: img("photo-1546069901-ba9599a7e63c", 1400),
+  lucknow: img("photo-1631452180519-c014fe946bc7", 2000),
+  delhi: img("photo-1565557623262-b51c2513a641", 2000),
+  mumbai: img("photo-1414235077428-338989a2e8c0", 2000),
+  bengaluru: img("photo-1517248135467-4c7edcad34c4", 2000),
+  kolkata: img("photo-1606491956689-2ea866880c84", 2000),
+  hyderabad: img("photo-1563379091339-03b21ab4a4f8", 2000),
+  jaipur: img("photo-1519225421980-715cb0215aed", 2000),
+  pune: img("photo-1546069901-ba9599a7e63c", 2000),
 };
 
 export const categories: Category[] = [
