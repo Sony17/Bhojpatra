@@ -187,8 +187,23 @@ export default function VendorCatalog() {
   });
   const [price, setPrice] = useState<PriceRange>(() => {
     const p = searchParams.get("price");
-    return PRICE_RANGES.some((r) => r.value === p) ? (p as PriceRange) : ALL;
+    if (PRICE_RANGES.some((r) => r.value === p)) return p as PriceRange;
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("bhoj_vendor_price");
+      if (PRICE_RANGES.some((r) => r.value === stored)) return stored as PriceRange;
+    }
+    return ALL;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (price !== ALL) {
+        sessionStorage.setItem("bhoj_vendor_price", price);
+      } else {
+        sessionStorage.removeItem("bhoj_vendor_price");
+      }
+    }
+  }, [price]);
   const [meals, setMeals] = useState<string[]>(() => {
     const m = searchParams.get("meal");
     return m && mealTypeOptions.includes(m) ? [m] : [];
@@ -201,7 +216,35 @@ export default function VendorCatalog() {
     const tm = searchParams.get("time");
     return tm && Object.values(bookingTimeSlots).flat().includes(tm) ? tm : "";
   });
-  const [sort, setSort] = useState<SortKey>("relevance");
+  const [sort, setSort] = useState<SortKey>(() => {
+    const s = searchParams.get("sort");
+    if (
+      s === "price-asc" ||
+      s === "price-desc" ||
+      s === "rating" ||
+      s === "relevance"
+    ) {
+      return s as SortKey;
+    }
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("bhoj_vendor_sort");
+      if (
+        stored === "price-asc" ||
+        stored === "price-desc" ||
+        stored === "rating" ||
+        stored === "relevance"
+      ) {
+        return stored as SortKey;
+      }
+    }
+    return "relevance";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("bhoj_vendor_sort", sort);
+    }
+  }, [sort]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Real customer ratings, matched to these listings by name (best-effort).
@@ -378,6 +421,10 @@ export default function VendorCatalog() {
     setMeals([]);
     setServingTime("");
     setSort("relevance");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("bhoj_vendor_sort");
+      sessionStorage.removeItem("bhoj_vendor_price");
+    }
   };
 
   const chipClass = (active: boolean) =>
@@ -464,20 +511,21 @@ export default function VendorCatalog() {
               {t("Filters", "फ़िल्टर")}
             </CategoryChip>
 
-            <ThemedSelect
+            <CategoryChip
               id="vendor-sort-chip"
-              value={sort}
-              onChange={(v) => setSort(v as SortKey)}
-              ariaLabel={t("Sort by", "क्रम")}
-              className="w-auto shrink-0"
-              buttonClassName={selectChipClass(sort !== "relevance")}
-              options={[
-                { value: "relevance", label: t("Sort", "क्रम") },
-                { value: "rating", label: t("Rating", "रेटिंग") },
-                { value: "price-asc", label: t("Price ↑", "कीमत ↑") },
-                { value: "price-desc", label: t("Price ↓", "कीमत ↓") },
-              ]}
-            />
+              selected={sort === "price-asc" || sort === "price-desc"}
+              onClick={() => {
+                setSort((prev) =>
+                  prev === "price-asc" ? "price-desc" : "price-asc",
+                );
+              }}
+            >
+              {sort === "price-asc"
+                ? t("Price: Low to High ↑", "कीमत: कम से ज्यादा ↑")
+                : sort === "price-desc"
+                  ? t("Price: High to Low ↓", "कीमत: ज्यादा से कम ↓")
+                  : t("Sort by Price", "कीमत अनुसार")}
+            </CategoryChip>
 
             <ThemedSelect
               id="vendor-city-chip"
@@ -492,19 +540,17 @@ export default function VendorCatalog() {
               ]}
             />
 
-            <ThemedSelect
+            <CategoryChip
               id="vendor-price-chip"
-              value={price}
-              onChange={(v) => setPrice(v as PriceRange)}
-              ariaLabel={t("Price", "कीमत")}
-              className="w-auto shrink-0"
-              buttonClassName={selectChipClass(price !== ALL)}
-              options={PRICE_RANGES.map((r) => ({
-                value: r.value,
-                label:
-                  r.value === ALL ? t("Price", "कीमत") : priceLabel(r.value),
-              }))}
-            />
+              selected={price !== ALL}
+              onClick={() => {
+                const ranges: PriceRange[] = ["all", "budget", "premium", "luxury"];
+                const nextIdx = (ranges.indexOf(price) + 1) % ranges.length;
+                setPrice(ranges[nextIdx]);
+              }}
+            >
+              {price === ALL ? t("Price", "कीमत") : priceLabel(price)}
+            </CategoryChip>
 
             {!isBainaSearch &&
               DIET_OPTIONS.filter((d) => d !== ALL).map((dietValue) => (
