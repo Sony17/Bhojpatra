@@ -4,14 +4,19 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
+import Reveal from "@/components/Reveal";
 import { Button, Card, Input, Textarea, Select } from "@/components/ui";
 import {
   partnerBenefits,
+  partnerFaqs,
   partnerSteps,
   partnerTypes,
+  partnerVoices,
   type PartnerBenefit,
+  type PartnerFaq,
   type PartnerStep,
   type PartnerType,
+  type PartnerVoice,
 } from "@/lib/data";
 
 interface EnquiryForm {
@@ -123,8 +128,8 @@ export default function PartnerLanding() {
             </p>
             <h1 className="font-display mt-5 text-[2.6rem] font-bold leading-[1.04] tracking-tight text-ink sm:text-6xl lg:text-7xl">
               {t(
-                "Grow your catering business with India's feast platform",
-                "भारत के फीस्ट प्लेटफ़ॉर्म के साथ अपना कैटरिंग व्यवसाय बढ़ाएँ"
+                "Grow your business with India's feast platform",
+                "भारत के फीस्ट प्लेटफ़ॉर्म के साथ अपना व्यवसाय बढ़ाएँ"
               )}
             </h1>
             <p className="mt-5 max-w-lg text-base text-ink-soft sm:text-lg">
@@ -153,6 +158,17 @@ export default function PartnerLanding() {
               </Button>
             </div>
 
+            {/* Trust line — rating only, so the numbers below feel earned. */}
+            <p className="mt-7 text-xs text-ink-soft sm:text-sm">
+              <span aria-hidden="true" className="text-maroon">
+                ★★★★★
+              </span>{" "}
+              {t(
+                "Rated 4.9 by partners across India",
+                "पूरे भारत के पार्टनर से 4.9 रेटिंग"
+              )}
+            </p>
+
             {/* Stat strip — quiet, premium numbers instead of pill clutter. */}
             <dl className="mt-12 flex flex-nowrap items-end gap-x-8 gap-y-4 overflow-x-auto no-scrollbar sm:flex-wrap sm:gap-x-10">
               {stats.map((s) => (
@@ -172,16 +188,22 @@ export default function PartnerLanding() {
 
       {/* ─── 2. PARTNER TYPES ─────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
-        <SectionHead
-          eyebrow={t("Who Can Partner", "कौन जुड़ सकता है")}
-          title={t("Choose how you want to partner", "चुनें कि आप कैसे जुड़ना चाहते हैं")}
-          lede={t(
-            "Pick the path that fits you — we'll pre-fill your enquiry below.",
-            "अपने लिए सही विकल्प चुनें — हम नीचे आपकी पूछताछ पहले से भर देंगे।"
-          )}
-        />
+        <Reveal>
+          <SectionHead
+            eyebrow={t("Who Can Partner", "कौन जुड़ सकता है")}
+            title={t("Choose how you want to partner", "चुनें कि आप कैसे जुड़ना चाहते हैं")}
+            lede={t(
+              "Pick the path that fits you — we'll pre-fill your enquiry below.",
+              "अपने लिए सही विकल्प चुनें — हम नीचे आपकी पूछताछ पहले से भर देंगे।"
+            )}
+          />
+        </Reveal>
 
-        <ul className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Reveal
+          as="ul"
+          stagger
+          className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
           {partnerTypes.map((type: PartnerType) => {
             const selected = form.partnerType === type.title;
             return (
@@ -215,22 +237,28 @@ export default function PartnerLanding() {
               </li>
             );
           })}
-        </ul>
+        </Reveal>
       </section>
 
       {/* ─── 3. BENEFITS ──────────────────────────────────────────────── */}
       <div className="border-y border-maroon/10 bg-surface-beige-2">
         <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
-          <SectionHead
-            eyebrow={t("The Bhojpatra Advantage", "Bhojpatra की खूबियाँ")}
-            title={t("Why partner with us", "हमारे साथ क्यों जुड़ें")}
-            lede={t(
-              "Everything you need to win more bookings and grow with confidence.",
-              "ज़्यादा बुकिंग पाने और आत्मविश्वास के साथ बढ़ने के लिए सब कुछ।"
-            )}
-          />
+          <Reveal>
+            <SectionHead
+              eyebrow={t("The Bhojpatra Advantage", "Bhojpatra की खूबियाँ")}
+              title={t("Why partner with us", "हमारे साथ क्यों जुड़ें")}
+              lede={t(
+                "Everything you need to win more bookings and grow with confidence.",
+                "ज़्यादा बुकिंग पाने और आत्मविश्वास के साथ बढ़ने के लिए सब कुछ।"
+              )}
+            />
+          </Reveal>
 
-          <ul className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Reveal
+            as="ul"
+            stagger
+            className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {partnerBenefits.map((benefit: PartnerBenefit) => (
               <li
                 key={benefit.title}
@@ -250,7 +278,7 @@ export default function PartnerLanding() {
                 </p>
               </li>
             ))}
-          </ul>
+          </Reveal>
         </section>
       </div>
 
@@ -260,7 +288,7 @@ export default function PartnerLanding() {
       <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
           {/* Pitch */}
-          <div>
+          <Reveal variant="left">
             <p className="eyebrow text-[0.7rem] font-semibold text-maroon">
               {t("Instant Payouts", "तुरंत भुगतान")}
             </p>
@@ -315,10 +343,10 @@ export default function PartnerLanding() {
             >
               {t("Become a Partner", "अभी जुड़ें")}
             </Button>
-          </div>
+          </Reveal>
 
           {/* Payout dashboard preview */}
-          <div>
+          <Reveal variant="right">
             <div className="rounded-hero border border-maroon/15 bg-white p-5 shadow-pop sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -390,44 +418,156 @@ export default function PartnerLanding() {
                 "वेन्यू पार्टनर को भी यही तुरंत-भुगतान व्यू मिलता है।"
               )}
             </p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* ─── 4. HOW IT WORKS ──────────────────────────────────────────── */}
       <section className="mx-auto max-w-5xl px-5 py-20 sm:py-28">
-        <SectionHead
-          eyebrow={t("Simple Onboarding", "आसान ऑनबोर्डिंग")}
-          title={t("How it works", "यह कैसे काम करता है")}
-          lede={t(
-            "Three easy steps from sign-up to your first booking.",
-            "साइन-अप से लेकर आपकी पहली बुकिंग तक तीन आसान चरण।"
-          )}
-        />
-
-        <ol className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-8">
-          {/* Connecting hairline on desktop */}
-          <span
-            aria-hidden="true"
-            className="absolute left-0 right-0 top-6 hidden h-px bg-maroon/15 sm:block"
+        <Reveal>
+          <SectionHead
+            eyebrow={t("Simple Onboarding", "आसान ऑनबोर्डिंग")}
+            title={t("How it works", "यह कैसे काम करता है")}
+            lede={t(
+              "Three easy steps from sign-up to your first booking.",
+              "साइन-अप से लेकर आपकी पहली बुकिंग तक तीन आसान चरण।"
+            )}
           />
-          {partnerSteps.map((step: PartnerStep) => (
-            <li
-              key={step.n}
-              className="relative flex flex-col items-center text-center"
-            >
-              <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-maroon text-lg font-bold text-cream ring-8 ring-surface-beige">
-                {step.n}
-              </span>
-              <h3 className="font-display mt-6 text-lg font-semibold text-ink">
-                {step.title}
-              </h3>
-              <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-soft">
-                {step.description}
-              </p>
+        </Reveal>
+
+        <Reveal variant="up">
+          <ol className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-8">
+            {/* Connecting hairline on desktop */}
+            <span
+              aria-hidden="true"
+              className="absolute left-0 right-0 top-6 hidden h-px bg-maroon/15 sm:block"
+            />
+            {partnerSteps.map((step: PartnerStep) => (
+              <li
+                key={step.n}
+                className="relative flex flex-col items-center text-center"
+              >
+                <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-maroon text-lg font-bold text-cream ring-8 ring-surface-beige">
+                  {step.n}
+                </span>
+                <h3 className="font-display mt-6 text-lg font-semibold text-ink">
+                  {step.title}
+                </h3>
+                <p className="mt-2 max-w-xs text-sm leading-relaxed text-ink-soft">
+                  {step.description}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </Reveal>
+      </section>
+
+      {/* ─── 4.5 PARTNER VOICES ───────────────────────────────────────── */}
+      {/* Social proof from the partner side — one voice per partner path so
+          every visitor sees someone like themselves already winning here. */}
+      <div className="home-band-cream border-t border-maroon/10">
+        <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+          <Reveal>
+            <SectionHead
+              eyebrow={t("Partner Voices", "पार्टनर की ज़ुबानी")}
+              title={t("Partners already growing with us", "पार्टनर जो हमारे साथ बढ़ रहे हैं")}
+              lede={t(
+                "Caterers, planners and venue owners on what changed after they joined.",
+                "कैटरर, प्लानर और वेन्यू मालिक — जुड़ने के बाद क्या बदला, उन्हीं की ज़ुबानी।"
+              )}
+            />
+          </Reveal>
+
+          <Reveal
+            as="ul"
+            stagger
+            className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {partnerVoices.map((voice: PartnerVoice) => (
+              <li
+                key={voice.id}
+                className="flex h-full flex-col rounded-hero border border-maroon/10 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:shadow-pop"
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    aria-label={t("5 out of 5 stars", "5 में से 5 स्टार")}
+                    className="text-sm text-maroon"
+                  >
+                    ★★★★★
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="font-display text-3xl leading-none text-cream"
+                  >
+                    &ldquo;
+                  </span>
+                </div>
+                <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-ink-soft">
+                  {t(voice.quote, voice.quoteHi)}
+                </blockquote>
+                <p className="mt-4">
+                  <span className="inline-flex rounded-full bg-cream/50 px-3 py-1 text-xs font-semibold text-maroon">
+                    {t(voice.metric, voice.metricHi)}
+                  </span>
+                </p>
+                <footer className="mt-4 flex items-center gap-3 border-t border-maroon/10 pt-4">
+                  <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-maroon/15">
+                    <Image
+                      src={voice.avatar}
+                      alt=""
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-ink">
+                      {voice.name}
+                    </span>
+                    <span className="block truncate text-xs text-ink-soft">
+                      {t(voice.business, voice.businessHi)}
+                    </span>
+                  </span>
+                </footer>
+              </li>
+            ))}
+          </Reveal>
+        </section>
+      </div>
+
+      {/* ─── 4.75 FAQ ─────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-3xl px-5 py-20 sm:py-28">
+        <Reveal>
+          <SectionHead
+            eyebrow={t("Good To Know", "जानने योग्य बातें")}
+            title={t("Frequently asked questions", "अक्सर पूछे जाने वाले सवाल")}
+            lede={t(
+              "The details partners ask us about most, answered upfront.",
+              "जो सवाल पार्टनर हमसे सबसे ज़्यादा पूछते हैं, उनके जवाब पहले से।"
+            )}
+          />
+        </Reveal>
+
+        <Reveal as="ul" stagger className="mt-12 flex flex-col gap-3">
+          {partnerFaqs.map((faq: PartnerFaq) => (
+            <li key={faq.q}>
+              <details className="group rounded-hero border border-maroon/10 bg-white transition hover:border-maroon/25 open:border-maroon/25 open:shadow-pop">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden sm:p-6 sm:text-base">
+                  {t(faq.q, faq.qHi)}
+                  <span
+                    aria-hidden="true"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-maroon/15 text-maroon transition-transform duration-200 group-open:rotate-45"
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="px-5 pb-5 text-sm leading-relaxed text-ink-soft sm:px-6 sm:pb-6">
+                  {t(faq.a, faq.aHi)}
+                </p>
+              </details>
             </li>
           ))}
-        </ol>
+        </Reveal>
       </section>
 
       {/* ─── 5. PARTNER ENQUIRY FORM ──────────────────────────────────── */}
@@ -436,14 +576,16 @@ export default function PartnerLanding() {
           id="partner-enquiry"
           className="mx-auto max-w-3xl px-5 py-20 sm:py-28"
         >
-          <SectionHead
-            eyebrow={t("Get Started", "शुरू करें")}
-            title={t("Send a partner enquiry", "पार्टनर पूछताछ भेजें")}
-            lede={t(
-              "Tell us about your business and our team will reach out.",
-              "हमें अपने व्यवसाय के बारे में बताएँ और हमारी टीम आपसे संपर्क करेगी।"
-            )}
-          />
+          <Reveal>
+            <SectionHead
+              eyebrow={t("Get Started", "शुरू करें")}
+              title={t("Send a partner enquiry", "पार्टनर पूछताछ भेजें")}
+              lede={t(
+                "Tell us about your business and our team will reach out.",
+                "हमें अपने व्यवसाय के बारे में बताएँ और हमारी टीम आपसे संपर्क करेगी।"
+              )}
+            />
+          </Reveal>
 
           <Card padding="none" className="mt-12 p-5 sm:p-8">
             {submitted ? (
@@ -650,8 +792,21 @@ export default function PartnerLanding() {
       </div>
 
       {/* ─── 6. CLOSING CTA BAND ──────────────────────────────────────── */}
-      <section className="bg-maroon text-cream">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-5 px-5 py-20 text-center sm:py-24">
+      <section className="home-band-maroon relative overflow-hidden text-cream">
+        {/* Brand pot watermark — quiet depth on the closing band. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 top-1/2 hidden -translate-y-1/2 opacity-[0.08] select-none sm:block"
+        >
+          <Image
+            src="/watermark-pot.png"
+            alt=""
+            width={280}
+            height={355}
+          />
+        </div>
+
+        <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-5 px-5 py-20 text-center sm:py-24">
           <h2 className="font-display text-3xl font-bold sm:text-4xl">
             {t("Start with zero upfront cost", "बिना किसी अग्रिम शुल्क के शुरू करें")}
           </h2>
@@ -677,6 +832,19 @@ export default function PartnerLanding() {
               {t("List as a Vendor", "वेंडर के रूप में लिस्ट करें")}
             </Link>
           </div>
+
+          <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-cream/80 sm:text-sm">
+            {[
+              t("No joining fee", "कोई जॉइनिंग फीस नहीं"),
+              t("KYC verified in 24–48 hrs", "24–48 घंटे में KYC वेरिफिकेशन"),
+              t("Instant payouts", "तुरंत भुगतान"),
+            ].map((line) => (
+              <li key={line} className="flex items-center gap-1.5">
+                <span aria-hidden="true">✓</span>
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
     </>

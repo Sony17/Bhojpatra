@@ -1835,6 +1835,101 @@ export const partnerTypes: PartnerType[] = [
   { id: "venue", title: "Venue Owner", subtitle: "GST No. required", description: "Banquet halls & venues partnering for in-house catering.", icon: "🏛️" },
 ];
 
+export interface PartnerVoice {
+  id: string;
+  name: string;
+  business: string;
+  businessHi: string;
+  quote: string;
+  quoteHi: string;
+  /** Headline result shown as a chip on the card, e.g. "3× bookings". */
+  metric: string;
+  metricHi: string;
+  avatar: string;
+}
+
+export const partnerVoices: PartnerVoice[] = [
+  {
+    id: "pv-1",
+    name: "Ramesh Yadav",
+    business: "Caterer · Lucknow",
+    businessHi: "कैटरर · लखनऊ",
+    quote:
+      "Within two seasons on Bhojpatra we went from word-of-mouth to a full wedding calendar. The leads actually match our cuisine and capacity.",
+    quoteHi:
+      "Bhojpatra पर दो सीज़न के भीतर हम मुँह-ज़बानी प्रचार से भरे हुए वेडिंग कैलेंडर तक पहुँच गए। लीड सच में हमारे व्यंजन और क्षमता से मेल खाती हैं।",
+    metric: "3× bookings in 6 months",
+    metricHi: "6 महीनों में 3 गुना बुकिंग",
+    avatar: "/avatars/t-4.jpg",
+  },
+  {
+    id: "pv-2",
+    name: "Meera Kapoor",
+    business: "Event Planner · Delhi",
+    businessHi: "इवेंट प्लानर · दिल्ली",
+    quote:
+      "I pass my client feasts to Bhojpatra and the payout lands before I have even filed the paperwork. My clients get better menus, I earn on every booking.",
+    quoteHi:
+      "मैं अपने क्लाइंट की दावतें Bhojpatra को सौंपती हूँ और कागज़ी काम पूरा होने से पहले ही भुगतान आ जाता है। क्लाइंट को बेहतर मेन्यू मिलता है, मुझे हर बुकिंग पर कमाई।",
+    metric: "₹1.2L earned in referrals",
+    metricHi: "रेफरल से ₹1.2 लाख की कमाई",
+    avatar: "/avatars/t-5.jpg",
+  },
+  {
+    id: "pv-3",
+    name: "Suresh Chandel",
+    business: "Venue Owner · Kanpur",
+    businessHi: "वेन्यू मालिक · कानपुर",
+    quote:
+      "Our banquet hall used to sit empty on weekdays. In-house catering through Bhojpatra changed that — and the dashboard makes every payout transparent.",
+    quoteHi:
+      "हमारा बैंक्वेट हॉल कार्यदिवसों में खाली रहता था। Bhojpatra के ज़रिए इन-हाउस कैटरिंग ने यह बदल दिया — और डैशबोर्ड हर भुगतान को पारदर्शी बनाता है।",
+    metric: "40% more weekday events",
+    metricHi: "कार्यदिवसों में 40% ज़्यादा आयोजन",
+    avatar: "/avatars/t-6.jpg",
+  },
+];
+
+export interface PartnerFaq {
+  q: string;
+  qHi: string;
+  a: string;
+  aHi: string;
+}
+
+export const partnerFaqs: PartnerFaq[] = [
+  {
+    q: "How much does it cost to join?",
+    qHi: "जुड़ने में कितना खर्च आता है?",
+    a: "Nothing. Listing is completely free — there is no joining fee, no subscription and no charge for leads. We earn a small commission only on bookings that actually confirm.",
+    aHi: "कुछ नहीं। लिस्टिंग पूरी तरह मुफ़्त है — कोई जॉइनिंग फीस, सब्सक्रिप्शन या लीड शुल्क नहीं। हम केवल पुष्ट होने वाली बुकिंग पर छोटा कमीशन लेते हैं।",
+  },
+  {
+    q: "How quickly do I get verified?",
+    qHi: "वेरिफिकेशन में कितना समय लगता है?",
+    a: "Upload your KYC documents (GST and FSSAI where applicable) and our team typically verifies your profile within 24–48 hours. You go live the moment verification completes.",
+    aHi: "अपने KYC दस्तावेज़ (जहाँ लागू हो GST और FSSAI) अपलोड करें — हमारी टीम आमतौर पर 24–48 घंटों में आपकी प्रोफ़ाइल वेरिफाई कर देती है। वेरिफिकेशन पूरा होते ही आप लाइव हो जाते हैं।",
+  },
+  {
+    q: "When and how do I get paid?",
+    qHi: "भुगतान कब और कैसे मिलता है?",
+    a: "Confirmed bookings turn payable the moment your event completes. Earnings, active payouts, due amounts and dates are all tracked live on your partner dashboard.",
+    aHi: "इवेंट पूरा होते ही पुष्ट बुकिंग भुगतान-योग्य हो जाती है। कमाई, सक्रिय भुगतान, बकाया राशि और तिथियाँ — सब कुछ आपके पार्टनर डैशबोर्ड पर लाइव दिखता है।",
+  },
+  {
+    q: "Who can become a partner?",
+    qHi: "पार्टनर कौन बन सकता है?",
+    a: "Caterers and food vendors, event planners, individual referrers and venue owners. Venue partnerships need a GST number; individual referrers just need a phone number to start.",
+    aHi: "कैटरर और फूड वेंडर, इवेंट प्लानर, इंडिविजुअल रेफरर और वेन्यू मालिक। वेन्यू पार्टनरशिप के लिए GST नंबर चाहिए; इंडिविजुअल रेफरर को शुरू करने के लिए सिर्फ़ फ़ोन नंबर चाहिए।",
+  },
+  {
+    q: "Do I have to work exclusively with Bhojpatra?",
+    qHi: "क्या मुझे सिर्फ़ Bhojpatra के साथ ही काम करना होगा?",
+    a: "No. There is no lock-in and no exclusivity clause — keep serving your own clients and channels. Bhojpatra simply becomes one more source of quality bookings.",
+    aHi: "नहीं। कोई लॉक-इन या एक्सक्लूसिविटी शर्त नहीं है — अपने क्लाइंट और चैनल पहले की तरह चलाते रहें। Bhojpatra बस क्वालिटी बुकिंग का एक और ज़रिया बन जाता है।",
+  },
+];
+
 /* ───────────────────────────────────────────────────────────────────────
    VENDOR DASHBOARD — booking requests, calendar, earnings, notifications.
 ─────────────────────────────────────────────────────────────────────── */
