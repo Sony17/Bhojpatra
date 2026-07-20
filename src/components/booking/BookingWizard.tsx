@@ -279,15 +279,12 @@ export default function BookingWizard() {
   const [activeCat, setActiveCat] = useState<number>(0);
   const [liveCat, setLiveCat] = useState<number>(0);
 
-  // Every step transition (Next/Back, the review-step "edit" jumps, a deep-
-  // linked/restored step) AND every course-category advance within the Menu (2)
-  // and Live Stall (3) steps should open at the top of the page. The advance
-  // buttons sit low on long steps/courses, so without this the next screen would
-  // render already scrolled to the bottom.
+  // Scroll to top on step transitions (Next/Back, review step edits, etc.).
+  // Category tabs inside a step update content in place without scroll jumps.
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [step, activeCat, liveCat]);
+  }, [step]);
 
   const [categoryVendor, setCategoryVendor] = useState<VendorMap>({});
   const [categoryItems, setCategoryItems] = useState<ItemMap>({});
