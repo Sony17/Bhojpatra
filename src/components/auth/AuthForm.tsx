@@ -72,10 +72,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [resetToken, setResetToken] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetReady, setResetReady] = useState(false);
-  // Dev-only: when no email domain is verified (Resend test mode can't deliver
-  // to arbitrary recipients), the API returns the raw token so we can surface a
-  // clickable reset link right here instead of relying on a mail that won't send.
-  const [devResetLink, setDevResetLink] = useState("");
 
   const isVendor = accountType === "vendor";
   const isPartner = accountType === "partner";
@@ -157,22 +153,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (isForgot) {
       setSubmitting(true);
       setError("");
-      const res = await fetch("/api/auth/forgot-password", {
+      await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       }).catch(() => null);
-      // In dev (no verified email domain) the API returns the raw token so we
-      // can show a working link on the confirmation screen. Never present in prod.
-      const json = (await res?.json().catch(() => null)) as
-        | { devToken?: string }
-        | null;
-      if (json?.devToken) {
-        setDevResetLink(
-          `/reset-password?token=${encodeURIComponent(json.devToken)}` +
-            `&email=${encodeURIComponent(email)}`,
-        );
-      }
       setSubmitting(false);
       setSubmitted(true); // always confirm — don't leak whether the email exists
       return;
@@ -399,25 +384,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             "यदि उस ईमेल के लिए कोई अकाउंट मौजूद है, तो हमने पासवर्ड रीसेट करने का लिंक भेज दिया है।",
           )}
         </p>
-        {devResetLink && (
-          <div className="mt-6 rounded-card border border-maroon/30 bg-cream px-4 py-4 text-left">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-              {t("Dev only — email not sent", "केवल डेव — ईमेल नहीं भेजा गया")}
-            </p>
-            <p className="mt-1 text-sm text-ink-soft">
-              {t(
-                "No email domain is verified yet, so open this reset link directly:",
-                "अभी तक कोई ईमेल डोमेन सत्यापित नहीं है, इसलिए इस रीसेट लिंक को सीधे खोलें:",
-              )}
-            </p>
-            <Link
-              href={devResetLink}
-              className="mt-2 block break-all text-sm font-medium text-maroon hover:underline"
-            >
-              {devResetLink}
-            </Link>
-          </div>
-        )}
         <div className="mt-8">
           <Button href="/login" variant="secondary" size="lg" fullWidth>
             {t("← Back to log in", "← लॉग इन पर वापस जाएं")}
@@ -485,6 +451,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div>
       <header className="mb-8">
+        {/* With no in-form role picker, arriving from a "List as a Vendor" /
+            "Become a Partner" CTA (?type=…) must announce itself clearly. */}
+        {isSignup && (isVendor || isPartner) && (
+          <span className="mb-3 inline-flex items-center rounded-full border border-maroon/30 bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-maroon">
+            {isVendor
+              ? t("Vendor Sign Up", "वेंडर साइन अप")
+              : t("Partner Sign Up", "पार्टनर साइन अप")}
+          </span>
+        )}
         <h1 className="font-display text-app-title text-ink sm:text-3xl lg:text-4xl">
           {isSignup
             ? t("Create your account", "अपना अकाउंट बनाएं")
@@ -532,64 +507,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </p>
       </header>
 
-      {isSignup && (
+      {/* Vendor/partner signups (reached via /signup?type=… CTAs) pick their
+          referral flavor here; the default /signup is a plain customer signup. */}
+      {isSignup && isPartner && (
         <div className="mb-6">
-          <span className="mb-2 block text-sm text-ink-soft">
-            {t("I want to register as", "मैं रजिस्टर करना चाहता हूं")}
-          </span>
-          <div
-            role="radiogroup"
-            aria-label={t("Registration type", "रजिस्ट्रेशन प्रकार")}
-            className="grid grid-cols-3 gap-2 rounded-card border border-cream-3 bg-cream/40 p-1.5"
-          >
-            {([
-              {
-                value: "customer" as const,
-                label: t("Customer", "ग्राहक"),
-                hint: t("Book feasts", "भोज बुक करें"),
-              },
-              {
-                value: "vendor" as const,
-                label: t("Vendor", "वेंडर"),
-                hint: t("List catering", "कैटरिंग सूचीबद्ध करें"),
-              },
-              {
-                value: "partner" as const,
-                label: t("Partner", "पार्टनर"),
-                hint: t("Refer & earn", "रेफ़र करें और कमाएं"),
-              },
-            ]).map((opt) => {
-              const active = accountType === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setAccountType(opt.value)}
-                  className={
-                    "focus-ring flex flex-col items-center rounded-control px-3 py-2.5 text-center transition-colors " +
-                    (active
-                      ? "bg-maroon text-cream shadow-sm"
-                      : "text-ink-soft hover:bg-cream-2")
-                  }
-                >
-                  <span className="text-sm font-semibold">{opt.label}</span>
-                  <span
-                    className={
-                      "text-xs " + (active ? "text-cream/80" : "text-ink-soft/70")
-                    }
-                  >
-                    {opt.hint}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Referral partner sub-types — revealed once "Partner" is chosen. */}
-          {isPartner && (
-            <div className="mt-3">
               <span className="mb-2 block text-sm text-ink-soft">
                 {t("How will you refer?", "आप कैसे रेफ़र करेंगे?")}
               </span>
@@ -651,8 +572,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   );
                 })}
               </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -924,6 +843,44 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           </>
         )}
       </p>
+
+      {/* Buttons (not ?type= links) — a client-side nav to the same route
+          wouldn't re-run the mount effect that reads the query string. */}
+      {isSignup && (
+        <p className="mt-2 text-center text-sm text-ink-soft">
+          {accountType === "customer" ? (
+            <>
+              {t("Here for business? ", "बिज़नेस के लिए आए हैं? ")}
+              <button
+                type="button"
+                onClick={() => setAccountType("vendor")}
+                className="font-semibold text-maroon hover:underline"
+              >
+                {t("List your catering", "अपनी कैटरिंग सूचीबद्ध करें")}
+              </button>
+              {" · "}
+              <button
+                type="button"
+                onClick={() => setAccountType("partner")}
+                className="font-semibold text-maroon hover:underline"
+              >
+                {t("Refer & earn", "रेफ़र करें और कमाएं")}
+              </button>
+            </>
+          ) : (
+            <>
+              {t("Just want to book a feast? ", "बस भोज बुक करना चाहते हैं? ")}
+              <button
+                type="button"
+                onClick={() => setAccountType("customer")}
+                className="font-semibold text-maroon hover:underline"
+              >
+                {t("Sign up as a customer", "ग्राहक के रूप में साइन अप करें")}
+              </button>
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

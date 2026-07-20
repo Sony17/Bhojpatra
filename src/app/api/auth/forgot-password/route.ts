@@ -4,16 +4,14 @@ import { sendPasswordResetEmail, siteBaseUrl } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
-const IS_PROD = process.env.NODE_ENV === "production";
 const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Two modes:
  *   { email }                     → issue a reset token (stored hashed).
  *   { email, token, password }    → complete the reset with the token.
- * Always responds 200 for the issue step so account existence isn't leaked.
- * There's no email service wired, so in dev the issued token is returned in the
- * response for testing; in production it would be emailed instead.
+ * Always responds 200 for the issue step so account existence isn't leaked;
+ * the reset link only ever travels via email.
  */
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -61,7 +59,6 @@ export async function POST(request: Request) {
 
   // ── Issue a reset token ─────────────────────────────────────────────────
   const user = await findUserByEmail(email);
-  let devToken: string | undefined;
   if (user) {
     const { token: rawToken, hash } = makeResetToken();
     user.resetTokenHash = hash;
@@ -75,13 +72,7 @@ export async function POST(request: Request) {
       `${base}/reset-password?token=${encodeURIComponent(rawToken)}` +
       `&email=${encodeURIComponent(email)}`;
     await sendPasswordResetEmail(email, resetUrl);
-
-    if (!IS_PROD) devToken = rawToken;
   }
 
-  return Response.json({
-    ok: true,
-    // Dev convenience only — omitted in production (would be emailed).
-    ...(devToken ? { devToken } : {}),
-  });
+  return Response.json({ ok: true });
 }
