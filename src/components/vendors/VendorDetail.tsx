@@ -435,12 +435,14 @@ function VendorProfile({
 
       {/* ── Ratings & reviews ─────────────────────────────────────────── */}
       <div id="reviews" className="mt-14 scroll-mt-32 border-t border-cream-3 pt-10">
-        <p className="eyebrow text-xs font-semibold text-maroon">
-          {t("Ratings & reviews", "रेटिंग और समीक्षाएँ")}
-        </p>
-        <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
-          {t("What guests say", "मेहमान क्या कहते हैं")}
-        </h2>
+        <div className="text-center">
+          <p className="eyebrow text-xs font-semibold text-maroon">
+            {t("Ratings & reviews", "रेटिंग और समीक्षाएँ")}
+          </p>
+          <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
+            {t("What guests say", "मेहमान क्या कहते हैं")}
+          </h2>
+        </div>
 
         {/* Summary — headline score alongside the star breakdown (or, until
             written reviews land, the reasons the rating can be trusted). */}

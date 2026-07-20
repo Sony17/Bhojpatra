@@ -301,7 +301,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       "क्यूरेटेड मेन्यू की तुलना करें, अपनी दावत कस्टमाइज़ करें और मिनटों में भरोसेमंद सेलिब्रेशन पार्टनर बुक करें।",
     cta: "Find Your Perfect Feast",
     ctaHi: "अपनी परफेक्ट दावत खोजें",
-    background: "/hero-bg.webp",
+    background: "/bhoj_Hero_1.png",
     backgroundsByOccasion: { ...heroEventImages },
     backgroundsByLocation: { ...heroLocationImages },
     backgroundPriority: "occasion",

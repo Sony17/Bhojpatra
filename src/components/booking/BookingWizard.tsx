@@ -2854,10 +2854,12 @@ function EventBar({
         (flush ? "" : "mt-5 sm:mt-7")
       }
     >
-      <span
-        className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
-        aria-hidden="true"
-      />
+      {Boolean(leadWarning) && (
+        <span
+          className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
+          aria-hidden="true"
+        />
+      )}
       {/* Mobile collapsed summary — the whole brief on one tappable line; hidden
           on desktop, where the full card is always shown. */}
       {collapsible && (

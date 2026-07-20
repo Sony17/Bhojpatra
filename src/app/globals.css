@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* ── Global scrollbar styling (White / Red / Cream theme) ────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b92025 #f0d09e;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #ffffff;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b92025;
+  border-radius: 4px;
+  border: 2px solid #ffffff;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b92025;
+}
+
 /* ── Bhojpatra design system ──────────────────────────────────────────
    The brand palette is EXACTLY four colours — nothing else is allowed:
      Red    #B92025
@@ -100,7 +126,13 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --tab-bar-h: 4.5rem;
-  --app-header-h: 3.5rem;
+  --app-header-h: calc(5.25rem + var(--safe-top));
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-header-h: calc(5.75rem + var(--safe-top));
+  }
 }
 
 /* Dark mode — same four brand hexes, inverted roles. Opt-in via .dark or
@@ -358,14 +390,14 @@ select:-webkit-autofill {
 }
 
 /* Non-hero pages: breathing room under sticky app header.
-   Header is sticky (not absolute), so we only need a small content inset. */
+   Proper layout spacing so the floating topbar does not overlap page content. */
 .app-page-pad {
-  padding-top: 0.5rem; /* 8px — 8-pt system */
+  padding-top: calc(5.5rem + var(--safe-top));
 }
 
 @media (min-width: 1024px) {
   .app-page-pad {
-    padding-top: 1rem; /* 16px */
+    padding-top: calc(6.5rem + var(--safe-top));
   }
 }
 
