@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent, ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import Reveal from "@/components/Reveal";
 import { servicePackages, type ServicePackage } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
@@ -262,6 +262,7 @@ function ServiceCard({
   onSelect?: (id: string) => void;
   guests?: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const name = lang === "hi" ? pkg.nameHi : pkg.name;
   const subtitle = lang === "hi" ? pkg.subtitleHi : pkg.subtitle;
   const choose = () => onSelect?.(pkg.id);
@@ -310,60 +311,100 @@ function ServiceCard({
       </h3>
       <p className={`mt-1 text-center text-sm ${variant.muted}`}>{subtitle}</p>
 
-      {/* INCLUDES */}
-      <SectionLabel variant={variant}>{t("Includes", "शामिल")}</SectionLabel>
-      <ul className="mt-3 space-y-2">
-        {pkg.includes.map((line) => (
-          <li key={line} className="flex items-start gap-2.5 text-sm">
-            <span
-              aria-hidden="true"
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${variant.tick}`}
-            >
-              ✓
-            </span>
-            <span className={variant.body}>{line}</span>
-          </li>
-        ))}
-      </ul>
+      {/* Expand / Collapse toggle button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded((v) => !v);
+        }}
+        aria-expanded={expanded}
+        className={`mt-4 flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${variant.label}`}
+      >
+        <span>
+          {expanded
+            ? t("Hide details", "विवरण छिपाएं")
+            : t("View details", "विवरण देखें")}
+        </span>
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-3.5 w-3.5 transition-transform duration-300 ${
+            expanded ? "rotate-180" : ""
+          }`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
-      {/* NOT INCLUDED — Package A only. */}
-      {pkg.notIncluded.length > 0 && (
-        <>
-          <SectionLabel variant={variant}>
-            {t("Not Included", "शामिल नहीं")}
-          </SectionLabel>
+      {/* Collapsible details container */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+          expanded ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          {/* INCLUDES */}
+          <SectionLabel variant={variant}>{t("Includes", "शामिल")}</SectionLabel>
           <ul className="mt-3 space-y-2">
-            {pkg.notIncluded.map((line) => (
-              <li
-                key={line}
-                className={`flex items-start gap-2.5 text-sm ${variant.muted}`}
-              >
+            {pkg.includes.map((line) => (
+              <li key={line} className="flex items-start gap-2.5 text-sm">
                 <span
                   aria-hidden="true"
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${variant.cross}`}
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${variant.tick}`}
                 >
-                  ✕
+                  ✓
                 </span>
-                <span>{line}</span>
+                <span className={variant.body}>{line}</span>
               </li>
             ))}
           </ul>
-        </>
-      )}
 
-      {/* BEST FOR */}
-      <SectionLabel variant={variant}>{t("Best For", "इनके लिए")}</SectionLabel>
-      <ul className="mt-3 space-y-2">
-        {pkg.bestFor.map((line) => (
-          <li key={line} className={`flex items-center gap-2.5 text-sm ${variant.body}`}>
-            <span
-              aria-hidden="true"
-              className={`h-1.5 w-1.5 shrink-0 rotate-45 ${variant.marker}`}
-            />
-            {line}
-          </li>
-        ))}
-      </ul>
+          {/* NOT INCLUDED — Package A only. */}
+          {pkg.notIncluded.length > 0 && (
+            <>
+              <SectionLabel variant={variant}>
+                {t("Not Included", "शामिल नहीं")}
+              </SectionLabel>
+              <ul className="mt-3 space-y-2">
+                {pkg.notIncluded.map((line) => (
+                  <li
+                    key={line}
+                    className={`flex items-start gap-2.5 text-sm ${variant.muted}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${variant.cross}`}
+                    >
+                      ✕
+                    </span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {/* BEST FOR */}
+          <SectionLabel variant={variant}>{t("Best For", "इनके लिए")}</SectionLabel>
+          <ul className="mt-3 space-y-2">
+            {pkg.bestFor.map((line) => (
+              <li key={line} className={`flex items-center gap-2.5 text-sm ${variant.body}`}>
+                <span
+                  aria-hidden="true"
+                  className={`h-1.5 w-1.5 shrink-0 rotate-45 ${variant.marker}`}
+                />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
 
       {/* Price bar — pinned to the card foot so all four align. */}
       <div className="mt-auto pt-6">
