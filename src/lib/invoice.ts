@@ -38,6 +38,9 @@ export interface InvoiceData {
   /** Meal period + clock time the feast is served at (e.g. "Dinner · 7:30 PM"),
    *  when the guest set one. Absent on orders saved before serving time. */
   servingTime?: string;
+  /** Food (diet) preference — "Pure Veg" / "Non-veg" / "Both" — when the guest
+   *  declared one. Absent otherwise. */
+  foodPreference?: string;
   city: string;
   venue: string;
   guests: number;
@@ -464,9 +467,10 @@ export function buildInvoicePdf(
   p.y -= 27;
   field(MX, "CITY", data.city);
   field(COL2, "VENUE", data.venue);
-  if (data.servingTime) {
+  if (data.servingTime || data.foodPreference) {
     p.y -= 27;
-    field(MX, "SERVING TIME", data.servingTime);
+    if (data.servingTime) field(MX, "SERVING TIME", data.servingTime);
+    if (data.foodPreference) field(COL2, "FOOD PREFERENCE", data.foodPreference);
   }
   p.y -= 27;
 

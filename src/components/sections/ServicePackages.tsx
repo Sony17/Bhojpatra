@@ -4,6 +4,7 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import Reveal from "@/components/Reveal";
 import { servicePackages, type ServicePackage } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
+import { money } from "@/lib/money";
 
 /**
  * "Choose Your Service Package" — the four-tier service comparison from the
@@ -238,9 +239,8 @@ const TRUST_ITEMS = [
 
 /** Per-guest price band, e.g. "₹180 – ₹300" / "₹400 – ₹700+" / flat "₹5,000". */
 function priceBand(pkg: ServicePackage): string {
-  const n = (v: number) => `₹${new Intl.NumberFormat("en-IN").format(v)}`;
-  if (!pkg.perPlate) return n(pkg.priceMin);
-  return `${n(pkg.priceMin)} – ${n(pkg.priceMax)}${pkg.openTop ? "+" : ""}`;
+  if (!pkg.perPlate) return money(pkg.priceMin);
+  return `${money(pkg.priceMin)} – ${money(pkg.priceMax)}${pkg.openTop ? "+" : ""}`;
 }
 
 function ServiceCard({
@@ -270,7 +270,7 @@ function ServiceCard({
   // fee if the tier isn't per-guest). Package A's ₹0 floor adds nothing.
   const feastPrice =
     typeof guests === "number" && pkg.perPlate ? pkg.priceMin * guests : pkg.priceMin;
-  const feastLabel = `₹${new Intl.NumberFormat("en-IN").format(feastPrice)}`;
+  const feastLabel = money(feastPrice);
 
   return (
     <div

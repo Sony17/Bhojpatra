@@ -83,8 +83,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   // server and first client render match — no Suspense boundary needed.
   useEffect(() => {
     if (!isSignup) return;
-    const type = new URLSearchParams(window.location.search).get("type");
+    const params = new URLSearchParams(window.location.search);
+    const type = params.get("type");
     if (type === "vendor" || type === "partner") setAccountType(type);
+    const role = params.get("role");
+    if (role === "planner" || role === "individual" || role === "venue") {
+      setPartnerRole(role);
+    }
   }, [isSignup]);
 
   // Pull the token + email out of the reset link (/reset-password?token=…&email=…).

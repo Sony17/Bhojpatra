@@ -55,18 +55,6 @@ export function Store(props: IconProps) {
   );
 }
 
-/* Fork & knife — Menu & Catalog. */
-export function Utensils(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M7 3v5a2 2 0 0 0 4 0V3" />
-      <path d="M9 8v13" />
-      <path d="M16.5 3c-1.4 1-2.3 3-2.3 5.5 0 1.7.9 2.7 2.3 2.8V3Z" />
-      <path d="M16.5 11.3V21" />
-    </svg>
-  );
-}
-
 /* Plus-in-circle — Add-On Manager. */
 export function PlusCircle(props: IconProps) {
   return (
@@ -168,16 +156,6 @@ export function Concierge(props: IconProps) {
       <path d="M5.5 18a6.5 6.5 0 0 1 13 0" />
       <path d="M12 8.5V6.5" />
       <path d="M10 6.5h4" />
-    </svg>
-  );
-}
-
-/* Bell — notifications. */
-export function Bell(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
-      <path d="M10 19a2 2 0 0 0 4 0" />
     </svg>
   );
 }
@@ -302,16 +280,6 @@ export function LifeBuoy(props: IconProps) {
       <circle cx="12" cy="12" r="8.5" />
       <circle cx="12" cy="12" r="3.5" />
       <path d="m6 6 3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18" />
-    </svg>
-  );
-}
-
-/* Key — Roles & Permissions. */
-export function Key(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="7.5" cy="12" r="3.5" />
-      <path d="M11 12h9M17 12v3M20 12v2.5" />
     </svg>
   );
 }

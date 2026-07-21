@@ -12,8 +12,7 @@ import { useLang } from "@/lib/i18n";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { Button, Card, Badge, AppBar, ImageCarousel } from "@/components/ui";
-
-const inr = new Intl.NumberFormat("en-IN");
+import { inr } from "@/lib/money";
 
 export default function VendorProfile({
   profile,
@@ -215,6 +214,33 @@ export default function VendorProfile({
           ))}
         </div>
       </div>
+
+      {/* Live counters & services the caterer offers (from the platform add-on set). */}
+      {profile.counters.length > 0 && (
+        <div className="mt-12">
+          <h2 className="font-display text-2xl text-ink">
+            {t("Live Counters & Services", "लाइव काउंटर और सेवाएं")}
+          </h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {profile.counters.map((c) => (
+              <Card key={c.id} padding="none" className="flex items-center gap-3 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream text-lg">
+                  <span aria-hidden="true">{c.icon}</span>
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-ink">
+                    {lang === "hi" ? c.nameHi : c.name}
+                  </span>
+                  <span className="block text-sm text-ink-soft">
+                    ₹{inr.format(c.price)}
+                    {c.perPlate ? `/${t("plate", "प्लेट")}` : ` ${t("flat", "एकमुश्त")}`}
+                  </span>
+                </span>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mobile sticky booking bar — price + CTA pinned above the tab bar. */}
       <StickyBookingBar

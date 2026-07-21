@@ -12,6 +12,7 @@ import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { money } from "@/components/admin/shared/money";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
+import PushToTopFiveButton from "@/components/admin/vendors/PushToTopFiveButton";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
 import { getBookingsByVendor } from "@/lib/admin/mockData";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
@@ -29,11 +30,12 @@ const TABS: TabItem[] = [
 ];
 
 /**
- * Vendor detail page (read-only). Shows the vendor's profile, tiers, KYC
- * documents and bookings as looked up by the route. Verification and status
- * changes are made in the Vendor Approvals console, which persists them — this
- * view intentionally has no action buttons so nothing here silently no-ops.
- * Renders a friendly not-found state for bad ids.
+ * Vendor detail page. Shows the vendor's profile, tiers, KYC documents and
+ * bookings as looked up by the route. Verification and status changes are made
+ * in the Vendor Approvals console, which persists them — the only action here
+ * is "Push to Top 5", which pins the vendor into the /book menu-builder
+ * vendor ribbon through the shared top-vendors store (nothing silently
+ * no-ops). Renders a friendly not-found state for bad ids.
  */
 export default function VendorDetail({ vendor }: { vendor: AdminVendor | null }) {
   if (!vendor) {
@@ -80,6 +82,9 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
         <TierBadges tiers={tiers} />
         <StatusBadge status={vendor.status} />
         {vendor.suspended && <StatusBadge status="Suspended" />}
+        <span className="ml-auto pl-2">
+          <PushToTopFiveButton vendor={vendor} />
+        </span>
       </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />

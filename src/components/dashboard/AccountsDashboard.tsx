@@ -22,12 +22,7 @@ import {
 import { fetchMyBookings, type StoredBooking } from "@/lib/bookings";
 import { vendorStats } from "@/lib/data";
 import { PARTNER_ROLE_LABEL, referralLink } from "@/lib/referral";
-
-const money = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
+import { money } from "@/lib/money";
 
 /** A single labelled figure inside an account section. */
 function Stat({ label, value }: { label: string; value: string }) {
@@ -173,7 +168,7 @@ export default function AccountsDashboard() {
             />
             <Stat
               label={t("Amount Due", "देय राशि")}
-              value={loading ? "—" : money.format(bookingCounts.due)}
+              value={loading ? "—" : money(bookingCounts.due)}
             />
           </div>
           {!loading && bookingCounts.total === 0 && (

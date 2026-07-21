@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
 import Tabs, { type TabItem } from "@/components/admin/shared/Tabs";
-import { Field, inputClass } from "@/components/admin/shared/FormControls";
+import { Field, inputClass, PasswordInput } from "@/components/admin/shared/FormControls";
 import { Button } from "@/components/ui";
 import { DEFAULT_MERCHANT, isValidVpa } from "@/lib/upi";
 
@@ -122,30 +122,24 @@ function ChangePasswordTab() {
       </p>
       <div className="grid max-w-md grid-cols-1 gap-4">
         <Field label="Current password">
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
-            className={inputClass}
             value={current}
-            onChange={(e) => edit(setCurrent)(e.target.value)}
+            onChange={edit(setCurrent)}
           />
         </Field>
         <Field label="New password" hint="At least 8 characters.">
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
-            className={inputClass}
             value={next}
-            onChange={(e) => edit(setNext)(e.target.value)}
+            onChange={edit(setNext)}
           />
         </Field>
         <Field label="Confirm new password">
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
-            className={inputClass}
             value={confirm}
-            onChange={(e) => edit(setConfirm)(e.target.value)}
+            onChange={edit(setConfirm)}
           />
         </Field>
       </div>

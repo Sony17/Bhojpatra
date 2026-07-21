@@ -51,7 +51,7 @@ export function parseEventDate(display: string): Date | null {
 }
 
 /** Midday-anchored Date from a `YYYY-MM-DD` key (inverse of {@link toISODate}). */
-export function fromISODate(iso: string): Date {
+function fromISODate(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
@@ -129,7 +129,7 @@ export function computeTrend(
 }
 
 /** Distinct months present in the given event dates, newest first. */
-export function monthsWithBookings(
+function monthsWithBookings(
   dates: Date[],
 ): { year: number; month: number }[] {
   const seen = new Set<string>();

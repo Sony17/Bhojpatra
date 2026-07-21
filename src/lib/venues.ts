@@ -15,6 +15,7 @@
  */
 
 import { venues as staticVenues, cities, type Venue } from "@/lib/data";
+import { money } from "@/lib/money";
 
 /** Booking fee → 18% GST, with a 10% advance to lock the date (matches the
  *  catering wizard's conventions). */
@@ -90,23 +91,37 @@ export interface BookableVenue extends Venue {
 export const DEFAULT_VENUE_IMAGE =
   "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=70";
 
+/** Remote hosts `next/image` can optimize — keep in sync with
+ *  `images.remotePatterns` in next.config.ts. */
+const VENUE_IMAGE_HOSTS = ["images.unsplash.com", "plus.unsplash.com"];
+const VENUE_IMAGE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+
 /**
- * Restrict venue images to sources `next/image` can actually serve: local
- * `/public` paths and the remote hosts whitelisted under
- * `images.remotePatterns` in next.config.ts. Owners paste things like an
- * unsplash.com *page* link (not an image file), which would crash every card
- * that renders it — those fall back to the default photo instead.
+ * Whether `next/image` can actually serve this source: a local `/public` path
+ * or a remote host whitelisted under `images.remotePatterns` in
+ * next.config.ts. Owners paste things like an unsplash.com *page* link (not an
+ * image file), which would crash every card that renders it.
  */
-export function sanitizeVenueImage(src: string | undefined): string {
+export function isServableVenueImage(src: string | undefined): boolean {
   const url = (src ?? "").trim();
-  if (url.startsWith("/")) return url;
+  if (url.startsWith("/")) return true;
   try {
     const { protocol, hostname } = new URL(url);
-    if (protocol === "https:" && hostname === "images.unsplash.com") return url;
+    return (
+      protocol === "https:" &&
+      (VENUE_IMAGE_HOSTS.includes(hostname) ||
+        hostname.endsWith(VENUE_IMAGE_HOST_SUFFIX))
+    );
   } catch {
-    /* not an absolute URL — fall through to the default */
+    return false; /* not an absolute URL */
   }
-  return DEFAULT_VENUE_IMAGE;
+}
+
+/** A non-servable (or missing) venue image falls back to the default photo —
+ *  the read-path guard for records stored before validation existed. */
+export function sanitizeVenueImage(src: string | undefined): string {
+  const url = (src ?? "").trim();
+  return isServableVenueImage(url) ? url : DEFAULT_VENUE_IMAGE;
 }
 
 /** Parse a display price like "₹1,20,000" or "₹85,000" → 120000 / 85000. */
@@ -116,9 +131,8 @@ export function parseVenuePrice(priceFrom: string): number {
 }
 
 /** Format a numeric fee back into the "₹85,000" display style. */
-const inr = new Intl.NumberFormat("en-IN");
 export function formatVenuePrice(amount: number): string {
-  return `₹${inr.format(Math.round(amount))}`;
+  return money(amount);
 }
 
 /** A URL/id-safe slug from a venue name, e.g. "Royal Palace" → "royal-palace". */

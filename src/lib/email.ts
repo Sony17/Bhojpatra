@@ -13,6 +13,7 @@ import type { PartnerRecord } from "@/app/api/partners/route";
 import type { VendorApplicationRecord } from "@/lib/vendorApplications";
 import type { VenueRecord } from "@/lib/venues";
 import type { EnquiryRecord } from "@/lib/enquiries";
+import type { SupportTicketRecord } from "@/lib/supportTickets";
 
 export interface AlertField {
   label: string;
@@ -50,6 +51,7 @@ export const ALERT_ENABLED = {
   payment: true, //           payment received           (main)
   lead: true, //              lead / callback request
   enquiry: true, //           contact-form enquiry
+  supportTicket: true, //     support ticket raised from My Bookings
   vendorApplication: true, // vendor KYC application
   partner: true, //           referral partner signup
   venue: true, //             venue listing
@@ -321,6 +323,28 @@ export async function sendEnquiryAlert(record: EnquiryRecord): Promise<void> {
       { label: "Message", value: record.message },
     ],
     link: base ? { label: "Open Enquiries", url: `${base}/admin/enquiries` } : null,
+  });
+}
+
+export async function sendSupportTicketAlert(
+  record: SupportTicketRecord,
+): Promise<void> {
+  if (!ALERT_ENABLED.supportTicket) return;
+  const base = siteBaseUrl();
+  await sendAlert({
+    subject: `Support ticket — ${record.subject} — ${record.customer}`,
+    heading: `New support ticket (${record.id} · ${record.priority})`,
+    fields: [
+      { label: "Customer", value: record.customer },
+      { label: "Email", value: record.email },
+      { label: "Category", value: record.category },
+      ...(record.bookingId
+        ? [{ label: "Booking", value: record.bookingId }]
+        : []),
+      { label: "Subject", value: record.subject },
+      { label: "Message", value: record.message },
+    ],
+    link: base ? { label: "Open Support", url: `${base}/admin/support` } : null,
   });
 }
 

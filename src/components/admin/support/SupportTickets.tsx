@@ -4,9 +4,13 @@
  * Support Tickets — post-booking customer support requests and their lifecycle:
  * Open → In Progress → Resolved. Distinct from Enquiries (pre-sale Contact-form
  * messages): a ticket has a priority and is usually tied to a booking.
+ *
+ * Tickets are raised by customers from My Bookings ("Get help" on an order) and
+ * read back here via GET /api/support; the footer actions persist status moves
+ * through PATCH /api/support.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -15,11 +19,11 @@ import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
+import LoadingSkeleton from "@/components/admin/shared/LoadingSkeleton";
 import Modal from "@/components/admin/shared/Modal";
 import { Field } from "@/components/admin/shared/FormControls";
 import { LifeBuoy, TrendingUp, ShieldCheck } from "@/components/admin/shared/icons";
 import { Button } from "@/components/ui";
-import { supportTickets, querySupport } from "@/lib/admin/mockData";
 import type { SupportTicket, SupportTicketStatus } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
@@ -38,41 +42,114 @@ const PRIORITY_OPTIONS = [
   { label: "High", value: "High" },
 ];
 
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function SupportTickets() {
-  const [rows, setRows] = useState<SupportTicket[]>(supportTickets);
+  const [rows, setRows] = useState<SupportTicket[] | null>(null);
+  const [error, setError] = useState(false);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [priority, setPriority] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/support", { cache: "no-store" });
+        if (!res.ok) throw new Error("Request failed");
+        const data = (await res.json()) as { tickets?: SupportTicket[] };
+        if (active) setRows(data.tickets ?? []);
+      } catch {
+        if (active) {
+          setError(true);
+          setRows([]);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);
     setPage(1);
   };
 
+  const all = useMemo(() => rows ?? [], [rows]);
+
   const stats = useMemo(
     () => ({
-      open: rows.filter((t) => t.status === "Open").length,
-      inProgress: rows.filter((t) => t.status === "In Progress").length,
-      resolved: rows.filter((t) => t.status === "Resolved").length,
+      open: all.filter((t) => t.status === "Open").length,
+      inProgress: all.filter((t) => t.status === "In Progress").length,
+      resolved: all.filter((t) => t.status === "Resolved").length,
     }),
-    [rows],
+    [all],
   );
 
-  const result = useMemo(
-    () =>
-      querySupport(
-        { q, status: status as never, priority: priority as never, page, pageSize: PAGE_SIZE },
-        rows,
-      ),
-    [q, status, priority, page, rows],
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return all.filter((t) => {
+      const matchesQ =
+        !needle ||
+        t.id.toLowerCase().includes(needle) ||
+        t.subject.toLowerCase().includes(needle) ||
+        t.customer.toLowerCase().includes(needle) ||
+        (t.bookingId?.toLowerCase().includes(needle) ?? false);
+      const matchesStatus = status === "All" || t.status === status;
+      const matchesPriority = priority === "All" || t.priority === priority;
+      return matchesQ && matchesStatus && matchesPriority;
+    });
+  }, [all, q, status, priority]);
+
+  const total = filtered.length;
+  const pageRows = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
   );
 
-  const selected = selectedId ? rows.find((t) => t.id === selectedId) ?? null : null;
+  const selected = selectedId
+    ? all.find((t) => t.id === selectedId) ?? null
+    : null;
 
-  const setTicketStatus = (id: string, next: SupportTicketStatus) =>
-    setRows((prev) => prev.map((t) => (t.id === id ? { ...t, status: next } : t)));
+  // Persist a lifecycle move, then reconcile with the server's copy (it stamps
+  // `updatedAt`). Errors keep the modal open so the admin can just retry.
+  const setTicketStatus = async (id: string, next: SupportTicketStatus) => {
+    if (statusBusy) return;
+    setStatusBusy(true);
+    try {
+      const res = await fetch("/api/support", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: next }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = (await res.json()) as { ticket?: SupportTicket };
+      const ticket = data.ticket;
+      if (ticket) {
+        setRows((prev) =>
+          (prev ?? []).map((t) => (t.id === ticket.id ? ticket : t)),
+        );
+      }
+    } catch {
+      // Leave the row as-is; the button stays available for a retry.
+    } finally {
+      setStatusBusy(false);
+    }
+  };
 
   const columns: Column<SupportTicket>[] = [
     {
@@ -91,16 +168,27 @@ export default function SupportTickets() {
     { key: "category", header: "Category", cell: (t) => <span className="text-ink-soft">{t.category}</span> },
     { key: "priority", header: "Priority", cell: (t) => <StatusBadge status={t.priority} /> },
     { key: "status", header: "Status", cell: (t) => <StatusBadge status={t.status} /> },
-    { key: "updatedAt", header: "Updated", cell: (t) => <span className="text-ink-soft">{t.updatedAt}</span> },
+    { key: "updatedAt", header: "Updated", cell: (t) => <span className="text-ink-soft">{formatDateTime(t.updatedAt)}</span> },
   ];
+
+  if (rows === null) return <LoadingSkeleton rows={8} />;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Admin Panel"
         title="Support Tickets"
-        subtitle="Track and resolve customer support requests."
+        subtitle="Help requests raised from My Bookings — track and resolve them here."
       />
+
+      {error && (
+        <p
+          role="alert"
+          className="rounded-xl border border-maroon/30 bg-cream-2 px-4 py-3 text-sm text-maroon"
+        >
+          Couldn&apos;t load support tickets. Please refresh the page.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={LifeBuoy} label="Open" value={String(stats.open)} />
@@ -123,14 +211,23 @@ export default function SupportTickets() {
 
       <DataTable
         columns={columns}
-        rows={result.data}
+        rows={pageRows}
         getRowKey={(t) => t.id}
         onRowClick={(t) => setSelectedId(t.id)}
         minWidthClass="min-w-[820px]"
-        empty={<EmptyState title="No tickets found" message="Try a different search term or filters." />}
+        empty={
+          <EmptyState
+            title={q || status !== "All" || priority !== "All" ? "No tickets found" : "No tickets yet"}
+            message={
+              q || status !== "All" || priority !== "All"
+                ? "Try a different search term or filters."
+                : "Tickets will appear here as customers use “Get help” in My Bookings."
+            }
+          />
+        }
       />
 
-      <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} onPageChange={setPage} />
+      <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
 
       <Modal
         open={!!selected}
@@ -141,12 +238,20 @@ export default function SupportTickets() {
           selected && (
             <>
               {selected.status === "Open" && (
-                <Button variant="primary" onClick={() => setTicketStatus(selected.id, "In Progress")}>
+                <Button
+                  variant="primary"
+                  loading={statusBusy}
+                  onClick={() => setTicketStatus(selected.id, "In Progress")}
+                >
                   Start Progress
                 </Button>
               )}
               {selected.status === "In Progress" && (
-                <Button variant="primary" onClick={() => setTicketStatus(selected.id, "Resolved")}>
+                <Button
+                  variant="primary"
+                  loading={statusBusy}
+                  onClick={() => setTicketStatus(selected.id, "Resolved")}
+                >
                   Mark Resolved
                 </Button>
               )}
@@ -172,8 +277,8 @@ export default function SupportTickets() {
               {selected.bookingId && (
                 <Field label="Booking"><p className="text-sm text-ink">{selected.bookingId}</p></Field>
               )}
-              <Field label="Created"><p className="text-sm text-ink">{selected.createdAt}</p></Field>
-              <Field label="Updated"><p className="text-sm text-ink">{selected.updatedAt}</p></Field>
+              <Field label="Created"><p className="text-sm text-ink">{formatDateTime(selected.createdAt)}</p></Field>
+              <Field label="Updated"><p className="text-sm text-ink">{formatDateTime(selected.updatedAt)}</p></Field>
             </dl>
 
             <Field label="Message">

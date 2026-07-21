@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
@@ -21,7 +21,7 @@ import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
-import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -71,6 +71,301 @@ function tierBadgeClass(tier: VendorListing["tiers"][number]): string {
   }
 }
 
+/**
+ * Signature dishes for the "Famous For" strip, keyed by cuisine — the first of
+ * the vendor's cuisines with an entry wins. Placeholder content for the curated
+ * seed listings; real onboarded vendors will declare their own.
+ */
+const FAMOUS_FOR: Record<
+  string,
+  { name: string; nameHi: string; icon: string }[]
+> = {
+  Chaat: [
+    { name: "Gol Gappe", nameHi: "गोल गप्पे", icon: "🥟" },
+    { name: "Aloo Tikki Chaat", nameHi: "आलू टिक्की चाट", icon: "🥔" },
+    { name: "Dahi Bhalla", nameHi: "दही भल्ला", icon: "🥣" },
+    { name: "Papdi Chaat", nameHi: "पापड़ी चाट", icon: "🫓" },
+  ],
+  Mughlai: [
+    { name: "Galouti Kebab", nameHi: "गलौटी कबाब", icon: "🍢" },
+    { name: "Dum Biryani", nameHi: "दम बिरयानी", icon: "🍛" },
+    { name: "Mutton Korma", nameHi: "मटन कोरमा", icon: "🍲" },
+    { name: "Sheermal", nameHi: "शीरमाल", icon: "🫓" },
+  ],
+  "North Indian": [
+    { name: "Dal Makhani", nameHi: "दाल मखनी", icon: "🍲" },
+    { name: "Paneer Lababdar", nameHi: "पनीर लबाबदार", icon: "🧀" },
+    { name: "Tandoori Platter", nameHi: "तंदूरी प्लैटर", icon: "🍢" },
+    { name: "Gulab Jamun", nameHi: "गुलाब जामुन", icon: "🍮" },
+  ],
+  Punjabi: [
+    { name: "Chole Bhature", nameHi: "छोले भटूरे", icon: "🫓" },
+    { name: "Butter Chicken", nameHi: "बटर चिकन", icon: "🍗" },
+    { name: "Amritsari Kulcha", nameHi: "अमृतसरी कुलचा", icon: "🥙" },
+    { name: "Lassi", nameHi: "लस्सी", icon: "🥛" },
+  ],
+  "South Indian": [
+    { name: "Masala Dosa", nameHi: "मसाला डोसा", icon: "🥞" },
+    { name: "Idli Sambar", nameHi: "इडली सांभर", icon: "🍚" },
+    { name: "Chettinad Curry", nameHi: "चेट्टीनाड करी", icon: "🍛" },
+    { name: "Filter Coffee", nameHi: "फ़िल्टर कॉफ़ी", icon: "☕" },
+  ],
+  Bengali: [
+    { name: "Kosha Mangsho", nameHi: "कोशा मांग्शो", icon: "🍲" },
+    { name: "Fish Curry", nameHi: "मछली करी", icon: "🐟" },
+    { name: "Rosogolla", nameHi: "रसगुल्ला", icon: "🍡" },
+    { name: "Mishti Doi", nameHi: "मिष्टी दोई", icon: "🥣" },
+  ],
+  Chinese: [
+    { name: "Hakka Noodles", nameHi: "हक्का नूडल्स", icon: "🍜" },
+    { name: "Veg Manchurian", nameHi: "वेज मंचूरियन", icon: "🥡" },
+    { name: "Spring Rolls", nameHi: "स्प्रिंग रोल", icon: "🌯" },
+    { name: "Chilli Paneer", nameHi: "चिली पनीर", icon: "🌶️" },
+  ],
+  Continental: [
+    { name: "Wood-fired Pizza", nameHi: "वुड-फ़ायर्ड पिज़्ज़ा", icon: "🍕" },
+    { name: "Pasta Station", nameHi: "पास्ता स्टेशन", icon: "🍝" },
+    { name: "Grilled Sizzlers", nameHi: "ग्रिल्ड सिज़लर", icon: "🥘" },
+    { name: "Salad Bar", nameHi: "सलाद बार", icon: "🥗" },
+  ],
+  "Baina Boxes": [
+    { name: "Motichoor Ladoo", nameHi: "मोतीचूर लड्डू", icon: "🍮" },
+    { name: "Kaju Katli", nameHi: "काजू कतली", icon: "🍬" },
+    { name: "Dry Fruit Box", nameHi: "ड्राई फ्रूट बॉक्स", icon: "🥜" },
+    { name: "Gujiya", nameHi: "गुझिया", icon: "🥟" },
+  ],
+  Beverages: [
+    { name: "Masala Shikanji", nameHi: "मसाला शिकंजी", icon: "🍋" },
+    { name: "Thandai", nameHi: "ठंडाई", icon: "🥛" },
+    { name: "Mocktail Counter", nameHi: "मॉकटेल काउंटर", icon: "🍹" },
+    { name: "Fresh Juices", nameHi: "ताज़ा जूस", icon: "🧃" },
+  ],
+  Decor: [
+    { name: "Mandap Styling", nameHi: "मंडप सज्जा", icon: "🏵️" },
+    { name: "Floral Themes", nameHi: "पुष्प थीम", icon: "💐" },
+    { name: "Stage Backdrops", nameHi: "स्टेज बैकड्रॉप", icon: "✨" },
+    { name: "Festive Lighting", nameHi: "उत्सव रोशनी", icon: "🪔" },
+  ],
+};
+
+/**
+ * Sample menu sections keyed by cuisine — merged across all of the vendor's
+ * cuisines. Placeholder content, same as the seed listings themselves.
+ */
+const SAMPLE_MENU: Record<
+  string,
+  { name: string; nameHi: string; icon: string; items: string[] }[]
+> = {
+  Chaat: [
+    {
+      name: "Chaat Counter", nameHi: "चाट काउंटर", icon: "🥟",
+      items: ["Gol Gappe", "Aloo Tikki Chaat", "Dahi Bhalla", "Papdi Chaat", "Raj Kachori", "Basket Chaat"],
+    },
+    {
+      name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍽️",
+      items: ["Pav Bhaji", "Matra Chaat", "Kulle Chaat", "Fruit Chaat"],
+    },
+  ],
+  Mughlai: [
+    {
+      name: "Starters", nameHi: "स्टार्टर", icon: "🍢",
+      items: ["Galouti Kebab", "Shami Kebab", "Seekh Kebab", "Chicken Malai Tikka", "Veg Shammi"],
+    },
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
+      items: ["Dum Biryani", "Mutton Korma", "Nihari", "Awadhi Pulao", "Sheermal", "Butter Naan"],
+    },
+  ],
+  "North Indian": [
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍲",
+      items: ["Dal Makhani", "Paneer Lababdar", "Shahi Paneer", "Mix Veg", "Butter Naan", "Jeera Rice"],
+    },
+    {
+      name: "Desserts", nameHi: "मिठाई", icon: "🍮",
+      items: ["Gulab Jamun", "Moong Dal Halwa", "Kheer", "Jalebi"],
+    },
+  ],
+  Punjabi: [
+    {
+      name: "Starters", nameHi: "स्टार्टर", icon: "🍢",
+      items: ["Paneer Tikka", "Tandoori Chicken", "Hara Bhara Kebab", "Amritsari Fish"],
+    },
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
+      items: ["Chole Bhature", "Butter Chicken", "Sarson da Saag", "Makki di Roti", "Rajma Chawal", "Lassi"],
+    },
+  ],
+  "South Indian": [
+    {
+      name: "Tiffin", nameHi: "टिफ़िन", icon: "🥞",
+      items: ["Masala Dosa", "Idli Sambar", "Medu Vada", "Uttapam", "Pongal"],
+    },
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
+      items: ["Chettinad Curry", "Sambar Rice", "Lemon Rice", "Curd Rice", "Filter Coffee"],
+    },
+  ],
+  Bengali: [
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍲",
+      items: ["Kosha Mangsho", "Fish Curry", "Luchi Aloor Dom", "Basanti Pulao"],
+    },
+    {
+      name: "Desserts", nameHi: "मिठाई", icon: "🍡",
+      items: ["Rosogolla", "Mishti Doi", "Sandesh", "Payesh"],
+    },
+  ],
+  Chinese: [
+    {
+      name: "Starters", nameHi: "स्टार्टर", icon: "🥠",
+      items: ["Spring Rolls", "Chilli Paneer", "Honey Chilli Potato", "Manchow Soup"],
+    },
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍜",
+      items: ["Hakka Noodles", "Veg Manchurian", "Fried Rice", "Chilli Chicken"],
+    },
+  ],
+  Continental: [
+    {
+      name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍕",
+      items: ["Wood-fired Pizza", "Pasta Station", "Grilled Sizzlers", "Salad Bar"],
+    },
+    {
+      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍝",
+      items: ["Mushroom Stroganoff", "Herb Rice", "Roast Veggies", "Garlic Bread"],
+    },
+  ],
+  "Baina Boxes": [
+    {
+      name: "Signature Boxes", nameHi: "सिग्नेचर बॉक्स", icon: "🎁",
+      items: ["Motichoor Ladoo", "Kaju Katli", "Gujiya", "Dry Fruit Box", "Milk Cake", "Besan Barfi"],
+    },
+  ],
+  Sweets: [
+    {
+      name: "Mithai Counter", nameHi: "मिठाई काउंटर", icon: "🍬",
+      items: ["Rasmalai", "Rabri", "Kulfi Falooda", "Gajar Halwa", "Jalebi", "Kheer"],
+    },
+  ],
+  Beverages: [
+    {
+      name: "Welcome Drinks", nameHi: "वेलकम ड्रिंक्स", icon: "🥤",
+      items: ["Masala Shikanji", "Aam Panna", "Rose Sharbat", "Thandai", "Nimbu Pani"],
+    },
+    {
+      name: "Mocktail Counter", nameHi: "मॉकटेल काउंटर", icon: "🍹",
+      items: ["Virgin Mojito", "Blue Lagoon", "Fruit Punch", "Fresh Juices"],
+    },
+  ],
+  Decor: [
+    {
+      name: "Decor Packages", nameHi: "सजावट पैकेज", icon: "🏵️",
+      items: ["Mandap Styling", "Floral Themes", "Stage Backdrops", "Festive Lighting", "Entrance Arch", "Table Centrepieces"],
+    },
+  ],
+};
+
+/** Shared shell for the maroon line icons used across the detail sections. */
+function LineIcon({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function MapPinIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </LineIcon>
+  );
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </LineIcon>
+  );
+}
+
+function ShareIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+    </LineIcon>
+  );
+}
+
+function CompareIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+      <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+      <path d="M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+    </LineIcon>
+  );
+}
+
+function RosetteIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <circle cx="12" cy="8" r="6" />
+      <path d="m15.48 12.89 1.51 8.52a.5.5 0 0 1-.81.47l-3.58-2.68a1 1 0 0 0-1.2 0l-3.59 2.68a.5.5 0 0 1-.81-.47l1.52-8.52" />
+    </LineIcon>
+  );
+}
+
+function LeafIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </LineIcon>
+  );
+}
+
+function PeopleIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </LineIcon>
+  );
+}
+
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <LineIcon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </LineIcon>
+  );
+}
+
 export default function VendorDetail({ id }: { id: string }) {
   const { t } = useLang();
   const vendor = useMemo(
@@ -113,6 +408,40 @@ function VendorProfile({
   const { has, toggle, isFull, count: compareCount } = useCompare();
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
+
+  // "Share" quick action — native share sheet where available, else copy link.
+  const [linkCopied, setLinkCopied] = useState(false);
+  const profileUrl = `${SITE_ORIGIN}/vendors/${vendor.id}`;
+  const handleShare = () => {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      navigator.share({ title: vendor.name, url: profileUrl }).catch(() => {});
+      return;
+    }
+    void navigator.clipboard?.writeText(profileUrl).then(() => {
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
+
+  const famousFor = vendor.cuisines.map((c) => FAMOUS_FOR[c]).find(Boolean);
+
+  // Menu sections merged across the vendor's cuisines — same-named courses
+  // (e.g. two cuisines both offering "Main Course") collapse into one.
+  const menu = useMemo(() => {
+    const sections: { name: string; nameHi: string; icon: string; items: string[] }[] = [];
+    for (const c of vendor.cuisines) {
+      for (const sec of SAMPLE_MENU[c] ?? []) {
+        const existing = sections.find((s) => s.name === sec.name);
+        if (existing) {
+          for (const it of sec.items)
+            if (!existing.items.includes(it)) existing.items.push(it);
+        } else {
+          sections.push({ ...sec, items: [...sec.items] });
+        }
+      }
+    }
+    return sections;
+  }, [vendor.cuisines]);
 
   // Real, customer-submitted reviews for this vendor. Best-effort — falls back
   // to an empty list (and the "no reviews yet" state) on any failure. Exposed as
@@ -261,176 +590,278 @@ function VendorProfile({
         }
       />
 
-      <div className="mt-2 grid gap-6 px-4 lg:mt-4 lg:grid-cols-[1.1fr_1fr] lg:gap-8 lg:px-0">
-        {/* ── Showcase ──────────────────────────────────────────────── */}
-        <div>
-          <div className="relative -mx-4 aspect-[16/10] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[4/3] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
-            <Image
-              src={vendor.image}
-              alt={vendor.name}
-              fill
-              priority
-              sizes="(min-width: 1024px) 600px, 100vw"
-              className="object-cover"
-            />
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/50 to-transparent sm:hidden"
-            />
-            <span className="absolute left-3 top-3 flex flex-wrap gap-1.5 sm:left-4 sm:top-4">
-              {vendor.tiers.map((tier) => (
-                <span
-                  key={tier}
-                  className={
-                    "rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-sm sm:px-3 sm:text-xs " +
-                    tierBadgeClass(tier)
-                  }
-                >
-                  {localize(tier)}
-                </span>
-              ))}
-            </span>
-            {vendor.verified && (
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-maroon shadow-sm backdrop-blur-sm sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
-                <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
-              </span>
-            )}
-            <a
-              href="#reviews"
-              className="absolute bottom-3 left-3 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm sm:hidden"
-            >
-              {shownRating}
-              <span aria-hidden>★</span>
-            </a>
-          </div>
-
-          <div className="mt-4 sm:mt-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="font-sans text-xl font-bold tracking-tight text-ink sm:font-display sm:text-3xl sm:font-normal">
-                {vendor.name}
-              </h1>
-              <a
-                href="#reviews"
-                className="hidden shrink-0 items-center gap-1.5 rounded-full bg-cream-2 px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-cream-3 sm:inline-flex"
+      <div className="mx-auto mt-2 max-w-4xl px-4 sm:px-0 lg:mt-4">
+        {/* ── Hero ──────────────────────────────────────────────────── */}
+        <div className="relative -mx-4 aspect-[16/10] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[16/9] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
+          <Image
+            src={vendor.image}
+            alt={vendor.name}
+            fill
+            priority
+            sizes="(min-width: 1024px) 896px, 100vw"
+            className="object-cover"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/50 to-transparent sm:hidden"
+          />
+          <span className="absolute left-3 top-3 flex flex-wrap gap-1.5 sm:left-4 sm:top-4">
+            {vendor.tiers.map((tier) => (
+              <span
+                key={tier}
+                className={
+                  "rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-sm sm:px-3 sm:text-xs " +
+                  tierBadgeClass(tier)
+                }
               >
-                <StarIcon className="h-4 w-4 text-maroon" />
-                {shownRating}
-                <span className="font-normal text-ink-soft">({shownCount})</span>
-              </a>
-            </div>
+                {localize(tier)}
+              </span>
+            ))}
+          </span>
+          {vendor.verified && (
+            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-maroon shadow-sm backdrop-blur-sm sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
+              <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
+            </span>
+          )}
+          {/* Rating pill — maroon score segment + white review-count segment. */}
+          <a
+            href="#reviews"
+            className="absolute bottom-3 left-3 flex overflow-hidden rounded-full shadow-sm sm:bottom-4 sm:left-4"
+          >
+            <span className="flex items-center gap-1 bg-maroon px-2.5 py-1.5 text-xs font-bold text-white">
+              <StarIcon className="h-3.5 w-3.5 text-cream" />
+              {shownRating}
+            </span>
+            <span className="flex items-center bg-white px-2.5 py-1.5 text-xs font-medium text-ink">
+              ({shownCount.toLocaleString("en-IN")} {t("Reviews", "समीक्षाएँ")})
+            </span>
+          </a>
+        </div>
 
-            <p className="mt-1.5 text-[13px] text-ink/55 sm:mt-2 sm:text-sm sm:text-ink-soft">
+        {/* ── Title + fixed-price card ─────────────────────────────── */}
+        <div className="mt-5 sm:mt-7 sm:flex sm:items-start sm:justify-between sm:gap-8">
+          <div className="min-w-0">
+            <h1 className="font-sans text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+              {vendor.name}
+            </h1>
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft sm:text-base">
+              <MapPinIcon className="h-4 w-4 shrink-0 text-maroon" />
               {vendor.city}, {vendor.state}
             </p>
 
-            <div className="-mx-4 mt-3 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 no-scrollbar sm:mt-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+            <div className="mt-3.5 flex flex-wrap items-center gap-2">
               {vendor.cuisines.map((c) => (
                 <span
                   key={c}
-                  className="shrink-0 whitespace-nowrap rounded-full bg-cream px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs sm:text-ink-soft"
+                  className="rounded-full bg-cream-2 px-3.5 py-1.5 text-sm font-medium text-ink"
                 >
                   {c}
                 </span>
               ))}
-              <span className="shrink-0 whitespace-nowrap rounded-full border border-maroon/15 px-2.5 py-1 text-[11px] font-medium text-ink/60 sm:px-3 sm:text-xs">
+              <span className="rounded-full border border-cream-3 bg-white px-3.5 py-1.5 text-sm font-medium text-ink">
                 {localize(vendor.diet)}
               </span>
             </div>
 
-            <p className="mt-2.5 text-[12px] text-ink/50 sm:mt-3 sm:text-sm sm:text-ink-soft">
-              <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>{" "}
-              {vendor.mealTypes.map(localize).join(" · ")}
-            </p>
-          </div>
-        </div>
-
-        {/* ── Booking panel ─────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-32 lg:self-start">
-          <div className="rounded-3xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
-            <p className="text-xs text-ink-soft">{t("From", "से")}</p>
-            <p className="font-display text-3xl font-bold text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
-              <span className="text-base font-normal text-ink-soft">
-                / {t("plate", "प्लेट")}
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-ink-soft">
-              {t(
-                "Final price depends on your menu, guest count and add-ons.",
-                "अंतिम कीमत आपके मेन्यू, मेहमानों की संख्या और ऐड-ऑन पर निर्भर करती है।",
-              )}
-            </p>
-
-            <Button
-              href={bookHref}
-              variant="primary"
-              size="lg"
-              fullWidth
-              className="mt-5"
-            >
-              {t("Book this caterer", "यह कैटरर बुक करें")} →
-            </Button>
-            <Button
-              variant={inCompare ? "primary" : "secondary"}
-              size="lg"
-              fullWidth
-              onClick={() => toggle(vendor.id)}
-              disabled={compareDisabled}
-              aria-pressed={inCompare}
-              className="mt-3"
-              leftIcon={<span aria-hidden="true">{inCompare ? "✓" : "+"}</span>}
-            >
-              {inCompare
-                ? t("Added to compare", "तुलना में जोड़ा")
-                : compareDisabled
-                  ? t("Compare list is full", "तुलना सूची भर गई है")
-                  : t("Add to compare", "तुलना में जोड़ें")}
-            </Button>
-            {compareCount >= 2 && (
-              <button
-                type="button"
-                onClick={openCompareTable}
-                className="mt-2 block w-full text-center text-sm font-semibold text-maroon hover:underline"
-              >
-                {t(
-                  `Compare ${compareCount} selected →`,
-                  `${compareCount} चुने हुए की तुलना करें →`,
-                )}
-              </button>
+            {vendor.mealTypes.length > 0 && (
+              <p className="mt-3.5 text-sm text-ink-soft sm:text-[15px]">
+                <span className="font-bold text-ink">
+                  {t("Serves", "परोसता है")}:
+                </span>{" "}
+                {vendor.mealTypes.map(localize).join(" • ")}
+              </p>
             )}
+          </div>
 
-            {/* Spread the word — forward this caterer to friends on WhatsApp. */}
-            <WhatsAppShareButton
-              path={`/vendors/${vendor.id}`}
-              variant="ghost"
-              fullWidth
-              className="mt-3"
-              label="Share this caterer"
-              labelHi="यह कैटरर शेयर करें"
-              message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
-              messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
-            />
-
-            <dl className="mt-5 space-y-2 border-t border-cream-3 pt-4 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Location", "स्थान")}</dt>
-                <dd className="font-medium text-ink">{vendor.city}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Tiers", "टियर")}</dt>
-                <dd className="font-medium text-ink">
-                  {vendor.tiers.map(localize).join(", ")}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Rating", "रेटिंग")}</dt>
-                <dd className="font-medium text-ink">
-                  {shownRating} ({shownCount})
-                </dd>
-              </div>
-            </dl>
+          <div className="mt-6 shrink-0 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:mt-0 sm:w-60">
+            <p className="text-sm text-ink-soft">
+              {t("Fixed Price", "निश्चित मूल्य")}
+            </p>
+            <p className="mt-1 font-display text-4xl font-bold text-maroon">
+              ₹{vendor.priceFrom.toLocaleString("en-IN")}
+            </p>
+            <p className="mt-1 text-lg font-bold text-ink">
+              / {t("plate", "प्लेट")}
+            </p>
+            <div className="mt-4 flex items-center gap-2.5 border-t border-cream-3 pt-4">
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-2 text-base font-bold text-maroon"
+              >
+                ₹
+              </span>
+              <span className="text-xs leading-snug text-ink">
+                {t("All inclusive", "सब कुछ शामिल")}
+                <span className="block text-ink-soft">
+                  {t("No hidden charges", "कोई छिपा शुल्क नहीं")}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* ── Famous For ───────────────────────────────────────────── */}
+        {famousFor && (
+          <div className="mt-6 rounded-2xl border border-cream-3 bg-cream/40 p-5 sm:p-6">
+            <p className="text-base font-bold text-maroon sm:text-lg">
+              {t("Famous For", "इनकी खासियत")}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+              {famousFor.map((dish) => (
+                <div
+                  key={dish.name}
+                  className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+                >
+                  <span className="text-2xl" aria-hidden="true">
+                    {dish.icon}
+                  </span>
+                  <span className="text-sm font-medium leading-snug text-ink">
+                    {t(dish.name, dish.nameHi)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Trust highlights ─────────────────────────────────────── */}
+        <div className="mt-4 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+            {[
+              {
+                icon: <RosetteIcon className="h-6 w-6" />,
+                label: t("Hygienic Preparation", "स्वच्छ तैयारी"),
+              },
+              {
+                icon: <LeafIcon className="h-6 w-6" />,
+                label: t("Fresh Ingredients", "ताज़ी सामग्री"),
+              },
+              {
+                icon: <PeopleIcon className="h-6 w-6" />,
+                label: t("10+ Years of Trust", "10+ वर्षों का भरोसा"),
+              },
+              {
+                icon: <ClockIcon className="h-6 w-6" />,
+                label: t("Quick Service", "तेज़ सेवा"),
+              },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+              >
+                <span className="shrink-0 text-maroon">{f.icon}</span>
+                <span className="max-w-28 text-[13px] font-semibold leading-snug text-ink">
+                  {f.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Quick actions ────────────────────────────────────────── */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <Button
+            href={bookHref}
+            variant="primary"
+            size="lg"
+            leftIcon={<CalendarIcon className="h-4 w-4" />}
+          >
+            {t("Book Now", "अभी बुक करें")}
+          </Button>
+          <WhatsAppShareButton
+            path={`/vendors/${vendor.id}`}
+            variant="secondary"
+            size="lg"
+            label="WhatsApp"
+            labelHi="व्हाट्सएप"
+            message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
+            messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
+          />
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleShare}
+            leftIcon={<ShareIcon className="h-4 w-4" />}
+          >
+            {linkCopied
+              ? t("Link copied", "लिंक कॉपी हुआ")
+              : t("Share", "शेयर")}
+          </Button>
+          <Button
+            variant={inCompare ? "primary" : "secondary"}
+            size="lg"
+            onClick={() => toggle(vendor.id)}
+            disabled={compareDisabled}
+            aria-pressed={inCompare}
+            leftIcon={<CompareIcon className="h-4 w-4" />}
+          >
+            {inCompare ? t("Added", "जोड़ा गया") : t("Compare", "तुलना करें")}
+          </Button>
+        </div>
+        {compareCount >= 2 && (
+          <button
+            type="button"
+            onClick={openCompareTable}
+            className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
+          >
+            {t(
+              `Compare ${compareCount} selected →`,
+              `${compareCount} चुने हुए की तुलना करें →`,
+            )}
+          </button>
+        )}
+
+        {/* ── Ideal For ────────────────────────────────────────────── */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-cream-3 bg-white px-5 py-4 shadow-sm">
+          <span className="flex items-center gap-2 text-sm font-bold text-maroon">
+            <PeopleIcon className="h-5 w-5" />
+            {t("Ideal For", "इनके लिए उपयुक्त")}
+          </span>
+          <span className="text-sm text-ink">
+            {[
+              t("Parties", "पार्टियाँ"),
+              t("Weddings", "शादियाँ"),
+              t("Corporate Events", "कॉर्पोरेट आयोजन"),
+              t("Family Functions", "पारिवारिक समारोह"),
+            ].join(" • ")}
+          </span>
+        </div>
+
+        {/* ── Menu ─────────────────────────────────────────────────── */}
+        {menu.length > 0 && (
+          <div className="mt-10">
+            <h2 className="font-display text-2xl text-ink">
+              {t("Menu", "मेन्यू")}
+            </h2>
+            <div className="mt-4 space-y-4">
+              {menu.map((course) => (
+                <div
+                  key={course.name}
+                  className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cream-2 text-lg">
+                      <span aria-hidden="true">{course.icon}</span>
+                    </span>
+                    <h3 className="font-sans text-base font-bold text-ink sm:text-lg">
+                      {t(course.name, course.nameHi)}
+                    </h3>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {course.items.map((it) => (
+                      <span
+                        key={it}
+                        className="rounded-full border border-cream-3 bg-cream/40 px-3.5 py-1.5 text-sm text-ink"
+                      >
+                        {it}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Ratings & reviews ─────────────────────────────────────────── */}

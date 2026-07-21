@@ -11,6 +11,7 @@ import TierBadges from "@/components/admin/shared/TierBadges";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { StarSolid, ChevronRight } from "@/components/admin/shared/icons";
+import PushToTopFiveButton from "@/components/admin/vendors/PushToTopFiveButton";
 import { filterAdminVendors } from "@/lib/admin/mockData";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import type { AdminVendor } from "@/lib/admin/types";
@@ -164,6 +165,13 @@ export default function VendorList() {
       key: "bookings",
       header: "Bookings",
       cell: (v) => <span className="text-ink">{v.totalBookings}</span>,
+      className: "text-right",
+      headerClassName: "text-right",
+    },
+    {
+      key: "topFive",
+      header: "Top 5",
+      cell: (v) => <PushToTopFiveButton vendor={v} />,
       className: "text-right",
       headerClassName: "text-right",
     },

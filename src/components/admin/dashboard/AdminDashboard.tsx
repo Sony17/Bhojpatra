@@ -18,6 +18,7 @@ import {
 } from "@/lib/admin/bookingPeriods";
 import RecentBookingsTable from "./RecentBookingsTable";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
+import AnalyticsPanels from "./AnalyticsPanels";
 import type {
   AdminBookingRow,
   BookingStatus,
@@ -45,8 +46,9 @@ function toBookingRow(o: Record<string, unknown>): AdminBookingRow {
  * Admin dashboard (landing). Reads only real, persisted data: recent bookings
  * from `/api/bookings`, pending vendor applications from
  * `/api/vendors/applications`, and collected advances from `/api/payments`.
- * There are no fabricated KPIs, charts or notifications — every figure here is
- * live, and the panels link through to the full consoles.
+ * Every figure — including the analytics trend charts at the bottom — is
+ * derived from this live data; nothing is fabricated, and the panels link
+ * through to the full consoles.
  */
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<AdminBookingRow[]>([]);
@@ -189,6 +191,10 @@ export default function AdminDashboard() {
         approvals={pending.slice(0, 5)}
         seeAllHref="/admin/vendor-approvals"
       />
+
+      {/* Trend charts over the full booking history — the period filter above
+          doesn't apply here (a one-month window can't show a trend). */}
+      <AnalyticsPanels bookings={dated} />
     </div>
   );
 }

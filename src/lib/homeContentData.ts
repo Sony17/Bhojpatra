@@ -590,8 +590,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
       "भोजपत्र द्वारा तैयार और डिलीवर — मशहूर ब्रांड्स के प्रीमियम गिफ्ट बॉक्स, खूबसूरती से पैक किए और हर उत्सव के लिए खास।",
     cta: "Explore Baina Box →",
     ctaHi: "बैना बॉक्स देखें →",
-    image:
-      "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=70",
+    image: "/baina-box-signature.png",
   },
   packages: {
     heading: "Select Your Package",
@@ -782,7 +781,15 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
         ? stored.bainaBoxes.brands
         : d.bainaBoxes.brands,
     },
-    bainaBoxSpecial: { ...d.bainaBoxSpecial, ...stored.bainaBoxSpecial },
+    bainaBoxSpecial: (() => {
+      const merged = { ...d.bainaBoxSpecial, ...stored.bainaBoxSpecial };
+      // Content saved before the in-house artwork existed points at the
+      // retired Unsplash default — heal it to the brand illustration.
+      if (merged.image?.includes("photo-1601050690597")) {
+        merged.image = d.bainaBoxSpecial.image;
+      }
+      return merged;
+    })(),
     packages: {
       ...d.packages,
       ...stored.packages,

@@ -1281,6 +1281,9 @@ export interface CategoryVendor {
   /** True for live (account-owned) vendors assembled from the vendor store —
    *  they bypass the Silver carousel cap and are filtered by event city. */
   live?: boolean;
+  /** Admin-pinned "Top 5" brand (Vendor Management → Push to Top 5) — ordered
+   *  first in every roster and always visible on capped tiers. */
+  pinned?: boolean;
   /** Live vendor's base city; curated seeds are city-agnostic. */
   city?: string;
   /** Marketplace tier band(s) this vendor sits in — mirrors the catalog's
@@ -1619,12 +1622,24 @@ export const mealTypeOptions: string[] = [
 
 /** Serving-time meal periods a guest picks in the booking wizard — the feast is
  *  served at one of these, alongside an exact clock time (see `formatClockTime`
- *  / `servingTimeLabel`). Kept to the three core meals; the clock time refines
- *  the slot within the meal. */
+ *  / `servingTimeLabel`). The clock time refines the slot within the meal. */
 export const bookingMealTimes: { id: string; name: string; nameHi: string }[] = [
   { id: "Breakfast", name: "Breakfast", nameHi: "नाश्ता" },
   { id: "Lunch", name: "Lunch", nameHi: "दोपहर का भोजन" },
+  { id: "Hi-tea", name: "Hi-tea", nameHi: "हाई-टी" },
   { id: "Dinner", name: "Dinner", nameHi: "रात्रि भोज" },
+];
+
+/** Food (diet) preference a guest declares for the feast in the booking wizard —
+ *  travels onto the order, invoice ("Food preference") and admin / My-Bookings
+ *  just like the serving time. Optional; the stored value is the English label
+ *  (also used verbatim in English-only surfaces like the invoice/admin), while
+ *  `nameHi` supplies the Hindi label for the wizard's own UI. Mirrors the vendor
+ *  `diet` vocabulary, worded the way guests expect (Pure Veg / Non-veg / Both). */
+export const bookingFoodPreferences: { value: string; nameHi: string }[] = [
+  { value: "Pure Veg", nameHi: "शुद्ध शाकाहारी" },
+  { value: "Non-veg", nameHi: "मांसाहारी" },
+  { value: "Both", nameHi: "दोनों" },
 ];
 
 /** Clock-time slots offered within each meal period, so a guest refines the
@@ -1640,6 +1655,9 @@ export const bookingTimeSlots: Record<string, string[]> = {
     "11:30", "12:00", "12:30", "13:00", "13:30",
     "14:00", "14:30", "15:00", "15:30",
   ],
+  "Hi-tea": [
+    "16:00", "16:30", "17:00", "17:30",
+  ],
   Dinner: [
     "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
     "21:00", "21:30", "22:00", "22:30", "23:00",
@@ -1647,11 +1665,13 @@ export const bookingTimeSlots: Record<string, string[]> = {
 };
 
 /** Map an exact `HH:MM` serving time to the meal period it falls in — morning →
- *  Breakfast, midday/afternoon → Lunch, evening/night → Dinner. The bands line up
- *  with `bookingTimeSlots`, so every offered slot resolves to its own meal. Lets
- *  the vendor catalog turn a picked serving time into a "Serves" match: a vendor
- *  qualifies when its `mealTypes` cover the returned period. Returns "" on empty /
- *  malformed input so callers can treat it as "no time chosen". */
+ *  Breakfast, midday/afternoon → Lunch, evening/night → Dinner. Lets the vendor
+ *  catalog turn a picked serving time into a "Serves" match: a vendor qualifies
+ *  when its `mealTypes` cover the returned period. Hi-tea's late-afternoon slots
+ *  deliberately fold into the adjacent Lunch / Dinner bands here — caterers don't
+ *  advertise a distinct Hi-tea service, so matching them by the neighbouring meal
+ *  keeps the catalog populated. Returns "" on empty / malformed input so callers
+ *  can treat it as "no time chosen". */
 export function mealPeriodForTime(hhmm?: string): string {
   if (!hhmm) return "";
   const [h, m] = hhmm.split(":").map(Number);
@@ -1765,6 +1785,9 @@ export interface Booking {
   /** Exact serving clock time as a 24-hour `HH:MM` string, when the guest set
    *  one alongside the meal period. Absent when only the meal was chosen. */
   eventTime?: string;
+  /** Food (diet) preference the guest declared — "Pure Veg" / "Non-veg" / "Both".
+   *  Absent on legacy orders saved before it was captured. */
+  foodPreference?: string;
   guests: number;
   vendor: string;
   city: string;
@@ -2013,12 +2036,34 @@ export const vendorNotifications: VendorNotification[] = [
 export const registrationCuisines: string[] = [
   "North Indian", "South Indian", "Chinese", "Continental",
   "Mughlai", "Punjabi", "Bengali",
+  // Speciality vendor types the /vendors catalog filters on (sweets houses,
+  // chaat / beverage / decor partners, Baina Box mithai) — so a specialist can
+  // categorise themselves exactly as customers browse them.
+  "Sweets", "Baina Boxes", "Chaat", "Beverages", "Decor",
 ];
 
-export const registrationCounters: string[] = [
-  "Pan Counter", "Chaat Station", "Live Counters", "Dessert Counter",
-  "Service Staff", "Tableware", "Decoration",
-];
+/** The full add-on / counter / service vocabulary a vendor can declare they
+ *  offer — the SAME list the /book wizard's "Extras" step sells to customers,
+ *  so the two can never drift. Derived from `addOns` (id + display fields), the
+ *  single source of truth. */
+export const vendorOfferings = addOns.map((a) => ({
+  id: a.id,
+  name: a.name,
+  nameHi: a.nameHi,
+  icon: a.icon,
+  /** Platform default price — prefilled as the vendor's own rate. */
+  price: a.price,
+  /** true = per plate, false = flat event fee. */
+  perPlate: a.perPlate,
+  category: a.category ?? "counter",
+}));
+
+/** Display names of every offering (live counters + services), used by the
+ *  registration wizard's chip picker. */
+export const registrationCounters: string[] = vendorOfferings.map((o) => o.name);
+
+/** Stable ids of every offering — the allow-list the menu API validates against. */
+export const vendorOfferingIds: string[] = vendorOfferings.map((o) => o.id);
 
 /* ───────────────────────────────────────────────────────────────────────
    GALLERY — a stack of real-event / signature-dish photos used by the

@@ -51,6 +51,8 @@ export interface StoredOrder {
   /** Exact serving clock time as a 24-hour `HH:MM` string, when the guest set
    *  one alongside the meal period. */
   eventTime?: string;
+  /** Food (diet) preference — "Pure Veg" / "Non-veg" / "Both" — when declared. */
+  foodPreference?: string;
   guests: number;
   vendor: string;
   city: string;
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
     date,
     mealTime,
     eventTime,
+    foodPreference,
     eventDateISO,
     packageId,
     guests,
@@ -287,6 +290,9 @@ export async function POST(request: Request) {
       : {}),
     ...(typeof eventTime === "string" && /^\d{1,2}:\d{2}$/.test(eventTime.trim())
       ? { eventTime: eventTime.trim() }
+      : {}),
+    ...(typeof foodPreference === "string" && foodPreference.trim()
+      ? { foodPreference: foodPreference.trim() }
       : {}),
     guests: Number.isFinite(Number(guests)) ? Math.round(Number(guests)) : 0,
     vendor: typeof vendor === "string" ? vendor : "Bhojpatra",

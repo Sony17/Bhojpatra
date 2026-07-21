@@ -3,6 +3,7 @@ import {
   parseVenuePrice,
   formatVenuePrice,
   sanitizeVenueImage,
+  isServableVenueImage,
   isVenuePublic,
   type VenueRecord,
 } from "@/lib/venues";
@@ -75,7 +76,21 @@ export async function PATCH(
   if (str(body.type)) next.type = str(body.type)!;
   if (body.capacity !== undefined) next.capacity = str(body.capacity) ?? "";
   if (body.image !== undefined && str(body.image)) {
-    next.image = sanitizeVenueImage(str(body.image));
+    const image = str(body.image)!;
+    // Reject a photo link the site can't serve rather than silently swapping
+    // in the default — the owner needs to know their image didn't take.
+    if (!isServableVenueImage(image)) {
+      return Response.json(
+        {
+          error:
+            "We can't use that photo link. Paste a direct image address from " +
+            "Unsplash (right-click the photo → Copy Image Address), or leave " +
+            "the field blank for the default photo.",
+        },
+        { status: 400 },
+      );
+    }
+    next.image = image;
   }
   if (str(body.ownerName)) next.ownerName = str(body.ownerName);
   if (str(body.phone)) next.phone = str(body.phone);

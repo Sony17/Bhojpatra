@@ -36,6 +36,7 @@ import {
 } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
 import StarInput from "@/components/reviews/StarInput";
+import { money } from "@/lib/money";
 
 const ALL = "All" as const;
 type Filter = typeof ALL | BookingStatus;
@@ -56,14 +57,6 @@ const OCCASION_HI: Record<string, string> = {
   "Birthday Party": "बर्थडे पार्टी",
   "Corporate Event": "कॉर्पोरेट इवेंट",
 };
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
-
-const formatINR = (value: number) => inr.format(value);
 
 /** Months as they appear in a booking's date label (e.g. "12 Dec 2026"). */
 const MONTHS = [
@@ -231,7 +224,7 @@ export default function MyBookings() {
           />
           <StatCard
             label={t("Amount Due", "बकाया राशि")}
-            value={formatINR(counts.dueAmount)}
+            value={money(counts.dueAmount)}
           />
           <StatCard
             label={t("Completed", "पूर्ण")}
@@ -552,12 +545,12 @@ function PayBalanceButton({ booking }: { booking: StoredBooking }) {
     <ConfirmAction
       tone="solid"
       triggerLabel={t(
-        `Pay Balance · ${formatINR(balance)}`,
-        `शेष भुगतान · ${formatINR(balance)}`,
+        `Pay Balance · ${money(balance)}`,
+        `शेष भुगतान · ${money(balance)}`,
       )}
       prompt={t(
-        `Settle the ${formatINR(balance)} balance now to confirm this booking?`,
-        `इस बुकिंग की पुष्टि के लिए अभी ${formatINR(balance)} शेष राशि चुकाएँ?`,
+        `Settle the ${money(balance)} balance now to confirm this booking?`,
+        `इस बुकिंग की पुष्टि के लिए अभी ${money(balance)} शेष राशि चुकाएँ?`,
       )}
       confirmLabel={t("Yes, pay balance", "हाँ, भुगतान करें")}
       run={() => patchMyBooking(booking.id, { status: "Confirmed" })}
@@ -587,7 +580,7 @@ function EmiSchedule({ plan }: { plan: EmiPlan }) {
             <span className="text-ink-soft">
               {t(`EMI ${it.index}`, `EMI ${it.index}`)} · {it.dueLabel}
             </span>
-            <span className="font-medium text-ink">{formatINR(it.amount)}</span>
+            <span className="font-medium text-ink">{money(it.amount)}</span>
           </li>
         ))}
       </ul>
@@ -624,6 +617,286 @@ function CancelBookingButton({ booking }: { booking: StoredBooking }) {
       confirmLabel={t("Yes, cancel", "हाँ, रद्द करें")}
       run={() => patchMyBooking(booking.id, { status: "Cancelled" })}
     />
+  );
+}
+
+/**
+ * "Request refund" — raises a refund claim against a booking the customer paid
+ * on (POST /api/refunds). Shown once an order is Cancelled or Completed with
+ * money collected; the server derives the amount/method from the booking and
+ * allows one open claim at a time (a second attempt gets a friendly 409).
+ */
+function RequestRefundButton({ booking }: { booking: StoredBooking }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  if (done) {
+    return (
+      <p className="shrink-0 text-sm font-medium text-maroon">
+        <span aria-hidden="true">✓</span>{" "}
+        {t(
+          "Refund requested — our team will review it shortly.",
+          "रिफ़ंड का अनुरोध हो गया — हमारी टीम जल्द समीक्षा करेगी।",
+        )}
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => setOpen(true)}
+        leftIcon={<span aria-hidden="true">↺</span>}
+        className="shrink-0"
+      >
+        {t("Request refund", "रिफ़ंड का अनुरोध करें")}
+      </Button>
+    );
+  }
+
+  const submit = async () => {
+    if (busy) return;
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      setError(
+        t(
+          "Please tell us why you're requesting a refund.",
+          "कृपया बताएं कि आप रिफ़ंड क्यों चाहते हैं।",
+        ),
+      );
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/refunds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id, reason: trimmed }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      if (!res.ok) {
+        setError(
+          json?.error ??
+            t(
+              "Couldn't send your request. Please try again.",
+              "आपका अनुरोध नहीं भेजा जा सका। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      setDone(true);
+    } catch {
+      setError(
+        t(
+          "Couldn't send your request. Please try again.",
+          "आपका अनुरोध नहीं भेजा जा सका। कृपया पुनः प्रयास करें।",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 flex-col items-start gap-1.5">
+      <Textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        rows={2}
+        maxLength={1000}
+        placeholder={t(
+          "Why are you requesting a refund?",
+          "आप रिफ़ंड का अनुरोध क्यों कर रहे हैं?",
+        )}
+        aria-label={t("Refund reason", "रिफ़ंड का कारण")}
+        className="w-72"
+      />
+      <div className="flex flex-nowrap items-center gap-2.5">
+        <Button variant="primary" onClick={submit} disabled={busy} className="shrink-0">
+          {busy
+            ? t("Sending…", "भेज रहे हैं…")
+            : t("Send request", "अनुरोध भेजें")}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setOpen(false);
+            setError("");
+          }}
+          disabled={busy}
+          className="shrink-0"
+        >
+          {t("Not yet", "अभी नहीं")}
+        </Button>
+      </div>
+      {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+    </div>
+  );
+}
+
+/* "Get help" ticket categories — the `en` label is the canonical value sent to
+   /api/support (it must match the server's TICKET_CATEGORIES whitelist); `hi`
+   is display-only. */
+const HELP_CATEGORIES: { en: string; hi: string }[] = [
+  { en: "Booking", hi: "बुकिंग" },
+  { en: "Payment", hi: "भुगतान" },
+  { en: "Refund", hi: "रिफ़ंड" },
+  { en: "Vendor", hi: "वेंडर" },
+  { en: "Billing", hi: "बिलिंग" },
+  { en: "Technical", hi: "तकनीकी" },
+  { en: "General", hi: "सामान्य" },
+];
+
+/**
+ * "Get help" — raises a support ticket against this booking (POST
+ * /api/support), which lands in the admin Support view. The customer's name
+ * and email come from the session server-side, so the form only asks what the
+ * problem is about and a description.
+ */
+function GetHelpButton({ booking }: { booking: StoredBooking }) {
+  const { lang, t } = useLang();
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState("Booking");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [ticketId, setTicketId] = useState("");
+
+  if (ticketId) {
+    return (
+      <p className="shrink-0 text-sm font-medium text-maroon">
+        <span aria-hidden="true">✓</span>{" "}
+        {t(
+          `Ticket ${ticketId} raised — our team will get back to you soon.`,
+          `टिकट ${ticketId} बन गया — हमारी टीम जल्द आपसे संपर्क करेगी।`,
+        )}
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => setOpen(true)}
+        leftIcon={<span aria-hidden="true">🎧</span>}
+        className="shrink-0"
+      >
+        {t("Get help", "मदद चाहिए")}
+      </Button>
+    );
+  }
+
+  const submit = async () => {
+    if (busy) return;
+    if (!subject.trim() || !message.trim()) {
+      setError(
+        t(
+          "Please add a subject and describe the issue.",
+          "कृपया विषय लिखें और समस्या बताएं।",
+        ),
+      );
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          category,
+          subject: subject.trim(),
+          message: message.trim(),
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { error?: string; ticket?: { id: string } }
+        | null;
+      if (!res.ok || !json?.ticket) {
+        setError(
+          json?.error ??
+            t(
+              "Couldn't send your request. Please try again.",
+              "आपका अनुरोध नहीं भेजा जा सका। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      setTicketId(json.ticket.id);
+    } catch {
+      setError(
+        t(
+          "Couldn't send your request. Please try again.",
+          "आपका अनुरोध नहीं भेजा जा सका। कृपया पुनः प्रयास करें।",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 flex-col items-start gap-1.5">
+      <div className="no-scrollbar flex w-72 flex-nowrap gap-2 overflow-x-auto">
+        {HELP_CATEGORIES.map((c) => (
+          <Chip
+            key={c.en}
+            selected={category === c.en}
+            onClick={() => setCategory(c.en)}
+            className="shrink-0 whitespace-nowrap"
+          >
+            {lang === "hi" ? c.hi : c.en}
+          </Chip>
+        ))}
+      </div>
+      <Input
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        maxLength={120}
+        placeholder={t("What's it about?", "किस बारे में है?")}
+        aria-label={t("Subject", "विषय")}
+        className="w-72"
+      />
+      <Textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder={t("Describe the issue…", "समस्या बताएं…")}
+        aria-label={t("Message", "संदेश")}
+        className="w-72"
+      />
+      <div className="flex flex-nowrap items-center gap-2.5">
+        <Button variant="primary" onClick={submit} disabled={busy} className="shrink-0">
+          {busy
+            ? t("Sending…", "भेज रहे हैं…")
+            : t("Raise ticket", "टिकट बनाएं")}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setOpen(false);
+            setError("");
+          }}
+          disabled={busy}
+          className="shrink-0"
+        >
+          {t("Not now", "अभी नहीं")}
+        </Button>
+      </div>
+      {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+    </div>
   );
 }
 
@@ -701,19 +974,19 @@ function BookingCard({
                 {t("Total", "कुल राशि")}
               </span>
               <span className="font-display text-lg font-semibold text-ink">
-                {formatINR(booking.amount)}
+                {money(booking.amount)}
               </span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between text-sm">
               <span className="text-ink-soft">{t("Paid", "भुगतान")}</span>
               <span className="font-medium text-maroon">
-                {formatINR(booking.paid)}
+                {money(booking.paid)}
               </span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between text-sm">
               <span className="text-ink-soft">{t("Balance", "बकाया")}</span>
               <span className="font-medium text-ink">
-                {formatINR(balance)}
+                {money(balance)}
               </span>
             </div>
 
@@ -753,6 +1026,9 @@ function BookingCard({
         {(booking.status === "Pending" || booking.status === "Confirmed") && (
           <CancelBookingButton booking={booking} />
         )}
+        {(booking.status === "Cancelled" || booking.status === "Completed") &&
+          booking.paid > 0 && <RequestRefundButton booking={booking} />}
+        <GetHelpButton booking={booking} />
 
         {/* Status actions, right-aligned: review a completed order plus the
             Confirmed ⇄ Completed toggle. */}
@@ -929,8 +1205,8 @@ function BookingDetailsModal({
   const waMessage =
     `${t("Here's my Bhojpatra invoice", "यह मेरा भोजपत्र इनवॉइस है")} — ${booking.occasion} (${booking.id})\n` +
     `${t("Date", "तिथि")}: ${booking.date} · ${booking.guests} ${t("guests", "मेहमान")}\n` +
-    `${t("Total", "कुल")}: ${formatINR(booking.amount)}` +
-    (balance > 0 ? ` · ${t("Balance", "बकाया")}: ${formatINR(balance)}` : "") +
+    `${t("Total", "कुल")}: ${money(booking.amount)}` +
+    (balance > 0 ? ` · ${t("Balance", "बकाया")}: ${money(balance)}` : "") +
     `\n${t("View & download", "देखें और डाउनलोड करें")}: ${shareUrl}`;
   const waHref = `https://wa.me/?text=${encodeURIComponent(waMessage)}`;
 

@@ -55,6 +55,7 @@ import {
   menuCategories,
   bookingMealTimes,
   bookingTimeSlots,
+  bookingFoodPreferences,
   formatClockTime,
   servingTimeLabel,
   packageCategories,
@@ -98,6 +99,7 @@ import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { Button, Stepper } from "@/components/ui";
+import { inr, money } from "@/lib/money";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -156,6 +158,7 @@ type BookingDraft = {
   eventDate: string;
   mealTime: string;
   eventTime: string;
+  foodPreference: string;
   venue: string;
   venueFee: number;
   selectedAddOns: string[];
@@ -190,9 +193,6 @@ function clearBookingDraft(): void {
     /* ignore */
   }
 }
-
-const inr = new Intl.NumberFormat("en-IN");
-const money = (n: number) => `₹${inr.format(Math.round(n))}`;
 
 /** Whole days from today (local midnight) until a `YYYY-MM-DD` date.
  *  Returns null for an empty/invalid date. */
@@ -309,6 +309,9 @@ export default function BookingWizard() {
   // 24-hour `HH:MM` string from `bookingTimeSlots`, scoped to the chosen meal.
   const [mealTime, setMealTime] = useState<string>("");
   const [eventTime, setEventTime] = useState<string>("");
+  // Food (diet) preference — Pure Veg / Non-veg / Both. Optional; travels onto the
+  // order, invoice ("Food preference") and admin / My-Bookings alongside the meal.
+  const [foodPreference, setFoodPreference] = useState<string>("");
   const [cityId, setCityId] = useState<string>("");
   // Free-text location typed when the customer picks "Other" (their city/state
   // isn't in the admin-managed list).
@@ -419,6 +422,7 @@ export default function BookingWizard() {
       if (d.eventDate) setEventDate(d.eventDate);
       if (d.mealTime) setMealTime(d.mealTime);
       if (d.eventTime) setEventTime(d.eventTime);
+      if (d.foodPreference) setFoodPreference(d.foodPreference);
       if (d.venue) setVenue(d.venue);
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
@@ -489,6 +493,14 @@ export default function BookingWizard() {
       pkgRequested && date !== null && !packageAvailable(pkg!, date);
     if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
     if (stepParam === "menu" && !pkgTooSoon) setStep(2);
+    // A Mehndi booking is a Single Stall order by design — the occasion
+    // deep-link (e.g. the home page's Mehndi card) lands straight in the
+    // custom plan's menu builder instead of the fixed-tier chooser. An
+    // explicit ?package= tier deep-link still wins.
+    if (occ === "mehndi" && !pkgRequested) {
+      setPackageId("custom");
+      setStep(2);
+    }
     // A brand page ("book this stall") hands off a specific vendor. That's a
     // Single Stall (one-vendor) order, so force the custom plan and drop the
     // guest onto the Menu step; the resolve effect pre-selects the vendor and
@@ -524,6 +536,7 @@ export default function BookingWizard() {
       eventDate,
       mealTime,
       eventTime,
+      foodPreference,
       venue,
       venueFee,
       selectedAddOns,
@@ -545,6 +558,7 @@ export default function BookingWizard() {
     eventDate,
     mealTime,
     eventTime,
+    foodPreference,
     venue,
     venueFee,
     selectedAddOns,
@@ -956,19 +970,6 @@ export default function BookingWizard() {
     singleStall &&
     menuComplete &&
     menuStepCategories.every((c) => !categoryComplete(c));
-  // Courses still needing a decision (not built and not skipped), per step — used
-  // to tell the guest exactly what's left before "Continue" and to jump them
-  // there. Kept separate so each step only nags about its own courses.
-  const menuIncompleteCats = menuStepCategories.filter((c) => !categoryResolved(c));
-  const firstMenuIncomplete = menuStepCategories.findIndex((c) => !categoryResolved(c));
-  const menuIncompleteNames = menuIncompleteCats.map((c) =>
-    lang === "hi" ? c.nameHi : c.name,
-  );
-  const liveIncompleteCats = liveStallCategories.filter((c) => !categoryResolved(c));
-  const firstLiveIncomplete = liveStallCategories.findIndex((c) => !categoryResolved(c));
-  const liveIncompleteNames = liveIncompleteCats.map((c) =>
-    lang === "hi" ? c.nameHi : c.name,
-  );
 
   // Skip a stall (Single Stall plan): drop any picks so it bills nothing and
   // never counts as "built", then mark it skipped so it stops blocking Continue.
@@ -1436,6 +1437,7 @@ export default function BookingWizard() {
       `Package:  ${pkg ? pkg.name : "-"}`,
       `Date:     ${eventDate || "-"}`,
       `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
+      `Food:     ${foodPreference || "-"}`,
       `City:     ${cityObj ? cityObj.name : "-"}`,
       `Venue:    ${venue || "-"}`,
       `Guests:   ${guests}`,
@@ -1550,6 +1552,7 @@ export default function BookingWizard() {
       // Meal period + clock time (e.g. "Dinner · 7:30 PM"); omitted when unset so
       // the invoice's "Serving time" line only shows for orders that carry one.
       servingTime: servingTimeLabel(mealTime, eventTime) || undefined,
+      foodPreference: foodPreference || undefined,
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
@@ -1624,6 +1627,7 @@ export default function BookingWizard() {
       (servingTimeLabel(mealTime, eventTime)
         ? `Serving: ${servingTimeLabel(mealTime, eventTime)}\n`
         : "") +
+      (foodPreference ? `Food: ${foodPreference}\n` : "") +
       `City: ${city ? city.name : "-"}\n` +
       `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
@@ -1802,6 +1806,8 @@ export default function BookingWizard() {
           // Sent only when set (the server drops blank / malformed values).
           ...(mealTime ? { mealTime } : {}),
           ...(eventTime ? { eventTime } : {}),
+          // Food (diet) preference — Pure Veg / Non-veg / Both. Sent only when set.
+          ...(foodPreference ? { foodPreference } : {}),
           packageId,
           leadDays: effectiveLeadDays,
           guests,
@@ -1921,6 +1927,8 @@ export default function BookingWizard() {
       setMealTime={setMealTime}
       eventTime={eventTime}
       setEventTime={setEventTime}
+      foodPreference={foodPreference}
+      setFoodPreference={setFoodPreference}
       cityId={cityId}
       setCityId={setCityId}
       customCity={customCity}
@@ -2088,7 +2096,13 @@ export default function BookingWizard() {
                   "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
                 )}
                 multiVendor={multiVendor}
-                maxVendors={packageId === "silver" ? 5 : undefined}
+                // Cap by band, not package id — covers Silver/Gold packages
+                // AND the Single Stall flow once its Silver/Gold lens is set.
+                maxVendors={
+                  effectiveTier === "Silver" || effectiveTier === "Gold"
+                    ? 5
+                    : undefined
+                }
                 categories={menuStepCategories}
                 activeCat={activeCat}
                 setActiveCat={setActiveCat}
@@ -2116,6 +2130,11 @@ export default function BookingWizard() {
                   "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
                 )}
                 multiVendor={counterMultiVendor}
+                maxVendors={
+                  effectiveTier === "Silver" || effectiveTier === "Gold"
+                    ? 5
+                    : undefined
+                }
                 categories={liveStallCategories}
                 activeCat={liveCat}
                 setActiveCat={setLiveCat}
@@ -2331,17 +2350,13 @@ export default function BookingWizard() {
           t={t}
           categories={menuStepCategories}
           activeCat={activeCat}
-          setActiveCat={setActiveCat}
           allResolved={menuComplete}
-          incompleteNames={menuIncompleteNames}
-          firstIncomplete={firstMenuIncomplete}
           singleStall={singleStall}
           isSkipped={isSkipped}
           unskipCat={unskipCat}
           onPrev={menuPrev}
           onNext={menuNext}
           onSkipCurrent={skipCurrentStall}
-          continueLabel={t("Continue to Live Stall", "लाइव स्टॉल तक जारी रखें")}
           extraBanner={
             menuFullySkipped ? (
               <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
@@ -2365,17 +2380,13 @@ export default function BookingWizard() {
             t={t}
             categories={liveStallCategories}
             activeCat={liveCat}
-            setActiveCat={setLiveCat}
             allResolved={liveComplete}
-            incompleteNames={liveIncompleteNames}
-            firstIncomplete={firstLiveIncomplete}
             singleStall={singleStall}
             isSkipped={isSkipped}
             unskipCat={unskipCat}
             onPrev={livePrev}
             onNext={liveNext}
             onSkipCurrent={skipCurrentLiveStall}
-            continueLabel={t("Continue to Add-ons", "एक्स्ट्रा तक जारी रखें")}
           />
         ) : (
           // Package with no live stalls (Silver) — nothing to pick here, so just
@@ -2498,82 +2509,42 @@ function SectionHead({
    Walks a step's courses tab-by-tab and spills into the wizard at the edges:
    Back off the first course returns to the previous step, Continue past the
    last advances to the next. Shared by the Menu (2) and Live Stall (3) steps so
-   both behave identically — a "still to finish" jump banner, per-stall skip on
-   the Single Stall plan, and a Continue that names where it leads. */
+   both behave identically — a clean Previous / Skip / Next row, per-stall skip
+   on the Single Stall plan, and a Continue that's disabled until the step's
+   courses are all resolved. */
 function MenuStepNav({
   t,
   categories,
   activeCat,
-  setActiveCat,
   allResolved,
-  incompleteNames,
-  firstIncomplete,
   singleStall,
   isSkipped,
   unskipCat,
   onPrev,
   onNext,
   onSkipCurrent,
-  continueLabel,
   extraBanner,
 }: {
   t: (en: string, hi: string) => string;
   categories: MenuCategory[];
   activeCat: number;
-  setActiveCat: (n: number) => void;
   allResolved: boolean;
-  incompleteNames: string[];
-  firstIncomplete: number;
   singleStall: boolean;
   isSkipped: (catId: string) => boolean;
   unskipCat: (catId: string) => void;
   onPrev: () => void;
   onNext: () => void;
   onSkipCurrent: () => void;
-  continueLabel: string;
   extraBanner?: ReactNode;
 }) {
   const atLast = activeCat >= categories.length - 1;
   const activeId = categories[activeCat]?.id ?? "";
   return (
     <div className="mt-10">
-      {/* When the step isn't finished, name the unfinished courses and let the
-          guest jump straight to the first — a silently-disabled Continue gives
-          no clue what's left to pick. */}
-      {!allResolved && incompleteNames.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setActiveCat(Math.max(0, firstIncomplete))}
-          className="focus-ring mb-4 flex w-full items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-left text-sm text-ink-soft transition hover:bg-cream/60"
-        >
-          <span aria-hidden="true" className="text-maroon">
-            ★
-          </span>
-          <span>
-            {t("Still to finish:", "अभी बाकी:")}{" "}
-            <span className="font-semibold text-maroon">
-              {incompleteNames.join(", ")}
-            </span>
-            {". "}
-            {singleStall
-              ? t(
-                  "Tap to jump there, or skip the stalls you don't want.",
-                  "वहाँ जाने के लिए टैप करें, या जो स्टॉल नहीं चाहिए उन्हें छोड़ दें।",
-                )
-              : t(
-                  "Tap to jump to the next course and pick the rest.",
-                  "अगले कोर्स पर जाने और बाकी चुनने के लिए टैप करें।",
-                )}
-          </span>
-        </button>
-      )}
       {extraBanner}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="secondary" onClick={onPrev}>
-          ←{" "}
-          {activeCat > 0
-            ? t("Prev Category", "पिछली श्रेणी")
-            : t("Back", "पीछे")}
+          ← {t("Previous", "पिछला")}
         </Button>
         {/* Single Stall lets a guest opt out of a course entirely — skip it and
             slide to the next stall, or undo if they skipped by mistake. */}
@@ -2585,23 +2556,20 @@ function MenuStepNav({
                 if (activeId) unskipCat(activeId);
               }}
             >
-              {t("Undo skip", "छोड़ना पूर्ववत करें")}
+              {t("Undo", "पूर्ववत")}
             </Button>
           ) : (
             <Button variant="secondary" onClick={onSkipCurrent}>
-              {t("Skip this stall", "यह स्टॉल छोड़ें")}
+              {t("Skip", "छोड़ें")}
             </Button>
           ))}
         {!atLast ? (
           <Button onClick={onNext}>
-            {singleStall
-              ? t("Next stall", "अगला स्टॉल")
-              : t("Next Category", "अगली श्रेणी")}{" "}
-            →
+            {t("Next", "अगला")} →
           </Button>
         ) : (
           <Button onClick={onNext} disabled={!allResolved}>
-            {continueLabel} →
+            {t("Continue", "जारी रखें")} →
           </Button>
         )}
       </div>
@@ -2706,6 +2674,8 @@ function EventBar({
   setMealTime,
   eventTime,
   setEventTime,
+  foodPreference,
+  setFoodPreference,
   cityId,
   setCityId,
   customCity,
@@ -2733,6 +2703,8 @@ function EventBar({
   setMealTime: (v: string) => void;
   eventTime: string;
   setEventTime: (v: string) => void;
+  foodPreference: string;
+  setFoodPreference: (v: string) => void;
   cityId: string;
   setCityId: (v: string) => void;
   customCity: string;
@@ -2832,10 +2804,15 @@ function EventBar({
   const servingName = [mealLabel, formatClockTime(eventTime)]
     .filter(Boolean)
     .join(" · ");
+  // Food preference for the collapsed summary — the stored value is the English
+  // label, so map it to the Hindi one for the HI locale.
+  const foodObj = bookingFoodPreferences.find((f) => f.value === foodPreference);
+  const foodName = foodObj ? (lang === "hi" ? foodObj.nameHi : foodObj.value) : "";
   const summaryParts = [
     occasionName,
     dateName,
     servingName,
+    foodName,
     cityName,
     showGuests ? `${guests} ${t("guests", "मेहमान")}` : "",
   ].filter(Boolean);
@@ -2915,12 +2892,12 @@ function EventBar({
       <div
         className={
           "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 " +
-          // Web view keeps the whole brief on one row (serving-time selects
-          // folded in below). Guests gets the widest share so its stepper +
-          // slider bar have room, while Meal/Time are trimmed narrower.
+          // Web view keeps the whole brief on one row (serving-time + food-pref
+          // selects folded in below). Guests gets the widest share so its stepper +
+          // slider bar have room, while Meal / Time / Food are trimmed narrower.
           (showGuests
-            ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr] "
-            : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr] ") +
+            ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr_0.85fr] "
+            : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
           (collapsible && !open ? "hidden lg:grid" : "")
         }
       >
@@ -3160,6 +3137,29 @@ function EventBar({
             options={(bookingTimeSlots[mealTime] ?? []).map((hhmm) => ({
               value: hhmm,
               label: formatClockTime(hhmm),
+            }))}
+          />
+        </div>
+
+        {/* Food preference — Pure Veg / Non-veg / Both. Optional; rides onto the
+            order, invoice ("Food preference") and admin / My-Bookings. */}
+        <div className="block">
+          <span className={labelClass}>
+            {t("Food", "खाना")}{" "}
+            <span className="font-medium normal-case tracking-normal text-ink/40">
+              ({t("optional", "वैकल्पिक")})
+            </span>
+          </span>
+          <ThemedSelect
+            value={foodPreference}
+            onChange={setFoodPreference}
+            ariaLabel={t("Food preference", "खाने की पसंद")}
+            placeholder={t("Select preference", "पसंद चुनें")}
+            className="mt-1.5"
+            buttonClassName={selectButtonClass}
+            options={bookingFoodPreferences.map((f) => ({
+              value: f.value,
+              label: lang === "hi" ? f.nameHi : f.value,
             }))}
           />
         </div>
@@ -3504,41 +3504,75 @@ function StepMenu({
   vendorRatings: VendorRatings;
 }) {
   const vendorScrollRef = useRef<HTMLDivElement>(null);
-  // "Show more" lets guests expand past the curated cap (Silver only). Reset
-  // whenever the cap itself changes (e.g. switching away from / back to Silver)
-  // so the roster doesn't stay expanded on a package that never capped it.
+  // "Explore more" lets guests expand past the shortlist cap. Collapse it again
+  // whenever the cap or the course changes, so a category never opens already
+  // expanded from a previous one.
   const [showAllVendors, setShowAllVendors] = useState(false);
-  useEffect(() => setShowAllVendors(false), [maxVendors]);
+  useEffect(() => setShowAllVendors(false), [maxVendors, activeCat]);
   const [vendorSearch, setVendorSearch] = useState("");
+  // The filter is reveal-on-demand (see toggle by the "Step A" heading), so it
+  // stays collapsed until the guest asks for it.
+  const [showSearch, setShowSearch] = useState(false);
+  // A query only matches the active course's roster, so collapse & clear it
+  // whenever the guest switches courses — carrying it across tabs would strand
+  // results behind an empty state.
+  useEffect(() => {
+    setShowSearch(false);
+    setVendorSearch("");
+  }, [activeCat]);
   // Guard against a transient out-of-range index right after the package (and
   // thus the category list) changes, before the parent's clamp effect runs.
   const cat = categories[activeCat] ?? categories[0];
-  // Silver advertises a fixed set of curated vendors — the cap applies to the
-  // seed roster only. Live caterers who published a menu always stay visible,
-  // whatever the package (they'd otherwise never surface on Silver, since the
-  // curated seeds sort first). "Show more" lifts the cap on demand.
-  const seedVendors = cat.vendors.filter((v) => !v.live);
-  const cap = maxVendors && !showAllVendors ? maxVendors : undefined;
-  const hiddenVendorCount = maxVendors
-    ? Math.max(0, seedVendors.length - maxVendors)
-    : 0;
-  const visibleVendors = maxVendors
-    ? [...seedVendors.slice(0, cap), ...cat.vendors.filter((v) => v.live)]
-    : cat.vendors;
+  // Every course caps its roster to a scannable shortlist: admin-pinned "Top 5"
+  // brands lead, seed brands fill the remaining slots, and live caterers (who
+  // published a menu) always stay visible whatever the tier. Silver & Gold pass
+  // their own curated cap; every other package defaults to five. "Explore more"
+  // lifts the cap on demand, and an active search scans the *full* roster so the
+  // cap never hides a match.
+  const VENDOR_CAP = maxVendors ?? 5;
+  const pinnedVendors = cat.vendors.filter((v) => v.pinned);
+  const seedVendors = cat.vendors.filter((v) => !v.live && !v.pinned);
+  const liveVendors = cat.vendors.filter((v) => v.live && !v.pinned);
+  // Full roster in display order — pinned, then seed, then live.
+  const orderedVendors = [...pinnedVendors, ...seedVendors, ...liveVendors];
+  const seedSlots = Math.max(0, VENDOR_CAP - pinnedVendors.length);
+  const hiddenVendorCount = Math.max(0, seedVendors.length - seedSlots);
+  // Collapsed view: the leading shortlist. Expanded: the whole roster.
+  const cappedVendors = showAllVendors
+    ? orderedVendors
+    : [...pinnedVendors, ...seedVendors.slice(0, seedSlots), ...liveVendors];
+  // Offer the filter only when the full roster runs past five — a short
+  // shortlist scans faster by eye than by typing.
+  const searchable = orderedVendors.length > 5;
+  const toggleSearch = () => {
+    if (showSearch) {
+      // Closing removes the filter so no hidden query lingers on the roster.
+      setVendorSearch("");
+      setShowSearch(false);
+    } else {
+      setShowSearch(true);
+    }
+  };
   const vSearchQuery = vendorSearch.trim().toLowerCase();
-  const filteredVendors = visibleVendors.filter((v) => {
-    if (!vSearchQuery) return true;
-    const nameMatch = v.name.toLowerCase().includes(vSearchQuery);
-    const itemMatch = v.items?.some((item) =>
-      item.name.toLowerCase().includes(vSearchQuery),
-    );
-    const cuisineMatch = Array.isArray((v as any).cuisines)
-      ? (v as any).cuisines.some((c: string) => c.toLowerCase().includes(vSearchQuery))
-      : typeof (v as any).cuisine === "string"
-        ? (v as any).cuisine.toLowerCase().includes(vSearchQuery)
-        : false;
-    return nameMatch || itemMatch || cuisineMatch;
-  });
+  // With a query, scan the full roster (bypassing the cap so hidden brands are
+  // still findable); otherwise show the capped shortlist as-is.
+  const filteredVendors = (vSearchQuery ? orderedVendors : cappedVendors).filter(
+    (v) => {
+      if (!vSearchQuery) return true;
+      const nameMatch = v.name.toLowerCase().includes(vSearchQuery);
+      const itemMatch = v.items?.some((item) =>
+        item.name.toLowerCase().includes(vSearchQuery),
+      );
+      const cuisineMatch = Array.isArray((v as any).cuisines)
+        ? (v as any).cuisines.some((c: string) =>
+            c.toLowerCase().includes(vSearchQuery),
+          )
+        : typeof (v as any).cuisine === "string"
+          ? (v as any).cuisine.toLowerCase().includes(vSearchQuery)
+          : false;
+      return nameMatch || itemMatch || cuisineMatch;
+    },
+  );
   const allowance = allowanceFor(cat.id); // effective total (scaled per vendor)
   const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
   const selectedIds = categoryVendor[cat.id] ?? [];
@@ -3606,41 +3640,6 @@ function StepMenu({
           </span>
         </p>
       )}
-
-      {/* Search Bar — filter vendors live by name or cuisine */}
-      <div className="relative mb-5">
-        <input
-          type="search"
-          value={vendorSearch}
-          onChange={(e) => setVendorSearch(e.target.value)}
-          placeholder={t(
-            "Search vendors by name or cuisine...",
-            "नाम या व्यंजन से वेंडर खोजें...",
-          )}
-          aria-label={t(
-            "Search vendors by name or cuisine",
-            "नाम या व्यंजन से वेंडर खोजें",
-          )}
-          className="w-full rounded-2xl border border-cream-3 bg-white px-4 py-2.5 pr-10 text-sm text-ink shadow-sm transition placeholder:text-ink-soft/60 focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
-        />
-        {vendorSearch ? (
-          <button
-            type="button"
-            onClick={() => setVendorSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-soft transition hover:text-maroon"
-            aria-label={t("Clear search", "खोज साफ़ करें")}
-          >
-            ✕
-          </button>
-        ) : (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-soft/50"
-          >
-            🔍
-          </span>
-        )}
-      </div>
 
       {/* Category tabs */}
       <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
@@ -3715,11 +3714,61 @@ function StepMenu({
       )}
 
       {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
-      <h3 className="mt-7 font-sans text-2xl font-semibold text-maroon">
-        {multiVendor
-          ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
-          : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
-      </h3>
+      <div className="mt-7 flex items-center justify-between gap-3">
+        <h3 className="font-sans text-2xl font-semibold text-maroon">
+          {multiVendor
+            ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
+            : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
+        </h3>
+        {/* Filter is offered only when the roster is long enough to be worth
+            typing over — a short shortlist stays clutter-free. */}
+        {searchable && (
+          <button
+            type="button"
+            onClick={toggleSearch}
+            aria-expanded={showSearch}
+            className={
+              "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition " +
+              (showSearch
+                ? "border-maroon bg-maroon text-cream"
+                : "border-cream-3 bg-white text-ink-soft hover:border-maroon hover:text-maroon")
+            }
+          >
+            <span aria-hidden="true">🔍</span>
+            {showSearch ? t("Close", "बंद करें") : t("Search", "खोजें")}
+          </button>
+        )}
+      </div>
+
+      {searchable && showSearch && (
+        <div className="relative mt-3">
+          <input
+            type="search"
+            autoFocus
+            value={vendorSearch}
+            onChange={(e) => setVendorSearch(e.target.value)}
+            placeholder={t(
+              "Search vendors by name or cuisine...",
+              "नाम या व्यंजन से वेंडर खोजें...",
+            )}
+            aria-label={t(
+              "Search vendors by name or cuisine",
+              "नाम या व्यंजन से वेंडर खोजें",
+            )}
+            className="w-full rounded-2xl border border-cream-3 bg-white px-4 py-2.5 pr-10 text-sm text-ink shadow-sm transition placeholder:text-ink-soft/60 focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
+          />
+          {vendorSearch && (
+            <button
+              type="button"
+              onClick={() => setVendorSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-soft transition hover:text-maroon"
+              aria-label={t("Clear search", "खोज साफ़ करें")}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
       <div className="relative mt-3">
       {filteredVendors.length === 0 ? (
         <p className="py-8 text-center text-sm font-medium text-ink-soft">
@@ -3836,9 +3885,10 @@ function StepMenu({
         )}
       </div>
 
-      {/* Show more — Silver curates a capped roster; let guests expand it to
-          browse the rest of the seed vendors on demand. */}
-      {hiddenVendorCount > 0 && (
+      {/* Explore more — each course shows a capped shortlist; let guests expand
+          it to browse the rest of the roster on demand. Hidden while a search is
+          active, since the query already scans the full roster. */}
+      {hiddenVendorCount > 0 && !vSearchQuery && (
         <div className="mt-4 flex justify-center">
           <button
             type="button"
@@ -3848,8 +3898,8 @@ function StepMenu({
             {showAllVendors
               ? t("Show fewer vendors", "कम वेंडर दिखाएं")
               : t(
-                  `Show ${hiddenVendorCount} more vendors`,
-                  `${hiddenVendorCount} और वेंडर दिखाएं`,
+                  `Explore ${hiddenVendorCount} more vendors`,
+                  `${hiddenVendorCount} और वेंडर देखें`,
                 )}
             <span aria-hidden="true" className="text-base leading-none">
               {showAllVendors ? "↑" : "↓"}
@@ -3882,7 +3932,7 @@ function StepMenu({
               </h3>
               <span
                 className={
-                  "eyebrow text-xs font-semibold " +
+                  "text-lg font-bold " +
                   (picks.length >= allowance ? "text-maroon" : "text-ink-soft")
                 }
               >
@@ -5933,6 +5983,17 @@ function SummaryPanel({
             </p>
           </div>
         </div>
+
+        {/* Ground the big total in its per-head basis — headcount × plate rate is
+            why a large-function estimate runs into lakhs, not a scary lump sum. */}
+        {guests > 0 && perPlate > 0 && (
+          <p className="mt-1.5 text-xs text-ink-soft">
+            {t(
+              `${money(perPlate)} / plate · ${inr.format(guests)} guests`,
+              `${money(perPlate)} / प्लेट · ${inr.format(guests)} मेहमान`,
+            )}
+          </p>
+        )}
 
         {/* Toggle the itemised bill — collapsed by default. */}
         <button

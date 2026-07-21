@@ -39,9 +39,7 @@ import { StarIcon } from "@/components/reviews/reviewDisplay";
 import VenueReviews from "@/components/venues/VenueReviews";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { Button, Card, Container, Input, Select, AppBar } from "@/components/ui";
-
-const inr = new Intl.NumberFormat("en-IN");
-const money = (n: number) => `₹${inr.format(Math.round(n))}`;
+import { money } from "@/lib/money";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",

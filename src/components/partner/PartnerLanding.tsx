@@ -81,8 +81,12 @@ export default function PartnerLanding() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function selectType(title: string) {
-    update("partnerType", title);
+  /** Each partner-type card goes straight to registration — caterers sign up
+   *  as vendors, everyone else as a partner with their role pre-selected. */
+  function signupHref(id: string) {
+    return id === "vendor"
+      ? "/signup?type=vendor"
+      : `/signup?type=partner&role=${id}`;
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -126,7 +130,7 @@ export default function PartnerLanding() {
             <p className="eyebrow text-[0.7rem] font-semibold text-maroon">
               {t("Partner With Bhojpatra", "Bhojpatra के साथ जुड़ें")}
             </p>
-            <h1 className="font-display mt-5 text-[2.6rem] font-bold leading-[1.04] tracking-tight text-ink sm:text-6xl lg:text-7xl">
+            <h1 className="font-display mt-5 text-[1.3rem] font-bold leading-[1.04] tracking-tight text-ink sm:text-3xl lg:text-4xl">
               {t(
                 "Grow your business with India's feast platform",
                 "भारत के फीस्ट प्लेटफ़ॉर्म के साथ अपना व्यवसाय बढ़ाएँ"
@@ -193,8 +197,8 @@ export default function PartnerLanding() {
             eyebrow={t("Who Can Partner", "कौन जुड़ सकता है")}
             title={t("Choose how you want to partner", "चुनें कि आप कैसे जुड़ना चाहते हैं")}
             lede={t(
-              "Pick the path that fits you — we'll pre-fill your enquiry below.",
-              "अपने लिए सही विकल्प चुनें — हम नीचे आपकी पूछताछ पहले से भर देंगे।"
+              "Pick the path that fits you — we'll take you straight to registration.",
+              "अपने लिए सही विकल्प चुनें — हम आपको सीधे रजिस्ट्रेशन पर ले जाएँगे।"
             )}
           />
         </Reveal>
@@ -204,39 +208,30 @@ export default function PartnerLanding() {
           stagger
           className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
-          {partnerTypes.map((type: PartnerType) => {
-            const selected = form.partnerType === type.title;
-            return (
-              <li key={type.id}>
-                <button
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => selectType(type.title)}
-                  className={`flex h-full w-full flex-col rounded-hero border bg-white p-5 text-left transition duration-200 sm:p-6 ${
-                    selected
-                      ? "border-maroon shadow-pop"
-                      : "border-maroon/10 hover:-translate-y-1 hover:border-maroon/25 hover:shadow-pop"
-                  }`}
+          {partnerTypes.map((type: PartnerType) => (
+            <li key={type.id}>
+              <Link
+                href={signupHref(type.id)}
+                className="flex h-full w-full flex-col rounded-hero border border-maroon/10 bg-white p-5 text-left transition duration-200 hover:-translate-y-1 hover:border-maroon/25 hover:shadow-pop sm:p-6"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-maroon/10 bg-cream/40 text-xl"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-maroon/10 bg-cream/40 text-xl"
-                  >
-                    {type.icon}
-                  </span>
-                  <h3 className="font-display mt-5 text-base font-semibold text-ink">
-                    {type.title}
-                  </h3>
-                  <p className="mt-1 text-xs font-medium uppercase tracking-wide text-maroon">
-                    {type.subtitle}
-                  </p>
-                  <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-                    {type.description}
-                  </p>
-                </button>
-              </li>
-            );
-          })}
+                  {type.icon}
+                </span>
+                <h3 className="font-display mt-5 text-base font-semibold text-ink">
+                  {type.title}
+                </h3>
+                <p className="mt-1 text-xs font-medium uppercase tracking-wide text-maroon">
+                  {type.subtitle}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+                  {type.description}
+                </p>
+              </Link>
+            </li>
+          ))}
         </Reveal>
       </section>
 

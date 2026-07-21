@@ -445,6 +445,11 @@ export default function VendorCatalog() {
       }
     >
       <div className="mx-auto max-w-7xl">
+      {/* Bhojpatra's signature Baina Box promotion — pinned above the catalogue. */}
+      <div className="mb-6 mt-2">
+        <BainaBoxSpecial variant="search" />
+      </div>
+
       <div className="max-w-xl px-1">
         <p className="eyebrow text-[11px] font-semibold text-maroon">
           {isBainaSearch
@@ -477,12 +482,6 @@ export default function VendorCatalog() {
           </>
         )}
       </div>
-
-      {isBainaSearch && (
-        <div className="mt-6">
-          <BainaBoxSpecial variant="search" />
-        </div>
-      )}
 
       {/* Sticky app chrome — search + chip row */}
       <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">

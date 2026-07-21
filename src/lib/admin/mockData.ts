@@ -15,17 +15,13 @@ import {
   cuisines,
   menuCourses,
   packages,
-  addOns,
   coupons,
 } from "@/lib/data";
 import type {
   AdminProfile,
-  AdminKpi,
   PendingVendorApproval,
   AdminBookingRow,
-  AdminNotification,
   RevenueSummary,
-  QuickAction,
   AdminVendor,
   VerificationStatus,
   Paginated,
@@ -41,22 +37,15 @@ import type {
   PaymentQuery,
   AdminCoupon,
   CatalogCuisine,
-  CatalogDish,
   CatalogPackage,
-  CatalogAddOn,
   ContentBanner,
   ContentTestimonial,
   ContentFaq,
   TrendPoint,
   VendorPerfRow,
   BusinessDetails,
-  AdminRoleInfo,
   AdminRefund,
   RefundQuery,
-  SupportTicket,
-  SupportQuery,
-  PermissionRow,
-  AccessLevel,
 } from "./types";
 
 /** Shared helper — slugify a business name for mock emails. Declared at the top
@@ -68,15 +57,6 @@ export const adminProfile: AdminProfile = {
   role: "Super Admin",
   initials: "AS",
 };
-
-export const adminKpis: AdminKpi[] = [
-  { key: "vendors", label: "Total Vendors", value: "128", sub: "+6 this month", iconKey: "vendors", href: "/admin/vendors" },
-  { key: "approvals", label: "Pending Approvals", value: "7", sub: "Awaiting KYC", iconKey: "approvals", href: "/admin/vendor-approvals" },
-  { key: "today", label: "Today's Bookings", value: "12", sub: "3 events today", iconKey: "bookings", href: "/admin/customers?tab=bookings" },
-  { key: "revenue", label: "Revenue", value: "₹42.8L", sub: "+12% MoM", iconKey: "revenue", href: "/admin/payments" },
-  { key: "customers", label: "Customers", value: "3,940", sub: "+128 this week", iconKey: "customers", href: "/admin/customers" },
-  { key: "coupons", label: "Active Coupons", value: "5", sub: "2 expiring soon", iconKey: "coupons", href: "/admin/coupons" },
-];
 
 export const recentBookings: AdminBookingRow[] = [
   { id: "BHJ-24871", customer: "Ankit Sharma", occasion: "Wedding", date: "12 Dec 2026", vendor: "Awadhi Royal Caterers", city: "Lucknow", amount: 674500, status: "Confirmed" },
@@ -154,25 +134,6 @@ export const revenueSummary: RevenueSummary = {
   pending: 460000,
 };
 
-export const adminNotifications: AdminNotification[] = [
-  { id: "an1", message: "New vendor application from Royal Tandoor Caterers (Lucknow).", time: "2 min ago", unread: true, category: "Vendors" },
-  { id: "an2", message: "Advance payment of ₹1,68,625 received for BHJ-24871.", time: "1 hr ago", unread: true, category: "Payments" },
-  { id: "an3", message: "Green Leaf Pure Veg passed FSSAI verification.", time: "3 hrs ago", unread: true, category: "Vendors" },
-  { id: "an4", message: "Booking BHJ-24990 was confirmed by Nawabi Dawat.", time: "4 hrs ago", unread: true, category: "Bookings" },
-  { id: "an5", message: "Refund RFD-4002 for BHJ-23541 was approved.", time: "6 hrs ago", unread: true, category: "Payments" },
-  { id: "an6", message: "Support ticket TCK-7003 raised — payment not reflecting.", time: "9 hrs ago", unread: false, category: "Support" },
-  { id: "an7", message: "Booking BHJ-23541 was cancelled by the customer.", time: "Yesterday", unread: false, category: "Bookings" },
-  { id: "an8", message: "Vendor settlement STL-3002 is due for Bengal Bhoj (Nov 2026).", time: "Yesterday", unread: false, category: "Payments" },
-  { id: "an9", message: "New venue “Utsav Lawns” submitted for approval (Jaipur).", time: "2 days ago", unread: false, category: "Venues" },
-  { id: "an10", message: "Weekly revenue report is ready to download.", time: "3 days ago", unread: false, category: "System" },
-];
-
-export const quickActions: QuickAction[] = [
-  { label: "Review Approvals", href: "/admin/vendor-approvals", iconKey: "approvals" },
-  { label: "Add Coupon", href: "/admin/coupons", iconKey: "coupons" },
-  { label: "Manage Content", href: "/admin/content", iconKey: "content" },
-];
-
 /* ───────────────────────────────────────────────────────────────────────
    VENDOR MANAGEMENT (Phase 2)
 
@@ -234,11 +195,6 @@ export const adminVendors: AdminVendor[] = vendorListings.map((v, i) => {
     ],
   };
 });
-
-/** Unique cities present in the vendor set (for the city filter). */
-export const vendorCities: string[] = Array.from(
-  new Set(adminVendors.map((v) => v.city)),
-).sort();
 
 /** Paginated, filtered vendor query over an arbitrary vendor list. Pure — the
  *  admin list feeds it live vendors fetched from the API; `queryVendors` feeds
@@ -344,10 +300,6 @@ export const adminCustomers: AdminCustomer[] = [
   { id: "CU-1012", name: "Neha Joshi", email: "neha.joshi@example.com", phone: "+91 98110 11012", city: "Jaipur", joined: "03 Oct 2025", totalBookings: 1, activeBookings: 1, lifetimeSpend: 0, status: "Active" },
 ];
 
-export const customerCities: string[] = Array.from(
-  new Set(adminCustomers.map((c) => c.city)),
-).sort();
-
 export function queryCustomers(params: CustomerQuery = {}): Paginated<AdminCustomer> {
   const { q = "", city = "All", status = "All", page = 1, pageSize = 8 } = params;
   const needle = q.trim().toLowerCase();
@@ -373,11 +325,6 @@ export function getCustomerById(id: string): AdminCustomer | undefined {
 /** Cross-module: a vendor's bookings (matched by business name). */
 export function getBookingsByVendor(vendor: string): AdminBooking[] {
   return adminBookings.filter((b) => b.vendor === vendor);
-}
-
-/** Cross-module: a customer's bookings (matched by name). */
-export function getBookingsByCustomer(customer: string): AdminBooking[] {
-  return adminBookings.filter((b) => b.customer === customer);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -466,8 +413,6 @@ for (const course of menuCourses) {
     dishCountByCuisine.set(d.cuisineId, (dishCountByCuisine.get(d.cuisineId) ?? 0) + 1);
   }
 }
-const cuisineName = new Map(cuisines.map((c) => [c.id, c.name]));
-
 export const catalogCuisines: CatalogCuisine[] = cuisines.map((c) => ({
   id: c.id,
   name: c.name,
@@ -475,17 +420,6 @@ export const catalogCuisines: CatalogCuisine[] = cuisines.map((c) => ({
   dishes: dishCountByCuisine.get(c.id) ?? 0,
   visible: true,
 }));
-
-export const catalogDishes: CatalogDish[] = menuCourses.flatMap((course) =>
-  course.dishes.map((d) => ({
-    id: d.id,
-    name: d.name,
-    course: course.name,
-    cuisine: cuisineName.get(d.cuisineId) ?? d.cuisineId,
-    diet: d.diet,
-    visible: true,
-  })),
-);
 
 export const catalogPackages: CatalogPackage[] = packages.map((p) => ({
   id: p.id,
@@ -495,16 +429,6 @@ export const catalogPackages: CatalogPackage[] = packages.map((p) => ({
   popular: Boolean(p.popular),
   features: p.features.length,
   visible: true,
-}));
-
-export const catalogAddOns: CatalogAddOn[] = addOns.map((a) => ({
-  id: a.id,
-  name: a.name,
-  nameHi: a.nameHi,
-  description: a.description,
-  price: a.price,
-  perPlate: a.perPlate,
-  active: true,
 }));
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -579,54 +503,6 @@ export const businessDetails: BusinessDetails = {
   instagram: "@bhojpatraofficial",
 };
 
-export const adminRoles: AdminRoleInfo[] = [
-  { name: "Super Admin", description: "Full access to every module and setting.", members: 1 },
-  { name: "Manager", description: "Manage vendors, bookings, payments and content.", members: 3 },
-  { name: "Support", description: "View bookings and customers; respond to enquiries.", members: 5 },
-];
-
-/** Modules that access is granted against — the roles × modules permission grid. */
-export const permissionModules = [
-  "Dashboard",
-  "Vendors & Approvals",
-  "Bookings",
-  "Customers",
-  "Payments & Settlements",
-  "Refunds",
-  "Coupons & Campaigns",
-  "Support Tickets",
-  "Reports & Analytics",
-  "Content (CMS)",
-  "Settings",
-  "Roles & Permissions",
-] as const;
-
-/** Per-role access to each module. Super Admin has Full everywhere; Manager runs
- *  operations but can't touch platform settings or roles; Support is read-mostly
- *  with write access only to tickets. */
-export const permissionRows: PermissionRow[] = permissionModules.map((module) => {
-  const manager: AccessLevel =
-    module === "Settings" || module === "Roles & Permissions" ? "None" : "Full";
-  let support: AccessLevel;
-  switch (module) {
-    case "Support Tickets":
-      support = "Full";
-      break;
-    case "Dashboard":
-    case "Bookings":
-    case "Customers":
-    case "Reports & Analytics":
-      support = "View";
-      break;
-    default:
-      support = "None";
-  }
-  return {
-    module,
-    access: { "Super Admin": "Full", Manager: manager, Support: support },
-  };
-});
-
 /* ───────────────────────────────────────────────────────────────────────
    REFUNDS
 ─────────────────────────────────────────────────────────────────────── */
@@ -642,16 +518,6 @@ export const adminRefunds: AdminRefund[] = [
   { id: "RFD-4008", bookingId: "BHJ-24988", customer: "Anjali Das", amount: 26980, reason: "Overcharged service fee", method: "UPI", status: "Requested", requestedAt: "21 Jan 2027" },
 ];
 
-export const refundsSummary = {
-  requested: adminRefunds.filter((r) => r.status === "Requested").length,
-  approved: adminRefunds.filter((r) => r.status === "Approved").length,
-  processed: adminRefunds.filter((r) => r.status === "Processed").length,
-  declined: adminRefunds.filter((r) => r.status === "Declined").length,
-  totalRefunded: adminRefunds
-    .filter((r) => r.status === "Processed")
-    .reduce((s, r) => s + r.amount, 0),
-};
-
 export function queryRefunds(
   params: RefundQuery = {},
   source: AdminRefund[] = adminRefunds,
@@ -666,45 +532,6 @@ export function queryRefunds(
       r.customer.toLowerCase().includes(needle);
     const matchesStatus = status === "All" || r.status === status;
     return matchesQ && matchesStatus;
-  });
-  const total = filtered.length;
-  const start = (page - 1) * pageSize;
-  return { data: filtered.slice(start, start + pageSize), page, pageSize, total };
-}
-
-/* ───────────────────────────────────────────────────────────────────────
-   SUPPORT TICKETS
-─────────────────────────────────────────────────────────────────────── */
-
-export const supportTickets: SupportTicket[] = [
-  { id: "TCK-7001", subject: "Caterer arrived an hour late", customer: "Ankit Sharma", email: "ankit.sharma@example.com", category: "Vendor", priority: "High", status: "Open", createdAt: "14 Nov 2026", updatedAt: "14 Nov 2026", bookingId: "BHJ-24871", message: "The catering team reached the venue nearly an hour behind schedule. Please look into this." },
-  { id: "TCK-7002", subject: "Need GST invoice for my booking", customer: "Rahul Gupta", email: "rahul.gupta@example.com", category: "Billing", priority: "Low", status: "Resolved", createdAt: "02 Nov 2026", updatedAt: "03 Nov 2026", bookingId: "BHJ-24655", message: "Could you email me a GST invoice for the balance payment I made?" },
-  { id: "TCK-7003", subject: "Payment not reflecting after UPI transfer", customer: "Arjun Mehta", email: "arjun.mehta@example.com", category: "Payment", priority: "High", status: "In Progress", createdAt: "23 Oct 2026", updatedAt: "24 Oct 2026", bookingId: "BHJ-24501", message: "I paid the advance over UPI but the booking still shows as pending." },
-  { id: "TCK-7004", subject: "Want to change the menu before the event", customer: "Pooja Reddy", email: "pooja.reddy@example.com", category: "Booking", priority: "Medium", status: "Open", createdAt: "08 Sep 2026", updatedAt: "08 Sep 2026", bookingId: "BHJ-24310", message: "Can I swap two of the main course dishes? The event is three weeks away." },
-  { id: "TCK-7005", subject: "Requesting a refund for cancelled event", customer: "Meera Nair", email: "meera.nair@example.com", category: "Refund", priority: "Medium", status: "Resolved", createdAt: "16 Jul 2026", updatedAt: "19 Jul 2026", bookingId: "BHJ-23541", message: "We had to cancel the reception. Please process the eligible refund." },
-  { id: "TCK-7006", subject: "App keeps logging me out", customer: "Sahil Kapoor", email: "sahil.kapoor@example.com", category: "Technical", priority: "Low", status: "In Progress", createdAt: "11 Nov 2026", updatedAt: "12 Nov 2026", message: "Every time I open the bookings page I get logged out and have to sign in again." },
-  { id: "TCK-7007", subject: "Vendor unresponsive to my messages", customer: "Neha Joshi", email: "neha.joshi@example.com", category: "Vendor", priority: "High", status: "Open", createdAt: "04 Mar 2027", updatedAt: "04 Mar 2027", bookingId: "BHJ-24902", message: "I've messaged the vendor twice with no reply. My wedding is close." },
-  { id: "TCK-7008", subject: "How do I add live counters?", customer: "Vikas Yadav", email: "vikas.yadav@example.com", category: "General", priority: "Low", status: "Resolved", createdAt: "10 Jan 2027", updatedAt: "10 Jan 2027", bookingId: "BHJ-24777", message: "Where in the booking flow can I add chaat and dessert live counters?" },
-  { id: "TCK-7009", subject: "Double charged for the advance", customer: "Imran Khan", email: "imran.khan@example.com", category: "Payment", priority: "High", status: "In Progress", createdAt: "22 Dec 2026", updatedAt: "22 Dec 2026", bookingId: "BHJ-24120", message: "My card was charged twice for the same advance. Please reverse one." },
-  { id: "TCK-7010", subject: "Feedback: great experience overall", customer: "Kavya Iyer", email: "kavya.iyer@example.com", category: "General", priority: "Low", status: "Resolved", createdAt: "31 May 2026", updatedAt: "31 May 2026", bookingId: "BHJ-23880", message: "Just wanted to say the team was excellent. Thank you!" },
-];
-
-export function querySupport(
-  params: SupportQuery = {},
-  source: SupportTicket[] = supportTickets,
-): Paginated<SupportTicket> {
-  const { q = "", status = "All", priority = "All", page = 1, pageSize = 8 } = params;
-  const needle = q.trim().toLowerCase();
-  const filtered = source.filter((t) => {
-    const matchesQ =
-      !needle ||
-      t.id.toLowerCase().includes(needle) ||
-      t.subject.toLowerCase().includes(needle) ||
-      t.customer.toLowerCase().includes(needle) ||
-      (t.bookingId?.toLowerCase().includes(needle) ?? false);
-    const matchesStatus = status === "All" || t.status === status;
-    const matchesPriority = priority === "All" || t.priority === priority;
-    return matchesQ && matchesStatus && matchesPriority;
   });
   const total = filtered.length;
   const start = (page - 1) * pageSize;

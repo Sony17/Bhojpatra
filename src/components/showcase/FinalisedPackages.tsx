@@ -67,7 +67,7 @@ function badgeChip(id: TierId) {
   return "bg-cream text-maroon ring-1 ring-maroon/20";
 }
 const isDark = (id: TierId) => id === "platinum";
-const muted = (id: TierId) => (isDark(id) ? "text-cream/75" : "text-ink-soft");
+const muted = (id: TierId) => (isDark(id) ? "text-cream/90" : "text-ink-soft");
 const accent = (id: TierId) => (isDark(id) ? "text-cream" : "text-maroon");
 
 /* ── Icons ──────────────────────────────────────────────────────────────── */
@@ -128,9 +128,9 @@ function MenuList({ features, dark }: { features: PackageFeature[]; dark: boolea
   const { lang } = useLang();
   const segments = buildCourseSegments(features);
   const border = dark ? "border-cream/20" : "border-maroon/10";
-  const sub = dark ? "text-cream/80" : "text-ink-soft";
+  const sub = dark ? "text-cream/90" : "text-ink-soft";
   return (
-    <ul className={`text-xs ${dark ? "text-cream" : "text-ink"}`}>
+    <ul className={`text-[13px] ${dark ? "text-cream" : "text-ink"}`}>
       {segments.map((seg) => {
         if (seg.type === "item") {
           const label = lang === "hi" ? seg.feature.labelHi : seg.feature.label;
@@ -171,7 +171,7 @@ function Disclosure({ label, dark, children }: { label: string; dark: boolean; c
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`flex w-full items-center justify-between rounded text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+        className={`flex w-full items-center justify-between rounded text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
           dark ? "text-cream focus-visible:ring-cream focus-visible:ring-offset-maroon" : "text-maroon focus-visible:ring-maroon"
         }`}
       >
@@ -250,7 +250,7 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
       )}
 
       <span
-        className={`mb-3 inline-flex w-fit items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] shadow-card sm:mb-4 ${badgeChip(id)}`}
+        className={`mb-3 inline-flex w-fit items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] shadow-card sm:mb-4 ${badgeChip(id)}`}
       >
         {recommended && <span aria-hidden className="mr-1">★</span>}
         {lang === "hi" ? BADGE[id][1] : BADGE[id][0]}
@@ -258,24 +258,24 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
 
       {/* Name + positioning */}
       <h3 className={`font-display text-[1.75rem] leading-none sm:text-[2rem] ${accent(id)}`}>{name}</h3>
-      {bestFor && <p className={`mt-1.5 text-[13px] leading-snug sm:mt-2 ${muted(id)}`}>{bestFor}</p>}
+      {bestFor && <p className={`mt-1.5 text-sm font-medium leading-snug sm:mt-2 ${muted(id)}`}>{bestFor}</p>}
 
       {/* Price */}
       <p className="mt-4 flex items-baseline gap-1.5 sm:mt-5">
         <span className={`text-[1.75rem] font-bold leading-none sm:text-[2rem] ${accent(id)}`}>{tier.price}</span>
         <span className={`text-sm ${muted(id)}`}>{unit}</span>
       </p>
-      {pax && <p className={`mt-1 text-xs sm:mt-1.5 ${muted(id)}`}>{pax}</p>}
+      {pax && <p className={`mt-1 text-[13px] sm:mt-1.5 ${muted(id)}`}>{pax}</p>}
 
       {/* Primary CTA (kept high so it's always visible) */}
       <div className="mt-4 sm:mt-5">{cta}</div>
 
       {/* Cumulative "what you get" — the value story, real numbers, always visible */}
       <div className={`mt-5 border-t pt-4 sm:mt-6 sm:pt-5 ${dark ? "border-cream/20" : "border-maroon/10"}`}>
-        <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${muted(id)}`}>{includesLabel}</p>
+        <p className={`text-xs font-bold uppercase tracking-[0.1em] ${muted(id)}`}>{includesLabel}</p>
         <ul className="mt-2.5 space-y-2 sm:mt-3 sm:space-y-2.5">
           {highlights.map((h) => (
-            <li key={h} className={`flex items-start gap-2.5 text-sm ${dark ? "text-cream" : "text-ink"}`}>
+            <li key={h} className={`flex items-start gap-2.5 text-[15px] ${dark ? "text-cream" : "text-ink"}`}>
               <CheckIcon className={`mt-0.5 h-4 w-4 shrink-0 ${accent(id)}`} />
               <span>{h}</span>
             </li>
@@ -290,7 +290,7 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
 
       {/* Qualifying note — subtle, pinned to the foot */}
       {footnote && footnote.length > 0 && (
-        <p className={`mt-auto pt-6 text-xs leading-snug ${muted(id)}`}>{footnote.join(" ")}</p>
+        <p className={`mt-auto pt-6 text-[13px] leading-snug ${muted(id)}`}>{footnote.join(" ")}</p>
       )}
       </div>
     </article>
@@ -326,10 +326,14 @@ export default function FinalisedPackages() {
           <SectionIntro
             eyebrow={t("Packages", "पैकेज")}
             title={t("Find your feast tier", "अपना दावत टियर चुनें")}
-            subtitle={t(
-              "Each tier includes everything below it — so you only pay up for what you actually add.",
-              "हर टियर में उसके नीचे वाला सब शामिल है — आप सिर्फ़ उसी के लिए ज़्यादा देते हैं जो आप जोड़ते हैं।",
-            )}
+            subtitle={
+              <span className="text-ink">
+                {t(
+                  "Each tier includes everything below it — so you only pay up for what you actually add.",
+                  "हर टियर में उसके नीचे वाला सब शामिल है — आप सिर्फ़ उसी के लिए ज़्यादा देते हैं जो आप जोड़ते हैं।",
+                )}
+              </span>
+            }
           >
             <Ornament className="mx-auto mt-6 text-maroon/35" />
           </SectionIntro>

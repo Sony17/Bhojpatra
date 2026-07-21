@@ -26,10 +26,7 @@ import {
   Banknote,
   Refund,
   BarChart,
-  TrendingUp,
   LifeBuoy,
-  Bell,
-  Key,
 } from "@/components/admin/shared/icons";
 
 /** Maps each nav item's icon key to its component. */
@@ -52,10 +49,7 @@ const NAV_ICON: Record<NavIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   campaigns: Rocket,
   services: Concierge,
   reports: BarChart,
-  analytics: TrendingUp,
-  notifications: Bell,
   content: Layout,
-  roles: Key,
   settings: Gear,
 };
 

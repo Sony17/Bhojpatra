@@ -17,9 +17,17 @@
  * that prefix to drop a de-selected vendor's items (multi-vendor tiers).
  */
 import { randomUUID } from "crypto";
-import { createStore } from "@/lib/store";
+import { createStore, readSingleton } from "@/lib/store";
+import {
+  TOP_VENDORS_KEY,
+  pinRank,
+  reconcileTopVendors,
+  type TopVendors,
+} from "@/lib/topVendorsData";
 import {
   menuCategories,
+  vendorOfferings,
+  vendorOfferingIds,
   type DietType,
   type MenuCategory,
   type VendorListing,
@@ -49,6 +57,17 @@ export interface VendorMenuSection {
   items: VendorMenuItem[];
   /** Paused by the vendor: dishes stay saved but customers don't see them. */
   hidden?: boolean;
+}
+
+/** A live counter / service the vendor declares they run — one of the platform
+ *  add-ons the /book wizard sells (`vendorOfferings` / `addOns`). Lets a vendor
+ *  advertise the same extras customers browse (pan, live woks, dessert counters,
+ *  service staff, decor…), each at their own rate. */
+export interface VendorCounter {
+  /** One of the platform offering ids (`vendorOfferingIds`). */
+  id: string;
+  /** Vendor's own price (₹); falls back to the platform default when absent. */
+  price?: number;
 }
 
 export interface LiveVendorRecord {
@@ -83,6 +102,8 @@ export interface LiveVendorRecord {
   tiers?: VendorTier[];
   moderation?: ModerationStatus;
   menu: VendorMenuSection[];
+  /** Live counters & services the vendor offers, from the platform add-on set. */
+  counters?: VendorCounter[];
   createdAt: string;
   updatedAt: string;
 }
@@ -169,13 +190,21 @@ export function saveVendor(record: LiveVendorRecord): Promise<void> {
 
 /** Assemble the `MenuCategory[]` consumed by the /book wizard: the static
  *  category taxonomy with every vendor (seed + live) that publishes at least
- *  one dish in that category. */
+ *  one dish in that category. Admin-pinned "Top 5" brands lead each roster
+ *  they appear in (pin order); everyone else keeps the stored order. */
 export async function assembleMenuCategories(): Promise<MenuCategory[]> {
-  const rows = await ensureSeededVendors();
+  const [rows, storedPins] = await Promise.all([
+    ensureSeededVendors(),
+    // A broken pin row must never take the menu down with it.
+    readSingleton<TopVendors>(TOP_VENDORS_KEY).catch(() => null),
+  ]);
+  const { pins } = reconcileTopVendors(storedPins);
   const visible = rows.filter((r) => r.moderation === "Approved");
   return menuCategories.map((cat) => ({
     ...cat,
-    vendors: visible.flatMap((r) => {
+    vendors: orderByPins(
+      pins,
+      visible.flatMap((r) => {
       const section = r.menu.find(
         (s) => s.categoryId === cat.id && !s.hidden && s.items.length > 0,
       );
@@ -205,8 +234,26 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
         },
       ];
-    }),
+      }),
+    ),
   }));
+}
+
+/** Move admin-pinned brands to the front of a roster (pin order, `pinned`
+ *  marked so the wizard keeps them above the capped-tier shortlist); the rest
+ *  keep their relative order. */
+function orderByPins(
+  pins: TopVendors["pins"],
+  vendors: MenuCategory["vendors"],
+): MenuCategory["vendors"] {
+  if (!pins.length) return vendors;
+  const ranked = vendors.map((v) => ({ v, rank: pinRank(pins, v) }));
+  const pinned = ranked
+    .filter((x) => x.rank >= 0)
+    .sort((a, b) => a.rank - b.rank)
+    .map((x) => ({ ...x.v, pinned: true }));
+  const rest = ranked.filter((x) => x.rank < 0).map((x) => x.v);
+  return [...pinned, ...rest];
 }
 
 /** Catalog card fields derived from a category id. */
@@ -302,6 +349,58 @@ export interface PublicVendorProfile {
     perPlate: number;
     items: { name: string; diet: DietType; photo?: string }[];
   }[];
+  /** Live counters & services the vendor offers, resolved for display. */
+  counters: {
+    id: string;
+    name: string;
+    nameHi: string;
+    icon: string;
+    price: number;
+    perPlate: boolean;
+    category: string;
+  }[];
+}
+
+/** Resolve a vendor's declared counter ids into display rows (name/icon/price),
+ *  falling back to the platform default price when the vendor set none. Shared
+ *  by the public profile and any other counter-facing surface. */
+/** Map counter/service *labels* (as captured by the registration wizard) back
+ *  onto platform offering ids, so a first-time dashboard prefills what the
+ *  vendor already declared. Labels with no matching offering are dropped. */
+export function countersFromLabels(
+  labels: string[] | undefined,
+): VendorCounter[] {
+  if (!labels?.length) return [];
+  const seen = new Set<string>();
+  return labels.flatMap((label) => {
+    const o = vendorOfferings.find(
+      (v) => v.name.toLowerCase() === label.trim().toLowerCase(),
+    );
+    if (!o || seen.has(o.id)) return [];
+    seen.add(o.id);
+    return [{ id: o.id }];
+  });
+}
+
+export function resolveVendorCounters(
+  counters: VendorCounter[] | undefined,
+): PublicVendorProfile["counters"] {
+  if (!counters?.length) return [];
+  return counters.flatMap((c) => {
+    const o = vendorOfferings.find((v) => v.id === c.id);
+    if (!o) return [];
+    return [
+      {
+        id: o.id,
+        name: o.name,
+        nameHi: o.nameHi,
+        icon: o.icon,
+        price: c.price ?? o.price,
+        perPlate: o.perPlate,
+        category: o.category,
+      },
+    ];
+  });
 }
 
 /** Project a record for the public detail page, or null when the vendor
@@ -342,6 +441,7 @@ export function toPublicVendorProfile(
         },
       ];
     }),
+    counters: resolveVendorCounters(r.counters),
   };
 }
 
@@ -350,7 +450,9 @@ export function toPublicVendorProfile(
 const CATEGORY_IDS = new Set(menuCategories.map((c) => c.id));
 const MAX_SECTIONS = menuCategories.length;
 const MAX_ITEMS_PER_SECTION = 24;
-const MAX_CUISINES = 8;
+const MAX_CUISINES = 12;
+/** Allow-list of live-counter / service ids a vendor may declare. */
+const OFFERING_IDS = new Set(vendorOfferingIds);
 
 /** Only our own photo-serving route is a valid dish-photo URL. */
 const PHOTO_URL_RE = /^\/api\/vendor\/photo\/[A-Za-z0-9-]{1,64}$/;
@@ -372,6 +474,7 @@ export interface VendorMenuInput {
   googleRating?: number;
   googleReviews?: number;
   menu: VendorMenuSection[];
+  counters?: VendorCounter[];
 }
 
 /** Normalize a self-declared Google rating (0–5, one decimal). Returns
@@ -484,6 +587,21 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
     });
   }
 
+  // Live counters & services — each must be a known platform offering; an
+  // optional own-price overrides the platform default. Duplicates are dropped.
+  const counters: VendorCounter[] = [];
+  if (Array.isArray(body.counters)) {
+    const seenCounters = new Set<string>();
+    for (const raw of body.counters.slice(0, OFFERING_IDS.size)) {
+      const c = (raw ?? {}) as Record<string, unknown>;
+      const id = cleanString(c.id, 30);
+      if (!OFFERING_IDS.has(id) || seenCounters.has(id)) continue;
+      seenCounters.add(id);
+      const price = cleanMoney(c.price, 1_000_000);
+      counters.push({ id, ...(price ? { price } : {}) });
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -498,6 +616,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(googleRating ? { googleRating } : {}),
       ...(googleReviews !== undefined ? { googleReviews } : {}),
       menu,
+      ...(counters.length ? { counters } : {}),
     },
   };
 }

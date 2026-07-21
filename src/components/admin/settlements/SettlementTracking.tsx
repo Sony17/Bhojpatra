@@ -7,7 +7,7 @@
  * mark a pending settlement as settled once the payout is released.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -33,9 +33,41 @@ const STATUS_OPTIONS = [
 
 export default function SettlementTracking() {
   const [rows, setRows] = useState<VendorSettlement[]>(vendorSettlements);
+  // Ids of rows derived from real bookings (fetched live) — only these get
+  // PATCHed; the demo seed rows are updated locally so the console still works
+  // with no DB.
+  const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Pull the real settlement rows (derived server-side from completed bookings)
+  // and surface them ahead of the demo seed. Same live-merge pattern the refund
+  // console uses.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settlements", { cache: "no-store" });
+        if (!res.ok) return;
+        const { settlements } = (await res.json()) as {
+          settlements?: VendorSettlement[];
+        };
+        if (cancelled || !Array.isArray(settlements) || settlements.length === 0) return;
+        setLiveIds(new Set(settlements.map((s) => s.id)));
+        setRows((prev) => {
+          const ids = new Set(settlements.map((s) => s.id));
+          return [...settlements, ...prev.filter((r) => !ids.has(r.id))];
+        });
+      } catch {
+        // Network/parse failure — keep the seed rows.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -67,8 +99,31 @@ export default function SettlementTracking() {
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const markSettled = (id: string) =>
+  // Optimistic settle. Live (derived-from-bookings) rows are PATCHed and rolled
+  // back if the server rejects it; demo seed rows update locally only.
+  const markSettled = (id: string) => {
+    const snapshot = rows;
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Settled" } : r)));
+
+    if (!liveIds.has(id)) return;
+
+    fetch(`/api/settlements/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Settled" }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("request failed"))))
+      .then((data: { settlement?: VendorSettlement }) => {
+        // Adopt the server's canonical row.
+        if (data?.settlement) {
+          setRows((prev) => prev.map((r) => (r.id === id ? data.settlement! : r)));
+        }
+      })
+      .catch(() => {
+        setRows(snapshot);
+        setToast("Couldn't save the settlement. Please try again.");
+      });
+  };
 
   const handleExport = () =>
     exportCsv(
@@ -163,6 +218,16 @@ export default function SettlementTracking() {
       />
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+
+      {toast && (
+        <p
+          role="status"
+          className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-3.5 py-1.5 text-sm font-medium text-ink"
+        >
+          <span aria-hidden="true" className="text-maroon">✓</span>
+          {toast}
+        </p>
+      )}
     </div>
   );
 }

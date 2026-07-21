@@ -30,6 +30,16 @@ create table if not exists refunds (
   updated_at timestamptz not null default now()
 );
 
+-- Vendor payout settlements. Rows are DERIVED from completed bookings (grouped
+-- per vendor per event month) at read time; this table only persists the ones
+-- an admin has marked Settled (a snapshot of what was paid out, for audit).
+create table if not exists settlements (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Leads are de-duplicated by email (the id-field for this store).
 create table if not exists leads (
   id         text primary key,
@@ -151,6 +161,15 @@ create table if not exists reviews (
 -- Blob store (the record carries the blob URL) and are served back through
 -- `GET /api/reviews/photo/[id]`; only the metadata is stored here.
 create table if not exists review_photos (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Customer support tickets raised from My Bookings ("Get help" on an order).
+-- Lifecycle Open → In Progress → Resolved, driven from the admin Support view.
+create table if not exists support_tickets (
   id         text primary key,
   seq        bigint generated always as identity,
   data       jsonb not null,

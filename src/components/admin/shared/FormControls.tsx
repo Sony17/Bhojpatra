@@ -1,30 +1,78 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState } from "react";
+import { controlClass } from "@/components/ui/Input";
 
 /**
  * Shared form primitives reused by every admin form (coupons, add-ons, menu,
- * settings, content). One copy of the input styling + field/toggle so forms
- * stay consistent and DRY.
+ * settings, content). Input styling + Field come from the design system
+ * (ui/Input) so admin forms match the app-wide controls; the password input
+ * and toggle stay admin-specific.
  */
-export const inputClass =
-  "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink placeholder:text-ink-soft/60 outline-none transition-colors focus:border-maroon focus:ring-1 focus:ring-maroon/30";
+export { Field } from "@/components/ui/Input";
+export const inputClass = controlClass;
 
-export function Field({
-  label,
-  children,
-  hint,
-}: {
-  label: string;
-  children: ReactNode;
-  hint?: string;
-}) {
+/** Eye / eye-off icon for the password visibility toggle. */
+function EyeIcon({ off }: { off: boolean }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
-        {label}
-      </span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-ink-soft">{hint}</span>}
-    </label>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {off ? (
+        <>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+          <path d="M9.4 5.2A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7-.4 1-1.2 2.1-2.3 3.1M6.1 6.1C3.9 7.4 2.4 9.6 2 12c.5 1.4 2 3.2 4 4.4A9.3 9.3 0 0 0 12 19c1 0 1.9-.1 2.8-.4" />
+        </>
+      ) : (
+        <>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** Password input with a show/hide (eye) toggle. Controlled. */
+export function PasswordInput({
+  value,
+  onChange,
+  autoComplete,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete?: string;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative block">
+      <input
+        type={show ? "text" : "password"}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        className={inputClass + " pr-11"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        aria-label={show ? "Hide password" : "Show password"}
+        className="focus-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-ink-soft transition-colors hover:text-maroon"
+      >
+        <EyeIcon off={show} />
+      </button>
+    </span>
   );
 }
 

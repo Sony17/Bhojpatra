@@ -25,10 +25,7 @@ export type NavIconKey =
   | "campaigns"
   | "services"
   | "reports"
-  | "analytics"
-  | "notifications"
   | "content"
-  | "roles"
   | "settings";
 
 export interface AdminNavItem {
@@ -53,13 +50,10 @@ export const adminNav: AdminNavItem[] = [
   { label: "Settlements", href: "/admin/settlements", iconKey: "settlements" },
   { label: "Refunds", href: "/admin/refunds", iconKey: "refunds" },
   { label: "Reports", href: "/admin/reports", iconKey: "reports" },
-  { label: "Analytics", href: "/admin/analytics", iconKey: "analytics" },
   { label: "Lead Generation", href: "/admin/leads", iconKey: "leads" },
   { label: "Support Tickets", href: "/admin/support", iconKey: "support" },
   { label: "Enquiries", href: "/admin/enquiries", iconKey: "enquiries" },
   { label: "Referrals", href: "/admin/referrals", iconKey: "referrals" },
-  { label: "Notifications", href: "/admin/notifications", iconKey: "notifications" },
   { label: "Content Control", href: "/admin/content", iconKey: "content" },
-  { label: "Roles & Permissions", href: "/admin/roles", iconKey: "roles" },
   { label: "Settings", href: "/admin/settings", iconKey: "settings" },
 ];

@@ -3,6 +3,7 @@ import {
   formatVenuePrice,
   venueSlug,
   sanitizeVenueImage,
+  isServableVenueImage,
   isVenuePublic,
   type VenueRecord,
 } from "@/lib/venues";
@@ -88,6 +89,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "A valid starting price is required." }, { status: 400 });
   }
 
+  // A photo link the site can't serve must not be silently swapped for the
+  // default — tell the owner so they can paste a usable one (or leave blank).
+  const image = str(b.image);
+  if (image && !isServableVenueImage(image)) {
+    return Response.json(
+      {
+        error:
+          "We can't use that photo link. Paste a direct image address from " +
+          "Unsplash (right-click the photo → Copy Image Address), or leave " +
+          "the field blank for the default photo.",
+      },
+      { status: 400 },
+    );
+  }
+
   const ratingRaw = Number(b.rating);
   const reviewsRaw = Number(b.reviews);
 
@@ -119,7 +135,7 @@ export async function POST(request: Request) {
     price,
     rating: Number.isFinite(ratingRaw) && ratingRaw > 0 ? ratingRaw : 4.5,
     reviews: Number.isFinite(reviewsRaw) && reviewsRaw > 0 ? Math.round(reviewsRaw) : 0,
-    image: sanitizeVenueImage(str(b.image)),
+    image: sanitizeVenueImage(image),
     ownerCode,
     ownerName: str(b.ownerName),
     phone: str(b.phone),

@@ -215,7 +215,9 @@ export default function ReferralManagement() {
       const matchesQ =
         !needle ||
         r.name.toLowerCase().includes(needle) ||
-        r.code.toLowerCase().includes(needle);
+        r.code.toLowerCase().includes(needle) ||
+        (r.email ?? "").toLowerCase().includes(needle) ||
+        (r.phone ?? "").toLowerCase().includes(needle);
       const matchesType = type === "All" || r.type === type;
       return matchesQ && matchesType;
     });
@@ -233,6 +235,8 @@ export default function ReferralManagement() {
         Code: r.code,
         Referrer: r.name,
         Type: PARTNER_ROLE_LABEL[r.type],
+        Email: r.email ?? "",
+        Phone: r.phone ?? "",
         City: r.city ?? "",
         "Referred Bookings": r.total,
         Confirmed: r.confirmed,
@@ -278,6 +282,16 @@ export default function ReferralManagement() {
       ),
     },
     { key: "type", header: "Type", cell: (r) => <TypeBadge type={r.type} /> },
+    {
+      key: "contact",
+      header: "Contact",
+      cell: (r) => (
+        <div className="min-w-0">
+          <p className="text-xs text-ink">{r.email ?? "—"}</p>
+          <p className="text-xs text-ink-soft">{r.phone ?? "—"}</p>
+        </div>
+      ),
+    },
     {
       key: "total",
       header: "Referred",
@@ -368,7 +382,7 @@ export default function ReferralManagement() {
         <SearchBar
           value={q}
           onChange={setQ}
-          placeholder="Search by referrer name or code…"
+          placeholder="Search by name, code, email or phone…"
           className="lg:max-w-sm lg:flex-1"
         />
         <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
@@ -381,7 +395,7 @@ export default function ReferralManagement() {
         rows={filtered}
         getRowKey={(r) => r.code}
         onRowClick={(r) => setSelected(r)}
-        minWidthClass="min-w-[780px]"
+        minWidthClass="min-w-[960px]"
         empty={
           <EmptyState
             title={loading ? "Loading referrals…" : "No referrers yet"}

@@ -318,8 +318,8 @@ export default function VenuePanel({
               />
               <span className="mt-1 block text-xs text-ink-soft/80">
                 {t(
-                  "Optional — we'll use a default photo if left blank.",
-                  "वैकल्पिक — खाली छोड़ने पर हम डिफ़ॉल्ट फ़ोटो लगाएंगे।",
+                  "Optional — paste an Unsplash image address (right-click the photo → Copy Image Address). We'll use a default photo if left blank.",
+                  "वैकल्पिक — Unsplash इमेज का पता पेस्ट करें (फ़ोटो पर राइट-क्लिक → Copy Image Address)। खाली छोड़ने पर हम डिफ़ॉल्ट फ़ोटो लगाएंगे।",
                 )}
               </span>
             </label>

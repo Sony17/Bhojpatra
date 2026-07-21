@@ -22,6 +22,7 @@ import {
 import type { BookingStatus } from "@/lib/data";
 import VenuePanel from "@/components/partner/VenuePanel";
 import { Badge, AppBar, Button, Card, EmptyState, type BadgeTone } from "@/components/ui";
+import { money } from "@/lib/money";
 
 /** All partner roles, in display order — used to offer the ones not yet held. */
 const ALL_ROLES: PartnerRole[] = ["planner", "individual", "venue"];
@@ -32,9 +33,6 @@ const ROLE_ICON: Record<PartnerRole, string> = {
   individual: "🙋",
   venue: "🏛️",
 };
-
-const inr = new Intl.NumberFormat("en-IN");
-const money = (n: number) => `₹${inr.format(n)}`;
 
 /**
  * Completed referred bookings a partner must reach before they become a

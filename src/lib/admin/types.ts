@@ -17,32 +17,6 @@ export interface AdminProfile {
   initials: string;
 }
 
-/** Icon keys understood by the admin icon map (`shared/iconMap`). */
-export type AdminIconKey =
-  | "vendors"
-  | "approvals"
-  | "bookings"
-  | "revenue"
-  | "customers"
-  | "coupons"
-  | "addons"
-  | "payments"
-  | "content"
-  | "reports"
-  | "settings";
-
-/** A single headline metric (KPI card). `value` is a display string
- *  (e.g. "₹42.8L") so <CountUp> can animate it. */
-export interface AdminKpi {
-  key: string;
-  label: string;
-  value: string;
-  sub: string;
-  iconKey: AdminIconKey;
-  /** Clicking the card deep-links here. */
-  href: string;
-}
-
 export type VerificationStatus = "Pending" | "Verified" | "Rejected";
 export type VendorTier = "Silver" | "Gold" | "Platinum";
 
@@ -100,27 +74,11 @@ export interface AdminBookingRow {
   status: BookingStatus;
 }
 
-export interface AdminNotification {
-  id: string;
-  message: string;
-  time: string;
-  unread: boolean;
-  /** Coarse grouping for the Notifications page filter (Vendors / Payments /
-   *  Bookings / System). Absent on legacy rows. */
-  category?: string;
-}
-
 export interface RevenueSummary {
   total: number;
   advance: number;
   settled: number;
   pending: number;
-}
-
-export interface QuickAction {
-  label: string;
-  href: string;
-  iconKey: AdminIconKey;
 }
 
 /* ── Vendor Management (Phase 2) ─────────────────────────────────────────── */
@@ -212,6 +170,8 @@ export interface AdminBooking {
   mealTime?: string;
   /** Exact serving clock time (`HH:MM`, 24-hour) alongside the meal, when set. */
   eventTime?: string;
+  /** Food (diet) preference — "Pure Veg" / "Non-veg" / "Both" — when declared. */
+  foodPreference?: string;
   guests: number;
   vendor: string;
   city: string;
@@ -345,15 +305,6 @@ export interface CatalogCuisine {
   visible: boolean;
 }
 
-export interface CatalogDish {
-  id: string;
-  name: string;
-  course: string;
-  cuisine: string;
-  diet: "veg" | "non-veg";
-  visible: boolean;
-}
-
 export interface CatalogPackage {
   id: string;
   name: string;
@@ -362,16 +313,6 @@ export interface CatalogPackage {
   popular: boolean;
   features: number;
   visible: boolean;
-}
-
-export interface CatalogAddOn {
-  id: string;
-  name: string;
-  nameHi: string;
-  description: string;
-  price: number;
-  perPlate: boolean;
-  active: boolean;
 }
 
 /* ── Content Management ──────────────────────────────────────────────────── */
@@ -426,12 +367,6 @@ export interface BusinessDetails {
   instagram: string;
 }
 
-export interface AdminRoleInfo {
-  name: string;
-  description: string;
-  members: number;
-}
-
 /* ── Refunds ─────────────────────────────────────────────────────────────── */
 
 export type RefundStatus = "Requested" | "Approved" | "Processed" | "Declined";
@@ -480,21 +415,3 @@ export interface SupportTicket {
   message: string;
 }
 
-export interface SupportQuery {
-  q?: string;
-  status?: SupportTicketStatus | "All";
-  priority?: SupportPriority | "All";
-  page?: number;
-  pageSize?: number;
-}
-
-/* ── Roles & Permissions ─────────────────────────────────────────────────── */
-
-export type AccessLevel = "Full" | "View" | "None";
-
-/** A permission matrix row: one platform module and the access each role has to
- *  it. Rendered as a roles × modules grid on the Roles & Permissions page. */
-export interface PermissionRow {
-  module: string;
-  access: Record<string, AccessLevel>;
-}

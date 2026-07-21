@@ -30,10 +30,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   campaigns: "Campaigns",
   services: "Service Packages",
   reports: "Reports",
-  analytics: "Analytics",
-  notifications: "Notifications",
   content: "Content Control",
-  roles: "Roles & Permissions",
   settings: "Settings",
 };
 
@@ -43,7 +40,7 @@ interface AdminTopbarProps {
 }
 
 /**
- * Sticky top navigation: hamburger (mobile) + breadcrumb, a notifications bell,
+ * Sticky top navigation: hamburger (mobile) + breadcrumb,
  * a welcome message and the admin avatar.
  * All styling reuses the brand tokens so it matches the public header.
  */

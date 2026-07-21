@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         hostname: "images.unsplash.com",
         pathname: "/**",
       },
+      // Unsplash+ (premium) photos are served from a separate host.
+      {
+        protocol: "https",
+        hostname: "plus.unsplash.com",
+        pathname: "/**",
+      },
       // Customer-uploaded review photos live in the public Vercel Blob store.
       {
         protocol: "https",
@@ -32,6 +38,8 @@ const nextConfig: NextConfig = {
     return [
       // `/admin` has no page of its own — send visitors to the dashboard.
       { source: "/admin", destination: "/admin/dashboard", permanent: false },
+      // Analytics was folded into the dashboard; keep old links working.
+      { source: "/admin/analytics", destination: "/admin/dashboard", permanent: false },
     ];
   },
 };

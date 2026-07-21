@@ -16,9 +16,15 @@ import {
   cities,
   menuCategories,
   registrationCuisines,
+  vendorOfferings,
   type DietType,
 } from "@/lib/data";
-import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
+import type {
+  ModerationStatus,
+  VendorCounter,
+  VendorMenuSection,
+} from "@/lib/vendorMenus";
+import { money } from "@/lib/money";
 import { useLang } from "@/lib/i18n";
 import { Button, Card } from "@/components/ui";
 
@@ -57,6 +63,7 @@ interface VendorPayload {
   googleRating?: number;
   googleReviews?: number;
   menu: VendorMenuSection[];
+  counters?: VendorCounter[];
 }
 
 const emptySections = (): Record<string, DraftSection> =>
@@ -101,6 +108,9 @@ export default function MenuBuilder() {
   const [sections, setSections] = useState<Record<string, DraftSection>>(
     emptySections,
   );
+  // Live counters & services the vendor offers: offering id → own-price string
+  // (a present key = offered; an empty value = charge the platform default).
+  const [counters, setCounters] = useState<Record<string, string>>({});
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -154,6 +164,18 @@ export default function MenuBuilder() {
             if (src.googleRating) setGoogleRating(String(src.googleRating));
             if (src.googleReviews !== undefined)
               setGoogleReviews(String(src.googleReviews));
+            // Counters carry over from a saved profile or, first time in, from
+            // whatever the registration application already declared.
+            if (src.counters) {
+              setCounters(
+                Object.fromEntries(
+                  src.counters.map((c) => [
+                    c.id,
+                    c.price != null ? String(c.price) : "",
+                  ]),
+                ),
+              );
+            }
           }
           if (d.gallery) setGallery(d.gallery);
           if (d.vendor) {
@@ -323,6 +345,23 @@ export default function MenuBuilder() {
     }
   };
 
+  // Toggle a live counter / service on or off. Turning it on seeds the vendor's
+  // price with the platform default so it's editable but never blank.
+  const toggleCounter = (id: string, defaultPrice: number) => {
+    setCounters((prev) => {
+      const next = { ...prev };
+      if (id in next) delete next[id];
+      else next[id] = String(defaultPrice);
+      return next;
+    });
+    setSaved(false);
+  };
+
+  const setCounterPrice = (id: string, value: string) => {
+    setCounters((prev) => ({ ...prev, [id]: value }));
+    setSaved(false);
+  };
+
   const onSave = async () => {
     setSaveError("");
     if (business.trim().length < 2) {
@@ -358,6 +397,14 @@ export default function MenuBuilder() {
             items: sections[c.id].items,
             ...(sections[c.id].enabled ? {} : { hidden: true }),
           })),
+        // Only send offerings the vendor still recognises; an own-price is
+        // optional (blank falls back to the platform default server-side).
+        counters: vendorOfferings
+          .filter((o) => o.id in counters)
+          .map((o) => {
+            const price = Number(counters[o.id]);
+            return { id: o.id, ...(price > 0 ? { price } : {}) };
+          }),
       };
       const res = await fetch("/api/vendor/menu", {
         method: "PUT",
@@ -751,6 +798,84 @@ export default function MenuBuilder() {
           );
         })}
       </div>
+
+      {/* Live counters & services — the same extras the /book wizard sells, so a
+          vendor can advertise every counter/service they run at their own rate. */}
+      <Card padding="none" className="p-5 sm:p-6">
+        <h3 className="font-display text-base font-semibold text-ink">
+          {t("Live Counters & Services", "लाइव काउंटर और सेवाएं")}
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          {t(
+            "Tick everything you offer, then set your own rate. Shown on your public profile.",
+            "जो भी आप देते हैं उसे चुनें, फिर अपना रेट डालें। आपके सार्वजनिक प्रोफ़ाइल पर दिखेगा।",
+          )}
+        </p>
+        {(["counter", "service"] as const).map((group) => {
+          const items = vendorOfferings.filter((o) => o.category === group);
+          if (items.length === 0) return null;
+          return (
+            <div key={group} className="mt-4">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                {group === "counter"
+                  ? t("Live counters", "लाइव काउंटर")
+                  : t("Services", "सेवाएं")}
+              </span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {items.map((o) => {
+                  const on = o.id in counters;
+                  return (
+                    <div
+                      key={o.id}
+                      className={
+                        "flex items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors " +
+                        (on
+                          ? "border-maroon bg-maroon-soft/30"
+                          : "border-cream-3 bg-cream/40")
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCounter(o.id, o.price)}
+                        aria-pressed={on}
+                        className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                      >
+                        <span aria-hidden="true" className="text-xl">{o.icon}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {lang === "hi" ? o.nameHi : o.name}
+                          </span>
+                          <span className="block text-xs text-ink-soft">
+                            {on
+                              ? o.perPlate
+                                ? t("per plate", "प्रति प्लेट")
+                                : t("flat fee", "एकमुश्त शुल्क")
+                              : `${t("from", "से")} ${money(o.price)}`}
+                          </span>
+                        </span>
+                      </button>
+                      {on && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <span className="text-sm text-ink-soft">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={counters[o.id]}
+                            onChange={(e) => setCounterPrice(o.id, e.target.value)}
+                            placeholder={String(o.price)}
+                            aria-label={`${o.name} ${t("price", "मूल्य")}`}
+                            className="w-20 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
 
       {/* Save bar */}
       <Card padding="none" className="flex flex-wrap items-center gap-4 p-5">

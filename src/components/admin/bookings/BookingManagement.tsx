@@ -40,6 +40,9 @@ function toAdminBooking(o: Record<string, unknown>): AdminBooking {
     date: typeof o.date === "string" ? o.date : "",
     ...(typeof o.mealTime === "string" && o.mealTime ? { mealTime: o.mealTime } : {}),
     ...(typeof o.eventTime === "string" && o.eventTime ? { eventTime: o.eventTime } : {}),
+    ...(typeof o.foodPreference === "string" && o.foodPreference
+      ? { foodPreference: o.foodPreference }
+      : {}),
     guests: Number(o.guests) || 0,
     vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
     city: typeof o.city === "string" ? o.city : "—",
@@ -215,6 +218,9 @@ export default function BookingManagement() {
               <Field label="Date"><p className="text-sm text-ink">{selected.date}</p></Field>
               {servingTimeLabel(selected.mealTime, selected.eventTime) && (
                 <Field label="Serving"><p className="text-sm text-ink">{servingTimeLabel(selected.mealTime, selected.eventTime)}</p></Field>
+              )}
+              {selected.foodPreference && (
+                <Field label="Food"><p className="text-sm text-ink">{selected.foodPreference}</p></Field>
               )}
               <Field label="Guests"><p className="text-sm text-ink">{selected.guests}</p></Field>
               <Field label="City"><p className="text-sm text-ink">{selected.city}</p></Field>

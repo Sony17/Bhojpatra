@@ -7,6 +7,7 @@ import {
   pruneDishPhotos,
 } from "@/lib/vendorPhotos";
 import {
+  countersFromLabels,
   DEFAULT_VENDOR_IMAGE,
   findVendorByOwner,
   newVendorId,
@@ -58,6 +59,9 @@ export async function GET() {
             maxEventsPerDay: Number(app.maxEventsPerDay) || undefined,
             googleRating: app.googleRating,
             googleReviews: app.googleReviews,
+            // Map the counter/service labels chosen at registration onto the
+            // platform offering ids the dashboard toggles (unmatched dropped).
+            counters: countersFromLabels(app.counters),
           }
         : { business: guard.name ?? "" },
     });

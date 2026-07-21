@@ -3,6 +3,7 @@
 import type { InvoiceData } from "@/lib/invoice";
 import BrandIcon from "@/components/BrandIcon";
 import { Card } from "@/components/ui";
+import { money } from "@/lib/money";
 
 /**
  * On-screen, branded rendering of an invoice — the visual twin of the PDF in
@@ -10,13 +11,6 @@ import { Card } from "@/components/ui";
  * /bookings/invoice viewer so a shared link looks exactly like the download.
  * Presentational only: it takes invoice data and renders it.
  */
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
-const money = (n: number) => inr.format(Math.round(n));
 
 export default function InvoicePreview({ data }: { data: InvoiceData }) {
   const balance = Math.max(0, Math.round(data.grandTotal) - Math.round(data.paid));
@@ -79,6 +73,9 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
             <Field label="Event Date" value={data.eventDate} />
             {data.servingTime && (
               <Field label="Serving" value={data.servingTime} />
+            )}
+            {data.foodPreference && (
+              <Field label="Food" value={data.foodPreference} />
             )}
             <Field label="Guests" value={String(data.guests)} />
             <Field label="City" value={data.city} />
