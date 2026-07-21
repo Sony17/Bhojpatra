@@ -787,7 +787,11 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
       ...d.packages,
       ...stored.packages,
       tiers: stored.packages?.tiers?.length
-        ? stored.packages.tiers
+        ? stored.packages.tiers.map((t) =>
+            t.id === "custom" || t.name?.toLowerCase().includes("customised") || t.name?.toLowerCase().includes("customized")
+              ? { ...t, name: "Single Stall", nameHi: "सिंगल स्टॉल" }
+              : t
+          )
         : d.packages.tiers,
     },
     gallery: (() => {
