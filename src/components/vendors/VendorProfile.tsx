@@ -9,8 +9,10 @@
 import Image from "next/image";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
+import { useCompare } from "@/lib/compare";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Button, Card, Badge, AppBar, ImageCarousel } from "@/components/ui";
 
 const inr = new Intl.NumberFormat("en-IN");
@@ -21,6 +23,10 @@ export default function VendorProfile({
   profile: PublicVendorProfile;
 }) {
   const { t, lang } = useLang();
+  const { has, toggle, isFull } = useCompare();
+  const inCompare = has(profile.id);
+  const compareDisabled = !inCompare && isFull;
+  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(profile.id)}&step=menu`;
   const allPhotos = [profile.image, ...profile.gallery.filter((g) => g !== profile.image)];
 
   return (
@@ -133,34 +139,15 @@ export default function VendorProfile({
               </span>
             </p>
 
-            <Button
-              href={`/book?package=custom&vendor=${encodeURIComponent(
-                profile.id,
-              )}&step=menu`}
-              variant="primary"
-              size="lg"
-              fullWidth
+            <VendorActionRow
+              bookHref={bookHref}
+              vendorName={profile.business}
+              vendorCity={profile.city}
+              priceFrom={profile.priceFrom}
+              inCompare={inCompare}
+              compareDisabled={compareDisabled}
+              onToggleCompare={() => toggle(profile.id)}
               className="mt-5"
-            >
-              {t("Start a Booking", "बुकिंग शुरू करें")}
-            </Button>
-            <p className="mt-2 text-center text-xs text-ink-soft">
-              {t(
-                "This caterer is pre-selected — just build your Single Stall menu in the wizard.",
-                "यह कैटरर पहले से चुना हुआ है — बस विज़ार्ड में अपना सिंगल स्टॉल मेन्यू बनाएं।",
-              )}
-            </p>
-
-            {/* Spread the word — forward this caterer to friends on WhatsApp. */}
-            <WhatsAppShareButton
-              path={`/vendors/${profile.id}`}
-              variant="ghost"
-              fullWidth
-              className="mt-3"
-              label="Share this caterer"
-              labelHi="यह कैटरर शेयर करें"
-              message={`Check out ${profile.business} on Bhojpatra — a verified caterer in ${profile.city} from ₹${inr.format(profile.priceFrom)}/plate.`}
-              messageHi={`${profile.business} को Bhojpatra पर देखें — ${profile.city} में एक वेरिफाइड कैटरर, ₹${inr.format(profile.priceFrom)}/प्लेट से।`}
             />
           </Card>
         </div>

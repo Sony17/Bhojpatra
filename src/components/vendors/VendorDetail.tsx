@@ -19,6 +19,7 @@ import CompareTray from "@/components/vendors/CompareTray";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
+import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
@@ -361,36 +362,21 @@ function VendorProfile({
               )}
             </p>
 
-            <Button
-              href={bookHref}
-              variant="primary"
-              size="lg"
-              fullWidth
+            <VendorActionRow
+              bookHref={bookHref}
+              vendorName={vendor.name}
+              vendorCity={vendor.city}
+              priceFrom={vendor.priceFrom}
+              inCompare={inCompare}
+              compareDisabled={compareDisabled}
+              onToggleCompare={() => toggle(vendor.id)}
               className="mt-5"
-            >
-              {t("Book this caterer", "यह कैटरर बुक करें")} →
-            </Button>
-            <Button
-              variant={inCompare ? "primary" : "secondary"}
-              size="lg"
-              fullWidth
-              onClick={() => toggle(vendor.id)}
-              disabled={compareDisabled}
-              aria-pressed={inCompare}
-              className="mt-3"
-              leftIcon={<span aria-hidden="true">{inCompare ? "✓" : "+"}</span>}
-            >
-              {inCompare
-                ? t("Added to compare", "तुलना में जोड़ा")
-                : compareDisabled
-                  ? t("Compare list is full", "तुलना सूची भर गई है")
-                  : t("Add to compare", "तुलना में जोड़ें")}
-            </Button>
+            />
             {compareCount >= 2 && (
               <button
                 type="button"
                 onClick={openCompareTable}
-                className="mt-2 block w-full text-center text-sm font-semibold text-maroon hover:underline"
+                className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
               >
                 {t(
                   `Compare ${compareCount} selected →`,
@@ -398,18 +384,6 @@ function VendorProfile({
                 )}
               </button>
             )}
-
-            {/* Spread the word — forward this caterer to friends on WhatsApp. */}
-            <WhatsAppShareButton
-              path={`/vendors/${vendor.id}`}
-              variant="ghost"
-              fullWidth
-              className="mt-3"
-              label="Share this caterer"
-              labelHi="यह कैटरर शेयर करें"
-              message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
-              messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
-            />
 
             <dl className="mt-5 space-y-2 border-t border-cream-3 pt-4 text-sm">
               <div className="flex items-center justify-between">
