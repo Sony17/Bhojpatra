@@ -99,7 +99,7 @@ import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { Button, Stepper } from "@/components/ui";
-import { inr, money } from "@/lib/money";
+import { inr, money, perPlateCost } from "@/lib/money";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 const MIN_GUESTS = 50;
@@ -1459,6 +1459,10 @@ export default function BookingWizard() {
       `GST (18%):   ${money(gst)}`,
       `Grand Total: ${money(grandTotal)}`,
     );
+    if (guests > 0)
+      lines.push(
+        `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
+      );
     const emiPlan = buildEmiPlanForOrder();
     if (emiPlan) {
       lines.push(
@@ -1637,6 +1641,9 @@ export default function BookingWizard() {
         ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
         : "") +
       `\nGrand Total: ${money(grandTotal)}` +
+      (guests > 0
+        ? `\nPer Plate: ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`
+        : "") +
       paymentLines +
       emiLines
     );
@@ -5505,6 +5512,14 @@ function StepConfirm({
             {money(grandTotal)}
           </p>
         </div>
+        {guests > 0 && grandTotal > 0 && (
+          <p className="mt-0.5 text-right text-xs text-ink-soft">
+            {t(
+              `≈ ${money(perPlateCost(grandTotal, guests))} / plate × ${inr.format(guests)} guests`,
+              `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट × ${inr.format(guests)} मेहमान`,
+            )}
+          </p>
+        )}
         {paidAmount >= Math.round(grandTotal) ? (
           <p className="mt-1 text-sm font-semibold text-maroon">
             ✓ {t("Paid in full", "पूरा भुगतान हो गया")} · {money(paidAmount)}
@@ -5669,6 +5684,14 @@ function StepDone({
           <div>
             <dt className="text-ink-soft">{t("Grand Total", "कुल राशि")}</dt>
             <dd className="font-semibold text-ink">{money(grandTotal)}</dd>
+            {guests > 0 && grandTotal > 0 && (
+              <dd className="text-xs text-ink-soft">
+                {t(
+                  `≈ ${money(perPlateCost(grandTotal, guests))} / plate`,
+                  `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट`,
+                )}
+              </dd>
+            )}
           </div>
           {paidAmount > 0 && (
             <>
@@ -5984,13 +6007,14 @@ function SummaryPanel({
           </div>
         </div>
 
-        {/* Ground the big total in its per-head basis — headcount × plate rate is
-            why a large-function estimate runs into lakhs, not a scary lump sum. */}
-        {guests > 0 && perPlate > 0 && (
+        {/* Ground the big total in its per-head basis — an all-in plate rate ×
+            headcount is why a large-function estimate runs into lakhs, not a
+            scary lump sum. Uses total ÷ guests so it multiplies back exactly. */}
+        {guests > 0 && grandTotal > 0 && (
           <p className="mt-1.5 text-xs text-ink-soft">
             {t(
-              `${money(perPlate)} / plate · ${inr.format(guests)} guests`,
-              `${money(perPlate)} / प्लेट · ${inr.format(guests)} मेहमान`,
+              `≈ ${money(perPlateCost(grandTotal, guests))} / plate × ${inr.format(guests)} guests`,
+              `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट × ${inr.format(guests)} मेहमान`,
             )}
           </p>
         )}

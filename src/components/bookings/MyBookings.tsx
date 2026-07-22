@@ -36,7 +36,7 @@ import {
 } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
 import StarInput from "@/components/reviews/StarInput";
-import { money } from "@/lib/money";
+import { money, perPlateCost } from "@/lib/money";
 
 const ALL = "All" as const;
 type Filter = typeof ALL | BookingStatus;
@@ -977,6 +977,14 @@ function BookingCard({
                 {money(booking.amount)}
               </span>
             </div>
+            {booking.guests > 0 && booking.amount > 0 && (
+              <p className="mt-0.5 text-right text-xs text-ink-soft">
+                {t(
+                  `≈ ${money(perPlateCost(booking.amount, booking.guests))} / plate × ${booking.guests} guests`,
+                  `≈ ${money(perPlateCost(booking.amount, booking.guests))} / प्लेट × ${booking.guests} मेहमान`,
+                )}
+              </p>
+            )}
             <div className="mt-1.5 flex items-baseline justify-between text-sm">
               <span className="text-ink-soft">{t("Paid", "भुगतान")}</span>
               <span className="font-medium text-maroon">
@@ -1206,6 +1214,9 @@ function BookingDetailsModal({
     `${t("Here's my Bhojpatra invoice", "यह मेरा भोजपत्र इनवॉइस है")} — ${booking.occasion} (${booking.id})\n` +
     `${t("Date", "तिथि")}: ${booking.date} · ${booking.guests} ${t("guests", "मेहमान")}\n` +
     `${t("Total", "कुल")}: ${money(booking.amount)}` +
+    (booking.guests > 0
+      ? ` (≈ ${money(perPlateCost(booking.amount, booking.guests))} / ${t("plate", "प्लेट")})`
+      : "") +
     (balance > 0 ? ` · ${t("Balance", "बकाया")}: ${money(balance)}` : "") +
     `\n${t("View & download", "देखें और डाउनलोड करें")}: ${shareUrl}`;
   const waHref = `https://wa.me/?text=${encodeURIComponent(waMessage)}`;
