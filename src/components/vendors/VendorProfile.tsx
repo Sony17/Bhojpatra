@@ -242,6 +242,87 @@ export default function VendorProfile({
         </div>
       )}
 
+      {/* Baina Box menu — photo-led box cards (image, name, contents, ₹/box). */}
+      {profile.bainaBoxes.length > 0 && (
+        <div className="mt-12">
+          <h2 className="font-display text-2xl text-ink">
+            <span aria-hidden="true">🎁</span> {t("Our Baina Boxes", "हमारे बैना बॉक्स")}
+          </h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {profile.bainaBoxes.map((b, i) => (
+              <Card
+                key={`${b.name}-${i}`}
+                padding="none"
+                className="overflow-hidden"
+              >
+                {b.photo && (
+                  <div className="relative aspect-[4/3] w-full bg-cream">
+                    <Image
+                      src={b.photo}
+                      alt={b.name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                <div className="p-4">
+                  <p className="font-display font-semibold text-ink">
+                    {b.name}
+                  </p>
+                  {b.contents && (
+                    <p className="mt-1 text-sm text-ink-soft">{b.contents}</p>
+                  )}
+                  <p className="mt-2 text-lg font-semibold text-maroon">
+                    ₹{inr.format(b.price)}
+                    <span className="text-sm font-normal text-ink-soft">
+                      {" "}
+                      / {t("Box", "बॉक्स")}
+                    </span>
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Essential Service offer — service crew & setup at the vendor's rate. */}
+      {profile.essentialService && (
+        <div className="mt-12">
+          <h2 className="font-display text-2xl text-ink">
+            <span aria-hidden="true">🍽️</span>{" "}
+            {t("Essential Service", "एसेंशियल सर्विस")}
+          </h2>
+          <Card padding="none" className="mt-5 p-5 sm:p-6">
+            <p className="text-sm text-ink-soft">
+              {t(
+                "Serving crew, buffet setup & essentials",
+                "सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान",
+              )}
+              {" · "}
+              <span className="font-semibold text-ink">
+                {profile.essentialService.perGuest > 0
+                  ? `₹${inr.format(profile.essentialService.perGuest)}/${t("guest", "मेहमान")}`
+                  : t("rate on request", "दर अनुरोध पर")}
+              </span>
+            </p>
+            {profile.essentialService.includes.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {profile.essentialService.includes.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-cream-3 bg-cream/40 px-3.5 py-1.5 text-sm text-ink"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* Mobile sticky booking bar — price + CTA pinned above the tab bar. */}
       <StickyBookingBar
         price={`₹${inr.format(profile.priceFrom)}`}

@@ -445,10 +445,14 @@ export default function VendorCatalog() {
       }
     >
       <div className="mx-auto max-w-7xl">
-      {/* Bhojpatra's signature Baina Box promotion — pinned above the catalogue. */}
-      <div className="mb-6 mt-2">
-        <BainaBoxSpecial variant="search" />
-      </div>
+      {/* Bhojpatra's signature Baina Box promotion — the hero of a Baina Box
+          search. For regular brand browsing it moves below the grid so the
+          brand search is what visitors land on. */}
+      {isBainaSearch && (
+        <div className="mb-6 mt-2">
+          <BainaBoxSpecial variant="search" />
+        </div>
+      )}
 
       <div className="max-w-xl px-1">
         <p className="eyebrow text-[11px] font-semibold text-maroon">
@@ -843,6 +847,12 @@ export default function VendorCatalog() {
             ) : undefined
           }
         />
+      )}
+
+      {!isBainaSearch && (
+        <div className="mt-8">
+          <BainaBoxSpecial variant="search" />
+        </div>
       )}
 
       <CompareTray />

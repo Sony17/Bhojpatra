@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
+  cateringCategories,
   cities,
   indianStates,
   registrationCuisines,
   registrationCounters,
+  servicePackages,
 } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -27,6 +30,19 @@ interface MenuPackage {
   dishes: string;
   price: string;
 }
+
+interface RegBainaBox {
+  name: string;
+  contents: string;
+  price: string;
+  /** Same-origin `/api/vendor/photo/<id>` URL once uploaded. */
+  photo?: string;
+}
+
+/** The platform Essential tier's checklist — suggestion chips for the
+ *  vendor's own Essential Service offer. */
+const ESSENTIAL_SUGGESTIONS: string[] =
+  servicePackages.find((p) => p.id === "essential")?.includes ?? [];
 
 type DocKey = "gst" | "fssai" | "ownerId" | "businessProof";
 
@@ -212,6 +228,9 @@ export default function VendorRegister() {
   });
 
   // Step 3 — menu & pricing
+  // Catering categories the vendor serves — the same offering types customers
+  // browse on the frontend (full catering, single stall, live stall, …).
+  const [cateringCats, setCateringCats] = useState<string[]>([]);
   const [packages, setPackages] = useState<MenuPackage[]>([
     {
       name: "Silver Veg Package",
@@ -222,6 +241,12 @@ export default function VendorRegister() {
   const [minGuests, setMinGuests] = useState<string>("");
   const [maxGuests, setMaxGuests] = useState<string>("");
   const [maxEventsPerDay, setMaxEventsPerDay] = useState<string>("");
+  // Baina Box menu — shown when the baina-box category is picked.
+  const [bainaBoxes, setBainaBoxes] = useState<RegBainaBox[]>([]);
+  const [boxPhotoError, setBoxPhotoError] = useState<string>("");
+  // Essential Service offer — shown when the essential category is picked.
+  const [essentialRate, setEssentialRate] = useState<string>("");
+  const [essentialIncludes, setEssentialIncludes] = useState<string[]>([]);
 
   // Step 4 — photos & coverage
   const [galleryNames, setGalleryNames] = useState<string[]>([]);
@@ -294,6 +319,49 @@ export default function VendorRegister() {
 
   const removePackage = (index: number) => {
     setPackages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addBainaBox = () => {
+    setBainaBoxes((prev) =>
+      prev.length >= 12
+        ? prev
+        : [...prev, { name: "", contents: "", price: "" }],
+    );
+  };
+
+  const updateBainaBox = (index: number, patch: Partial<RegBainaBox>) => {
+    setBainaBoxes((prev) =>
+      prev.map((b, i) => (i === index ? { ...b, ...patch } : b)),
+    );
+  };
+
+  const removeBainaBox = (index: number) => {
+    setBainaBoxes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  /* Upload a box photo — the caterer is already signed in (vendor role), so
+     it goes to the same photo store the dashboard menu builder uses. */
+  const uploadBoxPhoto = async (index: number, file: File) => {
+    setBoxPhotoError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", "dish");
+    try {
+      const res = await fetch("/api/vendor/photo", { method: "POST", body: fd });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setBoxPhotoError(
+          data.error ??
+            t("Upload failed. Please try again.", "अपलोड विफल। कृपया पुनः प्रयास करें।"),
+        );
+        return;
+      }
+      updateBainaBox(index, { photo: data.url });
+    } catch {
+      setBoxPhotoError(
+        t("Network error. Please try again.", "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।"),
+      );
+    }
   };
 
   /* Upload a KYC document the moment it's selected — the file is stored
@@ -402,6 +470,12 @@ export default function VendorRegister() {
       }
     }
     if (step === 2) {
+      if (cateringCats.length === 0) {
+        return t(
+          "Select at least one catering category you offer.",
+          "कम से कम एक कैटरिंग श्रेणी चुनें जो आप देते हैं।",
+        );
+      }
       if (packages.length === 0) {
         return t("Add at least one menu package.", "कम से कम एक मेन्यू पैकेज जोड़ें।");
       }
@@ -418,6 +492,17 @@ export default function VendorRegister() {
         return t(
           "Please set your guest capacity and max events per day.",
           "कृपया अपनी मेहमान क्षमता और प्रति-दिन अधिकतम इवेंट निर्धारित करें।",
+        );
+      }
+      const badBox = bainaBoxes.some(
+        (b) =>
+          (b.name.trim() || b.contents.trim() || b.photo) &&
+          (!b.name.trim() || !(Number(b.price) > 0)),
+      );
+      if (badBox) {
+        return t(
+          "Each Baina Box needs a name and a price per box.",
+          "हर बैना बॉक्स के लिए एक नाम और प्रति बॉक्स मूल्य आवश्यक है।",
         );
       }
     }
@@ -481,6 +566,19 @@ export default function VendorRegister() {
       googleRating,
       googleReviews,
       docIds,
+      cateringCategories: cateringCats,
+      bainaBoxes: bainaBoxes
+        .filter((b) => b.name.trim() || b.contents.trim())
+        .map((b) => ({
+          name: b.name.trim(),
+          contents: b.contents.trim(),
+          price: Number(b.price) || 0,
+          ...(b.photo ? { photo: b.photo } : {}),
+        })),
+      essentialService: {
+        perGuest: Number(essentialRate) || 0,
+        includes: essentialIncludes,
+      },
       packages,
       minGuests,
       maxGuests,
@@ -931,6 +1029,61 @@ export default function VendorRegister() {
               {t("Menu & Pricing", "मेन्यू और मूल्य")}
             </h2>
 
+            {/* Catering categories — the same offering types customers browse
+                on the frontend, declared here so the marketplace can match
+                this vendor to what a guest is booking. */}
+            <div className="flex flex-col gap-2">
+              <span className={labelClass}>
+                {t("Catering Categories", "कैटरिंग श्रेणियां")}
+              </span>
+              <p className="text-xs text-ink-soft/80">
+                {t(
+                  "Pick everything you offer — customers browse and book by these categories.",
+                  "जो भी आप देते हैं उसे चुनें — ग्राहक इन्हीं श्रेणियों से ब्राउज़ और बुक करते हैं।",
+                )}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {cateringCategories.map((c) => {
+                  const on = cateringCats.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggle(c.id, cateringCats, setCateringCats)}
+                      className={
+                        "flex items-start gap-3 rounded-control border px-3.5 py-3 text-left transition-colors " +
+                        (on
+                          ? "border-maroon bg-maroon/5"
+                          : "border-cream-3 bg-cream/40 hover:border-maroon")
+                      }
+                    >
+                      <span aria-hidden="true" className="text-xl">
+                        {c.icon}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink">
+                          {t(c.name, c.nameHi)}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-ink-soft">
+                          {t(c.blurb, c.blurbHi)}
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={
+                          "ml-auto shrink-0 text-base " +
+                          (on ? "text-maroon" : "text-cream-3")
+                        }
+                      >
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex flex-col gap-4">
               {packages.map((pkg, i) => (
                 <div
@@ -1066,6 +1219,204 @@ export default function VendorRegister() {
                 )}
               </p>
             </div>
+
+            {/* Baina Box menu — appears when the baina-box category is picked;
+                photo-led boxes exactly as customers will see them. */}
+            {cateringCats.includes("baina-box") && (
+              <div className="flex flex-col gap-2 rounded-card border border-cream-3 bg-cream/30 p-4">
+                <span className={labelClass}>
+                  <span aria-hidden="true">🎁</span>{" "}
+                  {t("Your Baina Boxes", "आपके बैना बॉक्स")}
+                </span>
+                <p className="text-xs text-ink-soft/80">
+                  {t(
+                    "Add each box with a photo, contents and price per box — shown to customers browsing Baina Boxes.",
+                    "हर बॉक्स को फ़ोटो, सामग्री और प्रति बॉक्स मूल्य के साथ जोड़ें — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखेगा।",
+                  )}
+                </p>
+                {bainaBoxes.map((b, i) => (
+                  <div
+                    key={i}
+                    className="rounded-card border border-cream-3 bg-white p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-ink">
+                        {t("Box", "बॉक्स")} {i + 1}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeBainaBox(i)}
+                        aria-label={t(
+                          `Remove box ${i + 1}`,
+                          `बॉक्स ${i + 1} हटाएं`,
+                        )}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="mt-3 flex gap-3">
+                      <label
+                        className="relative flex h-[6.5rem] w-[6.5rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-control border border-dashed border-cream-3 bg-cream/40 text-center transition-colors hover:border-maroon"
+                        aria-label={t(
+                          `Box ${i + 1} photo`,
+                          `बॉक्स ${i + 1} फ़ोटो`,
+                        )}
+                      >
+                        {b.photo ? (
+                          <Image
+                            src={b.photo}
+                            alt=""
+                            fill
+                            sizes="104px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="text-xl text-maroon"
+                            >
+                              ⬆
+                            </span>
+                            <span className="px-1 text-[11px] leading-tight text-ink-soft">
+                              {t("Add photo", "फ़ोटो जोड़ें")}
+                            </span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void uploadBoxPhoto(i, file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <div className="grid flex-1 gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          value={b.name}
+                          onChange={(e) =>
+                            updateBainaBox(i, { name: e.target.value })
+                          }
+                          placeholder={t(
+                            "e.g. Royal Baina Box",
+                            "उदा. रॉयल बैना बॉक्स",
+                          )}
+                          aria-label={t("Box name", "बॉक्स का नाम")}
+                          className={inputClass}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          value={b.price}
+                          onChange={(e) =>
+                            updateBainaBox(i, { price: e.target.value })
+                          }
+                          placeholder={t(
+                            "Price per box (₹)",
+                            "प्रति बॉक्स मूल्य (₹)",
+                          )}
+                          aria-label={t("Price per box", "प्रति बॉक्स मूल्य")}
+                          className={inputClass}
+                        />
+                        <input
+                          type="text"
+                          value={b.contents}
+                          onChange={(e) =>
+                            updateBainaBox(i, { contents: e.target.value })
+                          }
+                          placeholder={t(
+                            "Contents — e.g. Kaju Katli, Motichoor Ladoo, Dry Fruits",
+                            "सामग्री — उदा. काजू कतली, मोतीचूर लड्डू, ड्राई फ्रूट्स",
+                          )}
+                          aria-label={t("Box contents", "बॉक्स सामग्री")}
+                          className={inputClass + " sm:col-span-2"}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {boxPhotoError && (
+                  <p role="alert" className="text-xs font-semibold text-maroon">
+                    {boxPhotoError}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={addBainaBox}
+                  disabled={bainaBoxes.length >= 12}
+                  className="self-start"
+                >
+                  + {t("Add Box", "बॉक्स जोड़ें")}
+                </Button>
+              </div>
+            )}
+
+            {/* Essential Service offer — appears when the essential category
+                is picked; rate + what's included. */}
+            {cateringCats.includes("essential") && (
+              <div className="flex flex-col gap-2 rounded-card border border-cream-3 bg-cream/30 p-4">
+                <span className={labelClass}>
+                  <span aria-hidden="true">🍽️</span>{" "}
+                  {t("Your Essential Service", "आपकी एसेंशियल सर्विस")}
+                </span>
+                <p className="text-xs text-ink-soft/80">
+                  {t(
+                    "Serving crew, buffet setup & essentials at your own per-guest rate.",
+                    "आपकी अपनी प्रति-मेहमान दर पर सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान।",
+                  )}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-ink-soft">₹</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={essentialRate}
+                    onChange={(e) => setEssentialRate(e.target.value)}
+                    placeholder="40"
+                    aria-label={t("Per-guest rate", "प्रति-मेहमान दर")}
+                    className={inputClass + " w-24"}
+                  />
+                  <span className="text-sm text-ink-soft">
+                    / {t("guest", "मेहमान")}
+                  </span>
+                </div>
+                <span className={labelClass}>
+                  {t("What you include", "आप क्या शामिल करते हैं")}
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(
+                    new Set([...ESSENTIAL_SUGGESTIONS, ...essentialIncludes]),
+                  ).map((item) => (
+                    <Chip
+                      key={item}
+                      label={item}
+                      active={essentialIncludes.includes(item)}
+                      onClick={() =>
+                        toggle(item, essentialIncludes, setEssentialIncludes)
+                      }
+                    />
+                  ))}
+                </div>
+                <CustomAdder
+                  placeholder={t("Add your own item…", "अपना आइटम जोड़ें…")}
+                  onAdd={(value) =>
+                    setEssentialIncludes((prev) =>
+                      prev.some(
+                        (x) => x.toLowerCase() === value.toLowerCase(),
+                      )
+                        ? prev
+                        : [...prev, value],
+                    )
+                  }
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1220,6 +1571,43 @@ export default function VendorRegister() {
                 label={t("Cuisine Specialities", "व्यंजन विशेषज्ञता")}
                 value={cuisines.length ? cuisines.join(", ") : "—"}
               />
+              <ReviewItem
+                label={t("Catering Categories", "कैटरिंग श्रेणियां")}
+                value={
+                  cateringCats.length
+                    ? cateringCategories
+                        .filter((c) => cateringCats.includes(c.id))
+                        .map((c) => t(c.name, c.nameHi))
+                        .join(", ")
+                    : "—"
+                }
+              />
+              {cateringCats.includes("baina-box") && (
+                <ReviewItem
+                  label={t("Baina Boxes", "बैना बॉक्स")}
+                  value={
+                    bainaBoxes.filter((b) => b.name.trim()).length
+                      ? bainaBoxes
+                          .filter((b) => b.name.trim())
+                          .map((b) => `${b.name.trim()} (₹${b.price})`)
+                          .join(", ")
+                      : "—"
+                  }
+                />
+              )}
+              {cateringCats.includes("essential") && (
+                <ReviewItem
+                  label={t("Essential Service", "एसेंशियल सर्विस")}
+                  value={
+                    essentialRate.trim() || essentialIncludes.length
+                      ? t(
+                          `₹${essentialRate.trim() || "0"}/guest · ${essentialIncludes.length} items`,
+                          `₹${essentialRate.trim() || "0"}/मेहमान · ${essentialIncludes.length} आइटम`,
+                        )
+                      : "—"
+                  }
+                />
+              )}
               <ReviewItem
                 label={t("Menu Packages", "मेन्यू पैकेज")}
                 value={t(

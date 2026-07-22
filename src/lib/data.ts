@@ -2065,6 +2065,77 @@ export const registrationCounters: string[] = vendorOfferings.map((o) => o.name)
 /** Stable ids of every offering — the allow-list the menu API validates against. */
 export const vendorOfferingIds: string[] = vendorOfferings.map((o) => o.id);
 
+/**
+ * Catering categories — the offering types the customer frontend actually
+ * sells, so a vendor can declare their business in the exact terms customers
+ * browse. Each entry mirrors one customer-facing surface:
+ *   • full-catering — the Silver / Gold / Platinum feast package cards
+ *   • single-stall  — the "Single Stall · One Vendor" custom package card
+ *   • live-stall    — the /book wizard's dedicated "Live Stall" step
+ *   • baina-box     — the home "Baina Box" section (/vendors?q=Baina+Box)
+ *   • essential     — the Essential tier of /service-packages (service-only)
+ * Vendors pick theirs in the registration wizard's Menu step and in the
+ * dashboard Menu Builder; the ids are the allow-list the vendor APIs validate
+ * against (`cateringCategoryIds`).
+ */
+export interface CateringCategory {
+  id: string;
+  name: string;
+  nameHi: string;
+  icon: string;
+  /** One-line description shown under the pick chip. */
+  blurb: string;
+  blurbHi: string;
+}
+
+export const cateringCategories: CateringCategory[] = [
+  {
+    id: "full-catering",
+    name: "Full Catering",
+    nameHi: "फुल कैटरिंग",
+    icon: "🍲",
+    blurb: "Complete multi-course feasts — Silver, Gold & Platinum packages.",
+    blurbHi: "पूरे मल्टी-कोर्स भोज — सिल्वर, गोल्ड और प्लैटिनम पैकेज।",
+  },
+  {
+    id: "single-stall",
+    name: "Single Stall",
+    nameHi: "सिंगल स्टॉल",
+    icon: "🍢",
+    blurb: "One stall, one vendor — custom menus for any occasion.",
+    blurbHi: "एक स्टॉल, एक वेंडर — किसी भी अवसर के लिए कस्टम मेन्यू।",
+  },
+  {
+    id: "live-stall",
+    name: "Live Stall",
+    nameHi: "लाइव स्टॉल",
+    icon: "🍳",
+    blurb: "Made-to-order stations cooked in front of guests.",
+    blurbHi: "मेहमानों के सामने बनने वाले लाइव स्टेशन।",
+  },
+  {
+    id: "baina-box",
+    name: "Baina Box",
+    nameHi: "बैना बॉक्स",
+    icon: "🎁",
+    blurb: "Premium sweet & gifting boxes for weddings and functions.",
+    blurbHi: "शादियों और आयोजनों के लिए प्रीमियम मिठाई और गिफ्ट बॉक्स।",
+  },
+  {
+    id: "essential",
+    name: "Essential Service",
+    nameHi: "एसेंशियल सर्विस",
+    icon: "🍽️",
+    blurb: "Serving crew, buffet setup & essentials for small functions.",
+    blurbHi: "छोटे आयोजनों के लिए सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान।",
+  },
+];
+
+/** Stable catering-category ids — the allow-list the vendor APIs accept. */
+export const cateringCategoryIds: string[] = cateringCategories.map(
+  (c) => c.id,
+);
+
 /* ───────────────────────────────────────────────────────────────────────
    GALLERY — a stack of real-event / signature-dish photos used by the
    <Gallery> section. The first seven feed the scroll-driven "fan-out"

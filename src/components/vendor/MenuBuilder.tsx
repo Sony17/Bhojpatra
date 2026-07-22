@@ -13,15 +13,20 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
+  cateringCategories,
   cities,
+  isLiveStallCategory,
   menuCategories,
   registrationCuisines,
+  servicePackages,
   vendorOfferings,
   type DietType,
 } from "@/lib/data";
 import type {
   ModerationStatus,
+  VendorBainaBox,
   VendorCounter,
+  VendorEssentialService,
   VendorMenuSection,
 } from "@/lib/vendorMenus";
 import { money } from "@/lib/money";
@@ -64,7 +69,23 @@ interface VendorPayload {
   googleReviews?: number;
   menu: VendorMenuSection[];
   counters?: VendorCounter[];
+  serviceCategories?: string[];
+  bainaBoxes?: VendorBainaBox[];
+  essentialService?: VendorEssentialService;
 }
+
+interface DraftBox {
+  name: string;
+  contents: string;
+  price: string;
+  /** Same-origin box photo URL, set after an upload. */
+  photo?: string;
+}
+
+/** The platform Essential tier's checklist — suggestion chips for the vendor's
+ *  own Essential Service offer (they can add their own items too). */
+const ESSENTIAL_SUGGESTIONS: string[] =
+  servicePackages.find((p) => p.id === "essential")?.includes ?? [];
 
 const emptySections = (): Record<string, DraftSection> =>
   Object.fromEntries(
@@ -111,6 +132,16 @@ export default function MenuBuilder() {
   // Live counters & services the vendor offers: offering id → own-price string
   // (a present key = offered; an empty value = charge the platform default).
   const [counters, setCounters] = useState<Record<string, string>>({});
+  // Catering categories served — the same offering types customers browse on
+  // the frontend (full catering, single stall, live stall, baina box, …).
+  const [serviceCats, setServiceCats] = useState<string[]>([]);
+  // Baina Box menu — the vendor's own boxes (baina-box category).
+  const [boxes, setBoxes] = useState<DraftBox[]>([]);
+  const [boxPhotoError, setBoxPhotoError] = useState("");
+  // Essential Service offer — per-guest rate + what's included.
+  const [essentialRate, setEssentialRate] = useState("");
+  const [essentialIncludes, setEssentialIncludes] = useState<string[]>([]);
+  const [essentialDraft, setEssentialDraft] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -175,6 +206,24 @@ export default function MenuBuilder() {
                   ]),
                 ),
               );
+            }
+            // Categories likewise carry over from the saved profile or, first
+            // time in, from the registration application.
+            if (src.serviceCategories) setServiceCats(src.serviceCategories);
+            if (src.bainaBoxes) {
+              setBoxes(
+                src.bainaBoxes.map((b) => ({
+                  name: b.name,
+                  contents: b.contents,
+                  price: String(b.price),
+                  ...(b.photo ? { photo: b.photo } : {}),
+                })),
+              );
+            }
+            if (src.essentialService) {
+              if (src.essentialService.perGuest > 0)
+                setEssentialRate(String(src.essentialService.perGuest));
+              setEssentialIncludes(src.essentialService.includes);
             }
           }
           if (d.gallery) setGallery(d.gallery);
@@ -362,6 +411,91 @@ export default function MenuBuilder() {
     setSaved(false);
   };
 
+  const toggleServiceCat = (id: string) => {
+    setServiceCats((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    );
+    setSaved(false);
+  };
+
+  /** Auto-declare a catering category once its builder gains content, so the
+   *  declaration and the menu can't drift apart (never auto-unticks). */
+  const ensureServiceCat = (id: string) => {
+    setServiceCats((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const addBox = () => {
+    setBoxes((prev) =>
+      prev.length >= 12
+        ? prev
+        : [...prev, { name: "", contents: "", price: "" }],
+    );
+    ensureServiceCat("baina-box");
+    setSaved(false);
+  };
+
+  const updateBox = (index: number, patch: Partial<DraftBox>) => {
+    setBoxes((prev) =>
+      prev.map((b, i) => (i === index ? { ...b, ...patch } : b)),
+    );
+    setSaved(false);
+  };
+
+  const removeBox = (index: number) => {
+    setBoxes((prev) => prev.filter((_, i) => i !== index));
+    setSaved(false);
+  };
+
+  /** Upload a box photo (same "dish" photo store as menu items — orphans are
+   *  pruned on save) and pin it to the box row. */
+  const uploadBoxPhoto = async (index: number, file: File) => {
+    setBoxPhotoError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "dish");
+      const res = await fetch("/api/vendor/photo", { method: "POST", body: fd });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setBoxPhotoError(
+          data.error ?? t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"),
+        );
+        return;
+      }
+      updateBox(index, { photo: data.url });
+    } catch {
+      setBoxPhotoError(t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"));
+    }
+  };
+
+  const toggleEssentialInclude = (item: string) => {
+    setEssentialIncludes((prev) => {
+      if (prev.includes(item)) return prev.filter((x) => x !== item);
+      ensureServiceCat("essential");
+      return [...prev, item];
+    });
+    setSaved(false);
+  };
+
+  const addEssentialCustom = () => {
+    const value = essentialDraft.trim();
+    if (!value) return;
+    setEssentialIncludes((prev) =>
+      prev.some((x) => x.toLowerCase() === value.toLowerCase())
+        ? prev
+        : [...prev, value],
+    );
+    setEssentialDraft("");
+    ensureServiceCat("essential");
+    setSaved(false);
+  };
+
+  const onEssentialRate = (value: string) => {
+    setEssentialRate(value);
+    if (value.trim()) ensureServiceCat("essential");
+    setSaved(false);
+  };
+
   const onSave = async () => {
     setSaveError("");
     if (business.trim().length < 2) {
@@ -405,6 +539,21 @@ export default function MenuBuilder() {
             const price = Number(counters[o.id]);
             return { id: o.id, ...(price > 0 ? { price } : {}) };
           }),
+        serviceCategories: serviceCats,
+        // Blank box rows are dropped client-side; a named box without a price
+        // is left in so the server's clearer validation error surfaces.
+        bainaBoxes: boxes
+          .filter((b) => b.name.trim() || b.contents.trim())
+          .map((b) => ({
+            name: b.name.trim(),
+            contents: b.contents.trim(),
+            price: Number(b.price) || 0,
+            ...(b.photo ? { photo: b.photo } : {}),
+          })),
+        essentialService: {
+          perGuest: Number(essentialRate) || 0,
+          includes: essentialIncludes,
+        },
       };
       const res = await fetch("/api/vendor/menu", {
         method: "PUT",
@@ -774,30 +923,312 @@ export default function MenuBuilder() {
         )}
       </Card>
 
-      {/* Course sections */}
-      <div className="space-y-4">
-        {menuCategories.map((cat) => {
-          const s = sections[cat.id];
-          return (
-            <CategorySection
-              key={cat.id}
-              icon={cat.icon}
-              name={lang === "hi" ? cat.nameHi : cat.name}
-              blurb={lang === "hi" ? cat.blurbHi : cat.blurb}
-              suggestions={DISH_SUGGESTIONS[cat.id] ?? []}
-              section={s}
-              onToggle={() =>
-                updateSection(cat.id, { enabled: !s.enabled })
-              }
-              onPerPlate={(v) => updateSection(cat.id, { perPlate: v })}
-              onAddItem={(item) => addItem(cat.id, item)}
-              onRemoveItem={(i) => removeItem(cat.id, i)}
-              onToggleDiet={(i) => toggleItemDiet(cat.id, i)}
-              onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
+      {/* Catering categories — the same offering types the customer frontend
+          sells (feast packages, single stall, live stall, baina box, essential
+          service), declared here so the backend entry mirrors the storefront. */}
+      <Card padding="none" className="p-5 sm:p-6">
+        <h3 className="font-display text-base font-semibold text-ink">
+          {t("Catering Categories", "कैटरिंग श्रेणियां")}
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          {t(
+            "Pick everything you offer — customers browse and book by these categories.",
+            "जो भी आप देते हैं उसे चुनें — ग्राहक इन्हीं श्रेणियों से ब्राउज़ और बुक करते हैं।",
+          )}
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {cateringCategories.map((c) => {
+            const on = serviceCats.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleServiceCat(c.id)}
+                className={
+                  "flex items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors " +
+                  (on
+                    ? "border-maroon bg-maroon-soft/30"
+                    : "border-cream-3 bg-cream/40 hover:border-maroon")
+                }
+              >
+                <span aria-hidden="true" className="text-xl">{c.icon}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">
+                    {lang === "hi" ? c.nameHi : c.name}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-ink-soft">
+                    {lang === "hi" ? c.blurbHi : c.blurb}
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={
+                    "ml-auto shrink-0 text-base " +
+                    (on ? "text-maroon" : "text-cream-3")
+                  }
+                >
+                  ✓
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Course sections, grouped by the catering category they feed. Plated
+          courses power the Full Catering packages and Single Stall bookings;
+          live stations power the /book wizard's dedicated Live Stall step
+          (and the richer feast tiers). Same dish data as before — the split
+          mirrors the customer-facing booking flow. */}
+      {[
+        {
+          key: "plated",
+          icon: "🍲",
+          title: t(
+            "Full Catering & Single Stall Menu",
+            "फुल कैटरिंग और सिंगल स्टॉल मेन्यू",
+          ),
+          sub: t(
+            "Plated courses — served in your Silver–Platinum feast packages and single-stall bookings.",
+            "प्लेटेड कोर्स — आपके सिल्वर–प्लैटिनम फ़ीस्ट पैकेज और सिंगल स्टॉल बुकिंग में परोसे जाते हैं।",
+          ),
+          cats: menuCategories.filter((c) => !isLiveStallCategory(c.id)),
+        },
+        {
+          key: "live",
+          icon: "🍳",
+          title: t("Live Stall Menu", "लाइव स्टॉल मेन्यू"),
+          sub: t(
+            "Live stations cooked in front of guests — the Live Stall step of a booking, also part of Gold & Platinum feasts.",
+            "मेहमानों के सामने बनने वाले लाइव स्टेशन — बुकिंग का लाइव स्टॉल चरण, गोल्ड और प्लैटिनम भोज का हिस्सा भी।",
+          ),
+          cats: menuCategories.filter((c) => isLiveStallCategory(c.id)),
+        },
+      ].map((group) => (
+        <div key={group.key} className="space-y-4">
+          <div className="flex items-start gap-3 pt-2">
+            <span aria-hidden="true" className="text-xl">
+              {group.icon}
+            </span>
+            <div>
+              <h3 className="font-display text-base font-semibold text-ink">
+                {group.title}
+              </h3>
+              <p className="mt-0.5 text-xs text-ink-soft">{group.sub}</p>
+            </div>
+          </div>
+          {group.cats.map((cat) => {
+            const s = sections[cat.id];
+            return (
+              <CategorySection
+                key={cat.id}
+                icon={cat.icon}
+                name={lang === "hi" ? cat.nameHi : cat.name}
+                blurb={lang === "hi" ? cat.blurbHi : cat.blurb}
+                suggestions={DISH_SUGGESTIONS[cat.id] ?? []}
+                section={s}
+                onToggle={() =>
+                  updateSection(cat.id, { enabled: !s.enabled })
+                }
+                onPerPlate={(v) => updateSection(cat.id, { perPlate: v })}
+                onAddItem={(item) => addItem(cat.id, item)}
+                onRemoveItem={(i) => removeItem(cat.id, i)}
+                onToggleDiet={(i) => toggleItemDiet(cat.id, i)}
+                onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
+              />
+            );
+          })}
+        </div>
+      ))}
+
+      {/* Baina Box menu — the box offerings customers browse from the home
+          "Baina Box" section. Adding a box auto-declares the category. */}
+      <Card padding="none" className="p-5 sm:p-6">
+        <h3 className="font-display text-base font-semibold text-ink">
+          <span aria-hidden="true">🎁</span>{" "}
+          {t("Baina Box Menu", "बैना बॉक्स मेन्यू")}
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          {t(
+            "Sweet & gifting boxes priced per box — shown to customers browsing Baina Boxes.",
+            "प्रति बॉक्स मूल्य वाले मिठाई और गिफ्ट बॉक्स — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखते हैं।",
+          )}
+        </p>
+        <div className="mt-4 space-y-3">
+          {boxes.map((b, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-cream-3 bg-cream/30 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink">
+                  {t("Box", "बॉक्स")} {i + 1}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => removeBox(i)}
+                  aria-label={t(`Remove box ${i + 1}`, `बॉक्स ${i + 1} हटाएं`)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="mt-3 flex gap-3">
+                {/* Box photo — uploaded to the shared dish-photo store; shown
+                    on the customer-facing box card. */}
+                <label
+                  className="relative flex h-[6.5rem] w-[6.5rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-dashed border-cream-3 bg-cream/40 text-center transition-colors hover:border-maroon"
+                  aria-label={t(
+                    `Box ${i + 1} photo`,
+                    `बॉक्स ${i + 1} फ़ोटो`,
+                  )}
+                >
+                  {b.photo ? (
+                    <Image
+                      src={b.photo}
+                      alt=""
+                      fill
+                      sizes="104px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <>
+                      <span aria-hidden="true" className="text-xl text-maroon">
+                        ⬆
+                      </span>
+                      <span className="px-1 text-[11px] leading-tight text-ink-soft">
+                        {t("Add photo", "फ़ोटो जोड़ें")}
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadBoxPhoto(i, file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <div className="grid flex-1 gap-3 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={b.name}
+                    onChange={(e) => updateBox(i, { name: e.target.value })}
+                    placeholder={t("e.g. Royal Mithai Box", "उदा. रॉयल मिठाई बॉक्स")}
+                    aria-label={t("Box name", "बॉक्स का नाम")}
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={b.price}
+                    onChange={(e) => updateBox(i, { price: e.target.value })}
+                    placeholder={t("Price per box (₹)", "प्रति बॉक्स मूल्य (₹)")}
+                    aria-label={t("Price per box", "प्रति बॉक्स मूल्य")}
+                    className={inputClass}
+                  />
+                  <input
+                    type="text"
+                    value={b.contents}
+                    onChange={(e) => updateBox(i, { contents: e.target.value })}
+                    placeholder={t(
+                      "Contents, comma separated — e.g. Kaju Katli, Motichoor Ladoo, Dry Fruits",
+                      "सामग्री, अल्पविराम से अलग — उदा. काजू कतली, मोतीचूर लड्डू, ड्राई फ्रूट्स",
+                    )}
+                    aria-label={t("Box contents", "बॉक्स सामग्री")}
+                    className={inputClass + " sm:col-span-2"}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          {boxPhotoError && (
+            <p role="alert" className="text-xs font-semibold text-maroon">
+              {boxPhotoError}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addBox}
+            disabled={boxes.length >= 12}
+          >
+            + {t("Add Box", "बॉक्स जोड़ें")}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Essential Service — the vendor's own take on the service-only tier
+          customers see on /service-packages. Rate + what's included. */}
+      <Card padding="none" className="p-5 sm:p-6">
+        <h3 className="font-display text-base font-semibold text-ink">
+          <span aria-hidden="true">🍽️</span>{" "}
+          {t("Essential Service", "एसेंशियल सर्विस")}
+        </h3>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          {t(
+            "Serving crew, buffet setup & essentials at your own per-guest rate — for single stalls and small functions.",
+            "सिंगल स्टॉल और छोटे आयोजनों के लिए आपकी अपनी प्रति-मेहमान दर पर सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान।",
+          )}
+        </p>
+        <div className="mt-4 flex items-center gap-2">
+          <span className="text-sm text-ink-soft">₹</span>
+          <input
+            type="number"
+            min={0}
+            value={essentialRate}
+            onChange={(e) => onEssentialRate(e.target.value)}
+            placeholder="40"
+            aria-label={t("Per-guest rate", "प्रति-मेहमान दर")}
+            className="w-24 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+          />
+          <span className="text-sm text-ink-soft">
+            / {t("guest", "मेहमान")}
+          </span>
+        </div>
+        <span className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+          {t("What you include", "आप क्या शामिल करते हैं")}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {Array.from(
+            new Set([...ESSENTIAL_SUGGESTIONS, ...essentialIncludes]),
+          ).map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              active={essentialIncludes.includes(item)}
+              onClick={() => toggleEssentialInclude(item)}
             />
-          );
-        })}
-      </div>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            value={essentialDraft}
+            onChange={(e) => setEssentialDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addEssentialCustom();
+              }
+            }}
+            placeholder={t("Add your own item…", "अपना आइटम जोड़ें…")}
+            className={inputClass + " max-w-xs"}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addEssentialCustom}
+            disabled={!essentialDraft.trim()}
+          >
+            + {t("Add", "जोड़ें")}
+          </Button>
+        </div>
+      </Card>
 
       {/* Live counters & services — the same extras the /book wizard sells, so a
           vendor can advertise every counter/service they run at their own rate. */}

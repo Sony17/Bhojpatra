@@ -25,6 +25,8 @@ import {
   type TopVendors,
 } from "@/lib/topVendorsData";
 import {
+  cateringCategories,
+  cateringCategoryIds,
   menuCategories,
   vendorOfferings,
   vendorOfferingIds,
@@ -57,6 +59,28 @@ export interface VendorMenuSection {
   items: VendorMenuItem[];
   /** Paused by the vendor: dishes stay saved but customers don't see them. */
   hidden?: boolean;
+}
+
+/** One Baina Box the vendor sells — the sweet/gifting boxes customers browse
+ *  from the home "Baina Box" section. The vendor's own box menu. */
+export interface VendorBainaBox {
+  name: string;
+  /** What's inside, comma separated (shown on the box card). */
+  contents: string;
+  /** Price per box (₹). */
+  price: number;
+  /** Box photo (same-origin `/api/vendor/photo/<id>` URL, vendor-owned). */
+  photo?: string;
+}
+
+/** The vendor's Essential Service offer — the service-only tier customers see
+ *  on /service-packages (crew, buffet setup & essentials), at the vendor's
+ *  own per-guest rate with what they include. */
+export interface VendorEssentialService {
+  /** Per-guest rate (₹). 0 is valid — the platform tier starts at ₹0. */
+  perGuest: number;
+  /** What the vendor includes (checklist + their own additions). */
+  includes: string[];
 }
 
 /** A live counter / service the vendor declares they run — one of the platform
@@ -104,6 +128,14 @@ export interface LiveVendorRecord {
   menu: VendorMenuSection[];
   /** Live counters & services the vendor offers, from the platform add-on set. */
   counters?: VendorCounter[];
+  /** Catering categories the vendor serves — the same offering types customers
+   *  browse on the frontend (`cateringCategories` ids: full-catering,
+   *  single-stall, live-stall, baina-box, essential). */
+  serviceCategories?: string[];
+  /** The vendor's Baina Box menu (baina-box category). */
+  bainaBoxes?: VendorBainaBox[];
+  /** The vendor's Essential Service offer (essential category). */
+  essentialService?: VendorEssentialService;
   createdAt: string;
   updatedAt: string;
 }
@@ -359,6 +391,18 @@ export interface PublicVendorProfile {
     perPlate: boolean;
     category: string;
   }[];
+  /** Catering categories the vendor serves, resolved for display — the same
+   *  offering types the customer frontend sells (see `cateringCategories`). */
+  serviceCategories: {
+    id: string;
+    name: string;
+    nameHi: string;
+    icon: string;
+  }[];
+  /** The vendor's Baina Box menu (empty when they don't sell boxes). */
+  bainaBoxes: VendorBainaBox[];
+  /** The vendor's Essential Service offer, or null when not offered. */
+  essentialService: VendorEssentialService | null;
 }
 
 /** Resolve a vendor's declared counter ids into display rows (name/icon/price),
@@ -379,6 +423,18 @@ export function countersFromLabels(
     if (!o || seen.has(o.id)) return [];
     seen.add(o.id);
     return [{ id: o.id }];
+  });
+}
+
+/** Resolve declared catering-category ids into display rows (name/icon),
+ *  dropping any id no longer in the platform list. */
+export function resolveServiceCategories(
+  ids: string[] | undefined,
+): PublicVendorProfile["serviceCategories"] {
+  if (!ids?.length) return [];
+  return ids.flatMap((id) => {
+    const c = cateringCategories.find((cat) => cat.id === id);
+    return c ? [{ id: c.id, name: c.name, nameHi: c.nameHi, icon: c.icon }] : [];
   });
 }
 
@@ -442,6 +498,9 @@ export function toPublicVendorProfile(
       ];
     }),
     counters: resolveVendorCounters(r.counters),
+    serviceCategories: resolveServiceCategories(r.serviceCategories),
+    bainaBoxes: r.bainaBoxes ?? [],
+    essentialService: r.essentialService ?? null,
   };
 }
 
@@ -451,6 +510,8 @@ const CATEGORY_IDS = new Set(menuCategories.map((c) => c.id));
 const MAX_SECTIONS = menuCategories.length;
 const MAX_ITEMS_PER_SECTION = 24;
 const MAX_CUISINES = 12;
+const MAX_BAINA_BOXES = 12;
+const MAX_ESSENTIAL_INCLUDES = 20;
 /** Allow-list of live-counter / service ids a vendor may declare. */
 const OFFERING_IDS = new Set(vendorOfferingIds);
 
@@ -475,6 +536,75 @@ export interface VendorMenuInput {
   googleReviews?: number;
   menu: VendorMenuSection[];
   counters?: VendorCounter[];
+  serviceCategories?: string[];
+  bainaBoxes?: VendorBainaBox[];
+  essentialService?: VendorEssentialService;
+}
+
+type BainaBoxesCheck =
+  | { ok: true; value: VendorBainaBox[] }
+  | { ok: false; error: string };
+
+/** Validate + normalize a vendor's Baina Box list. Blank rows are dropped; a
+ *  named box without a valid price is a hard error (it would render
+ *  priceless). Photos must be our own photo-serving URLs — ownership is
+ *  verified by the menu route. Shared by the registration application route
+ *  and the dashboard menu save. */
+export function cleanBainaBoxes(v: unknown): BainaBoxesCheck {
+  const boxes: VendorBainaBox[] = [];
+  if (!Array.isArray(v)) return { ok: true, value: boxes };
+  for (const raw of v.slice(0, MAX_BAINA_BOXES)) {
+    const b = (raw ?? {}) as Record<string, unknown>;
+    const name = cleanString(b.name, 60);
+    const contents = cleanString(b.contents, 200);
+    if (!name && !contents) continue;
+    const price = cleanMoney(b.price, 100000);
+    if (!name || price === null || price <= 0) {
+      return {
+        ok: false,
+        error: "Each Baina Box needs a name and a price per box.",
+      };
+    }
+    const photo =
+      typeof b.photo === "string" && PHOTO_URL_RE.test(b.photo)
+        ? b.photo
+        : undefined;
+    boxes.push({ name, contents, price, ...(photo ? { photo } : {}) });
+  }
+  return { ok: true, value: boxes };
+}
+
+/** Normalize a vendor's Essential Service offer — per-guest rate (0 allowed:
+ *  the platform tier starts at ₹0) plus deduped includes. Undefined when it
+ *  says nothing. Shared by the application route and the menu save. */
+export function cleanEssentialService(
+  v: unknown,
+): VendorEssentialService | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const e = v as Record<string, unknown>;
+  const perGuest = cleanMoney(e.perGuest, 10000) ?? 0;
+  const seen = new Set<string>();
+  const includes = (Array.isArray(e.includes) ? e.includes : [])
+    .map((it) => cleanString(it, 60))
+    .filter((it) => {
+      if (!it || seen.has(it.toLowerCase())) return false;
+      seen.add(it.toLowerCase());
+      return true;
+    })
+    .slice(0, MAX_ESSENTIAL_INCLUDES);
+  return perGuest > 0 || includes.length > 0
+    ? { perGuest, includes }
+    : undefined;
+}
+
+/** Keep only known catering-category ids, deduped, in platform order. Shared
+ *  by the registration application route and the dashboard menu save. */
+export function cleanCateringCategories(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const picked = new Set(
+    v.filter((id): id is string => typeof id === "string").map((id) => id.trim()),
+  );
+  return cateringCategoryIds.filter((id) => picked.has(id));
 }
 
 /** Normalize a self-declared Google rating (0–5, one decimal). Returns
@@ -602,6 +732,24 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
     }
   }
 
+  // Baina Boxes + Essential Service — via the shared cleaners (also used by
+  // the registration application route).
+  const boxesCheck = cleanBainaBoxes(body.bainaBoxes);
+  if (!boxesCheck.ok) return boxesCheck;
+  const bainaBoxes = boxesCheck.value;
+  const essentialService = cleanEssentialService(body.essentialService);
+
+  // Catering categories — the customer-facing offering types the vendor
+  // serves. Unknown ids are dropped, and a category whose builder has content
+  // is always declared (the declaration and the menu can't drift apart).
+  // Order follows the platform list.
+  const declared = new Set(cleanCateringCategories(body.serviceCategories));
+  if (bainaBoxes.length) declared.add("baina-box");
+  if (essentialService) declared.add("essential");
+  const serviceCategories = cateringCategoryIds.filter((id) =>
+    declared.has(id),
+  );
+
   return {
     ok: true,
     value: {
@@ -617,6 +765,9 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(googleReviews !== undefined ? { googleReviews } : {}),
       menu,
       ...(counters.length ? { counters } : {}),
+      ...(serviceCategories.length ? { serviceCategories } : {}),
+      ...(bainaBoxes.length ? { bainaBoxes } : {}),
+      ...(essentialService ? { essentialService } : {}),
     },
   };
 }

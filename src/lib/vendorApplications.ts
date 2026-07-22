@@ -15,6 +15,10 @@ import type {
   VendorTier,
   VerificationStatus,
 } from "@/lib/admin/types";
+import type {
+  VendorBainaBox,
+  VendorEssentialService,
+} from "@/lib/vendorMenus";
 
 export interface VendorPackageInput {
   name: string;
@@ -62,6 +66,15 @@ export interface VendorApplicationRecord {
   maxEventsPerDay: string;
   serviceCities: string[];
   counters: string[];
+  /** Catering categories the vendor serves (`cateringCategories` ids) — the
+   *  same offering types customers browse on the frontend. Absent on
+   *  applications submitted before the field existed. */
+  cateringCategories?: string[];
+  /** Baina Box menu declared at registration (baina-box category) — prefills
+   *  the dashboard menu builder. */
+  bainaBoxes?: VendorBainaBox[];
+  /** Essential Service offer declared at registration (essential category). */
+  essentialService?: VendorEssentialService;
   status: VerificationStatus;
   /** Display date (YYYY-MM-DD) shown in the approvals table. */
   submitted: string;

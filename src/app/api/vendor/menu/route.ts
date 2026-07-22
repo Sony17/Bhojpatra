@@ -62,6 +62,11 @@ export async function GET() {
             // Map the counter/service labels chosen at registration onto the
             // platform offering ids the dashboard toggles (unmatched dropped).
             counters: countersFromLabels(app.counters),
+            // Catering categories, boxes and the essential offer declared at
+            // registration carry straight over (already stored normalized).
+            serviceCategories: app.cateringCategories ?? [],
+            bainaBoxes: app.bainaBoxes ?? [],
+            essentialService: app.essentialService,
           }
         : { business: guard.name ?? "" },
     });
@@ -119,6 +124,16 @@ export async function PUT(request: Request) {
       }),
     }));
 
+    // Baina Box photos ride the same "dish" photo store — strip any reference
+    // to a photo this vendor doesn't own.
+    const bainaBoxes = (check.value.bainaBoxes ?? []).map((b) => {
+      if (!b.photo) return b;
+      const photoId = photoIdFromUrl(b.photo);
+      return photoId && ownedDishPhotoIds.has(photoId)
+        ? b
+        : { name: b.name, contents: b.contents, price: b.price };
+    });
+
     const verified = app?.status === "Verified";
 
     // Content moderation: a Hidden vendor stays hidden until an admin restores
@@ -149,18 +164,20 @@ export async function PUT(request: Request) {
       updatedAt: now,
       ...check.value,
       menu,
+      ...(check.value.bainaBoxes ? { bainaBoxes } : {}),
     };
 
     await saveVendor(record);
 
-    // Clean up dish photos no longer referenced by any item.
+    // Clean up dish/box photos no longer referenced by any item or box.
     const referenced = new Set(
-      menu.flatMap((s) =>
-        s.items.flatMap((it) => {
-          const id = it.photo ? photoIdFromUrl(it.photo) : null;
-          return id ? [id] : [];
-        }),
-      ),
+      [
+        ...menu.flatMap((s) => s.items.map((it) => it.photo)),
+        ...bainaBoxes.map((b) => b.photo),
+      ].flatMap((url) => {
+        const id = url ? photoIdFromUrl(url) : null;
+        return id ? [id] : [];
+      }),
     );
     await pruneDishPhotos(guard.id, referenced);
 

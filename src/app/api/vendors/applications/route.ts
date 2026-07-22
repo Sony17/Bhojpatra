@@ -14,7 +14,13 @@ import {
   type VendorDocKind,
   type VendorTier,
 } from "@/lib/admin/types";
-import { cleanGoogleRating, cleanGoogleReviews } from "@/lib/vendorMenus";
+import {
+  cleanBainaBoxes,
+  cleanCateringCategories,
+  cleanEssentialService,
+  cleanGoogleRating,
+  cleanGoogleReviews,
+} from "@/lib/vendorMenus";
 import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendVendorApplicationAlert } from "@/lib/email";
 
@@ -118,6 +124,15 @@ export async function POST(request: Request) {
     docId: str(docIds[key]) || undefined,
   }));
 
+  // Baina Box menu + Essential Service offer — same cleaners as the dashboard
+  // menu save, so a bad box list fails registration with the same message.
+  const boxesCheck = cleanBainaBoxes(body.bainaBoxes);
+  if (!boxesCheck.ok) {
+    return Response.json({ error: boxesCheck.error }, { status: 400 });
+  }
+  const bainaBoxes = boxesCheck.value;
+  const essentialService = cleanEssentialService(body.essentialService);
+
   const rawPackages = Array.isArray(body.packages) ? body.packages : [];
   const packages: VendorPackageInput[] = rawPackages.map((p) => {
     const pkg = (p ?? {}) as Record<string, unknown>;
@@ -158,6 +173,15 @@ export async function POST(request: Request) {
     maxEventsPerDay: str(body.maxEventsPerDay),
     serviceCities: strList(body.serviceCities),
     counters: strList(body.counters),
+    // A category whose builder has content is always declared (same invariant
+    // as the dashboard menu save).
+    cateringCategories: cleanCateringCategories([
+      ...cleanCateringCategories(body.cateringCategories),
+      ...(bainaBoxes.length ? ["baina-box"] : []),
+      ...(essentialService ? ["essential"] : []),
+    ]),
+    ...(bainaBoxes.length ? { bainaBoxes } : {}),
+    ...(essentialService ? { essentialService } : {}),
     status: "Pending",
     submitted: now.toISOString().slice(0, 10),
     submittedAt: now.toISOString(),
