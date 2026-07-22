@@ -17,19 +17,28 @@ function LogoMark() {
   return (
     <Link
       href="/"
-      className="focus-ring flex shrink-0 flex-col items-start rounded-xl transition-transform duration-200 hover:scale-[1.02] lg:items-center"
+      className="focus-ring flex shrink-0 items-center gap-1 rounded-xl transition-transform duration-200 hover:scale-[1.02] sm:gap-1.5"
       aria-label="Bhojpatra home"
     >
-      <Image
-        src="/bhojpatra-logo.png"
-        alt="Bhojpatra"
-        width={894}
-        height={226}
-        priority
-        className="h-9 w-auto sm:h-11 lg:h-12"
-      />
-      <span className="mt-0.5 font-display text-[10px] leading-none tracking-[0.08em] text-maroon lg:text-[11px]">
-        {t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}
+      {/* Icon cropped live from the lockup PNG so the two-tone mark stays pixel-identical */}
+      <span className="block h-[43px] w-[40px] overflow-hidden sm:h-[53px] sm:w-[50px] lg:h-[58px] lg:w-[54px]">
+        <Image
+          src="/bhojpatra-logo.png"
+          alt=""
+          width={894}
+          height={226}
+          priority
+          className="h-full w-auto max-w-none"
+        />
+      </span>
+      {/* Wordmark + tagline column matches the icon height exactly */}
+      <span className="flex h-[43px] flex-col justify-between py-[2px] sm:h-[53px] lg:h-[58px]">
+        <span className="font-display text-[26px] leading-none text-maroon sm:text-[32px] lg:text-[35px]">
+          bhojpatra
+        </span>
+        <span className="font-sans text-[9px] leading-none tracking-[0.08em] text-maroon lg:text-[11px]">
+          {t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}
+        </span>
       </span>
     </Link>
   );

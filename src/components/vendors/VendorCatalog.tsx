@@ -471,7 +471,7 @@ export default function VendorCatalog() {
         ) : (
           <>
             <h1 className="mt-2 text-app-title text-ink">
-              {t("Find your caterer", "अपना कैटरर चुनें")}
+              {t("Choose your favourite Brand", "अपना पसंदीदा ब्रांड चुनें")}
             </h1>
             <p className="mt-2 text-body text-ink/55">
               {t(
@@ -490,10 +490,10 @@ export default function VendorCatalog() {
             id="vendor-search"
             value={query}
             onChange={setQuery}
-            aria-label={t("Search caterers", "कैटरर खोजें")}
+            aria-label={t("Search brands", "ब्रांड खोजें")}
             placeholder={t(
-              "Search for caterers or cuisine",
-              "कैटरर या व्यंजन खोजें",
+              "Search brands, stalls or cuisines",
+              "ब्रांड, स्टॉल या व्यंजन खोजें",
             )}
           />
 

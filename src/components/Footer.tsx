@@ -143,9 +143,9 @@ export default function Footer() {
                   alt="bhojpatra"
                   width={460}
                   height={543}
-                  className="h-auto w-[58px]"
+                  className="h-auto w-32"
                 />
-                <p className="mt-2 whitespace-nowrap font-display text-[14px] leading-none tracking-[0.08em] text-cream/70">
+                <p className="mt-2 whitespace-nowrap font-sans text-[15px] leading-none tracking-[0.08em] text-cream/70">
                   {t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}
                 </p>
               </div>
