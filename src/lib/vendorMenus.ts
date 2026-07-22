@@ -63,12 +63,24 @@ export interface VendorMenuSection {
 
 /** One Baina Box the vendor sells — the sweet/gifting boxes customers browse
  *  from the home "Baina Box" section. The vendor's own box menu. */
+/** A vendor-defined extra box size (e.g. 250 g, 2 kg) with its own price. */
+export interface VendorBoxSize {
+  /** Size label shown to customers (e.g. "250 g", "2 kg"). */
+  label: string;
+  /** Price for this size (₹). */
+  price: number;
+}
+
 export interface VendorBainaBox {
   name: string;
   /** What's inside, comma separated (shown on the box card). */
   contents: string;
-  /** Price per box (₹). */
+  /** Price per ½ kg box (₹) — the base booking size. */
   price: number;
+  /** Price per 1 kg box (₹), when the vendor also offers the bigger size. */
+  price1kg?: number;
+  /** Extra vendor-defined sizes beyond ½ kg / 1 kg (e.g. 250 g, 2 kg). */
+  customSizes?: VendorBoxSize[];
   /** Box photo (same-origin `/api/vendor/photo/<id>` URL, vendor-owned). */
   photo?: string;
 }
@@ -339,6 +351,9 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     priceFrom: r.priceFrom,
     verified: r.verified,
     image: r.image,
+    ...(r.serviceCategories?.length
+      ? { serviceCategories: r.serviceCategories }
+      : {}),
   };
 }
 
@@ -511,6 +526,7 @@ const MAX_SECTIONS = menuCategories.length;
 const MAX_ITEMS_PER_SECTION = 24;
 const MAX_CUISINES = 12;
 const MAX_BAINA_BOXES = 12;
+const MAX_BOX_CUSTOM_SIZES = 4;
 const MAX_ESSENTIAL_INCLUDES = 20;
 /** Allow-list of live-counter / service ids a vendor may declare. */
 const OFFERING_IDS = new Set(vendorOfferingIds);
@@ -546,10 +562,11 @@ type BainaBoxesCheck =
   | { ok: false; error: string };
 
 /** Validate + normalize a vendor's Baina Box list. Blank rows are dropped; a
- *  named box without a valid price is a hard error (it would render
- *  priceless). Photos must be our own photo-serving URLs — ownership is
- *  verified by the menu route. Shared by the registration application route
- *  and the dashboard menu save. */
+ *  named box without a valid ½ kg price is a hard error (it would render
+ *  priceless). The 1 kg price and any extra custom sizes (label + price) are
+ *  optional — boxes without them sell in ½ kg only. Photos must be our own
+ *  photo-serving URLs — ownership is verified by the menu route. Shared by
+ *  the registration application route and the dashboard menu save. */
 export function cleanBainaBoxes(v: unknown): BainaBoxesCheck {
   const boxes: VendorBainaBox[] = [];
   if (!Array.isArray(v)) return { ok: true, value: boxes };
@@ -562,14 +579,40 @@ export function cleanBainaBoxes(v: unknown): BainaBoxesCheck {
     if (!name || price === null || price <= 0) {
       return {
         ok: false,
-        error: "Each Baina Box needs a name and a price per box.",
+        error: "Each Baina Box needs a name and a ½ kg box price.",
       };
+    }
+    const price1kg = cleanMoney(b.price1kg, 100000);
+    const customSizes: VendorBoxSize[] = [];
+    for (const rawSize of (Array.isArray(b.customSizes)
+      ? b.customSizes
+      : []
+    ).slice(0, MAX_BOX_CUSTOM_SIZES)) {
+      const s = (rawSize ?? {}) as Record<string, unknown>;
+      const label = cleanString(s.label, 24);
+      const sizePrice = cleanMoney(s.price, 100000);
+      const priced = sizePrice !== null && sizePrice > 0;
+      if (!label && !priced) continue;
+      if (!label || !priced) {
+        return {
+          ok: false,
+          error: "Each custom box size needs a label and a price.",
+        };
+      }
+      customSizes.push({ label, price: sizePrice });
     }
     const photo =
       typeof b.photo === "string" && PHOTO_URL_RE.test(b.photo)
         ? b.photo
         : undefined;
-    boxes.push({ name, contents, price, ...(photo ? { photo } : {}) });
+    boxes.push({
+      name,
+      contents,
+      price,
+      ...(price1kg !== null && price1kg > 0 ? { price1kg } : {}),
+      ...(customSizes.length ? { customSizes } : {}),
+      ...(photo ? { photo } : {}),
+    });
   }
   return { ok: true, value: boxes };
 }

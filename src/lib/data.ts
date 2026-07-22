@@ -1612,6 +1612,10 @@ export interface VendorListing {
    *  when picked for a Custom / add-on order — the "as per vendor specification"
    *  rule. Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day accepted. */
   leadDays?: number;
+  /** Catering categories the vendor declared (`cateringCategories` ids). Live
+   *  vendors carry their dashboard-declared set; curated seeds omit this and
+   *  the catalog derives it via `listingCateringCategories`. */
+  serviceCategories?: string[];
 }
 
 /** Meal / course offerings used for the "Serves" filter on the catalog. */
@@ -1668,10 +1672,10 @@ export const bookingTimeSlots: Record<string, string[]> = {
  *  Breakfast, midday/afternoon → Lunch, evening/night → Dinner. Lets the vendor
  *  catalog turn a picked serving time into a "Serves" match: a vendor qualifies
  *  when its `mealTypes` cover the returned period. Hi-tea's late-afternoon slots
- *  deliberately fold into the adjacent Lunch / Dinner bands here — caterers don't
- *  advertise a distinct Hi-tea service, so matching them by the neighbouring meal
- *  keeps the catalog populated. Returns "" on empty / malformed input so callers
- *  can treat it as "no time chosen". */
+ *  deliberately fold into the adjacent Lunch / Dinner bands here — vendors declare
+ *  Hi-tea as a catering category (`cateringCategories`), not a "Serves" meal type,
+ *  so matching by the neighbouring meal keeps the catalog populated. Returns ""
+ *  on empty / malformed input so callers can treat it as "no time chosen". */
 export function mealPeriodForTime(hhmm?: string): string {
   if (!hhmm) return "";
   const [h, m] = hhmm.split(":").map(Number);
@@ -2072,6 +2076,7 @@ export const vendorOfferingIds: string[] = vendorOfferings.map((o) => o.id);
  *   • full-catering — the Silver / Gold / Platinum feast package cards
  *   • single-stall  — the "Single Stall · One Vendor" custom package card
  *   • live-stall    — the /book wizard's dedicated "Live Stall" step
+ *   • hi-tea        — the /book wizard's Hi-tea serving slot (4–6 PM chai & snacks)
  *   • baina-box     — the home "Baina Box" section (/vendors?q=Baina+Box)
  *   • essential     — the Essential tier of /service-packages (service-only)
  * Vendors pick theirs in the registration wizard's Menu step and in the
@@ -2114,6 +2119,14 @@ export const cateringCategories: CateringCategory[] = [
     blurbHi: "मेहमानों के सामने बनने वाले लाइव स्टेशन।",
   },
   {
+    id: "hi-tea",
+    name: "Hi-tea",
+    nameHi: "हाई-टी",
+    icon: "☕",
+    blurb: "Evening chai & snacks spreads served between 4 and 6 PM.",
+    blurbHi: "शाम 4 से 6 बजे के बीच परोसा जाने वाला चाय-नाश्ता।",
+  },
+  {
     id: "baina-box",
     name: "Baina Box",
     nameHi: "बैना बॉक्स",
@@ -2135,6 +2148,23 @@ export const cateringCategories: CateringCategory[] = [
 export const cateringCategoryIds: string[] = cateringCategories.map(
   (c) => c.id,
 );
+
+/** Catering categories a catalog listing serves — the /vendors category lens.
+ *  Live vendors declare theirs (`serviceCategories`); curated seeds derive
+ *  from what the listing already shows: full feasts from meal-period coverage,
+ *  live stalls from the Live Counters course, Baina from the Baina Boxes
+ *  speciality, and any food stall qualifies as a Single Stall. Hi-tea and
+ *  Essential Service are declared-only (no seed heuristic). */
+export function listingCateringCategories(v: VendorListing): string[] {
+  if (v.serviceCategories?.length) return v.serviceCategories;
+  const cats: string[] = [];
+  if (["Breakfast", "Lunch", "Dinner"].some((m) => v.mealTypes.includes(m)))
+    cats.push("full-catering");
+  if (v.mealTypes.length) cats.push("single-stall");
+  if (v.mealTypes.includes("Live Counters")) cats.push("live-stall");
+  if (v.cuisines.includes("Baina Boxes")) cats.push("baina-box");
+  return cats;
+}
 
 /* ───────────────────────────────────────────────────────────────────────
    GALLERY — a stack of real-event / signature-dish photos used by the

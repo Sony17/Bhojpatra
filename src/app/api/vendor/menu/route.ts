@@ -16,6 +16,7 @@ import {
   validateVendorMenuInput,
   type LiveVendorRecord,
   type ModerationStatus,
+  type VendorBainaBox,
 } from "@/lib/vendorMenus";
 
 export const dynamic = "force-dynamic";
@@ -126,12 +127,18 @@ export async function PUT(request: Request) {
 
     // Baina Box photos ride the same "dish" photo store — strip any reference
     // to a photo this vendor doesn't own.
-    const bainaBoxes = (check.value.bainaBoxes ?? []).map((b) => {
+    const bainaBoxes: VendorBainaBox[] = (check.value.bainaBoxes ?? []).map((b) => {
       if (!b.photo) return b;
       const photoId = photoIdFromUrl(b.photo);
       return photoId && ownedDishPhotoIds.has(photoId)
         ? b
-        : { name: b.name, contents: b.contents, price: b.price };
+        : {
+            name: b.name,
+            contents: b.contents,
+            price: b.price,
+            ...(b.price1kg != null ? { price1kg: b.price1kg } : {}),
+            ...(b.customSizes ? { customSizes: b.customSizes } : {}),
+          };
     });
 
     const verified = app?.status === "Verified";

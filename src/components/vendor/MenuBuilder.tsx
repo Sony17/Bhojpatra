@@ -74,13 +74,27 @@ interface VendorPayload {
   essentialService?: VendorEssentialService;
 }
 
+interface DraftBoxSize {
+  /** Size label (e.g. "250 g", "2 kg"). */
+  label: string;
+  price: string;
+}
+
 interface DraftBox {
   name: string;
   contents: string;
+  /** ½ kg box price (₹) — the base booking size. */
   price: string;
+  /** 1 kg box price (₹), optional — blank when the vendor sells ½ kg only. */
+  price1kg: string;
+  /** Extra vendor-defined sizes beyond ½ kg / 1 kg (max 4). */
+  customSizes: DraftBoxSize[];
   /** Same-origin box photo URL, set after an upload. */
   photo?: string;
 }
+
+/** Max extra custom sizes per box (matches the server-side cap). */
+const MAX_BOX_CUSTOM_SIZES = 4;
 
 /** The platform Essential tier's checklist — suggestion chips for the vendor's
  *  own Essential Service offer (they can add their own items too). */
@@ -216,6 +230,11 @@ export default function MenuBuilder() {
                   name: b.name,
                   contents: b.contents,
                   price: String(b.price),
+                  price1kg: b.price1kg != null ? String(b.price1kg) : "",
+                  customSizes: (b.customSizes ?? []).map((s) => ({
+                    label: s.label,
+                    price: String(s.price),
+                  })),
                   ...(b.photo ? { photo: b.photo } : {}),
                 })),
               );
@@ -428,7 +447,10 @@ export default function MenuBuilder() {
     setBoxes((prev) =>
       prev.length >= 12
         ? prev
-        : [...prev, { name: "", contents: "", price: "" }],
+        : [
+            ...prev,
+            { name: "", contents: "", price: "", price1kg: "", customSizes: [] },
+          ],
     );
     ensureServiceCat("baina-box");
     setSaved(false);
@@ -443,6 +465,51 @@ export default function MenuBuilder() {
 
   const removeBox = (index: number) => {
     setBoxes((prev) => prev.filter((_, i) => i !== index));
+    setSaved(false);
+  };
+
+  const addBoxSize = (boxIndex: number) => {
+    setBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex && b.customSizes.length < MAX_BOX_CUSTOM_SIZES
+          ? { ...b, customSizes: [...b.customSizes, { label: "", price: "" }] }
+          : b,
+      ),
+    );
+    setSaved(false);
+  };
+
+  const updateBoxSize = (
+    boxIndex: number,
+    sizeIndex: number,
+    patch: Partial<DraftBoxSize>,
+  ) => {
+    setBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex
+          ? {
+              ...b,
+              customSizes: b.customSizes.map((s, j) =>
+                j === sizeIndex ? { ...s, ...patch } : s,
+              ),
+            }
+          : b,
+      ),
+    );
+    setSaved(false);
+  };
+
+  const removeBoxSize = (boxIndex: number, sizeIndex: number) => {
+    setBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex
+          ? {
+              ...b,
+              customSizes: b.customSizes.filter((_, j) => j !== sizeIndex),
+            }
+          : b,
+      ),
+    );
     setSaved(false);
   };
 
@@ -544,12 +611,26 @@ export default function MenuBuilder() {
         // is left in so the server's clearer validation error surfaces.
         bainaBoxes: boxes
           .filter((b) => b.name.trim() || b.contents.trim())
-          .map((b) => ({
-            name: b.name.trim(),
-            contents: b.contents.trim(),
-            price: Number(b.price) || 0,
-            ...(b.photo ? { photo: b.photo } : {}),
-          })),
+          .map((b) => {
+            // Blank size rows are dropped; a half-filled one is left in so
+            // the server's clearer validation error surfaces.
+            const customSizes = b.customSizes
+              .filter((s) => s.label.trim() || s.price.trim())
+              .map((s) => ({
+                label: s.label.trim(),
+                price: Number(s.price) || 0,
+              }));
+            return {
+              name: b.name.trim(),
+              contents: b.contents.trim(),
+              price: Number(b.price) || 0,
+              ...(Number(b.price1kg) > 0
+                ? { price1kg: Number(b.price1kg) }
+                : {}),
+              ...(customSizes.length ? { customSizes } : {}),
+              ...(b.photo ? { photo: b.photo } : {}),
+            };
+          }),
         essentialService: {
           perGuest: Number(essentialRate) || 0,
           includes: essentialIncludes,
@@ -1051,8 +1132,8 @@ export default function MenuBuilder() {
         </h3>
         <p className="mt-0.5 text-xs text-ink-soft">
           {t(
-            "Sweet & gifting boxes priced per box — shown to customers browsing Baina Boxes.",
-            "प्रति बॉक्स मूल्य वाले मिठाई और गिफ्ट बॉक्स — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखते हैं।",
+            "Sweet, bhaji & gifting boxes booked in ½ kg, 1 kg or your own custom sizes — shown to customers browsing Baina Boxes.",
+            "½ किलो, 1 किलो या आपके अपने कस्टम साइज़ में बुक होने वाले मिठाई, भाजी और गिफ्ट बॉक्स — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखते हैं।",
           )}
         </p>
         <div className="mt-4 space-y-3">
@@ -1120,17 +1201,85 @@ export default function MenuBuilder() {
                     onChange={(e) => updateBox(i, { name: e.target.value })}
                     placeholder={t("e.g. Royal Mithai Box", "उदा. रॉयल मिठाई बॉक्स")}
                     aria-label={t("Box name", "बॉक्स का नाम")}
-                    className={inputClass}
+                    className={inputClass + " sm:col-span-2"}
                   />
                   <input
                     type="number"
                     min={0}
                     value={b.price}
                     onChange={(e) => updateBox(i, { price: e.target.value })}
-                    placeholder={t("Price per box (₹)", "प्रति बॉक्स मूल्य (₹)")}
-                    aria-label={t("Price per box", "प्रति बॉक्स मूल्य")}
+                    placeholder={t("½ kg box price (₹)", "½ किलो बॉक्स मूल्य (₹)")}
+                    aria-label={t("½ kg box price", "½ किलो बॉक्स मूल्य")}
                     className={inputClass}
                   />
+                  <input
+                    type="number"
+                    min={0}
+                    value={b.price1kg}
+                    onChange={(e) => updateBox(i, { price1kg: e.target.value })}
+                    placeholder={t(
+                      "1 kg box price (₹, optional)",
+                      "1 किलो बॉक्स मूल्य (₹, वैकल्पिक)",
+                    )}
+                    aria-label={t("1 kg box price", "1 किलो बॉक्स मूल्य")}
+                    className={inputClass}
+                  />
+                  {/* Extra vendor-defined sizes (250 g, 2 kg, …), each with
+                      its own price. */}
+                  {b.customSizes.map((s, si) => (
+                    <div
+                      key={si}
+                      className="flex items-center gap-3 sm:col-span-2"
+                    >
+                      <input
+                        type="text"
+                        value={s.label}
+                        onChange={(e) =>
+                          updateBoxSize(i, si, { label: e.target.value })
+                        }
+                        placeholder={t(
+                          "Size — e.g. 250 g, 2 kg",
+                          "साइज़ — उदा. 250 ग्राम, 2 किलो",
+                        )}
+                        aria-label={t("Custom size", "कस्टम साइज़")}
+                        className={inputClass + " flex-1"}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={s.price}
+                        onChange={(e) =>
+                          updateBoxSize(i, si, { price: e.target.value })
+                        }
+                        placeholder={t("Price (₹)", "मूल्य (₹)")}
+                        aria-label={t(
+                          "Custom size price",
+                          "कस्टम साइज़ मूल्य",
+                        )}
+                        className={inputClass + " w-32 flex-none sm:w-40"}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeBoxSize(i, si)}
+                        aria-label={t(
+                          "Remove custom size",
+                          "कस्टम साइज़ हटाएं",
+                        )}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {b.customSizes.length < MAX_BOX_CUSTOM_SIZES && (
+                    <button
+                      type="button"
+                      onClick={() => addBoxSize(i)}
+                      className="justify-self-start text-left text-xs font-semibold text-maroon hover:underline sm:col-span-2"
+                    >
+                      + {t("Add custom size (250 g, 2 kg…)", "कस्टम साइज़ जोड़ें (250 ग्राम, 2 किलो…)")}
+                    </button>
+                  )}
                   <input
                     type="text"
                     value={b.contents}

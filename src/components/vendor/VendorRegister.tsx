@@ -31,13 +31,27 @@ interface MenuPackage {
   price: string;
 }
 
+interface RegBoxSize {
+  /** Size label (e.g. "250 g", "2 kg"). */
+  label: string;
+  price: string;
+}
+
 interface RegBainaBox {
   name: string;
   contents: string;
+  /** ½ kg box price (₹) — the base booking size. */
   price: string;
+  /** 1 kg box price (₹), optional — blank when the vendor sells ½ kg only. */
+  price1kg: string;
+  /** Extra vendor-defined sizes beyond ½ kg / 1 kg (max 4). */
+  customSizes: RegBoxSize[];
   /** Same-origin `/api/vendor/photo/<id>` URL once uploaded. */
   photo?: string;
 }
+
+/** Max extra custom sizes per box (matches the server-side cap). */
+const MAX_BOX_CUSTOM_SIZES = 4;
 
 /** The platform Essential tier's checklist — suggestion chips for the
  *  vendor's own Essential Service offer. */
@@ -325,7 +339,10 @@ export default function VendorRegister() {
     setBainaBoxes((prev) =>
       prev.length >= 12
         ? prev
-        : [...prev, { name: "", contents: "", price: "" }],
+        : [
+            ...prev,
+            { name: "", contents: "", price: "", price1kg: "", customSizes: [] },
+          ],
     );
   };
 
@@ -337,6 +354,48 @@ export default function VendorRegister() {
 
   const removeBainaBox = (index: number) => {
     setBainaBoxes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addBoxSize = (boxIndex: number) => {
+    setBainaBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex && b.customSizes.length < MAX_BOX_CUSTOM_SIZES
+          ? { ...b, customSizes: [...b.customSizes, { label: "", price: "" }] }
+          : b,
+      ),
+    );
+  };
+
+  const updateBoxSize = (
+    boxIndex: number,
+    sizeIndex: number,
+    patch: Partial<RegBoxSize>,
+  ) => {
+    setBainaBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex
+          ? {
+              ...b,
+              customSizes: b.customSizes.map((s, j) =>
+                j === sizeIndex ? { ...s, ...patch } : s,
+              ),
+            }
+          : b,
+      ),
+    );
+  };
+
+  const removeBoxSize = (boxIndex: number, sizeIndex: number) => {
+    setBainaBoxes((prev) =>
+      prev.map((b, i) =>
+        i === boxIndex
+          ? {
+              ...b,
+              customSizes: b.customSizes.filter((_, j) => j !== sizeIndex),
+            }
+          : b,
+      ),
+    );
   };
 
   /* Upload a box photo — the caterer is already signed in (vendor role), so
@@ -501,8 +560,21 @@ export default function VendorRegister() {
       );
       if (badBox) {
         return t(
-          "Each Baina Box needs a name and a price per box.",
-          "हर बैना बॉक्स के लिए एक नाम और प्रति बॉक्स मूल्य आवश्यक है।",
+          "Each Baina Box needs a name and a ½ kg box price.",
+          "हर बैना बॉक्स के लिए एक नाम और ½ किलो बॉक्स मूल्य आवश्यक है।",
+        );
+      }
+      const badSize = bainaBoxes.some((b) =>
+        b.customSizes.some(
+          (s) =>
+            (s.label.trim() || s.price.trim()) &&
+            (!s.label.trim() || !(Number(s.price) > 0)),
+        ),
+      );
+      if (badSize) {
+        return t(
+          "Each custom box size needs a label and a price.",
+          "हर कस्टम बॉक्स साइज़ के लिए एक लेबल और मूल्य आवश्यक है।",
         );
       }
     }
@@ -569,12 +641,24 @@ export default function VendorRegister() {
       cateringCategories: cateringCats,
       bainaBoxes: bainaBoxes
         .filter((b) => b.name.trim() || b.contents.trim())
-        .map((b) => ({
-          name: b.name.trim(),
-          contents: b.contents.trim(),
-          price: Number(b.price) || 0,
-          ...(b.photo ? { photo: b.photo } : {}),
-        })),
+        .map((b) => {
+          const customSizes = b.customSizes
+            .filter((s) => s.label.trim() || s.price.trim())
+            .map((s) => ({
+              label: s.label.trim(),
+              price: Number(s.price) || 0,
+            }));
+          return {
+            name: b.name.trim(),
+            contents: b.contents.trim(),
+            price: Number(b.price) || 0,
+            ...(Number(b.price1kg) > 0
+              ? { price1kg: Number(b.price1kg) }
+              : {}),
+            ...(customSizes.length ? { customSizes } : {}),
+            ...(b.photo ? { photo: b.photo } : {}),
+          };
+        }),
       essentialService: {
         perGuest: Number(essentialRate) || 0,
         includes: essentialIncludes,
@@ -1230,8 +1314,8 @@ export default function VendorRegister() {
                 </span>
                 <p className="text-xs text-ink-soft/80">
                   {t(
-                    "Add each box with a photo, contents and price per box — shown to customers browsing Baina Boxes.",
-                    "हर बॉक्स को फ़ोटो, सामग्री और प्रति बॉक्स मूल्य के साथ जोड़ें — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखेगा।",
+                    "Add each box with a photo, contents and ½ kg / 1 kg / custom size prices — shown to customers browsing Baina Boxes.",
+                    "हर बॉक्स को फ़ोटो, सामग्री और ½ किलो / 1 किलो / कस्टम साइज़ मूल्य के साथ जोड़ें — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखेगा।",
                   )}
                 </p>
                 {bainaBoxes.map((b, i) => (
@@ -1307,7 +1391,7 @@ export default function VendorRegister() {
                             "उदा. रॉयल बैना बॉक्स",
                           )}
                           aria-label={t("Box name", "बॉक्स का नाम")}
-                          className={inputClass}
+                          className={inputClass + " sm:col-span-2"}
                         />
                         <input
                           type="number"
@@ -1317,12 +1401,86 @@ export default function VendorRegister() {
                             updateBainaBox(i, { price: e.target.value })
                           }
                           placeholder={t(
-                            "Price per box (₹)",
-                            "प्रति बॉक्स मूल्य (₹)",
+                            "½ kg box price (₹)",
+                            "½ किलो बॉक्स मूल्य (₹)",
                           )}
-                          aria-label={t("Price per box", "प्रति बॉक्स मूल्य")}
+                          aria-label={t("½ kg box price", "½ किलो बॉक्स मूल्य")}
                           className={inputClass}
                         />
+                        <input
+                          type="number"
+                          min={0}
+                          value={b.price1kg}
+                          onChange={(e) =>
+                            updateBainaBox(i, { price1kg: e.target.value })
+                          }
+                          placeholder={t(
+                            "1 kg box price (₹, optional)",
+                            "1 किलो बॉक्स मूल्य (₹, वैकल्पिक)",
+                          )}
+                          aria-label={t("1 kg box price", "1 किलो बॉक्स मूल्य")}
+                          className={inputClass}
+                        />
+                        {/* Extra vendor-defined sizes (250 g, 2 kg, …), each
+                            with its own price. */}
+                        {b.customSizes.map((s, si) => (
+                          <div
+                            key={si}
+                            className="flex items-center gap-3 sm:col-span-2"
+                          >
+                            <input
+                              type="text"
+                              value={s.label}
+                              onChange={(e) =>
+                                updateBoxSize(i, si, { label: e.target.value })
+                              }
+                              placeholder={t(
+                                "Size — e.g. 250 g, 2 kg",
+                                "साइज़ — उदा. 250 ग्राम, 2 किलो",
+                              )}
+                              aria-label={t("Custom size", "कस्टम साइज़")}
+                              className={inputClass + " flex-1"}
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              value={s.price}
+                              onChange={(e) =>
+                                updateBoxSize(i, si, { price: e.target.value })
+                              }
+                              placeholder={t("Price (₹)", "मूल्य (₹)")}
+                              aria-label={t(
+                                "Custom size price",
+                                "कस्टम साइज़ मूल्य",
+                              )}
+                              className={inputClass + " w-32 flex-none sm:w-40"}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeBoxSize(i, si)}
+                              aria-label={t(
+                                "Remove custom size",
+                                "कस्टम साइज़ हटाएं",
+                              )}
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {b.customSizes.length < MAX_BOX_CUSTOM_SIZES && (
+                          <button
+                            type="button"
+                            onClick={() => addBoxSize(i)}
+                            className="justify-self-start text-left text-xs font-semibold text-maroon hover:underline sm:col-span-2"
+                          >
+                            +{" "}
+                            {t(
+                              "Add custom size (250 g, 2 kg…)",
+                              "कस्टम साइज़ जोड़ें (250 ग्राम, 2 किलो…)",
+                            )}
+                          </button>
+                        )}
                         <input
                           type="text"
                           value={b.contents}

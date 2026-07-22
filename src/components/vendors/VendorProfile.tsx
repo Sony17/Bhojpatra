@@ -242,7 +242,8 @@ export default function VendorProfile({
         </div>
       )}
 
-      {/* Baina Box menu — photo-led box cards (image, name, contents, ₹/box). */}
+      {/* Baina Box menu — photo-led box cards (image, name, contents, and the
+          ½ kg / 1 kg / custom-size booking prices). */}
       {profile.bainaBoxes.length > 0 && (
         <div className="mt-12">
           <h2 className="font-display text-2xl text-ink">
@@ -277,9 +278,30 @@ export default function VendorProfile({
                     ₹{inr.format(b.price)}
                     <span className="text-sm font-normal text-ink-soft">
                       {" "}
-                      / {t("Box", "बॉक्स")}
+                      / {t("½ kg box", "½ किलो बॉक्स")}
                     </span>
                   </p>
+                  {b.price1kg != null && b.price1kg > 0 && (
+                    <p className="text-lg font-semibold text-maroon">
+                      ₹{inr.format(b.price1kg)}
+                      <span className="text-sm font-normal text-ink-soft">
+                        {" "}
+                        / {t("1 kg box", "1 किलो बॉक्स")}
+                      </span>
+                    </p>
+                  )}
+                  {(b.customSizes ?? []).map((s) => (
+                    <p
+                      key={s.label}
+                      className="text-lg font-semibold text-maroon"
+                    >
+                      ₹{inr.format(s.price)}
+                      <span className="text-sm font-normal text-ink-soft">
+                        {" "}
+                        / {s.label} {t("box", "बॉक्स")}
+                      </span>
+                    </p>
+                  ))}
                 </div>
               </Card>
             ))}

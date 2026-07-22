@@ -6,9 +6,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   bookingTimeSlots,
+  cateringCategories,
+  cateringCategoryIds,
   cities,
   formatClockTime,
   indianStates,
+  listingCateringCategories,
   mealPeriodForTime,
   mealTypeOptions,
   type VendorListing,
@@ -67,6 +70,35 @@ const matchesPrice = (vendor: VendorListing, range: PriceRange): boolean => {
   return vendor.priceFrom >= band.min && vendor.priceFrom <= band.max;
 };
 
+/** The individual filter controls the catalog offers beyond the always-on
+ *  city / state / search. */
+type FilterKey = "cuisine" | "tier" | "diet" | "price" | "meals" | "time";
+
+const ALL_FILTERS: ReadonlySet<FilterKey> = new Set([
+  "cuisine",
+  "tier",
+  "diet",
+  "price",
+  "meals",
+  "time",
+]);
+
+/**
+ * Which filters make sense per catering-category lens. Plain browsing and Full
+ * Catering expose everything; the specialist lenses trim to what customers
+ * actually decide by — a Baina Box hunt needs only city & box price, an
+ * Essential Service search only location. Ids not listed here (a category
+ * added later) fall back to the full set rather than hiding controls.
+ */
+const FILTERS_BY_CATEGORY: Record<string, ReadonlySet<FilterKey>> = {
+  "full-catering": ALL_FILTERS,
+  "single-stall": new Set(["cuisine", "diet", "price", "meals"]),
+  "live-stall": new Set(["cuisine", "diet", "price"]),
+  "hi-tea": new Set(["diet", "price"]),
+  "baina-box": new Set(["price"]),
+  essential: new Set([]),
+};
+
 /** A "Veg & Non-Veg" vendor satisfies both the Veg and Non-Veg filters. */
 const matchesDiet = (vendor: VendorListing, filter: DietFilter): boolean => {
   if (filter === ALL) return true;
@@ -88,7 +120,7 @@ const tierBadgeClass = (tier: Tier): string => {
 };
 
 export default function VendorCatalog() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const locations = useLocations();
 
   // Display-only translations for small fixed vocabularies. Underlying values
@@ -172,6 +204,13 @@ export default function VendorCatalog() {
   // filter into an invalid state.
   const searchParams = useSearchParams();
   const [query, setQuery] = useState<string>(() => searchParams.get("q") ?? "");
+  // The catering-category lens (full-catering / single-stall / live-stall /
+  // baina-box / essential …) — written out as chips right under the header so
+  // visitors see the offering types before they ever open a filter.
+  const [category, setCategory] = useState<string>(() => {
+    const c = searchParams.get("category") ?? "";
+    return cateringCategoryIds.includes(c) ? c : "";
+  });
   const [city, setCity] = useState<string>(() => searchParams.get("city") ?? ALL);
   const [state, setState] = useState<string>(() => searchParams.get("state") ?? ALL);
   const [cuisine, setCuisine] = useState<string>(
@@ -272,6 +311,23 @@ export default function VendorCatalog() {
   // catalog: only location & price filters are relevant. Cuisine, tier, diet and
   // meal-type ("Serves") filters are hidden and neutralised below.
   const isBainaSearch = query.trim().toLowerCase().includes("baina");
+  // Picking the Baina Box category behaves exactly like a Baina search — the
+  // promo hero, the boxed heading and the slimmed-down filter set.
+  const bainaMode = isBainaSearch || category === "baina-box";
+
+  // The filter controls that make sense for the current lens; anything hidden
+  // is also neutralised in the result filter so a stale value can't silently
+  // constrain the grid.
+  const visibleFilters: ReadonlySet<FilterKey> = useMemo(
+    () =>
+      bainaMode
+        ? FILTERS_BY_CATEGORY["baina-box"]
+        : category
+          ? (FILTERS_BY_CATEGORY[category] ?? ALL_FILTERS)
+          : ALL_FILTERS,
+    [bainaMode, category],
+  );
+  const showFilter = (f: FilterKey) => visibleFilters.has(f);
 
   // Distinct cities, in first-seen order.
   const cityOptions = useMemo(
@@ -318,8 +374,19 @@ export default function VendorCatalog() {
         v.name.toLowerCase().includes(q) ||
         v.cuisines.some((c) => c.toLowerCase().includes(q));
 
+      // The catering-category lens: live vendors match on their declared set,
+      // curated seeds on the derived one. Baina search text implies the
+      // baina-box lens even with no chip picked.
+      const matchesCategory =
+        bainaMode
+          ? listingCateringCategories(v).includes("baina-box") ||
+            v.name.toLowerCase().includes("baina") ||
+            v.cuisines.some((c) => c.toLowerCase().includes("baina"))
+          : category === "" ||
+            listingCateringCategories(v).includes(category);
+
       const matchesMeals =
-        isBainaSearch ||
+        !visibleFilters.has("meals") ||
         meals.length === 0 ||
         meals.some((m) => v.mealTypes.includes(m));
 
@@ -327,18 +394,19 @@ export default function VendorCatalog() {
       // (e.g. 8:30 PM → Dinner). Neutral for Baina searches (gift boxes aren't
       // time-served) and when no time is chosen.
       const matchesServingTime =
-        isBainaSearch ||
+        !visibleFilters.has("time") ||
         servingTime === "" ||
         v.mealTypes.includes(mealPeriodForTime(servingTime));
 
       return (
         matchesQuery &&
+        matchesCategory &&
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
-        (isBainaSearch || cuisine === ALL || v.cuisines.includes(cuisine)) &&
-        (isBainaSearch || matchesDiet(v, diet)) &&
-        (isBainaSearch || tier === ALL || v.tiers.includes(tier)) &&
-        matchesPrice(v, price) &&
+        (!visibleFilters.has("cuisine") || cuisine === ALL || v.cuisines.includes(cuisine)) &&
+        (!visibleFilters.has("diet") || matchesDiet(v, diet)) &&
+        (!visibleFilters.has("tier") || tier === ALL || v.tiers.includes(tier)) &&
+        (!visibleFilters.has("price") || matchesPrice(v, price)) &&
         matchesMeals &&
         matchesServingTime
       );
@@ -375,7 +443,9 @@ export default function VendorCatalog() {
   }, [
     allVendors,
     query,
-    isBainaSearch,
+    bainaMode,
+    category,
+    visibleFilters,
     city,
     state,
     cuisine,
@@ -389,6 +459,7 @@ export default function VendorCatalog() {
 
   const hasActiveFilters =
     query !== "" ||
+    category !== "" ||
     city !== ALL ||
     state !== ALL ||
     cuisine !== ALL ||
@@ -398,20 +469,23 @@ export default function VendorCatalog() {
     meals.length > 0 ||
     servingTime !== "";
 
-  /** Count of sheet filters (excludes search) — drives the Filters chip badge. */
+  /** Count of sheet filters (excludes search) — drives the Filters chip badge.
+   *  Only counts controls the current category lens shows; hidden filters are
+   *  neutralised, so they'd inflate the badge without affecting results. */
   const activeFilterCount = [
     city !== ALL,
     state !== ALL,
-    cuisine !== ALL,
-    diet !== ALL,
-    tier !== ALL,
-    price !== ALL,
-    meals.length > 0,
-    servingTime !== "",
+    showFilter("cuisine") && cuisine !== ALL,
+    showFilter("diet") && diet !== ALL,
+    showFilter("tier") && tier !== ALL,
+    showFilter("price") && price !== ALL,
+    showFilter("meals") && meals.length > 0,
+    showFilter("time") && servingTime !== "",
   ].filter(Boolean).length;
 
   const resetFilters = () => {
     setQuery("");
+    setCategory("");
     setCity(ALL);
     setState(ALL);
     setCuisine(ALL);
@@ -448,7 +522,7 @@ export default function VendorCatalog() {
       {/* Bhojpatra's signature Baina Box promotion — the hero of a Baina Box
           search. For regular brand browsing it moves below the grid so the
           brand search is what visitors land on. */}
-      {isBainaSearch && (
+      {bainaMode && (
         <div className="mb-6 mt-2">
           <BainaBoxSpecial variant="search" />
         </div>
@@ -456,11 +530,11 @@ export default function VendorCatalog() {
 
       <div className="max-w-xl px-1">
         <p className="eyebrow text-[11px] font-semibold text-maroon">
-          {isBainaSearch
+          {bainaMode
             ? t("Baina Boxes", "बैना बॉक्स")
             : t("Near you", "आपके पास")}
         </p>
-        {isBainaSearch ? (
+        {bainaMode ? (
           <>
             <h1 className="mt-2 text-app-title text-ink">
               {t("Gift Boxes of Sweetness & Love", "मिठास और प्यार के गिफ्ट बॉक्स")}
@@ -486,6 +560,34 @@ export default function VendorCatalog() {
           </>
         )}
       </div>
+
+      {/* The catering categories, written out up front — pick one to focus
+          the grid and trim the filters to what that offering needs. */}
+      <CategoryChips
+        className="mt-4 px-1"
+        label={t("Catering categories", "कैटरिंग श्रेणियाँ")}
+      >
+        <CategoryChip
+          selected={category === "" && !bainaMode}
+          onClick={() => setCategory("")}
+        >
+          {t("All", "सभी")}
+        </CategoryChip>
+        {cateringCategories.map((c) => (
+          <CategoryChip
+            key={c.id}
+            selected={
+              category === c.id || (c.id === "baina-box" && bainaMode)
+            }
+            onClick={() =>
+              setCategory((prev) => (prev === c.id ? "" : c.id))
+            }
+            leftIcon={<span aria-hidden="true">{c.icon}</span>}
+          >
+            {lang === "hi" ? c.nameHi : c.name}
+          </CategoryChip>
+        ))}
+      </CategoryChips>
 
       {/* Sticky app chrome — search + chip row */}
       <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">
@@ -514,21 +616,23 @@ export default function VendorCatalog() {
               {t("Filters", "फ़िल्टर")}
             </CategoryChip>
 
-            <CategoryChip
-              id="vendor-sort-chip"
-              selected={sort === "price-asc" || sort === "price-desc"}
-              onClick={() => {
-                setSort((prev) =>
-                  prev === "price-asc" ? "price-desc" : "price-asc",
-                );
-              }}
-            >
-              {sort === "price-asc"
-                ? t("Price: Low to High ↑", "कीमत: कम से ज्यादा ↑")
-                : sort === "price-desc"
-                  ? t("Price: High to Low ↓", "कीमत: ज्यादा से कम ↓")
-                  : t("Sort by Price", "कीमत अनुसार")}
-            </CategoryChip>
+            {showFilter("price") && (
+              <CategoryChip
+                id="vendor-sort-chip"
+                selected={sort === "price-asc" || sort === "price-desc"}
+                onClick={() => {
+                  setSort((prev) =>
+                    prev === "price-asc" ? "price-desc" : "price-asc",
+                  );
+                }}
+              >
+                {sort === "price-asc"
+                  ? t("Price: Low to High ↑", "कीमत: कम से ज्यादा ↑")
+                  : sort === "price-desc"
+                    ? t("Price: High to Low ↓", "कीमत: ज्यादा से कम ↓")
+                    : t("Sort by Price", "कीमत अनुसार")}
+              </CategoryChip>
+            )}
 
             <ThemedSelect
               id="vendor-city-chip"
@@ -543,19 +647,21 @@ export default function VendorCatalog() {
               ]}
             />
 
-            <CategoryChip
-              id="vendor-price-chip"
-              selected={price !== ALL}
-              onClick={() => {
-                const ranges: PriceRange[] = ["all", "budget", "premium", "luxury"];
-                const nextIdx = (ranges.indexOf(price) + 1) % ranges.length;
-                setPrice(ranges[nextIdx]);
-              }}
-            >
-              {price === ALL ? t("Price", "कीमत") : priceLabel(price)}
-            </CategoryChip>
+            {showFilter("price") && (
+              <CategoryChip
+                id="vendor-price-chip"
+                selected={price !== ALL}
+                onClick={() => {
+                  const ranges: PriceRange[] = ["all", "budget", "premium", "luxury"];
+                  const nextIdx = (ranges.indexOf(price) + 1) % ranges.length;
+                  setPrice(ranges[nextIdx]);
+                }}
+              >
+                {price === ALL ? t("Price", "कीमत") : priceLabel(price)}
+              </CategoryChip>
+            )}
 
-            {!isBainaSearch &&
+            {showFilter("diet") &&
               DIET_OPTIONS.filter((d) => d !== ALL).map((dietValue) => (
                 <CategoryChip
                   key={dietValue}
@@ -579,11 +685,22 @@ export default function VendorCatalog() {
             )}
           </CategoryChips>
 
-          {/* Desktop-only expanded dropdowns */}
+          {/* Desktop-only expanded dropdowns — only the controls the current
+              category lens keeps (city & state always; the rest per lens). */}
           <div
             className={
               "mt-3 hidden gap-2 lg:grid " +
-              (isBainaSearch ? "lg:grid-cols-3" : "lg:grid-cols-5")
+              ({
+                2: "lg:grid-cols-2",
+                3: "lg:grid-cols-3",
+                4: "lg:grid-cols-4",
+                5: "lg:grid-cols-5",
+              }[
+                2 +
+                  (showFilter("cuisine") ? 1 : 0) +
+                  (showFilter("tier") ? 1 : 0) +
+                  (showFilter("price") ? 1 : 0)
+              ] ?? "lg:grid-cols-5")
             }
           >
             <FilterSelect
@@ -606,7 +723,7 @@ export default function VendorCatalog() {
                 ...indianStates.map((s) => ({ value: s, label: s })),
               ]}
             />
-            {!isBainaSearch && (
+            {showFilter("cuisine") && (
               <FilterSelect
                 id="vendor-cuisine"
                 label={t("Cuisine", "व्यंजन")}
@@ -618,7 +735,7 @@ export default function VendorCatalog() {
                 ]}
               />
             )}
-            {!isBainaSearch && (
+            {showFilter("tier") && (
               <FilterSelect
                 id="vendor-tier"
                 label={t("Tier", "टियर")}
@@ -630,20 +747,22 @@ export default function VendorCatalog() {
                 }))}
               />
             )}
-            <FilterSelect
-              id="vendor-price"
-              label={
-                isBainaSearch
-                  ? t("Price / box", "कीमत / बॉक्स")
-                  : t("Price / plate", "कीमत / प्लेट")
-              }
-              value={price}
-              onChange={(v) => setPrice(v as PriceRange)}
-              options={PRICE_RANGES.map((r) => ({
-                value: r.value,
-                label: priceLabel(r.value),
-              }))}
-            />
+            {showFilter("price") && (
+              <FilterSelect
+                id="vendor-price"
+                label={
+                  bainaMode
+                    ? t("Price / box", "कीमत / बॉक्स")
+                    : t("Price / plate", "कीमत / प्लेट")
+                }
+                value={price}
+                onChange={(v) => setPrice(v as PriceRange)}
+                options={PRICE_RANGES.map((r) => ({
+                  value: r.value,
+                  label: priceLabel(r.value),
+                }))}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -675,7 +794,7 @@ export default function VendorCatalog() {
               ...indianStates.map((s) => ({ value: s, label: s })),
             ]}
           />
-          {!isBainaSearch && (
+          {showFilter("cuisine") && (
             <FilterSelect
               id="sheet-cuisine"
               label={t("Cuisine", "व्यंजन")}
@@ -687,7 +806,7 @@ export default function VendorCatalog() {
               ]}
             />
           )}
-          {!isBainaSearch && (
+          {showFilter("tier") && (
             <FilterSelect
               id="sheet-tier"
               label={t("Tier", "टियर")}
@@ -699,91 +818,95 @@ export default function VendorCatalog() {
               }))}
             />
           )}
-          <FilterSelect
-            id="sheet-price"
-            label={
-              isBainaSearch
-                ? t("Price / box", "कीमत / बॉक्स")
-                : t("Price / plate", "कीमत / प्लेट")
-            }
-            value={price}
-            onChange={(v) => setPrice(v as PriceRange)}
-            options={PRICE_RANGES.map((r) => ({
-              value: r.value,
-              label: priceLabel(r.value),
-            }))}
-          />
+          {showFilter("price") && (
+            <FilterSelect
+              id="sheet-price"
+              label={
+                bainaMode
+                  ? t("Price / box", "कीमत / बॉक्स")
+                  : t("Price / plate", "कीमत / प्लेट")
+              }
+              value={price}
+              onChange={(v) => setPrice(v as PriceRange)}
+              options={PRICE_RANGES.map((r) => ({
+                value: r.value,
+                label: priceLabel(r.value),
+              }))}
+            />
+          )}
 
-          {!isBainaSearch && (
-            <>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
-                  {t("Diet", "डाइट")}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {DIET_OPTIONS.map((dietValue) => (
-                    <button
-                      key={dietValue}
-                      type="button"
-                      onClick={() => setDiet(dietValue)}
-                      aria-pressed={diet === dietValue}
-                      className={chipClass(diet === dietValue)}
-                    >
-                      {dietLabel(dietValue)}
-                    </button>
-                  ))}
-                </div>
+          {showFilter("diet") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Diet", "डाइट")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {DIET_OPTIONS.map((dietValue) => (
+                  <button
+                    key={dietValue}
+                    type="button"
+                    onClick={() => setDiet(dietValue)}
+                    aria-pressed={diet === dietValue}
+                    className={chipClass(diet === dietValue)}
+                  >
+                    {dietLabel(dietValue)}
+                  </button>
+                ))}
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
-                  {t("Serves", "परोसता है")}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {mealTypeOptions.map((meal) => (
-                    <button
-                      key={meal}
-                      type="button"
-                      onClick={() => toggleMeal(meal)}
-                      aria-pressed={meals.includes(meal)}
-                      className={chipClass(meals.includes(meal))}
-                    >
-                      {mealLabel(meal)}
-                    </button>
-                  ))}
-                </div>
+            </div>
+          )}
+          {showFilter("meals") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Serves", "परोसता है")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {mealTypeOptions.map((meal) => (
+                  <button
+                    key={meal}
+                    type="button"
+                    onClick={() => toggleMeal(meal)}
+                    aria-pressed={meals.includes(meal)}
+                    className={chipClass(meals.includes(meal))}
+                  >
+                    {mealLabel(meal)}
+                  </button>
+                ))}
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
-                  {t("Serving time", "परोसने का समय")}
-                </p>
-                <div className="mt-2">
-                  <ThemedSelect
-                    value={servingTime}
-                    onChange={setServingTime}
-                    ariaLabel={t("Serving time", "परोसने का समय")}
-                    buttonClassName="w-full rounded-control border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
-                    options={[
-                      { value: "", label: t("Any time", "कोई भी समय") },
-                      ...Object.values(bookingTimeSlots)
-                        .flat()
-                        .map((hhmm) => ({
-                          value: hhmm,
-                          label: formatClockTime(hhmm),
-                        })),
-                    ]}
-                  />
-                  {servingTime && (
-                    <p className="mt-1.5 text-[12px] text-ink/55">
-                      {t("Showing", "दिखा रहे हैं")}{" "}
-                      <span className="font-medium text-maroon">
-                        {mealLabel(mealPeriodForTime(servingTime))}
-                      </span>{" "}
-                      {t("caterers", "कैटरर")}
-                    </p>
-                  )}
-                </div>
+            </div>
+          )}
+          {showFilter("time") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Serving time", "परोसने का समय")}
+              </p>
+              <div className="mt-2">
+                <ThemedSelect
+                  value={servingTime}
+                  onChange={setServingTime}
+                  ariaLabel={t("Serving time", "परोसने का समय")}
+                  buttonClassName="w-full rounded-control border border-cream-3 bg-cream-2/40 px-3.5 py-2.5 text-sm font-medium transition-colors"
+                  options={[
+                    { value: "", label: t("Any time", "कोई भी समय") },
+                    ...Object.values(bookingTimeSlots)
+                      .flat()
+                      .map((hhmm) => ({
+                        value: hhmm,
+                        label: formatClockTime(hhmm),
+                      })),
+                  ]}
+                />
+                {servingTime && (
+                  <p className="mt-1.5 text-[12px] text-ink/55">
+                    {t("Showing", "दिखा रहे हैं")}{" "}
+                    <span className="font-medium text-maroon">
+                      {mealLabel(mealPeriodForTime(servingTime))}
+                    </span>{" "}
+                    {t("caterers", "कैटरर")}
+                  </p>
+                )}
               </div>
-            </>
+            </div>
           )}
 
           <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-maroon/10 bg-white px-5 py-3">
@@ -849,7 +972,7 @@ export default function VendorCatalog() {
         />
       )}
 
-      {!isBainaSearch && (
+      {!bainaMode && (
         <div className="mt-8">
           <BainaBoxSpecial variant="search" />
         </div>
