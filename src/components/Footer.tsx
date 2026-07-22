@@ -136,14 +136,19 @@ export default function Footer() {
         <div className="mx-auto max-w-7xl px-5 py-12">
           <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-6">
             <div className="flex flex-col items-start">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/bhojpatra-logo1.png"
-                alt="bhojpatra"
-                width={460}
-                height={543}
-                className="h-auto w-32"
-              />
+              <div className="flex w-fit flex-col items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/bhojpatra-logo1.png"
+                  alt="bhojpatra"
+                  width={460}
+                  height={543}
+                  className="h-auto w-[58px]"
+                />
+                <p className="mt-2 whitespace-nowrap font-display text-[14px] leading-none tracking-[0.08em] text-cream/70">
+                  {t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}
+                </p>
+              </div>
               <a
                 href={`https://www.instagram.com/${contact.instagram.replace(/^@/, "")}`}
                 target="_blank"

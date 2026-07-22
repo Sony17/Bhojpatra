@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { setAccountMenuState } from "@/lib/accountMenu";
 import AccountMenuPanel from "./AccountMenuPanel";
+import PartnerMenuPanel from "./PartnerMenuPanel";
 
 /** App-style bottom tabs — always visible, active state highlighted.
  *  Same destinations; finish matches Zomato/Swiggy chrome. */
@@ -60,19 +61,20 @@ function tabActive(pathname: string, href: string) {
 export default function MobileTabBar() {
   const pathname = usePathname();
   const { t, lang } = useLang();
-  const [accountOpen, setAccountOpen] = useState(false);
+  // One popup at a time — opening a tab's menu hides whichever is already open.
+  const [openMenu, setOpenMenu] = useState<"partner" | "account" | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!openMenu) return;
     function onPointerDown(e: PointerEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setAccountOpen(false);
+        setOpenMenu(null);
       }
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setAccountOpen(false);
+      if (e.key === "Escape") setOpenMenu(null);
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -80,15 +82,15 @@ export default function MobileTabBar() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [accountOpen]);
+  }, [openMenu]);
 
   useEffect(() => {
-    if (accountOpen && popupRef.current) {
+    if (openMenu && popupRef.current) {
       setAccountMenuState(true, popupRef.current.offsetHeight);
     } else {
       setAccountMenuState(false);
     }
-  }, [accountOpen]);
+  }, [openMenu]);
 
   useEffect(() => () => setAccountMenuState(false), []);
 
@@ -98,12 +100,21 @@ export default function MobileTabBar() {
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-maroon/8 bg-white/96 pb-[var(--safe-bottom)] shadow-pop-up backdrop-blur-xl lg:hidden"
     >
-      {accountOpen && (
+      {openMenu === "partner" && (
+        <div
+          ref={popupRef}
+          className="absolute bottom-full right-3 z-50 mb-2 w-80 max-w-[calc(100vw-1.5rem)]"
+        >
+          <PartnerMenuPanel onClose={() => setOpenMenu(null)} />
+        </div>
+      )}
+
+      {openMenu === "account" && (
         <div
           ref={popupRef}
           className="absolute bottom-full right-3 z-50 mb-2 w-60 max-w-[calc(100vw-1.5rem)]"
         >
-          <AccountMenuPanel onClose={() => setAccountOpen(false)} />
+          <AccountMenuPanel onClose={() => setOpenMenu(null)} />
         </div>
       )}
 
@@ -114,7 +125,7 @@ export default function MobileTabBar() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
-                onClick={() => setAccountOpen(false)}
+                onClick={() => setOpenMenu(null)}
                 aria-current={active ? "page" : undefined}
                 className={
                   "focus-ring tap relative flex min-h-12 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition duration-200 active:scale-95 touch-manipulation " +
@@ -148,14 +159,14 @@ export default function MobileTabBar() {
         <li className="flex-1">
           <button
             type="button"
-            onClick={() => setAccountOpen((v) => !v)}
+            onClick={() => setOpenMenu((v) => (v === "partner" ? null : "partner"))}
             aria-haspopup="menu"
-            aria-expanded={accountOpen}
+            aria-expanded={openMenu === "partner"}
             className={`focus-ring tap relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition duration-200 active:scale-95 touch-manipulation ${
-              accountOpen ? "text-maroon" : "text-ink/55 hover:text-maroon"
+              openMenu === "partner" ? "text-maroon" : "text-ink/55 hover:text-maroon"
             }`}
           >
-            {accountOpen && (
+            {openMenu === "partner" && (
               <span
                 aria-hidden
                 className="absolute top-0 h-0.5 w-8 rounded-full bg-maroon"
@@ -167,7 +178,41 @@ export default function MobileTabBar() {
               className="h-[22px] w-[22px]"
               fill="none"
               stroke="currentColor"
-              strokeWidth={accountOpen ? "2" : "1.6"}
+              strokeWidth={openMenu === "partner" ? "2" : "1.6"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="9" cy="8.5" r="3" />
+              <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+              <path d="M15.5 5.8a3 3 0 0 1 0 5.4M17.5 13.9a5.5 5.5 0 0 1 3 5.1" />
+            </svg>
+            {t("Partner", "पार्टनर")}
+          </button>
+        </li>
+
+        <li className="flex-1">
+          <button
+            type="button"
+            onClick={() => setOpenMenu((v) => (v === "account" ? null : "account"))}
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "account"}
+            className={`focus-ring tap relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition duration-200 active:scale-95 touch-manipulation ${
+              openMenu === "account" ? "text-maroon" : "text-ink/55 hover:text-maroon"
+            }`}
+          >
+            {openMenu === "account" && (
+              <span
+                aria-hidden
+                className="absolute top-0 h-0.5 w-8 rounded-full bg-maroon"
+              />
+            )}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-[22px] w-[22px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={openMenu === "account" ? "2" : "1.6"}
               strokeLinecap="round"
               strokeLinejoin="round"
             >
