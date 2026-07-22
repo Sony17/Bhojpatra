@@ -57,7 +57,7 @@ export default function Packages() {
         <Reveal
           stagger
           from="right"
-          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-6 pt-7 sm:mx-auto sm:mt-14 sm:grid sm:max-w-6xl sm:snap-none sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-0 lg:grid-cols-3"
+          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-6 pt-7 sm:mx-auto sm:mt-14 sm:grid sm:max-w-7xl sm:snap-none sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-0 lg:grid-cols-3"
         >
           {tiers.map((tier) => {
             const selected = tier.id === selectedId;
@@ -65,7 +65,7 @@ export default function Packages() {
             return (
               <div
                 key={tier.id}
-                className="w-[85vw] max-w-[345px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+                className="w-[88vw] max-w-[390px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
               >
               <PackageScrollCard
                 tier={tier}
@@ -77,7 +77,7 @@ export default function Packages() {
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
                     aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-xs font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
+                    className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
                   >
                     <span className="font-display leading-none">
                       {t("Book", "बुक करें")} {tierName}

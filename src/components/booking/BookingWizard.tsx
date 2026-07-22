@@ -3266,7 +3266,7 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="relative w-[82vw] max-w-[360px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+              className="relative w-[88vw] max-w-[390px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
             >
             {tooSoon ? (
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
@@ -3320,7 +3320,7 @@ function StepPackage({
                     e.stopPropagation();
                     setPackageId(tier.id);
                   }}
-                  className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-[10px] font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
+                  className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-xs font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
                 >
                   <span className="font-display leading-none">
                     {selected

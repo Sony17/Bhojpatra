@@ -276,16 +276,16 @@ export default function PackageScrollCard({
           )}
 
           {/* Title + price */}
-          <h3 className="text-center font-display text-2xl leading-none tracking-wide text-maroon">
+          <h3 className="text-center font-display text-[1.75rem] leading-none tracking-wide text-maroon">
             {tierName}
           </h3>
-          <p className="mt-1 text-center text-[13px] text-ink-soft">
+          <p className="mt-1 text-center text-sm text-ink-soft">
             <span className="font-semibold text-maroon">@ {tier.price}</span>{" "}
             {lang === "hi" ? tier.unitHi : tier.unit}
           </p>
           {pax && (
             <p
-              className={`mx-auto mt-1.5 rounded-full px-2 py-0.5 text-center text-[11px] font-semibold tracking-wide ${
+              className={`mx-auto mt-1.5 rounded-full px-2 py-0.5 text-center text-xs font-semibold tracking-wide ${
                 premium
                   ? "bg-ink text-cream"
                   : silver
@@ -299,7 +299,7 @@ export default function PackageScrollCard({
 
           {/* Occasion guidance — which celebrations the tier suits best. */}
           {bestFor && (
-            <p className="mt-1.5 text-center text-[11px] leading-snug text-ink-soft">
+            <p className="mt-1.5 text-center text-xs leading-snug text-ink-soft">
               <span className="font-semibold text-maroon">
                 {t("Perfect for", "इनके लिए परफेक्ट")}:
               </span>{" "}
@@ -319,7 +319,7 @@ export default function PackageScrollCard({
                 return (
                   <li
                     key={seg.index}
-                    className="flex items-start gap-2 border-b border-maroon/10 py-1 text-left text-xs leading-tight text-ink last:border-b-0"
+                    className="flex items-start gap-2 border-b border-maroon/10 py-1 text-left text-[13px] leading-tight text-ink last:border-b-0"
                   >
                     <RhombusMarker />
                     <span>{label}</span>
@@ -347,7 +347,7 @@ export default function PackageScrollCard({
                       toggleCourse(seg.index);
                     }}
                     aria-expanded={hasItems ? isOpen : undefined}
-                    className="flex w-full items-start gap-2 rounded text-left text-xs font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
+                    className="flex w-full items-start gap-2 rounded text-left text-[13px] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
                   >
                     <RhombusMarker />
                     <span className="flex-1">{headingLabel}</span>
@@ -356,7 +356,7 @@ export default function PackageScrollCard({
                         {/* Item count — only when more than one line is hidden,
                             so a lone detail row doesn't read as a quantity. */}
                         {seg.items.length > 1 && (
-                          <span className="mt-px shrink-0 rounded-full border border-maroon/30 px-1.5 text-[10px] font-bold leading-tight text-maroon">
+                          <span className="mt-px shrink-0 rounded-full border border-maroon/30 px-1.5 text-[11px] font-bold leading-tight text-maroon">
                             {seg.items.length}
                           </span>
                         )}
@@ -382,7 +382,7 @@ export default function PackageScrollCard({
                         return (
                           <li
                             key={index}
-                            className="py-0.5 pl-5 text-left text-xs leading-tight text-ink-soft"
+                            className="py-0.5 pl-5 text-left text-[13px] leading-tight text-ink-soft"
                           >
                             <span>{label}</span>
                           </li>
@@ -397,7 +397,7 @@ export default function PackageScrollCard({
 
           {/* Closing note — sits just above the CTA, inside the parchment. */}
           {footnote && footnote.length > 0 && (
-            <div className="mt-1.5 text-center text-[11px] font-medium leading-tight text-ink-soft">
+            <div className="mt-1.5 text-center text-xs font-medium leading-tight text-ink-soft">
               {footnote.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
