@@ -106,15 +106,21 @@ export default function ReviewSelection() {
           </table>
         </div>
 
-        {/* Total row */}
+        {/* Per-plate row — the all-in rate leads and the lump-sum total sits
+            under it in smaller type, so the estimate reads fair, not scary. */}
         <div className="flex flex-col gap-4 border-t border-cream-3 bg-cream-2/40 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <span className="eyebrow text-xs font-semibold text-ink-soft">
-            Total (Approx.)
+            Per Plate (Approx.)
           </span>
-          <span className="font-display text-2xl font-semibold text-maroon sm:text-3xl">
-            ₹19,000{" "}
-            <span className="text-base font-normal text-ink-soft sm:text-lg">
-              / 200 Plates
+          <span className="sm:text-right">
+            <span className="font-display text-2xl font-semibold text-maroon sm:text-3xl">
+              ₹1,199{" "}
+              <span className="text-base font-normal text-ink-soft sm:text-lg">
+                / Plate
+              </span>
+            </span>
+            <span className="block text-sm text-ink-soft">
+              Total ₹2,39,800 · 200 Plates
             </span>
           </span>
         </div>

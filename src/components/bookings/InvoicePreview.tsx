@@ -3,7 +3,7 @@
 import type { InvoiceData } from "@/lib/invoice";
 import BrandIcon from "@/components/BrandIcon";
 import { Card } from "@/components/ui";
-import { money } from "@/lib/money";
+import { money, perPlateCost } from "@/lib/money";
 
 /**
  * On-screen, branded rendering of an invoice — the visual twin of the PDF in
@@ -138,17 +138,30 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
           </dl>
         </Section>
 
-        {/* Grand total band */}
+        {/* Grand total band — the per-plate rate leads and the lump-sum total
+            demotes to the sub-line; falls back to the plain total when the
+            headcount is unknown. */}
         <div className="relative flex items-center justify-between gap-4 overflow-hidden rounded-card bg-maroon px-6 py-4">
           <div className="pointer-events-none absolute inset-1.5 rounded-[10px] border border-cream/40" />
           <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cream">
-              Grand Total
+              {data.guests > 0 ? "Per Plate (All-in)" : "Grand Total"}
             </p>
-            <p className="text-[11px] text-white/85">Total amount for your event</p>
+            <p className="text-[11px] text-white/85">
+              {data.guests > 0
+                ? `Grand total ${money(data.grandTotal)} for ${data.guests} guests`
+                : "Total amount for your event"}
+            </p>
           </div>
           <p className="relative font-display text-2xl font-semibold tabular-nums text-white sm:text-3xl">
-            {money(data.grandTotal)}
+            {data.guests > 0 ? (
+              <>
+                ≈ {money(perPlateCost(data.grandTotal, data.guests))}
+                <span className="text-base font-medium"> / plate</span>
+              </>
+            ) : (
+              money(data.grandTotal)
+            )}
           </p>
         </div>
 

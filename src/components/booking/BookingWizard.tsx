@@ -1455,14 +1455,12 @@ export default function BookingWizard() {
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
-    lines.push(
-      `GST (18%):   ${money(gst)}`,
-      `Grand Total: ${money(grandTotal)}`,
-    );
+    lines.push(`GST (18%):   ${money(gst)}`);
     if (guests > 0)
       lines.push(
         `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
       );
+    lines.push(`Grand Total: ${money(grandTotal)}`);
     const emiPlan = buildEmiPlanForOrder();
     if (emiPlan) {
       lines.push(
@@ -1640,10 +1638,10 @@ export default function BookingWizard() {
       (selectedService
         ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
         : "") +
-      `\nGrand Total: ${money(grandTotal)}` +
       (guests > 0
         ? `\nPer Plate: ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`
         : "") +
+      `\nGrand Total: ${money(grandTotal)}` +
       paymentLines +
       emiLines
     );
@@ -5506,19 +5504,34 @@ function StepConfirm({
       </div>
 
       <div className="mt-6 rounded-2xl border border-maroon/30 bg-maroon-soft/30 p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-ink-soft">{t("Grand total", "कुल राशि")}</p>
-          <p className="text-2xl font-semibold text-maroon">
-            {money(grandTotal)}
-          </p>
-        </div>
-        {guests > 0 && grandTotal > 0 && (
-          <p className="mt-0.5 text-right text-xs text-ink-soft">
-            {t(
-              `≈ ${money(perPlateCost(grandTotal, guests))} / plate × ${inr.format(guests)} guests`,
-              `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट × ${inr.format(guests)} मेहमान`,
-            )}
-          </p>
+        {guests > 0 && grandTotal > 0 ? (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-ink-soft">
+                {t("Per plate (all-in)", "प्रति प्लेट (सब मिलाकर)")}
+              </p>
+              <p className="text-2xl font-semibold text-maroon">
+                ≈ {money(perPlateCost(grandTotal, guests))}
+                <span className="text-sm font-medium">
+                  {" "}
+                  / {t("plate", "प्लेट")}
+                </span>
+              </p>
+            </div>
+            <p className="mt-0.5 text-right text-sm text-ink-soft">
+              {t(
+                `Grand total ${money(grandTotal)} for ${inr.format(guests)} guests`,
+                `${inr.format(guests)} मेहमानों के लिए कुल राशि ${money(grandTotal)}`,
+              )}
+            </p>
+          </>
+        ) : (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-ink-soft">{t("Grand total", "कुल राशि")}</p>
+            <p className="text-2xl font-semibold text-maroon">
+              {money(grandTotal)}
+            </p>
+          </div>
         )}
         {paidAmount >= Math.round(grandTotal) ? (
           <p className="mt-1 text-sm font-semibold text-maroon">
@@ -5682,15 +5695,25 @@ function StepDone({
             <dd className="font-semibold text-ink">{inr.format(guests)}</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">{t("Grand Total", "कुल राशि")}</dt>
-            <dd className="font-semibold text-ink">{money(grandTotal)}</dd>
-            {guests > 0 && grandTotal > 0 && (
-              <dd className="text-xs text-ink-soft">
-                {t(
-                  `≈ ${money(perPlateCost(grandTotal, guests))} / plate`,
-                  `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट`,
-                )}
-              </dd>
+            {guests > 0 && grandTotal > 0 ? (
+              <>
+                <dt className="text-ink-soft">{t("Per Plate", "प्रति प्लेट")}</dt>
+                <dd className="text-base font-semibold text-maroon">
+                  ≈ {money(perPlateCost(grandTotal, guests))} /{" "}
+                  {t("plate", "प्लेट")}
+                </dd>
+                <dd className="text-xs text-ink-soft">
+                  {t(
+                    `Grand total ${money(grandTotal)}`,
+                    `कुल राशि ${money(grandTotal)}`,
+                  )}
+                </dd>
+              </>
+            ) : (
+              <>
+                <dt className="text-ink-soft">{t("Grand Total", "कुल राशि")}</dt>
+                <dd className="font-semibold text-ink">{money(grandTotal)}</dd>
+              </>
             )}
           </div>
           {paidAmount > 0 && (
@@ -5987,34 +6010,44 @@ function SummaryPanel({
           </div>
         )}
 
-        {/* Total to pay + advance — always visible, headline of the summary. */}
+        {/* Per-plate rate is the headline — an all-in plate rate reads fair
+            where a lakhs-scale lump sum reads scary. The grand total demotes
+            to the smaller line below; it still multiplies back exactly. */}
         <div className="mt-4 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-              {t("Total", "कुल")}
+              {guests > 0 && grandTotal > 0
+                ? t("Per Plate", "प्रति प्लेट")
+                : t("Total", "कुल")}
             </p>
             <p className="font-display text-2xl font-semibold text-maroon">
-              {money(grandTotal)}
+              {guests > 0 && grandTotal > 0 ? (
+                <>
+                  ≈ {money(perPlateCost(grandTotal, guests))}
+                  <span className="text-sm font-medium">
+                    {" "}
+                    / {t("plate", "प्लेट")}
+                  </span>
+                </>
+              ) : (
+                money(grandTotal)
+              )}
             </p>
           </div>
           <div className="text-right">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
               {t("Advance (10%)", "एडवांस (10%)")}
             </p>
-            <p className="font-display text-2xl font-semibold text-ink">
+            <p className="font-display text-lg font-semibold text-ink">
               {money(advance)}
             </p>
           </div>
         </div>
-
-        {/* Ground the big total in its per-head basis — an all-in plate rate ×
-            headcount is why a large-function estimate runs into lakhs, not a
-            scary lump sum. Uses total ÷ guests so it multiplies back exactly. */}
         {guests > 0 && grandTotal > 0 && (
-          <p className="mt-1.5 text-xs text-ink-soft">
+          <p className="mt-1.5 text-sm text-ink-soft">
             {t(
-              `≈ ${money(perPlateCost(grandTotal, guests))} / plate × ${inr.format(guests)} guests`,
-              `≈ ${money(perPlateCost(grandTotal, guests))} / प्लेट × ${inr.format(guests)} मेहमान`,
+              `Total ${money(grandTotal)} for ${inr.format(guests)} guests`,
+              `${inr.format(guests)} मेहमानों के लिए कुल ${money(grandTotal)}`,
             )}
           </p>
         )}

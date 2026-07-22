@@ -530,20 +530,39 @@ export function buildInvoicePdf(
   const BANDH = 54;
   p.rect(MX, bandTop - BANDH, RIGHT - MX, BANDH, MAROON);
   p.rectS(MX + 6, bandTop - BANDH + 6, RIGHT - MX - 12, BANDH - 12, CREAM, 0.4);
-  p.text(MX + 20, bandTop - 22, "GRAND TOTAL", 12, F_BOLD, CREAM, 2.2);
-  /* Ground the lump sum in per-head terms (ASCII only — the embedded fonts
-     cover codes 32-126, so "~"/"x" rather than the Unicode glyphs). */
+  /* The per-plate rate leads and the lump-sum total demotes to the sub-line
+     (ASCII only — the embedded fonts cover codes 32-126, so "~" rather than
+     the Unicode glyph). Falls back to the plain total when the headcount is
+     unknown. */
+  p.text(
+    MX + 20,
+    bandTop - 22,
+    data.guests > 0 ? "PER PLATE (ALL-IN)" : "GRAND TOTAL",
+    12,
+    F_BOLD,
+    CREAM,
+    2.2,
+  );
   p.text(
     MX + 20,
     bandTop - 38,
     data.guests > 0
-      ? `~ ${money(data.grandTotal / data.guests)} / plate x ${nf.format(data.guests)} guests`
+      ? `Grand total ${money(data.grandTotal)} for ${nf.format(data.guests)} guests`
       : "Total amount for your event",
     8,
     F_REG,
     WHITE,
   );
-  p.textRight(RIGHT - 20, bandTop - 35, money(data.grandTotal), 27, F_BOLD, WHITE);
+  p.textRight(
+    RIGHT - 20,
+    bandTop - 35,
+    data.guests > 0
+      ? `~ ${money(data.grandTotal / data.guests)} / plate`
+      : money(data.grandTotal),
+    data.guests > 0 ? 22 : 27,
+    F_BOLD,
+    WHITE,
+  );
   p.y = bandTop - BANDH - 22;
 
   /* Payment status — Paid + Balance cards side by side. */

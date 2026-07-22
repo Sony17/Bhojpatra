@@ -969,21 +969,36 @@ function BookingCard({
         {/* Payment summary */}
         <div className="lg:w-72 lg:shrink-0">
           <div className="rounded-xl border border-cream-3 bg-cream/40 p-4">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-ink-soft">
-                {t("Total", "कुल राशि")}
-              </span>
-              <span className="font-display text-lg font-semibold text-ink">
-                {money(booking.amount)}
-              </span>
-            </div>
-            {booking.guests > 0 && booking.amount > 0 && (
-              <p className="mt-0.5 text-right text-xs text-ink-soft">
-                {t(
-                  `≈ ${money(perPlateCost(booking.amount, booking.guests))} / plate × ${booking.guests} guests`,
-                  `≈ ${money(perPlateCost(booking.amount, booking.guests))} / प्लेट × ${booking.guests} मेहमान`,
-                )}
-              </p>
+            {booking.guests > 0 && booking.amount > 0 ? (
+              <>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-ink-soft">
+                    {t("Per plate", "प्रति प्लेट")}
+                  </span>
+                  <span className="font-display text-lg font-semibold text-maroon">
+                    ≈ {money(perPlateCost(booking.amount, booking.guests))}
+                    <span className="text-xs font-medium">
+                      {" "}
+                      / {t("plate", "प्लेट")}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between text-sm">
+                  <span className="text-ink-soft">{t("Total", "कुल राशि")}</span>
+                  <span className="font-medium text-ink">
+                    {money(booking.amount)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-ink-soft">
+                  {t("Total", "कुल राशि")}
+                </span>
+                <span className="font-display text-lg font-semibold text-ink">
+                  {money(booking.amount)}
+                </span>
+              </div>
             )}
             <div className="mt-1.5 flex items-baseline justify-between text-sm">
               <span className="text-ink-soft">{t("Paid", "भुगतान")}</span>
@@ -1213,10 +1228,9 @@ function BookingDetailsModal({
   const waMessage =
     `${t("Here's my Bhojpatra invoice", "यह मेरा भोजपत्र इनवॉइस है")} — ${booking.occasion} (${booking.id})\n` +
     `${t("Date", "तिथि")}: ${booking.date} · ${booking.guests} ${t("guests", "मेहमान")}\n` +
-    `${t("Total", "कुल")}: ${money(booking.amount)}` +
     (booking.guests > 0
-      ? ` (≈ ${money(perPlateCost(booking.amount, booking.guests))} / ${t("plate", "प्लेट")})`
-      : "") +
+      ? `${t("Per plate", "प्रति प्लेट")}: ≈ ${money(perPlateCost(booking.amount, booking.guests))} · ${t("Total", "कुल")}: ${money(booking.amount)}`
+      : `${t("Total", "कुल")}: ${money(booking.amount)}`) +
     (balance > 0 ? ` · ${t("Balance", "बकाया")}: ${money(balance)}` : "") +
     `\n${t("View & download", "देखें और डाउनलोड करें")}: ${shareUrl}`;
   const waHref = `https://wa.me/?text=${encodeURIComponent(waMessage)}`;
