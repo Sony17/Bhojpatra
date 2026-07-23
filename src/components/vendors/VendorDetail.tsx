@@ -578,22 +578,11 @@ function VendorProfile({
         subtitle={`${vendor.city}, ${vendor.state}`}
         backHref="/vendors"
         className="mb-2 sm:rounded-b-hero"
-        trailing={
-          <WhatsAppShareButton
-            path={`/vendors/${vendor.id}`}
-            message={`Check out ${vendor.name} on Bhojpatra`}
-            messageHi={`भोजपत्र पर ${vendor.name} देखें`}
-            variant="ghost"
-            size="sm"
-            label=""
-            labelHi=""
-          />
-        }
       />
 
       <div className="mx-auto mt-2 max-w-4xl px-4 sm:px-0 lg:mt-4">
         {/* ── Hero ──────────────────────────────────────────────────── */}
-        <div className="relative -mx-4 aspect-[16/10] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[16/9] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
+        <div className="relative -mx-4 aspect-[16/9.5] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[16/9] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
           <Image
             src={vendor.image}
             alt={vendor.name}
@@ -639,132 +628,76 @@ function VendorProfile({
           </a>
         </div>
 
-        {/* ── Title + fixed-price card ─────────────────────────────── */}
-        <div className="mt-5 sm:mt-7 sm:flex sm:items-start sm:justify-between sm:gap-8">
-          <div className="min-w-0">
-            <h1 className="font-sans text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        {/* ── Header Info + Right-Aligned Price Card ────────────────── */}
+        <div className="mt-3.5 flex flex-row items-start justify-between gap-2.5 sm:mt-7 sm:gap-6">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-sans text-lg font-bold tracking-tight text-ink sm:text-3xl">
               {vendor.name}
             </h1>
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft sm:text-base">
-              <MapPinIcon className="h-4 w-4 shrink-0 text-maroon" />
+            <p className="mt-1 flex items-center gap-1 text-xs text-ink-soft sm:mt-2 sm:gap-1.5 sm:text-base">
+              <MapPinIcon className="h-3.5 w-3.5 shrink-0 text-maroon sm:h-4 sm:w-4" />
               {vendor.city}, {vendor.state}
             </p>
 
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:mt-3.5 sm:gap-2">
               {vendor.cuisines.map((c) => (
                 <span
                   key={c}
-                  className="rounded-full bg-cream-2 px-3.5 py-1.5 text-sm font-medium text-ink"
+                  className="rounded-full bg-cream-2 px-2.5 py-0.5 text-xs font-medium text-ink sm:px-3.5 sm:py-1.5 sm:text-sm"
                 >
                   {c}
                 </span>
               ))}
-              <span className="rounded-full border border-cream-3 bg-white px-3.5 py-1.5 text-sm font-medium text-ink">
+              <span className="rounded-full border border-cream-3 bg-white px-2.5 py-0.5 text-xs font-medium text-ink sm:px-3.5 sm:py-1.5 sm:text-sm">
                 {localize(vendor.diet)}
               </span>
             </div>
 
             {vendor.mealTypes.length > 0 && (
-              <p className="mt-2.5 text-[12px] text-ink/50 sm:mt-3 sm:text-sm sm:text-ink-soft">
+              <p className="mt-1.5 text-[11px] text-ink/60 sm:mt-3 sm:text-sm sm:text-ink-soft">
                 <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>{" "}
                 {vendor.mealTypes.map(localize).join(" · ")}
               </p>
             )}
           </div>
-        </div>
 
-        {/* ── Booking panel ─────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-32 lg:self-start">
-          <div className="rounded-3xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
-            <p className="text-xs text-ink-soft">{t("From", "से")}</p>
-            <p className="font-display text-3xl font-bold text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
-              <span className="text-base font-normal text-ink-soft">
-                / {t("plate", "प्लेट")}
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-ink-soft">
-              {t(
-                "Final price depends on your menu, guest count and add-ons.",
-                "अंतिम कीमत आपके मेन्यू, मेहमानों की संख्या और ऐड-ऑन पर निर्भर करती है।",
-              )}
-            </p>
-
-            <div className="mt-4 flex items-center gap-2.5 border-t border-cream-3 pt-4">
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-2 text-base font-bold text-maroon"
-              >
-                ₹
-              </span>
-              <span className="text-xs leading-snug text-ink">
-                {t("All inclusive", "सब कुछ शामिल")}
-                <span className="block text-ink-soft">
-                  {t("No hidden charges", "कोई छिपा शुल्क नहीं")}
+          {/* Right-aligned Price Card Box */}
+          <div className="shrink-0 self-start">
+            <div className="rounded-xl border border-cream-3 bg-white p-2.5 text-right shadow-xs min-w-[125px] sm:min-w-[210px] sm:rounded-2xl sm:p-4 sm:shadow-sm">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-ink-soft sm:text-[11px]">
+                {t("Fixed Price", "फिक्स्ड प्राइस")}
+              </p>
+              <p className="mt-0.5 font-display text-xl font-bold leading-tight text-maroon sm:text-3xl">
+                ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
+                <span className="text-[10px] font-normal text-ink-soft sm:text-sm">
+                  / {t("plate", "प्लेट")}
                 </span>
-              </span>
+              </p>
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-cream-2 px-1.5 py-0.5 text-[9px] font-medium text-ink sm:mt-2 sm:gap-1.5 sm:px-3 sm:py-1 sm:text-[11px]">
+                <span aria-hidden="true" className="font-bold text-maroon">₹</span>
+                <span className="hidden sm:inline">{t("All inclusive · No hidden charges", "सब कुछ शामिल · कोई छिपा शुल्क नहीं")}</span>
+                <span className="sm:hidden">{t("All inclusive", "सब शामिल")}</span>
+              </div>
             </div>
-
-            <VendorActionRow
-              bookHref={bookHref}
-              vendorName={vendor.name}
-              vendorCity={vendor.city}
-              priceFrom={vendor.priceFrom}
-              inCompare={inCompare}
-              compareDisabled={compareDisabled}
-              onToggleCompare={() => toggle(vendor.id)}
-              className="mt-5"
-            />
-            {compareCount >= 2 && (
-              <button
-                type="button"
-                onClick={openCompareTable}
-                className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
-              >
-                {t(
-                  `Compare ${compareCount} selected →`,
-                  `${compareCount} चुने हुए की तुलना करें →`,
-                )}
-              </button>
-            )}
-
-            <dl className="mt-5 space-y-2 border-t border-cream-3 pt-4 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Location", "स्थान")}</dt>
-                <dd className="font-medium text-ink">{vendor.city}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Tiers", "टियर")}</dt>
-                <dd className="font-medium text-ink">
-                  {vendor.tiers.map(localize).join(", ")}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-soft">{t("Rating", "रेटिंग")}</dt>
-                <dd className="font-medium text-ink">
-                  {shownRating} ({shownCount})
-                </dd>
-              </div>
-            </dl>
           </div>
         </div>
 
         {/* ── Famous For ───────────────────────────────────────────── */}
         {famousFor && (
-          <div className="mt-6 rounded-2xl border border-cream-3 bg-cream/40 p-5 sm:p-6">
-            <p className="text-base font-bold text-maroon sm:text-lg">
+          <div className="mt-3 rounded-xl border border-cream-3 bg-cream/40 p-3 sm:mt-6 sm:rounded-2xl sm:p-5">
+            <p className="text-xs font-bold text-maroon sm:text-base">
               {t("Famous For", "इनकी खासियत")}
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
               {famousFor.map((dish) => (
                 <div
                   key={dish.name}
-                  className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+                  className="flex items-center gap-1.5 sm:gap-2.5 sm:px-4 sm:first:pl-0"
                 >
-                  <span className="text-2xl" aria-hidden="true">
+                  <span className="text-lg sm:text-2xl" aria-hidden="true">
                     {dish.icon}
                   </span>
-                  <span className="text-sm font-medium leading-snug text-ink">
+                  <span className="text-xs font-semibold leading-tight text-ink sm:text-sm sm:font-medium">
                     {t(dish.name, dish.nameHi)}
                   </span>
                 </div>
@@ -774,32 +707,32 @@ function VendorProfile({
         )}
 
         {/* ── Trust highlights ─────────────────────────────────────── */}
-        <div className="mt-4 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+        <div className="mt-2.5 rounded-xl border border-cream-3 bg-white p-2.5 shadow-xs sm:mt-4 sm:rounded-2xl sm:p-5 sm:shadow-sm">
+          <div className="grid grid-cols-4 divide-x divide-cream-3 text-center sm:text-left">
             {[
               {
-                icon: <RosetteIcon className="h-6 w-6" />,
+                icon: <RosetteIcon className="h-4 w-4 sm:h-6 sm:w-6" />,
                 label: t("Hygienic Preparation", "स्वच्छ तैयारी"),
               },
               {
-                icon: <LeafIcon className="h-6 w-6" />,
+                icon: <LeafIcon className="h-4 w-4 sm:h-6 sm:w-6" />,
                 label: t("Fresh Ingredients", "ताज़ी सामग्री"),
               },
               {
-                icon: <PeopleIcon className="h-6 w-6" />,
-                label: t("10+ Years of Trust", "10+ वर्षों का भरोसा"),
+                icon: <PeopleIcon className="h-4 w-4 sm:h-6 sm:w-6" />,
+                label: t("10+ Years Trust", "10+ वर्ष भरोसा"),
               },
               {
-                icon: <ClockIcon className="h-6 w-6" />,
+                icon: <ClockIcon className="h-4 w-4 sm:h-6 sm:w-6" />,
                 label: t("Quick Service", "तेज़ सेवा"),
               },
             ].map((f) => (
               <div
                 key={f.label}
-                className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+                className="flex flex-col items-center justify-center gap-1 px-1 sm:flex-row sm:justify-start sm:gap-2.5 sm:px-4 sm:first:pl-0"
               >
                 <span className="shrink-0 text-maroon">{f.icon}</span>
-                <span className="max-w-28 text-[13px] font-semibold leading-snug text-ink">
+                <span className="text-[9.5px] font-semibold leading-tight text-ink sm:text-[13px]">
                   {f.label}
                 </span>
               </div>
@@ -807,66 +740,38 @@ function VendorProfile({
           </div>
         </div>
 
-        {/* ── Quick actions ────────────────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <Button
-            href={bookHref}
-            variant="primary"
-            size="lg"
-            leftIcon={<CalendarIcon className="h-4 w-4" />}
-          >
-            {t("Book Now", "अभी बुक करें")}
-          </Button>
-          <WhatsAppShareButton
-            path={`/vendors/${vendor.id}`}
-            variant="secondary"
-            size="lg"
-            label="WhatsApp"
-            labelHi="व्हाट्सएप"
-            message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
-            messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
+        {/* ── Single Vendor Action Row ─────────────────────────────── */}
+        <div className="mt-3 sm:mt-6">
+          <VendorActionRow
+            bookHref={bookHref}
+            vendorName={vendor.name}
+            vendorCity={vendor.city}
+            priceFrom={vendor.priceFrom}
+            inCompare={inCompare}
+            compareDisabled={compareDisabled}
+            onToggleCompare={() => toggle(vendor.id)}
           />
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={handleShare}
-            leftIcon={<ShareIcon className="h-4 w-4" />}
-          >
-            {linkCopied
-              ? t("Link copied", "लिंक कॉपी हुआ")
-              : t("Share", "शेयर")}
-          </Button>
-          <Button
-            variant={inCompare ? "primary" : "secondary"}
-            size="lg"
-            onClick={() => toggle(vendor.id)}
-            disabled={compareDisabled}
-            aria-pressed={inCompare}
-            leftIcon={<CompareIcon className="h-4 w-4" />}
-          >
-            {inCompare ? t("Added", "जोड़ा गया") : t("Compare", "तुलना करें")}
-          </Button>
+          {compareCount >= 2 && (
+            <button
+              type="button"
+              onClick={openCompareTable}
+              className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
+            >
+              {t(
+                `Compare ${compareCount} selected →`,
+                `${compareCount} चुने हुए की तुलना करें →`,
+              )}
+            </button>
+          )}
         </div>
-        {compareCount >= 2 && (
-          <button
-            type="button"
-            onClick={openCompareTable}
-            className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
-          >
-            {t(
-              `Compare ${compareCount} selected →`,
-              `${compareCount} चुने हुए की तुलना करें →`,
-            )}
-          </button>
-        )}
 
         {/* ── Ideal For ────────────────────────────────────────────── */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-cream-3 bg-white px-5 py-4 shadow-sm">
-          <span className="flex items-center gap-2 text-sm font-bold text-maroon">
-            <PeopleIcon className="h-5 w-5" />
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-cream-3 bg-white px-3 py-2.5 shadow-xs sm:mt-4 sm:rounded-2xl sm:px-5 sm:py-4 sm:shadow-sm">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-maroon sm:gap-2 sm:text-sm">
+            <PeopleIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             {t("Ideal For", "इनके लिए उपयुक्त")}
           </span>
-          <span className="text-sm text-ink">
+          <span className="text-xs text-ink sm:text-sm">
             {[
               t("Parties", "पार्टियाँ"),
               t("Weddings", "शादियाँ"),

@@ -61,15 +61,15 @@ export default function VendorActionRow({
   };
 
   return (
-    <div className={`grid grid-cols-4 gap-1.5 sm:gap-2.5 ${className}`}>
+    <div className={`grid grid-cols-4 gap-1 sm:gap-2.5 ${className}`}>
       {/* 1. Book Now */}
       <Link
         href={bookHref}
-        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-maroon px-1.5 py-2 text-[12px] sm:text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark active:scale-95"
+        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-0.5 sm:gap-1.5 rounded-xl bg-maroon px-1 sm:px-1.5 py-2 text-[10px] xs:text-[11px] sm:text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark active:scale-95"
       >
         <svg
           viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0"
+          className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0"
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
@@ -89,11 +89,11 @@ export default function VendorActionRow({
       <button
         type="button"
         onClick={handleWhatsApp}
-        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-1 sm:gap-1.5 rounded-xl border border-cream-3 bg-white px-1.5 py-2 text-[12px] sm:text-sm font-semibold text-ink shadow-sm transition hover:bg-cream-2 active:scale-95"
+        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-0.5 sm:gap-1.5 rounded-xl border border-cream-3 bg-white px-1 sm:px-1.5 py-2 text-[10px] xs:text-[11px] sm:text-sm font-semibold text-ink shadow-sm transition hover:bg-cream-2 active:scale-95"
       >
         <svg
           viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-[#25D366]"
+          className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-[#25D366]"
           fill="currentColor"
           aria-hidden="true"
         >
@@ -106,11 +106,11 @@ export default function VendorActionRow({
       <button
         type="button"
         onClick={handleShare}
-        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-1 sm:gap-1.5 rounded-xl border border-cream-3 bg-white px-1.5 py-2 text-[12px] sm:text-sm font-semibold text-ink shadow-sm transition hover:bg-cream-2 active:scale-95"
+        className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-0.5 sm:gap-1.5 rounded-xl border border-cream-3 bg-white px-1 sm:px-1.5 py-2 text-[10px] xs:text-[11px] sm:text-sm font-semibold text-ink shadow-sm transition hover:bg-cream-2 active:scale-95"
       >
         <svg
           viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-ink-soft"
+          className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-ink-soft"
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
@@ -136,7 +136,7 @@ export default function VendorActionRow({
         disabled={compareDisabled || !onToggleCompare}
         aria-pressed={inCompare}
         className={
-          "focus-ring flex min-h-[2.75rem] items-center justify-center gap-1 sm:gap-1.5 rounded-xl border px-1.5 py-2 text-[12px] sm:text-sm font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 " +
+          "focus-ring flex min-h-[2.75rem] items-center justify-center gap-0.5 sm:gap-1.5 rounded-xl border px-1 sm:px-1.5 py-2 text-[10px] xs:text-[11px] sm:text-sm font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 " +
           (inCompare
             ? "border-maroon bg-cream-2 text-maroon font-bold"
             : "border-cream-3 bg-white text-ink hover:bg-cream-2")
@@ -145,7 +145,7 @@ export default function VendorActionRow({
         <svg
           viewBox="0 0 24 24"
           className={
-            "h-4 w-4 shrink-0 " + (inCompare ? "text-maroon" : "text-ink-soft")
+            "h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 " + (inCompare ? "text-maroon" : "text-ink-soft")
           }
           fill="none"
           stroke="currentColor"

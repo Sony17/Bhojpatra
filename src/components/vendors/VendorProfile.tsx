@@ -35,17 +35,6 @@ export default function VendorProfile({
         subtitle={[profile.city, profile.state].filter(Boolean).join(", ")}
         backHref="/vendors"
         className="mb-2 sm:rounded-b-hero"
-        trailing={
-          <WhatsAppShareButton
-            path={`/vendors/${profile.id}`}
-            message={`Check out ${profile.business} on Bhojpatra`}
-            messageHi={`भोजपत्र पर ${profile.business} देखें`}
-            variant="ghost"
-            size="sm"
-            label=""
-            labelHi=""
-          />
-        }
       />
 
       <div className="mt-2 grid grid-cols-1 gap-8 px-4 lg:grid-cols-5 lg:px-0">
