@@ -29,6 +29,7 @@ import type {
   VendorEssentialService,
   VendorMenuSection,
 } from "@/lib/vendorMenus";
+import { TIER_ORDER, type VendorTier } from "@/lib/admin/types";
 import { money } from "@/lib/money";
 import { useLang } from "@/lib/i18n";
 import { Button, Card } from "@/components/ui";
@@ -72,6 +73,7 @@ interface VendorPayload {
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
   essentialService?: VendorEssentialService;
+  tiers?: VendorTier[];
 }
 
 interface DraftBoxSize {
@@ -100,6 +102,14 @@ const MAX_BOX_CUSTOM_SIZES = 4;
  *  own Essential Service offer (they can add their own items too). */
 const ESSENTIAL_SUGGESTIONS: string[] =
   servicePackages.find((p) => p.id === "essential")?.includes ?? [];
+
+/** Per-plate band each marketplace tier covers (mirrors `tierForPrice`) —
+ *  shown on the tier chips so vendors know where they belong. */
+const TIER_BAND_HINTS: Record<VendorTier, string> = {
+  Silver: "< ₹1000",
+  Gold: "₹1000–1499",
+  Platinum: "₹1500+",
+};
 
 const emptySections = (): Record<string, DraftSection> =>
   Object.fromEntries(
@@ -133,6 +143,7 @@ export default function MenuBuilder() {
   const [city, setCity] = useState("");
   const [stateName, setStateName] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
+  const [cuisineDraft, setCuisineDraft] = useState("");
   const [about, setAbout] = useState("");
   const [priceFrom, setPriceFrom] = useState("999");
   const [maxCapacity, setMaxCapacity] = useState("");
@@ -149,6 +160,8 @@ export default function MenuBuilder() {
   // Catering categories served — the same offering types customers browse on
   // the frontend (full catering, single stall, live stall, baina box, …).
   const [serviceCats, setServiceCats] = useState<string[]>([]);
+  /** Marketplace tier bands the vendor places themselves in (empty = auto). */
+  const [tiers, setTiers] = useState<VendorTier[]>([]);
   // Baina Box menu — the vendor's own boxes (baina-box category).
   const [boxes, setBoxes] = useState<DraftBox[]>([]);
   const [boxPhotoError, setBoxPhotoError] = useState("");
@@ -224,6 +237,8 @@ export default function MenuBuilder() {
             // Categories likewise carry over from the saved profile or, first
             // time in, from the registration application.
             if (src.serviceCategories) setServiceCats(src.serviceCategories);
+            // Tiers: saved selection, or the review/price-derived prefill.
+            if (src.tiers?.length) setTiers(src.tiers);
             if (src.bainaBoxes) {
               setBoxes(
                 src.bainaBoxes.map((b) => ({
@@ -557,6 +572,20 @@ export default function MenuBuilder() {
     setSaved(false);
   };
 
+  // Add a cuisine the vendor typed in — a preset match just lights up that chip
+  // instead of duplicating it.
+  const addCustomCuisine = () => {
+    const name = cuisineDraft.trim();
+    if (!name) return;
+    const match = registrationCuisines.find(
+      (c) => c.toLowerCase() === name.toLowerCase(),
+    );
+    const value = match ?? name;
+    setCuisines((prev) => (prev.includes(value) ? prev : [...prev, value]));
+    setCuisineDraft("");
+    setSaved(false);
+  };
+
   const onEssentialRate = (value: string) => {
     setEssentialRate(value);
     if (value.trim()) ensureServiceCat("essential");
@@ -607,6 +636,9 @@ export default function MenuBuilder() {
             return { id: o.id, ...(price > 0 ? { price } : {}) };
           }),
         serviceCategories: serviceCats,
+        // Deselecting every tier falls back server-side to the assigned /
+        // existing bands (and ultimately the price-derived default).
+        tiers,
         // Blank box rows are dropped client-side; a named box without a price
         // is left in so the server's clearer validation error surfaces.
         bainaBoxes: boxes
@@ -934,6 +966,62 @@ export default function MenuBuilder() {
                 />
               ))}
             </div>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={cuisineDraft}
+                onChange={(e) => setCuisineDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomCuisine();
+                  }
+                }}
+                placeholder={t("Add another cuisine…", "एक और व्यंजन शैली जोड़ें…")}
+                className={inputClass + " max-w-xs"}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={addCustomCuisine}
+                disabled={!cuisineDraft.trim()}
+              >
+                + {t("Add", "जोड़ें")}
+              </Button>
+            </div>
+          </div>
+
+          {/* Marketplace tiers — self-placement into the Silver/Gold/Platinum
+              bands. Drives the /vendors catalog card and the tier lens the
+              /book wizard applies per course — including the Single Stall
+              flow's tier picker. */}
+          <div className="sm:col-span-2 lg:col-span-3">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Marketplace Tiers", "मार्केटप्लेस टियर")}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {TIER_ORDER.map((tier) => (
+                <Chip
+                  key={tier}
+                  label={`${tier} · ${TIER_BAND_HINTS[tier]}`}
+                  active={tiers.includes(tier)}
+                  onClick={() => {
+                    setTiers((prev) =>
+                      prev.includes(tier)
+                        ? prev.filter((v) => v !== tier)
+                        : [...prev, tier],
+                    );
+                    setSaved(false);
+                  }}
+                />
+              ))}
+            </div>
+            <span className="mt-1.5 block text-xs text-ink-soft">
+              {t(
+                "Pick every band you serve. This places your card in the vendor catalog and decides which tier shows your stalls in the Single Stall booking flow. Leave all off to be placed automatically by your prices.",
+                "जिन बैंड में आप सेवा देते हैं वे सभी चुनें। इसी से वेंडर कैटलॉग में आपका कार्ड और Single Stall बुकिंग में आपके स्टॉल का टियर तय होता है। सभी खाली छोड़ने पर आपकी कीमतों से अपने-आप तय होगा।",
+              )}
+            </span>
           </div>
         </div>
       </Card>

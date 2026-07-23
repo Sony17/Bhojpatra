@@ -182,6 +182,8 @@ export default function VendorCatalog() {
         return t("Breakfast", "नाश्ता");
       case "Lunch":
         return t("Lunch", "दोपहर का भोजन");
+      case "Hi-tea":
+        return t("Hi-tea", "हाई-टी");
       case "Dinner":
         return t("Dinner", "रात्रि भोज");
       case "Starters":
@@ -1087,6 +1089,8 @@ function VendorCard({
         return t("Breakfast", "नाश्ता");
       case "Lunch":
         return t("Lunch", "दोपहर का भोजन");
+      case "Hi-tea":
+        return t("Hi-tea", "हाई-टी");
       case "Dinner":
         return t("Dinner", "रात्रि भोज");
       case "Starters":

@@ -132,7 +132,7 @@ export default function Hero() {
     : "/vendors";
 
   const ctaLabel = lang === "hi" ? hero.ctaHi : hero.cta;
-  const browseLabel = t("Find caterers", "कैटरर खोजें");
+  const browseLabel = t("Explore more", "और देखें");
 
   const fieldLabel =
     "block truncate text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65";

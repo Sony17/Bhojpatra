@@ -16,12 +16,12 @@ import { useVendorRatings, statFor } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import { openCompareTable } from "@/lib/compareTray";
 import CompareTray from "@/components/vendors/CompareTray";
-import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
-import { Button, AppBar } from "@/components/ui";
-import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
+import { Button } from "@/components/ui";
+import { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
+import { WhatsApp } from "@/components/icons";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -366,6 +366,42 @@ function ClockIcon({ className }: { className?: string }) {
   );
 }
 
+function HeartIcon({
+  className,
+  filled = false,
+}: {
+  className?: string;
+  filled?: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    </svg>
+  );
+}
+
+/** localStorage key holding the ids of vendors the customer has hearted. */
+const SAVED_VENDORS_KEY = "bp:saved-vendors";
+
+/**
+ * Quick-action button recipe — the shared Button's look at responsive density.
+ * The design keeps all four actions on one row even on phones, which needs
+ * tighter padding/type than Button's fixed size steps allow.
+ */
+const ACTION_BASE =
+  "focus-ring tap relative inline-flex min-h-11 items-center justify-center gap-1 whitespace-nowrap rounded-control px-1 text-[11px] font-semibold transition duration-200 ease-out touch-manipulation active:scale-[.98] sm:min-h-12 sm:gap-2 sm:px-5 sm:text-base";
+const ACTION_PRIMARY = `${ACTION_BASE} btn-sheen bg-maroon text-cream shadow-brand hover:-translate-y-0.5 hover:shadow-pop`;
+const ACTION_SECONDARY = `${ACTION_BASE} border border-maroon bg-transparent text-maroon hover:bg-maroon hover:text-cream`;
+
 export default function VendorDetail({ id }: { id: string }) {
   const { t } = useLang();
   const vendor = useMemo(
@@ -422,6 +458,40 @@ function VendorProfile({
       window.setTimeout(() => setLinkCopied(false), 2000);
     });
   };
+
+  // "Heart" in the top bar — a device-local save list.
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    try {
+      const list = JSON.parse(
+        localStorage.getItem(SAVED_VENDORS_KEY) ?? "[]",
+      ) as string[];
+      setSaved(list.includes(vendor.id));
+    } catch {}
+  }, [vendor.id]);
+  const toggleSaved = () => {
+    setSaved((prev) => {
+      const next = !prev;
+      try {
+        const list = new Set<string>(
+          JSON.parse(
+            localStorage.getItem(SAVED_VENDORS_KEY) ?? "[]",
+          ) as string[],
+        );
+        if (next) list.add(vendor.id);
+        else list.delete(vendor.id);
+        localStorage.setItem(SAVED_VENDORS_KEY, JSON.stringify([...list]));
+      } catch {}
+      return next;
+    });
+  };
+
+  // WhatsApp forward — same promo-share deep link WhatsAppShareButton builds.
+  const waMessage = t(
+    `Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`,
+    `${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`,
+  );
+  const waHref = `https://wa.me/?text=${encodeURIComponent(`${waMessage} ${profileUrl}`)}`;
 
   const famousFor = vendor.cuisines.map((c) => FAMOUS_FOR[c]).find(Boolean);
 
@@ -509,6 +579,8 @@ function VendorProfile({
         return t("Breakfast", "नाश्ता");
       case "Lunch":
         return t("Lunch", "दोपहर का भोजन");
+      case "Hi-tea":
+        return t("Hi-tea", "हाई-टी");
       case "Dinner":
         return t("Dinner", "रात्रि भोज");
       case "Starters":
@@ -572,25 +644,46 @@ function VendorProfile({
         (compareCount > 0 ? "pb-32 sm:pb-36" : "")
       }
     >
-      <AppBar
-        title={vendor.name}
-        subtitle={`${vendor.city}, ${vendor.state}`}
-        backHref="/vendors"
-        className="mb-2 sm:rounded-b-hero"
-        trailing={
-          <WhatsAppShareButton
-            path={`/vendors/${vendor.id}`}
-            message={`Check out ${vendor.name} on Bhojpatra`}
-            messageHi={`भोजपत्र पर ${vendor.name} देखें`}
-            variant="ghost"
-            size="sm"
-            label=""
-            labelHi=""
-          />
-        }
-      />
+      {/* ── Minimal top bar — back left, save + share right ───────── */}
+      <div className="sticky top-0 z-30 mb-1 flex items-center justify-between bg-white px-2 py-1 pt-[max(0.5rem,var(--safe-top))] sm:mb-2 sm:rounded-b-hero">
+        <Link
+          href="/vendors"
+          aria-label={t("Back to caterers", "कैटरर पर वापस")}
+          className="focus-ring tap flex h-11 w-11 items-center justify-center rounded-full text-ink transition duration-150 hover:bg-cream/60 active:scale-95"
+        >
+          <LineIcon className="h-5 w-5">
+            <path d="M15 6 9 12l6 6" />
+          </LineIcon>
+        </Link>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={toggleSaved}
+            aria-pressed={saved}
+            aria-label={
+              saved
+                ? t("Remove from saved", "सेव से हटाएँ")
+                : t("Save this caterer", "यह कैटरर सेव करें")
+            }
+            className="focus-ring tap flex h-11 w-11 items-center justify-center rounded-full transition duration-150 hover:bg-cream/60 active:scale-95"
+          >
+            <HeartIcon
+              className={"h-5 w-5 " + (saved ? "text-maroon" : "text-ink")}
+              filled={saved}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label={t("Share", "शेयर")}
+            className="focus-ring tap flex h-11 w-11 items-center justify-center rounded-full text-ink transition duration-150 hover:bg-cream/60 active:scale-95"
+          >
+            <ShareIcon className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
 
-      <div className="mx-auto mt-2 max-w-4xl px-4 sm:px-0 lg:mt-4">
+      <div className="mx-auto max-w-4xl px-4 sm:mt-2 sm:px-0 lg:mt-4">
         {/* ── Hero ──────────────────────────────────────────────────── */}
         <div className="relative -mx-4 aspect-[16/10] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[16/9] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
           <Image
@@ -626,7 +719,7 @@ function VendorProfile({
           {/* Rating pill — maroon score segment + white review-count segment. */}
           <a
             href="#reviews"
-            className="absolute bottom-3 left-3 flex overflow-hidden rounded-full shadow-sm sm:bottom-4 sm:left-4"
+            className="absolute bottom-8 left-3 flex overflow-hidden rounded-full shadow-sm sm:bottom-4 sm:left-4"
           >
             <span className="flex items-center gap-1 bg-maroon px-2.5 py-1.5 text-xs font-bold text-white">
               <StarIcon className="h-3.5 w-3.5 text-cream" />
@@ -638,9 +731,11 @@ function VendorProfile({
           </a>
         </div>
 
+        {/* ── Content sheet — rounded white card overlapping the hero ── */}
+        <div className="relative -mx-4 -mt-5 rounded-t-hero bg-white px-4 pt-6 sm:mx-0 sm:mt-0 sm:rounded-none sm:bg-transparent sm:px-0 sm:pt-0">
         {/* ── Title + fixed-price card ─────────────────────────────── */}
-        <div className="mt-5 sm:mt-7 sm:flex sm:items-start sm:justify-between sm:gap-8">
-          <div className="min-w-0">
+        <div className="flex items-stretch justify-between gap-3 sm:mt-7 sm:gap-8">
+          <div className="min-w-0 flex-1">
             <h1 className="font-sans text-2xl font-bold tracking-tight text-ink sm:text-3xl">
               {vendor.name}
             </h1>
@@ -673,49 +768,51 @@ function VendorProfile({
             )}
           </div>
 
-          <div className="mt-6 shrink-0 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:mt-0 sm:w-60">
-            <p className="text-sm text-ink-soft">
-              {t("Fixed Price", "निश्चित मूल्य")}
-            </p>
-            <p className="mt-1 font-display text-4xl font-bold text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}
-            </p>
-            <p className="mt-1 text-lg font-bold text-ink">
-              / {t("plate", "प्लेट")}
-            </p>
-            <div className="mt-4 flex items-center gap-2.5 border-t border-cream-3 pt-4">
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-2 text-base font-bold text-maroon"
-              >
-                ₹
-              </span>
-              <span className="text-xs leading-snug text-ink">
-                {t("All inclusive", "सब कुछ शामिल")}
-                <span className="block text-ink-soft">
-                  {t("No hidden charges", "कोई छिपा शुल्क नहीं")}
+          <div className="shrink-0 border-l border-cream-3 pl-3 sm:pl-8">
+            <div className="w-40 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:w-60 sm:p-5">
+              <p className="text-sm text-ink-soft">
+                {t("Fixed Price", "निश्चित मूल्य")}
+              </p>
+              <p className="mt-1 font-display text-4xl font-bold text-maroon">
+                ₹{vendor.priceFrom.toLocaleString("en-IN")}
+              </p>
+              <p className="mt-1 text-lg font-bold text-ink">
+                / {t("plate", "प्लेट")}
+              </p>
+              <div className="mt-4 flex items-center gap-2.5 border-t border-cream-3 pt-4">
+                <span
+                  aria-hidden="true"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-2 text-base font-bold text-maroon"
+                >
+                  ₹
                 </span>
-              </span>
+                <span className="text-xs leading-snug text-ink">
+                  {t("All inclusive", "सब कुछ शामिल")}
+                  <span className="block text-ink-soft">
+                    {t("No hidden charges", "कोई छिपा शुल्क नहीं")}
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ── Famous For ───────────────────────────────────────────── */}
         {famousFor && (
-          <div className="mt-6 rounded-2xl border border-cream-3 bg-cream/40 p-5 sm:p-6">
+          <div className="mt-6 rounded-2xl border border-cream-3 bg-cream/40 p-4 sm:p-6">
             <p className="text-base font-bold text-maroon sm:text-lg">
               {t("Famous For", "इनकी खासियत")}
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+            <div className="mt-4 grid grid-cols-4 divide-x divide-cream-3">
               {famousFor.map((dish) => (
                 <div
                   key={dish.name}
-                  className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+                  className="flex items-center gap-1.5 px-1.5 first:pl-0 sm:gap-2.5 sm:px-4"
                 >
-                  <span className="text-2xl" aria-hidden="true">
+                  <span className="text-xl sm:text-2xl" aria-hidden="true">
                     {dish.icon}
                   </span>
-                  <span className="text-sm font-medium leading-snug text-ink">
+                  <span className="text-[11px] font-medium leading-tight text-ink sm:text-sm sm:leading-snug">
                     {t(dish.name, dish.nameHi)}
                   </span>
                 </div>
@@ -725,8 +822,8 @@ function VendorProfile({
         )}
 
         {/* ── Trust highlights ─────────────────────────────────────── */}
-        <div className="mt-4 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
+        <div className="mt-4 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm sm:p-6">
+          <div className="grid grid-cols-4 divide-x divide-cream-3">
             {[
               {
                 icon: <RosetteIcon className="h-6 w-6" />,
@@ -747,10 +844,12 @@ function VendorProfile({
             ].map((f) => (
               <div
                 key={f.label}
-                className="flex items-center gap-2.5 sm:px-4 sm:first:pl-0"
+                className="flex items-center gap-1.5 px-1.5 first:pl-0 sm:gap-2.5 sm:px-4"
               >
-                <span className="shrink-0 text-maroon">{f.icon}</span>
-                <span className="max-w-28 text-[13px] font-semibold leading-snug text-ink">
+                <span className="shrink-0 text-maroon [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-6 sm:[&>svg]:w-6">
+                  {f.icon}
+                </span>
+                <span className="text-[10px] font-semibold leading-tight text-ink sm:max-w-28 sm:text-[13px] sm:leading-snug">
                   {f.label}
                 </span>
               </div>
@@ -758,45 +857,38 @@ function VendorProfile({
           </div>
         </div>
 
-        {/* ── Quick actions ────────────────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <Button
-            href={bookHref}
-            variant="primary"
-            size="lg"
-            leftIcon={<CalendarIcon className="h-4 w-4" />}
-          >
+        {/* ── Quick actions — one row of four on every width ───────── */}
+        <div className="mt-6 grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2 sm:gap-3">
+          <Link href={bookHref} className={ACTION_PRIMARY}>
+            <CalendarIcon className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
             {t("Book Now", "अभी बुक करें")}
-          </Button>
-          <WhatsAppShareButton
-            path={`/vendors/${vendor.id}`}
-            variant="secondary"
-            size="lg"
-            label="WhatsApp"
-            labelHi="व्हाट्सएप"
-            message={`Check out ${vendor.name} on Bhojpatra — a verified caterer in ${vendor.city} from ₹${vendor.priceFrom.toLocaleString("en-IN")}/plate.`}
-            messageHi={`${vendor.name} को Bhojpatra पर देखें — ${vendor.city} में एक वेरिफाइड कैटरर, ₹${vendor.priceFrom.toLocaleString("en-IN")}/प्लेट से।`}
-          />
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={handleShare}
-            leftIcon={<ShareIcon className="h-4 w-4" />}
+          </Link>
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ACTION_SECONDARY}
           >
-            {linkCopied
-              ? t("Link copied", "लिंक कॉपी हुआ")
-              : t("Share", "शेयर")}
-          </Button>
-          <Button
-            variant={inCompare ? "primary" : "secondary"}
-            size="lg"
+            <WhatsApp className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+            {t("WhatsApp", "व्हाट्सएप")}
+          </a>
+          <button type="button" onClick={handleShare} className={ACTION_SECONDARY}>
+            <ShareIcon className="h-3 w-3 shrink-0 sm:h-4 sm:w-4" />
+            {linkCopied ? t("Copied", "कॉपी हुआ") : t("Share", "शेयर")}
+          </button>
+          <button
+            type="button"
             onClick={() => toggle(vendor.id)}
             disabled={compareDisabled}
             aria-pressed={inCompare}
-            leftIcon={<CompareIcon className="h-4 w-4" />}
+            className={
+              (inCompare ? ACTION_PRIMARY : ACTION_SECONDARY) +
+              " disabled:pointer-events-none disabled:opacity-50"
+            }
           >
+            <CompareIcon className="h-3 w-3 shrink-0 sm:h-4 sm:w-4" />
             {inCompare ? t("Added", "जोड़ा गया") : t("Compare", "तुलना करें")}
-          </Button>
+          </button>
         </div>
         {compareCount >= 2 && (
           <button
@@ -862,6 +954,7 @@ function VendorProfile({
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Ratings & reviews ─────────────────────────────────────────── */}
@@ -1010,14 +1103,6 @@ function VendorProfile({
       </div>
 
       <CompareTray />
-
-      {/* Mobile sticky booking bar — steps aside for the compare tray. */}
-      <StickyBookingBar
-        price={`₹${vendor.priceFrom.toLocaleString("en-IN")}`}
-        priceNote={t("per plate", "प्रति प्लेट")}
-        cta={t("Book this caterer", "यह कैटरर बुक करें")}
-        href={bookHref}
-      />
     </section>
   );
 }

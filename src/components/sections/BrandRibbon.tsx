@@ -209,7 +209,7 @@ export default function BrandRibbon() {
               </svg>
             }
           >
-            {t("Explore all brands", "सभी ब्रांड देखें")}
+            {t("Find brands to explore more", "और ब्रांड खोजें")}
           </Button>
         </div>
       </div>

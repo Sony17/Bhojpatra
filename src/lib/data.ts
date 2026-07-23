@@ -1031,6 +1031,7 @@ export const addOns: AddOn[] = [
   { id: "noodle", name: "Chinese Wok", nameHi: "चाइनीज़ वॉक", description: "Hakka noodles & Manchurian from the wok.", price: 85, perPlate: true, icon: "🍜", image: img("photo-1585032226651-759b368d7246", 600), keywords: ["chinese", "noodles", "hakka", "manchurian", "wok", "schezwan"] },
   { id: "waffle", name: "Waffle & Pancake Bar", nameHi: "वॉफल और पैनकेक बार", description: "Fresh waffles & pancakes with toppings.", price: 80, perPlate: true, icon: "🧇", image: img("photo-1541544741938-0af808871cc0", 600), keywords: ["waffle", "pancake", "nutella", "dessert", "brunch"] },
   { id: "dessert", name: "Dessert Counter", nameHi: "डेज़र्ट काउंटर", description: "Live jalebi, ice-cream & more.", price: 70, perPlate: true, icon: "🍨", image: img("photo-1565557623262-b51c2513a641", 600), keywords: ["jalebi", "ice cream", "kulfi", "sweets", "gulab jamun", "mithai"] },
+  { id: "hi-tea", name: "Hi-tea", nameHi: "हाई-टी", description: "Evening chai & nasta spread, served 4–6 PM.", price: 75, perPlate: true, icon: "🫖", image: img("photo-1601050690597-df0568f70950", 600), keywords: ["hi tea", "high tea", "chai", "tea", "nasta", "snacks", "samosa", "pakora", "evening"] },
   { id: "coffee", name: "Coffee & Chai Bar", nameHi: "कॉफ़ी और चाय बार", description: "Barista coffee, cutting chai & more.", price: 45, perPlate: true, icon: "☕", image: img("photo-1509042239860-f550ce710b93", 600), keywords: ["coffee", "chai", "tea", "barista", "cappuccino", "beverage"] },
   { id: "mocktail", name: "Mocktail & Juice Bar", nameHi: "मॉकटेल और जूस बार", description: "Fresh juices & mocktails, mixed live.", price: 65, perPlate: true, icon: "🍹", image: img("photo-1544145945-f90425340c7e", 600), keywords: ["mocktail", "juice", "drinks", "beverage", "cooler", "lemonade"] },
   { id: "staff", name: "Service Staff", nameHi: "सर्विस स्टाफ", description: "Trained stewards in uniform.", price: 8000, perPlate: false, icon: "🧑‍🍳", image: img("photo-1555939594-58d7cb561ad1", 600), keywords: ["waiter", "steward", "server", "manpower"], category: "service" },
@@ -1618,9 +1619,11 @@ export interface VendorListing {
   serviceCategories?: string[];
 }
 
-/** Meal / course offerings used for the "Serves" filter on the catalog. */
+/** Meal / course offerings used for the "Serves" filter on the catalog.
+ *  "Hi-tea" is earned via the vendor's declared `hi-tea` add-on counter (see
+ *  `addOns` / `toVendorListing`) rather than a menu section. */
 export const mealTypeOptions: string[] = [
-  "Breakfast", "Lunch", "Dinner", "Starters", "Main Course",
+  "Breakfast", "Lunch", "Hi-tea", "Dinner", "Starters", "Main Course",
   "Desserts", "Live Counters",
 ];
 
@@ -1672,10 +1675,11 @@ export const bookingTimeSlots: Record<string, string[]> = {
  *  Breakfast, midday/afternoon → Lunch, evening/night → Dinner. Lets the vendor
  *  catalog turn a picked serving time into a "Serves" match: a vendor qualifies
  *  when its `mealTypes` cover the returned period. Hi-tea's late-afternoon slots
- *  deliberately fold into the adjacent Lunch / Dinner bands here — vendors declare
- *  Hi-tea as a catering category (`cateringCategories`), not a "Serves" meal type,
- *  so matching by the neighbouring meal keeps the catalog populated. Returns ""
- *  on empty / malformed input so callers can treat it as "no time chosen". */
+ *  deliberately fold into the adjacent Lunch / Dinner bands here — only vendors
+ *  declaring the `hi-tea` add-on carry the "Hi-tea" meal type (reachable via the
+ *  explicit "Serves" filter), so matching the time by the neighbouring meal keeps
+ *  the catalog populated. Returns "" on empty / malformed input so callers can
+ *  treat it as "no time chosen". */
 export function mealPeriodForTime(hhmm?: string): string {
   if (!hhmm) return "";
   const [h, m] = hhmm.split(":").map(Number);
@@ -2076,7 +2080,6 @@ export const vendorOfferingIds: string[] = vendorOfferings.map((o) => o.id);
  *   • full-catering — the Silver / Gold / Platinum feast package cards
  *   • single-stall  — the "Single Stall · One Vendor" custom package card
  *   • live-stall    — the /book wizard's dedicated "Live Stall" step
- *   • hi-tea        — the /book wizard's Hi-tea serving slot (4–6 PM chai & snacks)
  *   • baina-box     — the home "Baina Box" section (/vendors?q=Baina+Box)
  *   • essential     — the Essential tier of /service-packages (service-only)
  * Vendors pick theirs in the registration wizard's Menu step and in the
@@ -2117,14 +2120,6 @@ export const cateringCategories: CateringCategory[] = [
     icon: "🍳",
     blurb: "Made-to-order stations cooked in front of guests.",
     blurbHi: "मेहमानों के सामने बनने वाले लाइव स्टेशन।",
-  },
-  {
-    id: "hi-tea",
-    name: "Hi-tea",
-    nameHi: "हाई-टी",
-    icon: "☕",
-    blurb: "Evening chai & snacks spreads served between 4 and 6 PM.",
-    blurbHi: "शाम 4 से 6 बजे के बीच परोसा जाने वाला चाय-नाश्ता।",
   },
   {
     id: "baina-box",

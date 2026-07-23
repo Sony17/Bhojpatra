@@ -34,7 +34,7 @@ import {
   type MenuCategory,
   type VendorListing,
 } from "@/lib/data";
-import { sortTiers, type VendorTier } from "@/lib/admin/types";
+import { parseTiers, sortTiers, type VendorTier } from "@/lib/admin/types";
 
 export interface VendorMenuItem {
   name: string;
@@ -133,8 +133,10 @@ export interface LiveVendorRecord {
   googleRating?: number;
   googleReviews?: number;
   verified: boolean;
-  /** Admin-assigned marketplace tiers, inherited from the linked application.
-   *  Overrides the price-derived default on the catalog card when present. */
+  /** Marketplace tier bands the vendor serves — self-selected from the
+   *  dashboard, falling back to the admin's review decision on the linked
+   *  application. Drives the catalog card and the /book wizard's tier lenses
+   *  (including Single Stall). Overrides the price-derived default when set. */
   tiers?: VendorTier[];
   moderation?: ModerationStatus;
   menu: VendorMenuSection[];
@@ -331,7 +333,12 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
       : "Non-Veg"
     : "Veg";
   const mealTypes = Array.from(
-    new Set(visible.flatMap((s) => CATEGORY_MEAL_TYPES[s.categoryId] ?? [])),
+    new Set([
+      ...visible.flatMap((s) => CATEGORY_MEAL_TYPES[s.categoryId] ?? []),
+      // A declared Hi-tea add-on counter advertises the 4–6 PM chai-nasta
+      // service on the catalog's "Serves" filter — no menu section maps to it.
+      ...(r.counters?.some((c) => c.id === "hi-tea") ? ["Hi-tea"] : []),
+    ]),
   );
   return {
     id: r.id,
@@ -555,6 +562,8 @@ export interface VendorMenuInput {
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
   essentialService?: VendorEssentialService;
+  /** Self-selected marketplace tier bands (absent = keep assigned/derived). */
+  tiers?: VendorTier[];
 }
 
 type BainaBoxesCheck =
@@ -775,6 +784,11 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
     }
   }
 
+  // Self-selected marketplace tiers — unknown values dropped, canonical order.
+  // An empty selection is omitted so the route's assigned/existing fallback
+  // (and ultimately the price-derived default) still applies.
+  const tiers = parseTiers(body.tiers);
+
   // Baina Boxes + Essential Service — via the shared cleaners (also used by
   // the registration application route).
   const boxesCheck = cleanBainaBoxes(body.bainaBoxes);
@@ -811,6 +825,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(serviceCategories.length ? { serviceCategories } : {}),
       ...(bainaBoxes.length ? { bainaBoxes } : {}),
       ...(essentialService ? { essentialService } : {}),
+      ...(tiers.length ? { tiers } : {}),
     },
   };
 }

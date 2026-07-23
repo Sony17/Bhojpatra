@@ -68,6 +68,9 @@ export async function GET() {
             serviceCategories: app.cateringCategories ?? [],
             bainaBoxes: app.bainaBoxes ?? [],
             essentialService: app.essentialService,
+            // Tier chips start from the admin's review decision, else the
+            // price-derived baseline captured at registration.
+            tiers: app.assignedTiers ?? app.requestedTiers,
           }
         : { business: guard.name ?? "" },
     });
@@ -162,10 +165,10 @@ export async function PUT(request: Request) {
       rating: existing?.rating ?? 0,
       reviews: existing?.reviews ?? 0,
       verified,
-      // Marketplace tiers follow the admin's review decision (falling back to a
-      // value already synced onto the record); price-derived bands fill in on
-      // the catalog when neither is set.
-      tiers: app?.assignedTiers ?? existing?.tiers,
+      // Marketplace tiers: the vendor's own dashboard selection wins, then the
+      // admin's review decision, then whatever was already on the record;
+      // price-derived bands fill in on the catalog when none is set.
+      tiers: check.value.tiers ?? app?.assignedTiers ?? existing?.tiers,
       moderation,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

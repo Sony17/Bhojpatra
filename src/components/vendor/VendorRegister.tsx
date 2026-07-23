@@ -308,6 +308,18 @@ export default function VendorRegister() {
     setCounters((prev) => (prev.includes(value) ? prev : [...prev, value]));
   };
 
+  // Add a cuisine speciality the vendor typed in — same label-based storage as
+  // counters, so a preset match lights up the existing chip instead of duplicating.
+  const addCustomCuisine = (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
+    const match = registrationCuisines.find(
+      (c) => c.toLowerCase() === name.toLowerCase(),
+    );
+    const value = match ?? name;
+    setCuisines((prev) => (prev.includes(value) ? prev : [...prev, value]));
+  };
+
   // Vendor-typed entries not covered by the preset chip lists — rendered as
   // their own removable chips beneath the presets.
   const customServiceCities = serviceCities.filter(
@@ -315,6 +327,9 @@ export default function VendorRegister() {
   );
   const customCounters = counters.filter(
     (c) => !registrationCounters.includes(c),
+  );
+  const customCuisines = cuisines.filter(
+    (c) => !registrationCuisines.includes(c),
   );
 
   const updatePackage = (
@@ -945,7 +960,22 @@ export default function VendorRegister() {
                     onClick={() => toggle(c, cuisines, setCuisines)}
                   />
                 ))}
+                {customCuisines.map((c) => (
+                  <Chip
+                    key={c}
+                    label={c}
+                    active
+                    onClick={() => toggle(c, cuisines, setCuisines)}
+                  />
+                ))}
               </div>
+              <CustomAdder
+                placeholder={t(
+                  "Add another cuisine…",
+                  "एक और व्यंजन शैली जोड़ें…",
+                )}
+                onAdd={addCustomCuisine}
+              />
             </div>
 
             {/* Optional Google reputation — surfaced as a "Google" badge on the

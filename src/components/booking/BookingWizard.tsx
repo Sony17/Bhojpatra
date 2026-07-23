@@ -488,9 +488,17 @@ export default function BookingWizard() {
     // while Step 1 shows that same tier disabled. When it's too soon we skip both
     // the preselect and the menu jump, keeping the guest on Step 1 where the tier
     // renders disabled with the date it unlocks.
+    // The date the wizard actually ends up holding is the URL's `date` when
+    // present, else the one the rehydrate effect above restored from the saved
+    // draft (e.g. home → hero sets wedding 30 days out → back home → "Book
+    // Platinum", whose link carries no date). That restored state isn't visible
+    // to this closure, so re-read the draft directly.
     const pkgRequested = pkg !== null && packages.some((p) => p.id === pkg);
+    const effectiveDate = date ?? readBookingDraft()?.eventDate ?? null;
     const pkgTooSoon =
-      pkgRequested && date !== null && !packageAvailable(pkg!, date);
+      pkgRequested &&
+      effectiveDate !== null &&
+      !packageAvailable(pkg!, effectiveDate);
     if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
     if (stepParam === "menu" && !pkgTooSoon) setStep(2);
     // A Mehndi booking is a Single Stall order by design — the occasion
@@ -663,7 +671,8 @@ export default function BookingWizard() {
   // Gold) stripped Platinum's multi-vendor menu out from under the guest without
   // explanation. Instead we keep their pick and surface a lead-time notice +
   // block "Next" (see `dateMeetsLead` / `nextBlockers`) so they choose a later
-  // date or a lower tier on purpose. Step 1 still hides too-soon tiers up front.
+  // date or a lower tier on purpose. Step 1 shows too-soon tiers locked (dimmed,
+  // with their unlock date) rather than hiding them — see `StepPackage`.
 
   // Step 4 — Confirm (coupon + optional 10% advance / full payment)
   const [couponInput, setCouponInput] = useState<string>("");
