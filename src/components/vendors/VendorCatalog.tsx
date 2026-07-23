@@ -592,98 +592,101 @@ export default function VendorCatalog() {
       {/* Sticky app chrome — search + chip row */}
       <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">
         <div className="mx-auto max-w-7xl">
-          <AppSearchBar
-            id="vendor-search"
-            value={query}
-            onChange={setQuery}
-            aria-label={t("Search brands", "ब्रांड खोजें")}
-            placeholder={t(
-              "Search brands, stalls or cuisines",
-              "ब्रांड, स्टॉल या व्यंजन खोजें",
-            )}
-          />
-
-          <CategoryChips
-            className="mt-3"
-            label={t("Filters", "फ़िल्टर")}
-          >
-            <CategoryChip
-              selected={activeFilterCount > 0}
-              onClick={() => setFiltersOpen(true)}
-              count={activeFilterCount > 0 ? activeFilterCount : undefined}
-              leftIcon={<FilterGlyph />}
-            >
-              {t("Filters", "फ़िल्टर")}
-            </CategoryChip>
-
-            {showFilter("price") && (
-              <CategoryChip
-                id="vendor-sort-chip"
-                selected={sort === "price-asc" || sort === "price-desc"}
-                onClick={() => {
-                  setSort((prev) =>
-                    prev === "price-asc" ? "price-desc" : "price-asc",
-                  );
-                }}
-              >
-                {sort === "price-asc"
-                  ? t("Price: Low to High ↑", "कीमत: कम से ज्यादा ↑")
-                  : sort === "price-desc"
-                    ? t("Price: High to Low ↓", "कीमत: ज्यादा से कम ↓")
-                    : t("Sort by Price", "कीमत अनुसार")}
-              </CategoryChip>
-            )}
-
-            <ThemedSelect
-              id="vendor-city-chip"
-              value={city}
-              onChange={setCity}
-              ariaLabel={t("City", "शहर")}
-              className="w-auto max-w-[9rem] shrink-0"
-              buttonClassName={selectChipClass(city !== ALL)}
-              options={[
-                { value: ALL, label: t("City", "शहर") },
-                ...cityOptions.map((c) => ({ value: c, label: c })),
-              ]}
+          <div className="lg:flex lg:items-center lg:gap-3">
+            <AppSearchBar
+              id="vendor-search"
+              value={query}
+              onChange={setQuery}
+              aria-label={t("Search brands", "ब्रांड खोजें")}
+              placeholder={t(
+                "Search brands, stalls or cuisines",
+                "ब्रांड, स्टॉल या व्यंजन खोजें",
+              )}
+              className="lg:w-96 lg:shrink-0"
             />
 
-            {showFilter("price") && (
+            <CategoryChips
+              className="mt-3 lg:mt-0 lg:min-w-0 lg:flex-1"
+              label={t("Filters", "फ़िल्टर")}
+            >
               <CategoryChip
-                id="vendor-price-chip"
-                selected={price !== ALL}
-                onClick={() => {
-                  const ranges: PriceRange[] = ["all", "budget", "premium", "luxury"];
-                  const nextIdx = (ranges.indexOf(price) + 1) % ranges.length;
-                  setPrice(ranges[nextIdx]);
-                }}
+                selected={activeFilterCount > 0}
+                onClick={() => setFiltersOpen(true)}
+                count={activeFilterCount > 0 ? activeFilterCount : undefined}
+                leftIcon={<FilterGlyph />}
               >
-                {price === ALL ? t("Price", "कीमत") : priceLabel(price)}
+                {t("Filters", "फ़िल्टर")}
               </CategoryChip>
-            )}
 
-            {showFilter("diet") &&
-              DIET_OPTIONS.filter((d) => d !== ALL).map((dietValue) => (
+              {showFilter("price") && (
                 <CategoryChip
-                  key={dietValue}
-                  selected={diet === dietValue}
-                  onClick={() =>
-                    setDiet((prev) => (prev === dietValue ? ALL : dietValue))
-                  }
+                  id="vendor-sort-chip"
+                  selected={sort === "price-asc" || sort === "price-desc"}
+                  onClick={() => {
+                    setSort((prev) =>
+                      prev === "price-asc" ? "price-desc" : "price-asc",
+                    );
+                  }}
                 >
-                  {dietLabel(dietValue)}
+                  {sort === "price-asc"
+                    ? t("Price: Low to High ↑", "कीमत: कम से ज्यादा ↑")
+                    : sort === "price-desc"
+                      ? t("Price: High to Low ↓", "कीमत: ज्यादा से कम ↓")
+                      : t("Sort by Price", "कीमत अनुसार")}
                 </CategoryChip>
-              ))}
+              )}
 
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="shrink-0 px-2 text-[12px] font-semibold text-maroon"
-              >
-                {t("Clear", "हटाएँ")}
-              </button>
-            )}
-          </CategoryChips>
+              <ThemedSelect
+                id="vendor-city-chip"
+                value={city}
+                onChange={setCity}
+                ariaLabel={t("City", "शहर")}
+                className="w-auto max-w-[9rem] shrink-0"
+                buttonClassName={selectChipClass(city !== ALL)}
+                options={[
+                  { value: ALL, label: t("City", "शहर") },
+                  ...cityOptions.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+
+              {showFilter("price") && (
+                <CategoryChip
+                  id="vendor-price-chip"
+                  selected={price !== ALL}
+                  onClick={() => {
+                    const ranges: PriceRange[] = ["all", "budget", "premium", "luxury"];
+                    const nextIdx = (ranges.indexOf(price) + 1) % ranges.length;
+                    setPrice(ranges[nextIdx]);
+                  }}
+                >
+                  {price === ALL ? t("Price", "कीमत") : priceLabel(price)}
+                </CategoryChip>
+              )}
+
+              {showFilter("diet") &&
+                DIET_OPTIONS.filter((d) => d !== ALL).map((dietValue) => (
+                  <CategoryChip
+                    key={dietValue}
+                    selected={diet === dietValue}
+                    onClick={() =>
+                      setDiet((prev) => (prev === dietValue ? ALL : dietValue))
+                    }
+                  >
+                    {dietLabel(dietValue)}
+                  </CategoryChip>
+                ))}
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="shrink-0 px-2 text-[12px] font-semibold text-maroon"
+                >
+                  {t("Clear", "हटाएँ")}
+                </button>
+              )}
+            </CategoryChips>
+          </div>
 
           {/* Desktop-only expanded dropdowns — only the controls the current
               category lens keeps (city & state always; the rest per lens). */}
