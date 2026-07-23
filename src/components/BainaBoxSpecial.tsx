@@ -44,18 +44,25 @@ export default function BainaBoxSpecial({
         className={
           "grid " +
           (isSearch
-            ? "sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]"
+            ? "sm:grid-cols-2"
             : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]")
         }
       >
-        {/* Image — a banner strip on mobile, filling the card height from sm up. */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-cream-2 sm:aspect-auto">
+        {/* Image — always 4:3 in the search banner so the creative is never
+            cropped (the card grows to fit it); the dashboard card instead
+            fills whatever height the copy column sets. */}
+        <div
+          className={
+            "relative aspect-[4/3] w-full overflow-hidden bg-cream-2" +
+            (isSearch ? "" : " sm:aspect-auto")
+          }
+        >
           {special.image ? (
             <Image
               src={special.image}
               alt={heading}
               fill
-              sizes="(min-width: 640px) 440px, 100vw"
+              sizes="(min-width: 640px) 50vw, 100vw"
               className="object-cover"
               unoptimized={isUnoptimized(special.image)}
             />
