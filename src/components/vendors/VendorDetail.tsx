@@ -19,6 +19,7 @@ import CompareTray from "@/components/vendors/CompareTray";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
+import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
 import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
@@ -664,25 +665,31 @@ function VendorProfile({
             </div>
 
             {vendor.mealTypes.length > 0 && (
-              <p className="mt-3.5 text-sm text-ink-soft sm:text-[15px]">
-                <span className="font-bold text-ink">
-                  {t("Serves", "परोसता है")}:
-                </span>{" "}
-                {vendor.mealTypes.map(localize).join(" • ")}
+              <p className="mt-2.5 text-[12px] text-ink/50 sm:mt-3 sm:text-sm sm:text-ink-soft">
+                <span className="font-semibold text-ink">{t("Serves", "परोसता है")}:</span>{" "}
+                {vendor.mealTypes.map(localize).join(" · ")}
               </p>
             )}
           </div>
+        </div>
 
-          <div className="mt-6 shrink-0 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:mt-0 sm:w-60">
-            <p className="text-sm text-ink-soft">
-              {t("Fixed Price", "निश्चित मूल्य")}
+        {/* ── Booking panel ─────────────────────────────────────────── */}
+        <div className="lg:sticky lg:top-32 lg:self-start">
+          <div className="rounded-3xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6">
+            <p className="text-xs text-ink-soft">{t("From", "से")}</p>
+            <p className="font-display text-3xl font-bold text-maroon">
+              ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
+              <span className="text-base font-normal text-ink-soft">
+                / {t("plate", "प्लेट")}
+              </span>
             </p>
-            <p className="mt-1 font-display text-4xl font-bold text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}
+            <p className="mt-1 text-xs text-ink-soft">
+              {t(
+                "Final price depends on your menu, guest count and add-ons.",
+                "अंतिम कीमत आपके मेन्यू, मेहमानों की संख्या और ऐड-ऑन पर निर्भर करती है।",
+              )}
             </p>
-            <p className="mt-1 text-lg font-bold text-ink">
-              / {t("plate", "प्लेट")}
-            </p>
+
             <div className="mt-4 flex items-center gap-2.5 border-t border-cream-3 pt-4">
               <span
                 aria-hidden="true"
@@ -697,6 +704,48 @@ function VendorProfile({
                 </span>
               </span>
             </div>
+
+            <VendorActionRow
+              bookHref={bookHref}
+              vendorName={vendor.name}
+              vendorCity={vendor.city}
+              priceFrom={vendor.priceFrom}
+              inCompare={inCompare}
+              compareDisabled={compareDisabled}
+              onToggleCompare={() => toggle(vendor.id)}
+              className="mt-5"
+            />
+            {compareCount >= 2 && (
+              <button
+                type="button"
+                onClick={openCompareTable}
+                className="mt-3 block w-full text-center text-sm font-semibold text-maroon hover:underline"
+              >
+                {t(
+                  `Compare ${compareCount} selected →`,
+                  `${compareCount} चुने हुए की तुलना करें →`,
+                )}
+              </button>
+            )}
+
+            <dl className="mt-5 space-y-2 border-t border-cream-3 pt-4 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="text-ink-soft">{t("Location", "स्थान")}</dt>
+                <dd className="font-medium text-ink">{vendor.city}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-ink-soft">{t("Tiers", "टियर")}</dt>
+                <dd className="font-medium text-ink">
+                  {vendor.tiers.map(localize).join(", ")}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-ink-soft">{t("Rating", "रेटिंग")}</dt>
+                <dd className="font-medium text-ink">
+                  {shownRating} ({shownCount})
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
 

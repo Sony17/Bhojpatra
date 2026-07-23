@@ -65,7 +65,14 @@ export default function Packages() {
             return (
               <div
                 key={tier.id}
-                className="w-[88vw] max-w-[390px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+                className={
+                  "w-[85vw] max-w-[345px] shrink-0 snap-center rounded-3xl border p-2 sm:w-auto sm:max-w-none sm:shrink sm:p-3 transition-all duration-300 " +
+                  (tier.id === "platinum"
+                    ? "border-zinc-700/80 bg-zinc-950/10 shadow-lg ring-1 ring-zinc-700/50"
+                    : tier.id === "gold" || tier.popular
+                      ? "border-amber-400/80 bg-amber-500/10 shadow-brand ring-2 ring-amber-400/40"
+                      : "border-slate-300 bg-white/70 shadow-card ring-1 ring-slate-200")
+                }
               >
               <PackageScrollCard
                 tier={tier}
@@ -77,7 +84,14 @@ export default function Packages() {
                     href={`/book?package=${tier.id}&step=menu`}
                     onClick={() => setSelectedId(tier.id)}
                     aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
+                    className={
+                      "btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full px-4 text-[11px] font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 " +
+                      (tier.id === "platinum"
+                        ? "bg-zinc-900 text-cream shadow-md ring-1 ring-zinc-700 hover:bg-black"
+                        : tier.id === "gold" || tier.popular
+                          ? "bg-maroon text-cream shadow-brand ring-1 ring-maroon/40 hover:bg-maroon-dark"
+                          : "bg-white text-maroon shadow-sm ring-1 ring-slate-300 hover:bg-slate-50")
+                    }
                   >
                     <span className="font-display leading-none">
                       {t("Book", "बुक करें")} {tierName}

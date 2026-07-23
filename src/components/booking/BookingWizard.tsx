@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
@@ -1650,8 +1651,18 @@ export default function BookingWizard() {
     buildWhatsAppMessage(),
   )}`;
 
+  const router = useRouter();
+
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const goBack = () => {
+    if (step > 1) {
+      setStep((s) => s - 1);
+    } else if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/vendors");
+    }
+  };
 
   // Menu-step (2) course navigation that spills into wizard steps at the edges:
   // back off the first course returns to Package; past the last advances to the
@@ -2429,7 +2440,6 @@ export default function BookingWizard() {
             <Button
               variant="secondary"
               onClick={goBack}
-              disabled={step === 1}
               aria-label={t("Back", "पीछे")}
             >
               {t("Back", "पीछे")}
@@ -2451,7 +2461,6 @@ export default function BookingWizard() {
                 variant="secondary"
                 size="sm"
                 onClick={goBack}
-                disabled={step === 1}
                 aria-label={t("Back", "पीछे")}
                 className="min-h-11 px-4"
               >
@@ -3201,7 +3210,12 @@ function StepPackage({
   const tiers = packages.map((tier) => {
     const meta = homePackages.tiers.find((x) => x.id === tier.id);
     const display = meta
-      ? { ...tier, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+      ? {
+          ...tier,
+          name: tier.id === "custom" ? "Single Stall" : meta.name,
+          nameHi: tier.id === "custom" ? "सिंगल स्टॉल" : meta.nameHi,
+          price: meta.price,
+        }
       : tier;
     const lead = packageLeadDays[tier.id] ?? 0;
     return {
@@ -3264,18 +3278,18 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="relative w-[88vw] max-w-[390px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+              className="relative flex w-[88vw] max-w-[390px] shrink-0 snap-center flex-col first:snap-start sm:w-auto sm:max-w-none sm:shrink"
             >
             {tooSoon ? (
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
-              // or focusable), with a legible notice pinned over the fold naming
+              // or focusable), with a legible notice below the scroll card naming
               // its lead time and the date it unlocks. Nothing is silently
               // dropped, so the guest can pick a later date to reach it. The card
               // stays only lightly muted (not near-invisible) and carries a
               // "Locked" badge pinned to the top so the tier reads as present but
               // temporarily unavailable — never as if it had gone missing.
               <>
-                <div inert className="select-none opacity-60">
+                <div className="select-none opacity-60">
                   <PackageScrollCard
                     tier={tier}
                     selected={false}
@@ -3290,8 +3304,8 @@ function StepPackage({
                     {t("Locked", "लॉक")}
                   </span>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-[12%] z-30 flex justify-center px-4">
-                  <div className="rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
+                <div className="mt-2.5 flex justify-center px-1">
+                  <div className="w-full rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
                     <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
                       <span aria-hidden="true">★</span>
                       {t(
@@ -3645,6 +3659,41 @@ function StepMenu({
           </span>
         </p>
       )}
+
+      {/* Search Bar — filter vendors live by name or cuisine */}
+      <div className="relative mb-5">
+        <input
+          type="search"
+          value={vendorSearch}
+          onChange={(e) => setVendorSearch(e.target.value)}
+          placeholder={t(
+            "Search vendors by name or cuisine...",
+            "नाम या व्यंजन से वेंडर खोजें...",
+          )}
+          aria-label={t(
+            "Search vendors by name or cuisine",
+            "नाम या व्यंजन से वेंडर खोजें",
+          )}
+          className="w-full rounded-2xl border border-cream-3 bg-white px-4 py-2.5 pr-10 text-sm text-ink shadow-sm transition placeholder:text-ink-soft/60 focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
+        />
+        {vendorSearch ? (
+          <button
+            type="button"
+            onClick={() => setVendorSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-soft transition hover:text-maroon"
+            aria-label={t("Clear search", "खोज साफ़ करें")}
+          >
+            ✕
+          </button>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-ink-soft/50"
+          >
+            🔍
+          </span>
+        )}
+      </div>
 
       {/* Category tabs */}
       <div className="-mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
