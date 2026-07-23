@@ -16,8 +16,8 @@ import { useLang } from "@/lib/i18n";
  * booking-step select button).
  */
 
-/** Aspect ratio of the patra scroll artwork (public/pack.png, 458×545). */
-const SCROLL_RATIO = "458 / 545";
+/** Aspect ratio of the patra scroll artwork (458×670 for taller menu content). */
+const SCROLL_RATIO = "458 / 670";
 
 /**
  * Writable area of the scroll, as inset % of the artwork. The menu is
@@ -25,7 +25,7 @@ const SCROLL_RATIO = "458 / 545";
  * horizontal insets keep text clear of the maroon border and the right-hand
  * roll; the vertical insets clear the top lace band and bottom roll.
  */
-const PARCHMENT = "left-[13%] right-[21%] top-[16%] bottom-[19%]";
+const PARCHMENT = "left-[13%] right-[21%] top-[14%] bottom-[16%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
@@ -198,7 +198,7 @@ export default function PackageScrollCard({
           alt=""
           fill
           sizes="(min-width:1024px) 360px, (min-width:640px) 45vw, 90vw"
-          className="pointer-events-none select-none object-contain"
+          className="pointer-events-none select-none object-fill"
           priority={priority || popular}
         />
 
