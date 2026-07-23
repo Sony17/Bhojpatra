@@ -1566,7 +1566,7 @@ export const packageBasePerPlate: Record<string, number> = {
 export const packageLeadDays: Record<string, number> = {
   silver: 7,
   gold: 21,
-  platinum: 45,
+  platinum: 30,
   custom: 0,
 };
 

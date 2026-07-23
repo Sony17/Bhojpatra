@@ -483,8 +483,8 @@ export default function BookingWizard() {
     // here pre-selected; `step=menu` then drops the guest straight onto vendor
     // selection (Step 2) so they flow into the booking instead of re-picking.
     // But a deep-linked tier is only honoured when it actually clears its lead
-    // time for the passed date — otherwise (e.g. Platinum, which needs 45 days,
-    // for a wedding 30 days out) we'd strand the guest on a too-soon tier's menu
+    // time for the passed date — otherwise (e.g. Platinum, which needs 30 days,
+    // for an event a fortnight out) we'd strand the guest on a too-soon tier's menu
     // while Step 1 shows that same tier disabled. When it's too soon we skip both
     // the preselect and the menu jump, keeping the guest on Step 1 where the tier
     // renders disabled with the date it unlocks.
@@ -1181,7 +1181,7 @@ export default function BookingWizard() {
   };
 
   /* ─── Advance-booking lead time ────────────────────────────────────── */
-  // Silver/Gold/Platinum carry a fixed package lead (7/21/45 days). The Custom
+  // Silver/Gold/Platinum carry a fixed package lead (7/21/30 days). The Custom
   // single-stall plan has NO fixed lead — its notice is "as per vendor
   // specification": the longest lead among the stalls the guest actually picked
   // (each vendor's `leadDays`, default 2; same-day stalls set 0). So a Custom
@@ -1237,7 +1237,7 @@ export default function BookingWizard() {
   // The date picker's floor is just "today" (no past dates) — NOT the lead-time
   // earliest (the EventBar's DatePicker uses `minDaysAhead={0}`). A lead-based
   // floor greys out every near date, which reads as "I can't select a date"
-  // (esp. Gold/Platinum's 21/45-day leads). Instead we let the guest pick freely
+  // (esp. Gold/Platinum's 21/30-day leads). Instead we let the guest pick freely
   // and lean on the soft path: `leadWarning` explains the shortfall inline and
   // `dateMeetsLead` blocks "Next" on the details step. Keep them in sync — don't
   // re-tighten the picker floor to earliestDate.
@@ -3205,8 +3205,8 @@ function StepPackage({
   // Every tier is shown — with the same admin name/price overrides — but a tier
   // whose lead time the chosen date doesn't yet clear renders disabled (dimmed +
   // inert) with the date it unlocks, rather than silently vanishing. That way a
-  // guest never wonders where e.g. Platinum went for a wedding booked 30 days
-  // out (Platinum needs 45): they see it, greyed, with "available from …".
+  // guest never wonders where e.g. Platinum (30-day lead) went for an event a
+  // fortnight out: they see it, greyed, with "available from …".
   const tiers = packages.map((tier) => {
     const meta = homePackages.tiers.find((x) => x.id === tier.id);
     const display = meta
