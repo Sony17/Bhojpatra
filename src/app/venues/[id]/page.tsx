@@ -26,7 +26,7 @@ export default async function VenueDetailPage({
 }) {
   const { id } = await params;
   return (
-    <PublicShell>
+    <PublicShell detail>
       <VenueDetail id={id} />
     </PublicShell>
   );

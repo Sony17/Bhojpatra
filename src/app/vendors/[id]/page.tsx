@@ -62,7 +62,7 @@ export default async function VendorProfilePage({
 
   if (profile) {
     return (
-      <PublicShell>
+      <PublicShell detail>
         <VendorProfile profile={profile} />
       </PublicShell>
     );
@@ -71,7 +71,7 @@ export default async function VendorProfilePage({
   const listing = vendorListings.find((v) => v.id === id);
   if (listing) {
     return (
-      <PublicShell>
+      <PublicShell detail>
         <VendorDetail id={id} />
       </PublicShell>
     );

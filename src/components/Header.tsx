@@ -168,7 +168,7 @@ export default function Header() {
 
   /* Detail / AppBar screens skip the location chrome. */
   const isDetail =
-    /^\/(vendors|venues)\/[^/]+/.test(pathname) ||
+    /^\/(vendors|venues|baina-box)\/[^/]+/.test(pathname) ||
     pathname.startsWith("/bookings/invoice") ||
     pathname === "/compare" ||
     pathname === "/about" ||

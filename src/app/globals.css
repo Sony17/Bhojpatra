@@ -395,8 +395,15 @@ select:-webkit-autofill {
   padding-top: calc(5.5rem + var(--safe-top));
 }
 
+/* Detail / AppBar screens: 0 mobile top pad so AppBar attaches cleanly to top-0;
+   desktop header remains floating, so retain lg:pt top padding. */
+.app-detail-page-pad {
+  padding-top: 0;
+}
+
 @media (min-width: 1024px) {
-  .app-page-pad {
+  .app-page-pad,
+  .app-detail-page-pad {
     padding-top: calc(6.5rem + var(--safe-top));
   }
 }
