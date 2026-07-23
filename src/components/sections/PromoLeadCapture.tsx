@@ -97,7 +97,7 @@ export default function PromoLeadCapture() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-stretch sm:gap-2"
+        className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-stretch sm:gap-2"
       >
         <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2.5 py-1.5 transition focus-within:border-cream">
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
@@ -138,7 +138,7 @@ export default function PromoLeadCapture() {
           </span>
         </label>
 
-        <div className="col-span-2 flex items-stretch gap-1.5 sm:col-span-1 sm:contents">
+        <div className="flex items-stretch gap-2 sm:col-span-1 sm:contents">
           <Button
             type="submit"
             variant="inverse"
@@ -170,7 +170,7 @@ export default function PromoLeadCapture() {
       {hasImage && (
         <section id="offers" aria-label="Promotional offers" className="bg-white">
           <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-            <div className="relative aspect-[2.54/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10">
+            <div className="relative aspect-[2/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:aspect-[2.54/1]">
               <Image
                 src={promo.image}
                 alt={heading}
@@ -204,10 +204,10 @@ export default function PromoLeadCapture() {
                 <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
                   {t("Offer", "ऑफर")}
                 </p>
-                <h2 className="font-display mt-0.5 truncate text-base leading-snug text-cream sm:text-lg">
+                <h2 className="font-display mt-0.5 text-base leading-snug text-cream sm:truncate sm:text-lg">
                   {heading}
                 </h2>
-                <p className="mt-0.5 line-clamp-1 text-xs text-cream/70">
+                <p className="mt-0.5 text-xs text-cream/70 sm:line-clamp-1">
                   {subtitle}
                 </p>
               </div>
