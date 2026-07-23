@@ -158,13 +158,65 @@ export default function Header() {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const prevScrollY = useRef(0);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
+    prevScrollY.current = typeof window !== "undefined" ? window.scrollY : 0;
+    setVisible(true);
+    setScrolled(window.scrollY > 24);
+
+    const threshold = 12; // Minimum scroll delta before toggling
+    const topBuffer = 50;  // Always show when within 50px of page top
+
+    const onScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrolled(currentScrollY > 24);
+
+      if (currentScrollY <= topBuffer) {
+        setVisible(true);
+        prevScrollY.current = currentScrollY;
+        return;
+      }
+
+      const delta = currentScrollY - prevScrollY.current;
+
+      if (Math.abs(delta) < threshold) {
+        return;
+      }
+
+      if (delta > 0) {
+        // Scrolling DOWN -> hide top bar
+        setVisible(false);
+      } else {
+        // Scrolling UP -> show top bar
+        setVisible(true);
+      }
+
+      prevScrollY.current = currentScrollY;
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (visible) {
+        document.documentElement.classList.remove("header-hidden");
+      } else {
+        document.documentElement.classList.add("header-hidden");
+      }
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.remove("header-hidden");
+      }
+    };
+  }, []);
 
   /* Detail / AppBar screens skip the location chrome. */
   const isDetail =
@@ -186,105 +238,108 @@ export default function Header() {
     pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header
-      className={
-        (isHome ? "fixed " : "sticky ") +
-        "inset-x-0 top-[calc(20px+var(--safe-top))] z-50"
-      }
-    >
-      {/* Light top veil blends the floating white glass into the hero. */}
-      {isHome && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-white/70 via-cream/25 to-transparent"
-        />
-      )}
+    <>
+      <header
+        className={
+          (isHome ? "fixed " : "sticky ") +
+          "inset-x-0 top-[calc(20px+var(--safe-top))] z-50 transition-transform duration-300 ease-in-out " +
+          (visible ? "translate-y-0" : "-translate-y-[200%]")
+        }
+      >
+        {/* Light top veil blends the floating white glass into the hero. */}
+        {isHome && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-white/70 via-cream/25 to-transparent"
+          />
+        )}
 
-      {/* Mobile app bar — location + mark (hidden on detail; AppBar takes over) */}
-      {!isDetail && (
+        {/* Mobile app bar — location + mark (hidden on detail; AppBar takes over) */}
+        {!isDetail && (
+          <div
+            className={
+              "animate-fade mx-4 flex h-16 items-center justify-between gap-3 rounded-[18px] px-4 lg:hidden " +
+              navSurface
+            }
+          >
+            <LogoMark />
+            <div className="min-w-0 max-w-[13rem] flex-1">
+              <AppLocationBar
+                compact
+                onDark={false}
+                className="ml-auto min-w-0 justify-end"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Desktop nav bar */}
         <div
           className={
-            "animate-fade mx-4 flex h-16 items-center justify-between gap-3 rounded-[18px] px-4 lg:hidden " +
+            "animate-fade relative mx-auto hidden h-[72px] w-[calc(100%-40px)] max-w-[1240px] items-center rounded-[18px] px-6 lg:flex " +
             navSurface
           }
         >
-          <LogoMark />
-          <div className="min-w-0 max-w-[13rem] flex-1">
+          <div className="flex flex-1 min-w-0 items-center">
+            <LogoMark />
+          </div>
+
+          <nav className="flex flex-1 items-center justify-center gap-10">
+            {navLinks.map((link) => {
+              const active = isNavActive(link.href);
+              return (
+                <div key={link.label} className="group relative">
+                  <Link
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      "relative flex items-center gap-1.5 py-2 text-[15px] font-medium tracking-[0.3px] transition-colors duration-200 after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:transition-transform after:duration-200 " +
+                      (active
+                        ? "text-maroon after:scale-x-100 after:bg-maroon"
+                        : "text-ink after:scale-x-0 after:bg-maroon hover:text-maroon hover:after:scale-x-100")
+                    }
+                  >
+                    {lang === "hi" ? link.labelHi : link.label}
+                    {link.hasDropdown && (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 12 12"
+                        className="h-3 w-3 transition-transform duration-200 group-hover:-rotate-180"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path d="M3 4.5 6 7.5 9 4.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </Link>
+
+                  {link.items && (
+                    <div className="invisible absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 translate-y-2 pt-5 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                      <PartnerMenuPanel />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          <div className="flex flex-1 min-w-0 items-center justify-end gap-3">
             <AppLocationBar
               compact
               onDark={false}
-              className="ml-auto min-w-0 justify-end"
+              className="hidden min-w-0 max-w-[11rem] lg:flex"
             />
+            <span
+              aria-hidden="true"
+              className="hidden h-8 w-px shrink-0 bg-maroon/10 lg:block"
+            />
+            <ProfileMenu onLight />
           </div>
         </div>
-      )}
-
-      {/* Desktop nav bar */}
-      <div
-        className={
-          "animate-fade relative mx-auto hidden h-[72px] w-[calc(100%-40px)] max-w-[1240px] items-center rounded-[18px] px-6 lg:flex " +
-          navSurface
-        }
-      >
-        <div className="flex flex-1 min-w-0 items-center">
-          <LogoMark />
-        </div>
-
-        <nav className="flex flex-1 items-center justify-center gap-10">
-          {navLinks.map((link) => {
-            const active = isNavActive(link.href);
-            return (
-              <div key={link.label} className="group relative">
-                <Link
-                  href={link.href}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    "relative flex items-center gap-1.5 py-2 text-[15px] font-medium tracking-[0.3px] transition-colors duration-200 after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:transition-transform after:duration-200 " +
-                    (active
-                      ? "text-maroon after:scale-x-100 after:bg-maroon"
-                      : "text-ink after:scale-x-0 after:bg-maroon hover:text-maroon hover:after:scale-x-100")
-                  }
-                >
-                  {lang === "hi" ? link.labelHi : link.label}
-                  {link.hasDropdown && (
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 12 12"
-                      className="h-3 w-3 transition-transform duration-200 group-hover:-rotate-180"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    >
-                      <path d="M3 4.5 6 7.5 9 4.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </Link>
-
-                {link.items && (
-                  <div className="invisible absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 translate-y-2 pt-5 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                    <PartnerMenuPanel />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="flex flex-1 min-w-0 items-center justify-end gap-3">
-          <AppLocationBar
-            compact
-            onDark={false}
-            className="hidden min-w-0 max-w-[11rem] lg:flex"
-          />
-          <span
-            aria-hidden="true"
-            className="hidden h-8 w-px shrink-0 bg-maroon/10 lg:block"
-          />
-          <ProfileMenu onLight />
-        </div>
-      </div>
+      </header>
 
       <MobileTabBar />
-    </header>
+    </>
   );
 }

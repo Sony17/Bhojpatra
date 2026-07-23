@@ -413,22 +413,33 @@ select:-webkit-autofill {
   /* Sit just under the sticky app header */
   top: calc(var(--app-header-h) + var(--safe-top));
   z-index: 30;
-  border-bottom: 1px solid rgba(185, 32, 37, 0.06);
-  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(185, 32, 37, 0.08);
+  background: #ffffff;
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  transition: top 300ms ease-in-out;
+}
+
+:root.header-hidden .app-sticky-chrome,
+html.header-hidden .app-sticky-chrome {
+  top: var(--safe-top, 0px);
 }
 
 @media (min-width: 1024px) {
   .app-sticky-chrome {
     top: calc(4.25rem + var(--safe-top));
   }
+
+  :root.header-hidden .app-sticky-chrome,
+  html.header-hidden .app-sticky-chrome {
+    top: var(--safe-top, 0px);
+  }
 }
 
 .dark .app-sticky-chrome,
 [data-theme="dark"] .app-sticky-chrome {
-  background: rgba(0, 0, 0, 0.88);
+  background: #000000;
   border-bottom-color: rgba(240, 208, 158, 0.12);
 }
 
