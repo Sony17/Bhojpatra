@@ -12,6 +12,7 @@ import { cn } from "@/components/ui";
 export default function PublicShell({
   children,
   hero = false,
+  detail = false,
   chat = true,
   footer = true,
   className,
@@ -20,6 +21,8 @@ export default function PublicShell({
   children: ReactNode;
   /** Full-bleed hero page (home) — no app-page-pad / wash. */
   hero?: boolean;
+  /** Detail / AppBar screen — skips mobile top pad so AppBar attaches to top-0. */
+  detail?: boolean;
   chat?: boolean;
   footer?: boolean;
   className?: string;
@@ -31,7 +34,10 @@ export default function PublicShell({
       <main
         className={cn(
           "app-shell-main flex-1",
-          !hero && "app-page-wash app-page-pad",
+          !hero &&
+            (detail
+              ? "app-page-wash app-detail-page-pad"
+              : "app-page-wash app-page-pad"),
           !footer && "app-bottom-safe",
           mainClassName,
         )}

@@ -62,7 +62,7 @@ export default async function VendorProfilePage({
 
   if (profile) {
     return (
-      <PublicShell>
+      <PublicShell detail>
         <VendorProfile profile={profile} />
       </PublicShell>
     );
@@ -71,10 +71,7 @@ export default async function VendorProfilePage({
   const listing = vendorListings.find((v) => v.id === id);
   if (listing) {
     return (
-      // Below lg the global header renders nothing on detail routes, so the
-      // page's own top bar owns the chrome — drop the header pad and let it
-      // sit flush at the top (the `!` outranks the unlayered .app-page-pad).
-      <PublicShell mainClassName="max-lg:pt-0!">
+      <PublicShell detail>
         <VendorDetail id={id} />
       </PublicShell>
     );

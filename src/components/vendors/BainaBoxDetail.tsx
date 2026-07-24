@@ -49,7 +49,7 @@ export default function BainaBoxDetail({
   };
 
   return (
-    <PublicShell>
+    <PublicShell detail>
       <section className="app-bottom-safe mx-auto max-w-6xl sm:px-5 sm:py-6 lg:py-10">
         {/* Sticky top header bar */}
         <AppBar
