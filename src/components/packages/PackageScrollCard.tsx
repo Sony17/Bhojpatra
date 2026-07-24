@@ -76,6 +76,7 @@ export default function PackageScrollCard({
   cta,
   ctaOnFold = false,
   priority = false,
+  accordion = false,
 }: {
   tier: PackageTier;
   selected: boolean;
@@ -86,6 +87,8 @@ export default function PackageScrollCard({
   ctaOnFold?: boolean;
   /** Eager-load the scroll image (use for the popular / above-the-fold card). */
   priority?: boolean;
+  /** Only one course open at a time — bounds menu height on compact surfaces. */
+  accordion?: boolean;
 }) {
   const { lang, t } = useLang();
   // Courses start collapsed so the scroll reads clean; clicking a course header
@@ -93,6 +96,7 @@ export default function PackageScrollCard({
   const [openCourses, setOpenCourses] = useState<Set<number>>(new Set());
   const toggleCourse = (index: number) =>
     setOpenCourses((prev) => {
+      if (accordion) return prev.has(index) ? new Set() : new Set([index]);
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
       else next.add(index);

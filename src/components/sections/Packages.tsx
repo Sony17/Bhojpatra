@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { packages } from "@/lib/data";
 import Reveal from "@/components/Reveal";
-import PackageScrollCard from "@/components/packages/PackageScrollCard";
+import PackageCascadeStack from "@/components/packages/PackageCascadeStack";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
 import { useHomeContent } from "@/lib/homeContent";
@@ -51,60 +51,41 @@ export default function Packages() {
           <Ornament className="mx-auto mt-6 text-maroon/50" />
         </Reveal>
 
-        {/* Mobile: one row, swipe left–right with snap (no-scrollbar hides the
-            bar; pt makes room for the ribbons, which sit above the cards and
-            would otherwise be clipped by the scroll box). sm+: the grid. */}
         <Reveal
           stagger
           from="right"
-          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-6 pt-7 sm:mx-auto sm:mt-14 sm:grid sm:max-w-7xl sm:snap-none sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-0 lg:grid-cols-3"
+          className="mx-auto mt-10 max-w-7xl sm:mt-14"
         >
-          {tiers.map((tier) => {
-            const selected = tier.id === selectedId;
-            const tierName = lang === "hi" ? tier.nameHi : tier.name;
-            return (
-              <div
-                key={tier.id}
-                className={
-                  "w-[85vw] max-w-[345px] shrink-0 snap-center rounded-3xl border p-2 sm:w-auto sm:max-w-none sm:shrink sm:p-3 transition-all duration-300 " +
-                  (tier.id === "platinum"
-                    ? "border-zinc-700/80 bg-zinc-950/10 shadow-lg ring-1 ring-zinc-700/50"
-                    : tier.id === "gold" || tier.popular
-                      ? "border-amber-400/80 bg-amber-500/10 shadow-brand ring-2 ring-amber-400/40"
-                      : "border-slate-300 bg-white/70 shadow-card ring-1 ring-slate-200")
-                }
-              >
-              <PackageScrollCard
-                tier={tier}
-                selected={selected}
-                onSelect={() => setSelectedId(tier.id)}
-                ctaOnFold
-                cta={
-                  <Link
-                    href={`/book?package=${tier.id}&step=menu`}
-                    onClick={() => setSelectedId(tier.id)}
-                    aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className={
-                      "btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full px-4 text-[11px] font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 " +
-                      (tier.id === "platinum"
-                        ? "bg-zinc-900 text-cream shadow-md ring-1 ring-zinc-700 hover:bg-black"
-                        : tier.id === "gold" || tier.popular
-                          ? "bg-maroon text-cream shadow-brand ring-1 ring-maroon/40 hover:bg-maroon-dark"
-                          : "bg-white text-maroon shadow-sm ring-1 ring-slate-300 hover:bg-slate-50")
-                    }
-                  >
-                    <span className="font-display leading-none">
-                      {t("Book", "बुक करें")} {tierName}
-                    </span>
-                    <span aria-hidden="true" className="text-sm leading-none">
-                      →
-                    </span>
-                  </Link>
-                }
-              />
-              </div>
-            );
-          })}
+          <PackageCascadeStack
+            tiers={tiers.map((tier) => ({ tier }))}
+            selectedId={selectedId}
+            onSelectTier={setSelectedId}
+            renderCta={(tier, selected) => {
+              const tierName = lang === "hi" ? tier.nameHi : tier.name;
+              return (
+                <Link
+                  href={`/book?package=${tier.id}&step=menu`}
+                  onClick={() => setSelectedId(tier.id)}
+                  aria-label={`${t("Book", "बुक करें")} ${tierName}`}
+                  className={
+                    "btn-sheen inline-flex h-7 items-center gap-1.5 rounded-full px-4 text-[11px] font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 " +
+                    (tier.id === "platinum"
+                      ? "bg-zinc-900 text-cream shadow-md ring-1 ring-zinc-700 hover:bg-black"
+                      : tier.id === "gold" || tier.popular
+                        ? "bg-maroon text-cream shadow-brand ring-1 ring-maroon/40 hover:bg-maroon-dark"
+                        : "bg-white text-maroon shadow-sm ring-1 ring-slate-300 hover:bg-slate-50")
+                  }
+                >
+                  <span className="font-display leading-none">
+                    {t("Book", "बुक करें")} {tierName}
+                  </span>
+                  <span aria-hidden="true" className="text-sm leading-none">
+                    →
+                  </span>
+                </Link>
+              );
+            }}
+          />
         </Reveal>
 
         {/* Curated-package option — when no tier fits, reach out on WhatsApp. */}

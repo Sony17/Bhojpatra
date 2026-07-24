@@ -21,6 +21,7 @@ import LoginGate from "@/components/auth/LoginGate";
 import ThemedSelect from "@/components/ThemedSelect";
 import DatePicker from "@/components/DatePicker";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
+import PackageCascadeStack from "@/components/packages/PackageCascadeStack";
 import {
   useVendorRatings,
   statFor,
@@ -784,7 +785,7 @@ export default function BookingWizard() {
       .then((d: { categories?: MenuCategory[] } | null) => {
         if (live && d?.categories?.length) setLiveMenuCategories(d.categories);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       live = false;
     };
@@ -1299,18 +1300,18 @@ export default function BookingWizard() {
       ? ""
       : leadOccasion
         ? t(
-            `A ${leadOccasion.name} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}.`,
-            `${leadOccasion.nameHi} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें।`,
-          )
+          `A ${leadOccasion.name} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}.`,
+          `${leadOccasion.nameHi} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें।`,
+        )
         : packageId === "custom"
           ? t(
-              `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
-              `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
-            )
+            `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
+            `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
+          )
           : t(
-              `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
-              `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
-            );
+            `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
+            `${selectedPackage?.name ?? "इस पैकेज"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या कम अग्रिम समय वाला पैकेज चुनें।`,
+          );
 
   const preDiscount = subtotal + addOnsTotal;
   const couponDiscount = appliedCoupon
@@ -1669,7 +1670,7 @@ export default function BookingWizard() {
     const paymentLines =
       paidAmount > 0
         ? `\nPaid${paidAmount >= Math.round(grandTotal) ? " (full)" : " (advance)"}: ${money(paidAmount)}\nBalance Due: ${money(balance)}` +
-          (paymentRef ? `\nTransaction Ref: ${paymentRef}` : "")
+        (paymentRef ? `\nTransaction Ref: ${paymentRef}` : "")
         : `\nAdvance to confirm (10%): ${money(advance)}`;
     const contactLines =
       (customerName.trim() ? `Name: ${customerName.trim()}\n` : "") +
@@ -1904,12 +1905,12 @@ export default function BookingWizard() {
           // The feast-wide service package (its price is already in `amount`).
           ...(selectedService
             ? {
-                service: {
-                  id: selectedService.id,
-                  name: selectedService.name,
-                  price: serviceTotal,
-                },
-              }
+              service: {
+                id: selectedService.id,
+                name: selectedService.name,
+                price: serviceTotal,
+              },
+            }
             : {}),
           receipt: buildReceipt(),
           invoice: invoiceData,
@@ -1923,10 +1924,10 @@ export default function BookingWizard() {
           | null;
         setConfirmError(
           data?.error ??
-            t(
-              "Couldn't confirm your booking. Please try again.",
-              "आपकी बुकिंग कन्फर्म नहीं हो सकी। कृपया पुनः प्रयास करें।",
-            ),
+          t(
+            "Couldn't confirm your booking. Please try again.",
+            "आपकी बुकिंग कन्फर्म नहीं हो सकी। कृपया पुनः प्रयास करें।",
+          ),
         );
         setConfirming(false);
         return;
@@ -2161,35 +2162,35 @@ export default function BookingWizard() {
                     />
                   ) : null}
                   <StepMenu
-                lang={lang}
-                t={t}
-                title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
-                subtitle={t(
-                  "Pick vendors and dishes for your plated courses — live counters come next.",
-                  "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
-                )}
-                multiVendor={multiVendor}
-                // Cap by band, not package id — covers Silver/Gold packages
-                // AND the Single Stall flow once its Silver/Gold lens is set.
-                maxVendors={
-                  effectiveTier === "Silver" || effectiveTier === "Gold"
-                    ? 5
-                    : undefined
-                }
-                categories={menuStepCategories}
-                activeCat={activeCat}
-                setActiveCat={setActiveCat}
-                categoryVendor={categoryVendor}
-                pickVendor={pickVendor}
-                itemsFor={itemsFor}
-                toggleItem={toggleItem}
-                allowanceFor={allowanceFor}
-                baseAllowanceFor={baseAllowanceFor}
-                categoryComplete={categoryComplete}
-                isSkipped={isSkipped}
-                unskipCat={unskipCat}
-                onSkipMenu={singleStall ? skipMenuEntirely : undefined}
-                vendorRatings={vendorRatings}
+                    lang={lang}
+                    t={t}
+                    title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
+                    subtitle={t(
+                      "Pick vendors and dishes for your plated courses — live counters come next.",
+                      "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                    )}
+                    multiVendor={multiVendor}
+                    // Cap by band, not package id — covers Silver/Gold packages
+                    // AND the Single Stall flow once its Silver/Gold lens is set.
+                    maxVendors={
+                      effectiveTier === "Silver" || effectiveTier === "Gold"
+                        ? 5
+                        : undefined
+                    }
+                    categories={menuStepCategories}
+                    activeCat={activeCat}
+                    setActiveCat={setActiveCat}
+                    categoryVendor={categoryVendor}
+                    pickVendor={pickVendor}
+                    itemsFor={itemsFor}
+                    toggleItem={toggleItem}
+                    allowanceFor={allowanceFor}
+                    baseAllowanceFor={baseAllowanceFor}
+                    categoryComplete={categoryComplete}
+                    isSkipped={isSkipped}
+                    unskipCat={unskipCat}
+                    onSkipMenu={singleStall ? skipMenuEntirely : undefined}
+                    vendorRatings={vendorRatings}
                   />
                 </>
               )
@@ -2228,180 +2229,180 @@ export default function BookingWizard() {
           </div>
         </div>
       ) : (
-      <>
-      {/* Event brief sits up top on these steps (Package / Add-ons / Essentials /
+        <>
+          {/* Event brief sits up top on these steps (Package / Add-ons / Essentials /
           Review) — no reordering needed. */}
-      {renderEventBar()}
-      <div
-        className={
-          showSummary
-            ? "mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "mt-7"
-        }
-      >
-        {/* min-w-0 lets the package carousel scroll inside this grid column
+          {renderEventBar()}
+          <div
+            className={
+              showSummary
+                ? "mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+                : "mt-7"
+            }
+          >
+            {/* min-w-0 lets the package carousel scroll inside this grid column
             instead of the column growing to the row's full content width. */}
-        <div className="min-w-0">
-          {step === 1 && (
-            <StepPackage
-              lang={lang}
-              t={t}
-              packageId={packageId}
-              // Selecting a package drops the guest straight onto vendor
-              // selection — no Next arrow needed.
-              setPackageId={(id) => {
-                setPackageId(id);
-                setStep(2);
-              }}
-              eventDate={eventDate}
-              shortNotice={shortNotice}
-            />
-          )}
-          {step === 4 && (
-            <StepDetails
-              lang={lang}
-              t={t}
-              guests={guests}
-              selectedAddOns={selectedAddOns}
-              toggleAddOn={toggleAddOn}
-              packageName={selectedPackage?.name ?? ""}
-              multiVendor={counterMultiVendor}
-              eligibleVendors={eligibleAddOnVendors}
-              vendorIdsFor={addOnVendorIds}
-              onVendorToggle={toggleAddOnVendor}
-              // Gold & Platinum unlock the full extras filter (browse by
-              // counters vs whole-event services); Single Stall & Silver keep
-              // just the free-text search.
-              fullFilter={packageId === "gold" || packageId === "platinum"}
-            />
-          )}
-          {/* Essentials step (5) — the mandatory "Choose Your Service Package"
+            <div className="min-w-0">
+              {step === 1 && (
+                <StepPackage
+                  lang={lang}
+                  t={t}
+                  packageId={packageId}
+                  // Selecting a package drops the guest straight onto vendor
+                  // selection — no Next arrow needed.
+                  setPackageId={(id) => {
+                    setPackageId(id);
+                    setStep(2);
+                  }}
+                  eventDate={eventDate}
+                  shortNotice={shortNotice}
+                />
+              )}
+              {step === 4 && (
+                <StepDetails
+                  lang={lang}
+                  t={t}
+                  guests={guests}
+                  selectedAddOns={selectedAddOns}
+                  toggleAddOn={toggleAddOn}
+                  packageName={selectedPackage?.name ?? ""}
+                  multiVendor={counterMultiVendor}
+                  eligibleVendors={eligibleAddOnVendors}
+                  vendorIdsFor={addOnVendorIds}
+                  onVendorToggle={toggleAddOnVendor}
+                  // Gold & Platinum unlock the full extras filter (browse by
+                  // counters vs whole-event services); Single Stall & Silver keep
+                  // just the free-text search.
+                  fullFilter={packageId === "gold" || packageId === "platinum"}
+                />
+              )}
+              {/* Essentials step (5) — the mandatory "Choose Your Service Package"
               comparison. Single-select; the chosen tier's price folds into the
               total (each card shows its own computed feast price). */}
-          {step === 5 && (
-            <ServicePackages
-              packages={services}
-              selectedId={serviceId}
-              onSelect={setServiceId}
-              guests={guests}
-              embedded
-            />
-          )}
-          {/* Confirm step — payment + placing the order. Both require a
+              {step === 5 && (
+                <ServicePackages
+                  packages={services}
+                  selectedId={serviceId}
+                  onSelect={setServiceId}
+                  guests={guests}
+                  embedded
+                />
+              )}
+              {/* Confirm step — payment + placing the order. Both require a
               signed-in guest, so an anonymous visitor gets the login gate here
               (their in-progress booking stays intact); logging in reveals the
               real Confirm step. A neutral placeholder covers the brief moment
               the client session is still loading, to avoid a sign-in flash. */}
-          {step === 6 && !confirmed && sessionStatus === undefined && (
-            <div className="min-h-[40vh]" />
-          )}
-          {step === 6 && !confirmed && sessionStatus === null && (
-            <LoginGate onBack={() => setStep(5)} />
-          )}
-          {step === 6 && !confirmed && sessionStatus != null && (
-            <StepConfirm
-              t={t}
-              occasion={resolveOccasion(occasionId)}
-              packageName={selectedPackage?.name ?? ""}
-              eventDate={eventDate}
-              city={resolveCity(cityId)}
-              venue={venue}
-              setVenue={setVenue}
-              guests={guests}
-              categories={activeCategories}
-              categoryVendor={categoryVendor}
-              itemsFor={itemsFor}
-              selectedAddOns={selectedAddOns}
-              addOnVendorNames={addOnVendorNames}
-              serviceName={selectedService?.name}
-              serviceTotal={serviceTotal}
-              onEditMenu={() => setStep(2)}
-              onEditCourse={editCourse}
-              onRemoveVendor={removeVendor}
-              onEditExtras={() => setStep(4)}
-              onEditService={() => setStep(5)}
-              couponInput={couponInput}
-              setCouponInput={setCouponInput}
-              applyCoupon={applyCoupon}
-              applyCouponCode={applyCouponCode}
-              removeCoupon={removeCoupon}
-              preDiscount={preDiscount}
-              appliedCoupon={appliedCoupon}
-              couponError={couponError}
-              couponDiscount={couponDiscount}
-              referralDiscount={referralDiscount}
-              referralPercent={referralCustomerPercent}
-              grandTotal={grandTotal}
-              bookingId={bookingId}
-              paidAmount={paidAmount}
-              onPaid={(amount, ref) => {
-                setPaidAmount(amount);
-                setPaymentRef(ref);
-                // Advance settled → confirm the booking in the same click, using
-                // the just-recorded amount + UTR (state above hasn't flushed yet).
-                void handleConfirm(amount, ref);
-              }}
-              customerName={customerName}
-              setCustomerName={setCustomerName}
-              customerPhone={customerPhone}
-              setCustomerPhone={setCustomerPhone}
-              customerEmail={customerEmail}
-              setCustomerEmail={setCustomerEmail}
-              referralCode={referralCode}
-              setReferralCode={setReferralCode}
-              referrerName={referrerName}
-              selfReferral={selfReferral}
-              payMethod={payMethod}
-              setPayMethod={setPayMethod}
-              emiCount={emiCount}
-              setEmiCount={setEmiCount}
-              confirming={confirming}
-              confirmError={confirmError}
-              onConfirm={handleConfirm}
-              whatsappHref={whatsappHref}
-            />
-          )}
-          {step === 6 && confirmed && (
-            <StepDone
-              t={t}
-              bookingId={bookingId}
-              occasion={resolveOccasion(occasionId)}
-              eventDate={eventDate}
-              city={resolveCity(cityId)}
-              venue={venue}
-              guests={guests}
-              grandTotal={grandTotal}
-              paidAmount={paidAmount}
-              referrerName={referrerName}
-              onDownload={downloadMenu}
-              whatsappHref={whatsappHref}
-            />
-          )}
-        </div>
+              {step === 6 && !confirmed && sessionStatus === undefined && (
+                <div className="min-h-[40vh]" />
+              )}
+              {step === 6 && !confirmed && sessionStatus === null && (
+                <LoginGate onBack={() => setStep(5)} />
+              )}
+              {step === 6 && !confirmed && sessionStatus != null && (
+                <StepConfirm
+                  t={t}
+                  occasion={resolveOccasion(occasionId)}
+                  packageName={selectedPackage?.name ?? ""}
+                  eventDate={eventDate}
+                  city={resolveCity(cityId)}
+                  venue={venue}
+                  setVenue={setVenue}
+                  guests={guests}
+                  categories={activeCategories}
+                  categoryVendor={categoryVendor}
+                  itemsFor={itemsFor}
+                  selectedAddOns={selectedAddOns}
+                  addOnVendorNames={addOnVendorNames}
+                  serviceName={selectedService?.name}
+                  serviceTotal={serviceTotal}
+                  onEditMenu={() => setStep(2)}
+                  onEditCourse={editCourse}
+                  onRemoveVendor={removeVendor}
+                  onEditExtras={() => setStep(4)}
+                  onEditService={() => setStep(5)}
+                  couponInput={couponInput}
+                  setCouponInput={setCouponInput}
+                  applyCoupon={applyCoupon}
+                  applyCouponCode={applyCouponCode}
+                  removeCoupon={removeCoupon}
+                  preDiscount={preDiscount}
+                  appliedCoupon={appliedCoupon}
+                  couponError={couponError}
+                  couponDiscount={couponDiscount}
+                  referralDiscount={referralDiscount}
+                  referralPercent={referralCustomerPercent}
+                  grandTotal={grandTotal}
+                  bookingId={bookingId}
+                  paidAmount={paidAmount}
+                  onPaid={(amount, ref) => {
+                    setPaidAmount(amount);
+                    setPaymentRef(ref);
+                    // Advance settled → confirm the booking in the same click, using
+                    // the just-recorded amount + UTR (state above hasn't flushed yet).
+                    void handleConfirm(amount, ref);
+                  }}
+                  customerName={customerName}
+                  setCustomerName={setCustomerName}
+                  customerPhone={customerPhone}
+                  setCustomerPhone={setCustomerPhone}
+                  customerEmail={customerEmail}
+                  setCustomerEmail={setCustomerEmail}
+                  referralCode={referralCode}
+                  setReferralCode={setReferralCode}
+                  referrerName={referrerName}
+                  selfReferral={selfReferral}
+                  payMethod={payMethod}
+                  setPayMethod={setPayMethod}
+                  emiCount={emiCount}
+                  setEmiCount={setEmiCount}
+                  confirming={confirming}
+                  confirmError={confirmError}
+                  onConfirm={handleConfirm}
+                  whatsappHref={whatsappHref}
+                />
+              )}
+              {step === 6 && confirmed && (
+                <StepDone
+                  t={t}
+                  bookingId={bookingId}
+                  occasion={resolveOccasion(occasionId)}
+                  eventDate={eventDate}
+                  city={resolveCity(cityId)}
+                  venue={venue}
+                  guests={guests}
+                  grandTotal={grandTotal}
+                  paidAmount={paidAmount}
+                  referrerName={referrerName}
+                  onDownload={downloadMenu}
+                  whatsappHref={whatsappHref}
+                />
+              )}
+            </div>
 
-        {showSummary && (
-          <SummaryPanel
-            t={t}
-            packageName={selectedPackage?.name ?? ""}
-            basePerPlate={basePerPlate}
-            categoryAddTotal={categoryAddTotal}
-            perPlate={perPlate}
-            guests={guests}
-            subtotal={subtotal}
-            addOnsTotal={addOnsTotal}
-            serviceTotal={serviceTotal}
-            serviceName={selectedService?.name ?? ""}
-            venueFee={venueFee}
-            venueName={venue}
-            couponDiscount={couponDiscount}
-            referralDiscount={referralDiscount}
-            referrerName={referrerName}
-            gst={gst}
-            grandTotal={grandTotal}
-          />
-        )}
-      </div>
-      </>
+            {showSummary && (
+              <SummaryPanel
+                t={t}
+                packageName={selectedPackage?.name ?? ""}
+                basePerPlate={basePerPlate}
+                categoryAddTotal={categoryAddTotal}
+                perPlate={perPlate}
+                guests={guests}
+                subtotal={subtotal}
+                addOnsTotal={addOnsTotal}
+                serviceTotal={serviceTotal}
+                serviceName={selectedService?.name ?? ""}
+                venueFee={venueFee}
+                venueName={venue}
+                couponDiscount={couponDiscount}
+                referralDiscount={referralDiscount}
+                referrerName={referrerName}
+                gst={gst}
+                grandTotal={grandTotal}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Nav buttons */}
@@ -2419,35 +2420,35 @@ export default function BookingWizard() {
             </Button>
           </div>
         ) : (
-        <MenuStepNav
-          t={t}
-          categories={menuStepCategories}
-          activeCat={activeCat}
-          canAdvance={hasStepAnySelection(menuStepCategories)}
-          isPartial={isStepPartial(menuStepCategories)}
-          missingSummaries={getMissingCategorySummaries(menuStepCategories)}
-          singleStall={singleStall}
-          isSkipped={isSkipped}
-          unskipCat={unskipCat}
-          onPrev={menuPrev}
-          onNext={menuNext}
-          onSkipCurrent={skipCurrentStall}
-          extraBanner={
-            menuFullySkipped ? (
-              <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
-                <span aria-hidden="true" className="text-maroon">
-                  ★
-                </span>
-                <span>
-                  {t(
-                    "You've skipped every stall. Continue to live counters & extras — you'll pick at least one there to complete your order.",
-                    "आपने हर स्टॉल छोड़ दिया है। लाइव काउंटर और एक्स्ट्रा तक जारी रखें — ऑर्डर पूरा करने के लिए वहाँ कम से कम एक चुनें।",
-                  )}
-                </span>
-              </div>
-            ) : undefined
-          }
-        />
+          <MenuStepNav
+            t={t}
+            categories={menuStepCategories}
+            activeCat={activeCat}
+            canAdvance={hasStepAnySelection(menuStepCategories)}
+            isPartial={isStepPartial(menuStepCategories)}
+            missingSummaries={getMissingCategorySummaries(menuStepCategories)}
+            singleStall={singleStall}
+            isSkipped={isSkipped}
+            unskipCat={unskipCat}
+            onPrev={menuPrev}
+            onNext={menuNext}
+            onSkipCurrent={skipCurrentStall}
+            extraBanner={
+              menuFullySkipped ? (
+                <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
+                  <span aria-hidden="true" className="text-maroon">
+                    ★
+                  </span>
+                  <span>
+                    {t(
+                      "You've skipped every stall. Continue to live counters & extras — you'll pick at least one there to complete your order.",
+                      "आपने हर स्टॉल छोड़ दिया है। लाइव काउंटर और एक्स्ट्रा तक जारी रखें — ऑर्डर पूरा करने के लिए वहाँ कम से कम एक चुनें।",
+                    )}
+                  </span>
+                </div>
+              ) : undefined
+            }
+          />
         )
       ) : step === 3 ? (
         hasLiveStalls ? (
@@ -2565,9 +2566,8 @@ function SectionHead({
         </span>
       </div>
       <h2
-        className={`font-display text-3xl leading-tight text-ink sm:text-4xl${
-          nowrap ? " sm:whitespace-nowrap" : ""
-        }`}
+        className={`font-display text-3xl leading-tight text-ink sm:text-4xl${nowrap ? " sm:whitespace-nowrap" : ""
+          }`}
       >
         {title}
       </h2>
@@ -2880,14 +2880,14 @@ function EventBar({
   const geoMessage =
     geoStatus === "denied"
       ? t(
-          "Location permission blocked — pick your city below.",
-          "लोकेशन की अनुमति नहीं मिली — नीचे अपना शहर चुनें।",
-        )
+        "Location permission blocked — pick your city below.",
+        "लोकेशन की अनुमति नहीं मिली — नीचे अपना शहर चुनें।",
+      )
       : geoStatus === "failed" || geoStatus === "unsupported"
         ? t(
-            "Couldn't detect your location — pick your city below.",
-            "आपकी लोकेशन नहीं मिल पाई — नीचे अपना शहर चुनें।",
-          )
+          "Couldn't detect your location — pick your city below.",
+          "आपकी लोकेशन नहीं मिल पाई — नीचे अपना शहर चुनें।",
+        )
         : "";
 
   // Local editing buffer for the typed headcount, so a guest can clear the box
@@ -2922,16 +2922,16 @@ function EventBar({
     occasionId === OTHER_OCCASION_ID
       ? customOccasion.trim()
       : (occasionList.find((x) => x.id === occasionId) &&
-          (lang === "hi"
-            ? occasionList.find((x) => x.id === occasionId)!.nameHi
-            : occasionList.find((x) => x.id === occasionId)!.name)) || "";
+        (lang === "hi"
+          ? occasionList.find((x) => x.id === occasionId)!.nameHi
+          : occasionList.find((x) => x.id === occasionId)!.name)) || "";
   const cityName =
     cityId === OTHER_LOCATION_ID
       ? customCity.trim()
       : (locations.find((x) => x.id === cityId) &&
-          (lang === "hi"
-            ? locations.find((x) => x.id === cityId)!.nameHi
-            : locations.find((x) => x.id === cityId)!.name)) || "";
+        (lang === "hi"
+          ? locations.find((x) => x.id === cityId)!.nameHi
+          : locations.find((x) => x.id === cityId)!.name)) || "";
   const dateName = eventDate ? formatEventDate(eventDate) : "";
   // Serving time for the collapsed summary — the meal's localized name plus the
   // clock slot (the stored `mealTime` id is English, so we look up its label).
@@ -3326,9 +3326,7 @@ function StepPackage({
   const { packages: homePackages } = useHomeContent();
   // Every tier is shown — with the same admin name/price overrides — but a tier
   // whose lead time the chosen date doesn't yet clear renders disabled (dimmed +
-  // inert) with the date it unlocks, rather than silently vanishing. That way a
-  // guest never wonders where e.g. Platinum went for a wedding booked 30 days
-  // out (Platinum needs 45): they see it, greyed, with "available from …".
+  // inert) with the date it unlocks, rather than silently vanishing.
   const tiers = packages.map((tier) => {
     const meta = homePackages.tiers.find((x) => x.id === tier.id);
     const display = meta
@@ -3347,6 +3345,10 @@ function StepPackage({
       unlock: formatEventDate(isoAfterDays(lead)),
     };
   });
+
+  const cascadeTiers = tiers.filter((t) => t.tier.id !== "custom");
+  const singleStallItem = tiers.find((t) => t.tier.id === "custom");
+
   return (
     <div>
       <SectionHead
@@ -3357,10 +3359,6 @@ function StepPackage({
           "यह आपकी बेस प्लेट कीमत और हर कोर्स में शामिल आइटम तय करता है।",
         )}
       />
-      {/* Short-notice dates can't be sourced for the regular tiers — steer the
-          guest to the Single Stall plan (one vendor per course) + add-ons.
-          Tiers that just need more notice aren't hidden; each disabled card
-          below spells out its own lead time and unlock date. */}
       {shortNotice && (
         <p className="mb-4 flex items-start gap-2 rounded-lg border border-maroon/30 bg-cream/40 px-4 py-2.5 text-sm text-ink-soft">
           <span aria-hidden="true" className="text-maroon">
@@ -3374,101 +3372,124 @@ function StepPackage({
           </span>
         </p>
       )}
-      {/* Same "patra scroll" cards the home page advertises, so a tier looks
-          identical here and on the landing page — fold-mounted CTA pill and,
-          on mobile, the same swipe left–right snap carousel. On sm+ the grid's
-          columns track the number of packages the date qualifies for, so a
-          lone available tier (e.g. only the Single Stall plan for a same-day date) fills the
-          column instead of stranding an empty half beside it. */}
-      <div
-        className={
-          // pt keeps the Popular/Premium ribbons (which float above the cards)
-          // clear of the availability notice above the grid.
-          "no-scrollbar -mx-3 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-3 pb-5 pt-7 sm:mx-0 sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
-          (tiers.length === 1
-            ? "sm:grid-cols-1"
-            : tiers.length === 2
-              ? "sm:grid-cols-2"
-              : tiers.length === 3
-                ? "sm:grid-cols-2 lg:grid-cols-3"
-                : "sm:grid-cols-2 lg:grid-cols-4")
-        }
-      >
-        {tiers.map(({ tier, tooSoon, lead, unlock }) => {
-          const selected = tier.id === packageId;
+
+      {/* Silver / Gold / Platinum Package Cascade Stack */}
+      <PackageCascadeStack
+        tiers={cascadeTiers}
+        selectedId={packageId}
+        onSelectTier={(id) => setPackageId(id)}
+        renderCta={(tier, selected) => {
           const tierName = lang === "hi" ? tier.nameHi : tier.name;
           return (
-            <div
-              key={tier.id}
-              className="relative flex w-[88vw] max-w-[390px] shrink-0 snap-center flex-col first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPackageId(tier.id);
+              }}
+              className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-xs font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
             >
-            {tooSoon ? (
-              // Too-soon tier: the full scroll, dimmed and inert (not clickable
-              // or focusable), with a legible notice below the scroll card naming
-              // its lead time and the date it unlocks. Nothing is silently
-              // dropped, so the guest can pick a later date to reach it. The card
-              // stays only lightly muted (not near-invisible) and carries a
-              // "Locked" badge pinned to the top so the tier reads as present but
-              // temporarily unavailable — never as if it had gone missing.
-              <>
-                <div className="select-none opacity-60">
-                  <PackageScrollCard
-                    tier={tier}
-                    selected={false}
-                    onSelect={() => {}}
-                    ctaOnFold
-                    cta={<span aria-hidden="true" />}
-                  />
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center px-4">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cream shadow-card">
-                    <span aria-hidden="true">🔒</span>
-                    {t("Locked", "लॉक")}
-                  </span>
-                </div>
-                <div className="mt-2.5 flex justify-center px-1">
-                  <div className="w-full rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
-                    <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
-                      <span aria-hidden="true">★</span>
-                      {t(
-                        `${tierName} needs ${lead} days' notice`,
-                        `${tierName} के लिए ${lead} दिन का अग्रिम समय चाहिए`,
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-ink-soft">
-                      {t(`Available from ${unlock}`, `${unlock} से उपलब्ध`)}
-                    </p>
-                  </div>
-                </div>
-              </>
-            ) : (
-            <PackageScrollCard
-              tier={tier}
-              selected={selected}
-              onSelect={() => setPackageId(tier.id)}
-              ctaOnFold
-              cta={
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPackageId(tier.id);
-                  }}
-                  className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-xs font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
-                >
-                  <span className="font-display leading-none">
-                    {selected
-                      ? `✓ ${t("Selected", "चयनित")}`
-                      : `${t("Select", "चुनें")} ${tierName}`}
-                  </span>
-                </button>
-              }
-            />
-            )}
+              <span className="font-display leading-none">
+                {selected
+                  ? `✓ ${t("Selected", "चयनित")}`
+                  : `${t("Select", "चुनें")} ${tierName}`}
+              </span>
+            </button>
+          );
+        }}
+        renderNoticeBelow={(item) => {
+          if (!item.tooSoon) return null;
+          const tierName = lang === "hi" ? item.tier.nameHi : item.tier.name;
+          return (
+            <div className="mt-2.5 flex justify-center px-1">
+              <div className="w-full rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
+                <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
+                  <span aria-hidden="true">★</span>
+                  {t(
+                    `${tierName} needs ${item.lead} days' notice`,
+                    `${tierName} के लिए ${item.lead} दिन का अग्रिम समय चाहिए`,
+                  )}
+                </p>
+                <p className="mt-0.5 text-[11px] text-ink-soft">
+                  {t(`Available from ${item.unlock}`, `${item.unlock} से उपलब्ध`)}
+                </p>
+              </div>
             </div>
           );
-        })}
-      </div>
+        }}
+      />
+
+      {/* Single Stall Custom Tier — Maintained as a separate option */}
+      {singleStallItem && (
+        <div className="mt-10 border-t border-maroon/15 pt-8">
+          <div className="mx-auto max-w-sm sm:max-w-md">
+            <h4 className="mb-4 text-center text-xs font-bold uppercase tracking-wider text-ink-soft">
+              {t("Custom & Single-Stall Option", "कस्टम व सिंगल-स्टॉल विकल्प")}
+            </h4>
+            <div className="rounded-3xl border border-slate-300 bg-white/70 p-3 shadow-card ring-1 ring-slate-200">
+              {singleStallItem.tooSoon ? (
+                <>
+                  <div className="select-none opacity-60">
+                    <PackageScrollCard
+                      tier={singleStallItem.tier}
+                      selected={false}
+                      onSelect={() => {}}
+                      ctaOnFold
+                      cta={<span aria-hidden="true" />}
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center px-4">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cream shadow-card">
+                      <span aria-hidden="true">🔒</span>
+                      {t("Locked", "लॉक")}
+                    </span>
+                  </div>
+                  <div className="mt-2.5 flex justify-center px-1">
+                    <div className="w-full rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
+                      <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
+                        <span aria-hidden="true">★</span>
+                        {t(
+                          `Single Stall needs ${singleStallItem.lead} days' notice`,
+                          `सिंगल स्टॉल के लिए ${singleStallItem.lead} दिन का अग्रिम समय चाहिए`,
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-ink-soft">
+                        {t(
+                          `Available from ${singleStallItem.unlock}`,
+                          `${singleStallItem.unlock} से उपलब्ध`,
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <PackageScrollCard
+                  tier={singleStallItem.tier}
+                  selected={packageId === "custom"}
+                  onSelect={() => setPackageId("custom")}
+                  ctaOnFold
+                  cta={
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPackageId("custom");
+                      }}
+                      className="btn-sheen inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full bg-cream px-4 text-xs font-bold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
+                    >
+                      <span className="font-display leading-none">
+                        {packageId === "custom"
+                          ? `✓ ${t("Selected", "चयनित")}`
+                          : t("Select Single Stall", "सिंगल स्टॉल चुनें")}
+                      </span>
+                    </button>
+                  }
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3484,25 +3505,25 @@ const STALL_TIER_LENSES: {
   descEn: (city: string) => string;
   descHi: (city: string) => string;
 }[] = [
-  {
-    id: "Silver",
-    nameHi: "सिल्वर",
-    descEn: (c) => `${c || "Your city"}'s Silver stalls`,
-    descHi: (c) => `${c || "आपके शहर"} के सिल्वर स्टॉल`,
-  },
-  {
-    id: "Gold",
-    nameHi: "गोल्ड",
-    descEn: (c) => `${c || "Your city"}'s Gold stalls`,
-    descHi: (c) => `${c || "आपके शहर"} के गोल्ड स्टॉल`,
-  },
-  {
-    id: "Platinum",
-    nameHi: "प्लेटिनम",
-    descEn: () => "Stalls from every city — the full roster",
-    descHi: () => "हर शहर के स्टॉल — पूरा रोस्टर",
-  },
-];
+    {
+      id: "Silver",
+      nameHi: "सिल्वर",
+      descEn: (c) => `${c || "Your city"}'s Silver stalls`,
+      descHi: (c) => `${c || "आपके शहर"} के सिल्वर स्टॉल`,
+    },
+    {
+      id: "Gold",
+      nameHi: "गोल्ड",
+      descEn: (c) => `${c || "Your city"}'s Gold stalls`,
+      descHi: (c) => `${c || "आपके शहर"} के गोल्ड स्टॉल`,
+    },
+    {
+      id: "Platinum",
+      nameHi: "प्लेटिनम",
+      descEn: () => "Stalls from every city — the full roster",
+      descHi: () => "हर शहर के स्टॉल — पूरा रोस्टर",
+    },
+  ];
 
 function StallTierPicker({
   t,
@@ -3536,11 +3557,10 @@ function StallTierPicker({
               key={tier.id}
               type="button"
               onClick={() => onPick(tier.id)}
-              className={`rounded-card border p-4 text-left transition ${
-                active
+              className={`rounded-card border p-4 text-left transition ${active
                   ? "border-maroon bg-cream/50"
                   : "border-maroon/15 bg-white hover:border-maroon/40"
-              }`}
+                }`}
             >
               <span className="font-display text-lg text-maroon">
                 {lang === "hi" ? tier.nameHi : tier.id}
@@ -3706,8 +3726,8 @@ function StepMenu({
       );
       const cuisineMatch = Array.isArray((v as any).cuisines)
         ? (v as any).cuisines.some((c: string) =>
-            c.toLowerCase().includes(vSearchQuery),
-          )
+          c.toLowerCase().includes(vSearchQuery),
+        )
         : typeof (v as any).cuisine === "string"
           ? (v as any).cuisine.toLowerCase().includes(vSearchQuery)
           : false;
@@ -3766,18 +3786,18 @@ function StepMenu({
           <span className="min-w-0 flex-1 break-words">
             {multiVendor && multiDish
               ? t(
-                  "This package lets you mix multiple vendors and pick multiple dishes across your courses.",
-                  "इस पैकेज में आप कई वेंडर मिला सकते हैं और अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
-                )
+                "This package lets you mix multiple vendors and pick multiple dishes across your courses.",
+                "इस पैकेज में आप कई वेंडर मिला सकते हैं और अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
+              )
               : multiVendor
                 ? t(
-                    "This package lets you mix multiple vendors across your courses.",
-                    "इस पैकेज में आप अपने कोर्सेज़ में कई वेंडर मिला सकते हैं।",
-                  )
+                  "This package lets you mix multiple vendors across your courses.",
+                  "इस पैकेज में आप अपने कोर्सेज़ में कई वेंडर मिला सकते हैं।",
+                )
                 : t(
-                    "This package lets you pick multiple dishes across your courses.",
-                    "इस पैकेज में आप अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
-                  )}
+                  "This package lets you pick multiple dishes across your courses.",
+                  "इस पैकेज में आप अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
+                )}
           </span>
         </p>
       )}
@@ -3946,96 +3966,96 @@ function StepMenu({
         </div>
       )}
       <div className="relative mt-3">
-      {filteredVendors.length === 0 ? (
-        <p className="py-8 text-center text-sm font-medium text-ink-soft">
-          {t(
-            `No vendors matching "${vendorSearch}" in this category.`,
-            `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
-          )}
-        </p>
-      ) : (
-      <div
-        ref={vendorScrollRef}
-        // px/pt + matching -mx give the hover-lift and the selected ring-2 room
-        // inside the scroller — overflow-x-auto otherwise clips them (the cards
-        // looked cropped from the top and the red selected ring vanished).
-        className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2"
-      >
-        {filteredVendors.map((v) => {
-          const selected = selectedIds.includes(v.id);
-          const stat = statFor(vendorRatings, v);
-          return (
-            <button
-              key={v.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => pickVendor(cat.id, v.id)}
-              className={
-                "group relative flex w-36 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:w-[202px] " +
-                (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
-              }
-            >
-              <div className="relative aspect-[16/10] w-full overflow-hidden">
-                <Image
-                  src={v.image}
-                  alt={v.name}
-                  fill
-                  sizes="(min-width: 640px) 202px, 144px"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              </div>
-              <div className="flex flex-1 flex-col p-2.5 sm:p-3.5">
-                <h4 className="font-sans text-xs font-semibold text-maroon sm:text-sm">
-                  {v.name}
-                </h4>
-                {v.reviews > 0 ? (
-                  <p className="mt-1 text-xs text-ink-soft">
-                    ⭐ {v.rating}{" "}
-                    <span className="text-ink-soft/70">
-                      ({inr.format(v.reviews)})
-                    </span>
-                  </p>
-                ) : v.googleRating ? (
-                  <p className="mt-1 text-xs text-ink-soft">
-                    <span aria-hidden="true" className="text-maroon">★</span>{" "}
-                    <span className="font-semibold text-ink">{v.googleRating}</span>{" "}
-                    <span className="text-ink-soft/70">
-                      {t("Google", "गूगल")}
-                      {v.googleReviews ? ` (${inr.format(v.googleReviews)})` : ""}
-                    </span>
-                  </p>
-                ) : (
-                  !stat && (
-                    <p className="mt-1 text-xs font-semibold text-maroon">
-                      {t("New on Bhojpatra", "भोजपत्र पर नया")}
-                    </p>
-                  )
-                )}
-                {stat && (
-                  <p className="mt-1 text-xs font-semibold text-maroon">
-                    ★ {stat.rating} ·{" "}
-                    {t(
-                      `${stat.count} verified`,
-                      `${stat.count} सत्यापित`,
+        {filteredVendors.length === 0 ? (
+          <p className="py-8 text-center text-sm font-medium text-ink-soft">
+            {t(
+              `No vendors matching "${vendorSearch}" in this category.`,
+              `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
+            )}
+          </p>
+        ) : (
+          <div
+            ref={vendorScrollRef}
+            // px/pt + matching -mx give the hover-lift and the selected ring-2 room
+            // inside the scroller — overflow-x-auto otherwise clips them (the cards
+            // looked cropped from the top and the red selected ring vanished).
+            className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2"
+          >
+            {filteredVendors.map((v) => {
+              const selected = selectedIds.includes(v.id);
+              const stat = statFor(vendorRatings, v);
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => pickVendor(cat.id, v.id)}
+                  className={
+                    "group relative flex w-36 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:w-[202px] " +
+                    (selected ? "border-maroon ring-2 ring-maroon" : "border-cream-3")
+                  }
+                >
+                  <div className="relative aspect-[16/10] w-full overflow-hidden">
+                    <Image
+                      src={v.image}
+                      alt={v.name}
+                      fill
+                      sizes="(min-width: 640px) 202px, 144px"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col p-2.5 sm:p-3.5">
+                    <h4 className="font-sans text-xs font-semibold text-maroon sm:text-sm">
+                      {v.name}
+                    </h4>
+                    {v.reviews > 0 ? (
+                      <p className="mt-1 text-xs text-ink-soft">
+                        ⭐ {v.rating}{" "}
+                        <span className="text-ink-soft/70">
+                          ({inr.format(v.reviews)})
+                        </span>
+                      </p>
+                    ) : v.googleRating ? (
+                      <p className="mt-1 text-xs text-ink-soft">
+                        <span aria-hidden="true" className="text-maroon">★</span>{" "}
+                        <span className="font-semibold text-ink">{v.googleRating}</span>{" "}
+                        <span className="text-ink-soft/70">
+                          {t("Google", "गूगल")}
+                          {v.googleReviews ? ` (${inr.format(v.googleReviews)})` : ""}
+                        </span>
+                      </p>
+                    ) : (
+                      !stat && (
+                        <p className="mt-1 text-xs font-semibold text-maroon">
+                          {t("New on Bhojpatra", "भोजपत्र पर नया")}
+                        </p>
+                      )
                     )}
-                  </p>
-                )}
-              </div>
-              <span
-                className={
-                  "block py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide transition sm:py-2 sm:text-xs " +
-                  (selected
-                    ? "bg-maroon text-cream"
-                    : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
-                }
-              >
-                {selected ? `✓ ${t("Selected", "चयनित")}` : t("Select", "चुनें")}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      )}
+                    {stat && (
+                      <p className="mt-1 text-xs font-semibold text-maroon">
+                        ★ {stat.rating} ·{" "}
+                        {t(
+                          `${stat.count} verified`,
+                          `${stat.count} सत्यापित`,
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={
+                      "block py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide transition sm:py-2 sm:text-xs " +
+                      (selected
+                        ? "bg-maroon text-cream"
+                        : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
+                    }
+                  >
+                    {selected ? `✓ ${t("Selected", "चयनित")}` : t("Select", "चुनें")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Scroll hint — more vendors than fit; nudge the guest to scroll. */}
         {filteredVendors.length > 5 && (
@@ -4074,9 +4094,9 @@ function StepMenu({
             {showAllVendors
               ? t("Show fewer vendors", "कम वेंडर दिखाएं")
               : t(
-                  `Explore ${hiddenVendorCount} more vendors`,
-                  `${hiddenVendorCount} और वेंडर देखें`,
-                )}
+                `Explore ${hiddenVendorCount} more vendors`,
+                `${hiddenVendorCount} और वेंडर देखें`,
+              )}
             <span aria-hidden="true" className="text-base leading-none">
               {showAllVendors ? "↑" : "↓"}
             </span>
@@ -4090,13 +4110,13 @@ function StepMenu({
           <p className="text-sm text-ink-soft">
             {multiVendor
               ? t(
-                  "Pick one or more vendors above to see their menus.",
-                  "उनके मेन्यू देखने के लिए ऊपर एक या अधिक वेंडर चुनें।",
-                )
+                "Pick one or more vendors above to see their menus.",
+                "उनके मेन्यू देखने के लिए ऊपर एक या अधिक वेंडर चुनें।",
+              )
               : t(
-                  "Pick a vendor above to see their menu.",
-                  "उनका मेन्यू देखने के लिए ऊपर वेंडर चुनें।",
-                )}
+                "Pick a vendor above to see their menu.",
+                "उनका मेन्यू देखने के लिए ऊपर वेंडर चुनें।",
+              )}
           </p>
         ) : (
           <>
@@ -4124,13 +4144,13 @@ function StepMenu({
               <p className="mt-2 text-xs text-ink-soft">
                 {base === 1
                   ? t(
-                      "You can pick one dish from each vendor for this course.",
-                      "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
-                    )
+                    "You can pick one dish from each vendor for this course.",
+                    "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                  )
                   : t(
-                      `You can pick up to ${base} dishes from each vendor for this course.`,
-                      `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
-                    )}
+                    `You can pick up to ${base} dishes from each vendor for this course.`,
+                    `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
+                  )}
               </p>
             )}
 
@@ -4144,26 +4164,26 @@ function StepMenu({
               );
               const vendorFull = vendorItemPicks.length >= base;
               return (
-              <div key={vendor.id} className="mt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="eyebrow text-xs font-semibold text-gold">
-                    {vendor.name}
-                  </p>
-                  {multiVendor && (
-                    <span
-                      className={
-                        "eyebrow text-[10px] font-semibold " +
-                        (vendorFull ? "text-maroon" : "text-ink-soft")
-                      }
-                    >
-                      {vendorItemPicks.length}/{base}
-                    </span>
-                  )}
-                </div>
-                {/* Swiggy/Zomato-style menu list — one dish per row, thumbnail
+                <div key={vendor.id} className="mt-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="eyebrow text-xs font-semibold text-gold">
+                      {vendor.name}
+                    </p>
+                    {multiVendor && (
+                      <span
+                        className={
+                          "eyebrow text-[10px] font-semibold " +
+                          (vendorFull ? "text-maroon" : "text-ink-soft")
+                        }
+                      >
+                        {vendorItemPicks.length}/{base}
+                      </span>
+                    )}
+                  </div>
+                  {/* Swiggy/Zomato-style menu list — one dish per row, thumbnail
                     on the left, add/added control on the right. */}
-                <div className="mt-2 flex flex-col gap-2">
-                  {vendor.items.map((it: CategoryItem) => {
+                  <div className="mt-2 flex flex-col gap-2">
+                    {vendor.items.map((it: CategoryItem) => {
                       const active = picks.includes(it.id);
                       const atCap =
                         !active &&
@@ -4236,8 +4256,8 @@ function StepMenu({
                         </button>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
               );
             })}
           </>
@@ -4315,22 +4335,22 @@ function StepDetails({
   const priceSpread =
     vendorPlates.length >= 2
       ? (() => {
-          const avg =
-            vendorPlates.reduce((s, n) => s + n, 0) / vendorPlates.length;
-          const rawLo = Math.min(...vendorPlates) / avg;
-          const rawHi = Math.max(...vendorPlates) / avg;
-          return {
-            lo: 1 - SPREAD_DAMP * (1 - rawLo),
-            hi: 1 + SPREAD_DAMP * (rawHi - 1),
-          };
-        })()
+        const avg =
+          vendorPlates.reduce((s, n) => s + n, 0) / vendorPlates.length;
+        const rawLo = Math.min(...vendorPlates) / avg;
+        const rawHi = Math.max(...vendorPlates) / avg;
+        return {
+          lo: 1 - SPREAD_DAMP * (1 - rawLo),
+          hi: 1 + SPREAD_DAMP * (rawHi - 1),
+        };
+      })()
       : null;
   const priceRange = (base: number): { min: number; max: number } =>
     priceSpread
       ? {
-          min: Math.round(base * priceSpread.lo),
-          max: Math.round(base * priceSpread.hi),
-        }
+        min: Math.round(base * priceSpread.lo),
+        max: Math.round(base * priceSpread.hi),
+      }
       : { min: base, max: base };
   // The category chips shown on the full-filter tiers.
   const catChips: { id: "all" | AddOnCategory; label: string }[] = [
@@ -4474,9 +4494,9 @@ function StepDetails({
                     <p className="mt-1.5 text-xs text-ink-soft">
                       {a.perPlate
                         ? t(
-                            `≈ ${guestsLabel} for ${guests} guests`,
-                            `${guests} मेहमानों के लिए ≈ ${guestsLabel}`,
-                          )
+                          `≈ ${guestsLabel} for ${guests} guests`,
+                          `${guests} मेहमानों के लिए ≈ ${guestsLabel}`,
+                        )
                         : t("One-time charge", "एकमुश्त शुल्क")}
                     </p>
                   </div>
@@ -4598,13 +4618,13 @@ function StepDetails({
         <p className="mt-5 rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-4 py-6 text-center text-sm text-ink-soft">
           {query
             ? t(
-                `No add-ons match "${addOnQuery.trim()}".`,
-                `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
-              )
+              `No add-ons match "${addOnQuery.trim()}".`,
+              `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
+            )
             : t(
-                "No add-ons in this category.",
-                "इस श्रेणी में कोई ऐड-ऑन नहीं।",
-              )}
+              "No add-ons in this category.",
+              "इस श्रेणी में कोई ऐड-ऑन नहीं।",
+            )}
         </p>
       )}
     </div>
@@ -4677,7 +4697,7 @@ function PaymentBox({
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       active = false;
     };
@@ -4757,7 +4777,7 @@ function PaymentBox({
       if (!res.ok) {
         setError(
           data?.error ??
-            t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+          t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
         );
         return;
       }
@@ -5910,17 +5930,17 @@ function StepDone({
         {paidAmount > 0
           ? fullyPaid
             ? t(
-                "Payment received in full and a confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements.",
-                "पूरा भुगतान प्राप्त हुआ और पुष्टि WhatsApp व ईमेल पर भेज दी गई है। व्यवस्था तय करने के लिए हमारी टीम संपर्क करेगी।",
-              )
+              "Payment received in full and a confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements.",
+              "पूरा भुगतान प्राप्त हुआ और पुष्टि WhatsApp व ईमेल पर भेज दी गई है। व्यवस्था तय करने के लिए हमारी टीम संपर्क करेगी।",
+            )
             : t(
-                `Your ${money(paidAmount)} advance is received and your date is locked. A confirmation has been sent via WhatsApp and email — our team will collect the ${money(balance)} balance and finalise the arrangements.`,
-                `आपका ${money(paidAmount)} एडवांस प्राप्त हुआ और आपकी तारीख पक्की है। पुष्टि WhatsApp व ईमेल पर भेज दी गई है — हमारी टीम ${money(balance)} शेष राशि लेगी और व्यवस्था तय करेगी।`,
-              )
+              `Your ${money(paidAmount)} advance is received and your date is locked. A confirmation has been sent via WhatsApp and email — our team will collect the ${money(balance)} balance and finalise the arrangements.`,
+              `आपका ${money(paidAmount)} एडवांस प्राप्त हुआ और आपकी तारीख पक्की है। पुष्टि WhatsApp व ईमेल पर भेज दी गई है — हमारी टीम ${money(balance)} शेष राशि लेगी और व्यवस्था तय करेगी।`,
+            )
           : t(
-              "A confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements and payment.",
-              "पुष्टि WhatsApp और ईमेल पर भेज दी गई है। व्यवस्था और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।",
-            )}
+            "A confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements and payment.",
+            "पुष्टि WhatsApp और ईमेल पर भेज दी गई है। व्यवस्था और भुगतान तय करने के लिए हमारी टीम संपर्क करेगी।",
+          )}
       </p>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -6024,73 +6044,73 @@ function SelectedPackageRail({
             collapsible ? (open ? "mt-3 lg:mt-0" : "hidden lg:block") : ""
           }
         >
-        <p
-          className={
-            "eyebrow text-xs font-semibold text-gold " +
-            (collapsible ? "hidden lg:block" : "")
-          }
-        >
-          {t("YOUR PACKAGE", "आपका पैकेज")}
-        </p>
-        <div className="mt-2 flex items-center justify-between">
-          <h3 className="font-display text-xl font-semibold text-maroon">
-            {lang === "hi" ? tier.nameHi : tier.name}
-          </h3>
-          {tier.popular && (
-            <span className="rounded-full bg-gold-soft/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon">
-              {t("Popular", "लोकप्रिय")}
-            </span>
-          )}
-        </div>
-        <p className="mt-1 text-lg font-semibold text-maroon">
-          {tier.price}
-          <span className="text-xs font-normal text-ink-soft">
-            {" "}
-            {lang === "hi" ? tier.unitHi : tier.unit}
-          </span>
-        </p>
-        <p className="mt-2 text-sm text-ink-soft">
-          {t("Base / plate", "बेस / प्लेट")}:{" "}
-          <span className="font-semibold text-ink">{money(basePerPlate)}</span>
-        </p>
-        {(lang === "hi" ? tier.paxHi : tier.pax) && (
-          <p className="mt-1 text-sm text-ink-soft">
-            {t("Guests", "मेहमान")}:{" "}
-            <span className="font-semibold text-ink">
-              {lang === "hi" ? tier.paxHi : tier.pax}
+          <p
+            className={
+              "eyebrow text-xs font-semibold text-gold " +
+              (collapsible ? "hidden lg:block" : "")
+            }
+          >
+            {t("YOUR PACKAGE", "आपका पैकेज")}
+          </p>
+          <div className="mt-2 flex items-center justify-between">
+            <h3 className="font-display text-xl font-semibold text-maroon">
+              {lang === "hi" ? tier.nameHi : tier.name}
+            </h3>
+            {tier.popular && (
+              <span className="rounded-full bg-gold-soft/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon">
+                {t("Popular", "लोकप्रिय")}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-lg font-semibold text-maroon">
+            {tier.price}
+            <span className="text-xs font-normal text-ink-soft">
+              {" "}
+              {lang === "hi" ? tier.unitHi : tier.unit}
             </span>
           </p>
-        )}
-        <ul className="mt-3 flex flex-col gap-1.5">
-          {tier.features.map((feature, i) => {
-            const label = lang === "hi" ? feature.labelHi : feature.label;
-            if (feature.heading) {
+          <p className="mt-2 text-sm text-ink-soft">
+            {t("Base / plate", "बेस / प्लेट")}:{" "}
+            <span className="font-semibold text-ink">{money(basePerPlate)}</span>
+          </p>
+          {(lang === "hi" ? tier.paxHi : tier.pax) && (
+            <p className="mt-1 text-sm text-ink-soft">
+              {t("Guests", "मेहमान")}:{" "}
+              <span className="font-semibold text-ink">
+                {lang === "hi" ? tier.paxHi : tier.pax}
+              </span>
+            </p>
+          )}
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {tier.features.map((feature, i) => {
+              const label = lang === "hi" ? feature.labelHi : feature.label;
+              if (feature.heading) {
+                return (
+                  <li key={i} className="pt-1 text-sm font-semibold text-ink">
+                    {label}
+                  </li>
+                );
+              }
               return (
-                <li key={i} className="pt-1 text-sm font-semibold text-ink">
+                <li
+                  key={i}
+                  className="flex items-start gap-1.5 text-sm text-ink-soft"
+                >
+                  <span aria-hidden="true" className="text-maroon">
+                    ✓
+                  </span>
                   {label}
                 </li>
               );
-            }
-            return (
-              <li
-                key={i}
-                className="flex items-start gap-1.5 text-sm text-ink-soft"
-              >
-                <span aria-hidden="true" className="text-maroon">
-                  ✓
-                </span>
-                {label}
-              </li>
-            );
-          })}
-        </ul>
-        <button
-          type="button"
-          onClick={onChange}
-          className="mt-4 w-full rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
-        >
-          {t("Change package", "पैकेज बदलें")}
-        </button>
+            })}
+          </ul>
+          <button
+            type="button"
+            onClick={onChange}
+            className="mt-4 w-full rounded-full border border-maroon px-4 py-2 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+          >
+            {t("Change package", "पैकेज बदलें")}
+          </button>
         </div>
       </div>
     </aside>
@@ -6170,156 +6190,156 @@ function SummaryPanel({
           </h3>
         </div>
         <div className="p-5">
-        {packageName && (
-          <div className="flex items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2">
-            <span className="text-xs font-medium text-ink-soft">
-              {t("Package", "पैकेज")}
-            </span>
-            <span className="rounded-full bg-gold-soft/50 px-3 py-0.5 text-sm font-semibold text-maroon">
-              {packageName}
-            </span>
-          </div>
-        )}
-
-        {/* Per-plate rate is the headline — an all-in plate rate reads fair
-            where a lakhs-scale lump sum reads scary. The grand total demotes
-            to the smaller line below; it still multiplies back exactly. */}
-        <div className="mt-4 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-              {guests > 0 && grandTotal > 0
-                ? t("Per Plate", "प्रति प्लेट")
-                : t("Total", "कुल")}
-            </p>
-            <p className="font-display text-2xl font-semibold text-maroon">
-              {guests > 0 && grandTotal > 0 ? (
-                <>
-                  ≈ {money(perPlateCost(grandTotal, guests))}
-                  <span className="text-sm font-medium">
-                    {" "}
-                    / {t("plate", "प्लेट")}
-                  </span>
-                </>
-              ) : (
-                money(grandTotal)
-              )}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
-              {t("Advance (10%)", "एडवांस (10%)")}
-            </p>
-            <p className="font-display text-lg font-semibold text-ink">
-              {money(advance)}
-            </p>
-          </div>
-        </div>
-        {guests > 0 && grandTotal > 0 && (
-          <p className="mt-1.5 text-sm text-ink-soft">
-            {t(
-              `Total ${money(grandTotal)} for ${inr.format(guests)} guests`,
-              `${inr.format(guests)} मेहमानों के लिए कुल ${money(grandTotal)}`,
-            )}
-          </p>
-        )}
-
-        {/* Toggle the itemised bill — collapsed by default. */}
-        <button
-          type="button"
-          onClick={() => setShowDetails((v) => !v)}
-          aria-expanded={showDetails}
-          className="mt-4 flex w-full items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-cream-2"
-        >
-          <span>
-            {showDetails
-              ? t("Hide bill details", "बिल विवरण छिपाएं")
-              : t("View bill details", "बिल विवरण देखें")}
-          </span>
-          <svg
-            viewBox="0 0 24 24"
-            className={`h-4 w-4 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
-
-        {showDetails && (
-          <div className="mt-4 space-y-2">
-            <SummaryRow
-              label={t("Package base / plate", "पैकेज बेस / प्लेट")}
-              value={money(basePerPlate)}
-            />
-            <SummaryRow
-              label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
-              value={`+ ${money(categoryAddTotal)}`}
-            />
-            <SummaryRow
-              label={t("Per plate", "प्रति प्लेट")}
-              value={money(perPlate)}
-              accent
-            />
-            <SummaryRow label={t("Guests", "मेहमान")} value={inr.format(guests)} />
-            <div className="my-2 h-px bg-cream-3" />
-            <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
-            <SummaryRow
-              label={t("Add-ons", "एक्स्ट्रा")}
-              value={money(addOnsTotal)}
-            />
-            {serviceName && (
-              <SummaryRow
-                label={`${t("Service", "सर्विस")} · ${serviceName}`}
-                value={serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
-              />
-            )}
-            {venueFee > 0 && (
-              <SummaryRow
-                label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
-                value={money(venueFee)}
-              />
-            )}
-            {couponDiscount > 0 && (
-              <SummaryRow
-                label={t("Coupon discount", "कूपन छूट")}
-                value={`− ${money(couponDiscount)}`}
-                accent
-              />
-            )}
-            {referralDiscount > 0 && (
-              <SummaryRow
-                label={
-                  referrerName
-                    ? `${t("Referral", "रेफ़रल")} · ${referrerName}`
-                    : t("Referral discount", "रेफ़रल छूट")
-                }
-                value={`− ${money(referralDiscount)}`}
-                accent
-              />
-            )}
-            <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
-            <div className="my-2 h-px bg-cream-3" />
-            <div className="flex items-center justify-between">
-              <span className="font-display text-base font-semibold text-ink">
-                {t("Grand Total", "कुल राशि")}
+          {packageName && (
+            <div className="flex items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2">
+              <span className="text-xs font-medium text-ink-soft">
+                {t("Package", "पैकेज")}
               </span>
-              <span className="font-display text-lg font-semibold text-maroon">
-                {money(grandTotal)}
+              <span className="rounded-full bg-gold-soft/50 px-3 py-0.5 text-sm font-semibold text-maroon">
+                {packageName}
               </span>
             </div>
-          </div>
-        )}
-
-        <p className="mt-4 rounded-xl bg-cream/30 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
-          {t(
-            `Pay a 10% advance (${money(advance)}) to lock your date — or book now, pay later.`,
-            `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(advance)}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
           )}
-        </p>
+
+          {/* Per-plate rate is the headline — an all-in plate rate reads fair
+            where a lakhs-scale lump sum reads scary. The grand total demotes
+            to the smaller line below; it still multiplies back exactly. */}
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                {guests > 0 && grandTotal > 0
+                  ? t("Per Plate", "प्रति प्लेट")
+                  : t("Total", "कुल")}
+              </p>
+              <p className="font-display text-2xl font-semibold text-maroon">
+                {guests > 0 && grandTotal > 0 ? (
+                  <>
+                    ≈ {money(perPlateCost(grandTotal, guests))}
+                    <span className="text-sm font-medium">
+                      {" "}
+                      / {t("plate", "प्लेट")}
+                    </span>
+                  </>
+                ) : (
+                  money(grandTotal)
+                )}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-soft">
+                {t("Advance (10%)", "एडवांस (10%)")}
+              </p>
+              <p className="font-display text-lg font-semibold text-ink">
+                {money(advance)}
+              </p>
+            </div>
+          </div>
+          {guests > 0 && grandTotal > 0 && (
+            <p className="mt-1.5 text-sm text-ink-soft">
+              {t(
+                `Total ${money(grandTotal)} for ${inr.format(guests)} guests`,
+                `${inr.format(guests)} मेहमानों के लिए कुल ${money(grandTotal)}`,
+              )}
+            </p>
+          )}
+
+          {/* Toggle the itemised bill — collapsed by default. */}
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            aria-expanded={showDetails}
+            className="mt-4 flex w-full items-center justify-between rounded-xl bg-cream-2/50 px-3 py-2.5 text-sm font-semibold text-maroon transition-colors hover:bg-cream-2"
+          >
+            <span>
+              {showDetails
+                ? t("Hide bill details", "बिल विवरण छिपाएं")
+                : t("View bill details", "बिल विवरण देखें")}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-4 w-4 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {showDetails && (
+            <div className="mt-4 space-y-2">
+              <SummaryRow
+                label={t("Package base / plate", "पैकेज बेस / प्लेट")}
+                value={money(basePerPlate)}
+              />
+              <SummaryRow
+                label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
+                value={`+ ${money(categoryAddTotal)}`}
+              />
+              <SummaryRow
+                label={t("Per plate", "प्रति प्लेट")}
+                value={money(perPlate)}
+                accent
+              />
+              <SummaryRow label={t("Guests", "मेहमान")} value={inr.format(guests)} />
+              <div className="my-2 h-px bg-cream-3" />
+              <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
+              <SummaryRow
+                label={t("Add-ons", "एक्स्ट्रा")}
+                value={money(addOnsTotal)}
+              />
+              {serviceName && (
+                <SummaryRow
+                  label={`${t("Service", "सर्विस")} · ${serviceName}`}
+                  value={serviceTotal > 0 ? money(serviceTotal) : t("Included", "शामिल")}
+                />
+              )}
+              {venueFee > 0 && (
+                <SummaryRow
+                  label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
+                  value={money(venueFee)}
+                />
+              )}
+              {couponDiscount > 0 && (
+                <SummaryRow
+                  label={t("Coupon discount", "कूपन छूट")}
+                  value={`− ${money(couponDiscount)}`}
+                  accent
+                />
+              )}
+              {referralDiscount > 0 && (
+                <SummaryRow
+                  label={
+                    referrerName
+                      ? `${t("Referral", "रेफ़रल")} · ${referrerName}`
+                      : t("Referral discount", "रेफ़रल छूट")
+                  }
+                  value={`− ${money(referralDiscount)}`}
+                  accent
+                />
+              )}
+              <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+              <div className="my-2 h-px bg-cream-3" />
+              <div className="flex items-center justify-between">
+                <span className="font-display text-base font-semibold text-ink">
+                  {t("Grand Total", "कुल राशि")}
+                </span>
+                <span className="font-display text-lg font-semibold text-maroon">
+                  {money(grandTotal)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-4 rounded-xl bg-cream/30 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
+            {t(
+              `Pay a 10% advance (${money(advance)}) to lock your date — or book now, pay later.`,
+              `अपनी तारीख पक्की करने के लिए 10% एडवांस (${money(advance)}) दें — या अभी बुक करें, बाद में भुगतान करें।`,
+            )}
+          </p>
         </div>
       </div>
     </aside>
