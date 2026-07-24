@@ -7,6 +7,7 @@
  */
 
 import Image from "next/image";
+import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
 import { useCompare } from "@/lib/compare";
@@ -141,59 +142,29 @@ export default function VendorProfile({
         </div>
       </div>
 
-      {/* Menu by course */}
-      <div className="mt-12">
-        <h2 className="font-display text-2xl text-ink">
-          {t("Menu", "मेन्यू")}
-        </h2>
-        <div className="mt-5 space-y-5">
-          {profile.menu.map((course) => (
-            <Card
-              key={course.categoryId}
-              padding="none"
-              className="p-5 sm:p-6"
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cream text-lg">
-                  <span aria-hidden="true">{course.icon}</span>
-                </span>
-                <h3 className="font-display text-lg font-semibold text-ink">
-                  {lang === "hi" ? course.nameHi : course.name}
-                </h3>
-                <span className="text-sm text-ink-soft">
-                  + ₹{inr.format(course.perPlate)}/{t("plate", "प्लेट")}
-                </span>
-              </div>
-              <div className="-mx-5 mt-4 flex flex-nowrap gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-                {course.items.map((it, i) => (
-                  <span
-                    key={`${it.name}-${i}`}
-                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-cream-3 bg-cream/40 py-1.5 pl-2 pr-4 text-sm text-ink"
-                  >
-                    {it.photo && (
-                      <span className="relative block h-7 w-7 shrink-0 overflow-hidden rounded-full border border-cream-3">
-                        <Image src={it.photo} alt="" fill sizes="28px" className="object-cover" />
-                      </span>
-                    )}
-                    <span
-                      aria-hidden="true"
-                      className={
-                        "inline-block h-2.5 w-2.5 rounded-sm border " +
-                        (it.diet === "veg" ? "border-ink" : "border-maroon bg-maroon")
-                      }
-                    />
-                    {it.name}
-                    {it.price != null && (
-                      <span className="font-semibold text-maroon">
-                        · ₹{inr.format(it.price)}/{t("plate", "प्लेट")}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </Card>
-          ))}
-        </div>
+      {/* Browse Menu CTA */}
+      <div className="mt-6 sm:mt-8">
+        <Link
+          href={`/vendors/${profile.id}/menu`}
+          className="focus-ring flex items-center justify-between rounded-xl border border-cream-3 bg-white p-4 shadow-xs transition hover:border-maroon/20 hover:bg-cream/30 active:scale-[0.99] sm:rounded-2xl sm:p-5"
+        >
+          <div className="flex items-center gap-3.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cream text-lg sm:h-11 sm:w-11 sm:text-xl">
+              📖
+            </span>
+            <div>
+              <p className="text-sm font-bold text-ink sm:text-base">
+                {t("Browse Menu", "मेन्यू देखें")}
+              </p>
+              <p className="text-xs text-ink-soft sm:text-xs">
+                {t("View complete dishes, categories & per-plate prices", "सभी व्यंजन, श्रेणियाँ और कीमतें देखें")}
+              </p>
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-bold text-maroon sm:text-sm">
+            {t("Explore", "देखें")} →
+          </span>
+        </Link>
       </div>
 
       {/* Live counters & services the caterer offers (from the platform add-on set). */}

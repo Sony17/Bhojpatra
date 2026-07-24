@@ -685,9 +685,17 @@ function VendorProfile({
         {/* ── Famous For ───────────────────────────────────────────── */}
         {famousFor && (
           <div className="mt-3 rounded-xl border border-cream-3 bg-cream/40 p-3 sm:mt-6 sm:rounded-2xl sm:p-5">
-            <p className="text-xs font-bold text-maroon sm:text-base">
-              {t("Famous For", "इनकी खासियत")}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-maroon sm:text-base">
+                {t("Famous For", "इनकी खासियत")}
+              </p>
+              <Link
+                href={`/vendors/${vendor.id}/menu`}
+                className="text-xs font-semibold text-maroon hover:underline sm:text-sm"
+              >
+                {t("View Full Menu →", "पूरा मेन्यू देखें →")}
+              </Link>
+            </div>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-cream-3">
               {famousFor.map((dish) => (
                 <div
@@ -781,41 +789,30 @@ function VendorProfile({
           </span>
         </div>
 
-        {/* ── Menu ─────────────────────────────────────────────────── */}
-        {menu.length > 0 && (
-          <div className="mt-10">
-            <h2 className="font-display text-2xl text-ink">
-              {t("Menu", "मेन्यू")}
-            </h2>
-            <div className="mt-4 space-y-4">
-              {menu.map((course) => (
-                <div
-                  key={course.name}
-                  className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm sm:p-6"
-                >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cream-2 text-lg">
-                      <span aria-hidden="true">{course.icon}</span>
-                    </span>
-                    <h3 className="font-sans text-base font-bold text-ink sm:text-lg">
-                      {t(course.name, course.nameHi)}
-                    </h3>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {course.items.map((it) => (
-                      <span
-                        key={it}
-                        className="rounded-full border border-cream-3 bg-cream/40 px-3.5 py-1.5 text-sm text-ink"
-                      >
-                        {it}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
+        {/* ── Browse Menu CTA ──────────────────────────────────────── */}
+        <div className="mt-3 sm:mt-5">
+          <Link
+            href={`/vendors/${vendor.id}/menu`}
+            className="focus-ring flex items-center justify-between rounded-xl border border-cream-3 bg-white p-3.5 shadow-xs transition hover:border-maroon/20 hover:bg-cream/30 active:scale-[0.99] sm:rounded-2xl sm:p-5"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cream text-base sm:h-10 sm:w-10 sm:text-lg">
+                📖
+              </span>
+              <div>
+                <p className="text-xs font-bold text-ink sm:text-base">
+                  {t("Browse Menu", "मेन्यू देखें")}
+                </p>
+                <p className="text-[11px] text-ink-soft sm:text-xs">
+                  {t("View complete dishes & categories", "सभी व्यंजन और श्रेणियाँ देखें")}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+            <span className="flex items-center gap-1 text-xs font-bold text-maroon sm:text-sm">
+              {t("Explore", "देखें")} →
+            </span>
+          </Link>
+        </div>
       </div>
 
       {/* ── Ratings & reviews ─────────────────────────────────────────── */}
