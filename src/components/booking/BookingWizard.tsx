@@ -3251,7 +3251,12 @@ function StepPackage({
   const tiers = packages.map((tier) => {
     const meta = homePackages.tiers.find((x) => x.id === tier.id);
     const display = meta
-      ? { ...tier, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+      ? {
+          ...tier,
+          name: tier.id === "custom" ? "Single Stall" : meta.name,
+          nameHi: tier.id === "custom" ? "सिंगल स्टॉल" : meta.nameHi,
+          price: meta.price,
+        }
       : tier;
     const lead = packageLeadDays[tier.id] ?? 0;
     return {
@@ -3314,18 +3319,18 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="relative w-[88vw] max-w-[390px] shrink-0 snap-center first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+              className="relative flex w-[82vw] max-w-[360px] shrink-0 snap-center flex-col first:snap-start sm:w-auto sm:max-w-none sm:shrink"
             >
             {tooSoon ? (
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
-              // or focusable), with a legible notice pinned over the fold naming
+              // or focusable), with a legible notice below the scroll card naming
               // its lead time and the date it unlocks. Nothing is silently
               // dropped, so the guest can pick a later date to reach it. The card
               // stays only lightly muted (not near-invisible) and carries a
               // "Locked" badge pinned to the top so the tier reads as present but
               // temporarily unavailable — never as if it had gone missing.
               <>
-                <div inert className="select-none opacity-60">
+                <div className="select-none opacity-60">
                   <PackageScrollCard
                     tier={tier}
                     selected={false}
@@ -3340,8 +3345,8 @@ function StepPackage({
                     {t("Locked", "लॉक")}
                   </span>
                 </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-[12%] z-30 flex justify-center px-4">
-                  <div className="rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
+                <div className="mt-2.5 flex justify-center px-1">
+                  <div className="w-full rounded-lg border border-maroon/40 bg-white px-3 py-2 text-center shadow-card">
                     <p className="flex items-center justify-center gap-1 text-xs font-bold text-maroon">
                       <span aria-hidden="true">★</span>
                       {t(

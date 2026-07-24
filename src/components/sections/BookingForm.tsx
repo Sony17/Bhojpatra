@@ -209,10 +209,16 @@ export default function BookingForm() {
               {packages.map((tier) => {
                 const active = selectedPackage === tier.id;
                 const meta = tierMeta(tier.id);
-                const name =
+                const rawName =
                   lang === "hi"
                     ? meta?.nameHi ?? tier.nameHi
                     : meta?.name ?? tier.name;
+                const name =
+                  tier.id === "custom"
+                    ? lang === "hi"
+                      ? "सिंगल स्टॉल"
+                      : "Single Stall"
+                    : rawName;
                 const price = meta?.price ?? tier.price;
                 return (
                   <label
