@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { type PackageTier } from "@/lib/data";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import { useLang } from "@/lib/i18n";
@@ -22,21 +22,44 @@ export default function PackageCascadeStack({
   tiers,
   selectedId,
   onSelectTier,
+  activeId: externalActiveId,
+  onActiveTierChange,
   renderCta,
   renderNoticeBelow,
 }: {
   tiers: CascadeTierItem[];
   selectedId: string;
   onSelectTier: (id: string) => void;
+  activeId?: string;
+  onActiveTierChange?: (id: string) => void;
   renderCta: (tier: PackageTier, selected: boolean) => ReactNode;
   renderNoticeBelow?: (item: CascadeTierItem) => ReactNode;
 }) {
   const { lang, t } = useLang();
 
-  // Find index of the currently active tier among the cascade tiers
+  // Internal state for the currently active/viewed scroll card
+  const [internalActiveId, setInternalActiveId] = useState<string>(
+    () => externalActiveId || selectedId || tiers[0]?.tier.id || "silver",
+  );
+
+  // Sync internal active tier if selectedId changes externally and externalActiveId is unmanaged
+  useEffect(() => {
+    if (!externalActiveId && selectedId) {
+      setInternalActiveId(selectedId);
+    }
+  }, [selectedId, externalActiveId]);
+
+  const activeId = externalActiveId ?? internalActiveId;
+
+  const setActiveId = (id: string) => {
+    setInternalActiveId(id);
+    onActiveTierChange?.(id);
+  };
+
+  // Find index of the currently viewed (active) tier among the cascade tiers
   const activeIndex = Math.max(
     0,
-    tiers.findIndex((item) => item.tier.id === selectedId),
+    tiers.findIndex((item) => item.tier.id === activeId),
   );
 
   const activeItem = tiers[activeIndex] ?? tiers[0];
@@ -46,10 +69,10 @@ export default function PackageCascadeStack({
     <div className="w-full">
       {/* ── MOBILE VIEW (< sm): Physical Cascading Scroll Deck (from Sony's prototype) ── */}
       <div className="block select-none sm:hidden">
-        {/* Tier Pills Navigation */}
+        {/* Tier Pills Navigation — BROWSE ONLY */}
         <div className="mb-4 flex flex-wrap items-center justify-center gap-2.5">
           {tiers.map((item) => {
-            const isSelected = item.tier.id === selectedId;
+            const isViewed = item.tier.id === activeId;
             const tierId = item.tier.id;
             const name = lang === "hi" ? item.tier.nameHi : item.tier.name;
 
@@ -57,10 +80,10 @@ export default function PackageCascadeStack({
               <button
                 key={tierId}
                 type="button"
-                aria-pressed={isSelected}
-                onClick={() => onSelectTier(tierId)}
+                aria-pressed={isViewed}
+                onClick={() => setActiveId(tierId)}
                 className={`rounded-full px-5 py-2 font-display text-xs font-bold tracking-wide transition-all duration-300 active:scale-95 ${
-                  isSelected
+                  isViewed
                     ? "bg-maroon text-cream shadow-card ring-1 ring-cream"
                     : "border border-maroon/25 bg-white text-maroon hover:bg-cream/40"
                 }`}
@@ -112,7 +135,7 @@ export default function PackageCascadeStack({
                         tier={item.tier}
                         selected={false}
                         onSelect={() => {
-                          if (!front) onSelectTier(item.tier.id);
+                          if (!front) setActiveId(item.tier.id);
                         }}
                         accordion
                         ctaOnFold
@@ -133,7 +156,11 @@ export default function PackageCascadeStack({
                     tier={item.tier}
                     selected={isSelected}
                     onSelect={() => {
-                      if (!front) onSelectTier(item.tier.id);
+                      if (!front) {
+                        setActiveId(item.tier.id);
+                      } else {
+                        onSelectTier(item.tier.id);
+                      }
                     }}
                     accordion
                     ctaOnFold
@@ -144,7 +171,7 @@ export default function PackageCascadeStack({
                 {/* White veil overlay on rear waiting cards — blanks internal menu & CTAs,
                     displaying tier name and price along the visible top-right peeking edge */}
                 <div
-                  onClick={front ? undefined : () => onSelectTier(item.tier.id)}
+                  onClick={front ? undefined : () => setActiveId(item.tier.id)}
                   className={`absolute bottom-[14%] left-[11%] right-[19%] top-[13.5%] z-40 rounded-[28px] bg-white transition-opacity duration-300 ${
                     front
                       ? "pointer-events-none opacity-0"
@@ -159,7 +186,7 @@ export default function PackageCascadeStack({
             );
           })}
 
-          {/* Independent Peeking Hit Targets for exposed rear scrolls */}
+          {/* Independent Peeking Hit Targets for exposed rear scrolls — BROWSE ONLY */}
           {tiers.map((item, i) => {
             const depth = (i - activeIndex + count) % count;
             if (depth === 0) return null;
@@ -169,8 +196,8 @@ export default function PackageCascadeStack({
               <button
                 key={`hit-${item.tier.id}`}
                 type="button"
-                aria-label={t(`Select ${tierName}`, `${tierName} चुनें`)}
-                onClick={() => onSelectTier(item.tier.id)}
+                aria-label={t(`Browse ${tierName}`, `${tierName} देखें`)}
+                onClick={() => setActiveId(item.tier.id)}
                 className="absolute inset-x-0 top-0 cursor-pointer select-none rounded-t-[28px] transition-transform duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform origin-top-right focus:outline-none"
                 style={{
                   transform: DECK_TRANSFORMS[depth] ?? DECK_TRANSFORMS[0],
@@ -183,7 +210,7 @@ export default function PackageCascadeStack({
           })}
         </div>
 
-        {/* Rhombus Pagination Markers */}
+        {/* Rhombus Pagination Markers — BROWSE ONLY */}
         <div
           className="mt-8 flex items-center justify-center gap-3.5"
           aria-hidden="true"
@@ -196,7 +223,7 @@ export default function PackageCascadeStack({
                 type="button"
                 aria-label={item.tier.name}
                 aria-pressed={isActive}
-                onClick={() => onSelectTier(item.tier.id)}
+                onClick={() => setActiveId(item.tier.id)}
                 className={`h-2.5 w-2.5 rotate-45 transition-all duration-300 ${
                   isActive
                     ? "scale-125 bg-maroon shadow-[0_0_8px_rgba(185,32,37,0.5)]"
@@ -264,3 +291,4 @@ export default function PackageCascadeStack({
     </div>
   );
 }
+
