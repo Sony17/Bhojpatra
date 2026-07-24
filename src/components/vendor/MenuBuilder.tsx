@@ -44,6 +44,10 @@ interface DraftItem {
   diet: DietType;
   /** Same-origin dish photo URL, set after a per-dish upload. */
   photo?: string;
+  /** Per-delicacy price (₹, as a form string) — collected from Single Stall
+   *  vendors on their plated dishes. Blank for vendors who don't sell Single
+   *  Stall. */
+  price?: string;
 }
 
 interface GalleryPhoto {
@@ -69,6 +73,7 @@ interface VendorPayload {
   googleRating?: number;
   googleReviews?: number;
   menu: VendorMenuSection[];
+  featured?: string[];
   counters?: VendorCounter[];
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
@@ -97,6 +102,10 @@ interface DraftBox {
 
 /** Max extra custom sizes per box (matches the server-side cap). */
 const MAX_BOX_CUSTOM_SIZES = 4;
+
+/** Signature dishes are all-or-nothing: a vendor features exactly this many, or
+ *  none (matches the server-side `FEATURED_COUNT`). */
+const FEATURED_COUNT = 4;
 
 /** The platform Essential tier's checklist — suggestion chips for the vendor's
  *  own Essential Service offer (they can add their own items too). */
@@ -154,6 +163,9 @@ export default function MenuBuilder() {
   const [sections, setSections] = useState<Record<string, DraftSection>>(
     emptySections,
   );
+  // Signature dishes — the (up to four) dish names the vendor is famous for,
+  // shown as tags on their catalog card. Names reference their own live dishes.
+  const [featured, setFeatured] = useState<string[]>([]);
   // Live counters & services the vendor offers: offering id → own-price string
   // (a present key = offered; an empty value = charge the platform default).
   const [counters, setCounters] = useState<Record<string, string>>({});
@@ -237,6 +249,9 @@ export default function MenuBuilder() {
             // Categories likewise carry over from the saved profile or, first
             // time in, from the registration application.
             if (src.serviceCategories) setServiceCats(src.serviceCategories);
+            // Signature dishes carry over from the saved profile (a first-time
+            // application has none). Reconciled against live dishes on render.
+            if (src.featured) setFeatured(src.featured);
             // Tiers: saved selection, or the review/price-derived prefill.
             if (src.tiers?.length) setTiers(src.tiers);
             if (src.bainaBoxes) {
@@ -280,6 +295,7 @@ export default function MenuBuilder() {
                     name: it.name,
                     diet: it.diet,
                     ...(it.photo ? { photo: it.photo } : {}),
+                    ...(it.price != null ? { price: String(it.price) } : {}),
                   })),
                 };
               }
@@ -329,9 +345,46 @@ export default function MenuBuilder() {
     });
   };
 
+  const setItemPrice = (catId: string, index: number, value: string) => {
+    updateSection(catId, {
+      items: sections[catId].items.map((it, i) =>
+        i === index ? { ...it, price: value } : it,
+      ),
+    });
+  };
+
+  // A vendor who sells the Single Stall category can price each delicacy
+  // individually — the plated-course dishes gain an optional per-dish ₹ field;
+  // a blank one falls back to the course per-plate rate.
+  const offersSingleStall = serviceCats.includes("single-stall");
+
   const publishedDishes = Object.values(sections)
     .filter((s) => s.enabled)
     .reduce((n, s) => n + s.items.length, 0);
+
+  // Signature-dish pool: every dish in an enabled course (the dishes that go
+  // live), de-duplicated by name in menu order. A vendor may only feature these.
+  const featurablePool = Array.from(
+    new Set(
+      menuCategories
+        .filter((c) => sections[c.id]?.enabled)
+        .flatMap((c) => sections[c.id].items.map((it) => it.name)),
+    ),
+  );
+  const featurableSet = new Set(featurablePool);
+  // Keep only chosen names that still map to a live dish (a dish may have been
+  // removed or its course paused since it was picked).
+  const validFeatured = featured.filter((n) => featurableSet.has(n));
+
+  const toggleFeatured = (name: string) => {
+    setFeatured((prev) => {
+      const cur = prev.filter((n) => featurableSet.has(n));
+      if (cur.includes(name)) return cur.filter((n) => n !== name);
+      if (cur.length >= FEATURED_COUNT) return cur; // cap: never more than four
+      return [...cur, name];
+    });
+    setSaved(false);
+  };
 
   const onPhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -602,6 +655,16 @@ export default function MenuBuilder() {
       setSaveError(t("Enter your city.", "अपना शहर दर्ज करें।"));
       return;
     }
+    // Signature dishes are all-or-nothing — exactly four, or none.
+    if (validFeatured.length !== 0 && validFeatured.length !== FEATURED_COUNT) {
+      setSaveError(
+        t(
+          `Pick exactly ${FEATURED_COUNT} signature dishes to feature, or none.`,
+          `फ़ीचर करने के लिए ठीक ${FEATURED_COUNT} सिग्नेचर डिश चुनें, या कोई नहीं।`,
+        ),
+      );
+      return;
+    }
     setSaving(true);
     try {
       const payload: VendorPayload = {
@@ -624,9 +687,18 @@ export default function MenuBuilder() {
           .map((c) => ({
             categoryId: c.id,
             perPlate: Number(sections[c.id].perPlate) || 0,
-            items: sections[c.id].items,
+            // Carry the per-delicacy price as a number; drop it when blank/zero
+            // so non-Single-Stall dishes stay priceless.
+            items: sections[c.id].items.map((it) => ({
+              name: it.name,
+              diet: it.diet,
+              ...(it.photo ? { photo: it.photo } : {}),
+              ...(Number(it.price) > 0 ? { price: Number(it.price) } : {}),
+            })),
             ...(sections[c.id].enabled ? {} : { hidden: true }),
           })),
+        // Signature dishes — reconciled to live dishes; empty means "none".
+        featured: validFeatured,
         // Only send offerings the vendor still recognises; an own-price is
         // optional (blank falls back to the platform default server-side).
         counters: vendorOfferings
@@ -1205,11 +1277,85 @@ export default function MenuBuilder() {
                 onRemoveItem={(i) => removeItem(cat.id, i)}
                 onToggleDiet={(i) => toggleItemDiet(cat.id, i)}
                 onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
+                // Single Stall vendors price each plated delicacy individually;
+                // live-stall dishes bill as counters, so no per-dish field.
+                priceable={group.key === "plated" && offersSingleStall}
+                onItemPrice={(i, v) => setItemPrice(cat.id, i, v)}
               />
             );
           })}
         </div>
       ))}
+
+      {/* Signature dishes — the up-to-four "famous for" tags shown on the
+          vendor's catalog card. The pool is the vendor's own live dishes, so a
+          dish must exist in an active course before it can be featured. */}
+      <Card padding="none" className="p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-base font-semibold text-ink">
+            <span aria-hidden="true">⭐</span>{" "}
+            {t("Signature Dishes", "सिग्नेचर डिश")}
+          </h3>
+          <span
+            className={
+              "text-xs font-semibold " +
+              (validFeatured.length === FEATURED_COUNT
+                ? "text-maroon"
+                : "text-ink-soft")
+            }
+          >
+            {validFeatured.length}/{FEATURED_COUNT}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          {t(
+            "Pick exactly four dishes you're famous for — they show as tags on your brand card in the vendor catalogue.",
+            "ठीक चार डिश चुनें जिनके लिए आप मशहूर हैं — ये वेंडर कैटलॉग में आपके ब्रांड कार्ड पर टैग के रूप में दिखेंगी।",
+          )}
+        </p>
+        {featurablePool.length < FEATURED_COUNT ? (
+          <p className="mt-4 rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-3 text-xs text-ink-soft">
+            {t(
+              "Add at least four dishes to an active course above, then come back to choose your signature ones.",
+              "ऊपर किसी सक्रिय कोर्स में कम से कम चार डिश जोड़ें, फिर अपनी सिग्नेचर डिश चुनने के लिए यहाँ लौटें।",
+            )}
+          </p>
+        ) : (
+          <>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {featurablePool.map((name) => {
+                const on = validFeatured.includes(name);
+                const capped = !on && validFeatured.length >= FEATURED_COUNT;
+                return (
+                  <Chip
+                    key={name}
+                    label={name}
+                    active={on}
+                    disabled={capped}
+                    onClick={() => toggleFeatured(name)}
+                  />
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-ink-soft">
+              {validFeatured.length === FEATURED_COUNT
+                ? t(
+                    "Great — these four are featured on your card.",
+                    "बढ़िया — ये चार आपके कार्ड पर फ़ीचर होंगी।",
+                  )
+                : validFeatured.length === 0
+                  ? t(
+                      "Tap four dishes to feature them (optional).",
+                      "चार डिश टैप करके फ़ीचर करें (वैकल्पिक)।",
+                    )
+                  : t(
+                      `${FEATURED_COUNT - validFeatured.length} more to go — feature exactly four, or none.`,
+                      `${FEATURED_COUNT - validFeatured.length} और — ठीक चार फ़ीचर करें, या कोई नहीं।`,
+                    )}
+            </p>
+          </>
+        )}
+      </Card>
 
       {/* Baina Box menu — the box offerings customers browse from the home
           "Baina Box" section. Adding a box auto-declares the category. */}
@@ -1598,6 +1744,8 @@ function CategorySection({
   onRemoveItem,
   onToggleDiet,
   onUploadItemPhoto,
+  priceable = false,
+  onItemPrice,
 }: {
   icon: string;
   name: string;
@@ -1610,6 +1758,9 @@ function CategorySection({
   onRemoveItem: (index: number) => void;
   onToggleDiet: (index: number) => void;
   onUploadItemPhoto: (index: number, file: File) => Promise<string | null>;
+  /** Single Stall vendors price each dish — shows a per-dish ₹ field. */
+  priceable?: boolean;
+  onItemPrice?: (index: number, value: string) => void;
 }) {
   const { t } = useLang();
   const [draftName, setDraftName] = useState("");
@@ -1717,6 +1868,14 @@ function CategorySection({
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Dishes", "डिश")} ({section.items.length}/24)
             </p>
+            {priceable && (
+              <p className="mb-2 text-xs text-ink-soft">
+                {t(
+                  "You offer Single Stall — set a ₹ price per plate for any delicacy (optional; blank uses this course's per-plate rate).",
+                  "आप सिंगल स्टॉल देते हैं — किसी भी डिश के लिए प्रति-प्लेट ₹ मूल्य डालें (वैकल्पिक; खाली रहने पर इस कोर्स की प्रति-प्लेट दर लगेगी)।",
+                )}
+              </p>
+            )}
             {section.items.length === 0 ? (
               <p className="text-sm text-ink-soft">
                 {t(
@@ -1791,6 +1950,23 @@ function CategorySection({
                       />
                     </button>
                     {it.name}
+                    {priceable && (
+                      <span className="flex items-center gap-0.5">
+                        <span className="text-xs text-ink-soft">₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={it.price ?? ""}
+                          onChange={(e) => onItemPrice?.(i, e.target.value)}
+                          placeholder={t("price", "मूल्य")}
+                          aria-label={t(
+                            `Single Stall price for ${it.name}`,
+                            `${it.name} के लिए सिंगल स्टॉल मूल्य`,
+                          )}
+                          className="w-16 rounded-full border border-cream-3 bg-white px-2 py-1 text-xs text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                        />
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => onRemoveItem(i)}
@@ -1907,18 +2083,21 @@ function Chip({
   label,
   active,
   onClick,
+  disabled = false,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={active}
       className={
-        "shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors " +
+        "shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 " +
         (active
           ? "bg-maroon text-cream"
           : "bg-cream-2 text-ink-soft hover:bg-cream-3")

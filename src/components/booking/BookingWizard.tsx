@@ -1095,7 +1095,35 @@ export default function BookingWizard() {
     [categoryVendor, activeCategories],
   );
 
-  const perPlate = basePerPlate + categoryAddTotal;
+  // Single Stall bills per selected delicacy — each dish's own price, or the
+  // vendor's course per-plate when the vendor left it blank ("pay only for what
+  // you select"). The fixed feast tiers keep the flat per-vendor uplift above.
+  const singleStallMenuTotal = useMemo<number>(() => {
+    if (!singleStall) return 0;
+    return activeCategories.reduce((sum, cat) => {
+      const chosen = categoryVendor[cat.id] ?? [];
+      const picks = categoryItems[cat.id] ?? [];
+      return (
+        sum +
+        cat.vendors
+          .filter((v) => chosen.includes(v.id))
+          .reduce(
+            (s, v) =>
+              s +
+              v.items
+                .filter((it) => picks.includes(it.id))
+                .reduce((acc, it) => acc + (it.price ?? v.perPlate), 0),
+            0,
+          )
+      );
+    }, 0);
+  }, [singleStall, categoryVendor, categoryItems, activeCategories]);
+
+  // The menu's per-plate contribution: per-dish for Single Stall, per-vendor for
+  // the fixed tiers. Everything downstream (subtotal, invoice, summary) reads it.
+  const menuAddTotal = singleStall ? singleStallMenuTotal : categoryAddTotal;
+
+  const perPlate = basePerPlate + menuAddTotal;
   const subtotal = perPlate * guests;
 
   const addOnsTotal = useMemo<number>(
@@ -1512,10 +1540,12 @@ export default function BookingWizard() {
         amount: basePerPlate * guests,
       },
     ];
-    if (categoryAddTotal > 0) {
+    if (menuAddTotal > 0) {
       lines.push({
-        label: `Premium vendor add-ons (${money(categoryAddTotal)}/plate × ${guests})`,
-        amount: categoryAddTotal * guests,
+        label: singleStall
+          ? `Single Stall menu (${money(menuAddTotal)}/plate × ${guests})`
+          : `Premium vendor add-ons (${money(menuAddTotal)}/plate × ${guests})`,
+        amount: menuAddTotal * guests,
       });
     }
     addOns
@@ -2130,6 +2160,7 @@ export default function BookingWizard() {
                 isSkipped={isSkipped}
                 unskipCat={unskipCat}
                 onSkipMenu={singleStall ? skipMenuEntirely : undefined}
+                showItemPrice={singleStall}
                 vendorRatings={vendorRatings}
                   />
                 </>
@@ -2324,8 +2355,9 @@ export default function BookingWizard() {
           <SummaryPanel
             t={t}
             packageName={selectedPackage?.name ?? ""}
+            singleStall={singleStall}
             basePerPlate={basePerPlate}
-            categoryAddTotal={categoryAddTotal}
+            categoryAddTotal={menuAddTotal}
             perPlate={perPlate}
             guests={guests}
             subtotal={subtotal}
@@ -3490,6 +3522,7 @@ function StepMenu({
   isSkipped,
   unskipCat,
   onSkipMenu,
+  showItemPrice = false,
   vendorRatings,
 }: {
   lang: Lang;
@@ -3515,6 +3548,10 @@ function StepMenu({
   unskipCat: (catId: string) => void;
   /** Single Stall only — skip the whole menu and go straight to add-ons. */
   onSkipMenu?: () => void;
+  /** Single Stall — surface each delicacy's own per-plate price (vendors who
+   *  sell Single Stall price dishes individually). Display only; the checkout
+   *  total still runs on the course per-plate. */
+  showItemPrice?: boolean;
   vendorRatings: VendorRatings;
 }) {
   const vendorScrollRef = useRef<HTMLDivElement>(null);
@@ -4044,7 +4081,8 @@ function StepMenu({
                               className="object-cover"
                             />
                           </span>
-                          {/* Diet mark + dish name */}
+                          {/* Diet mark + dish name (+ per-delicacy price on
+                              Single Stall, where vendors price each dish). */}
                           <span className="flex min-w-0 flex-1 items-center gap-2">
                             <span
                               aria-hidden="true"
@@ -4053,8 +4091,19 @@ function StepMenu({
                                 dietBorder
                               }
                             />
-                            <span className="truncate text-sm font-semibold text-ink sm:text-base">
-                              {it.name}
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold text-ink sm:text-base">
+                                {it.name}
+                              </span>
+                              {/* Single Stall shows each dish's own price, or
+                                  the vendor's course per-plate as the fallback. */}
+                              {showItemPrice &&
+                                (it.price ?? vendor.perPlate) > 0 && (
+                                  <span className="block text-xs font-semibold text-maroon">
+                                    {money(it.price ?? vendor.perPlate)}/
+                                    {t("plate", "प्लेट")}
+                                  </span>
+                                )}
                             </span>
                           </span>
                           {/* Add / added control */}
@@ -5958,6 +6007,7 @@ function SummaryRow({
 function SummaryPanel({
   t,
   packageName,
+  singleStall,
   basePerPlate,
   categoryAddTotal,
   perPlate,
@@ -5976,6 +6026,7 @@ function SummaryPanel({
 }: {
   t: (en: string, hi: string) => string;
   packageName: string;
+  singleStall: boolean;
   basePerPlate: number;
   categoryAddTotal: number;
   perPlate: number;
@@ -6094,7 +6145,11 @@ function SummaryPanel({
               value={money(basePerPlate)}
             />
             <SummaryRow
-              label={t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")}
+              label={
+                singleStall
+                  ? t("Single Stall menu / plate", "सिंगल स्टॉल मेन्यू / प्लेट")
+                  : t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")
+              }
               value={`+ ${money(categoryAddTotal)}`}
             />
             <SummaryRow

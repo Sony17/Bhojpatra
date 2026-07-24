@@ -1264,6 +1264,10 @@ export interface CategoryItem {
   diet: DietType;
   /** Dish thumbnail (live vendors upload these; seeds have none). */
   photo?: string;
+  /** Per-delicacy price (₹) a Single Stall vendor sets for this dish — shown
+   *  next to the dish in the Single Stall booking flow. Absent on seeds and on
+   *  vendors that don't sell Single Stall (those courses price per-plate only). */
+  price?: number;
 }
 
 export interface CategoryVendor {
@@ -1617,6 +1621,10 @@ export interface VendorListing {
    *  vendors carry their dashboard-declared set; curated seeds omit this and
    *  the catalog derives it via `listingCateringCategories`. */
   serviceCategories?: string[];
+  /** The vendor's signature dishes — exactly four dish names they self-select
+   *  as what they're famous for, shown as tags on the catalog card. Absent /
+   *  empty when the vendor hasn't chosen four. */
+  featured?: string[];
 }
 
 /** Meal / course offerings used for the "Serves" filter on the catalog.

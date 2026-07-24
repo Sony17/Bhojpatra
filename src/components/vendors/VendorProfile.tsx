@@ -207,6 +207,11 @@ export default function VendorProfile({
                       }
                     />
                     {it.name}
+                    {it.price != null && (
+                      <span className="font-semibold text-maroon">
+                        · ₹{inr.format(it.price)}/{t("plate", "प्लेट")}
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>

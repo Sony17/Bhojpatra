@@ -41,6 +41,10 @@ export interface VendorMenuItem {
   diet: DietType;
   /** Same-origin dish photo URL (`/api/vendor/photo/<id>`), owned by the vendor. */
   photo?: string;
+  /** Per-delicacy price (₹) a Single Stall vendor may set for this dish.
+   *  Optional: when absent, the dish falls back to its course per-plate rate.
+   *  Only surfaced in the Single Stall flow. */
+  price?: number;
 }
 
 /** Content moderation for live vendors — a pre-approval model: new/edited menus
@@ -140,6 +144,10 @@ export interface LiveVendorRecord {
   tiers?: VendorTier[];
   moderation?: ModerationStatus;
   menu: VendorMenuSection[];
+  /** The vendor's signature dishes — exactly four dish names (drawn from their
+   *  own visible menu items) they self-select as what they're famous for, shown
+   *  as tags on the catalog card. Absent when they haven't chosen four. */
+  featured?: string[];
   /** Live counters & services the vendor offers, from the platform add-on set. */
   counters?: VendorCounter[];
   /** Catering categories the vendor serves — the same offering types customers
@@ -276,6 +284,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             name: it.name,
             diet: it.diet,
             ...(it.photo ? { photo: it.photo } : {}),
+            ...(it.price != null ? { price: it.price } : {}),
           })),
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
         },
@@ -361,6 +370,16 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     ...(r.serviceCategories?.length
       ? { serviceCategories: r.serviceCategories }
       : {}),
+    // Signature dishes: only surface names that still map to a visible menu
+    // item (a later menu edit could have removed one). Kept in the vendor's
+    // chosen order.
+    ...(r.featured?.length
+      ? {
+          featured: r.featured.filter((name) =>
+            visible.some((s) => s.items.some((it) => it.name === name)),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -401,7 +420,7 @@ export interface PublicVendorProfile {
     nameHi: string;
     icon: string;
     perPlate: number;
-    items: { name: string; diet: DietType; photo?: string }[];
+    items: { name: string; diet: DietType; photo?: string; price?: number }[];
   }[];
   /** Live counters & services the vendor offers, resolved for display. */
   counters: {
@@ -531,6 +550,9 @@ export function toPublicVendorProfile(
 const CATEGORY_IDS = new Set(menuCategories.map((c) => c.id));
 const MAX_SECTIONS = menuCategories.length;
 const MAX_ITEMS_PER_SECTION = 24;
+/** Signature dishes are all-or-nothing: a vendor features exactly this many, or
+ *  none at all (a new vendor with fewer dishes simply skips it). */
+const FEATURED_COUNT = 4;
 const MAX_CUISINES = 12;
 const MAX_BAINA_BOXES = 12;
 const MAX_BOX_CUSTOM_SIZES = 4;
@@ -558,6 +580,8 @@ export interface VendorMenuInput {
   googleRating?: number;
   googleReviews?: number;
   menu: VendorMenuSection[];
+  /** Signature dishes — exactly four visible dish names (or none). */
+  featured?: string[];
   counters?: VendorCounter[];
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
@@ -759,7 +783,16 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
         typeof it.photo === "string" && PHOTO_URL_RE.test(it.photo)
           ? it.photo
           : undefined;
-      items.push({ name, diet, ...(photo ? { photo } : {}) });
+      // Per-delicacy price — kept only when a positive amount is supplied; the
+      // Single-Stall requirement below rejects the save if any visible plated
+      // dish is left without one.
+      const price = cleanMoney(it.price, 100000);
+      items.push({
+        name,
+        diet,
+        ...(photo ? { photo } : {}),
+        ...(price !== null && price > 0 ? { price } : {}),
+      });
     }
     menu.push({
       categoryId,
@@ -767,6 +800,29 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       items,
       ...(s.hidden === true ? { hidden: true } : {}),
     });
+  }
+
+  // Signature dishes — exactly four of the vendor's own dish names (or none).
+  // Each must match a dish in a non-hidden section (i.e. one customers can see);
+  // unknown / duplicate names are dropped, and the chosen order is preserved.
+  const visibleDishNames = new Set(
+    menu.filter((s) => !s.hidden).flatMap((s) => s.items.map((it) => it.name)),
+  );
+  const featured: string[] = [];
+  if (Array.isArray(body.featured)) {
+    const seenFeatured = new Set<string>();
+    for (const raw of body.featured) {
+      const name = cleanString(raw, 60);
+      if (!name || seenFeatured.has(name) || !visibleDishNames.has(name)) continue;
+      seenFeatured.add(name);
+      featured.push(name);
+    }
+  }
+  if (featured.length !== 0 && featured.length !== FEATURED_COUNT) {
+    return {
+      ok: false,
+      error: `Feature exactly ${FEATURED_COUNT} signature dishes from your menu, or none at all.`,
+    };
   }
 
   // Live counters & services — each must be a known platform offering; an
@@ -821,6 +877,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(googleRating ? { googleRating } : {}),
       ...(googleReviews !== undefined ? { googleReviews } : {}),
       menu,
+      ...(featured.length ? { featured } : {}),
       ...(counters.length ? { counters } : {}),
       ...(serviceCategories.length ? { serviceCategories } : {}),
       ...(bainaBoxes.length ? { bainaBoxes } : {}),

@@ -122,9 +122,15 @@ export async function PUT(request: Request) {
       items: s.items.map((it) => {
         if (!it.photo) return it;
         const photoId = photoIdFromUrl(it.photo);
+        // Strip only the disallowed photo — keep the dish's name, diet and any
+        // per-delicacy price.
         return photoId && ownedDishPhotoIds.has(photoId)
           ? it
-          : { name: it.name, diet: it.diet };
+          : {
+              name: it.name,
+              diet: it.diet,
+              ...(it.price != null ? { price: it.price } : {}),
+            };
       }),
     }));
 

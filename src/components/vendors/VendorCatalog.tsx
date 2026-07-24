@@ -1229,6 +1229,23 @@ function VendorCard({
           </div>
         </div>
 
+        {/* Signature dishes — the vendor's four "famous for" tags. */}
+        {vendor.featured && vendor.featured.length > 0 && (
+          <ul
+            className="mt-2 flex flex-wrap gap-1"
+            aria-label={t("Signature dishes", "सिग्नेचर डिश")}
+          >
+            {vendor.featured.map((dish) => (
+              <li
+                key={dish}
+                className="max-w-full truncate rounded-full border border-maroon/15 bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon"
+              >
+                {dish}
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-maroon/8 pt-2.5">
           <p className="min-w-0 font-sans text-[13px] font-semibold text-ink">
             <span className="text-maroon">
