@@ -12,7 +12,7 @@ describe("homeContentData", () => {
   it("reconcile keeps new hero CTA and trust badges from defaults when absent", () => {
     const merged = reconcile({
       hero: { headlineTop: "Custom headline" },
-    });
+    } as unknown as Partial<HomeContent>);
     assert.equal(merged.hero.headlineTop, "Custom headline");
     assert.equal(merged.hero.cta, DEFAULT_HOME_CONTENT.hero.cta);
     assert.equal(merged.hero.trustBadges.length, 4);
@@ -32,7 +32,7 @@ describe("homeContentData", () => {
           },
         ],
       },
-    });
+    } as unknown as Partial<HomeContent>);
     assert.equal(merged.hero.trustBadges.length, 1);
     assert.equal(merged.hero.trustBadges[0].title, "Add Your Feast");
   });

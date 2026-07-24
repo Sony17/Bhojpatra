@@ -213,3 +213,8 @@ export const BAINA_BOX_VENDOR_DATA: Record<string, BainaBoxVendorData> = {
 export function getBainaBoxVendor(slug: string): BainaBoxVendorData | undefined {
   return BAINA_BOX_VENDOR_DATA[slug];
 }
+
+export function getBainaBoxVendorByVendorId(vendorId: string): BainaBoxVendorData | undefined {
+  return Object.values(BAINA_BOX_VENDOR_DATA).find((v) => v.vendorId === vendorId);
+}
+

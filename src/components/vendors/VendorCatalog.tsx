@@ -34,6 +34,7 @@ import {
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
+import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 import {
   AppSearchBar,
   Button,
@@ -954,6 +955,7 @@ export default function VendorCatalog() {
               key={vendor.id}
               vendor={vendor}
               stats={statFor(ratings, vendor)}
+              isBainaSearch={isBainaSearch}
             />
           ))}
         </ul>
@@ -1036,15 +1038,25 @@ function FilterSelect({
 function VendorCard({
   vendor,
   stats,
+  isBainaSearch,
 }: {
   vendor: VendorListing;
   stats?: VendorRatingSummary;
+  isBainaSearch?: boolean;
 }) {
   const { t } = useLang();
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
+
+  const bainaVendorData = isBainaSearch
+    ? getBainaBoxVendorByVendorId(vendor.id)
+    : undefined;
+  const vendorHref = bainaVendorData
+    ? `/baina-box/${bainaVendorData.slug}`
+    : `/vendors/${vendor.id}`;
+
   // "Book" from a brand card starts a Single Stall with this vendor pre-selected
   // (still changeable in the wizard). Live vendors resolve by id; a curated seed
   // id absent from the booking menu simply falls back to the tier picker.
@@ -1160,7 +1172,11 @@ function VendorCard({
         <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1.5">
           {vendor.reviews > 0 || stats ? (
             <Link
-              href={`/vendors/${vendor.id}#reviews`}
+              href={
+                isBainaSearch && bainaVendorData
+                  ? vendorHref
+                  : `/vendors/${vendor.id}#reviews`
+              }
               className="relative z-10 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm"
               aria-label={t(
                 `Rated ${stats?.rating ?? vendor.rating}`,
@@ -1258,7 +1274,7 @@ function VendorCard({
           </p>
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
             <Button
-              href={`/vendors/${vendor.id}`}
+              href={vendorHref}
               variant="ghost"
               size="sm"
               className="min-h-8 px-2.5 text-[11px]"
@@ -1278,7 +1294,7 @@ function VendorCard({
       </div>
 
       <Link
-        href={`/vendors/${vendor.id}`}
+        href={vendorHref}
         aria-label={t(`View ${vendor.name}`, `${vendor.name} देखें`)}
         className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
         tabIndex={-1}
