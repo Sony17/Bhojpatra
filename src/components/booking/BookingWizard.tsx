@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
@@ -1689,8 +1690,18 @@ export default function BookingWizard() {
     buildWhatsAppMessage(),
   )}`;
 
+  const router = useRouter();
+
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const goBack = () => {
+    if (step > 1) {
+      setStep((s) => s - 1);
+    } else if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/vendors");
+    }
+  };
 
   // Menu-step (2) course navigation that spills into wizard steps at the edges:
   // back off the first course returns to Package; past the last advances to the
@@ -2470,7 +2481,6 @@ export default function BookingWizard() {
             <Button
               variant="secondary"
               onClick={goBack}
-              disabled={step === 1}
               aria-label={t("Back", "पीछे")}
             >
               {t("Back", "पीछे")}
@@ -2492,7 +2502,6 @@ export default function BookingWizard() {
                 variant="secondary"
                 size="sm"
                 onClick={goBack}
-                disabled={step === 1}
                 aria-label={t("Back", "पीछे")}
                 className="min-h-11 px-4"
               >
