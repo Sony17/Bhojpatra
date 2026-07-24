@@ -29,11 +29,11 @@ export default function PublicShell({
   mainClassName?: string;
 }) {
   return (
-    <div className={cn("flex min-h-full flex-1 flex-col", className)}>
+    <div className={cn("flex min-h-full flex-1 flex-col w-full min-w-0 max-w-full overflow-x-clip", className)}>
       <Header />
       <main
         className={cn(
-          "app-shell-main flex-1",
+          "app-shell-main flex-1 w-full min-w-0 max-w-full",
           !hero &&
             (detail
               ? "app-page-wash app-detail-page-pad"
