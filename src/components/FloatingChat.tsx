@@ -148,12 +148,8 @@ export default function FloatingChat() {
   const { lang, t } = useLang();
   const compareTray = useCompareTrayState();
   const bookingBar = useBookingBarState();
-  // On mobile the launcher lives at the top-right (see container classes),
-  // clear of the bottom tab bar and every sticky dock — so it needs no lift
-  // there. Only on desktop does it sit bottom-right, where it must clear the
-  // compare tray / booking dock; lift it by whichever is taller. `isDesktop`
-  // gates the lift so a top-anchored mobile launcher is never shoved up into
-  // the header.
+  // Lift the floating chat launcher when a sticky dock (compare tray or booking
+  // bar) is visible so it stays clear of the CTA button on both mobile & desktop.
   const dockLift = Math.max(
     compareTray.visible ? compareTray.height : 0,
     bookingBar.visible ? bookingBar.height : 0,
@@ -353,7 +349,7 @@ export default function FloatingChat() {
               right: "auto",
               bottom: "auto",
             }
-          : isDesktop && dockLift > 0
+          : dockLift > 0
           ? { transform: `translateY(-${dockLift + 8}px)` }
           : undefined
       }
