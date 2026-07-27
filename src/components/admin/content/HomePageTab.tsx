@@ -953,15 +953,23 @@ export default function HomePageTab() {
       {/* ── Promo banner ────────────────────────────────────────────────── */}
       <SectionCard title="Promotional Banner">
         <p className="text-xs text-ink-soft">
-          The offer band under the hero. Upload a wide banner image (headline
-          and artwork baked into the design). The subtitle appears in the lead
-          strip below the banner; heading is used for accessibility.
+          The offer band under the hero. Upload two artworks — a wide banner for
+          desktop and a portrait/square one for mobile (headline and artwork
+          baked into each design). The subtitle appears in the lead strip below
+          the banner; heading is used for accessibility.
         </p>
         <ImageField
-          label="Banner image"
+          label="Desktop banner image"
+          value={draft.promo.imageDesktop}
+          highQuality
+          hint="Wide banner shown on desktop / large screens. Upload a rectangular, high-resolution JPG/PNG (≈1600px+ wide, e.g. 2:1) — it renders full width and is kept crisp. Or paste a URL. Leave empty to reuse the mobile image at half width."
+          onChange={(v) => patch("promo", { imageDesktop: v })}
+        />
+        <ImageField
+          label="Mobile banner image"
           value={draft.promo.image}
           highQuality
-          hint="Full-width banner shown under the hero. Upload a wide, high-resolution JPG/PNG (≈1600px+ wide) — it's kept crisp for large screens. Or paste a URL. Leave empty for the text-only invitation layout."
+          hint="Banner shown on phones. Upload a portrait/square high-resolution JPG/PNG. Or paste a URL. Leave empty for the text-only invitation layout."
           onChange={(v) => patch("promo", { image: v })}
         />
         <TextRow

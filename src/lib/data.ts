@@ -849,7 +849,7 @@ export const partnerOptions: DropdownItem[] = [
     titleHi: "इवेंट प्लानर के रूप में",
     subtitle: "For Refer Business",
     subtitleHi: "बिज़नेस रेफर करने के लिए",
-    href: "/partner",
+    href: "/signup?type=partner&role=planner",
     iconKey: "planner",
   },
   {
@@ -857,15 +857,15 @@ export const partnerOptions: DropdownItem[] = [
     titleHi: "व्यक्ति के रूप में",
     subtitle: "For Refer Business",
     subtitleHi: "बिज़नेस रेफर करने के लिए",
-    href: "/partner",
+    href: "/signup?type=partner&role=individual",
     iconKey: "individual",
   },
   {
     title: "As a Venue Owner",
     titleHi: "वेन्यू मालिक के रूप में",
-    subtitle: "GST No. Required",
-    subtitleHi: "GST नंबर आवश्यक",
-    href: "/partner",
+    subtitle: "List & manage your venues",
+    subtitleHi: "अपने वेन्यू लिस्ट व प्रबंधित करें",
+    href: "/signup?type=partner&role=venue",
     iconKey: "venue",
   },
 ];

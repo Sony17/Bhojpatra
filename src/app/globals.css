@@ -518,6 +518,24 @@ html.header-hidden .app-sticky-chrome {
   );
 }
 
+/* Lead-capture band — a soft cream-on-white gradient so the full-width strip
+   reads warm and premium without any heavy fill. Brand-alpha (cream) over
+   white only; two gentle corner blooms give it quiet depth. */
+.promo-lead-band {
+  background:
+    radial-gradient(
+      75% 120% at 100% 0%,
+      rgba(240, 208, 158, 0.55),
+      transparent 58%
+    ),
+    radial-gradient(
+      65% 120% at 0% 100%,
+      rgba(240, 208, 158, 0.38),
+      transparent 55%
+    ),
+    #ffffff;
+}
+
 /* Promo banner — maroon wash so the lead form sits elegantly on the artwork. */
 .promo-overlay-scrim {
   background: linear-gradient(
@@ -618,6 +636,17 @@ html.header-hidden .app-sticky-chrome {
 @keyframes bp-shimmer {
   to {
     background-position: 200% center;
+  }
+}
+
+/* Gentle rightward nudge — hints the packages carousel swipes sideways. */
+@keyframes bp-swipe-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
   }
 }
 
@@ -767,6 +796,15 @@ html.header-hidden .app-sticky-chrome {
   /* ── Ambient accents ────────────────────────────────────────────── */
   .animate-float {
     animation: bp-float 6s ease-in-out infinite;
+  }
+  /* Swipe hint arrow on the mobile packages carousel. */
+  .animate-swipe-nudge {
+    animation: bp-swipe-nudge 1.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-swipe-nudge {
+      animation: none;
+    }
   }
   .animate-kenburns {
     animation: bp-kenburns 2.4s var(--ease-out-expo) both;

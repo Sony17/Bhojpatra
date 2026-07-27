@@ -96,7 +96,39 @@ export default function AccountsDashboard() {
 
   const name = session.name?.trim();
   const memberships = partnerMemberships(session);
+  // Venue Owner is a distinct function from person-to-person referral, so split
+  // the roles and surface them as separate sections instead of lumping the
+  // venue role under "Referral Partner".
+  const venueMemberships = memberships.filter((m) => m.type === "venue");
+  const referralMemberships = memberships.filter((m) => m.type !== "venue");
   const loading = bookings === null;
+
+  // Identity chips shown under the greeting. The generic "partner" account is
+  // split into role-specific chips so a venue owner reads as "Venue Owner", not
+  // "Referral Partner". A legacy partner with no resolvable roles keeps the
+  // generic chip.
+  const accountChips: { key: string; label: string }[] = [];
+  for (const a of session.accounts) {
+    if (a !== "partner") {
+      accountChips.push({ key: a, label: t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi) });
+      continue;
+    }
+    if (referralMemberships.length > 0) {
+      accountChips.push({
+        key: "partner",
+        label: t(ACCOUNT_LABEL.partner.en, ACCOUNT_LABEL.partner.hi),
+      });
+    }
+    if (venueMemberships.length > 0) {
+      accountChips.push({ key: "venue", label: t("Venue Owner", "वेन्यू मालिक") });
+    }
+    if (referralMemberships.length === 0 && venueMemberships.length === 0) {
+      accountChips.push({
+        key: "partner",
+        label: t(ACCOUNT_LABEL.partner.en, ACCOUNT_LABEL.partner.hi),
+      });
+    }
+  }
 
   // Accounts the person could still add (customer is universal, so never here).
   const addable = (
@@ -138,12 +170,12 @@ export default function AccountsDashboard() {
           )}
         </p>
         <div className="-mx-4 mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar px-4 sm:mx-0 sm:px-0 md:flex-wrap md:overflow-visible">
-          {session.accounts.map((a) => (
+          {accountChips.map((c) => (
             <span
-              key={a}
+              key={c.key}
               className="shrink-0 whitespace-nowrap rounded-full border border-maroon/25 bg-cream px-3 py-1 text-xs font-semibold text-maroon"
             >
-              {t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi)}
+              {c.label}
             </span>
           ))}
         </div>
@@ -212,17 +244,21 @@ export default function AccountsDashboard() {
           </SectionCard>
         )}
 
-        {/* Referral partner — only if held. */}
-        {session.accounts.includes("partner") && (
+        {/* Referral partner — the person-to-person referral roles. Also shown
+            for a legacy partner with no resolvable roles, but never when the
+            only partner role is Venue Owner (that gets its own section below). */}
+        {(referralMemberships.length > 0 ||
+          (session.accounts.includes("partner") &&
+            venueMemberships.length === 0)) && (
           <SectionCard
             title={t("Referral Partner", "रेफ़रल पार्टनर")}
             badge={t(ACCOUNT_LABEL.partner.en, ACCOUNT_LABEL.partner.hi)}
             href={DASHBOARD_PATH.partner}
             cta={t("Open referral dashboard", "रेफ़रल डैशबोर्ड खोलें")}
           >
-            {memberships.length ? (
+            {referralMemberships.length ? (
               <ul className="flex flex-col gap-2.5">
-                {memberships.map((m) => (
+                {referralMemberships.map((m) => (
                   <li
                     key={m.type}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-maroon/10 bg-cream/40 px-4 py-3"
@@ -249,6 +285,49 @@ export default function AccountsDashboard() {
                 )}
               </p>
             )}
+          </SectionCard>
+        )}
+
+        {/* Venue owner — its own function, kept clearly separate from referral.
+            Lists the venue attribution code(s) and opens straight on the venue
+            dashboard (the "My Venue" tab), not the referral views. */}
+        {venueMemberships.length > 0 && (
+          <SectionCard
+            title={t("Venue Owner", "वेन्यू मालिक")}
+            badge={t("Venue Owner", "वेन्यू मालिक")}
+            href="/partner/dashboard?tab=venues"
+            cta={t("Open venue dashboard", "वेन्यू डैशबोर्ड खोलें")}
+          >
+            <p className="text-sm text-ink-soft">
+              {t(
+                "List and manage your venues — every booking made for them is credited to your venue code.",
+                "अपने वेन्यू लिस्ट और प्रबंधित करें — उनके लिए हर बुकिंग आपके वेन्यू कोड में जुड़ती है।",
+              )}
+            </p>
+            <ul className="mt-3 flex flex-col gap-2.5">
+              {venueMemberships.map((m) => (
+                <li
+                  key={m.type}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-maroon/10 bg-cream/40 px-4 py-3"
+                >
+                  <p className="text-sm font-semibold text-ink">
+                    <span aria-hidden="true">🏛 </span>
+                    {t("Venue code", "वेन्यू कोड")}
+                  </p>
+                  <span className="font-display rounded-lg bg-maroon px-3 py-1 text-sm font-bold tracking-wider text-cream">
+                    {m.referralCode}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Button
+              variant="ghost"
+              size="sm"
+              href="/partner/dashboard?tab=venues"
+              className="mt-4"
+            >
+              {t("List / manage your venues", "अपने वेन्यू लिस्ट / प्रबंधित करें")} →
+            </Button>
           </SectionCard>
         )}
 

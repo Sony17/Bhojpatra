@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { cities } from "@/lib/data";
 import {
   staticBookableVenues,
@@ -113,16 +114,19 @@ export default function VenueExplorer() {
         <div className="mx-auto max-w-7xl">
           <div className="max-w-xl px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-maroon">
-              {t("Near you", "आपके पास")}
+              {t("Venues · Event spaces", "वेन्यू · आयोजन स्थल")}
             </p>
             <h1 className="mt-2 text-app-title text-ink">
-              {t("Find a venue", "वेन्यू खोजें")}
+              {t("Book an event venue", "आयोजन वेन्यू बुक करें")}
             </h1>
             <p className="mt-2 text-body text-ink/55">
               {t(
-                "Banquet halls, lawns & resorts — filter by city.",
-                "बैंक्वेट हॉल, लॉन और रिज़ॉर्ट — शहर से फ़िल्टर करें।",
+                "Bookable banquet halls, lawns & resorts — filter by city. Looking for food instead? ",
+                "बुक करने योग्य बैंक्वेट हॉल, लॉन और रिज़ॉर्ट — शहर से फ़िल्टर करें। खाना खोज रहे हैं? ",
               )}
+              <Link href="/vendors" className="font-semibold text-maroon hover:underline">
+                {t("Browse caterers", "कैटरर्स ब्राउज़ करें")}
+              </Link>
             </p>
           </div>
 
@@ -272,6 +276,12 @@ function VenueListing({
       priority={priority}
       badges={
         <>
+          {/* Explicit "Venue" tag so customers never mistake an event space for
+              a caterer/food brand — the venue type stays as a secondary chip. */}
+          <ListingBadge tone="solid">
+            <span aria-hidden>🏛 </span>
+            {t("Venue", "वेन्यू")}
+          </ListingBadge>
           <ListingBadge tone="soft">{typeLabel}</ListingBadge>
           <ListingBadge tone="solid">
             {rating}

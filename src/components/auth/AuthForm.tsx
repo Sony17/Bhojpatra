@@ -323,15 +323,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                 "Next, complete your business profile and KYC to start receiving bookings.",
                 "आगे, बुकिंग प्राप्त करना शुरू करने के लिए अपनी बिज़नेस प्रोफ़ाइल और केवाईसी पूरी करें।"
               )
-            : isPartner
+            : isVenuePartner
               ? t(
-                  "Share your referral code below. Every feast booked with it is tagged to you.",
-                  "नीचे दिया अपना रेफ़रल कोड साझा करें। इससे बुक हुआ हर भोज आपके नाम टैग होगा।"
+                  "Next, list your venue so customers can find, book and pay for it on Bhojpatra.",
+                  "आगे, अपना वेन्यू लिस्ट करें ताकि ग्राहक इसे Bhojpatra पर खोज, बुक और भुगतान कर सकें।"
                 )
-              : t(
-                  "You're all set to book your next feast.",
-                  "आप अपना अगला भोज बुक करने के लिए तैयार हैं।"
-                )}
+              : isPartner
+                ? t(
+                    "Share your referral code below. Every feast booked with it is tagged to you.",
+                    "नीचे दिया अपना रेफ़रल कोड साझा करें। इससे बुक हुआ हर भोज आपके नाम टैग होगा।"
+                  )
+                : t(
+                    "You're all set to book your next feast.",
+                    "आप अपना अगला भोज बुक करने के लिए तैयार हैं।"
+                  )}
         </p>
 
         <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-cream-2 px-4 py-2 text-sm text-ink">
@@ -357,12 +362,23 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          <Button href={MERGED_DASHBOARD_PATH} size="lg" fullWidth>
-            {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
-          </Button>
+          {isVenuePartner ? (
+            <Button href="/partner/dashboard?tab=venues" size="lg" fullWidth>
+              {t("List your venue", "अपना वेन्यू लिस्ट करें")}
+            </Button>
+          ) : (
+            <Button href={MERGED_DASHBOARD_PATH} size="lg" fullWidth>
+              {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
+            </Button>
+          )}
           {isVendor && (
             <Button href="/vendor/register" variant="secondary" size="lg" fullWidth>
               {t("Complete Vendor Registration", "वेंडर रजिस्ट्रेशन पूरा करें")}
+            </Button>
+          )}
+          {isVenuePartner && (
+            <Button href={MERGED_DASHBOARD_PATH} variant="secondary" size="lg" fullWidth>
+              {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
             </Button>
           )}
           <Button href="/login" variant="secondary" size="lg" fullWidth>

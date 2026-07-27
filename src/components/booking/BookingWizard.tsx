@@ -809,15 +809,36 @@ export default function BookingWizard() {
     if (!pendingVendorId) return;
     const preset: VendorMap = {};
     let tiers: VendorTier[] = [];
+    const hitCats: string[] = [];
     for (const cat of liveMenuCategories) {
       const v = cat.vendors.find((x) => x.id === pendingVendorId);
       if (!v) continue;
       preset[cat.id] = [pendingVendorId];
+      hitCats.push(cat.id);
       if (v.tiers?.length) tiers = v.tiers as VendorTier[];
     }
     if (Object.keys(preset).length === 0) return; // not loaded yet, or unknown id
     setCategoryVendor((m) => ({ ...preset, ...m }));
     setStallTier((cur) => cur || sortTiers(tiers)[0] || "Gold");
+    // Land the guest on the step/tab that actually holds this vendor's course.
+    // The hand-off opens the plated Menu step (2) by default, but a beverage /
+    // chaat brand may publish only on a live-station course, which lives on the
+    // Live Stall step (3). Without this jump the pre-selected stall sits on a
+    // step the guest never sees — reading as "my vendor vanished". A vendor that
+    // spans both keeps the default plated landing. Indexing follows the custom
+    // course order (each step's tab list mirrors it); liveCat self-clamps.
+    const courses = packageCategories.custom ?? [];
+    const plated = courses.filter((id) => !isLiveStallCategory(id));
+    const live = courses.filter((id) => isLiveStallCategory(id));
+    const platedHit = hitCats.find((id) => plated.includes(id));
+    const liveHit = hitCats.find((id) => live.includes(id));
+    if (platedHit) {
+      setActiveCat(Math.max(0, plated.indexOf(platedHit)));
+      setStep(2);
+    } else if (liveHit) {
+      setLiveCat(Math.max(0, live.indexOf(liveHit)));
+      setStep(3);
+    }
     setPendingVendorId("");
   }, [liveMenuCategories, pendingVendorId]);
 
@@ -2024,7 +2045,7 @@ export default function BookingWizard() {
   // builders reorder it below the builder on mobile (see the grid below) so a
   // guest can start picking dishes right away. `flush` drops its top margin when
   // the grid gap already supplies the spacing.
-  const renderEventBar = (flush = false) => (
+  const renderEventBar = (flush = false, mobileCollapse = false) => (
     <EventBar
       lang={lang}
       t={t}
@@ -2058,14 +2079,19 @@ export default function BookingWizard() {
       flush={flush}
       // The reordered mobile layout (Menu / Live Stall steps, where `flush` is
       // set) collapses the brief to a one-line summary to keep this section tight.
-      collapsible={flush}
+      // `mobileCollapse` extends that one-line chip to the other steps, but only
+      // on phones (< sm) — tablet / desktop keep the full editable card.
+      collapsible={flush || mobileCollapse}
+      collapseAt={mobileCollapse ? "sm" : "lg"}
     />
   );
 
   return (
     <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
-      {/* A rich editorial opening gives the utility-heavy flow a premium moment. */}
-      <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
+      {/* A rich editorial opening gives the utility-heavy flow a premium moment.
+          Phones drop the tall hero entirely for a minimal, low-scroll flow — it
+          returns untouched at sm+ (tablet / desktop). */}
+      <div className="relative isolate hidden overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:block sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
         {/* Feast photo backdrop, dimmed and flooded maroon so the white
             headline stays legible and the brand red still reads dominant. */}
         <Image
@@ -2124,28 +2150,56 @@ export default function BookingWizard() {
           they're picking now and what comes after. Hidden on the confirmed
           success screen. */}
       {!confirmed && (
-        <div className="app-sticky-chrome relative z-20 mx-2 -mt-3 rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:rounded-2xl sm:px-6 sm:py-5 lg:mx-8">
-          <Stepper current={step - 1} steps={stepLabels} />
-          <p className="mt-2 text-[12px] text-ink/55 sm:mt-3 sm:text-sm sm:text-ink-soft">
-            {t(
-              `Step ${step} of ${TOTAL_STEPS}`,
-              `चरण ${step} / ${TOTAL_STEPS}`,
-            )}{" "}
-            ·{" "}
-            <span className="font-semibold text-maroon">{stepLabels[step - 1]}</span>
-            {nextStepLabel && (
-              <>
-                {" "}
-                <span className="hidden text-ink-soft/70 sm:inline">
-                  {t("· Next: ", "· आगे: ")}
-                </span>
-                <span className="hidden font-semibold text-ink sm:inline">
+        <>
+          {/* Phones — a slim, non-sticky progress bar + "Step X of Y · Label".
+              (The shared sticky chrome is desktop-only via sm:static, and its
+              sticky offset — meant to sit under a hero that phones no longer
+              show — would otherwise cover the event chip below.) */}
+          <div className="mx-2 -mt-6 rounded-card border border-cream bg-white px-4 py-2.5 shadow-soft sm:hidden">
+            <div className="flex items-baseline justify-between gap-3 text-[12px] font-semibold">
+              <span className="text-maroon">
+                {t(`Step ${step} of ${TOTAL_STEPS}`, `चरण ${step} / ${TOTAL_STEPS}`)}
+                {" · "}
+                <span className="text-ink">{stepLabels[step - 1]}</span>
+              </span>
+              {nextStepLabel && (
+                <span className="shrink-0 text-[11px] font-medium text-ink/45">
+                  {t("Next: ", "आगे: ")}
                   {nextStepLabel}
                 </span>
-              </>
-            )}
-          </p>
-        </div>
+              )}
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-cream">
+              <div
+                className="h-full rounded-full bg-maroon transition-all duration-300"
+                style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+              />
+            </div>
+          </div>
+          {/* Tablet / desktop — unchanged full stepper. */}
+          <div className="app-sticky-chrome relative z-20 mx-2 -mt-3 hidden rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:block sm:rounded-2xl sm:px-6 sm:py-5 lg:mx-8">
+            <Stepper current={step - 1} steps={stepLabels} />
+            <p className="mt-2 text-[12px] text-ink/55 sm:mt-3 sm:text-sm sm:text-ink-soft">
+              {t(
+                `Step ${step} of ${TOTAL_STEPS}`,
+                `चरण ${step} / ${TOTAL_STEPS}`,
+              )}{" "}
+              ·{" "}
+              <span className="font-semibold text-maroon">{stepLabels[step - 1]}</span>
+              {nextStepLabel && (
+                <>
+                  {" "}
+                  <span className="hidden text-ink-soft/70 sm:inline">
+                    {t("· Next: ", "· आगे: ")}
+                  </span>
+                  <span className="hidden font-semibold text-ink sm:inline">
+                    {nextStepLabel}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </>
       )}
 
       {/* Layout */}
@@ -2270,8 +2324,9 @@ export default function BookingWizard() {
       ) : (
       <>
       {/* Event brief sits up top on these steps (Package / Add-ons / Essentials /
-          Review) — no reordering needed. */}
-      {renderEventBar()}
+          Review) — no reordering needed. On phones it collapses to a one-line
+          editable chip (mobileCollapse) so the step content leads. */}
+      {renderEventBar(false, true)}
       <div
         className={
           showSummary
@@ -2347,6 +2402,7 @@ export default function BookingWizard() {
               city={resolveCity(cityId)}
               venue={venue}
               setVenue={setVenue}
+              venueFee={venueFee}
               guests={guests}
               categories={activeCategories}
               categoryVendor={categoryVendor}
@@ -2866,6 +2922,7 @@ function EventBar({
   showGuests = true,
   flush = false,
   collapsible = false,
+  collapseAt = "lg",
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -2901,6 +2958,10 @@ function EventBar({
   /** On mobile only, collapse to a one-line summary (all values shown inline)
    *  that expands on tap. Desktop always renders the full editable card. */
   collapsible?: boolean;
+  /** Breakpoint above which the full editable card is always shown. `"lg"` (the
+   *  default) collapses on phones + small tablets; `"sm"` collapses on phones
+   *  only, leaving every larger view (tablet / desktop) exactly as-is. */
+  collapseAt?: "sm" | "lg";
 }) {
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
@@ -3018,7 +3079,10 @@ function EventBar({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center justify-between gap-3 text-left lg:hidden"
+          className={
+            "flex w-full items-center justify-between gap-3 text-left " +
+            (collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
+          }
         >
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
@@ -3048,7 +3112,11 @@ function EventBar({
       <div
         className={
           "flex items-center justify-between gap-4 " +
-          (collapsible ? "hidden lg:flex" : "")
+          (collapsible
+            ? collapseAt === "sm"
+              ? "hidden sm:flex"
+              : "hidden lg:flex"
+            : "")
         }
       >
         <div className="flex min-w-0 items-baseline gap-2">
@@ -3075,7 +3143,11 @@ function EventBar({
           (showGuests
             ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr_0.85fr] "
             : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
-          (collapsible && !open ? "hidden lg:grid" : "")
+          (collapsible && !open
+            ? collapseAt === "sm"
+              ? "hidden sm:grid"
+              : "hidden lg:grid"
+            : "")
         }
       >
         <label className="block">
@@ -3423,9 +3495,11 @@ function StepPackage({
           column instead of stranding an empty half beside it. */}
       <div
         className={
+          // Phones stack the tiers vertically (all four visible on one scroll,
+          // no sideways swipe); sm+ restores the original snap-carousel → grid.
           // pt keeps the Popular/Premium ribbons (which float above the cards)
           // clear of the availability notice above the grid.
-          "no-scrollbar -mx-3 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-3 pb-5 pt-7 sm:mx-0 sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
+          "no-scrollbar flex flex-col gap-3 pb-1 pt-7 sm:mx-0 sm:flex-row sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
           (tiers.length === 1
             ? "sm:grid-cols-1"
             : tiers.length === 2
@@ -3441,7 +3515,7 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="relative flex w-[82vw] max-w-[360px] shrink-0 snap-center flex-col first:snap-start sm:w-auto sm:max-w-none sm:shrink"
+              className="relative flex w-full flex-col sm:w-auto sm:max-w-none sm:shrink"
             >
             {tooSoon ? (
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
@@ -3717,17 +3791,46 @@ function StepMenu({
   // lifts the cap on demand, and an active search scans the *full* roster so the
   // cap never hides a match.
   const VENDOR_CAP = maxVendors ?? 5;
+  // The guest's picked vendor(s) for this course — floated to the very front of
+  // the roster so a pre-selected stall (deep-linked "Book this caterer") or a
+  // just-picked one always leads and is never capped out behind "Explore more".
+  const selectedIds = categoryVendor[cat.id] ?? [];
+  const isSelectedVendor = (v: MenuCategory["vendors"][number]) =>
+    selectedIds.includes(v.id);
+  const floatSelected = (list: MenuCategory["vendors"]) => [
+    ...list.filter(isSelectedVendor),
+    ...list.filter((v) => !isSelectedVendor(v)),
+  ];
   const pinnedVendors = cat.vendors.filter((v) => v.pinned);
   const seedVendors = cat.vendors.filter((v) => !v.live && !v.pinned);
   const liveVendors = cat.vendors.filter((v) => v.live && !v.pinned);
-  // Full roster in display order — pinned, then seed, then live.
-  const orderedVendors = [...pinnedVendors, ...seedVendors, ...liveVendors];
+  // Full roster in display order — picked first, then pinned, seed, live.
+  const orderedVendors = floatSelected([
+    ...pinnedVendors,
+    ...seedVendors,
+    ...liveVendors,
+  ]);
   const seedSlots = Math.max(0, VENDOR_CAP - pinnedVendors.length);
-  const hiddenVendorCount = Math.max(0, seedVendors.length - seedSlots);
-  // Collapsed view: the leading shortlist. Expanded: the whole roster.
+  // Collapsed view: the leading shortlist — but any selected vendor is always
+  // pulled in (never hidden by the cap) and floated to the front.
+  const shortlist = [
+    ...pinnedVendors,
+    ...seedVendors.slice(0, seedSlots),
+    ...liveVendors,
+  ];
   const cappedVendors = showAllVendors
     ? orderedVendors
-    : [...pinnedVendors, ...seedVendors.slice(0, seedSlots), ...liveVendors];
+    : floatSelected([
+        ...shortlist,
+        ...cat.vendors.filter(
+          (v) => isSelectedVendor(v) && !shortlist.includes(v),
+        ),
+      ]);
+  // Whatever the collapsed view omits is exactly what "Explore more" reveals.
+  const hiddenVendorCount = Math.max(
+    0,
+    orderedVendors.length - cappedVendors.length,
+  );
   // Offer the filter only when the full roster runs past five — a short
   // shortlist scans faster by eye than by typing.
   const searchable = orderedVendors.length > 5;
@@ -3762,7 +3865,6 @@ function StepMenu({
   );
   const allowance = allowanceFor(cat.id); // effective total (scaled per vendor)
   const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
-  const selectedIds = categoryVendor[cat.id] ?? [];
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
   const picks = itemsFor(cat.id);
   // Whether this package lets a guest pick more than one dish in at least one
@@ -5156,6 +5258,7 @@ function StepConfirm({
   city,
   venue,
   setVenue,
+  venueFee,
   guests,
   categories,
   categoryVendor,
@@ -5210,6 +5313,7 @@ function StepConfirm({
   city: City | undefined;
   venue: string;
   setVenue: (v: string) => void;
+  venueFee: number;
   guests: number;
   categories: MenuCategory[];
   categoryVendor: VendorMap;
@@ -5632,9 +5736,20 @@ function StepConfirm({
               catalogue, but editable here so it's captured even when the guest
               reached the wizard without one. Spans the full row. */}
           <div className="sm:col-span-2">
-            <label className="text-xs font-medium text-ink-soft">
-              {t("Venue", "वेन्यू")}
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-medium text-ink-soft">
+                {t("Venue", "वेन्यू")}
+              </label>
+              {/* A catalogue venue (booked from /venues) carries a fee — flag it
+                  explicitly so the customer can tell a listed Bhojpatra venue
+                  apart from a free-typed hall name. */}
+              {venueFee > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-[11px] font-semibold text-cream">
+                  <span aria-hidden>🏛</span>{" "}
+                  {t("Listed venue", "लिस्टेड वेन्यू")} · {money(venueFee)}
+                </span>
+              )}
+            </div>
             <input
               type="text"
               value={venue}
@@ -5645,6 +5760,14 @@ function StepConfirm({
               )}
               className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
             />
+            {venueFee > 0 && (
+              <p className="mt-1 text-[11px] text-ink-soft">
+                {t(
+                  "A listed Bhojpatra venue — its booking fee is included in your total below.",
+                  "एक लिस्टेड Bhojpatra वेन्यू — इसका बुकिंग शुल्क नीचे आपके कुल में शामिल है।",
+                )}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -6308,7 +6431,7 @@ function SummaryPanel({
             )}
             {venueFee > 0 && (
               <SummaryRow
-                label={`${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
+                label={`🏛 ${t("Venue", "वेन्यू")}${venueName ? ` · ${venueName}` : ""}`}
                 value={money(venueFee)}
               />
             )}

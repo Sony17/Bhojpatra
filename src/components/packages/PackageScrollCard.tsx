@@ -24,8 +24,15 @@ const SCROLL_RATIO = "458 / 545";
  * positioned inside this box; nudge these if text crowds the frame. The
  * horizontal insets keep text clear of the maroon border and the right-hand
  * roll; the vertical insets clear the top lace band and bottom roll.
+ *
+ * On desktop (sm+) the box reaches a little further down the parchment so the
+ * whole menu fits without an inner scrollbar — the cards there are large enough
+ * that the extra rows still clear the bottom roll. Mobile keeps the tighter box
+ * (its longer footnotes would otherwise crowd the fold-mounted CTA) and its
+ * inner scroll as a fallback.
  */
-const PARCHMENT = "left-[13%] right-[21%] top-[16%] bottom-[19%]";
+const PARCHMENT =
+  "left-[13%] right-[21%] top-[16%] bottom-[19%] sm:top-[15%] sm:bottom-[14%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
@@ -312,11 +319,13 @@ export default function PackageScrollCard({
             </p>
           )}
 
-          {/* Entire menu — every course and item written out. Scrolls within
-              the parchment only if a very long tier overflows the frame.
+          {/* Entire menu — every course and item written out. On desktop the
+              enlarged parchment fits the whole menu, so it flows without an
+              inner scrollbar; mobile's compact cards keep the scroll as a
+              fallback for a very long tier.
               pl-1 gives the rotated rhombus markers room — their corners
               poke ~2px past their box and were being clipped flat. */}
-          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pl-1 pr-1">
+          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pl-1 pr-1 sm:flex-none sm:overflow-visible">
             {segments.map((seg) => {
               if (seg.type === "item") {
                 const label =
@@ -324,7 +333,7 @@ export default function PackageScrollCard({
                 return (
                   <li
                     key={seg.index}
-                    className="flex items-start gap-2 border-b border-maroon/10 py-1 text-left text-[13px] leading-tight text-ink last:border-b-0"
+                    className="flex items-start gap-2 border-b border-maroon/10 py-1 text-left text-[13px] leading-tight text-ink last:border-b-0 sm:py-0.5"
                   >
                     <RhombusMarker />
                     <span>{label}</span>
@@ -339,7 +348,7 @@ export default function PackageScrollCard({
               return (
                 <li
                   key={seg.index}
-                  className="border-b border-maroon/10 py-1 last:border-b-0"
+                  className="border-b border-maroon/10 py-1 last:border-b-0 sm:py-0.5"
                 >
                   {/* Course header — click to reveal its items; kept collapsed
                       by default so the scroll stays clean. Stops propagation so

@@ -1,19 +1,21 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Image from "next/image";
 import { useLang } from "@/lib/i18n";
-import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
+import { useHomeContent } from "@/lib/homeContent";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
-import { Mail, Phone } from "@/components/icons";
 import { Button, useToast } from "@/components/ui";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
 /**
- * Promo under the hero — banner art and lead capture as two separate strips.
- * No scroll-reveal — keeps the hero → promo handoff continuous.
+ * Lead-capture band at the foot of the home funnel (after testimonials).
+ * The offer banner art lives up top in PromoBanner (below the hero).
+ *
+ * A full-width, minimal band on a soft cream-on-white gradient: a line of copy,
+ * two slim fields and a single primary CTA, with a quiet WhatsApp "share the
+ * offer" action alongside for word-of-mouth promotion.
  */
 export default function PromoLeadCapture() {
   const { lang, t } = useLang();
@@ -24,7 +26,7 @@ export default function PromoLeadCapture() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
-  const hasImage = Boolean(promo.image);
+  const hasImage = Boolean(promo.image || promo.imageDesktop);
   const heading = lang === "hi" ? promo.headingHi : promo.heading;
   const subtitle = lang === "hi" ? promo.subtitleHi : promo.subtitle;
   const promoLine = `${heading} — ${subtitle}`;
@@ -69,9 +71,7 @@ export default function PromoLeadCapture() {
       }
 
       setStatus("success");
-      setMessage(
-        t("You're on the list!", "आप लिस्ट में शामिल हो गए!"),
-      );
+      setMessage(t("You're on the list!", "आप लिस्ट में शामिल हो गए!"));
       setEmail("");
       setPhone("");
     } catch {
@@ -85,138 +85,97 @@ export default function PromoLeadCapture() {
     }
   }
 
-  const leadForm =
-    status === "success" ? (
-      <p
-        role="status"
-        className="rounded-control border border-cream/40 bg-cream px-3 py-2 text-center text-xs font-semibold text-maroon shadow-card"
-      >
-        {message}
-      </p>
-    ) : (
-      <form
-        onSubmit={handleSubmit}
-        noValidate
-        className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] sm:items-stretch sm:gap-2"
-      >
-        <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2.5 py-1.5 transition focus-within:border-cream">
-          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
-            <Mail className="h-3 w-3" />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col justify-center gap-0">
-            <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
-            <input
-              type="email"
-              name="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder={t("Email", "ईमेल")}
-              autoComplete="email"
-              className="w-full min-w-0 bg-transparent text-xs leading-tight text-ink outline-none placeholder:text-ink/50"
-            />
-          </span>
-        </label>
-
-        <label className="focus-within:shadow-brand flex min-h-10 min-w-0 items-center gap-1.5 rounded-control border border-cream/50 bg-white px-2.5 py-1.5 transition focus-within:border-cream">
-          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cream text-maroon">
-            <Phone className="h-3 w-3" />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col justify-center gap-0">
-            <span className="sr-only">{t("Mobile Number", "मोबाइल नंबर")}</span>
-            <input
-              type="tel"
-              name="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              placeholder={t("Mobile", "मोबाइल")}
-              autoComplete="tel"
-              inputMode="numeric"
-              className="w-full min-w-0 bg-transparent text-xs leading-tight text-ink outline-none placeholder:text-ink/50"
-            />
-          </span>
-        </label>
-
-        <div className="flex items-stretch gap-2 sm:col-span-1 sm:contents">
-          <Button
-            type="submit"
-            variant="inverse"
-            size="sm"
-            loading={status === "submitting"}
-            className="min-h-10 min-w-0 flex-1 px-3 sm:w-auto sm:flex-none sm:px-5"
-          >
-            {status === "submitting"
-              ? t("…", "…")
-              : t("Notify Me", "सूचित करें")}
-          </Button>
-          <WhatsAppShareButton
-            path="/#offers"
-            message={promoLine}
-            messageHi={promoLine}
-            label=""
-            labelHi=""
-            variant="inverse"
-            size="sm"
-            className="min-h-10 shrink-0 px-3"
-          />
-        </div>
-      </form>
-    );
+  const inputClass =
+    "min-h-11 w-full rounded-control border border-maroon/20 bg-white px-4 text-sm text-ink outline-none transition placeholder:text-ink/40 focus:border-maroon";
 
   return (
-    <>
-      {/* ── 1. Promo banner (art only) ───────────────────────────────────── */}
-      {hasImage && (
-        <section id="offers" aria-label="Promotional offers" className="bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-            <div className="relative aspect-[2/1] overflow-hidden rounded-card bg-cream shadow-pop ring-1 ring-maroon/10 sm:aspect-[2.54/1]">
-              <Image
-                src={promo.image}
-                alt={heading}
-                fill
-                sizes="(min-width: 1280px) 1280px, calc(100vw - 32px)"
-                className="object-cover object-center"
-                unoptimized={isUnoptimized(promo.image)}
-                priority
-              />
-            </div>
+    <section
+      id={hasImage ? "notify" : "offers"}
+      aria-label={t("Get notified", "सूचित रहें")}
+      className="promo-lead-band border-y border-maroon/10"
+    >
+      <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 sm:py-11 lg:px-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-14">
+          <div className="min-w-0 lg:w-1/3 lg:shrink-0">
+            <h2 className="font-display text-2xl leading-tight text-maroon sm:text-3xl">
+              {heading}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink/70 sm:text-base">
+              {subtitle}
+            </p>
           </div>
-        </section>
-      )}
 
-      {/* ── 2. Lead capture (separate strip) ─────────────────────────────── */}
-      <section
-        id={hasImage ? "notify" : "offers"}
-        aria-label={t("Get notified", "सूचित रहें")}
-        className="bg-white"
-      >
-        <div
-          className={
-            hasImage
-              ? "mx-auto max-w-7xl px-4 pb-3 sm:px-6 sm:pb-4 lg:px-8"
-              : "mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8"
-          }
-        >
-          <div className="overflow-hidden rounded-card bg-maroon shadow-card">
-            <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-5 sm:px-6 sm:py-3.5">
-              <div className="min-w-0 shrink sm:max-w-xs lg:max-w-sm">
-                <p className="eyebrow text-[9px] font-semibold tracking-[0.2em] text-cream/70">
-                  {t("Offer", "ऑफर")}
-                </p>
-                <h2 className="font-display mt-0.5 text-base leading-snug text-cream sm:truncate sm:text-lg">
-                  {heading}
-                </h2>
-                <p className="mt-0.5 text-xs text-cream/70 sm:line-clamp-1">
-                  {subtitle}
-                </p>
-              </div>
+          <div className="min-w-0 lg:flex-1">
+            {status === "success" ? (
+              <p
+                role="status"
+                className="rounded-control border border-maroon/25 bg-white px-4 py-3 text-sm font-medium text-maroon shadow-soft"
+              >
+                {message}
+              </p>
+            ) : (
+              <form
+                onSubmit={handleSubmit}
+                noValidate
+                className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center"
+              >
+                <label className="w-full sm:min-w-[9rem] sm:flex-1">
+                  <span className="sr-only">{t("Email Address", "ईमेल पता")}</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder={t("Email", "ईमेल")}
+                    autoComplete="email"
+                    className={inputClass}
+                  />
+                </label>
 
-              <div className="min-w-0 flex-1">{leadForm}</div>
-            </div>
+                <label className="w-full sm:min-w-[9rem] sm:flex-1">
+                  <span className="sr-only">
+                    {t("Mobile Number", "मोबाइल नंबर")}
+                  </span>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    placeholder={t("Mobile", "मोबाइल")}
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    className={inputClass}
+                  />
+                </label>
+
+                <div className="flex gap-2.5 sm:contents">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    loading={status === "submitting"}
+                    className="flex-1 sm:w-auto sm:flex-none"
+                  >
+                    {t("Notify Me", "सूचित करें")}
+                  </Button>
+                  <WhatsAppShareButton
+                    path="/#offers"
+                    message={promoLine}
+                    messageHi={promoLine}
+                    label="Share"
+                    labelHi="साझा करें"
+                    variant="secondary"
+                    size="md"
+                    className="flex-1 sm:w-auto sm:flex-none"
+                  />
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

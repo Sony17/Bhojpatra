@@ -19,21 +19,65 @@ export default function Packages() {
     "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
   );
   const waLink = `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(waText)}`;
-  // Only the three headline tiers are shown here — Custom lives in the booking flow.
+  // The three headline tiers ride the patra scrolls; Single Stall (the "custom"
+  // tier) is surfaced separately, below the grid, as a premium banner — its full
+  // build-your-own flow still lives in /book.
   // Admin-editable name / price (from the home-content store) override the
   // seed values; the menu structure stays sourced from `data.ts`.
-  const tiers = packages
-    .filter((p) => p.id !== "custom")
-    .map((p) => {
-      const meta = homePackages.tiers.find((x) => x.id === p.id);
-      return meta
-        ? { ...p, name: meta.name, nameHi: meta.nameHi, price: meta.price }
-        : p;
-    });
+  const applyMeta = (p: (typeof packages)[number]) => {
+    const meta = homePackages.tiers.find((x) => x.id === p.id);
+    return meta
+      ? { ...p, name: meta.name, nameHi: meta.nameHi, price: meta.price }
+      : p;
+  };
+  const tiers = packages.filter((p) => p.id !== "custom").map(applyMeta);
+  const singleStall = (() => {
+    const raw = packages.find((p) => p.id === "custom");
+    return raw ? applyMeta(raw) : null;
+  })();
   // Pre-select the popular tier so a highlight is visible by default.
   const [selectedId, setSelectedId] = useState<string>(
     tiers.find((p) => p.popular)?.id ?? tiers[0].id,
   );
+
+  // Depth of a tier within the stack: 0 = selected (front), 1 & 2 = the other
+  // two fanned behind it in their natural order. STACK maps each depth to the
+  // transform / opacity / z-index that lifts the front card and dims the rest.
+  const depthOf = (id: string) => {
+    if (id === selectedId) return 0;
+    const rest = tiers.filter((tp) => tp.id !== selectedId);
+    return rest.findIndex((tp) => tp.id === id) + 1;
+  };
+
+  // One tier scroll + its "Book" fold CTA — shared by the mobile stacked deck
+  // and the desktop side-by-side grid so both render an identical card.
+  const renderCard = (tier: (typeof tiers)[number], isSelected: boolean) => {
+    const tierName = lang === "hi" ? tier.nameHi : tier.name;
+    return (
+      <PackageScrollCard
+        tier={tier}
+        selected={isSelected}
+        onSelect={() => setSelectedId(tier.id)}
+        priority={tier.popular}
+        ctaOnFold
+        cta={
+          <Link
+            href={`/book?package=${tier.id}&step=menu`}
+            onClick={() => setSelectedId(tier.id)}
+            aria-label={`${t("Book", "बुक करें")} ${tierName}`}
+            className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
+          >
+            <span className="font-display leading-none">
+              {t("Book", "बुक करें")} {tierName}
+            </span>
+            <span aria-hidden="true" className="text-sm leading-none">
+              →
+            </span>
+          </Link>
+        }
+      />
+    );
+  };
 
   return (
     <section
@@ -49,51 +93,182 @@ export default function Packages() {
             {lang === "hi" ? homePackages.subtitleHi : homePackages.subtitle}
           </p>
           <Ornament className="mx-auto mt-6 text-maroon/50" />
+          {/* Cue that the three tiers are a stack you switch between — only the
+              mobile deck stacks, so this hint is hidden once the desktop grid
+              lays all three out side by side. */}
+          <p className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-maroon/25 bg-cream/50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon sm:hidden">
+            {t("Tap a tier to bring it forward", "आगे लाने के लिए टियर चुनें")}
+          </p>
         </Reveal>
 
-        {/* Mobile: one row, swipe left–right with snap (no-scrollbar hides the
-            bar; pt makes room for the ribbons, which sit above the cards and
-            would otherwise be clipped by the scroll box). sm+: the grid. */}
-        <Reveal
-          stagger
-          from="right"
-          className="no-scrollbar -mx-5 mt-12 flex snap-x snap-mandatory items-stretch gap-5 overflow-x-auto px-5 pb-6 pt-7 sm:mx-auto sm:mt-14 sm:grid sm:max-w-7xl sm:snap-none sm:grid-cols-2 sm:gap-7 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-0 lg:grid-cols-3"
-        >
+        {/* ── Tier selector — three buttons (Silver / Gold / Platinum) in a
+            cream segmented control. Tapping one lifts that scroll to the front
+            of the stack below. Mobile only — the desktop grid shows every tier
+            at once, so no selector is needed there. ── */}
+        <Reveal className="mx-auto mt-12 flex max-w-md items-stretch justify-center gap-1.5 rounded-full border border-maroon/20 bg-cream/40 p-1.5 shadow-card sm:hidden">
           {tiers.map((tier) => {
-            const selected = tier.id === selectedId;
+            const active = tier.id === selectedId;
             const tierName = lang === "hi" ? tier.nameHi : tier.name;
             return (
-              <div
+              <button
                 key={tier.id}
-                className="w-[88vw] max-w-[390px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelectedId(tier.id)}
+                className={[
+                  "flex-1 rounded-full px-4 py-2.5 text-sm tracking-wide transition-all duration-300",
+                  active
+                    ? "bg-maroon text-cream shadow-card"
+                    : "text-maroon hover:bg-cream/70 active:scale-95",
+                ].join(" ")}
               >
-              <PackageScrollCard
-                tier={tier}
-                selected={selected}
-                onSelect={() => setSelectedId(tier.id)}
-                ctaOnFold
-                cta={
-                  <Link
-                    href={`/book?package=${tier.id}&step=menu`}
-                    onClick={() => setSelectedId(tier.id)}
-                    aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-                    className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
-                  >
-                    <span className="font-display leading-none">
-                      {t("Book", "बुक करें")} {tierName}
-                    </span>
-                    <span aria-hidden="true" className="text-sm leading-none">
-                      →
-                    </span>
-                  </Link>
-                }
-              />
-              </div>
+                <span className="font-display leading-none">{tierName}</span>
+              </button>
             );
           })}
         </Reveal>
 
-        {/* Curated-package option — when no tier fits, reach out on WhatsApp. */}
+        {/* ── Mobile stacked scrolls — every tier occupies the same spot; the
+            selected one sits at the front while the other two fan behind it,
+            dimmed and scaled back. Selecting a button smoothly lifts its scroll
+            forward. All cards share one grid cell (col/row-start-1) so the stack
+            sizes to the front card; only transforms/opacity change per depth.
+            Hidden on sm+, where the side-by-side grid below takes over. ── */}
+        <Reveal className="mx-auto mt-12 w-full max-w-sm sm:hidden">
+          <div className="grid [&>*]:col-start-1 [&>*]:row-start-1">
+            {tiers.map((tier) => {
+              const active = tier.id === selectedId;
+              const s = STACK[depthOf(tier.id)];
+              return (
+                <div
+                  key={tier.id}
+                  aria-hidden={!active}
+                  className={`transition-all duration-500 ease-out ${
+                    active ? "pointer-events-auto" : "pointer-events-none"
+                  }`}
+                  style={{
+                    transform: s.transform,
+                    opacity: s.opacity,
+                    zIndex: s.zIndex,
+                  }}
+                >
+                  {renderCard(tier, active)}
+                </div>
+              );
+            })}
+          </div>
+        </Reveal>
+
+        {/* ── Desktop grid — the previous layout: all three tiers laid out side
+            by side (two columns on sm, three on lg). Hidden on mobile, where the
+            stacked deck above takes over. ── */}
+        <Reveal
+          stagger
+          from="right"
+          className="mx-auto mt-14 hidden max-w-7xl gap-7 sm:grid sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {tiers.map((tier) => (
+            <div key={tier.id}>{renderCard(tier, tier.id === selectedId)}</div>
+          ))}
+        </Reveal>
+
+        {/* ── Single Stall — the build-your-own tier, surfaced beneath the three
+            headline scrolls as one premium banner (its full flow lives in
+            /book). Styled like an engraved invitation — an inset maroon
+            hairline frame on a warm cream-washed surface with an ornament
+            flourish — so it reads elevated and bespoke without a heavy colour
+            block. ── */}
+        {singleStall && (
+          <Reveal className="mx-auto mt-12 max-w-5xl sm:mt-14">
+            <div className="relative overflow-hidden rounded-card bg-gradient-to-br from-cream/40 via-white to-cream/30 shadow-card ring-1 ring-maroon/15">
+              {/* Inset hairline frame — the "engraved" premium cue. */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-[7px] rounded-[0.6rem] border border-maroon/20"
+              />
+              {/* Soft cream corner glow for warmth (alpha on brand cream). */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cream/50 blur-2xl"
+              />
+
+              <div className="relative flex flex-col gap-7 p-8 sm:p-10 lg:flex-row lg:items-center lg:gap-10">
+                {/* Identity · price · CTA */}
+                <div className="text-center lg:max-w-xs lg:shrink-0 lg:text-left">
+                  <p className="eyebrow text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-soft">
+                    {t("Build Your Own", "अपना खुद का बनाएं")}
+                  </p>
+                  <h3 className="mt-2 font-display text-3xl leading-none tracking-wide text-maroon sm:text-4xl">
+                    {lang === "hi" ? singleStall.nameHi : singleStall.name}
+                  </h3>
+                  <Ornament className="mx-auto mt-4 text-maroon/50 lg:mx-0" />
+                  {singleStall.tagline && (
+                    <p className="font-script mt-3 text-lg text-ink-soft">
+                      {lang === "hi" ? singleStall.taglineHi : singleStall.tagline}
+                    </p>
+                  )}
+                  <p className="mt-4 text-sm text-ink-soft">
+                    <span className="text-2xl font-semibold text-maroon">
+                      {singleStall.price}
+                    </span>{" "}
+                    {lang === "hi" ? singleStall.unitHi : singleStall.unit}
+                  </p>
+                  <Link
+                    href="/book?package=custom&step=menu"
+                    aria-label={t("Build Your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                    className="btn-sheen mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-maroon px-6 text-sm font-semibold tracking-wide text-cream shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-110 active:scale-95"
+                  >
+                    <span className="font-display leading-none">
+                      {t("Build Your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                    </span>
+                    <span aria-hidden="true" className="leading-none">
+                      →
+                    </span>
+                  </Link>
+                </div>
+
+                {/* Hairline divider — vertical on lg, horizontal when stacked. */}
+                <span
+                  aria-hidden="true"
+                  className="h-px w-full bg-maroon/15 lg:h-40 lg:w-px"
+                />
+
+                {/* What it includes */}
+                <div className="lg:flex-1">
+                  {singleStall.bestFor && (
+                    <p className="text-center text-sm font-semibold text-maroon lg:text-left">
+                      {t("Perfect for", "इनके लिए परफेक्ट")}:{" "}
+                      <span className="font-normal text-ink-soft">
+                        {lang === "hi" ? singleStall.bestForHi : singleStall.bestFor}
+                      </span>
+                    </p>
+                  )}
+                  <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                    {singleStall.features.map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2.5 text-sm leading-snug text-ink"
+                      >
+                        {/* Cream rhombus ringed in maroon — the same elegant
+                            marker the tier scrolls use. */}
+                        <span
+                          aria-hidden="true"
+                          className="mt-1.5 h-2 w-2 shrink-0 rotate-45 bg-cream shadow-[inset_0_0_0_1px_rgba(185,32,37,0.55)]"
+                        />
+                        <span>{lang === "hi" ? f.labelHi : f.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        )}
+
+        {/* Curated-package option — when no tier fits, reach out on WhatsApp.
+            The price disclaimer is clubbed in beneath as a small un-boxed
+            footnote (rather than its own bordered block) so the section tail
+            stays compact. */}
         <Reveal className="mx-auto mt-10 max-w-2xl">
           <div className="flex flex-col items-center gap-4 rounded-card border border-maroon/20 bg-cream/40 px-6 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
             <p className="text-sm text-ink-soft">
@@ -117,11 +292,8 @@ export default function Packages() {
               </span>
             </Button>
           </div>
-        </Reveal>
-
-        {/* Disclaimer — echoes the reference footer note. */}
-        <Reveal className="mx-auto mt-10 max-w-2xl">
-          <p className="rounded-card border border-maroon/15 bg-cream/30 px-5 py-3 text-center text-sm text-ink-soft">
+          {/* Disclaimer — small un-boxed footnote clubbed under the box above. */}
+          <p className="mt-3 px-2 text-center text-xs text-ink-soft">
             {t(
               "Prices are approximate. Final price may vary as per menu & vendor selection.",
               "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है।",
@@ -132,6 +304,15 @@ export default function Packages() {
     </section>
   );
 }
+
+/** Per-depth placement for the stacked scrolls — index by depthOf(tier.id).
+ *  Depth 0 sits at the front, full size and opacity; 1 & 2 fan behind it,
+ *  nudged down, scaled back and dimmed so the selected tier reads as lifted. */
+const STACK = [
+  { transform: "translateY(0) scale(1)", opacity: 1, zIndex: 30 },
+  { transform: "translateY(18px) scale(0.94)", opacity: 0.55, zIndex: 20 },
+  { transform: "translateY(36px) scale(0.88)", opacity: 0.3, zIndex: 10 },
+] as const;
 
 /** WhatsApp glyph — rendered in a single brand colour via currentColor. */
 function WhatsAppIcon({ className = "" }: { className?: string }) {

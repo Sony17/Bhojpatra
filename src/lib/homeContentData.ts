@@ -263,10 +263,14 @@ export interface HomeContent {
     headingHi: string;
     subtitle: string;
     subtitleHi: string;
-    /** Optional full-width banner artwork (uploaded via admin). When set, the
-     *  image is shown edge-to-edge and the heading/subtitle are used for alt
-     *  text and the lead-capture strip below. */
+    /** Optional banner artwork for **phones** (uploaded via admin). Shown on
+     *  small screens; also the fallback on desktop when no wide banner is set.
+     *  The heading/subtitle are used for alt text and the lead-capture strip. */
     image: string;
+    /** Optional wide banner artwork for **desktop / large screens**. When set,
+     *  it renders edge-to-edge (full column width) on `lg+`; the `image` field
+     *  above stays untouched for mobile. Falls back to `image` when empty. */
+    imageDesktop: string;
   };
   booking: {
     heading: string;
@@ -670,6 +674,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     subtitleHi:
       "अपनों के लिए असली भोजपत्र से बने अनोखे उपहार — ऑफर अपडेट सबसे पहले पाएं।",
     image: "/promo-baina-box.png",
+    imageDesktop: "/promo-desktop.jpg",
   },
   booking: {
     heading: "Book Your Celebration",

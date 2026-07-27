@@ -49,14 +49,14 @@ export default function Gallery() {
               {[...row, ...row].map((item: HomeGalleryItem, i: number) => (
                 <div
                   key={`${item.id}-${i}`}
-                  className="group relative aspect-[4/5] w-[6.5rem] shrink-0 overflow-hidden rounded-card shadow-card ring-1 ring-maroon/10 mr-2 sm:mr-2.5 sm:w-32 lg:w-40"
+                  className="group relative aspect-[4/5] w-[7.15rem] shrink-0 overflow-hidden rounded-card shadow-card ring-1 ring-maroon/10 mr-2 sm:mr-2.5 sm:w-[8.8rem] lg:w-[11rem]"
                 >
                   {item.image && (
                     <Image
                       src={item.image}
                       alt={i < row.length ? item.title : ""}
                       fill
-                      sizes="(min-width:1024px) 160px, (min-width:640px) 128px, 104px"
+                      sizes="(min-width:1024px) 176px, (min-width:640px) 141px, 114px"
                       loading="eager"
                       className="object-cover transition-transform duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-105"
                       unoptimized={isUnoptimized(item.image)}

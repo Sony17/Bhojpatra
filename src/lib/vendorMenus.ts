@@ -28,6 +28,7 @@ import {
   cateringCategories,
   cateringCategoryIds,
   menuCategories,
+  vendorListings,
   vendorOfferings,
   vendorOfferingIds,
   type DietType,
@@ -207,13 +208,86 @@ function seedRecords(): LiveVendorRecord[] {
   );
 }
 
+/** The curated placeholder specialists from the /vendors catalog
+ *  (`vendorListings`) that the home page's Chaat / Beverage category cards land
+ *  on, mapped to a booking-menu course + a representative dish list. Keyed by
+ *  the SAME id as the catalog listing so a `/book?vendor=<id>` hand-off from a
+ *  brand card resolves in `assembleMenuCategories()` and pre-selects the stall
+ *  (without this the picked vendor silently vanishes — it exists only in the
+ *  catalog id-space, never in the booking menu). Beverages ride the "welcome"
+ *  (Welcome Drinks) course, chaat the "chaat" course. Decor placeholders
+ *  (vl-21/22) are intentionally omitted — they're a service, not a food stall. */
+const PLACEHOLDER_SPECIALIST_MENUS: {
+  id: string;
+  categoryId: string;
+  items: string[];
+}[] = [
+  { id: "vl-16", categoryId: "chaat", items: ["Basket Chaat", "Aloo Tikki Chaat", "Pani Puri", "Dahi Bhalla", "Papdi Chaat", "Matar Tikki"] },
+  { id: "vl-17", categoryId: "chaat", items: ["Bhel Puri", "Sev Puri", "Ragda Pattice", "Dahi Puri", "Pani Puri", "Samosa Chaat"] },
+  { id: "vl-18", categoryId: "chaat", items: ["Aloo Tikki Chaat", "Ram Ladoo", "Golgappa", "Papdi Chaat", "Dahi Bhalla", "Matar Kulcha"] },
+  { id: "vl-19", categoryId: "welcome", items: ["Rose Sharbat", "Khus Sharbat", "Kesar Thandai", "Shikanji", "Aam Panna", "Falsa Sharbat"] },
+  { id: "vl-20", categoryId: "welcome", items: ["Virgin Mojito", "Blue Lagoon", "Fruit Punch", "Watermelon Cooler", "Mint Lemonade", "Masala Cola"] },
+];
+
+/** Bookable seed records for the catalog placeholder specialists above. Card
+ *  fields (name, city, price, image, tiers…) come straight from the listing so
+ *  the catalog and the booking menu can't drift; no `ownerUserId`, so they stay
+ *  out of the live-vendor catalog projection (no duplicate card) and skip the
+ *  event-city gate (a beverage/chaat brand shows for any city). */
+function placeholderSpecialistSeeds(): LiveVendorRecord[] {
+  const now = new Date(0).toISOString(); // epoch: sorts with the fixture seeds
+  return PLACEHOLDER_SPECIALIST_MENUS.flatMap((spec) => {
+    const listing = vendorListings.find((v) => v.id === spec.id);
+    if (!listing) return [];
+    return [
+      {
+        id: listing.id,
+        business: listing.name,
+        city: listing.city,
+        state: listing.state,
+        cuisines: listing.cuisines,
+        priceFrom: listing.priceFrom,
+        image: listing.image,
+        rating: listing.rating,
+        reviews: listing.reviews,
+        verified: listing.verified,
+        ...(listing.tiers?.length ? { tiers: listing.tiers } : {}),
+        moderation: "Approved" as const,
+        menu: [
+          {
+            categoryId: spec.categoryId,
+            perPlate: listing.priceFrom,
+            items: spec.items.map((name) => ({
+              name,
+              diet: "veg" as DietType,
+            })),
+          },
+        ],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+  });
+}
+
 /** All vendor records, seeding the fixture specialists on first read. */
 export async function ensureSeededVendors(): Promise<LiveVendorRecord[]> {
   const rows = await store.list();
-  if (rows.length > 0) return rows;
-  const seeds = seedRecords();
-  await store.upsertMany(seeds);
-  return seeds;
+  if (rows.length === 0) {
+    const seeds = [...seedRecords(), ...placeholderSpecialistSeeds()];
+    await store.upsertMany(seeds);
+    return seeds;
+  }
+  // Back-fill placeholder specialists added after the store was first seeded:
+  // seeding only runs on an empty store, so an existing DB would never gain
+  // them (and the catalog "Book" hand-off would keep failing to resolve). Only
+  // the ids that are actually missing are written — a one-time top-up that
+  // never overwrites an admin edit or a re-onboarded vendor on the same id.
+  const have = new Set(rows.map((r) => r.id));
+  const missing = placeholderSpecialistSeeds().filter((s) => !have.has(s.id));
+  if (missing.length === 0) return rows;
+  await store.upsertMany(missing);
+  return [...rows, ...missing];
 }
 
 export async function findVendorByOwner(

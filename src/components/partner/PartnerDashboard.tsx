@@ -76,13 +76,34 @@ const VENUE_TAB: { id: Tab; en: string; hi: string } = {
 export default function PartnerDashboard() {
   const { t } = useLang();
   const session = useSession();
-  const [tab, setTab] = useState<Tab>("overview");
+  // `null` = no explicit choice yet, so the active tab defaults per role —
+  // venue owners land on "My Venue", referrers on "Overview".
+  const [tab, setTab] = useState<Tab | null>(null);
   const [orders, setOrders] = useState<ReferredOrder[]>([]);
   const [rates, setRates] = useState<ReferralRates>(DEFAULT_REFERRAL_RATES);
   // Which role's dashboard is on screen (null → default to the first held).
   const [activeType, setActiveType] = useState<PartnerRole | null>(null);
   // The role currently being registered, while its referral code is minted.
   const [adding, setAdding] = useState<PartnerRole | null>(null);
+
+  // Deep-link support: /partner/dashboard?tab=venues (used by the venue-owner
+  // onboarding CTAs) opens straight on the "My Venue" tab and auto-selects the
+  // Venue-Owner role. Read after mount so SSR and first client render match; the
+  // state persists as the session's memberships resolve, so the venue tab
+  // appears the moment the role loads.
+  useEffect(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "venues") {
+      setActiveType("venue");
+      setTab("venues");
+    } else if (
+      tabParam === "share" ||
+      tabParam === "referrals" ||
+      tabParam === "overview"
+    ) {
+      setTab(tabParam);
+    }
+  }, []);
 
   // Every role this account holds; one person can be all three at once. Each
   // role carries its own referral code, so each gets its own dashboard view.
@@ -99,7 +120,7 @@ export default function PartnerDashboard() {
 
   function selectRole(type: PartnerRole) {
     setActiveType(type);
-    setTab("overview");
+    setTab(null); // let the newly selected role pick its default tab
   }
 
   // Register an extra partner role on this account: mint a fresh code, persist
@@ -120,7 +141,7 @@ export default function PartnerDashboard() {
     }
     await addPartnerRole({ type, referralCode: newCode });
     setActiveType(type);
-    setTab("overview");
+    setTab(null); // land on the new role's default tab (venue → My Venue)
     setAdding(null);
   }
 
@@ -209,10 +230,26 @@ export default function PartnerDashboard() {
   })();
   const roleIcon = active ? ROLE_ICON[active.type] : "★";
 
+  // Venue owners get a venue-first dashboard: "My Venue" leads and the
+  // referral-only tabs (Share & Earn / My Referrals) drop away, so the venue
+  // function reads as its own thing rather than a referral sidecar. Overview
+  // stays — it already frames payouts + bookings for the venue.
+  const visibleTabs = isVenue ? [VENUE_TAB, TABS[0]] : TABS;
+  const effectiveTab: Tab = tab ?? (isVenue ? "venues" : "overview");
+  // Guard against a stale choice after a role switch (e.g. "share" carried over
+  // to the venue role, which no longer offers that tab).
+  const activeTab: Tab = visibleTabs.some((tb) => tb.id === effectiveTab)
+    ? effectiveTab
+    : visibleTabs[0].id;
+
   return (
     <>
       <AppBar
-        title={t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
+        title={
+          isVenue
+            ? t("Venue Dashboard", "वेन्यू डैशबोर्ड")
+            : t("Partner Dashboard", "पार्टनर डैशबोर्ड")
+        }
         backHref="/"
         className="lg:hidden"
       />
@@ -222,6 +259,7 @@ export default function PartnerDashboard() {
         role={partnerLabel}
         roleIcon={roleIcon}
         verified={verified}
+        isVenue={isVenue}
       />
 
       {/* Verification gate — payouts unlock after 3 completed referred feasts. */}
@@ -243,20 +281,20 @@ export default function PartnerDashboard() {
         onAdd={addRole}
       />
 
-      {/* Tab bar — the Venue-Owner role gets an extra "My Venue" tab where it
-          publishes the venues it lists, books and gets paid for. */}
+      {/* Tab bar — a Venue Owner leads with "My Venue" and only sees venue-
+          relevant tabs; referrers keep the referral tabs. */}
       <div className="mt-8 flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
-        {(active?.type === "venue" ? [...TABS, VENUE_TAB] : TABS).map((tb) => {
-          const active = tab === tb.id;
+        {visibleTabs.map((tb) => {
+          const isActive = activeTab === tb.id;
           return (
             <button
               key={tb.id}
               type="button"
               onClick={() => setTab(tb.id)}
-              aria-pressed={active}
+              aria-pressed={isActive}
               className={
                 "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-colors " +
-                (active
+                (isActive
                   ? "bg-maroon text-cream"
                   : "bg-cream-2 text-ink-soft hover:bg-cream-3")
               }
@@ -268,7 +306,7 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="mt-8">
-        {tab === "overview" && (
+        {activeTab === "overview" && (
           <OverviewPanel
             code={code}
             name={session?.name}
@@ -287,10 +325,11 @@ export default function PartnerDashboard() {
             }}
             onShare={() => setTab("share")}
             onSeeAll={() => setTab("referrals")}
+            onManageVenues={() => setTab("venues")}
             recent={orders.slice(0, 3)}
           />
         )}
-        {tab === "share" && (
+        {activeTab === "share" && (
           <SharePanel
             code={code}
             name={session?.name}
@@ -301,8 +340,8 @@ export default function PartnerDashboard() {
             threshold={VERIFY_THRESHOLD}
           />
         )}
-        {tab === "referrals" && <ReferralsPanel orders={orders} />}
-        {tab === "venues" && active?.type === "venue" && (
+        {activeTab === "referrals" && <ReferralsPanel orders={orders} />}
+        {activeTab === "venues" && (
           <VenuePanel code={code} name={session?.name} />
         )}
       </div>
@@ -413,17 +452,21 @@ function DashboardHeader({
   role,
   roleIcon,
   verified,
+  isVenue,
 }: {
   name?: string;
   role: string;
   roleIcon: string;
   verified: boolean;
+  isVenue: boolean;
 }) {
   const { t } = useLang();
   return (
     <Card padding="none" className="p-5 sm:p-6">
       <p className="eyebrow text-sm font-medium text-gold">
-        {t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
+        {isVenue
+          ? t("Venue Dashboard", "वेन्यू डैशबोर्ड")
+          : t("Partner Dashboard", "पार्टनर डैशबोर्ड")}
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="font-display text-2xl text-ink sm:text-3xl">
@@ -435,10 +478,15 @@ function DashboardHeader({
         <VerifyBadge verified={verified} />
       </div>
       <p className="font-script mt-2 text-lg text-ink-soft">
-        {t(
-          "Refer feasts, track bookings, settle your earnings.",
-          "भोज रेफ़र करें, बुकिंग ट्रैक करें, अपनी कमाई पाएं।",
-        )}
+        {isVenue
+          ? t(
+              "List your venues, track their bookings, settle your earnings.",
+              "अपने वेन्यू लिस्ट करें, उनकी बुकिंग ट्रैक करें, अपनी कमाई पाएं।",
+            )
+          : t(
+              "Refer feasts, track bookings, settle your earnings.",
+              "भोज रेफ़र करें, बुकिंग ट्रैक करें, अपनी कमाई पाएं।",
+            )}
       </p>
     </Card>
   );
@@ -541,6 +589,7 @@ function OverviewPanel({
   payout,
   onShare,
   onSeeAll,
+  onManageVenues,
   recent,
 }: {
   code: string;
@@ -555,9 +604,11 @@ function OverviewPanel({
   payout: { total: number; active: number; due: number; dueDate: string };
   onShare: () => void;
   onSeeAll: () => void;
+  onManageVenues: () => void;
   recent: ReferredOrder[];
 }) {
   const { t } = useLang();
+  const isVenue = roleType === "venue";
   const [copied, setCopied] = useState(false);
   const copyCode = () => {
     if (!code) return;
@@ -571,10 +622,12 @@ function OverviewPanel({
   };
   const stats = [
     {
-      label: t("Referrals", "रेफ़रल"),
+      label: isVenue ? t("Bookings", "बुकिंग") : t("Referrals", "रेफ़रल"),
       value: String(total),
-      sub: t("feasts booked with your code", "आपके कोड से बुक भोज"),
-      icon: "🎟️",
+      sub: isVenue
+        ? t("feasts booked at your venue", "आपके वेन्यू पर बुक भोज")
+        : t("feasts booked with your code", "आपके कोड से बुक भोज"),
+      icon: isVenue ? "🏛️" : "🎟️",
     },
     {
       label: t("Confirmed", "पुष्ट"),
@@ -703,9 +756,11 @@ function OverviewPanel({
         <Card className="lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold text-ink">
-              {t("Recent Referrals", "हाल के रेफ़रल")}
+              {isVenue
+                ? t("Recent bookings", "हाल की बुकिंग")
+                : t("Recent Referrals", "हाल के रेफ़रल")}
             </h2>
-            {recent.length > 0 && (
+            {recent.length > 0 && !isVenue && (
               <Button variant="ghost" size="sm" onClick={onSeeAll}>
                 {t("See all", "सभी देखें")}
               </Button>
@@ -714,15 +769,32 @@ function OverviewPanel({
           {recent.length === 0 ? (
             <EmptyState
               className="mt-4 border-0 bg-cream/40 py-6 shadow-none"
-              title={t("No referrals yet", "अभी कोई रेफ़रल नहीं")}
-              message={t(
-                "Share your link to get started.",
-                "शुरू करने के लिए अपना लिंक साझा करें।",
-              )}
+              title={
+                isVenue
+                  ? t("No bookings yet", "अभी कोई बुकिंग नहीं")
+                  : t("No referrals yet", "अभी कोई रेफ़रल नहीं")
+              }
+              message={
+                isVenue
+                  ? t(
+                      "List a venue — its bookings show up here.",
+                      "एक वेन्यू लिस्ट करें — उसकी बुकिंग यहाँ दिखेंगी।",
+                    )
+                  : t(
+                      "Share your link to get started.",
+                      "शुरू करने के लिए अपना लिंक साझा करें।",
+                    )
+              }
               action={
-                <Button variant="primary" size="sm" onClick={onShare}>
-                  {t("Share & Earn", "शेयर करें और कमाएं")}
-                </Button>
+                isVenue ? (
+                  <Button variant="primary" size="sm" onClick={onManageVenues}>
+                    {t("Add a venue", "वेन्यू जोड़ें")}
+                  </Button>
+                ) : (
+                  <Button variant="primary" size="sm" onClick={onShare}>
+                    {t("Share & Earn", "शेयर करें और कमाएं")}
+                  </Button>
+                )
               }
             />
           ) : (
@@ -750,7 +822,9 @@ function OverviewPanel({
         {/* Share card */}
         <Card className="flex flex-col">
           <h2 className="font-display text-lg font-semibold text-ink">
-            {t("Your Referral Code", "आपका रेफ़रल कोड")}
+            {isVenue
+              ? t("Your venue code", "आपका वेन्यू कोड")
+              : t("Your Referral Code", "आपका रेफ़रल कोड")}
           </h2>
           <div className="mt-3 flex items-center justify-between gap-3 rounded-control border border-maroon/30 bg-cream px-4 py-3">
             <span className="font-display text-2xl font-bold tracking-wider text-maroon">
@@ -767,18 +841,25 @@ function OverviewPanel({
             </Button>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
-            {t(
-              "Share your link — every feast booked with it is credited to you.",
-              "अपना लिंक साझा करें — इससे बुक हर भोज आपके खाते में जुड़ेगा।",
-            )}
+            {isVenue
+              ? t(
+                  "Bookings made for your venue are automatically credited to this code.",
+                  "आपके वेन्यू के लिए की गई बुकिंग अपने-आप इस कोड में जुड़ जाती है।",
+                )
+              : t(
+                  "Share your link — every feast booked with it is credited to you.",
+                  "अपना लिंक साझा करें — इससे बुक हर भोज आपके खाते में जुड़ेगा।",
+                )}
           </p>
           <Button
             variant="primary"
             fullWidth
-            onClick={onShare}
+            onClick={isVenue ? onManageVenues : onShare}
             className="mt-auto"
           >
-            {t("Share & Earn", "शेयर करें और कमाएं")}
+            {isVenue
+              ? t("Manage venues", "वेन्यू प्रबंधित करें")
+              : t("Share & Earn", "शेयर करें और कमाएं")}
           </Button>
         </Card>
       </div>

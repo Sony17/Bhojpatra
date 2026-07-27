@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import BrandSelect from "@/components/BrandSelect";
 import DatePicker from "@/components/DatePicker";
-import { ShieldCheck, PriceTag, ClipboardCheck, Headset } from "@/components/icons";
+import { ShieldCheck, PriceTag, ClipboardCheck, Headset, ChefHat } from "@/components/icons";
 import type { ComponentType } from "react";
 import { occasions, cities } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
@@ -221,8 +221,9 @@ export default function Hero() {
         <a
           href={bookHref}
           aria-label={ctaLabel}
-          className="btn-sheen flex flex-1 items-center justify-center rounded-xl bg-maroon px-3 py-2.5 text-[12px] font-bold tracking-wide text-white shadow-brand transition-all duration-200 hover:shadow-pop active:scale-[0.97] sm:min-w-[7.5rem] sm:rounded-[0.9rem] sm:px-5 sm:text-[13px]"
+          className="btn-sheen flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-maroon px-3 py-2.5 text-[12px] font-bold tracking-wide text-white shadow-brand transition-all duration-200 hover:shadow-pop active:scale-[0.97] sm:min-w-[7.5rem] sm:rounded-[0.9rem] sm:px-5 sm:text-[13px]"
         >
+          <ChefHat className="h-3.5 w-3.5 shrink-0" />
           <span className="whitespace-nowrap">{ctaLabel}</span>
         </a>
         <a
@@ -311,13 +312,13 @@ export default function Hero() {
             return (
               <li
                 key={badge.id}
-                className="flex min-w-0 flex-col items-center gap-1 px-1 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
+                className="flex min-w-0 flex-col items-center gap-1 px-0.5 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/85 text-maroon ring-1 ring-maroon/12 sm:mt-0.5 sm:h-9 sm:w-9">
                   <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[9px] font-semibold leading-tight text-ink sm:text-[13px] sm:tracking-wide">
+                  <span className="block whitespace-nowrap text-[9px] font-semibold leading-tight -tracking-[0.02em] text-ink sm:whitespace-normal sm:text-[13px] sm:tracking-wide">
                     {title}
                   </span>
                   <span className="mt-0.5 block text-[8px] leading-tight text-ink/65 sm:mt-1 sm:text-xs sm:leading-snug">
