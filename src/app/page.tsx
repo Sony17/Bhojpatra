@@ -6,7 +6,6 @@ import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import BainaBoxes from "@/components/sections/BainaBoxes";
 import Packages from "@/components/sections/Packages";
-import FindVenues from "@/components/sections/FindVenues";
 import Gallery from "@/components/sections/Gallery";
 import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
@@ -20,9 +19,8 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  * 4. Categories → /vendors
  * 5. Packages → book
  * 6. Baina → order path
- * 7. Venues → /venues (book an event space)
- * 8. Social proof
- * 9. Promo lead capture — post-testimonials
+ * 7. Social proof
+ * 8. Promo lead capture — post-testimonials
  */
 export default function Home() {
   return (
@@ -35,7 +33,6 @@ export default function Home() {
       </div>
       <Packages />
       <BainaBoxes />
-      <FindVenues />
       <div className="home-band-cream">
         <Gallery />
       </div>
