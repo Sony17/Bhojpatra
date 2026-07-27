@@ -58,7 +58,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [accountType, setAccountType] = useState<AccountType>("customer");
-  const [partnerRole, setPartnerRole] = useState<PartnerRole>("individual");
+  // `null` = a partner signup where no lane has been picked yet. We show the
+  // partner chooser instead of jamming a 3-way picker above the account fields;
+  // each lane then opens its own dedicated, tailored sign-up.
+  const [partnerRole, setPartnerRole] = useState<PartnerRole | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -210,9 +213,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       }
       // A referral partner gets a unique code they share to attribute bookings.
       const code = isPartner ? makeReferralCode(name) : "";
-      const partnerRoles = isPartner
-        ? [{ type: partnerRole, referralCode: code }]
-        : undefined;
+      const partnerRoles =
+        isPartner && partnerRole
+          ? [{ type: partnerRole, referralCode: code }]
+          : undefined;
 
       setSubmitting(true);
       setError("");
@@ -239,7 +243,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         // The server set the auth cookie and (for a partner) persisted the
         // referral roles on the user record — refresh the session so the header
         // + dashboards pick up the signed-in user.
-        if (isPartner) {
+        if (isPartner && partnerRole) {
           setReferralCode(code);
           await refreshSession();
           // Record the referral partner so the booking wizard can resolve the
@@ -344,7 +348,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           <span className="font-semibold text-maroon">
             {isVendor
               ? t("Vendor", "वेंडर")
-              : isPartner
+              : isPartner && partnerRole
                 ? PARTNER_ROLE_LABEL[partnerRole]
                 : t("Customer", "ग्राहक")}
           </span>
@@ -469,21 +473,157 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     );
   }
 
+  // The three referral partner lanes — used by the chooser below and to tailor
+  // each lane's dedicated sign-up header/CTA.
+  const partnerLanes: {
+    value: PartnerRole;
+    icon: string;
+    title: string;
+    hint: string;
+  }[] = [
+    {
+      value: "planner",
+      icon: "📋",
+      title: t("Event Planner", "इवेंट प्लानर"),
+      hint: t("Refer client bookings", "क्लाइंट बुकिंग रेफ़र करें"),
+    },
+    {
+      value: "individual",
+      icon: "🙋",
+      title: t("Individual Referrer", "व्यक्तिगत रेफ़रर"),
+      hint: t("Refer & earn", "रेफ़र करें और कमाएं"),
+    },
+    {
+      value: "venue",
+      icon: "🏛️",
+      title: t("Venue Owner", "वेन्यू मालिक"),
+      hint: t("Banquet halls & venues", "बैंक्वेट हॉल और वेन्यू"),
+    },
+  ];
+
+  // Per-lane copy so each partner gets its own dedicated flow rather than one
+  // catch-all "Partner Sign Up" form. Null for customer/vendor signups.
+  const partnerRoleMeta =
+    partnerRole === "planner"
+      ? {
+          badge: t("Event Planner Sign Up", "इवेंट प्लानर साइन अप"),
+          heading: t("Join as an Event Planner", "इवेंट प्लानर के रूप में जुड़ें"),
+          lede: t(
+            "Refer your client bookings to Bhojpatra and earn on every confirmed feast.",
+            "अपनी क्लाइंट बुकिंग Bhojpatra को रेफ़र करें और हर पुष्ट भोज पर कमाएं।",
+          ),
+          cta: t("Create Planner Account", "प्लानर अकाउंट बनाएं"),
+        }
+      : partnerRole === "venue"
+        ? {
+            badge: t("Venue Owner Sign Up", "वेन्यू मालिक साइन अप"),
+            heading: t("List your venue on Bhojpatra", "अपना वेन्यू Bhojpatra पर लिस्ट करें"),
+            lede: t(
+              "Onboard your banquet hall or lawn for in-house catering and earn on every booking.",
+              "इन-हाउस कैटरिंग के लिए अपना बैंक्वेट हॉल या लॉन जोड़ें और हर बुकिंग पर कमाएं।",
+            ),
+            cta: t("Create Venue Account", "वेन्यू अकाउंट बनाएं"),
+          }
+        : partnerRole === "individual"
+          ? {
+              badge: t("Individual Referrer Sign Up", "व्यक्तिगत रेफ़रर साइन अप"),
+              heading: t("Refer feasts & earn", "भोज रेफ़र करें और कमाएं"),
+              lede: t(
+                "Share your code, refer a feast, and earn on every confirmed booking — no business needed.",
+                "अपना कोड साझा करें, भोज रेफ़र करें, और हर पुष्ट बुकिंग पर कमाएं — किसी व्यवसाय की ज़रूरत नहीं।",
+              ),
+              cta: t("Create Referrer Account", "रेफ़रर अकाउंट बनाएं"),
+            }
+          : null;
+
+  // ── Partner chooser ─────────────────────────────────────────────────────
+  // A partner signup with no lane picked (via "Become a Partner" / "Refer &
+  // earn"). Rather than crowd the account form with a picker, we present the
+  // lanes on their own, then hand off to that lane's dedicated flow.
+  if (isSignup && isPartner && !partnerRole) {
+    return (
+      <div>
+        <header className="mb-8">
+          <span className="mb-3 inline-flex items-center rounded-full border border-maroon/30 bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-maroon">
+            {t("Partner Sign Up", "पार्टनर साइन अप")}
+          </span>
+          <h1 className="font-display text-app-title text-ink sm:text-3xl lg:text-4xl">
+            {t("How do you want to partner?", "आप कैसे जुड़ना चाहते हैं?")}
+          </h1>
+          <p className="mt-2 text-base text-ink-soft">
+            {t(
+              "Pick the path that fits you — each one has its own quick sign-up.",
+              "अपने लिए सही रास्ता चुनें — हर एक का अपना त्वरित साइन-अप है।",
+            )}
+          </p>
+        </header>
+
+        <div role="list" className="flex flex-col gap-3">
+          {partnerLanes.map((lane) => (
+            <button
+              key={lane.value}
+              type="button"
+              onClick={() => setPartnerRole(lane.value)}
+              className="focus-ring group flex items-center gap-4 rounded-card border border-cream-3 bg-cream/40 px-4 py-4 text-left transition-colors hover:border-maroon/50 hover:bg-cream-2"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-maroon/15 bg-white text-xl"
+              >
+                {lane.icon}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-base font-semibold text-ink">
+                  {lane.title}
+                </span>
+                <span className="text-sm text-ink-soft">{lane.hint}</span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="text-lg text-maroon transition-transform group-hover:translate-x-0.5"
+              >
+                →
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-8 text-center text-sm text-ink-soft">
+          {t("Just want to book a feast? ", "बस भोज बुक करना चाहते हैं? ")}
+          <button
+            type="button"
+            onClick={() => setAccountType("customer")}
+            className="font-semibold text-maroon hover:underline"
+          >
+            {t("Sign up as a customer", "ग्राहक के रूप में साइन अप करें")}
+          </button>
+        </p>
+        <p className="mt-2 text-center text-sm text-ink-soft">
+          {t("Already have an account? ", "पहले से अकाउंट है? ")}
+          <Link href="/login" className="font-semibold text-maroon hover:underline">
+            {t("Log in", "लॉग इन")}
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <header className="mb-8">
         {/* With no in-form role picker, arriving from a "List as a Vendor" /
-            "Become a Partner" CTA (?type=…) must announce itself clearly. */}
-        {isSignup && (isVendor || isPartner) && (
+            "Become a Partner" CTA (?type=…) must announce itself clearly — and
+            each partner lane names itself so the flow feels dedicated. */}
+        {isSignup && (isVendor || (isPartner && partnerRoleMeta)) && (
           <span className="mb-3 inline-flex items-center rounded-full border border-maroon/30 bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-maroon">
-            {isVendor
-              ? t("Vendor Sign Up", "वेंडर साइन अप")
-              : t("Partner Sign Up", "पार्टनर साइन अप")}
+            {isVendor ? t("Vendor Sign Up", "वेंडर साइन अप") : partnerRoleMeta!.badge}
           </span>
         )}
         <h1 className="font-display text-app-title text-ink sm:text-3xl lg:text-4xl">
           {isSignup
-            ? t("Create your account", "अपना अकाउंट बनाएं")
+            ? isPartner && partnerRoleMeta
+              ? partnerRoleMeta.heading
+              : t("Create your account", "अपना अकाउंट बनाएं")
             : isForgot
               ? t("Reset your password", "अपना पासवर्ड रीसेट करें")
               : isReset
@@ -497,11 +637,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                   "Register your catering business on Bhojpatra.",
                   "अपना कैटरिंग बिज़नेस Bhojpatra पर रजिस्टर करें।"
                 )
-              : isPartner
-                ? t(
-                    "Refer feasts to Bhojpatra and earn on every confirmed booking.",
-                    "Bhojpatra को भोज रेफ़र करें और हर पुष्ट बुकिंग पर कमाएं।"
-                  )
+              : isPartner && partnerRoleMeta
+                ? partnerRoleMeta.lede
                 : t(
                     "Join Bhojpatra to book your next feast.",
                     "अपना अगला भोज बुक करने के लिए Bhojpatra से जुड़ें।"
@@ -526,75 +663,18 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                     "अपने समारोह प्रबंधित करने के लिए लॉग इन करें।"
                   )}
         </p>
-      </header>
 
-      {/* Vendor/partner signups (reached via /signup?type=… CTAs) pick their
-          referral flavor here; the default /signup is a plain customer signup. */}
-      {isSignup && isPartner && (
-        <div className="mb-6">
-              <span className="mb-2 block text-sm text-ink-soft">
-                {t("How will you refer?", "आप कैसे रेफ़र करेंगे?")}
-              </span>
-              <div
-                role="radiogroup"
-                aria-label={t("Partner type", "पार्टनर प्रकार")}
-                className="grid grid-cols-1 gap-2 sm:grid-cols-2"
-              >
-                {([
-                  {
-                    value: "planner" as const,
-                    icon: "📋",
-                    title: t("Event Planner", "इवेंट प्लानर"),
-                    hint: t("Refer client bookings", "क्लाइंट बुकिंग रेफ़र करें"),
-                  },
-                  {
-                    value: "individual" as const,
-                    icon: "🙋",
-                    title: t("Individual Referrer", "व्यक्तिगत रेफ़रर"),
-                    hint: t("Refer & earn", "रेफ़र करें और कमाएं"),
-                  },
-                  {
-                    value: "venue" as const,
-                    icon: "🏛️",
-                    title: t("Venue Owner", "वेन्यू मालिक"),
-                    hint: t("Banquet halls & venues", "बैंक्वेट हॉल और वेन्यू"),
-                  },
-                ]).map((opt) => {
-                  const active = partnerRole === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => setPartnerRole(opt.value)}
-                      className={
-                        "focus-ring flex items-start gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors " +
-                        (active
-                          ? "border-maroon bg-maroon text-cream shadow-sm"
-                          : "border-cream-3 bg-cream/40 text-ink hover:border-maroon/40 hover:bg-cream-2")
-                      }
-                    >
-                      <span aria-hidden="true" className="text-lg leading-none">
-                        {opt.icon}
-                      </span>
-                      <span className="flex flex-col">
-                        <span className="text-sm font-semibold">{opt.title}</span>
-                        <span
-                          className={
-                            "text-xs " +
-                            (active ? "text-cream/80" : "text-ink-soft/70")
-                          }
-                        >
-                          {opt.hint}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-        </div>
-      )}
+        {/* Dedicated partner flow: let them switch lanes without losing place. */}
+        {isSignup && isPartner && partnerRole && (
+          <button
+            type="button"
+            onClick={() => setPartnerRole(null)}
+            className="focus-ring mt-3 inline-flex items-center gap-1 rounded-control text-sm font-medium text-maroon hover:underline"
+          >
+            {t("← Choose a different partner type", "← अलग पार्टनर प्रकार चुनें")}
+          </button>
+        )}
+      </header>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {isSignup && (
@@ -830,7 +910,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               ? isVendor
                 ? t("Create Vendor Account", "वेंडर अकाउंट बनाएं")
                 : isPartner
-                  ? t("Create Partner Account", "पार्टनर अकाउंट बनाएं")
+                  ? (partnerRoleMeta?.cta ??
+                    t("Create Partner Account", "पार्टनर अकाउंट बनाएं"))
                   : t("Create Account", "अकाउंट बनाएं")
               : isForgot
                 ? t("Send Reset Link", "रीसेट लिंक भेजें")
