@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
@@ -78,6 +85,7 @@ import {
   type BookingStatus,
 } from "@/lib/data";
 import { sortTiers, type VendorTier } from "@/lib/admin/types";
+import { slugifyName } from "@/lib/bookings";
 import {
   useLocations,
   OTHER_LOCATION_ID,
@@ -802,18 +810,38 @@ export default function BookingWizard() {
   // Resolve a brand-page vendor hand-off (/book?vendor=ID) once the live menu
   // arrives: pre-select that vendor in every course it publishes and infer its
   // tier lens, so the Menu step skips the picker and opens on that vendor's
-  // roster. Unknown ids (e.g. a curated catalog id absent from the booking
-  // menu) fall through — the guest just picks a tier as usual. A resumed draft's
-  // picks win, so returning to a half-built order isn't clobbered.
+  // roster. A catalog id with no booking-menu record under it (a curated
+  // caterer listing) is bridged to its wizard counterpart by name-slug — the
+  // same name bridge reviews use — tolerating the listing's trailing
+  // "Caterers" ("Awadhi Royal Caterers" ↔ "Awadhi Royal"), so the brand the
+  // guest picked still lands pre-selected instead of silently vanishing.
+  // Truly unknown ids fall through — the guest just picks a tier as usual. A
+  // resumed draft's picks win, so returning to a half-built order isn't
+  // clobbered.
   useEffect(() => {
     if (!pendingVendorId) return;
+    const nameKey = (name: string) =>
+      slugifyName(name).replace(/-caterers$/, "");
+    let targetId = pendingVendorId;
+    const menuHasId = liveMenuCategories.some((c) =>
+      c.vendors.some((v) => v.id === pendingVendorId),
+    );
+    if (!menuHasId) {
+      const listing = vendorListings.find((l) => l.id === pendingVendorId);
+      const hit = listing
+        ? liveMenuCategories
+            .flatMap((c) => c.vendors)
+            .find((v) => nameKey(v.name) === nameKey(listing.name))
+        : undefined;
+      if (hit) targetId = hit.id;
+    }
     const preset: VendorMap = {};
     let tiers: VendorTier[] = [];
     const hitCats: string[] = [];
     for (const cat of liveMenuCategories) {
-      const v = cat.vendors.find((x) => x.id === pendingVendorId);
+      const v = cat.vendors.find((x) => x.id === targetId);
       if (!v) continue;
-      preset[cat.id] = [pendingVendorId];
+      preset[cat.id] = [targetId];
       hitCats.push(cat.id);
       if (v.tiers?.length) tiers = v.tiers as VendorTier[];
     }
@@ -1038,12 +1066,24 @@ export default function BookingWizard() {
     return result;
   };
 
-  // Courses actually built (vendor + full item quota).
+  // Every dish actually picked across the plated + live courses, vendor-filtered
+  // so a stale pick from a now-hidden vendor never counts (mirrors `itemsFor`).
+  const pickedItemCount = activeCategories.reduce(
+    (n, c) => n + itemsFor(c.id).length,
+    0,
+  );
+  // Courses fully built (vendor + whole dish quota) — the bar the fixed packages
+  // hold to, since those tiers ship a set menu the guest is meant to complete.
   const builtCount = activeCategories.filter(categoryComplete).length;
-  // An order must carry something billable, but not necessarily from the menu —
-  // a Single Stall guest may skip every stall and build an add-ons-only order.
-  // Enforced on the details/extras step, where add-ons are chosen.
-  const orderHasItems = builtCount > 0 || selectedAddOns.length > 0;
+  // An order must carry something billable, enforced on the details/extras step.
+  // Fixed packages need at least one *complete* course (or an extra). Single
+  // Stall is build-your-own across all three of its tier lenses (Silver/Gold/
+  // Platinum — a lens only changes which vendors show, never `singleStall`), so
+  // there any single picked dish — or a skip-every-stall add-ons-only order — is
+  // enough.
+  const orderHasItems =
+    selectedAddOns.length > 0 ||
+    (singleStall ? pickedItemCount > 0 : builtCount > 0);
   // "Step done" = every stall on that step resolved (built or skipped). Skipping
   // is allowed on Custom — the guest just moves on. On the fixed tiers nothing is
   // skippable, so these reduce to "every course complete". `menuComplete` gates
@@ -1771,6 +1811,21 @@ export default function BookingWizard() {
   const router = useRouter();
 
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
+  // Wipe the saved draft and every in-progress pick, dropping the guest back to a
+  // pristine Step 1. A hard navigation (not router.push) forces a full remount so
+  // all wizard state resets — with the draft already cleared, nothing rehydrates.
+  const startOver = () => {
+    if (typeof window === "undefined") return;
+    const ok = window.confirm(
+      t(
+        "Start over? This clears your current booking selections.",
+        "फिर से शुरू करें? इससे आपकी वर्तमान बुकिंग चयन हट जाएँगे।",
+      ),
+    );
+    if (!ok) return;
+    clearBookingDraft();
+    window.location.assign("/book");
+  };
   const goBack = () => {
     if (step > 1) {
       setStep((s) => s - 1);
@@ -2199,6 +2254,20 @@ export default function BookingWizard() {
               )}
             </p>
           </div>
+          {/* Escape hatch — clears the persisted draft and every pick, returning
+              to a clean Step 1. Only offered once past Package selection, where
+              there are actually selections worth discarding. */}
+          {step > 1 && (
+            <div className="mx-2 mt-2 flex justify-end sm:mx-5 lg:mx-8">
+              <button
+                type="button"
+                onClick={startOver}
+                className="text-[11px] font-semibold text-ink/50 underline underline-offset-2 transition-colors hover:text-maroon sm:text-xs"
+              >
+                {t("Start over", "फिर से शुरू करें")}
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -2211,16 +2280,16 @@ export default function BookingWizard() {
         // stalls (Silver) shows an explanatory panel on Step 3 instead.
         //
         // Ordering: on desktop the event brief spans the full width up top, with
-        // the package rail (left) and builder (right) below. On mobile the source
-        // order is overridden so the *builder comes first* — guests land straight
-        // on dish-picking — then the event brief, then the package / price rail.
-        <div className="mt-8 grid w-full min-w-0 gap-8 lg:grid-cols-[18rem_1fr]">
-          {/* Event brief — full-width top on desktop; between builder and rail on mobile. */}
-          <div className="order-2 w-full min-w-0 lg:order-none lg:col-span-2 lg:row-start-1">
+        // the package rail (left) and builder (right) below. On mobile the
+        // event brief and package summary lead as compact collapsed chips (the
+        // app mockup's top bar), with the builder below them.
+        <div className="mt-8 grid w-full min-w-0 gap-4 sm:gap-8 lg:grid-cols-[18rem_1fr]">
+          {/* Event brief — top on mobile and full-width top on desktop. */}
+          <div className="order-1 w-full min-w-0 lg:order-none lg:col-span-2 lg:row-start-1">
             {renderEventBar(true)}
           </div>
-          {/* Package / price rail — last on mobile, pinned left on desktop. */}
-          <div className="order-3 w-full min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
+          {/* Package / price rail — under the event chip on mobile, pinned left on desktop. */}
+          <div className="order-2 w-full min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
             <SelectedPackageRail
               lang={lang}
               t={t}
@@ -2228,12 +2297,12 @@ export default function BookingWizard() {
               basePerPlate={basePerPlate}
               onChange={() => setStep(1)}
               // Collapse to a summary on mobile so the event brief +
-              // package sit compactly below the builder.
+              // package sit compactly above the builder.
               collapsible
             />
           </div>
-          {/* Builder — first on mobile, right column on desktop. */}
-          <div className="order-1 w-full min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
+          {/* Builder — below the chips on mobile, right column on desktop. */}
+          <div className="order-3 w-full min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
             {step === 2 ? (
               singleStall && !stallTier ? (
                 <StallTierPicker
@@ -2529,6 +2598,8 @@ export default function BookingWizard() {
           onPrev={menuPrev}
           onNext={menuNext}
           onSkipCurrent={skipCurrentStall}
+          estTotal={grandTotal}
+          guestCount={guests}
           extraBanner={
             menuFullySkipped ? (
               <div className="mb-4 flex items-start gap-2 rounded-card border border-maroon/30 bg-cream/40 px-4 py-3 text-sm text-ink-soft">
@@ -2561,6 +2632,8 @@ export default function BookingWizard() {
             onPrev={livePrev}
             onNext={liveNext}
             onSkipCurrent={skipCurrentLiveStall}
+            estTotal={grandTotal}
+            guestCount={guests}
           />
         ) : (
           // Package with no live stalls (Silver) — nothing to pick here, so just
@@ -2612,32 +2685,100 @@ export default function BookingWizard() {
                 : `${t("Continue", "आगे")} →`}
             </Button>
           </div>
-          {/* Mobile sticky checkout chrome */}
+          {/* Mobile sticky checkout chrome — carries the running estimate (as in
+              the app mockup's persistent bar) above the Back / Continue row. */}
           <div className="app-sticky-cta md:hidden">
-            <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goBack}
-                aria-label={t("Back", "पीछे")}
-                className="min-h-11 px-4"
-              >
-                ←
-              </Button>
-              <Button
-                onClick={goNext}
-                disabled={!canNext}
-                fullWidth
-                className="min-h-11"
-              >
-                {nextStepLabel
-                  ? `${t("Continue", "आगे")} · ${nextStepLabel}`
-                  : t("Continue", "आगे")}
-              </Button>
+            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
+              <div className="mb-2 flex items-end justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                    {t("Total (Est.)", "कुल (अनुमानित)")}
+                  </span>
+                  <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
+                    {money(grandTotal)}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
+                  {t(
+                    `For ${inr.format(guests)} guests`,
+                    `${inr.format(guests)} मेहमानों के लिए`,
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={goBack}
+                  aria-label={t("Back", "पीछे")}
+                  className="min-h-11 px-4"
+                >
+                  ←
+                </Button>
+                <Button
+                  onClick={goNext}
+                  disabled={!canNext}
+                  fullWidth
+                  className="min-h-11"
+                >
+                  {nextStepLabel
+                    ? `${t("Continue", "आगे")} · ${nextStepLabel}`
+                    : t("Continue", "आगे")}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       ) : null}
+
+      {/* Trust strip — the reassurance row from the app mockup. Mobile-only so
+          the tablet / desktop layout is untouched; hidden on the success screen. */}
+      {!confirmed && (
+        <ul className="mt-8 grid grid-cols-2 gap-2.5 sm:hidden">
+          {[
+            {
+              icon: "🛡️",
+              title: t("Trusted Vendors", "भरोसेमंद वेंडर"),
+              sub: t("Quality you can rely on", "जिस पर आप भरोसा कर सकें"),
+            },
+            {
+              icon: "🏅",
+              title: t("Curated Menus", "चुने हुए मेन्यू"),
+              sub: t("Tasty & verified", "स्वादिष्ट और सत्यापित"),
+            },
+            {
+              icon: "🎧",
+              title: t("24x7 Support", "24x7 सहायता"),
+              sub: t("We're here to help", "हम मदद के लिए हैं"),
+            },
+            {
+              icon: "🔒",
+              title: t("Secure Booking", "सुरक्षित बुकिंग"),
+              sub: t("100% safe payments", "100% सुरक्षित भुगतान"),
+            },
+          ].map((b) => (
+            <li
+              key={b.title}
+              className="flex items-center gap-2.5 rounded-2xl border border-cream-3 bg-white px-3 py-2.5 shadow-sm"
+            >
+              <span
+                aria-hidden="true"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cream text-base"
+              >
+                {b.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-semibold text-ink">
+                  {b.title}
+                </span>
+                <span className="block truncate text-[11px] text-ink-soft">
+                  {b.sub}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -2698,6 +2839,8 @@ function MenuStepNav({
   onNext,
   onSkipCurrent,
   extraBanner,
+  estTotal,
+  guestCount,
 }: {
   t: (en: string, hi: string) => string;
   categories: MenuCategory[];
@@ -2712,6 +2855,10 @@ function MenuStepNav({
   onNext: () => void;
   onSkipCurrent: () => void;
   extraBanner?: ReactNode;
+  /** Running order estimate + headcount — surfaced on mobile as a compact
+   *  summary strip above the nav, echoing the app mockup's persistent bar. */
+  estTotal?: number;
+  guestCount?: number;
 }) {
   const atLast = activeCat >= categories.length - 1;
   const activeId = categories[activeCat]?.id ?? "";
@@ -2755,6 +2902,27 @@ function MenuStepNav({
               "आप अभी आगे बढ़ सकते हैं और बाकी विकल्प बाद में तय कर सकते हैं।",
             )}
           </p>
+        </div>
+      )}
+
+      {/* Mobile — running order estimate (app mockup's persistent summary bar).
+          Desktop keeps the price in the side rail / summary panel. */}
+      {typeof estTotal === "number" && estTotal > 0 && (
+        <div className="flex items-end justify-between gap-3 rounded-2xl border border-cream-3 bg-white px-3.5 py-2.5 shadow-sm sm:hidden">
+          <span className="min-w-0">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Total (Est.)", "कुल (अनुमानित)")}
+            </span>
+            <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
+              {money(estTotal)}
+            </span>
+          </span>
+          <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
+            {t(
+              `For ${inr.format(guestCount ?? 0)} guests`,
+              `${inr.format(guestCount ?? 0)} मेहमानों के लिए`,
+            )}
+          </span>
         </div>
       )}
 
@@ -3937,42 +4105,85 @@ function StepMenu({
           const complete = categoryComplete(c);
           const skipped = isSkipped(c.id);
           return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setActiveCat(i)}
-              className={
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition " +
-                (active
-                  ? "border-maroon bg-maroon text-cream"
-                  : skipped
-                    ? "border-cream-3 bg-cream-2/60 text-ink-soft/60 hover:bg-cream-2"
-                    : "border-cream-3 bg-white text-ink-soft hover:bg-cream-2")
-              }
-            >
-              <span aria-hidden="true">{c.icon}</span>
-              <span
+            <Fragment key={c.id}>
+              {/* Mobile — vertical icon-card chip (app mockup): icon on top,
+                  title-case label below; the active course fills cream with a
+                  red label. Completion ✓ and skipped state carry over. */}
+              <button
+                type="button"
+                onClick={() => setActiveCat(i)}
                 className={
-                  "eyebrow text-xs" + (skipped && !active ? " line-through" : "")
+                  "flex min-w-[4.5rem] shrink-0 flex-col items-center gap-1 whitespace-nowrap rounded-xl border px-3 py-2 text-center transition sm:hidden " +
+                  (active
+                    ? "border-maroon/40 bg-cream/60 shadow-sm"
+                    : skipped
+                      ? "border-cream-3 bg-cream-2/60 opacity-70"
+                      : "border-cream-3 bg-white")
                 }
               >
-                {(lang === "hi" ? c.nameHi : c.name).toUpperCase()}
-              </span>
-              {complete ? (
-                <span aria-hidden="true" className={active ? "text-cream" : "text-maroon"}>
-                  ✓
+                <span aria-hidden="true" className="text-xl leading-none">
+                  {c.icon}
                 </span>
-              ) : skipped ? (
                 <span
                   className={
-                    "eyebrow text-[10px] font-semibold " +
-                    (active ? "text-cream" : "text-ink-soft/60")
+                    "text-[11px] font-semibold leading-tight " +
+                    (active
+                      ? "text-maroon"
+                      : skipped
+                        ? "text-ink-soft/60 line-through"
+                        : "text-ink")
                   }
                 >
-                  {t("SKIPPED", "छोड़ा")}
+                  {lang === "hi" ? c.nameHi : c.name}
+                  {complete && (
+                    <span aria-hidden="true" className="ml-1 text-maroon">
+                      ✓
+                    </span>
+                  )}
                 </span>
-              ) : null}
-            </button>
+                {skipped && (
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-ink-soft/60">
+                    {t("Skipped", "छोड़ा")}
+                  </span>
+                )}
+              </button>
+              {/* Desktop — original pill chip (unchanged). */}
+              <button
+                type="button"
+                onClick={() => setActiveCat(i)}
+                className={
+                  "hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition sm:flex " +
+                  (active
+                    ? "border-maroon bg-maroon text-cream"
+                    : skipped
+                      ? "border-cream-3 bg-cream-2/60 text-ink-soft/60 hover:bg-cream-2"
+                      : "border-cream-3 bg-white text-ink-soft hover:bg-cream-2")
+                }
+              >
+                <span aria-hidden="true">{c.icon}</span>
+                <span
+                  className={
+                    "eyebrow text-xs" + (skipped && !active ? " line-through" : "")
+                  }
+                >
+                  {(lang === "hi" ? c.nameHi : c.name).toUpperCase()}
+                </span>
+                {complete ? (
+                  <span aria-hidden="true" className={active ? "text-cream" : "text-maroon"}>
+                    ✓
+                  </span>
+                ) : skipped ? (
+                  <span
+                    className={
+                      "eyebrow text-[10px] font-semibold " +
+                      (active ? "text-cream" : "text-ink-soft/60")
+                    }
+                  >
+                    {t("SKIPPED", "छोड़ा")}
+                  </span>
+                ) : null}
+              </button>
+            </Fragment>
           );
         })}
       </div>
@@ -4058,7 +4269,123 @@ function StepMenu({
           )}
         </div>
       )}
-      <div className="relative mt-3">
+      {/* Mobile — vertical radio-row list (app-style). Each vendor reads as one
+          tappable row: selection radio · thumbnail · name + rating · affordance.
+          The horizontal cards below are kept untouched for tablet / desktop. */}
+      <div className="mt-3 sm:hidden">
+        {filteredVendors.length === 0 ? (
+          <p className="py-8 text-center text-sm font-medium text-ink-soft">
+            {t(
+              `No vendors matching "${vendorSearch}" in this category.`,
+              `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
+            )}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {filteredVendors.map((v) => {
+              const selected = selectedIds.includes(v.id);
+              const stat = statFor(vendorRatings, v);
+              return (
+                <li key={v.id}>
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => pickVendor(cat.id, v.id)}
+                    className={
+                      "flex w-full items-center gap-3 rounded-2xl border bg-white p-2.5 text-left shadow-sm transition " +
+                      (selected
+                        ? "border-maroon ring-2 ring-maroon"
+                        : "border-cream-3")
+                    }
+                  >
+                    {/* Selection radio */}
+                    <span
+                      aria-hidden="true"
+                      className={
+                        "grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition " +
+                        (selected ? "border-maroon" : "border-cream-3")
+                      }
+                    >
+                      {selected && (
+                        <span className="h-2.5 w-2.5 rounded-full bg-maroon" />
+                      )}
+                    </span>
+                    {/* Thumbnail */}
+                    <span className="relative block h-[54px] w-[54px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
+                      <Image
+                        src={v.image}
+                        alt={v.name}
+                        fill
+                        sizes="54px"
+                        className="object-cover"
+                      />
+                    </span>
+                    {/* Name + rating — same content as the desktop card. */}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-sans text-sm font-semibold text-maroon">
+                        {v.name}
+                      </span>
+                      {v.reviews > 0 ? (
+                        <span className="mt-0.5 text-xs text-ink-soft">
+                          ⭐ {v.rating}{" "}
+                          <span className="text-ink-soft/70">
+                            ({inr.format(v.reviews)})
+                          </span>
+                        </span>
+                      ) : v.googleRating ? (
+                        <span className="mt-0.5 text-xs text-ink-soft">
+                          <span aria-hidden="true" className="text-maroon">
+                            ★
+                          </span>{" "}
+                          <span className="font-semibold text-ink">
+                            {v.googleRating}
+                          </span>{" "}
+                          <span className="text-ink-soft/70">
+                            {t("Google", "गूगल")}
+                            {v.googleReviews
+                              ? ` (${inr.format(v.googleReviews)})`
+                              : ""}
+                          </span>
+                        </span>
+                      ) : !stat ? (
+                        <span className="mt-0.5 text-xs font-semibold text-maroon">
+                          {t("New on Bhojpatra", "भोजपत्र पर नया")}
+                        </span>
+                      ) : null}
+                      {stat && (
+                        <span className="mt-0.5 text-xs font-semibold text-maroon">
+                          ★ {stat.rating} ·{" "}
+                          {t(`${stat.count} verified`, `${stat.count} सत्यापित`)}
+                        </span>
+                      )}
+                      {/* Vendor's own per-person price — Single Stall only
+                          (`showItemPrice`), where vendors price individually.
+                          Fixed tiers price via the package, so no price here. */}
+                      {showItemPrice && v.perPlate > 0 && (
+                        <span className="mt-0.5 text-xs font-bold text-maroon">
+                          {money(v.perPlate)} /{" "}
+                          {t("person", "व्यक्ति")}
+                        </span>
+                      )}
+                    </span>
+                    {/* Selected mark / tap affordance */}
+                    <span
+                      aria-hidden="true"
+                      className={
+                        "shrink-0 pr-0.5 text-lg leading-none " +
+                        (selected ? "text-maroon" : "text-ink-soft/40")
+                      }
+                    >
+                      {selected ? "✓" : "›"}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="relative mt-3 hidden sm:block">
       {filteredVendors.length === 0 ? (
         <p className="py-8 text-center text-sm font-medium text-ink-soft">
           {t(
@@ -4221,8 +4548,10 @@ function StepMenu({
               </h3>
               <span
                 className={
-                  "text-lg font-bold " +
-                  (picks.length >= allowance ? "text-maroon" : "text-ink-soft")
+                  // Mobile echoes the mockup's red "X/Y ITEMS SELECTED" chip;
+                  // desktop keeps the original larger neutral/maroon counter.
+                  "text-[11px] font-bold uppercase tracking-wide text-maroon sm:text-lg sm:normal-case sm:tracking-normal " +
+                  (picks.length >= allowance ? "sm:text-maroon" : "sm:text-ink-soft")
                 }
               >
                 {picks.length}/{allowance} {t("PICKED", "चुने गए")}
@@ -4258,7 +4587,47 @@ function StepMenu({
               const vendorFull = vendorItemPicks.length >= base;
               return (
               <div key={vendor.id} className="mt-4">
-                <div className="flex items-center justify-between gap-2">
+                {/* Mobile — chosen-vendor pill (app mockup): photo · name ·
+                    Selected badge · Change. "Change" toggles the vendor off, the
+                    same as tapping it in the list, so the guest can pick another. */}
+                <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-cream-3 bg-white p-2 shadow-sm sm:hidden">
+                  <span className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-cream-3 bg-cream-2">
+                    <Image
+                      src={vendor.image}
+                      alt={vendor.name}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  </span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-ink">
+                      {vendor.name}
+                    </span>
+                    <span className="shrink-0 rounded-full border border-maroon/30 bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
+                      {t("Selected", "चयनित")}
+                    </span>
+                  </span>
+                  {multiVendor && (
+                    <span
+                      className={
+                        "eyebrow shrink-0 text-[10px] font-semibold " +
+                        (vendorFull ? "text-maroon" : "text-ink-soft")
+                      }
+                    >
+                      {vendorItemPicks.length}/{base}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => pickVendor(cat.id, vendor.id)}
+                    className="shrink-0 text-xs font-semibold text-maroon underline-offset-2 hover:underline"
+                  >
+                    {t("Change", "बदलें")}
+                  </button>
+                </div>
+                {/* Desktop — original gold eyebrow header (unchanged). */}
+                <div className="hidden items-center justify-between gap-2 sm:flex">
                   <p className="eyebrow text-xs font-semibold text-gold">
                     {vendor.name}
                   </p>
@@ -4308,6 +4677,23 @@ function StepMenu({
                                 : "bg-white hover:-translate-y-0.5 hover:shadow-md")
                           }
                         >
+                          {/* Mobile — leading checkbox (app mockup). Reflects the
+                              added state; brand-maroon so no non-brand hue leaks in. */}
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition sm:hidden " +
+                              (active
+                                ? "border-maroon bg-maroon text-cream"
+                                : "border-cream-3 bg-white")
+                            }
+                          >
+                            {active && (
+                              <span className="text-[11px] font-bold leading-none">
+                                ✓
+                              </span>
+                            )}
+                          </span>
                           {/* Dish thumbnail — real photo when the vendor uploaded
                               one, otherwise a deterministic premium food shot. */}
                           <span className="relative block h-[51px] w-[51px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-16 sm:w-16 sm:rounded-2xl">
@@ -5227,8 +5613,8 @@ function PaymentBox({
           )}
           <p className="mt-2 text-xs text-ink-soft">
             {t(
-              "Prefer to pay later? Choose “Bhojpatra connects you (COD)” above.",
-              "बाद में भुगतान करना चाहते हैं? ऊपर “भोजपत्र आपसे संपर्क करेगा (COD)” चुनें।",
+              "Prefer to pay later? Choose “Bhojpatra connects you” above.",
+              "बाद में भुगतान करना चाहते हैं? ऊपर “भोजपत्र आपसे संपर्क करेगा” चुनें।",
             )}
           </p>
         </>
@@ -5422,73 +5808,155 @@ function StepConfirm({
             {t("Edit all", "सब बदलें")}
           </button>
         </div>
-        <div className="mt-3 space-y-3">
-          {(() => {
-            // One card per course that has picks, one row per selected vendor
-            // (several possible on Platinum). Each row can be re-opened on the
-            // build step ("Edit") or dropped from the order ("Remove").
-            const cards = categories
-              .map((cat) => {
-                const chosen = categoryVendor[cat.id] ?? [];
-                const rows = cat.vendors
-                  .filter((v) => chosen.includes(v.id))
-                  .map((v) => ({
-                    vendor: v,
-                    picks: v.items
-                      .filter((it) => itemsFor(cat.id).includes(it.id))
-                      .map((it) => it.name),
-                  }))
-                  .filter((r) => r.picks.length > 0);
-                return { cat, rows };
-              })
-              .filter((c) => c.rows.length > 0);
-            if (cards.length === 0) {
-              return (
-                <p className="text-sm text-ink-soft">
-                  {t("No dishes selected yet.", "अभी तक कोई व्यंजन नहीं चुना गया।")}
-                </p>
-              );
-            }
-            return cards.map(({ cat, rows }) => (
-              <div key={cat.id}>
-                {rows.map((r) => (
-                  <div
-                    key={r.vendor.id}
-                    className="mt-2 flex items-start justify-between gap-3 first:mt-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink-soft">
-                        {cat.icon} {t(cat.name, cat.nameHi)} ·{" "}
-                        <span className="text-maroon">{r.vendor.name}</span>
-                      </p>
-                      <p className="text-sm text-ink">{r.picks.join(", ")}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onEditCourse(cat.id)}
-                        className="text-xs font-semibold text-maroon hover:underline"
+        {(() => {
+          // One card per course that has picks, one row per selected vendor
+          // (several possible on Platinum). Each row can be re-opened on the
+          // build step ("Edit") or dropped from the order ("Remove").
+          const cards = categories
+            .map((cat) => {
+              const chosen = categoryVendor[cat.id] ?? [];
+              const rows = cat.vendors
+                .filter((v) => chosen.includes(v.id))
+                .map((v) => ({
+                  vendor: v,
+                  picks: v.items
+                    .filter((it) => itemsFor(cat.id).includes(it.id))
+                    .map((it) => it.name),
+                }))
+                .filter((r) => r.picks.length > 0);
+              return { cat, rows };
+            })
+            .filter((c) => c.rows.length > 0);
+          if (cards.length === 0) {
+            return (
+              <p className="mt-3 text-sm text-ink-soft">
+                {t("No dishes selected yet.", "अभी तक कोई व्यंजन नहीं चुना गया।")}
+              </p>
+            );
+          }
+          const countPicks = (rows: { picks: string[] }[]) =>
+            rows.reduce((n, r) => n + r.picks.length, 0);
+          return (
+            <>
+              {/* Mobile — collapsible "Your Selection" cards (app mockup): one
+                  card per course, the first open by default. Same vendors, dishes
+                  and Edit / Remove actions as the desktop list — just accordioned. */}
+              <div className="mt-3 space-y-2.5 sm:hidden">
+                {cards.map(({ cat, rows }, i) => {
+                  const n = countPicks(rows);
+                  return (
+                    <details
+                      key={cat.id}
+                      open={i === 0}
+                      className="group overflow-hidden rounded-2xl border border-cream-3 bg-cream-2/30"
+                    >
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-3.5 py-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream text-base">
+                          {cat.icon}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-sm font-semibold text-ink">
+                            {t(cat.name, cat.nameHi)}
+                          </span>
+                          <span className="text-xs text-ink-soft">
+                            {n}{" "}
+                            {n === 1
+                              ? t("item selected", "आइटम चुना")
+                              : t("items selected", "आइटम चुने")}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className="shrink-0 text-lg leading-none text-maroon transition-transform group-open:rotate-180"
+                        >
+                          ⌄
+                        </span>
+                      </summary>
+                      <div className="space-y-3 border-t border-cream-3 px-3.5 py-3">
+                        {rows.map((r) => (
+                          <div
+                            key={r.vendor.id}
+                            className="flex items-start justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="eyebrow text-[11px] font-semibold text-gold">
+                                {r.vendor.name}
+                              </p>
+                              <p className="mt-0.5 text-sm text-ink">
+                                {r.picks.join(", ")}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => onEditCourse(cat.id)}
+                                className="text-xs font-semibold text-maroon hover:underline"
+                              >
+                                {t("Edit", "बदलें")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onRemoveVendor(cat.id, r.vendor.id)}
+                                aria-label={t(
+                                  `Remove ${r.vendor.name} from ${cat.name}`,
+                                  `${t(cat.name, cat.nameHi)} से ${r.vendor.name} हटाएं`,
+                                )}
+                                className="text-xs font-semibold text-ink-soft transition hover:text-maroon hover:underline"
+                              >
+                                {t("Remove", "हटाएं")}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+              {/* Desktop — original flat list (unchanged). */}
+              <div className="mt-3 hidden space-y-3 sm:block">
+                {cards.map(({ cat, rows }) => (
+                  <div key={cat.id}>
+                    {rows.map((r) => (
+                      <div
+                        key={r.vendor.id}
+                        className="mt-2 flex items-start justify-between gap-3 first:mt-0"
                       >
-                        {t("Edit", "बदलें")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveVendor(cat.id, r.vendor.id)}
-                        aria-label={t(
-                          `Remove ${r.vendor.name} from ${cat.name}`,
-                          `${t(cat.name, cat.nameHi)} से ${r.vendor.name} हटाएं`,
-                        )}
-                        className="text-xs font-semibold text-ink-soft transition hover:text-maroon hover:underline"
-                      >
-                        {t("Remove", "हटाएं")}
-                      </button>
-                    </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-ink-soft">
+                            {cat.icon} {t(cat.name, cat.nameHi)} ·{" "}
+                            <span className="text-maroon">{r.vendor.name}</span>
+                          </p>
+                          <p className="text-sm text-ink">{r.picks.join(", ")}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => onEditCourse(cat.id)}
+                            className="text-xs font-semibold text-maroon hover:underline"
+                          >
+                            {t("Edit", "बदलें")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveVendor(cat.id, r.vendor.id)}
+                            aria-label={t(
+                              `Remove ${r.vendor.name} from ${cat.name}`,
+                              `${t(cat.name, cat.nameHi)} से ${r.vendor.name} हटाएं`,
+                            )}
+                            className="text-xs font-semibold text-ink-soft transition hover:text-maroon hover:underline"
+                          >
+                            {t("Remove", "हटाएं")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            ));
-          })()}
-        </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Add-ons */}
@@ -5865,8 +6333,8 @@ function StepConfirm({
         ) : (
           <p className="mt-1 text-sm text-ink-soft">
             {t(
-              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) now to confirm your booking — or choose “Bhojpatra connects you (COD)” below and our team will reach out to finalise the menu and payment.`,
-              `अपनी बुकिंग पक्की करने के लिए अभी 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या नीचे “भोजपत्र आपसे संपर्क करेगा (COD)” चुनें, हमारी टीम मेन्यू और भुगतान तय करने के लिए संपर्क करेगी।`,
+              `Pay a 10% advance (${money(Math.round(grandTotal * ADVANCE_RATE))}) now to confirm your booking — or choose “Bhojpatra connects you” below and our team will reach out to finalise the menu and payment.`,
+              `अपनी बुकिंग पक्की करने के लिए अभी 10% एडवांस (${money(Math.round(grandTotal * ADVANCE_RATE))}) दें — या नीचे “भोजपत्र आपसे संपर्क करेगा” चुनें, हमारी टीम मेन्यू और भुगतान तय करने के लिए संपर्क करेगी।`,
             )}
           </p>
         )}
@@ -6126,7 +6594,12 @@ function SelectedPackageRail({
   const [open, setOpen] = useState(false);
   if (!tier) return null;
   const tierName = lang === "hi" ? tier.nameHi : tier.name;
-  const summaryLine = `${tierName} · ${money(basePerPlate)} ${t("/ plate", "/ प्लेट")}`;
+  // Fixed tiers lead with their base plate price; the Single Stall plan has no
+  // base (₹0 — the menu picks set the price), so say that instead of "₹0 / plate".
+  const summaryLine =
+    basePerPlate > 0
+      ? `${tierName} · ${money(basePerPlate)} ${t("/ plate", "/ प्लेट")}`
+      : `${tierName} · ${t("priced by your menu", "कीमत आपके मेन्यू से")}`;
   return (
     <aside className="lg:sticky lg:top-32 lg:self-start">
       <div className="rounded-2xl border border-maroon bg-white p-5 shadow-sm ring-2 ring-maroon">

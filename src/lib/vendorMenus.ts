@@ -209,24 +209,42 @@ function seedRecords(): LiveVendorRecord[] {
 }
 
 /** The curated placeholder specialists from the /vendors catalog
- *  (`vendorListings`) that the home page's Chaat / Beverage category cards land
- *  on, mapped to a booking-menu course + a representative dish list. Keyed by
- *  the SAME id as the catalog listing so a `/book?vendor=<id>` hand-off from a
- *  brand card resolves in `assembleMenuCategories()` and pre-selects the stall
- *  (without this the picked vendor silently vanishes — it exists only in the
- *  catalog id-space, never in the booking menu). Beverages ride the "welcome"
- *  (Welcome Drinks) course, chaat the "chaat" course. Decor placeholders
- *  (vl-21/22) are intentionally omitted — they're a service, not a food stall. */
+ *  (`vendorListings`) that the home page's category cards land on, mapped to a
+ *  booking-menu course + a representative dish list. Keyed by the SAME id as
+ *  the catalog listing so a `/book?vendor=<id>` hand-off from a brand card
+ *  resolves in `assembleMenuCategories()` and pre-selects the stall (without
+ *  this the picked vendor silently vanishes — it exists only in the catalog
+ *  id-space, never in the booking menu). Beverages ride the "welcome"
+ *  (Welcome Drinks) course, chaat the "chaat" course, caterers "main", the
+ *  Baina Box mithai houses "sweets". Catalog caterers that duplicate a wizard
+ *  specialist by name (vl-1/2/5/9/11 ↔ Awadhi Royal, Nawabi Dawat, Namma
+ *  Ruchi, Chettinad Feast Co., Tandoor Tales) are NOT seeded — the wizard's
+ *  hand-off bridges those by name-slug so the roster never shows the same
+ *  brand twice. Decor placeholders (vl-21/22) are intentionally omitted —
+ *  they're a service, not a food stall. Items default to veg; a `[name,
+ *  "non-veg"]` tuple marks the exceptions. */
 const PLACEHOLDER_SPECIALIST_MENUS: {
   id: string;
   categoryId: string;
-  items: string[];
+  items: (string | [name: string, diet: DietType])[];
 }[] = [
   { id: "vl-16", categoryId: "chaat", items: ["Basket Chaat", "Aloo Tikki Chaat", "Pani Puri", "Dahi Bhalla", "Papdi Chaat", "Matar Tikki"] },
   { id: "vl-17", categoryId: "chaat", items: ["Bhel Puri", "Sev Puri", "Ragda Pattice", "Dahi Puri", "Pani Puri", "Samosa Chaat"] },
   { id: "vl-18", categoryId: "chaat", items: ["Aloo Tikki Chaat", "Ram Ladoo", "Golgappa", "Papdi Chaat", "Dahi Bhalla", "Matar Kulcha"] },
   { id: "vl-19", categoryId: "welcome", items: ["Rose Sharbat", "Khus Sharbat", "Kesar Thandai", "Shikanji", "Aam Panna", "Falsa Sharbat"] },
   { id: "vl-20", categoryId: "welcome", items: ["Virgin Mojito", "Blue Lagoon", "Fruit Punch", "Watermelon Cooler", "Mint Lemonade", "Masala Cola"] },
+  // Catalog caterers with no wizard counterpart — bookable on the Main Course.
+  { id: "vl-3", categoryId: "main", items: ["Paneer Lababdar", "Dal Makhani", ["Butter Chicken", "non-veg"], ["Mutton Korma", "non-veg"], "Veg Biryani", "Butter Naan"] },
+  { id: "vl-4", categoryId: "main", items: ["Puran Poli", "Masale Bhat", "Batata Bhaji", "Amti Dal", "Bharli Vangi", "Solkadhi"] },
+  { id: "vl-6", categoryId: "main", items: [["Shorshe Ilish", "non-veg"], ["Kosha Mangsho", "non-veg"], ["Chingri Malai Curry", "non-veg"], "Aloo Posto", "Cholar Dal", "Basanti Pulao"] },
+  { id: "vl-7", categoryId: "main", items: [["Hyderabadi Chicken Biryani", "non-veg"], ["Mutton Haleem", "non-veg"], ["Chicken 65", "non-veg"], ["Nihari", "non-veg"], "Mirchi ka Salan", "Double ka Meetha"] },
+  { id: "vl-8", categoryId: "main", items: ["Dal Baati Churma", "Gatte ki Sabzi", "Ker Sangri", "Pyaaz Kachori", "Bajre ki Roti", "Papad ki Sabzi"] },
+  { id: "vl-10", categoryId: "main", items: ["Veg Manchurian", "Hakka Noodles", "Paneer Chilli", ["Grilled Chicken", "non-veg"], "Veg Au Gratin", "Schezwan Fried Rice"] },
+  { id: "vl-12", categoryId: "main", items: ["Sattvik Thali", "Jeera Aloo", "Lauki Kofta", "Sambar Rice", "Curd Rice", "Moong Dal Halwa"] },
+  // Baina Box mithai houses — the home Sweets category cards.
+  { id: "vl-13", categoryId: "sweets", items: ["Malai Gilori", "Kesar Peda", "Motichoor Ladoo", "Kaju Katli", "Imarti", "Sondesh"] },
+  { id: "vl-14", categoryId: "sweets", items: ["Besan Ladoo", "Kesar Barfi", "Gujiya", "Rasmalai", "Dry Fruit Ladoo", "Balushahi"] },
+  { id: "vl-15", categoryId: "sweets", items: ["Hazelnut Barfi", "Chocolate Ladoo", "Kaju Katli", "Baklava", "Motichoor Ladoo", "Assorted Mithai Box"] },
 ];
 
 /** Bookable seed records for the catalog placeholder specialists above. Card
@@ -257,10 +275,11 @@ function placeholderSpecialistSeeds(): LiveVendorRecord[] {
           {
             categoryId: spec.categoryId,
             perPlate: listing.priceFrom,
-            items: spec.items.map((name) => ({
-              name,
-              diet: "veg" as DietType,
-            })),
+            items: spec.items.map((it) =>
+              typeof it === "string"
+                ? { name: it, diet: "veg" as DietType }
+                : { name: it[0], diet: it[1] },
+            ),
           },
         ],
         createdAt: now,

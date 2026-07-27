@@ -29,8 +29,8 @@ export const ORDER_PAYMENT_LABELS: Record<
   UPI: { en: "UPI ID", hi: "UPI आईडी" },
   QR: { en: "Scan QR", hi: "QR स्कैन" },
   Connect: {
-    en: "Bhojpatra connects you (COD)",
-    hi: "भोजपत्र आपसे संपर्क करेगा (COD)",
+    en: "Bhojpatra connects you",
+    hi: "भोजपत्र आपसे संपर्क करेगा",
   },
 };
 
