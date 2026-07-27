@@ -40,17 +40,10 @@ export default function Packages() {
     tiers.find((p) => p.popular)?.id ?? tiers[0].id,
   );
 
-  // Depth of a tier within the stack: 0 = selected (front), 1 & 2 = the other
-  // two fanned behind it in their natural order. STACK maps each depth to the
-  // transform / opacity / z-index that lifts the front card and dims the rest.
-  const depthOf = (id: string) => {
-    if (id === selectedId) return 0;
-    const rest = tiers.filter((tp) => tp.id !== selectedId);
-    return rest.findIndex((tp) => tp.id === id) + 1;
-  };
+  const selectedTier = tiers.find((p) => p.id === selectedId) ?? tiers[0];
 
-  // One tier scroll + its "Book" fold CTA — shared by the mobile stacked deck
-  // and the desktop side-by-side grid so both render an identical card.
+  // One tier scroll + its "Book" fold CTA — shared by the mobile single-card
+  // view and the desktop side-by-side grid so both render an identical card.
   const renderCard = (tier: (typeof tiers)[number], isSelected: boolean) => {
     const tierName = lang === "hi" ? tier.nameHi : tier.name;
     return (
@@ -93,18 +86,17 @@ export default function Packages() {
             {lang === "hi" ? homePackages.subtitleHi : homePackages.subtitle}
           </p>
           <Ornament className="mx-auto mt-6 text-maroon/50" />
-          {/* Cue that the three tiers are a stack you switch between — only the
-              mobile deck stacks, so this hint is hidden once the desktop grid
-              lays all three out side by side. */}
+          {/* Cue that the selector below switches the single card — mobile
+              only; the desktop grid lays all three out side by side. */}
           <p className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-maroon/25 bg-cream/50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon sm:hidden">
-            {t("Tap a tier to bring it forward", "आगे लाने के लिए टियर चुनें")}
+            {t("Pick a tier to view its menu", "मेन्यू देखने के लिए टियर चुनें")}
           </p>
         </Reveal>
 
         {/* ── Tier selector — three buttons (Silver / Gold / Platinum) in a
-            cream segmented control. Tapping one lifts that scroll to the front
-            of the stack below. Mobile only — the desktop grid shows every tier
-            at once, so no selector is needed there. ── */}
+            cream segmented control. Tapping one swaps the single scroll below
+            to that tier. Mobile only — the desktop grid shows every tier at
+            once, so no selector is needed there. ── */}
         <Reveal className="mx-auto mt-12 flex max-w-md items-stretch justify-center gap-1.5 rounded-full border border-maroon/20 bg-cream/40 p-1.5 shadow-card sm:hidden">
           {tiers.map((tier) => {
             const active = tier.id === selectedId;
@@ -128,34 +120,14 @@ export default function Packages() {
           })}
         </Reveal>
 
-        {/* ── Mobile stacked scrolls — every tier occupies the same spot; the
-            selected one sits at the front while the other two fan behind it,
-            dimmed and scaled back. Selecting a button smoothly lifts its scroll
-            forward. All cards share one grid cell (col/row-start-1) so the stack
-            sizes to the front card; only transforms/opacity change per depth.
+        {/* ── Mobile single scroll — only the selected tier is rendered; the
+            parchment artwork is semi-transparent, so layering the other tiers
+            behind it (even dimmed) bled their text through the front card.
+            Re-keying on the tier fades the fresh card in on every switch.
             Hidden on sm+, where the side-by-side grid below takes over. ── */}
         <Reveal className="mx-auto mt-12 w-full max-w-sm sm:hidden">
-          <div className="grid [&>*]:col-start-1 [&>*]:row-start-1">
-            {tiers.map((tier) => {
-              const active = tier.id === selectedId;
-              const s = STACK[depthOf(tier.id)];
-              return (
-                <div
-                  key={tier.id}
-                  aria-hidden={!active}
-                  className={`transition-all duration-500 ease-out ${
-                    active ? "pointer-events-auto" : "pointer-events-none"
-                  }`}
-                  style={{
-                    transform: s.transform,
-                    opacity: s.opacity,
-                    zIndex: s.zIndex,
-                  }}
-                >
-                  {renderCard(tier, active)}
-                </div>
-              );
-            })}
+          <div key={selectedTier.id} className="animate-fade">
+            {renderCard(selectedTier, true)}
           </div>
         </Reveal>
 
@@ -304,15 +276,6 @@ export default function Packages() {
     </section>
   );
 }
-
-/** Per-depth placement for the stacked scrolls — index by depthOf(tier.id).
- *  Depth 0 sits at the front, full size and opacity; 1 & 2 fan behind it,
- *  nudged down, scaled back and dimmed so the selected tier reads as lifted. */
-const STACK = [
-  { transform: "translateY(0) scale(1)", opacity: 1, zIndex: 30 },
-  { transform: "translateY(18px) scale(0.94)", opacity: 0.55, zIndex: 20 },
-  { transform: "translateY(36px) scale(0.88)", opacity: 0.3, zIndex: 10 },
-] as const;
 
 /** WhatsApp glyph — rendered in a single brand colour via currentColor. */
 function WhatsAppIcon({ className = "" }: { className?: string }) {
