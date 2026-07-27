@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import SectionIntro from "@/components/SectionIntro";
+import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
@@ -65,6 +66,16 @@ export default function ChooseOccasion() {
             }),
           )}
         </div>
+      </div>
+
+      <div className="mt-8 flex justify-center sm:mt-10">
+        <Button
+          href="/occasions"
+          variant="secondary"
+          rightIcon={<span aria-hidden>→</span>}
+        >
+          {t("View all occasions", "सभी अवसर देखें")}
+        </Button>
       </div>
     </section>
   );

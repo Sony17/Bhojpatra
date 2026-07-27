@@ -3,22 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import SectionIntro from "@/components/SectionIntro";
+import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
-
-// Maps a service category to a pre-filtered vendor-catalog deep-link.
-const CATEGORY_HREF: Record<string, string> = {
-  caterers: "/vendors",
-  "live-counters": "/vendors?meal=Live+Counters",
-  sweets: "/vendors?cuisine=Sweets",
-  chaat: "/vendors?cuisine=Chaat",
-  beverages: "/vendors?cuisine=Beverages",
-  decor: "/vendors?cuisine=Decor",
-};
-
-function serviceCategoryHref(id: string, name: string): string {
-  return CATEGORY_HREF[id] ?? `/vendors?q=${encodeURIComponent(name)}`;
-}
+import { serviceCategoryHref } from "@/lib/homeLinks";
 
 /**
  * Category rail under "Single stall, one Bhojpatra Experience…" —
@@ -106,6 +94,16 @@ export default function TopCategories() {
             )),
           )}
         </div>
+      </div>
+
+      <div className="mt-8 flex justify-center sm:mt-10">
+        <Button
+          href="/categories"
+          variant="secondary"
+          rightIcon={<span aria-hidden>→</span>}
+        >
+          {lang === "hi" ? services.ctaHi : services.cta}
+        </Button>
       </div>
     </section>
   );
