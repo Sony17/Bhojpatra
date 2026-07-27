@@ -312,13 +312,13 @@ export default function Hero() {
             return (
               <li
                 key={badge.id}
-                className="flex min-w-0 flex-col items-center gap-1 px-0.5 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
+                className="flex min-w-0 flex-col items-center gap-1 px-1 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/85 text-maroon ring-1 ring-maroon/12 sm:mt-0.5 sm:h-9 sm:w-9">
                   <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block whitespace-nowrap text-[9px] font-semibold leading-tight -tracking-[0.02em] text-ink sm:whitespace-normal sm:text-[13px] sm:tracking-wide">
+                  <span className="block min-h-[2.5em] text-[9px] font-semibold leading-tight -tracking-[0.02em] text-ink sm:min-h-0 sm:text-[13px] sm:tracking-wide">
                     {title}
                   </span>
                   <span className="mt-0.5 block text-[8px] leading-tight text-ink/65 sm:mt-1 sm:text-xs sm:leading-snug">

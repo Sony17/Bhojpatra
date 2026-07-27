@@ -23,23 +23,22 @@ const SCROLL_RATIO = "458 / 545";
  * Writable area of the scroll, as inset % of the artwork. The menu is
  * positioned inside this box; nudge these if text crowds the frame. The
  * horizontal insets keep text clear of the maroon border and the right-hand
- * roll; the vertical insets clear the top lace band and bottom roll.
+ * roll; the vertical insets clear the top lace band, the dotted flourish
+ * (83.5–84.2% of the artwork height) and the bottom roll (from 88.1%).
  *
- * On desktop (sm+) the box reaches a little further down the parchment so the
- * whole menu fits without an inner scrollbar — the cards there are large enough
- * that the extra rows still clear the bottom roll. Mobile keeps the tighter box
- * (its longer footnotes would otherwise crowd the fold-mounted CTA) and its
- * inner scroll as a fallback.
+ * The box reaches well down the parchment at every breakpoint so the whole
+ * menu is written out at once — no inner scrollbar on any surface. Mobile now
+ * shares the roomier desktop box; the cards there are large enough that the
+ * full course list still clears the bottom roll before the fold-mounted CTA.
  */
-const PARCHMENT =
-  "left-[13%] right-[21%] top-[16%] bottom-[19%] sm:top-[15%] sm:bottom-[14%]";
+const PARCHMENT = "left-[13%] right-[21%] top-[13.5%] bottom-[17%]";
 
 /** Small cream rhombus marker — elegant, ringed in maroon. */
 function RhombusMarker() {
   return (
     <span
       aria-hidden="true"
-      className="mt-1.5 h-2 w-2 shrink-0 rotate-45 bg-cream shadow-[inset_0_0_0_1px_rgba(185,32,37,0.55)]"
+      className="mt-[max(2.5px,1cqw)] h-[max(4px,1.5cqw)] w-[max(4px,1.5cqw)] shrink-0 rotate-45 bg-cream shadow-[inset_0_0_0_1px_rgba(185,32,37,0.55)]"
     />
   );
 }
@@ -99,9 +98,18 @@ export default function PackageScrollCard({
   accordion?: boolean;
 }) {
   const { lang, t } = useLang();
-  // Courses start collapsed so the scroll reads clean; clicking a course header
-  // reveals the items beneath it (tracked by segment index).
-  const [openCourses, setOpenCourses] = useState<Set<number>>(new Set());
+  // Group the flat feature list into course segments (a heading plus the items
+  // beneath it). The full-scroll surfaces (home page, booking wizard) write the
+  // WHOLE menu out — every course header and every item visible at once, no
+  // click-to-reveal — so nothing on the scroll is ever hidden. Only the compact
+  // accordion deck (/ideate) collapses courses to bound its height, opening one
+  // at a time.
+  const segments = buildCourseSegments(tier.features);
+  const [openCourses, setOpenCourses] = useState<Set<number>>(() =>
+    accordion
+      ? new Set()
+      : new Set(segments.filter((s) => s.type === "course").map((s) => s.index)),
+  );
   const toggleCourse = (index: number) =>
     setOpenCourses((prev) => {
       if (accordion) return prev.has(index) ? new Set() : new Set([index]);
@@ -118,10 +126,6 @@ export default function PackageScrollCard({
   const bestFor = lang === "hi" ? tier.bestForHi : tier.bestFor;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
 
-  // Group the flat feature list into course segments, then write the whole
-  // menu out — every course header and every item is shown (no collapsing).
-  const segments = buildCourseSegments(tier.features);
-
   // Whole-scroll metallic finish — the palette's stand-ins for the metals:
   // brand white reads silver, brand cream reads gold, and brand black reads
   // platinum. Each is diagonal banding (the metallic read) masked to the patra
@@ -129,26 +133,28 @@ export default function PackageScrollCard({
   // multiply deepens gold/platinum and soft-light brightens silver, so the
   // scroll's red stays saturated instead of fading under a translucent wash.
   // Custom (and any future tier) stays plain.
-  // Gold gets two layers: a normal-blend cream underlay that re-establishes a
-  // truly golden parchment (the artwork is semi-transparent, so without it the
-  // pink glow behind the card tints the parchment rosy), then the multiply
-  // banding for metallic depth. Silver and platinum need one layer each.
+  // Kept deliberately subtle — a soft metallic wash, not hard stripes — so the
+  // written menu reads clean and premium rather than busy. Gold gets two layers:
+  // a normal-blend cream underlay that re-establishes a truly golden parchment
+  // (the artwork is semi-transparent, so without it the pink glow behind the
+  // card tints the parchment rosy), then a gentle multiply sheen. Silver and
+  // platinum need one layer each.
   const finish: { band: string; blend: "normal" | "multiply" | "soft-light" }[] =
     popular
       ? [
           {
-            band: "linear-gradient(150deg, rgba(240,208,158,0.5), rgba(240,208,158,0.3) 45%, rgba(240,208,158,0.45))",
+            band: "linear-gradient(150deg, rgba(240,208,158,0.4), rgba(240,208,158,0.28) 50%, rgba(240,208,158,0.38))",
             blend: "normal",
           },
           {
-            band: "linear-gradient(150deg, rgba(240,208,158,0.85), rgba(240,208,158,0.45) 38%, rgba(240,208,158,0.8) 52%, rgba(240,208,158,0.4) 66%, rgba(240,208,158,0.75))",
+            band: "linear-gradient(150deg, rgba(240,208,158,0.46), rgba(240,208,158,0.3) 45%, rgba(240,208,158,0.42) 60%, rgba(240,208,158,0.32))",
             blend: "multiply",
           },
         ]
       : premium
         ? [
             {
-              band: "linear-gradient(150deg, rgba(0,0,0,0.32), rgba(0,0,0,0.14) 38%, rgba(0,0,0,0.28) 52%, rgba(0,0,0,0.12) 66%, rgba(0,0,0,0.26))",
+              band: "linear-gradient(150deg, rgba(0,0,0,0.2), rgba(0,0,0,0.1) 42%, rgba(0,0,0,0.17) 55%, rgba(0,0,0,0.09) 68%, rgba(0,0,0,0.16))",
               blend: "multiply",
             },
           ]
@@ -196,9 +202,13 @@ export default function PackageScrollCard({
         </span>
       )}
 
-      {/* ── Patra scroll artwork with the entire menu written on it ── */}
+      {/* ── Patra scroll artwork with the entire menu written on it ──
+          [container-type:inline-size] makes this the reference for the cqw
+          type/spacing units used on the parchment: all the written content
+          scales with the card exactly like the artwork does, so the menu
+          fits identically at every card size — nothing can clip. */}
       <div
-        className={`relative w-full transition duration-300 ${
+        className={`relative w-full [container-type:inline-size] transition duration-300 ${
           selected
             ? "[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.45))]"
             : "[filter:drop-shadow(0_10px_22px_rgba(0,0,0,0.25))] group-hover:[filter:drop-shadow(0_16px_30px_rgba(185,32,37,0.32))]"
@@ -231,16 +241,6 @@ export default function PackageScrollCard({
           />
         ))}
 
-        {/* Platinum-only shimmer sweep — the same mask keeps it inside the
-            scroll's silhouette. The other tiers carry no shine. */}
-        {premium && (
-          <div
-            aria-hidden="true"
-            className="premium-shimmer pointer-events-none absolute inset-0"
-            style={scrollMask}
-          />
-        )}
-
         {/* Writable parchment area. The masked finish above only bites where
             the artwork is opaque (the red folds); the parchment pixels are
             near-transparent, so Platinum's smoky cast is painted here as a
@@ -261,21 +261,6 @@ export default function PackageScrollCard({
               : undefined
           }
         >
-          {/* Mid-card shimmer — masked with a radial fade so the sweeping band
-              dissolves before the parchment box's edges instead of being cut
-              off by them (a hard clip reads as a visible rectangle). */}
-          {premium && (
-            <div
-              aria-hidden="true"
-              className="premium-shimmer pointer-events-none absolute inset-0 z-10"
-              style={{
-                WebkitMaskImage:
-                  "radial-gradient(closest-side at 50% 45%, black 40%, transparent 96%)",
-                maskImage:
-                  "radial-gradient(closest-side at 50% 45%, black 40%, transparent 96%)",
-              }}
-            />
-          )}
           {/* Selected marker — a maroon check chip pinned to the parchment's
               top-right corner so the chosen scroll is unmistakable. */}
           {selected && (
@@ -287,17 +272,19 @@ export default function PackageScrollCard({
             </span>
           )}
 
-          {/* Title + price */}
-          <h3 className="text-center font-display text-[1.75rem] leading-none tracking-wide text-maroon">
+          {/* ── Header (the "30%") — identity, price, guests, occasion. Kept
+              compact and small so the written menu below owns the larger
+              share of the scroll. ── */}
+          <h3 className="text-center font-display text-[max(16px,5.8cqw)] leading-none tracking-wide text-maroon">
             {tierName}
           </h3>
-          <p className="mt-1 text-center text-sm text-ink-soft">
+          <p className="mt-[1cqw] text-center text-[max(9px,3.1cqw)] leading-none text-ink-soft">
             <span className="font-semibold text-maroon">@ {tier.price}</span>{" "}
             {lang === "hi" ? tier.unitHi : tier.unit}
           </p>
           {pax && (
             <p
-              className={`mx-auto mt-1.5 rounded-full px-2 py-0.5 text-center text-xs font-semibold tracking-wide ${
+              className={`mx-auto mt-[1.1cqw] rounded-full px-2.5 py-0.5 text-center text-[max(8px,2.7cqw)] font-semibold tracking-wide ${
                 premium
                   ? "bg-ink text-cream"
                   : silver
@@ -308,10 +295,8 @@ export default function PackageScrollCard({
               {pax}
             </p>
           )}
-
-          {/* Occasion guidance — which celebrations the tier suits best. */}
           {bestFor && (
-            <p className="mt-1.5 text-center text-xs leading-snug text-ink-soft">
+            <p className="mt-[1.1cqw] text-center text-[max(8px,2.7cqw)] leading-tight text-ink-soft">
               <span className="font-semibold text-maroon">
                 {t("Perfect for", "इनके लिए परफेक्ट")}:
               </span>{" "}
@@ -319,13 +304,12 @@ export default function PackageScrollCard({
             </p>
           )}
 
-          {/* Entire menu — every course and item written out. On desktop the
-              enlarged parchment fits the whole menu, so it flows without an
-              inner scrollbar; mobile's compact cards keep the scroll as a
-              fallback for a very long tier.
-              pl-1 gives the rotated rhombus markers room — their corners
-              poke ~2px past their box and were being clipped flat. */}
-          <ul className="mt-2 min-h-0 flex-1 overflow-y-auto pl-1 pr-1 sm:flex-none sm:overflow-visible">
+          {/* ── Menu (the "70%") — the scroll's focus. Given the dominant share
+              of the parchment (flex-1), unframed — no rule bars — so the items
+              read as ink written straight onto the parchment. Rows breathe
+              with even spacing for a clean, premium read. The whole list shows
+              at once — no inner scroll. ── */}
+          <ul className="mt-[1.4cqw] flex flex-1 flex-col justify-center gap-y-[1cqw] py-[1cqw] pl-1 pr-1">
             {segments.map((seg) => {
               if (seg.type === "item") {
                 const label =
@@ -333,7 +317,7 @@ export default function PackageScrollCard({
                 return (
                   <li
                     key={seg.index}
-                    className="flex items-start gap-2 border-b border-maroon/10 py-1 text-left text-[13px] leading-tight text-ink last:border-b-0 sm:py-0.5"
+                    className="flex items-start gap-2 text-left text-[max(9px,2.9cqw)] leading-tight text-ink"
                   >
                     <RhombusMarker />
                     <span>{label}</span>
@@ -344,15 +328,45 @@ export default function PackageScrollCard({
               const headingLabel =
                 lang === "hi" ? seg.heading.labelHi : seg.heading.label;
               const hasItems = seg.items.length > 0;
-              const isOpen = openCourses.has(seg.index);
+              // Full-scroll surfaces write every course out in full; only the
+              // compact accordion deck collapses and toggles.
+              const isOpen = accordion ? openCourses.has(seg.index) : true;
+              const items = hasItems && isOpen && (
+                <ul className="mt-[0.5cqw] flex flex-col gap-y-[0.5cqw]">
+                  {seg.items.map(({ feature, index }) => {
+                    const label =
+                      lang === "hi" ? feature.labelHi : feature.label;
+                    return (
+                      <li
+                        key={index}
+                        className="pl-5 text-left text-[max(9px,2.9cqw)] leading-tight text-ink-soft"
+                      >
+                        <span>{label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+
+              // Non-accordion: a plain course header with every item written
+              // out beneath it — nothing hidden, no toggle chrome.
+              if (!accordion) {
+                return (
+                  <li key={seg.index}>
+                    <div className="flex items-start gap-2 text-left text-[max(9px,2.9cqw)] font-semibold leading-tight text-maroon">
+                      <RhombusMarker />
+                      <span className="flex-1">{headingLabel}</span>
+                    </div>
+                    {items}
+                  </li>
+                );
+              }
+
               return (
-                <li
-                  key={seg.index}
-                  className="border-b border-maroon/10 py-1 last:border-b-0 sm:py-0.5"
-                >
+                <li key={seg.index}>
                   {/* Course header — click to reveal its items; kept collapsed
-                      by default so the scroll stays clean. Stops propagation so
-                      expanding a course doesn't also select the card. */}
+                      by default so the compact deck stays bounded. Stops
+                      propagation so expanding doesn't also select the card. */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -361,7 +375,7 @@ export default function PackageScrollCard({
                       toggleCourse(seg.index);
                     }}
                     aria-expanded={hasItems ? isOpen : undefined}
-                    className="flex w-full items-start gap-2 rounded text-left text-[13px] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
+                    className="flex w-full items-start gap-2 rounded text-left text-[max(9px,2.9cqw)] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
                   >
                     <RhombusMarker />
                     <span className="flex-1">{headingLabel}</span>
@@ -370,15 +384,15 @@ export default function PackageScrollCard({
                         {/* Item count — only when more than one line is hidden,
                             so a lone detail row doesn't read as a quantity. */}
                         {seg.items.length > 1 && (
-                          <span className="mt-px shrink-0 rounded-full border border-maroon/30 px-1.5 text-[11px] font-bold leading-tight text-maroon">
+                          <span className="mt-px shrink-0 rounded-full border border-maroon/25 px-1.5 text-[max(8px,2.5cqw)] font-bold leading-tight text-maroon">
                             {seg.items.length}
                           </span>
                         )}
-                        {/* Plus → rotates to a cross when open; a clearer
-                            "there's more" affordance than a sideways chevron. */}
+                        {/* Plus → rotates to a cross when open; a subtle
+                            "there's more" affordance. */}
                         <span
                           aria-hidden="true"
-                          className={`mt-0.5 shrink-0 text-sm leading-none transition-transform duration-200 ${
+                          className={`shrink-0 text-[max(9px,3.2cqw)] leading-none text-maroon/50 transition-transform duration-200 ${
                             isOpen ? "rotate-45" : ""
                           }`}
                         >
@@ -387,31 +401,16 @@ export default function PackageScrollCard({
                       </>
                     )}
                   </button>
-                  {/* Items — revealed only when the course is expanded. */}
-                  {hasItems && isOpen && (
-                    <ul className="mt-0.5">
-                      {seg.items.map(({ feature, index }) => {
-                        const label =
-                          lang === "hi" ? feature.labelHi : feature.label;
-                        return (
-                          <li
-                            key={index}
-                            className="py-0.5 pl-5 text-left text-[13px] leading-tight text-ink-soft"
-                          >
-                            <span>{label}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  {items}
                 </li>
               );
             })}
           </ul>
 
-          {/* Closing note — sits just above the CTA, inside the parchment. */}
+          {/* Closing note — extra-small footnote type so the full sentence
+              always fits above the bottom roll, on every surface. */}
           {footnote && footnote.length > 0 && (
-            <div className="mt-1.5 text-center text-xs font-medium leading-tight text-ink-soft">
+            <div className="mt-[1cqw] text-center text-[max(8px,2.5cqw)] font-medium leading-snug text-ink-soft">
               {footnote.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}

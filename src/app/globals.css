@@ -390,9 +390,11 @@ select:-webkit-autofill {
 }
 
 /* Non-hero pages: breathing room under sticky app header.
-   Proper layout spacing so the floating topbar does not overlap page content. */
+   The sticky app bar already reserves its own 64px of flow height, so this only
+   needs to clear its 20px downward offset plus a small gap — not a full header's
+   worth. Keep it tight on mobile so content sits just under the floating topbar. */
 .app-page-pad {
-  padding-top: calc(5.5rem + var(--safe-top));
+  padding-top: calc(2.125rem + var(--safe-top));
 }
 
 /* Detail / AppBar screens: 0 mobile top pad so AppBar attaches cleanly to top-0;

@@ -86,11 +86,6 @@ export default function Packages() {
             {lang === "hi" ? homePackages.subtitleHi : homePackages.subtitle}
           </p>
           <Ornament className="mx-auto mt-6 text-maroon/50" />
-          {/* Cue that the selector below switches the single card — mobile
-              only; the desktop grid lays all three out side by side. */}
-          <p className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-maroon/25 bg-cream/50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon sm:hidden">
-            {t("Pick a tier to view its menu", "मेन्यू देखने के लिए टियर चुनें")}
-          </p>
         </Reveal>
 
         {/* ── Tier selector — three buttons (Silver / Gold / Platinum) in a
@@ -125,8 +120,11 @@ export default function Packages() {
             behind it (even dimmed) bled their text through the front card.
             Re-keying on the tier fades the fresh card in on every switch.
             Hidden on sm+, where the side-by-side grid below takes over. ── */}
-        <Reveal className="mx-auto mt-12 w-full max-w-sm sm:hidden">
-          <div key={selectedTier.id} className="animate-fade">
+        <Reveal className="-mx-5 mt-12 sm:hidden">
+          <div
+            key={selectedTier.id}
+            className="animate-fade mx-auto w-full max-w-md px-1"
+          >
             {renderCard(selectedTier, true)}
           </div>
         </Reveal>
