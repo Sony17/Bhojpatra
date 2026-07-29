@@ -6,6 +6,9 @@
  *                 pruned on menu save.
  *   • "gallery" — the photo gallery on the vendor's public detail page
  *                 (capped, individually deletable).
+ *   • "venue"   — photos a Venue-Owner partner uploads for their venue
+ *                 listings (referenced by URL from venue records; served via
+ *                 /api/venues/photo/[id]).
  *
  * Same storage split as KYC documents (`kyc.ts`): the BYTES go to the private
  * Vercel Blob store (or `data/vendor-photos/` locally when the token is
@@ -33,19 +36,21 @@ export const PHOTO_ALLOWED_TYPES: Record<string, string> = {
 
 export const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
-export type VendorPhotoKind = "card" | "dish" | "gallery";
+export type VendorPhotoKind = "card" | "dish" | "gallery" | "venue";
 
 export const GALLERY_MAX_PHOTOS = 8;
 /** Hard backstop for dish photos (one per dish; 8 sections × 24 dishes). */
 export const DISH_MAX_PHOTOS = 192;
+/** Hard backstop for one owner's venue photos (8 per venue × ~10 venues). */
+export const VENUE_OWNER_MAX_PHOTOS = 80;
 
 export function isPhotoKind(v: unknown): v is VendorPhotoKind {
-  return v === "card" || v === "dish" || v === "gallery";
+  return v === "card" || v === "dish" || v === "gallery" || v === "venue";
 }
 
 export interface VendorPhoto {
   id: string;
-  /** Auth user (role "vendor") the photo belongs to. */
+  /** Auth user the photo belongs to — a vendor, or a partner for "venue". */
   ownerUserId: string;
   /** What the photo is used for; records from before kinds existed are cards. */
   kind?: VendorPhotoKind;

@@ -39,6 +39,23 @@ export const VENUE_TYPES = [
   "Heritage Venue",
 ] as const;
 
+/** The space categories a venue can offer, each priced separately. */
+export type VenueSpaceKey =
+  | "banquet"
+  | "lawn"
+  | "terrace"
+  | "conference"
+  | "rooms";
+
+/** An owner-chosen space a venue offers, with its own booking fee in ₹. */
+export interface VenueSpacePrice {
+  key: VenueSpaceKey;
+  price: number;
+}
+
+/** Cap on the photos a venue lists (cover = first). */
+export const VENUE_MAX_IMAGES = 8;
+
 /**
  * An owner-registered venue as persisted on disk (`data/venues.json`). Mirrors
  * the seed `Venue` shape, plus a numeric booking fee and owner attribution so
@@ -58,6 +75,12 @@ export interface VenueRecord {
   rating: number;
   reviews: number;
   image: string;
+  /** Full ordered photo gallery (first = cover). `image` mirrors the first
+   *  entry so single-image consumers keep working. Absent on legacy records. */
+  images?: string[];
+  /** The spaces this venue offers with owner-set prices. Absent on legacy
+   *  records, whose spaces are derived from the headline fee instead. */
+  spaces?: VenueSpacePrice[];
   /** Referral code of the Venue-Owner partner who published this venue. */
   ownerCode: string;
   ownerName?: string;
@@ -81,6 +104,8 @@ export interface VenueRecord {
  */
 export interface BookableVenue extends Venue {
   price: number;
+  images?: string[];
+  spaces?: VenueSpacePrice[];
   ownerCode?: string;
   ownerName?: string;
   phone?: string;
@@ -122,6 +147,19 @@ export function isServableVenueImage(src: string | undefined): boolean {
 export function sanitizeVenueImage(src: string | undefined): string {
   const url = (src ?? "").trim();
   return isServableVenueImage(url) ? url : DEFAULT_VENUE_IMAGE;
+}
+
+/** A venue's full photo list — cover first, deduped, never empty (falls back
+ *  to the single `image`, then the default photo). */
+export function venueImages(venue: {
+  image?: string;
+  images?: string[];
+}): string[] {
+  const all = [venue.image, ...(venue.images ?? [])]
+    .map((s) => (s ?? "").trim())
+    .filter((s) => isServableVenueImage(s));
+  const unique = [...new Set(all)];
+  return unique.length ? unique : [DEFAULT_VENUE_IMAGE];
 }
 
 /** Parse a display price like "₹1,20,000" or "₹85,000" → 120000 / 85000. */
@@ -178,7 +216,7 @@ export function venueTypeLabel(type: string, lang: "en" | "hi"): string {
  * rooms offered per-room, `subject` to availability rather than booked online.
  */
 export interface VenueSpaceOption {
-  key: "banquet" | "lawn" | "rooms";
+  key: VenueSpaceKey;
   en: string;
   hi: string;
   icon: string;
@@ -189,6 +227,21 @@ export interface VenueSpaceOption {
   subject?: boolean;
 }
 
+/** Everything about a space category except its price — the fixed vocabulary
+ *  the owner form offers and the customer surfaces label from. Order here is
+ *  display order everywhere. */
+export const VENUE_SPACE_CATALOG: Omit<VenueSpaceOption, "price">[] = [
+  { key: "banquet", en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️" },
+  { key: "lawn", en: "Open Lawn", hi: "खुला लॉन", icon: "🌿" },
+  { key: "terrace", en: "Rooftop / Terrace", hi: "रूफ़टॉप / छत", icon: "🌇" },
+  { key: "conference", en: "Conference Hall", hi: "कॉन्फ़्रेंस हॉल", icon: "🏢" },
+  { key: "rooms", en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", subject: true },
+];
+
+export function isVenueSpaceKey(v: unknown): v is VenueSpaceKey {
+  return VENUE_SPACE_CATALOG.some((c) => c.key === v);
+}
+
 /** Open lawns run ~20% larger than the indoor hall; guest rooms cost ~5% of the
  *  hall fee per room / night. Derived from the venue's headline fee so every
  *  venue — seed or owner-listed — gets sensible per-space pricing for free. */
@@ -196,14 +249,22 @@ export const VENUE_LAWN_PREMIUM = 1.2;
 export const VENUE_ROOM_RATE = 0.05;
 
 /**
- * The spaces a venue offers, priced off its headline fee: a banquet hall (the
- * "from" price), an open lawn (a step up), and guest rooms (per room, subject
- * to availability). Every venue lists all three — matching the generated
- * description and the seed catalogue's assumption that a venue is multi-space.
+ * The spaces a venue offers. When the owner set them explicitly (`spaces` on
+ * the record), those categories + prices are the truth. Otherwise — seed and
+ * legacy venues — the classic trio is derived from the headline fee: a banquet
+ * hall (the "from" price), an open lawn (a step up), and guest rooms (per
+ * room, subject to availability).
  */
 export function venueSpaceOptions(
-  venue: Venue & { price?: number },
+  venue: Venue & { price?: number; spaces?: VenueSpacePrice[] },
 ): VenueSpaceOption[] {
+  if (venue.spaces?.length) {
+    // Catalog order, not submission order, so surfaces stay consistent.
+    return VENUE_SPACE_CATALOG.flatMap((c) => {
+      const set = venue.spaces!.find((s) => s.key === c.key);
+      return set && set.price > 0 ? [{ ...c, price: set.price }] : [];
+    });
+  }
   const base =
     typeof venue.price === "number" && venue.price > 0
       ? venue.price
@@ -230,25 +291,54 @@ export function bookableSpaces(
   return venueSpaceOptions(venue).filter((s) => !s.subject);
 }
 
+/** "a, b और c" / "a, b and c" list joiner for the generated copy. */
+function listJoin(items: string[], lang: "en" | "hi"): string {
+  if (items.length <= 1) return items[0] ?? "";
+  const sep = lang === "hi" ? " और " : " and ";
+  return items.slice(0, -1).join(", ") + sep + items[items.length - 1];
+}
+
 /**
  * A readable, bilingual venue description generated from the venue's own fields
- * (type, locality, city, capacity). Every venue — seed or owner-listed — gets
- * sensible copy without hand-writing a description per venue.
+ * (type, locality, city, capacity, offered spaces). Every venue — seed or
+ * owner-listed — gets sensible copy without hand-writing a description per
+ * venue. Owner-set spaces drive the "offers" clause; legacy/seed venues keep
+ * the classic lawn + hall + rooms line.
  */
-export function venueDescription(venue: Venue, lang: "en" | "hi"): string {
+export function venueDescription(
+  venue: Venue & { spaces?: VenueSpacePrice[] },
+  lang: "en" | "hi",
+): string {
   const type = venueTypeLabel(venue.type, lang).toLowerCase();
   const locality = venue.location ? `${venue.location}, ` : "";
+  const explicit = venue.spaces?.length ? venueSpaceOptions(venue) : null;
   if (lang === "hi") {
     const cap = venue.capacity
       ? `, जिसमें ${venue.capacity.replace(/Guests/gi, "मेहमान")} की क्षमता है`
       : "";
-    return `${venue.name}, ${locality}${venueCityNameHi(venue.city)} में एक ${type} है${cap}। यहाँ खुला लॉन, वातानुकूलित बैंक्वेट हॉल और (उपलब्धता अनुसार) अतिथि कक्ष उपलब्ध हैं — शादी, रिसेप्शन और पारिवारिक आयोजनों के लिए उपयुक्त।`;
+    const offers = explicit
+      ? `यहाँ ${listJoin(
+          explicit.map((s) => (s.subject ? `(उपलब्धता अनुसार) ${s.hi}` : s.hi)),
+          "hi",
+        )} उपलब्ध हैं`
+      : "यहाँ खुला लॉन, वातानुकूलित बैंक्वेट हॉल और (उपलब्धता अनुसार) अतिथि कक्ष उपलब्ध हैं";
+    return `${venue.name}, ${locality}${venueCityNameHi(venue.city)} में एक ${type} है${cap}। ${offers} — शादी, रिसेप्शन और पारिवारिक आयोजनों के लिए उपयुक्त।`;
   }
   const article = /^[aeiou]/i.test(type) ? "an" : "a";
   const cap = venue.capacity
     ? ` with room for ${venue.capacity.replace(/Guests/gi, "guests")}`
     : "";
-  return `${venue.name} is ${article} ${type} in ${locality}${venueCityName(venue.city)}${cap}. It offers a landscaped open lawn, an air-conditioned banquet hall and guest rooms on request — a versatile setting for weddings, receptions and family celebrations.`;
+  const offers = explicit
+    ? `It offers ${listJoin(
+        explicit.map((s) => {
+          if (s.key === "rooms") return "guest rooms on request";
+          const n = s.en.toLowerCase();
+          return `${/^[aeiou]/.test(n) ? "an" : "a"} ${n}`;
+        }),
+        "en",
+      )}`
+    : "It offers a landscaped open lawn, an air-conditioned banquet hall and guest rooms on request";
+  return `${venue.name} is ${article} ${type} in ${locality}${venueCityName(venue.city)}${cap}. ${offers} — a versatile setting for weddings, receptions and family celebrations.`;
 }
 
 /** Make any seed/record venue bookable — derive the numeric fee when absent. */
@@ -277,6 +367,8 @@ export function recordToBookable(r: VenueRecord): BookableVenue {
     rating: r.rating,
     reviews: r.reviews,
     image: r.image,
+    images: r.images,
+    spaces: r.spaces,
     price: r.price,
     ownerCode: r.ownerCode,
     ownerName: r.ownerName,

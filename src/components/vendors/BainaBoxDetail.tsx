@@ -2,15 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import PublicShell from "@/components/app/PublicShell";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import VendorActionRow from "@/components/vendors/VendorActionRow";
+import BainaBoxOrderPanel from "@/components/vendors/BainaBoxOrderPanel";
 import CompareTray from "@/components/vendors/CompareTray";
 import { useCompare } from "@/lib/compare";
 import { openCompareTable } from "@/lib/compareTray";
 import { useLang } from "@/lib/i18n";
-import { AppBar, Button, ImageCarousel } from "@/components/ui";
+import { AppBar } from "@/components/ui";
 import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
 
 export default function BainaBoxDetail({
@@ -176,7 +176,7 @@ export default function BainaBoxDetail({
                   key={tag}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     tag === "Veg"
-                      ? "bg-green-100 text-green-800"
+                      ? "border border-maroon bg-white text-maroon"
                       : tag === "Baina Boxes"
                       ? "bg-cream-3 text-maroon"
                       : "bg-cream-2 text-ink-soft"
@@ -270,70 +270,20 @@ export default function BainaBoxDetail({
           </div>
         </div>
 
-        {/* ── Popular Sweets & Boxes grid ─────────────────────────── */}
-        <div className="mt-12 border-t border-cream-3 pt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
-              {t("Popular Sweets & Boxes", "लोकप्रिय मिठाई और डिब्बे")}
-            </h2>
-            <Link
-              href="/baina-box"
-              className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-            >
-              {t("View All →", "सभी देखें →")}
-            </Link>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-            {data.products.map((prod) => (
-              <div
-                key={prod.id}
-                className="group flex flex-col overflow-hidden rounded-card border border-cream-3 bg-white p-3 shadow-sm transition hover:border-maroon/20 hover:shadow-card"
-              >
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-cream">
-                  <Image
-                    src={prod.image}
-                    alt={prod.name}
-                    fill
-                    sizes="(min-width: 640px) 250px, 180px"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                </div>
-                <div className="mt-3 flex flex-1 flex-col justify-between">
-                  <div>
-                    <h3 className="font-sans text-sm font-bold text-ink">
-                      {prod.name}
-                    </h3>
-                    <p className="mt-1 font-display text-base font-bold text-maroon">
-                      ₹{prod.price.toLocaleString("en-IN")}{" "}
-                      <span className="text-xs font-normal text-ink-soft">
-                        / {prod.unit}
-                      </span>
-                    </p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    href="#"
-                    onClick={(e) => e.preventDefault()}
-                    className="mt-3 w-full border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
-                  >
-                    {t("View Details", "विवरण देखें")}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* ── Order Sweets & Boxes — per-box ordering (qty → date → confirm).
+            The feast wizard hand-off above stays for full catering; this panel
+            is how a box order actually completes. ── */}
+        <BainaBoxOrderPanel data={data} />
 
         <CompareTray />
 
-        {/* Mobile sticky booking bar */}
+        {/* Mobile sticky booking bar — jumps to the on-page box order panel
+            (the catering wizard stays reachable via the action row's Book Now). */}
         <StickyBookingBar
           price={`₹${data.fixedPrice.toLocaleString("en-IN")}`}
           priceNote={t("per Box", "प्रति डिब्बा")}
-          cta={t("Book Now", "अभी बुक करें")}
-          href={bookHref}
+          cta={t("Order Boxes", "डिब्बे ऑर्डर करें")}
+          href="#baina-order"
         />
       </section>
     </PublicShell>

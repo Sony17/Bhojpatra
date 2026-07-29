@@ -5,7 +5,10 @@ import {
   sanitizeVenueImage,
   isServableVenueImage,
   isVenuePublic,
+  isVenueSpaceKey,
+  VENUE_MAX_IMAGES,
   type VenueRecord,
+  type VenueSpacePrice,
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
 import { sendVenueAlert } from "@/lib/email";
@@ -34,7 +37,13 @@ export async function GET(request: Request) {
   // URL must never reach a `next/image` and crash the page.
   const venues = (await store.list())
     .filter((v) => !v.deleted)
-    .map((v) => ({ ...v, image: sanitizeVenueImage(v.image) }));
+    .map((v) => ({
+      ...v,
+      image: sanitizeVenueImage(v.image),
+      ...(v.images
+        ? { images: v.images.filter((s) => isServableVenueImage(s)) }
+        : {}),
+    }));
 
   if (id) {
     // The single-venue lookup feeds the public detail page + booking flow, so
@@ -77,11 +86,42 @@ export async function POST(request: Request) {
     return Response.json({ error: "City is required." }, { status: 400 });
   }
 
-  // Numeric fee from an explicit `price`, otherwise parsed from a display
-  // `priceFrom` string. We keep both: a number for booking maths and a
-  // formatted string for the catalogue card.
-  const rawPrice =
-    typeof b.price === "number"
+  // The spaces this venue offers (banquet hall, lawn, …), each with its own
+  // owner-set fee. Optional — legacy clients still send a single price.
+  let spaces: VenueSpacePrice[] | undefined;
+  if (Array.isArray(b.spaces) && b.spaces.length) {
+    spaces = [];
+    for (const raw of b.spaces) {
+      const s = (raw ?? {}) as Record<string, unknown>;
+      const spacePrice = Math.round(Number(s.price));
+      if (!isVenueSpaceKey(s.key) || !Number.isFinite(spacePrice) || spacePrice <= 0) {
+        return Response.json(
+          { error: "Each offered space needs a valid price." },
+          { status: 400 },
+        );
+      }
+      if (!spaces.some((x) => x.key === s.key)) {
+        spaces.push({ key: s.key, price: spacePrice });
+      }
+    }
+    // Guest rooms are on-request only — a venue can't be *just* rooms.
+    if (!spaces.some((s) => s.key !== "rooms")) {
+      return Response.json(
+        { error: "Offer at least one bookable space (hall, lawn…) with a price." },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Numeric fee: the cheapest bookable space when spaces are set; otherwise an
+  // explicit `price` or a parsed display `priceFrom`. We keep both: a number
+  // for booking maths and a formatted string for the catalogue card.
+  const bookablePrices = (spaces ?? [])
+    .filter((s) => s.key !== "rooms")
+    .map((s) => s.price);
+  const rawPrice = bookablePrices.length
+    ? Math.min(...bookablePrices)
+    : typeof b.price === "number"
       ? b.price
       : parseVenuePrice(str(b.price) ?? str(b.priceFrom) ?? "");
   const price = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round(rawPrice) : 0;
@@ -89,20 +129,25 @@ export async function POST(request: Request) {
     return Response.json({ error: "A valid starting price is required." }, { status: 400 });
   }
 
-  // A photo link the site can't serve must not be silently swapped for the
-  // default — tell the owner so they can paste a usable one (or leave blank).
-  const image = str(b.image);
-  if (image && !isServableVenueImage(image)) {
-    return Response.json(
-      {
-        error:
-          "We can't use that photo link. Paste a direct image address from " +
-          "Unsplash (right-click the photo → Copy Image Address), or leave " +
-          "the field blank for the default photo.",
-      },
-      { status: 400 },
-    );
+  // Photo links the site can't serve must not be silently swapped for the
+  // default — tell the owner so they can fix them (or upload files instead).
+  const images = (Array.isArray(b.images) ? b.images : [b.image])
+    .map((v) => str(v))
+    .filter((v): v is string => Boolean(v));
+  for (const img of images) {
+    if (!isServableVenueImage(img)) {
+      return Response.json(
+        {
+          error:
+            "We can't use that photo link. Paste a direct image address from " +
+            "Unsplash (right-click the photo → Copy Image Address), upload " +
+            "the photo instead, or leave it blank for the default photo.",
+        },
+        { status: 400 },
+      );
+    }
   }
+  const gallery = [...new Set(images)].slice(0, VENUE_MAX_IMAGES);
 
   const ratingRaw = Number(b.rating);
   const reviewsRaw = Number(b.reviews);
@@ -131,11 +176,17 @@ export async function POST(request: Request) {
     location: str(b.location) ?? "",
     type: str(b.type) ?? "Banquet Hall",
     capacity: str(b.capacity) ?? "",
-    priceFrom: str(b.priceFrom) ?? formatVenuePrice(price),
+    // With owner-set spaces the display price must track the derived minimum,
+    // not whatever the client formatted.
+    priceFrom: spaces
+      ? formatVenuePrice(price)
+      : (str(b.priceFrom) ?? formatVenuePrice(price)),
     price,
     rating: Number.isFinite(ratingRaw) && ratingRaw > 0 ? ratingRaw : 4.5,
     reviews: Number.isFinite(reviewsRaw) && reviewsRaw > 0 ? Math.round(reviewsRaw) : 0,
-    image: sanitizeVenueImage(image),
+    image: sanitizeVenueImage(gallery[0]),
+    ...(gallery.length ? { images: gallery } : {}),
+    ...(spaces ? { spaces } : {}),
     ownerCode,
     ownerName: str(b.ownerName),
     phone: str(b.phone),

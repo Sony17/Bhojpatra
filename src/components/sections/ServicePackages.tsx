@@ -2,6 +2,7 @@
 
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import Reveal from "@/components/Reveal";
+import { CategoryChips, CategoryChip } from "@/components/ui";
 import { servicePackages, type ServicePackage } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { money } from "@/lib/money";
@@ -40,6 +41,18 @@ export default function ServicePackages({
   const { lang, t } = useLang();
   const selectable = typeof onSelect === "function";
 
+  // On phones the four tier cards would stack into a very long scroll, so
+  // mobile reduces them to a chip-tab row showing one card at a time (the
+  // already-chosen tier first in wizard mode). Tablet/desktop keep the
+  // side-by-side comparison grid.
+  const [activeIdx, setActiveIdx] = useState(() => {
+    const i = packages.findIndex((p) => p.id === selectedId);
+    return i >= 0 ? i : 0;
+  });
+  // `packages` can re-hydrate from the admin-configured set — keep the open
+  // tab in range so mobile never shows an empty step.
+  const shownIdx = Math.min(activeIdx, Math.max(0, packages.length - 1));
+
   const body = (
     <div
       className={
@@ -60,9 +73,24 @@ export default function ServicePackages({
           </p>
         </Reveal>
 
+        <Reveal className="mx-auto mt-10 max-w-7xl sm:hidden">
+          <CategoryChips label={t("Service packages", "सर्विस पैकेज")}>
+            {packages.map((pkg, i) => (
+              <CategoryChip
+                key={pkg.id}
+                selected={i === shownIdx}
+                onClick={() => setActiveIdx(i)}
+                leftIcon={<span aria-hidden="true">{pkg.icon}</span>}
+              >
+                {lang === "hi" ? pkg.nameHi : pkg.name}
+              </CategoryChip>
+            ))}
+          </CategoryChips>
+        </Reveal>
+
         <Reveal
           stagger
-          className="mx-auto mt-12 grid max-w-7xl grid-cols-1 items-stretch gap-6 sm:mt-14 sm:grid-cols-2 xl:grid-cols-4"
+          className="mx-auto mt-5 grid max-w-7xl grid-cols-1 items-stretch gap-6 sm:mt-14 sm:grid-cols-2 xl:grid-cols-4"
         >
           {packages.map((pkg, i) => (
             <ServiceCard
@@ -75,33 +103,38 @@ export default function ServicePackages({
               selected={pkg.id === selectedId}
               onSelect={onSelect}
               guests={guests}
+              className={i === shownIdx ? undefined : "max-sm:hidden"}
             />
           ))}
         </Reveal>
 
-        {/* Trust bar — the reference's reassurance strip, in brand colours. */}
-        <Reveal className="mx-auto mt-12 max-w-5xl">
-          <ul className="grid grid-cols-1 gap-4 rounded-card border border-maroon/15 bg-cream/40 p-5 sm:grid-cols-2 sm:gap-5 sm:p-6 lg:grid-cols-4">
-            {TRUST_ITEMS.map((item) => (
-              <li key={item.en} className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-maroon text-base text-cream"
-                >
-                  {item.icon}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-maroon">
-                    {t(item.en, item.hi)}
+        {/* Trust bar — the reference's reassurance strip, in brand colours.
+            Marketing surfaces only; the wizard's Essentials step keeps just
+            the tier choice. */}
+        {!embedded && (
+          <Reveal className="mx-auto mt-12 max-w-5xl">
+            <ul className="grid grid-cols-1 gap-4 rounded-card border border-maroon/15 bg-cream/40 p-5 sm:grid-cols-2 sm:gap-5 sm:p-6 lg:grid-cols-4">
+              {TRUST_ITEMS.map((item) => (
+                <li key={item.en} className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-maroon text-base text-cream"
+                  >
+                    {item.icon}
                   </span>
-                  <span className="block text-xs text-ink-soft">
-                    {t(item.subEn, item.subHi)}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-maroon">
+                      {t(item.en, item.hi)}
+                    </span>
+                    <span className="block text-xs text-ink-soft">
+                      {t(item.subEn, item.subHi)}
+                    </span>
                   </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Reveal>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        )}
       </div>
   );
 
@@ -252,6 +285,7 @@ function ServiceCard({
   selected = false,
   onSelect,
   guests,
+  className = "",
 }: {
   pkg: ServicePackage;
   variant: Variant;
@@ -261,6 +295,7 @@ function ServiceCard({
   selected?: boolean;
   onSelect?: (id: string) => void;
   guests?: number;
+  className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const name = lang === "hi" ? pkg.nameHi : pkg.name;
@@ -290,7 +325,7 @@ function ServiceCard({
         : {})}
       className={`card-lift relative flex h-full flex-col rounded-card border p-6 pt-8 shadow-card transition duration-300 ${variant.card} ${
         selectable ? "cursor-pointer" : ""
-      } ${selected ? `ring-2 ${variant.sel}` : ""}`}
+      } ${selected ? `ring-2 ${variant.sel}` : ""} ${className}`}
     >
       {/* Badge — centred, overlapping the top edge. */}
       <span

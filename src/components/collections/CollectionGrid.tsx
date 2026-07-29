@@ -42,7 +42,7 @@ export default function CollectionGrid({
             key={tile.id}
             href={tile.href}
             aria-label={tile.name}
-            className="group relative overflow-hidden rounded-2xl shadow-card ring-1 ring-maroon/8 transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+            className="group relative overflow-hidden border border-cream shadow-pop transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <span className="relative block aspect-[3/4] w-full bg-cream">
               <Image

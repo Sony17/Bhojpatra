@@ -192,9 +192,11 @@ export default function PartnerDashboard() {
   const confirmedValue = confirmed.reduce((s, o) => s + o.amount, 0);
   const reward = Math.round((confirmedValue * rewardPercent) / 100);
 
-  // Verification gate: a partner unlocks payouts once 3 referred feasts are
+  // Verification gate: a referrer unlocks payouts once 3 referred feasts are
   // actually Completed. Until then they're "Pending Verification" and the
   // earnings figure stays visible but the settlement button is disabled.
+  // Referrer-only — venue owners are paid on their venue's bookings and are
+  // never gated, so none of the verification UI applies to them.
   const completedCount = orders.filter((o) => o.status === "Completed").length;
   const verified = completedCount >= VERIFY_THRESHOLD;
 
@@ -262,8 +264,9 @@ export default function PartnerDashboard() {
         isVenue={isVenue}
       />
 
-      {/* Verification gate — payouts unlock after 3 completed referred feasts. */}
-      {active && (
+      {/* Verification gate — payouts unlock after 3 completed referred feasts.
+          Referrer roles only; venue owners never see it. */}
+      {active && !isVenue && (
         <VerificationBanner
           verified={verified}
           completed={completedCount}
@@ -316,7 +319,7 @@ export default function PartnerDashboard() {
             roleType={active?.type ?? null}
             roleLabel={partnerLabel}
             roleIcon={roleIcon}
-            verified={verified}
+            verified={isVenue || verified}
             payout={{
               total: totalEarning,
               active: activePayout,
@@ -475,7 +478,7 @@ function DashboardHeader({
         <Badge tone="solid">
           <span aria-hidden="true">{roleIcon}</span> {role}
         </Badge>
-        <VerifyBadge verified={verified} />
+        {!isVenue && <VerifyBadge verified={verified} />}
       </div>
       <p className="font-script mt-2 text-lg text-ink-soft">
         {isVenue

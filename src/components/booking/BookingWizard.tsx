@@ -2100,8 +2100,13 @@ export default function BookingWizard() {
   // builders reorder it below the builder on mobile (see the grid below) so a
   // guest can start picking dishes right away. `flush` drops its top margin when
   // the grid gap already supplies the spacing.
-  const renderEventBar = (flush = false, mobileCollapse = false) => (
+  const renderEventBar = (
+    flush = false,
+    mobileCollapse = false,
+    embedded = false,
+  ) => (
     <EventBar
+      embedded={embedded}
       lang={lang}
       t={t}
       occasionId={occasionId}
@@ -2281,27 +2286,43 @@ export default function BookingWizard() {
         //
         // Ordering: on desktop the event brief spans the full width up top, with
         // the package rail (left) and builder (right) below. On mobile the
-        // event brief and package summary lead as compact collapsed chips (the
-        // app mockup's top bar), with the builder below them.
+        // event brief and package summary pack into ONE collapsed card — a row
+        // each, with a pencil to expand and edit — with the builder below it.
         <div className="mt-8 grid w-full min-w-0 gap-4 sm:gap-8 lg:grid-cols-[18rem_1fr]">
-          {/* Event brief — top on mobile and full-width top on desktop. */}
-          <div className="order-1 w-full min-w-0 lg:order-none lg:col-span-2 lg:row-start-1">
+          {/* Mobile / tablet — combined event + package summary card. */}
+          <div className="order-1 w-full min-w-0 lg:hidden">
+            <div className="rounded-[1.5rem] border border-cream bg-white p-4 shadow-card">
+              {renderEventBar(true, false, true)}
+              {selectedPackage && (
+                <>
+                  <div aria-hidden="true" className="my-3 h-px bg-cream" />
+                  <SelectedPackageRail
+                    lang={lang}
+                    t={t}
+                    tier={selectedPackage}
+                    basePerPlate={basePerPlate}
+                    onChange={() => setStep(1)}
+                    embedded
+                  />
+                </>
+              )}
+            </div>
+          </div>
+          {/* Event brief — full-width top row on desktop. */}
+          <div className="hidden w-full min-w-0 lg:block lg:col-span-2 lg:row-start-1">
             {renderEventBar(true)}
           </div>
-          {/* Package / price rail — under the event chip on mobile, pinned left on desktop. */}
-          <div className="order-2 w-full min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
+          {/* Package / price rail — pinned left on desktop. */}
+          <div className="hidden w-full min-w-0 lg:block lg:col-start-1 lg:row-start-2">
             <SelectedPackageRail
               lang={lang}
               t={t}
               tier={selectedPackage}
               basePerPlate={basePerPlate}
               onChange={() => setStep(1)}
-              // Collapse to a summary on mobile so the event brief +
-              // package sit compactly above the builder.
-              collapsible
             />
           </div>
-          {/* Builder — below the chips on mobile, right column on desktop. */}
+          {/* Builder — below the combined card on mobile, right column on desktop. */}
           <div className="order-3 w-full min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
             {step === 2 ? (
               singleStall && !stallTier ? (
@@ -3091,6 +3112,7 @@ function EventBar({
   flush = false,
   collapsible = false,
   collapseAt = "lg",
+  embedded = false,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -3130,6 +3152,10 @@ function EventBar({
    *  default) collapses on phones + small tablets; `"sm"` collapses on phones
    *  only, leaving every larger view (tablet / desktop) exactly as-is. */
   collapseAt?: "sm" | "lg";
+  /** Render bare (no card chrome) as one row of a shared summary card — the
+   *  collapsed line gets a pencil affordance and expands to the full editor.
+   *  Used by the combined mobile brief + package card on the builder steps. */
+  embedded?: boolean;
 }) {
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
@@ -3230,26 +3256,29 @@ function EventBar({
   return (
     <div
       className={
-        "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 " +
-        (flush ? "" : "mt-5 sm:mt-7")
+        embedded
+          ? "relative"
+          : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 " +
+            (flush ? "" : "mt-5 sm:mt-7")
       }
     >
-      {Boolean(leadWarning) && (
+      {Boolean(leadWarning) && !embedded && (
         <span
           className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
           aria-hidden="true"
         />
       )}
       {/* Mobile collapsed summary — the whole brief on one tappable line; hidden
-          on desktop, where the full card is always shown. */}
-      {collapsible && (
+          on desktop, where the full card is always shown. Embedded rows keep it
+          at every width and swap the chevron for a pencil edit cue. */}
+      {(collapsible || embedded) && (
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           className={
             "flex w-full items-center justify-between gap-3 text-left " +
-            (collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
+            (embedded ? "" : collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
           }
         >
           <span className="flex min-w-0 items-baseline gap-2">
@@ -3260,31 +3289,48 @@ function EventBar({
               {summaryLine}
             </span>
           </span>
-          <svg
-            viewBox="0 0 24 24"
-            className={
-              "h-4 w-4 shrink-0 text-maroon transition-transform " +
-              (open ? "rotate-180" : "")
-            }
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          {embedded ? (
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4 shrink-0 text-maroon"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              className={
+                "h-4 w-4 shrink-0 text-maroon transition-transform " +
+                (open ? "rotate-180" : "")
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          )}
         </button>
       )}
       <div
         className={
           "flex items-center justify-between gap-4 " +
-          (collapsible
-            ? collapseAt === "sm"
-              ? "hidden sm:flex"
-              : "hidden lg:flex"
-            : "")
+          (embedded
+            ? "hidden"
+            : collapsible
+              ? collapseAt === "sm"
+                ? "hidden sm:flex"
+                : "hidden lg:flex"
+              : "")
         }
       >
         <div className="flex min-w-0 items-baseline gap-2">
@@ -3311,11 +3357,15 @@ function EventBar({
           (showGuests
             ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr_0.85fr] "
             : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
-          (collapsible && !open
-            ? collapseAt === "sm"
-              ? "hidden sm:grid"
-              : "hidden lg:grid"
-            : "")
+          (embedded
+            ? open
+              ? ""
+              : "hidden"
+            : collapsible && !open
+              ? collapseAt === "sm"
+                ? "hidden sm:grid"
+                : "hidden lg:grid"
+              : "")
         }
       >
         <label className="block">
@@ -6581,6 +6631,7 @@ function SelectedPackageRail({
   basePerPlate,
   onChange,
   collapsible = false,
+  embedded = false,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -6590,6 +6641,10 @@ function SelectedPackageRail({
   /** On mobile only, collapse to a one-line summary (package · base price) that
    *  expands on tap. Desktop always renders the full detail card. */
   collapsible?: boolean;
+  /** Render bare (no card chrome) as one row of a shared summary card — the
+   *  collapsed line gets a pencil affordance and expands to the full detail.
+   *  Used by the combined mobile brief + package card on the builder steps. */
+  embedded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (!tier) return null;
@@ -6601,52 +6656,92 @@ function SelectedPackageRail({
       ? `${tierName} · ${money(basePerPlate)} ${t("/ plate", "/ प्लेट")}`
       : `${tierName} · ${t("priced by your menu", "कीमत आपके मेन्यू से")}`;
   return (
-    <aside className="lg:sticky lg:top-32 lg:self-start">
-      <div className="rounded-2xl border border-maroon bg-white p-5 shadow-sm ring-2 ring-maroon">
+    <aside className={embedded ? "" : "lg:sticky lg:top-32 lg:self-start"}>
+      <div
+        className={
+          embedded
+            ? ""
+            : "rounded-2xl border border-maroon bg-white p-5 shadow-sm ring-2 ring-maroon"
+        }
+      >
         {/* Mobile collapsed summary — package + base price on one tappable line;
-            hidden on desktop, where the full card is always shown. */}
-        {collapsible && (
+            hidden on desktop, where the full card is always shown. Embedded rows
+            keep it at every width and swap the chevron for a pencil edit cue. */}
+        {(collapsible || embedded) && (
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="flex w-full items-center justify-between gap-3 text-left lg:hidden"
+            className={
+              "flex w-full items-center justify-between gap-3 text-left " +
+              (embedded ? "" : "lg:hidden")
+            }
           >
             <span className="flex min-w-0 items-baseline gap-2">
-              <span className="eyebrow shrink-0 text-xs font-semibold text-gold">
+              <span
+                className={
+                  "eyebrow shrink-0 " +
+                  (embedded
+                    ? "text-[10px] font-bold text-maroon"
+                    : "text-xs font-semibold text-gold")
+                }
+              >
                 {t("YOUR PACKAGE", "आपका पैकेज")}
               </span>
               <span className="min-w-0 text-xs font-semibold text-ink/70 line-clamp-2 sm:line-clamp-none break-words">
                 {summaryLine}
               </span>
             </span>
-            <svg
-              viewBox="0 0 24 24"
-              className={
-                "h-4 w-4 shrink-0 text-maroon transition-transform " +
-                (open ? "rotate-180" : "")
-              }
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+            {embedded ? (
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0 text-maroon"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 24 24"
+                className={
+                  "h-4 w-4 shrink-0 text-maroon transition-transform " +
+                  (open ? "rotate-180" : "")
+                }
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            )}
           </button>
         )}
         {/* Full detail — on mobile shown only when expanded; desktop always. */}
         <div
           className={
-            collapsible ? (open ? "mt-3 lg:mt-0" : "hidden lg:block") : ""
+            embedded
+              ? open
+                ? "mt-3"
+                : "hidden"
+              : collapsible
+                ? open
+                  ? "mt-3 lg:mt-0"
+                  : "hidden lg:block"
+                : ""
           }
         >
         <p
           className={
             "eyebrow text-xs font-semibold text-gold " +
-            (collapsible ? "hidden lg:block" : "")
+            (embedded ? "hidden" : collapsible ? "hidden lg:block" : "")
           }
         >
           {t("YOUR PACKAGE", "आपका पैकेज")}

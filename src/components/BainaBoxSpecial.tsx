@@ -44,7 +44,7 @@ export default function BainaBoxSpecial({
         className="overflow-hidden rounded-card border border-cream-3 bg-cream/40 shadow-card ring-1 ring-cream"
         aria-label={heading}
       >
-        <div className="grid h-[20vh] max-h-[180px] min-h-[130px] grid-cols-2">
+        <div className="grid h-[20vh] max-h-[180px] min-h-[130px] grid-cols-[4fr_5fr] sm:grid-cols-2">
           <div className="relative h-full w-full overflow-hidden bg-cream-2">
             {special.image ? (
               <Image
@@ -61,11 +61,13 @@ export default function BainaBoxSpecial({
             <h3 className="font-display text-base leading-tight text-ink sm:text-xl">
               {heading}
             </h3>
+            {/* max-w-full + wrap: the admin-editable CTA label must never
+                spill out of this narrow column on phones. */}
             <Button
               href={BAINA_HREF}
               variant="secondary"
               size="sm"
-              className="btn-sheen"
+              className="btn-sheen max-w-full !whitespace-normal text-center"
             >
               {cta}
             </Button>

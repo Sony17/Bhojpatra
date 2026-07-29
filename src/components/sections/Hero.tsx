@@ -6,7 +6,7 @@ import BrandSelect from "@/components/BrandSelect";
 import DatePicker from "@/components/DatePicker";
 import { ShieldCheck, PriceTag, ClipboardCheck, Headset, ChefHat } from "@/components/icons";
 import type { ComponentType } from "react";
-import { occasions, cities } from "@/lib/data";
+import { occasions, cities, guestPresets } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
 import {
@@ -53,6 +53,10 @@ export default function Hero() {
     ...occasionList,
     { id: OTHER_OCCASION_ID, name: t("Other", "अन्य"), nameHi: "अन्य" },
   ];
+  const guestOptions = guestPresets.map((preset) => ({
+    id: String(preset),
+    name: preset.toLocaleString("en-IN"),
+  }));
   const locations = useLocations();
 
   // Location is chosen from the header bar now — the hero just consumes the
@@ -64,6 +68,7 @@ export default function Hero() {
   const [cityId, setCityId] = useState(cities[0].id);
   const [customCity, setCustomCity] = useState("");
   const [date, setDate] = useState<Date | null>(null);
+  const [guests, setGuests] = useState<string>(String(guestPresets[1]));
   // Seed from IP/GPS at most once. After the visitor picks a city (or edits
   // "Other"), never let a late detection response overwrite them.
   const locationTouched = useRef(false);
@@ -119,6 +124,7 @@ export default function Hero() {
     bookParams.set("occName", customOccasion.trim());
   if (isOtherCity && customCity.trim()) bookParams.set("loc", customCity.trim());
   if (date) bookParams.set("date", toYmd(date));
+  bookParams.set("guests", guests);
   const bookHref = `/book?${bookParams.toString()}`;
 
   // Browse path — same location, into the catalog (Zomato-style discover → convert).
@@ -135,7 +141,7 @@ export default function Hero() {
   const browseLabel = t("Explore more", "और देखें");
 
   const fieldLabel =
-    "block truncate text-[10px] font-bold uppercase tracking-[0.16em] text-ink/65";
+    "block truncate text-[8px] font-bold uppercase tracking-[0.12em] text-ink/65 sm:text-[10px] sm:tracking-[0.16em]";
   const divider = (
     <span
       aria-hidden="true"
@@ -143,11 +149,13 @@ export default function Hero() {
     />
   );
   const slotInputClass =
-    "mt-0.5 w-full bg-transparent py-0.5 pr-1 text-sm font-semibold text-ink outline-none placeholder:text-ink/55";
+    "mt-0.5 w-full bg-transparent py-0.5 pr-1 text-xs font-semibold text-ink outline-none placeholder:text-ink/55 sm:text-sm";
+  const slotButtonClass =
+    "py-0.5 pr-5 text-xs font-medium sm:text-sm lg:pr-8";
 
   const bookingBar = (
-    <div className="grid w-full grid-cols-2 overflow-visible rounded-[1.5rem] border border-white/40 bg-white/95 p-1.5 shadow-[0_24px_64px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-shadow focus-within:border-cream sm:flex sm:items-stretch sm:rounded-[1.25rem] sm:p-1">
-      <div className="min-w-0 flex-1 border-b border-r border-maroon/10 px-3 py-2.5 sm:border-b-0 sm:border-r-0 sm:px-3 sm:py-2.5 lg:px-4">
+    <div className="grid w-full grid-cols-[1fr_1.3fr_0.85fr] overflow-visible rounded-[1.5rem] border border-white/40 bg-white/95 p-1.5 shadow-[0_24px_64px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-shadow focus-within:border-cream sm:flex sm:items-stretch sm:rounded-[1.25rem] sm:p-1">
+      <div className="min-w-0 flex-1 border-b border-r border-maroon/10 px-2.5 py-2 sm:border-b-0 sm:border-r-0 sm:px-3 sm:py-2.5 lg:px-4">
         <span className={fieldLabel}>{t("Occasion", "अवसर")}</span>
         {isOtherOccasion ? (
           <div className="relative mt-1 flex min-w-0 items-center">
@@ -185,7 +193,7 @@ export default function Hero() {
             placeholder={t("Select Occasion", "अवसर चुनें")}
             ariaLabel={t("Select Occasion", "अवसर चुनें")}
             icon="chevron"
-            buttonClassName="py-0.5 pr-5 text-sm font-medium lg:pr-8"
+            buttonClassName={slotButtonClass}
             iconClassName="right-1"
             direction="up"
             align="left"
@@ -201,13 +209,13 @@ export default function Hero() {
 
       {divider}
 
-      <div className="min-w-0 flex-1 border-b border-maroon/10 px-3 py-2.5 sm:border-b-0 sm:px-3 sm:py-2.5 lg:px-4">
+      <div className="min-w-0 flex-1 border-b border-r border-maroon/10 px-2.5 py-2 sm:border-b-0 sm:border-r-0 sm:px-3 sm:py-2.5 lg:px-4">
         <span className={fieldLabel}>{t("Date", "तारीख")}</span>
         <DatePicker
           className="mt-1"
           placeholder={t("Select Date", "तारीख चुनें")}
           ariaLabel={t("Select Date", "तारीख चुनें")}
-          buttonClassName="py-0.5 pr-5 text-sm font-medium lg:pr-8"
+          buttonClassName={slotButtonClass}
           iconClassName="right-1"
           direction="up"
           align="center"
@@ -217,7 +225,32 @@ export default function Hero() {
         />
       </div>
 
-      <div className="relative z-0 col-span-2 m-1 grid shrink-0 grid-cols-2 gap-2 sm:m-0 sm:ml-1 sm:flex sm:self-stretch sm:items-stretch">
+      {divider}
+
+      <div className="min-w-0 flex-1 border-b border-maroon/10 px-2.5 py-2 sm:border-b-0 sm:px-3 sm:py-2.5 lg:px-4">
+        <span className={fieldLabel}>
+          <span className="sm:hidden">{t("Guests", "मेहमान")}</span>
+          <span className="hidden sm:inline">
+            {t("No. of Guests", "मेहमानों की संख्या")}
+          </span>
+        </span>
+        <BrandSelect
+          className="mt-1"
+          options={guestOptions}
+          placeholder={t("Select Guests", "मेहमान चुनें")}
+          ariaLabel={t("Select Guests", "मेहमान चुनें")}
+          icon="chevron"
+          buttonClassName={slotButtonClass}
+          iconClassName="right-1"
+          direction="up"
+          align="left"
+          defaultId={String(guestPresets[1])}
+          valueId={guests}
+          onChange={(o) => setGuests(o.id)}
+        />
+      </div>
+
+      <div className="relative z-0 col-span-3 m-1 grid shrink-0 grid-cols-2 gap-2 sm:m-0 sm:ml-1 sm:flex sm:self-stretch sm:items-stretch">
         <a
           href={bookHref}
           aria-label={ctaLabel}

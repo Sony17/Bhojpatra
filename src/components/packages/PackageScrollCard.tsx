@@ -38,7 +38,7 @@ function RhombusMarker() {
   return (
     <span
       aria-hidden="true"
-      className="mt-[max(2.5px,1cqw)] h-[max(4px,1.5cqw)] w-[max(4px,1.5cqw)] shrink-0 rotate-45 bg-cream shadow-[inset_0_0_0_1px_rgba(185,32,37,0.55)]"
+      className="mt-[max(3px,1.2cqw)] h-[max(5px,1.7cqw)] w-[max(5px,1.7cqw)] shrink-0 rotate-45 bg-cream shadow-[inset_0_0_0_1px_rgba(185,32,37,0.55)]"
     />
   );
 }
@@ -309,7 +309,7 @@ export default function PackageScrollCard({
               read as ink written straight onto the parchment. Rows breathe
               with even spacing for a clean, premium read. The whole list shows
               at once — no inner scroll. ── */}
-          <ul className="mt-[1.4cqw] flex flex-1 flex-col justify-center gap-y-[1cqw] py-[1cqw] pl-1 pr-1">
+          <ul className="mt-[1.4cqw] flex flex-1 flex-col justify-center gap-y-[1.4cqw] pl-1 pr-1">
             {segments.map((seg) => {
               if (seg.type === "item") {
                 const label =
@@ -317,7 +317,7 @@ export default function PackageScrollCard({
                 return (
                   <li
                     key={seg.index}
-                    className="flex items-start gap-2 text-left text-[max(9px,2.9cqw)] leading-tight text-ink"
+                    className="flex items-start gap-2 text-left text-[max(11px,3.4cqw)] leading-tight text-ink"
                   >
                     <RhombusMarker />
                     <span>{label}</span>
@@ -332,14 +332,14 @@ export default function PackageScrollCard({
               // compact accordion deck collapses and toggles.
               const isOpen = accordion ? openCourses.has(seg.index) : true;
               const items = hasItems && isOpen && (
-                <ul className="mt-[0.5cqw] flex flex-col gap-y-[0.5cqw]">
+                <ul className="mt-[0.7cqw] flex flex-col gap-y-[0.7cqw]">
                   {seg.items.map(({ feature, index }) => {
                     const label =
                       lang === "hi" ? feature.labelHi : feature.label;
                     return (
                       <li
                         key={index}
-                        className="pl-5 text-left text-[max(9px,2.9cqw)] leading-tight text-ink-soft"
+                        className="pl-5 text-left text-[max(11px,3.4cqw)] leading-tight text-ink-soft"
                       >
                         <span>{label}</span>
                       </li>
@@ -353,7 +353,7 @@ export default function PackageScrollCard({
               if (!accordion) {
                 return (
                   <li key={seg.index}>
-                    <div className="flex items-start gap-2 text-left text-[max(9px,2.9cqw)] font-semibold leading-tight text-maroon">
+                    <div className="flex items-start gap-2 text-left text-[max(11px,3.4cqw)] font-semibold leading-tight text-maroon">
                       <RhombusMarker />
                       <span className="flex-1">{headingLabel}</span>
                     </div>
@@ -375,7 +375,7 @@ export default function PackageScrollCard({
                       toggleCourse(seg.index);
                     }}
                     aria-expanded={hasItems ? isOpen : undefined}
-                    className="flex w-full items-start gap-2 rounded text-left text-[max(9px,2.9cqw)] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
+                    className="flex w-full items-start gap-2 rounded text-left text-[max(11px,3.4cqw)] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
                   >
                     <RhombusMarker />
                     <span className="flex-1">{headingLabel}</span>
@@ -384,7 +384,7 @@ export default function PackageScrollCard({
                         {/* Item count — only when more than one line is hidden,
                             so a lone detail row doesn't read as a quantity. */}
                         {seg.items.length > 1 && (
-                          <span className="mt-px shrink-0 rounded-full border border-maroon/25 px-1.5 text-[max(8px,2.5cqw)] font-bold leading-tight text-maroon">
+                          <span className="mt-px shrink-0 rounded-full border border-maroon/25 px-1.5 text-[max(9px,2.9cqw)] font-bold leading-tight text-maroon">
                             {seg.items.length}
                           </span>
                         )}
@@ -392,7 +392,7 @@ export default function PackageScrollCard({
                             "there's more" affordance. */}
                         <span
                           aria-hidden="true"
-                          className={`shrink-0 text-[max(9px,3.2cqw)] leading-none text-maroon/50 transition-transform duration-200 ${
+                          className={`shrink-0 text-[max(10px,3.6cqw)] leading-none text-maroon/50 transition-transform duration-200 ${
                             isOpen ? "rotate-45" : ""
                           }`}
                         >

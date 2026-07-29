@@ -59,7 +59,7 @@ export default function TopCategories() {
                 aria-label={copy === 0 ? card.name : undefined}
                 aria-hidden={copy === 1 || undefined}
                 tabIndex={copy === 1 ? -1 : undefined}
-                className="group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl shadow-card ring-1 ring-maroon/8 transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-[11rem]"
+                className="group relative w-[9.5rem] shrink-0 overflow-hidden border border-cream shadow-pop transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-[11rem]"
               >
                 <span className="relative block aspect-[3/4] w-full bg-cream">
                   <Image

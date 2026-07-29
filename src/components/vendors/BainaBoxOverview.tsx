@@ -18,10 +18,7 @@ export default function BainaBoxOverview() {
       <section className="app-bottom-safe mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         {/* Banner / Header */}
         <div className="rounded-2xl border border-cream-3 bg-cream/40 p-6 sm:p-8">
-          <p className="eyebrow text-xs font-semibold uppercase tracking-wider text-maroon">
-            {t("Specially by Bhojpatra", "भोजपत्र की खास पेशकश")}
-          </p>
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-4xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-4xl">
             {t("Baina Box & Sweet Box Marketplace", "बैना बॉक्स और मिठाई मार्केटप्लेस")}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
