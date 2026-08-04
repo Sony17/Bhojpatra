@@ -6,7 +6,7 @@ import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
 /** Where the CTA always points — the curated Baina Box catalogue. */
-const BAINA_HREF = "/vendors?q=Baina+Box";
+const BAINA_HREF = "/vendors?category=baina-box";
 
 /**
  * "Baina Box, specially by Bhojpatra" — an elegant signature block for

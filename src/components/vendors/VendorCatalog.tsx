@@ -34,7 +34,7 @@ import {
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
-import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
+import { getBainaBoxVendorByVendorId, BAINA_BOX_VENDOR_DATA } from "@/lib/bainaBoxData";
 import {
   AppSearchBar,
   Button,
@@ -150,19 +150,6 @@ export default function VendorCatalog() {
     }
   };
 
-  // Diet value as stored on a vendor (includes the combined option).
-  const vendorDietLabel = (value: VendorListing["diet"]): string => {
-    switch (value) {
-      case "Veg":
-        return t("Veg", "वेज");
-      case "Non-Veg":
-        return t("Non-Veg", "नॉन-वेज");
-      case "Veg & Non-Veg":
-        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
-      default:
-        return value;
-    }
-  };
 
   const priceLabel = (value: PriceRange): string => {
     switch (value) {
@@ -236,6 +223,17 @@ export default function VendorCatalog() {
     }
     return ALL;
   });
+
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    if (cat !== null) {
+      setCategory(cateringCategoryIds.includes(cat) ? cat : "");
+    }
+    const q = searchParams.get("q");
+    if (q !== null) {
+      setQuery(q);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -384,7 +382,8 @@ export default function VendorCatalog() {
         bainaMode
           ? listingCateringCategories(v).includes("baina-box") ||
             v.name.toLowerCase().includes("baina") ||
-            v.cuisines.some((c) => c.toLowerCase().includes("baina"))
+            v.cuisines.some((c) => c.toLowerCase().includes("baina")) ||
+            Boolean(getBainaBoxVendorByVendorId(v.id))
           : category === "" ||
             listingCateringCategories(v).includes(category);
 
@@ -569,20 +568,22 @@ export default function VendorCatalog() {
         label={t("Catering categories", "कैटरिंग श्रेणियाँ")}
       >
         <CategoryChip
-          selected={category === "" && !bainaMode}
-          onClick={() => setCategory("")}
+          selected={category === ""}
+          onClick={() => {
+            if (isBainaSearch) setQuery("");
+            setCategory("");
+          }}
         >
           {t("All", "सभी")}
         </CategoryChip>
         {cateringCategories.map((c) => (
           <CategoryChip
             key={c.id}
-            selected={
-              category === c.id || (c.id === "baina-box" && bainaMode)
-            }
-            onClick={() =>
-              setCategory((prev) => (prev === c.id ? "" : c.id))
-            }
+            selected={category === c.id}
+            onClick={() => {
+              if (isBainaSearch) setQuery("");
+              setCategory((prev) => (prev === c.id ? "" : c.id));
+            }}
             leftIcon={<span aria-hidden="true">{c.icon}</span>}
           >
             {lang === "hi" ? c.nameHi : c.name}
@@ -955,7 +956,7 @@ export default function VendorCatalog() {
               key={vendor.id}
               vendor={vendor}
               stats={statFor(ratings, vendor)}
-              isBainaSearch={isBainaSearch}
+              isBainaMode={bainaMode}
             />
           ))}
         </ul>
@@ -1038,11 +1039,11 @@ function FilterSelect({
 function VendorCard({
   vendor,
   stats,
-  isBainaSearch,
+  isBainaMode,
 }: {
   vendor: VendorListing;
   stats?: VendorRatingSummary;
-  isBainaSearch?: boolean;
+  isBainaMode?: boolean;
 }) {
   const { t } = useLang();
   const { has, toggle, isFull } = useCompare();
@@ -1050,19 +1051,25 @@ function VendorCard({
   const compareDisabled = !inCompare && isFull;
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
 
-  const bainaVendorData = isBainaSearch
-    ? getBainaBoxVendorByVendorId(vendor.id)
+  const bainaVendorData = isBainaMode
+    ? (getBainaBoxVendorByVendorId(vendor.id) ??
+       Object.values(BAINA_BOX_VENDOR_DATA).find(
+         (v) => v.name.toLowerCase() === vendor.name.toLowerCase(),
+       ))
     : undefined;
   const vendorHref = bainaVendorData
     ? `/baina-box/${bainaVendorData.slug}`
-    : `/vendors/${vendor.id}`;
+    : isBainaMode
+      ? `/vendors/${vendor.id}?mode=baina`
+      : `/vendors/${vendor.id}`;
 
   // "Book" from a brand card starts a Single Stall with this vendor pre-selected
-  // (still changeable in the wizard). Live vendors resolve by id; a curated seed
-  // id absent from the booking menu simply falls back to the tier picker.
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
-    vendor.id,
-  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
+  // (still changeable in the wizard). When in Baina mode, CTA directs to the Baina Box flow.
+  const bookHref = isBainaMode
+    ? (bainaVendorData ? `/baina-box/${bainaVendorData.slug}#baina-order` : `/baina-box`)
+    : `/book?package=custom&vendor=${encodeURIComponent(
+        vendor.id,
+      )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
@@ -1173,7 +1180,7 @@ function VendorCard({
           {vendor.reviews > 0 || stats ? (
             <Link
               href={
-                isBainaSearch && bainaVendorData
+                isBainaMode && bainaVendorData
                   ? vendorHref
                   : `/vendors/${vendor.id}#reviews`
               }

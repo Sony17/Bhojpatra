@@ -22,7 +22,7 @@ import ReviewCard from "@/components/vendors/ReviewCard";
 import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
-import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
+import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -300,35 +300,6 @@ function MapPinIcon({ className }: { className?: string }) {
   );
 }
 
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <LineIcon className={className}>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </LineIcon>
-  );
-}
-
-function ShareIcon({ className }: { className?: string }) {
-  return (
-    <LineIcon className={className}>
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
-    </LineIcon>
-  );
-}
-
-function CompareIcon({ className }: { className?: string }) {
-  return (
-    <LineIcon className={className}>
-      <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-      <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-      <path d="M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
-    </LineIcon>
-  );
-}
 
 function RosetteIcon({ className }: { className?: string }) {
   return (
@@ -410,39 +381,7 @@ function VendorProfile({
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
 
-  // "Share" quick action — native share sheet where available, else copy link.
-  const [linkCopied, setLinkCopied] = useState(false);
-  const profileUrl = `${SITE_ORIGIN}/vendors/${vendor.id}`;
-  const handleShare = () => {
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      navigator.share({ title: vendor.name, url: profileUrl }).catch(() => {});
-      return;
-    }
-    void navigator.clipboard?.writeText(profileUrl).then(() => {
-      setLinkCopied(true);
-      window.setTimeout(() => setLinkCopied(false), 2000);
-    });
-  };
-
   const famousFor = vendor.cuisines.map((c) => FAMOUS_FOR[c]).find(Boolean);
-
-  // Menu sections merged across the vendor's cuisines — same-named courses
-  // (e.g. two cuisines both offering "Main Course") collapse into one.
-  const menu = useMemo(() => {
-    const sections: { name: string; nameHi: string; icon: string; items: string[] }[] = [];
-    for (const c of vendor.cuisines) {
-      for (const sec of SAMPLE_MENU[c] ?? []) {
-        const existing = sections.find((s) => s.name === sec.name);
-        if (existing) {
-          for (const it of sec.items)
-            if (!existing.items.includes(it)) existing.items.push(it);
-        } else {
-          sections.push({ ...sec, items: [...sec.items] });
-        }
-      }
-    }
-    return sections;
-  }, [vendor.cuisines]);
 
   // Real, customer-submitted reviews for this vendor. Best-effort — falls back
   // to an empty list (and the "no reviews yet" state) on any failure. Exposed as
@@ -531,9 +470,18 @@ function VendorProfile({
   // resolve by id; a curated seed id absent from the booking menu falls back to
   // the tier picker.
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
-    vendor.id,
-  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
+  const bainaVendorData = getBainaBoxVendorByVendorId(vendor.id);
+  const isBainaMode =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("mode") === "baina";
+  const bookHref =
+    isBainaMode || bainaVendorData
+      ? bainaVendorData
+        ? `/baina-box/${bainaVendorData.slug}#baina-order`
+        : `/baina-box`
+      : `/book?package=custom&vendor=${encodeURIComponent(
+          vendor.id,
+        )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
 
   // A live aggregate from the reviews just loaded for this vendor, so a rating
   // submitted from the panel below is reflected immediately (the shared

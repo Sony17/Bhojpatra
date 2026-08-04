@@ -6,7 +6,7 @@ import PublicShell from "@/components/app/PublicShell";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { useLang } from "@/lib/i18n";
-import { Button, Badge } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
 
 export default function BainaBoxOverview() {

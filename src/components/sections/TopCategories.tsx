@@ -28,7 +28,7 @@ export default function TopCategories() {
     id: services.bainaBox.id,
     name: lang === "hi" ? services.bainaBox.nameHi : services.bainaBox.name,
     image: services.bainaBox.image,
-    href: "/vendors?q=Baina+Box",
+    href: "/vendors?category=baina-box",
     priceFrom: services.bainaBox.priceFrom ?? "",
   };
   const mid = Math.floor(serviceCards.length / 2);

@@ -74,7 +74,7 @@ export default function BainaBoxes() {
                   {lang === "hi" ? bainaBoxes.subtitleHi : bainaBoxes.subtitle}
                 </p>
                 <Button
-                  href="/baina-box"
+                  href="/vendors?category=baina-box"
                   variant="secondary"
                   size="md"
                   className="btn-sheen mt-5 rounded-full px-7 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-pop"

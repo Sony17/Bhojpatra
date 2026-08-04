@@ -34,7 +34,7 @@ export default function CategoriesExplorer() {
     id: baina.id,
     name: lang === "hi" ? baina.nameHi : baina.name,
     image: baina.image,
-    href: "/vendors?q=Baina+Box",
+    href: "/vendors?category=baina-box",
     cta: t("Explore", "देखें"),
     sub: priceSub(baina.priceFrom),
   });

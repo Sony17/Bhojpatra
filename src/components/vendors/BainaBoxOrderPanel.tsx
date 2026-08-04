@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DatePicker from "@/components/DatePicker";
@@ -61,8 +61,48 @@ export default function BainaBoxOrderPanel({
   // null = signed out, undefined = still resolving — the tri-state keeps the
   // login gate from flashing for an already signed-in customer.
   const session = useSessionStatus();
+  // Primary / default box for this vendor (matches fixedPrice or first product).
+  const defaultProduct = useMemo(() => {
+    return (
+      data.products.find((p) => p.price === data.fixedPrice) ??
+      data.products[0]
+    );
+  }, [data.products, data.fixedPrice]);
 
-  const [qty, setQty] = useState<Record<string, number>>({});
+  const [qty, setQty] = useState<Record<string, number>>(() => {
+    const def =
+      data.products.find((p) => p.price === data.fixedPrice) ??
+      data.products[0];
+    return def ? { [def.id]: 1 } : {};
+  });
+
+  // Ensure at least 1 box is selected when user clicks any "Book Now" / "#baina-order" link
+  useEffect(() => {
+    if (!defaultProduct) return;
+
+    function handleSelectDefault() {
+      setQty((prev) => {
+        const sum = Object.values(prev).reduce((a, b) => a + b, 0);
+        if (sum === 0) {
+          return { [defaultProduct.id]: 1 };
+        }
+        return prev;
+      });
+    }
+
+    function onClick(e: MouseEvent) {
+      const anchor = (e.target as HTMLElement)?.closest<
+        HTMLAnchorElement | HTMLButtonElement
+      >('a[href*="#baina-order"], button[href*="#baina-order"]');
+      if (anchor) {
+        handleSelectDefault();
+      }
+    }
+
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, [defaultProduct]);
+
   const [dateIso, setDateIso] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -312,12 +352,27 @@ export default function BainaBoxOrderPanel({
       {/* ── Order summary & confirm ───────────────────────────────────── */}
       <div className="mt-8" id="baina-order">
         {totalBoxes === 0 ? (
-          <p className="rounded-card border border-cream-3 bg-cream/30 px-4 py-3 text-center text-sm text-ink-soft">
-            {t(
-              "Add boxes above to start your order.",
-              "ऑर्डर शुरू करने के लिए ऊपर डिब्बे जोड़ें।",
+          <div className="rounded-card border border-cream-3 bg-cream/30 p-6 text-center shadow-sm">
+            <p className="text-sm text-ink-soft">
+              {t(
+                "Add boxes above to start your order.",
+                "ऑर्डर शुरू करने के लिए ऊपर डिब्बे जोड़ें।",
+              )}
+            </p>
+            {defaultProduct && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
+                onClick={() => setCount(defaultProduct.id, 1)}
+              >
+                {t(
+                  `Add 1 ${defaultProduct.name} (₹${defaultProduct.price.toLocaleString("en-IN")})`,
+                  `1 ${defaultProduct.name} जोड़ें (₹${defaultProduct.price.toLocaleString("en-IN")})`,
+                )}
+              </Button>
             )}
-          </p>
+          </div>
         ) : (
           <div className="overflow-hidden rounded-card border border-maroon/15 bg-white shadow-card">
             <div className="border-b border-cream-3 bg-cream/40 px-5 py-4">
@@ -432,7 +487,7 @@ export default function BainaBoxOrderPanel({
 
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
                     <label className="text-sm text-ink-soft" htmlFor="baina-address">
-                      {t("Delivery address (optional)", "डिलीवरी पता (वैकल्पिक)")}
+                      {t("Delivery address", "डिलीवरी पता")}
                     </label>
                     <Input
                       id="baina-address"
