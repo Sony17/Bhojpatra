@@ -1010,15 +1010,26 @@ export default function BookingWizard() {
 
   // Check if a category has any selection made by the user (vendor, item, or skipped).
   const hasCategorySelection = (cat: MenuCategory): boolean => {
+    const rawVendors = categoryVendor[cat.id] ?? [];
+    const rawItems = categoryItems[cat.id] ?? [];
     const chosenVendors = vendorsFor(cat.id);
     const chosenItems = itemsFor(cat.id);
     const skipped = isSkipped(cat.id);
-    return chosenVendors.length > 0 || chosenItems.length > 0 || skipped;
+    return (
+      rawVendors.length > 0 ||
+      rawItems.length > 0 ||
+      chosenVendors.length > 0 ||
+      chosenItems.length > 0 ||
+      skipped
+    );
   };
 
   // Check if a list of categories has at least one selection made.
   const hasStepAnySelection = (cats: MenuCategory[]): boolean => {
-    return cats.some(hasCategorySelection);
+    if (cats.some(hasCategorySelection)) return true;
+    const hasAnyVendor = Object.values(categoryVendor).some((v) => v && v.length > 0);
+    const hasAnyItem = Object.values(categoryItems).some((i) => i && i.length > 0);
+    return hasAnyVendor || hasAnyItem;
   };
 
   // Check if all categories in a list are fully resolved.
@@ -1811,20 +1822,25 @@ export default function BookingWizard() {
   const router = useRouter();
 
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
-  // Wipe the saved draft and every in-progress pick, dropping the guest back to a
-  // pristine Step 1. A hard navigation (not router.push) forces a full remount so
-  // all wizard state resets — with the draft already cleared, nothing rehydrates.
+  // Reset chosen vendors and menu items to 0, leaving event date, occasion,
+  // headcount and city intact.
   const startOver = () => {
     if (typeof window === "undefined") return;
     const ok = window.confirm(
       t(
-        "Start over? This clears your current booking selections.",
-        "फिर से शुरू करें? इससे आपकी वर्तमान बुकिंग चयन हट जाएँगे।",
+        "Start over? This clears your chosen vendors and menu item selections.",
+        "फिर से शुरू करें? इससे आपके चुने हुए वेंडर और मेन्यू आइटम हट जाएँगे।",
       ),
     );
     if (!ok) return;
-    clearBookingDraft();
-    window.location.assign("/book");
+    setCategoryVendor({});
+    setCategoryItems({});
+    setSkippedCats([]);
+    setSelectedAddOns([]);
+    setAddOnVendor({});
+    setActiveCat(0);
+    setLiveCat(0);
+    setStep(2);
   };
   const goBack = () => {
     if (step > 1) {
@@ -1845,7 +1861,7 @@ export default function BookingWizard() {
   };
   const menuNext = () => {
     if (activeCat < menuStepCategories.length - 1) setActiveCat((c) => c + 1);
-    else if (hasStepAnySelection(menuStepCategories)) goNext();
+    else goNext();
   };
   // Live Stall-step (3) navigation — the same walk over the live-station courses.
   // Back off the first returns to Menu; past the last advances to Add-ons.
@@ -4263,12 +4279,12 @@ function StepMenu({
         </div>
       )}
 
-      {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
+      {/* Pick a vendor (multiple allowed on Platinum) */}
       <div className="mt-7 flex items-center justify-between gap-3">
         <h3 className="font-sans text-2xl font-semibold text-maroon">
           {multiVendor
-            ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
-            : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
+            ? t("Choose Vendors", "वेंडर चुनें (कई चुनें)")
+            : t("Choose a Vendor", "वेंडर चुनें")}
         </h3>
         {/* Filter is offered only when the roster is long enough to be worth
             typing over — a short shortlist stays clutter-free. */}
@@ -4574,7 +4590,7 @@ function StepMenu({
         </div>
       )}
 
-      {/* Step B · Pick items */}
+      {/* Pick items */}
       <div className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 shadow-sm">
         {selectedVendors.length === 0 ? (
           <p className="text-sm text-ink-soft">
@@ -4593,8 +4609,8 @@ function StepMenu({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-sans text-2xl font-semibold text-maroon">
                 {multiVendor
-                  ? t("Step B · Pick items across your vendors", "चरण B · अपने वेंडरों से आइटम चुनें")
-                  : t("Step B · Pick items from their menu", "चरण B · उनके मेन्यू से आइटम चुनें")}
+                  ? t("Select Dishes Across Vendors", "अपने वेंडरों से आइटम चुनें")
+                  : t("Select Dishes", "उनके मेन्यू से आइटम चुनें")}
               </h3>
               <span
                 className={
