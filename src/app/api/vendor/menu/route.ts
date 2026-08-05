@@ -17,6 +17,7 @@ import {
   type LiveVendorRecord,
   type ModerationStatus,
   type VendorBainaBox,
+  type VendorSingleStallMenu,
 } from "@/lib/vendorMenus";
 
 export const dynamic = "force-dynamic";
@@ -150,6 +151,35 @@ export async function PUT(request: Request) {
           };
     });
 
+    // Single Stall Menu photos ride the same "dish" photo store — strip any
+    // reference to cover or item photos this vendor doesn't own.
+    const singleStallMenu: VendorSingleStallMenu | undefined = check.value
+      .singleStallMenu
+      ? {
+          ...check.value.singleStallMenu,
+          coverPhoto:
+            check.value.singleStallMenu.coverPhoto &&
+            photoIdFromUrl(check.value.singleStallMenu.coverPhoto) &&
+            ownedDishPhotoIds.has(
+              photoIdFromUrl(check.value.singleStallMenu.coverPhoto)!,
+            )
+              ? check.value.singleStallMenu.coverPhoto
+              : undefined,
+          items: check.value.singleStallMenu.items.map((it) => {
+            if (!it.photo) return it;
+            const photoId = photoIdFromUrl(it.photo);
+            return photoId && ownedDishPhotoIds.has(photoId)
+              ? it
+              : {
+                  name: it.name,
+                  diet: it.diet,
+                  ...(it.price != null ? { price: it.price } : {}),
+                  ...(it.description ? { description: it.description } : {}),
+                };
+          }),
+        }
+      : undefined;
+
     const verified = app?.status === "Verified";
 
     // Content moderation: a Hidden vendor stays hidden until an admin restores
@@ -181,15 +211,17 @@ export async function PUT(request: Request) {
       ...check.value,
       menu,
       ...(check.value.bainaBoxes ? { bainaBoxes } : {}),
+      ...(singleStallMenu ? { singleStallMenu } : {}),
     };
 
     await saveVendor(record);
 
-    // Clean up dish/box photos no longer referenced by any item or box.
+    // Clean up dish/box/stall photos no longer referenced by any item or box.
     const referenced = new Set(
       [
         ...menu.flatMap((s) => s.items.map((it) => it.photo)),
         ...bainaBoxes.map((b) => b.photo),
+        ...(singleStallMenu ? [singleStallMenu.coverPhoto, ...singleStallMenu.items.map((it) => it.photo)] : []),
       ].flatMap((url) => {
         const id = url ? photoIdFromUrl(url) : null;
         return id ? [id] : [];

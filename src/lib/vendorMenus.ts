@@ -90,6 +90,34 @@ export interface VendorBainaBox {
   photo?: string;
 }
 
+/** Individual dish item inside a vendor's dedicated Single Stall menu. */
+export interface SingleStallMenuItem {
+  name: string;
+  diet: DietType;
+  /** Optional per-item price (₹) when items inside the stall are individually priced. */
+  price?: number;
+  /** Brief description or ingredients of the dish. */
+  description?: string;
+  /** Same-origin dish photo URL (`/api/vendor/photo/<id>`), owned by the vendor. */
+  photo?: string;
+}
+
+/** The vendor's dedicated Single Stall Menu offer — a fixed stall menu customers book. */
+export interface VendorSingleStallMenu {
+  /** Stall title (e.g. "Awadhi Chaat & Kebab Counter"). */
+  title: string;
+  /** Brief description of the stall setup or experience. */
+  description?: string;
+  /** Cover photo of the stall setup (`/api/vendor/photo/<id>`). */
+  coverPhoto?: string;
+  /** Fixed rate per guest / per plate (₹). */
+  pricePerGuest: number;
+  /** Minimum headcount required for booking this stall (e.g. 50). */
+  minGuests?: number;
+  /** Fixed list of items included in this stall menu. */
+  items: SingleStallMenuItem[];
+}
+
 /** The vendor's Essential Service offer — the service-only tier customers see
  *  on /service-packages (crew, buffet setup & essentials), at the vendor's
  *  own per-guest rate with what they include. */
@@ -159,6 +187,8 @@ export interface LiveVendorRecord {
   bainaBoxes?: VendorBainaBox[];
   /** The vendor's Essential Service offer (essential category). */
   essentialService?: VendorEssentialService;
+  /** The vendor's dedicated Single Stall menu offer (single-stall category). */
+  singleStallMenu?: VendorSingleStallMenu;
   createdAt: string;
   updatedAt: string;
 }
@@ -537,6 +567,8 @@ export interface PublicVendorProfile {
   bainaBoxes: VendorBainaBox[];
   /** The vendor's Essential Service offer, or null when not offered. */
   essentialService: VendorEssentialService | null;
+  /** The vendor's dedicated Single Stall menu offer, or null when not offered. */
+  singleStallMenu: VendorSingleStallMenu | null;
 }
 
 /** Resolve a vendor's declared counter ids into display rows (name/icon/price),
@@ -635,6 +667,7 @@ export function toPublicVendorProfile(
     serviceCategories: resolveServiceCategories(r.serviceCategories),
     bainaBoxes: r.bainaBoxes ?? [],
     essentialService: r.essentialService ?? null,
+    singleStallMenu: r.singleStallMenu ?? null,
   };
 }
 
@@ -661,6 +694,8 @@ export function photoIdFromUrl(url: string): string | null {
   return PHOTO_URL_RE.test(url) ? url.split("/").pop()! : null;
 }
 
+const MAX_SINGLE_STALL_ITEMS = 30;
+
 export interface VendorMenuInput {
   business: string;
   city: string;
@@ -679,6 +714,7 @@ export interface VendorMenuInput {
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
   essentialService?: VendorEssentialService;
+  singleStallMenu?: VendorSingleStallMenu;
   /** Self-selected marketplace tier bands (absent = keep assigned/derived). */
   tiers?: VendorTier[];
 }
@@ -686,6 +722,76 @@ export interface VendorMenuInput {
 type BainaBoxesCheck =
   | { ok: true; value: VendorBainaBox[] }
   | { ok: false; error: string };
+
+type SingleStallMenuCheck =
+  | { ok: true; value: VendorSingleStallMenu | undefined }
+  | { ok: false; error: string };
+
+/** Normalize + validate a vendor's Single Stall Menu offer. Undefined when absent/empty. */
+export function cleanSingleStallMenu(v: unknown): SingleStallMenuCheck {
+  if (!v || typeof v !== "object") return { ok: true, value: undefined };
+  const s = v as Record<string, unknown>;
+  const title = cleanString(s.title, 80);
+  const description = cleanString(s.description, 300);
+  const pricePerGuest = cleanMoney(s.pricePerGuest, 100000);
+  const minGuests = cleanMoney(s.minGuests, 10000);
+  const coverPhoto =
+    typeof s.coverPhoto === "string" && PHOTO_URL_RE.test(s.coverPhoto)
+      ? s.coverPhoto
+      : undefined;
+
+  // If both title and price are absent, consider singleStallMenu omitted
+  if (!title && pricePerGuest === null) {
+    return { ok: true, value: undefined };
+  }
+
+  if (!title) {
+    return { ok: false, error: "Single Stall Menu requires a title." };
+  }
+
+  if (pricePerGuest === null || pricePerGuest <= 0) {
+    return {
+      ok: false,
+      error: "Single Stall Menu price per guest must be a valid amount.",
+    };
+  }
+
+  const items: SingleStallMenuItem[] = [];
+  if (Array.isArray(s.items)) {
+    for (const rawItem of s.items.slice(0, MAX_SINGLE_STALL_ITEMS)) {
+      const it = (rawItem ?? {}) as Record<string, unknown>;
+      const name = cleanString(it.name, 60);
+      if (!name) continue;
+      const diet: DietType = it.diet === "non-veg" ? "non-veg" : "veg";
+      const itemPrice = cleanMoney(it.price, 100000);
+      const itemDesc = cleanString(it.description, 150);
+      const itemPhoto =
+        typeof it.photo === "string" && PHOTO_URL_RE.test(it.photo)
+          ? it.photo
+          : undefined;
+
+      items.push({
+        name,
+        diet,
+        ...(itemPrice !== null && itemPrice > 0 ? { price: itemPrice } : {}),
+        ...(itemDesc ? { description: itemDesc } : {}),
+        ...(itemPhoto ? { photo: itemPhoto } : {}),
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      title,
+      ...(description ? { description } : {}),
+      ...(coverPhoto ? { coverPhoto } : {}),
+      pricePerGuest,
+      ...(minGuests !== null && minGuests > 0 ? { minGuests } : {}),
+      items,
+    },
+  };
+}
 
 /** Validate + normalize a vendor's Baina Box list. Blank rows are dropped; a
  *  named box without a valid ½ kg price is a hard error (it would render
@@ -938,11 +1044,15 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
   // (and ultimately the price-derived default) still applies.
   const tiers = parseTiers(body.tiers);
 
-  // Baina Boxes + Essential Service — via the shared cleaners (also used by
-  // the registration application route).
+  // Baina Boxes, Essential Service & Single Stall Menu — via shared cleaners.
   const boxesCheck = cleanBainaBoxes(body.bainaBoxes);
   if (!boxesCheck.ok) return boxesCheck;
   const bainaBoxes = boxesCheck.value;
+
+  const stallCheck = cleanSingleStallMenu(body.singleStallMenu);
+  if (!stallCheck.ok) return stallCheck;
+  const singleStallMenu = stallCheck.value;
+
   const essentialService = cleanEssentialService(body.essentialService);
 
   // Catering categories — the customer-facing offering types the vendor
@@ -975,6 +1085,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(serviceCategories.length ? { serviceCategories } : {}),
       ...(bainaBoxes.length ? { bainaBoxes } : {}),
       ...(essentialService ? { essentialService } : {}),
+      ...(singleStallMenu ? { singleStallMenu } : {}),
       ...(tiers.length ? { tiers } : {}),
     },
   };
