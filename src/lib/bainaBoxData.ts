@@ -58,6 +58,14 @@ export const BAINA_BOX_VENDOR_DATA: Record<string, BainaBoxVendorData> = {
     ],
     products: [
       {
+        id: "ram-4",
+        name: "Baina Box (Mix)",
+        image:
+          "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=80",
+        price: 749,
+        unit: "Box",
+      },
+      {
         id: "ram-1",
         name: "Kaju Katli",
         image:
@@ -69,7 +77,7 @@ export const BAINA_BOX_VENDOR_DATA: Record<string, BainaBoxVendorData> = {
         id: "ram-2",
         name: "Motichoor Laddu",
         image:
-          "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=80",
+          "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?auto=format&fit=crop&w=500&q=80",
         price: 599,
         unit: "Box",
       },
@@ -79,14 +87,6 @@ export const BAINA_BOX_VENDOR_DATA: Record<string, BainaBoxVendorData> = {
         image:
           "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=80",
         price: 999,
-        unit: "Box",
-      },
-      {
-        id: "ram-4",
-        name: "Baina Box (Mix)",
-        image:
-          "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=500&q=80",
-        price: 749,
         unit: "Box",
       },
     ],

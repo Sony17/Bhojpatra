@@ -33,7 +33,7 @@ export default function QuantitySelector({
   return (
     <div
       className={cn(
-        "inline-flex items-stretch overflow-hidden rounded-full border border-cream bg-white shadow-soft",
+        "inline-flex items-stretch overflow-hidden rounded-full border border-[#E5C185] bg-white shadow-xs",
         className,
       )}
       role="group"
@@ -45,7 +45,7 @@ export default function QuantitySelector({
         disabled={value <= min}
         aria-label="Decrease"
         className={cn(
-          "focus-ring flex items-center justify-center font-bold leading-none text-maroon transition duration-150 hover:bg-cream/30 active:scale-95 disabled:opacity-30",
+          "focus-ring flex items-center justify-center font-bold leading-none text-maroon transition duration-150 hover:bg-cream/40 active:scale-95 disabled:opacity-30",
           btn,
         )}
       >
@@ -54,7 +54,7 @@ export default function QuantitySelector({
       <span
         aria-live="polite"
         className={cn(
-          "flex min-w-12 items-center justify-center border-x border-cream/70 px-2 text-center font-bold tabular-nums text-ink",
+          "flex min-w-10 items-center justify-center border-x border-[#E5C185]/60 px-2.5 text-center font-bold tabular-nums text-ink",
           size === "sm" ? "text-sm" : "text-base",
         )}
       >

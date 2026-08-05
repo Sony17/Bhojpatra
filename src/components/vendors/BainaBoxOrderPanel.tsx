@@ -54,8 +54,12 @@ function isValidEmail(v: string): boolean {
  */
 export default function BainaBoxOrderPanel({
   data,
+  qty: externalQty,
+  setQty: externalSetQty,
 }: {
   data: BainaBoxVendorData;
+  qty?: Record<string, number>;
+  setQty?: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }) {
   const { t } = useLang();
   // null = signed out, undefined = still resolving — the tri-state keeps the
@@ -69,12 +73,15 @@ export default function BainaBoxOrderPanel({
     );
   }, [data.products, data.fixedPrice]);
 
-  const [qty, setQty] = useState<Record<string, number>>(() => {
+  const [internalQty, setInternalQty] = useState<Record<string, number>>(() => {
     const def =
       data.products.find((p) => p.price === data.fixedPrice) ??
       data.products[0];
     return def ? { [def.id]: 1 } : {};
   });
+
+  const qty = externalQty ?? internalQty;
+  const setQty = externalSetQty ?? setInternalQty;
 
   // Ensure at least 1 box is selected when user clicks any "Book Now" / "#baina-order" link
   useEffect(() => {
@@ -129,6 +136,11 @@ export default function BainaBoxOrderPanel({
   );
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
+
+  const additionalProducts = useMemo(() => {
+    if (!defaultProduct) return data.products;
+    return data.products.filter((p) => p.id !== defaultProduct.id);
+  }, [data.products, defaultProduct]);
 
   const setCount = (id: string, next: number) =>
     setQty((m) => ({ ...m, [id]: next }));
@@ -277,22 +289,23 @@ export default function BainaBoxOrderPanel({
 
   return (
     <>
-      {/* ── Boxes & sweets grid — pick quantities ─────────────────────── */}
-      <div className="mt-12 border-t border-cream-3 pt-8">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
-            {t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
-          </h2>
-          <Link
-            href="/baina-box"
-            className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-          >
-            {t("View All →", "सभी देखें →")}
-          </Link>
-        </div>
+      {/* ── Boxes & sweets grid — pick quantities (excluding primary item in inspection) ── */}
+      {additionalProducts.length > 0 && (
+        <div className="mt-12 border-t border-cream-3 pt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
+              {t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
+            </h2>
+            <Link
+              href="/baina-box"
+              className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
+            >
+              {t("View All →", "सभी देखें →")}
+            </Link>
+          </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {data.products.map((prod) => {
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            {additionalProducts.map((prod) => {
             const count = qty[prod.id] ?? 0;
             return (
               <div
@@ -348,6 +361,7 @@ export default function BainaBoxOrderPanel({
           })}
         </div>
       </div>
+      )}
 
       {/* ── Order summary & confirm ───────────────────────────────────── */}
       <div className="mt-8" id="baina-order">
