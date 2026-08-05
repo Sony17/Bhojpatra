@@ -303,57 +303,6 @@ export default function BainaBoxDetail({
             is how a box order actually completes. ── */}
         <BainaBoxOrderPanel data={data} />
 
-        {/* ── Explore Other Sweet Houses ── */}
-        {otherVendors.length > 0 && (
-          <div className="mt-14 border-t border-cream-3 pt-10">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-xl font-bold text-ink sm:text-2xl">
-                {t("Explore Other Sweet Houses", "अन्य मिठाई घर देखें")}
-              </h2>
-              <Link
-                href="/baina-box"
-                className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-              >
-                {t("View All →", "सभी देखें →")}
-              </Link>
-            </div>
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {otherVendors.map((v) => (
-                <Link
-                  key={v.slug}
-                  href={`/baina-box/${v.slug}`}
-                  className="group flex items-center gap-3.5 rounded-2xl border border-cream-3 bg-white p-3.5 shadow-sm transition hover:border-maroon/20 hover:shadow-card"
-                >
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-cream">
-                    <Image
-                      src={v.heroImage}
-                      alt={v.name}
-                      fill
-                      sizes="64px"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-display text-base font-bold text-ink transition-colors group-hover:text-maroon">
-                      {v.name}
-                    </h3>
-                    <p className="text-xs text-ink-soft">{v.location}</p>
-                    <p className="mt-1 font-display text-sm font-bold text-maroon">
-                      ₹{v.fixedPrice.toLocaleString("en-IN")}{" "}
-                      <span className="text-[11px] font-normal text-ink-soft">
-                        / {v.priceUnit}
-                      </span>
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-maroon transition-transform group-hover:translate-x-0.5">
-                    →
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
         <CompareTray />
 
         {/* Mobile sticky booking bar — jumps to the on-page box order panel

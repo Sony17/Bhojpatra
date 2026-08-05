@@ -281,13 +281,11 @@ export function getAllBainaBoxVendors(
   const seenSlugs = new Set(result.map((b) => b.slug));
 
   for (const v of allListings) {
-    if (v.cuisines.includes("Baina Boxes") || v.cuisines.includes("Sweets")) {
-      const slug = slugifyName(v.name);
-      if (!seenIds.has(v.id) && !seenSlugs.has(slug)) {
-        result.push(vendorListingToBainaData(v));
-        seenIds.add(v.id);
-        seenSlugs.add(slug);
-      }
+    const slug = slugifyName(v.name);
+    if (!seenIds.has(v.id) && !seenSlugs.has(slug)) {
+      result.push(vendorListingToBainaData(v));
+      seenIds.add(v.id);
+      seenSlugs.add(slug);
     }
   }
   return result;

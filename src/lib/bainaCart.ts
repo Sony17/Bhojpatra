@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
-import { BAINA_BOX_VENDOR_DATA, type BainaBoxProduct, type BainaBoxVendorData } from "./bainaBoxData";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { BAINA_BOX_VENDOR_DATA, getAllBainaBoxVendors, type BainaBoxProduct, type BainaBoxVendorData } from "./bainaBoxData";
+import { useAllVendors } from "./useAllVendors";
 
 export interface BainaCartLine {
   id: string; // product id e.g. "ram-4"
@@ -23,8 +24,11 @@ let cacheMap: Record<string, number> = EMPTY_MAP;
 let cacheRaw = " ";
 
 /** Find product & vendor metadata by product ID across all Baina Box vendors */
-export function findBainaProduct(productId: string): { product: BainaBoxProduct; vendor: BainaBoxVendorData } | null {
-  for (const vendor of Object.values(BAINA_BOX_VENDOR_DATA)) {
+export function findBainaProduct(
+  productId: string,
+  allVendors: BainaBoxVendorData[] = Object.values(BAINA_BOX_VENDOR_DATA),
+): { product: BainaBoxProduct; vendor: BainaBoxVendorData } | null {
+  for (const vendor of allVendors) {
     const p = vendor.products.find((prod) => prod.id === productId);
     if (p) return { product: p, vendor };
   }
@@ -69,6 +73,12 @@ function write(map: Record<string, number>) {
 /** Reactive access to persistent Baina Box cart, synced across every page/component. */
 export function useBainaCart() {
   const map = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const allListings = useAllVendors();
+
+  const allBainaVendors = useMemo(
+    () => getAllBainaBoxVendors(allListings),
+    [allListings],
+  );
 
   const setQty = useCallback((productId: string, qty: number) => {
     const cur = { ...getSnapshot() };
@@ -91,7 +101,7 @@ export function useBainaCart() {
 
   for (const [prodId, qty] of Object.entries(map)) {
     if (qty > 0) {
-      const info = findBainaProduct(prodId);
+      const info = findBainaProduct(prodId, allBainaVendors);
       if (info) {
         lines.push({
           id: prodId,

@@ -9,8 +9,10 @@ import { useLang } from "@/lib/i18n";
 import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
-import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
+import type { BainaBoxVendorData, BainaBoxProduct } from "@/lib/bainaBoxData";
+import { getAllBainaBoxVendors } from "@/lib/bainaBoxData";
 import { useBainaCart } from "@/lib/bainaCart";
+import { useAllVendors } from "@/lib/useAllVendors";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -138,10 +140,28 @@ export default function BainaBoxOrderPanel({
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
 
+  const allListings = useAllVendors();
+  const allVendors = useMemo(
+    () => getAllBainaBoxVendors(allListings),
+    [allListings],
+  );
+
   const additionalProducts = useMemo(() => {
-    if (!defaultProduct) return data.products;
-    return data.products.filter((p) => p.id !== defaultProduct.id);
-  }, [data.products, defaultProduct]);
+    const list: (BainaBoxProduct & { vendorName?: string; vendorSlug?: string })[] = [];
+    // 1. Products of current vendor (excluding default product if inspected)
+    for (const p of data.products) {
+      if (defaultProduct && p.id === defaultProduct.id) continue;
+      list.push({ ...p, vendorName: data.name, vendorSlug: data.slug });
+    }
+    // 2. Products of ALL other Baina Box vendors in the marketplace
+    for (const v of allVendors) {
+      if (v.slug === data.slug || v.vendorId === data.vendorId) continue;
+      for (const p of v.products) {
+        list.push({ ...p, vendorName: v.name, vendorSlug: v.slug });
+      }
+    }
+    return list;
+  }, [data, defaultProduct, allVendors]);
 
   const setCount = (id: string, next: number) => {
     if (externalSetQty) {
@@ -295,80 +315,6 @@ export default function BainaBoxOrderPanel({
 
   return (
     <>
-      {/* ── Boxes & sweets grid — pick quantities (excluding primary item in inspection) ── */}
-      {!hideProductsGrid && additionalProducts.length > 0 && (
-        <div className="mt-12 border-t border-cream-3 pt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
-              {t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
-            </h2>
-            <Link
-              href="/baina-box"
-              className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-            >
-              {t("View All →", "सभी देखें →")}
-            </Link>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-            {additionalProducts.map((prod) => {
-            const count = qty[prod.id] ?? 0;
-            return (
-              <div
-                key={prod.id}
-                className={`group flex flex-col overflow-hidden rounded-card border bg-white p-3 shadow-sm transition hover:shadow-card ${
-                  count > 0 ? "border-maroon/40" : "border-cream-3 hover:border-maroon/20"
-                }`}
-              >
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-cream">
-                  <Image
-                    src={prod.image}
-                    alt={prod.name}
-                    fill
-                    sizes="(min-width: 640px) 250px, 180px"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                </div>
-                <div className="mt-3 flex flex-1 flex-col justify-between">
-                  <div>
-                    <h3 className="font-sans text-sm font-bold text-ink">
-                      {prod.name}
-                    </h3>
-                    <p className="mt-1 font-display text-base font-bold text-maroon">
-                      ₹{prod.price.toLocaleString("en-IN")}{" "}
-                      <span className="text-xs font-normal text-ink-soft">
-                        / {prod.unit}
-                      </span>
-                    </p>
-                  </div>
-                  {count === 0 ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCount(prod.id, 1)}
-                      className="mt-3 w-full border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
-                    >
-                      {t("Add Box", "डिब्बा जोड़ें")}
-                    </Button>
-                  ) : (
-                    <QuantitySelector
-                      value={count}
-                      onChange={(n) => setCount(prod.id, n)}
-                      min={0}
-                      max={200}
-                      size="sm"
-                      label={prod.name}
-                      className="mt-3 self-center"
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      )}
-
       {/* ── Order summary & confirm ───────────────────────────────────── */}
       <div className="mt-8" id="baina-order">
         {totalBoxes === 0 ? (
@@ -563,6 +509,85 @@ export default function BainaBoxOrderPanel({
           </div>
         )}
       </div>
+
+      {/* ── Boxes & sweets grid — pick quantities (excluding primary item in inspection) ── */}
+      {!hideProductsGrid && additionalProducts.length > 0 && (
+        <div className="mt-12 border-t border-cream-3 pt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
+              {t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
+            </h2>
+            <Link
+              href="/baina-box"
+              className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
+            >
+              {t("View All →", "सभी देखें →")}
+            </Link>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            {additionalProducts.slice(0, 4).map((prod) => {
+              const count = qty[prod.id] ?? 0;
+              return (
+                <div
+                  key={prod.id}
+                  className={`group flex flex-col overflow-hidden rounded-card border bg-white p-3 shadow-sm transition hover:shadow-card ${
+                    count > 0 ? "border-maroon/40" : "border-cream-3 hover:border-maroon/20"
+                  }`}
+                >
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-cream">
+                    <Image
+                      src={prod.image}
+                      alt={prod.name}
+                      fill
+                      sizes="(min-width: 640px) 250px, 180px"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-1 flex-col justify-between">
+                    <div>
+                      <h3 className="font-sans text-sm font-bold text-ink">
+                        {prod.name}
+                      </h3>
+                      {"vendorName" in prod && prod.vendorName && (
+                        <p className="text-[11px] font-medium text-maroon/80">
+                          {prod.vendorName}
+                        </p>
+                      )}
+                      <p className="mt-1 font-display text-base font-bold text-maroon">
+                        ₹{prod.price.toLocaleString("en-IN")}{" "}
+                        <span className="text-xs font-normal text-ink-soft">
+                          / {prod.unit}
+                        </span>
+                      </p>
+                    </div>
+                    {count === 0 ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCount(prod.id, 1)}
+                        className="mt-3 w-full border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
+                      >
+                        {t("Add Box", "डिब्बा जोड़ें")}
+                      </Button>
+                    ) : (
+                      <QuantitySelector
+                        value={count}
+                        onChange={(n) => setCount(prod.id, n)}
+                        min={0}
+                        max={200}
+                        size="sm"
+                        label={prod.name}
+                        className="mt-3 self-center"
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </>
   );
 }

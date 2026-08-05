@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import PublicShell from "@/components/app/PublicShell";
 import CompareTray from "@/components/vendors/CompareTray";
-import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import BainaBoxOrderPanel from "@/components/vendors/BainaBoxOrderPanel";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui";
@@ -44,10 +43,12 @@ export default function BainaBoxOverview() {
           </p>
         </div>
 
-        {/* Featured Bhojpatra Special Banner */}
-        <div className="mt-6">
-          <BainaBoxSpecial variant="search" />
-        </div>
+        {/* Active Baina Order checkout card — positioned before the vendors grid */}
+        {cart.totalBoxes > 0 && (
+          <div className="mt-6">
+            <BainaBoxOrderPanel data={primaryVendor} hideProductsGrid />
+          </div>
+        )}
 
         {/* Vendor Grid Header */}
         <div className="mt-8 flex items-center justify-between px-1">
@@ -173,13 +174,6 @@ export default function BainaBoxOverview() {
             </Link>
           ))}
         </div>
-
-        {/* Active Baina Order checkout card persistent at bottom if items selected */}
-        {cart.totalBoxes > 0 && (
-          <div className="mt-8">
-            <BainaBoxOrderPanel data={primaryVendor} hideProductsGrid />
-          </div>
-        )}
 
         <CompareTray />
       </section>

@@ -521,12 +521,13 @@ export default function VendorCatalog() {
       }
     >
       <div className="mx-auto max-w-7xl">
-      {/* Bhojpatra's signature Baina Box promotion — pinned to the top of the
-          catalogue so every visitor lands on it before the brand grid,
-          whether they're browsing brands or filtering Baina Boxes. */}
-      <div className="mb-6 mt-2">
-        <BainaBoxSpecial variant="search" />
-      </div>
+      {/* Bhojpatra's signature Baina Box promotion — shown when browsing general brands,
+          hidden when filtering or searching for Baina Boxes to avoid redundancy. */}
+      {!bainaMode && (
+        <div className="mb-6 mt-2">
+          <BainaBoxSpecial variant="search" />
+        </div>
+      )}
 
       <div className="max-w-xl px-1">
         <p className="eyebrow text-[11px] font-semibold text-maroon">
