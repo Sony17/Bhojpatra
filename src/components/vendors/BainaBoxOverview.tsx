@@ -9,16 +9,23 @@ import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import BainaBoxOrderPanel from "@/components/vendors/BainaBoxOrderPanel";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui";
-import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData, getAllBainaBoxVendors } from "@/lib/bainaBoxData";
 import { useBainaCart } from "@/lib/bainaCart";
+import { useAllVendors } from "@/lib/useAllVendors";
 
 export default function BainaBoxOverview() {
   const { t } = useLang();
-  const vendors: BainaBoxVendorData[] = Object.values(BAINA_BOX_VENDOR_DATA);
+  const allListings = useAllVendors();
+  const vendors: BainaBoxVendorData[] = useMemo(
+    () => getAllBainaBoxVendors(allListings),
+    [allListings],
+  );
   const cart = useBainaCart();
 
   const primaryVendor = useMemo(() => {
-    return BAINA_BOX_VENDOR_DATA[cart.primaryVendorSlug] ?? vendors[0];
+    return (
+      vendors.find((v) => v.slug === cart.primaryVendorSlug) ?? vendors[0]
+    );
   }, [cart.primaryVendorSlug, vendors]);
 
   return (

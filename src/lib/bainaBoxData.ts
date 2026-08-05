@@ -210,11 +210,111 @@ export const BAINA_BOX_VENDOR_DATA: Record<string, BainaBoxVendorData> = {
   },
 };
 
-export function getBainaBoxVendor(slug: string): BainaBoxVendorData | undefined {
-  return BAINA_BOX_VENDOR_DATA[slug];
+import { vendorListings, type VendorListing } from "@/lib/data";
+import { slugifyName } from "@/lib/bookings";
+
+export function vendorListingToBainaData(v: VendorListing): BainaBoxVendorData {
+  const existing = Object.values(BAINA_BOX_VENDOR_DATA).find(
+    (b) => b.vendorId === v.id || b.slug === slugifyName(v.name),
+  );
+  if (existing) return existing;
+
+  const slug = slugifyName(v.name);
+  const fixedPrice = v.priceFrom || 799;
+
+  return {
+    slug,
+    vendorId: v.id,
+    name: v.name,
+    heroImage: v.image,
+    gallery: [v.image],
+    rating: v.rating || 4.8,
+    reviews: v.reviews || 100,
+    location: `${v.city}, ${v.state}`,
+    tags: v.cuisines.includes("Baina Boxes")
+      ? v.cuisines
+      : ["Baina Boxes", ...v.cuisines],
+    verified: v.verified,
+    fixedPrice,
+    priceUnit: "Box",
+    bestFor: ["Weddings", "Gifting", "Festivals", "Parties"],
+    whyChoose: [
+      "Authentic Traditional Taste",
+      "Made with Pure Desi Ghee",
+      "Freshly Prepared Daily",
+      "Hygienic Preparation",
+      "On-time Delivery",
+    ],
+    products: [
+      {
+        id: `${slug}-main`,
+        name: `${v.name} Signature Baina Box`,
+        image: v.image,
+        price: fixedPrice,
+        unit: "Box",
+      },
+      {
+        id: `${slug}-sweets`,
+        name: "Assorted Sweets Box",
+        image:
+          "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=500&q=80",
+        price: Math.round(fixedPrice * 1.1),
+        unit: "Box",
+      },
+      {
+        id: `${slug}-dryfruits`,
+        name: "Royal Dry Fruits Hamper",
+        image:
+          "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=80",
+        price: Math.round(fixedPrice * 1.3),
+        unit: "Box",
+      },
+    ],
+  };
 }
 
-export function getBainaBoxVendorByVendorId(vendorId: string): BainaBoxVendorData | undefined {
-  return Object.values(BAINA_BOX_VENDOR_DATA).find((v) => v.vendorId === vendorId);
+export function getAllBainaBoxVendors(
+  allListings: VendorListing[] = vendorListings,
+): BainaBoxVendorData[] {
+  const result: BainaBoxVendorData[] = [...Object.values(BAINA_BOX_VENDOR_DATA)];
+  const seenIds = new Set(result.map((b) => b.vendorId));
+  const seenSlugs = new Set(result.map((b) => b.slug));
+
+  for (const v of allListings) {
+    if (v.cuisines.includes("Baina Boxes") || v.cuisines.includes("Sweets")) {
+      const slug = slugifyName(v.name);
+      if (!seenIds.has(v.id) && !seenSlugs.has(slug)) {
+        result.push(vendorListingToBainaData(v));
+        seenIds.add(v.id);
+        seenSlugs.add(slug);
+      }
+    }
+  }
+  return result;
+}
+
+export function getBainaBoxVendor(
+  slug: string,
+  allListings: VendorListing[] = vendorListings,
+): BainaBoxVendorData | undefined {
+  if (BAINA_BOX_VENDOR_DATA[slug]) return BAINA_BOX_VENDOR_DATA[slug];
+  const listing = allListings.find(
+    (v) => slugifyName(v.name) === slug || v.id === slug,
+  );
+  if (listing) return vendorListingToBainaData(listing);
+  return undefined;
+}
+
+export function getBainaBoxVendorByVendorId(
+  vendorId: string,
+  allListings: VendorListing[] = vendorListings,
+): BainaBoxVendorData | undefined {
+  const staticFound = Object.values(BAINA_BOX_VENDOR_DATA).find(
+    (v) => v.vendorId === vendorId,
+  );
+  if (staticFound) return staticFound;
+  const listing = allListings.find((v) => v.id === vendorId);
+  if (listing) return vendorListingToBainaData(listing);
+  return undefined;
 }
 

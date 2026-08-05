@@ -12,8 +12,9 @@ import { useCompare } from "@/lib/compare";
 import { openCompareTable } from "@/lib/compareTray";
 import { useLang } from "@/lib/i18n";
 import { AppBar } from "@/components/ui";
-import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData, getAllBainaBoxVendors } from "@/lib/bainaBoxData";
 import { useBainaCart } from "@/lib/bainaCart";
+import { useAllVendors } from "@/lib/useAllVendors";
 
 export default function BainaBoxDetail({
   data,
@@ -52,9 +53,13 @@ export default function BainaBoxDetail({
     cart.setQty(defaultProduct.id, next);
   };
 
+  const allListings = useAllVendors();
   const otherVendors = useMemo(
-    () => Object.values(BAINA_BOX_VENDOR_DATA).filter((v) => v.slug !== data.slug),
-    [data.slug],
+    () =>
+      getAllBainaBoxVendors(allListings).filter(
+        (v) => v.slug !== data.slug && v.vendorId !== data.vendorId,
+      ),
+    [allListings, data.slug, data.vendorId],
   );
 
   // Icon map for "Best For" items
