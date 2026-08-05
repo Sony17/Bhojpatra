@@ -13,6 +13,7 @@ import { openCompareTable } from "@/lib/compareTray";
 import { useLang } from "@/lib/i18n";
 import { AppBar } from "@/components/ui";
 import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { useBainaCart } from "@/lib/bainaCart";
 
 export default function BainaBoxDetail({
   data,
@@ -35,6 +36,8 @@ export default function BainaBoxDetail({
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [wishlisted, setWishlisted] = useState(false);
 
+  const cart = useBainaCart();
+
   const defaultProduct = useMemo(() => {
     return (
       data.products.find((p) => p.price === data.fixedPrice) ??
@@ -42,16 +45,11 @@ export default function BainaBoxDetail({
     );
   }, [data.products, data.fixedPrice]);
 
-  const [qty, setQty] = useState<Record<string, number>>({});
-
-  const primaryQty = defaultProduct ? (qty[defaultProduct.id] ?? 0) : 0;
+  const primaryQty = defaultProduct ? (cart.map[defaultProduct.id] ?? 0) : 0;
 
   const handlePrimaryQtyChange = (next: number) => {
     if (!defaultProduct) return;
-    setQty((prev) => ({
-      ...prev,
-      [defaultProduct.id]: next,
-    }));
+    cart.setQty(defaultProduct.id, next);
   };
 
   const otherVendors = useMemo(
@@ -298,7 +296,7 @@ export default function BainaBoxDetail({
         {/* ── Order Sweets & Boxes — per-box ordering (qty → date → confirm).
             The feast wizard hand-off above stays for full catering; this panel
             is how a box order actually completes. ── */}
-        <BainaBoxOrderPanel data={data} qty={qty} setQty={setQty} />
+        <BainaBoxOrderPanel data={data} />
 
         {/* ── Explore Other Sweet Houses ── */}
         {otherVendors.length > 0 && (

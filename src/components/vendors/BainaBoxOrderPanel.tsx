@@ -10,6 +10,7 @@ import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
 import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { useBainaCart } from "@/lib/bainaCart";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -56,15 +57,17 @@ export default function BainaBoxOrderPanel({
   data,
   qty: externalQty,
   setQty: externalSetQty,
+  hideProductsGrid = false,
 }: {
   data: BainaBoxVendorData;
   qty?: Record<string, number>;
   setQty?: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  hideProductsGrid?: boolean;
 }) {
   const { t } = useLang();
-  // null = signed out, undefined = still resolving — the tri-state keeps the
-  // login gate from flashing for an already signed-in customer.
   const session = useSessionStatus();
+  const cart = useBainaCart();
+
   // Primary / default box for this vendor (matches fixedPrice or first product).
   const defaultProduct = useMemo(() => {
     return (
@@ -73,28 +76,16 @@ export default function BainaBoxOrderPanel({
     );
   }, [data.products, data.fixedPrice]);
 
-  const [internalQty, setInternalQty] = useState<Record<string, number>>(() => {
-    const def =
-      data.products.find((p) => p.price === data.fixedPrice) ??
-      data.products[0];
-    return def ? { [def.id]: 1 } : {};
-  });
-
-  const qty = externalQty ?? internalQty;
-  const setQty = externalSetQty ?? setInternalQty;
+  const qty = externalQty ?? cart.map;
 
   // Ensure at least 1 box is selected when user clicks any "Book Now" / "#baina-order" link
   useEffect(() => {
     if (!defaultProduct) return;
 
     function handleSelectDefault() {
-      setQty((prev) => {
-        const sum = Object.values(prev).reduce((a, b) => a + b, 0);
-        if (sum === 0) {
-          return { [defaultProduct.id]: 1 };
-        }
-        return prev;
-      });
+      if (cart.totalBoxes === 0) {
+        cart.setQty(defaultProduct.id, 1);
+      }
     }
 
     function onClick(e: MouseEvent) {
@@ -108,15 +99,13 @@ export default function BainaBoxOrderPanel({
 
     window.addEventListener("click", onClick);
     return () => window.removeEventListener("click", onClick);
-  }, [defaultProduct]);
+  }, [defaultProduct, cart]);
 
   const [dateIso, setDateIso] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
-  // Contact fields start blank and adopt the session's details unless the
-  // customer already typed something (edits always win over prefill).
   const [touched, setTouched] = useState<{ name?: boolean; email?: boolean }>({});
   const effName = touched.name ? name : name || session?.name || "";
   const effEmail = touched.email ? email : email || session?.email || "";
@@ -127,13 +116,25 @@ export default function BainaBoxOrderPanel({
     null,
   );
 
-  const lines = useMemo(
-    () =>
-      data.products
-        .map((p) => ({ ...p, qty: qty[p.id] ?? 0 }))
-        .filter((p) => p.qty > 0),
-    [data.products, qty],
-  );
+  const lines = useMemo(() => {
+    if (cart.lines.length > 0) {
+      return cart.lines;
+    }
+    return data.products
+      .map((p) => ({
+        id: p.id,
+        vendorId: data.vendorId,
+        vendorSlug: data.slug,
+        vendorName: data.name,
+        name: p.name,
+        price: p.price,
+        unit: p.unit,
+        qty: qty[p.id] ?? 0,
+        image: p.image,
+      }))
+      .filter((p) => p.qty > 0);
+  }, [cart.lines, data, qty]);
+
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
 
@@ -142,8 +143,12 @@ export default function BainaBoxOrderPanel({
     return data.products.filter((p) => p.id !== defaultProduct.id);
   }, [data.products, defaultProduct]);
 
-  const setCount = (id: string, next: number) =>
-    setQty((m) => ({ ...m, [id]: next }));
+  const setCount = (id: string, next: number) => {
+    if (externalSetQty) {
+      externalSetQty((m) => ({ ...m, [id]: next }));
+    }
+    cart.setQty(id, next);
+  };
 
   const handleConfirm = async () => {
     setError("");
@@ -235,6 +240,7 @@ export default function BainaBoxOrderPanel({
         return;
       }
       setPlaced({ id, amount: totalAmount });
+      cart.clear();
     } catch {
       setError(
         t(
@@ -276,7 +282,7 @@ export default function BainaBoxOrderPanel({
               variant="secondary"
               onClick={() => {
                 setPlaced(null);
-                setQty({});
+                cart.clear();
               }}
             >
               {t("Order more boxes", "और डिब्बे ऑर्डर करें")}
@@ -290,7 +296,7 @@ export default function BainaBoxOrderPanel({
   return (
     <>
       {/* ── Boxes & sweets grid — pick quantities (excluding primary item in inspection) ── */}
-      {additionalProducts.length > 0 && (
+      {!hideProductsGrid && additionalProducts.length > 0 && (
         <div className="mt-12 border-t border-cream-3 pt-8">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
@@ -398,14 +404,26 @@ export default function BainaBoxOrderPanel({
             <div className="px-5 py-4">
               <ul className="divide-y divide-cream-2 text-sm">
                 {lines.map((l) => (
-                  <li key={l.id} className="flex items-center justify-between gap-3 py-2">
-                    <span className="min-w-0 truncate text-ink">
-                      {l.name}{" "}
-                      <span className="text-ink-soft">× {l.qty}</span>
-                    </span>
-                    <span className="shrink-0 font-semibold text-ink">
-                      ₹{(l.qty * l.price).toLocaleString("en-IN")}
-                    </span>
+                  <li key={l.id} className="flex flex-wrap items-center justify-between gap-2.5 py-2.5 sm:flex-nowrap">
+                    <div className="min-w-0 flex-1 truncate text-ink">
+                      <span className="font-semibold">{l.name}</span>
+                      {"vendorName" in l && l.vendorName && l.vendorName !== data.name && (
+                        <span className="ml-1.5 text-xs text-ink-soft">({l.vendorName})</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <QuantitySelector
+                        value={l.qty}
+                        onChange={(n) => setCount(l.id, n)}
+                        min={0}
+                        max={200}
+                        size="sm"
+                        label={l.name}
+                      />
+                      <span className="min-w-[4.25rem] text-right font-semibold text-ink">
+                        ₹{(l.qty * l.price).toLocaleString("en-IN")}
+                      </span>
+                    </div>
                   </li>
                 ))}
                 <li className="flex items-center justify-between gap-3 py-3">

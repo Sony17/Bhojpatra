@@ -1,17 +1,25 @@
 "use client";
 
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import PublicShell from "@/components/app/PublicShell";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
+import BainaBoxOrderPanel from "@/components/vendors/BainaBoxOrderPanel";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui";
 import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { useBainaCart } from "@/lib/bainaCart";
 
 export default function BainaBoxOverview() {
   const { t } = useLang();
   const vendors: BainaBoxVendorData[] = Object.values(BAINA_BOX_VENDOR_DATA);
+  const cart = useBainaCart();
+
+  const primaryVendor = useMemo(() => {
+    return BAINA_BOX_VENDOR_DATA[cart.primaryVendorSlug] ?? vendors[0];
+  }, [cart.primaryVendorSlug, vendors]);
 
   return (
     <PublicShell>
@@ -158,6 +166,13 @@ export default function BainaBoxOverview() {
             </Link>
           ))}
         </div>
+
+        {/* Active Baina Order checkout card persistent at bottom if items selected */}
+        {cart.totalBoxes > 0 && (
+          <div className="mt-8">
+            <BainaBoxOrderPanel data={primaryVendor} hideProductsGrid />
+          </div>
+        )}
 
         <CompareTray />
       </section>
