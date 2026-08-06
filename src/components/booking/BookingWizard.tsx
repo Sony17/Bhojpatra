@@ -106,6 +106,7 @@ import {
 } from "@/lib/occasions";
 import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
+import SingleStallView from "@/components/booking/SingleStallView";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { Button, Stepper } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
@@ -267,7 +268,17 @@ export default function BookingWizard() {
 
   // Step 1 — Package
   const [packageId, setPackageId] = useState<string>(
-    packages.find((p) => p.popular)?.id ?? packages[0].id,
+    packages.find(
+      (p) =>
+        p.popular &&
+        100 >= (p.minPax ?? MIN_GUESTS) &&
+        100 <= (p.maxPax ?? MAX_GUESTS),
+    )?.id ??
+      packages.find(
+        (p) =>
+          100 >= (p.minPax ?? MIN_GUESTS) && 100 <= (p.maxPax ?? MAX_GUESTS),
+      )?.id ??
+      packages[0].id,
   );
 
   // Single Stall (custom) tier "lens" — which roster the guest browses on the
@@ -487,7 +498,8 @@ export default function BookingWizard() {
     }
     if (venueParam) setVenue(venueParam);
     const g = Number(guestsParam);
-    if (g >= MIN_GUESTS && g <= MAX_GUESTS) setGuests(Math.round(g));
+    const validG = g >= MIN_GUESTS && g <= MAX_GUESTS ? Math.round(g) : null;
+    if (validG !== null) setGuests(validG);
     // A package chosen on the home page's "Select Your Package" section arrives
     // here pre-selected; `step=menu` then drops the guest straight onto vendor
     // selection (Step 2) so they flow into the booking instead of re-picking.
@@ -508,7 +520,28 @@ export default function BookingWizard() {
       pkgRequested &&
       effectiveDate !== null &&
       !packageAvailable(pkg!, effectiveDate);
-    if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
+    const vendorParam = sp.get("vendor")?.trim();
+    if (pkgRequested && !pkgTooSoon) {
+      setPackageId(pkg!);
+    } else if (!pkgRequested && occ !== "mehndi" && !vendorParam) {
+      // Pick a default package compatible with the effective headcount so
+      // headcount clamping on mount doesn't overwrite guest choices <150.
+      const effectiveGuests = validG ?? readBookingDraft()?.guests ?? 100;
+      const compatiblePkg =
+        packages.find(
+          (p) =>
+            p.popular &&
+            effectiveGuests >= (p.minPax ?? MIN_GUESTS) &&
+            effectiveGuests <= (p.maxPax ?? MAX_GUESTS),
+        ) ??
+        packages.find(
+          (p) =>
+            effectiveGuests >= (p.minPax ?? MIN_GUESTS) &&
+            effectiveGuests <= (p.maxPax ?? MAX_GUESTS),
+        ) ??
+        packages[0];
+      setPackageId(compatiblePkg.id);
+    }
     if (stepParam === "menu" && !pkgTooSoon) setStep(2);
     // A Mehndi booking is a Single Stall order by design — the occasion
     // deep-link (e.g. the home page's Mehndi card) lands straight in the
@@ -522,7 +555,6 @@ export default function BookingWizard() {
     // Single Stall (one-vendor) order, so force the custom plan and drop the
     // guest onto the Menu step; the resolve effect pre-selects the vendor and
     // infers its tier once the live menu loads.
-    const vendorParam = sp.get("vendor")?.trim();
     if (vendorParam) {
       setPackageId("custom");
       setPendingVendorId(vendorParam);
@@ -869,6 +901,32 @@ export default function BookingWizard() {
     }
     setPendingVendorId("");
   }, [liveMenuCategories, pendingVendorId]);
+
+  // Resolve the selected vendor (from a hand-off link or category selection)
+  const selectedVendorId = useMemo(() => {
+    if (pendingVendorId) return pendingVendorId;
+    for (const catId in categoryVendor) {
+      const vids = categoryVendor[catId];
+      if (vids && vids.length > 0) return vids[0];
+    }
+    return "";
+  }, [pendingVendorId, categoryVendor]);
+
+  const singleStallVendor = useMemo(() => {
+    if (!selectedVendorId) return null;
+    for (const cat of liveMenuCategories) {
+      const v = cat.vendors.find((x) => x.id === selectedVendorId);
+      if (v) return v;
+    }
+    return null;
+  }, [selectedVendorId, liveMenuCategories]);
+
+  const isSingleStallMode = useMemo(() => {
+    return (
+      packageId === "custom" &&
+      Boolean(singleStallVendor && singleStallVendor.singleStallMenu)
+    );
+  }, [packageId, singleStallVendor]);
 
   // The tier "lens" that decides which vendors each course surfaces. Fixed tiers
   // use their own band (Silver shows Silver-mapped vendors, etc.) via the
@@ -2341,7 +2399,12 @@ export default function BookingWizard() {
           {/* Builder — below the combined card on mobile, right column on desktop. */}
           <div className="order-3 w-full min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
             {step === 2 ? (
-              singleStall && !stallTier ? (
+              isSingleStallMode && singleStallVendor && singleStallVendor.singleStallMenu ? (
+                <SingleStallView
+                  vendor={singleStallVendor}
+                  singleStallMenu={singleStallVendor.singleStallMenu}
+                />
+              ) : singleStall && !stallTier ? (
                 <StallTierPicker
                   t={t}
                   lang={lang}

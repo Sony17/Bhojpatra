@@ -410,6 +410,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             ...(it.price != null ? { price: it.price } : {}),
           })),
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
+          ...(r.singleStallMenu ? { singleStallMenu: r.singleStallMenu } : {}),
         },
       ];
       }),

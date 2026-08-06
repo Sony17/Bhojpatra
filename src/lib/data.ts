@@ -3,6 +3,8 @@
  * Sourced from the brand mockup — swap with API/CMS data later.
  */
 
+import type { VendorSingleStallMenu } from "@/lib/vendorMenus";
+
 export interface Stat {
   value: string;
   label: string;
@@ -1300,6 +1302,7 @@ export interface CategoryVendor {
    *  the "as per vendor specification" rule for the Custom single-stall flow.
    *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */
   leadDays?: number;
+  singleStallMenu?: VendorSingleStallMenu;
 }
 
 export interface MenuCategory {
