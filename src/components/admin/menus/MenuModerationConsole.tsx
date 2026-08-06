@@ -21,7 +21,7 @@ import Modal from "@/components/admin/shared/Modal";
 import { Badge, Button } from "@/components/ui";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { menuCategories } from "@/lib/data";
-import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
+import type { ModerationStatus, VendorMenuSection, VendorSingleStallMenu } from "@/lib/vendorMenus";
 
 const PAGE_SIZE = 8;
 
@@ -38,6 +38,7 @@ interface ModerationVendor {
   moderation: ModerationStatus;
   updatedAt: string;
   menu: VendorMenuSection[];
+  singleStallMenu?: VendorSingleStallMenu | null;
   gallery: string[];
 }
 
@@ -370,6 +371,96 @@ export default function MenuModerationConsole() {
                 ))}
               </ul>
             </div>
+
+            {/* Single Stall Menu */}
+            {selected.singleStallMenu && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  🎪 Single Stall Menu
+                </p>
+                <div className="rounded-xl border border-cream-3 p-4">
+                  <div className="flex items-start justify-between gap-4 border-b border-cream-3 pb-3">
+                    <div>
+                      <h4 className="font-display text-base font-bold text-ink">
+                        {selected.singleStallMenu.title}
+                      </h4>
+                      {selected.singleStallMenu.description && (
+                        <p className="mt-0.5 text-xs text-ink-soft">
+                          {selected.singleStallMenu.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-sm font-bold text-maroon">
+                        ₹{selected.singleStallMenu.pricePerGuest} / guest
+                      </p>
+                      {selected.singleStallMenu.minGuests != null && selected.singleStallMenu.minGuests > 0 && (
+                        <p className="text-[11px] font-medium text-ink-soft">
+                          Min. {selected.singleStallMenu.minGuests} guests
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {selected.singleStallMenu.coverPhoto && (
+                    <div className="relative mt-3 aspect-[21/9] w-full overflow-hidden rounded-lg border border-cream-3 bg-cream-2 sm:aspect-[3/1]">
+                      <Image
+                        src={selected.singleStallMenu.coverPhoto}
+                        alt={selected.singleStallMenu.title}
+                        fill
+                        unoptimized
+                        sizes="600px"
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {selected.singleStallMenu.items.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-2 text-xs font-semibold text-ink-soft">
+                        Included Dishes ({selected.singleStallMenu.items.length})
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {selected.singleStallMenu.items.map((it, i) => (
+                          <div
+                            key={`${it.name}-${i}`}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-cream-3 bg-cream/30 p-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  aria-hidden="true"
+                                  className={
+                                    "inline-block h-2.5 w-2.5 shrink-0 rounded-xs border " +
+                                    (it.diet === "veg"
+                                      ? "border-maroon bg-white"
+                                      : "border-maroon bg-maroon")
+                                  }
+                                />
+                                <p className="truncate text-xs font-semibold text-ink">
+                                  {it.name}
+                                </p>
+                              </div>
+                              {it.description && (
+                                <p className="mt-0.5 truncate text-[11px] text-ink-soft">
+                                  {it.description}
+                                </p>
+                              )}
+                            </div>
+                            {it.price != null && it.price > 0 && (
+                              <span className="shrink-0 text-xs font-bold text-maroon">
+                                ₹{it.price}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Gallery */}
             {selected.gallery.length > 0 && (

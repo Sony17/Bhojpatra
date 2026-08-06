@@ -157,14 +157,12 @@ export async function PUT(request: Request) {
       .singleStallMenu
       ? {
           ...check.value.singleStallMenu,
-          coverPhoto:
-            check.value.singleStallMenu.coverPhoto &&
-            photoIdFromUrl(check.value.singleStallMenu.coverPhoto) &&
-            ownedDishPhotoIds.has(
-              photoIdFromUrl(check.value.singleStallMenu.coverPhoto)!,
-            )
-              ? check.value.singleStallMenu.coverPhoto
-              : undefined,
+          coverPhoto: (() => {
+            const raw = check.value.singleStallMenu.coverPhoto;
+            if (!raw) return undefined;
+            const pid = photoIdFromUrl(raw);
+            return pid ? (ownedDishPhotoIds.has(pid) ? raw : undefined) : raw;
+          })(),
           items: check.value.singleStallMenu.items.map((it) => {
             if (!it.photo) return it;
             const photoId = photoIdFromUrl(it.photo);

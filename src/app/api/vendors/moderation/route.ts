@@ -27,6 +27,7 @@ export async function GET() {
         moderation: r.moderation ?? "Pending",
         updatedAt: r.updatedAt,
         menu: r.menu,
+        singleStallMenu: r.singleStallMenu ?? null,
         gallery: r.ownerUserId
           ? (await listPhotosByOwner(r.ownerUserId, "gallery")).map(photoUrl)
           : [],

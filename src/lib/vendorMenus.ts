@@ -736,8 +736,8 @@ export function cleanSingleStallMenu(v: unknown): SingleStallMenuCheck {
   const pricePerGuest = cleanMoney(s.pricePerGuest, 100000);
   const minGuests = cleanMoney(s.minGuests, 10000);
   const coverPhoto =
-    typeof s.coverPhoto === "string" && PHOTO_URL_RE.test(s.coverPhoto)
-      ? s.coverPhoto
+    typeof s.coverPhoto === "string" && s.coverPhoto.trim().length > 0
+      ? s.coverPhoto.trim()
       : undefined;
 
   // If both title and price are absent, consider singleStallMenu omitted

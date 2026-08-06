@@ -167,6 +167,131 @@ export default function VendorProfile({
         </Link>
       </div>
 
+      {/* Single Stall Menu — dedicated fixed stall menu offer */}
+      {profile.singleStallMenu && (
+        <div className="mt-12">
+          <h2 className="font-display text-2xl text-ink">
+            <span aria-hidden="true">🎪</span> {t("Single Stall Menu", "सिंगल स्टॉल मेन्यू")}
+          </h2>
+          <Card padding="none" className="mt-5 overflow-hidden p-5 sm:p-6">
+            {profile.singleStallMenu.coverPhoto ? (
+              <div className="relative mb-5 aspect-[21/9] w-full overflow-hidden rounded-xl bg-cream sm:aspect-[3/1]">
+                <Image
+                  src={profile.singleStallMenu.coverPhoto}
+                  alt={profile.singleStallMenu.title}
+                  fill
+                  unoptimized
+                  sizes="(max-width: 1280px) 100vw, 1200px"
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cream-3 bg-gradient-to-r from-maroon/10 via-cream-2 to-cream/40 p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl shadow-xs">
+                    🎪
+                  </span>
+                  <div>
+                    <span className="inline-block rounded-full bg-maroon/10 px-2.5 py-0.5 text-[11px] font-semibold text-maroon">
+                      {t("Fixed Stall Package", "फिक्स्ड स्टॉल पैकेज")}
+                    </span>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      {t(
+                        "Live stall setup with all dishes included in a single per-guest rate.",
+                        "एक ही प्रति-मेहमान दर में शामिल सभी व्यंजनों के साथ लाइव स्टॉल सेटअप।",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="font-display text-xl font-bold text-ink sm:text-2xl">
+                  {profile.singleStallMenu.title}
+                </h3>
+                {profile.singleStallMenu.description && (
+                  <p className="mt-1.5 text-sm text-ink-soft">
+                    {profile.singleStallMenu.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="shrink-0 text-left sm:text-right">
+                <p className="font-display text-2xl font-bold text-maroon">
+                  ₹{inr.format(profile.singleStallMenu.pricePerGuest)}
+                  <span className="text-sm font-normal text-ink-soft">
+                    {" "}
+                    / {t("guest", "मेहमान")}
+                  </span>
+                </p>
+                {profile.singleStallMenu.minGuests != null && profile.singleStallMenu.minGuests > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-ink-soft">
+                    {t(
+                      `Min. ${profile.singleStallMenu.minGuests} guests`,
+                      `न्यूनतम ${profile.singleStallMenu.minGuests} मेहमान`,
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Included Dishes */}
+            {profile.singleStallMenu.items.length > 0 && (
+              <div className="mt-6 border-t border-cream-3 pt-5">
+                <h4 className="font-display text-base font-semibold text-ink">
+                  {t("Included Dishes", "शामिल डिश")} ({profile.singleStallMenu.items.length})
+                </h4>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {profile.singleStallMenu.items.map((item, idx) => {
+                    const isVeg = item.diet === "veg";
+                    const isNonVeg = item.diet === "non-veg";
+
+                    return (
+                      <div
+                        key={`${item.name}-${idx}`}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-cream-3 bg-cream/20 p-3.5 shadow-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            {(isVeg || isNonVeg) && (
+                              <span
+                                className={
+                                  "inline-block h-3 w-3 shrink-0 rounded-xs border " +
+                                  (isVeg
+                                    ? "border-maroon bg-white"
+                                    : "border-maroon bg-maroon")
+                                }
+                                title={isVeg ? "Vegetarian" : "Non-Vegetarian"}
+                              />
+                            )}
+                            <p className="truncate text-sm font-semibold text-ink">
+                              {item.name}
+                            </p>
+                          </div>
+                          {item.description && (
+                            <p className="mt-0.5 truncate text-xs text-ink-soft">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {item.price != null && item.price > 0 && (
+                          <span className="shrink-0 font-display text-sm font-bold text-maroon">
+                            ₹{inr.format(item.price)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* Live counters & services the caterer offers (from the platform add-on set). */}
       {profile.counters.length > 0 && (
         <div className="mt-12">

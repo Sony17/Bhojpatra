@@ -24,10 +24,12 @@ import {
 } from "@/lib/data";
 import type {
   ModerationStatus,
+  SingleStallMenuItem,
   VendorBainaBox,
   VendorCounter,
   VendorEssentialService,
   VendorMenuSection,
+  VendorSingleStallMenu,
 } from "@/lib/vendorMenus";
 import { TIER_ORDER, type VendorTier } from "@/lib/admin/types";
 import { money } from "@/lib/money";
@@ -78,7 +80,25 @@ interface VendorPayload {
   serviceCategories?: string[];
   bainaBoxes?: VendorBainaBox[];
   essentialService?: VendorEssentialService;
+  singleStallMenu?: VendorSingleStallMenu;
   tiers?: VendorTier[];
+}
+
+export interface DraftSingleStallMenuItem {
+  name: string;
+  diet: DietType;
+  price: string;
+  description: string;
+  photo?: string;
+}
+
+export interface DraftSingleStallMenu {
+  title: string;
+  description: string;
+  coverPhoto?: string;
+  pricePerGuest: string;
+  minGuests: string;
+  items: DraftSingleStallMenuItem[];
 }
 
 interface DraftBoxSize {
@@ -181,6 +201,19 @@ export default function MenuBuilder() {
   const [essentialRate, setEssentialRate] = useState("");
   const [essentialIncludes, setEssentialIncludes] = useState<string[]>([]);
   const [essentialDraft, setEssentialDraft] = useState("");
+  // Single Stall Menu offer — title, price/guest, cover, items.
+  const [singleStallMenu, setSingleStallMenu] = useState<DraftSingleStallMenu | null>(null);
+  const [singleStallCoverPhotoError, setSingleStallCoverPhotoError] = useState("");
+  const [stallDraftName, setStallDraftName] = useState("");
+  const [stallDraftDiet, setStallDraftDiet] = useState<DietType>("veg");
+  const [stallDraftPrice, setStallDraftPrice] = useState("");
+  const [stallDraftDesc, setStallDraftDesc] = useState("");
+  const stallDraftNameInputRef = useRef<HTMLInputElement>(null);
+
+  const stallItemPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [stallItemPhotoTarget, setStallItemPhotoTarget] = useState<number | null>(null);
+  const [uploadingStallItemPhoto, setUploadingStallItemPhoto] = useState(false);
+  const [stallItemPhotoError, setStallItemPhotoError] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -273,6 +306,28 @@ export default function MenuBuilder() {
               if (src.essentialService.perGuest > 0)
                 setEssentialRate(String(src.essentialService.perGuest));
               setEssentialIncludes(src.essentialService.includes);
+            }
+            if (src.singleStallMenu) {
+              setSingleStallMenu({
+                title: src.singleStallMenu.title ?? "",
+                description: src.singleStallMenu.description ?? "",
+                coverPhoto: src.singleStallMenu.coverPhoto,
+                pricePerGuest:
+                  src.singleStallMenu.pricePerGuest != null
+                    ? String(src.singleStallMenu.pricePerGuest)
+                    : "",
+                minGuests:
+                  src.singleStallMenu.minGuests != null
+                    ? String(src.singleStallMenu.minGuests)
+                    : "",
+                items: (src.singleStallMenu.items ?? []).map((it) => ({
+                  name: it.name ?? "",
+                  diet: it.diet ?? "veg",
+                  price: it.price != null ? String(it.price) : "",
+                  description: it.description ?? "",
+                  photo: it.photo,
+                })),
+              });
             }
           }
           if (d.gallery) setGallery(d.gallery);
@@ -645,6 +700,119 @@ export default function MenuBuilder() {
     setSaved(false);
   };
 
+  const updateSingleStallMenu = (patch: Partial<DraftSingleStallMenu>) => {
+    setSingleStallMenu((prev) => {
+      const base = prev ?? {
+        title: "",
+        description: "",
+        pricePerGuest: "",
+        minGuests: "",
+        items: [],
+      };
+      return { ...base, ...patch };
+    });
+    setSaved(false);
+  };
+
+  const addSingleStallItem = (item: DraftSingleStallMenuItem) => {
+    setSingleStallMenu((prev) => {
+      const base = prev ?? {
+        title: "",
+        description: "",
+        pricePerGuest: "",
+        minGuests: "",
+        items: [],
+      };
+      return { ...base, items: [...base.items, item] };
+    });
+    setSaved(false);
+  };
+
+  const updateSingleStallItem = (index: number, patch: Partial<DraftSingleStallMenuItem>) => {
+    setSingleStallMenu((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        items: prev.items.map((it, i) => (i === index ? { ...it, ...patch } : it)),
+      };
+    });
+    setSaved(false);
+  };
+
+  const removeSingleStallItem = (index: number) => {
+    setSingleStallMenu((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        items: prev.items.filter((_, i) => i !== index),
+      };
+    });
+    setSaved(false);
+  };
+
+  const uploadSingleStallCoverPhoto = async (file: File) => {
+    setSingleStallCoverPhotoError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "dish");
+      const res = await fetch("/api/vendor/photo", { method: "POST", body: fd });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setSingleStallCoverPhotoError(
+          data.error ?? t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"),
+        );
+        return;
+      }
+      updateSingleStallMenu({ coverPhoto: data.url });
+    } catch {
+      setSingleStallCoverPhotoError(t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"));
+    }
+  };
+
+  const handleAddStallItem = () => {
+    const name = stallDraftName.trim();
+    if (!name) return;
+    addSingleStallItem({
+      name,
+      diet: stallDraftDiet,
+      price: stallDraftPrice.trim(),
+      description: stallDraftDesc.trim(),
+    });
+    setStallDraftName("");
+    setStallDraftPrice("");
+    setStallDraftDesc("");
+    setStallDraftDiet("veg");
+    stallDraftNameInputRef.current?.focus();
+  };
+
+  const onStallItemPhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || stallItemPhotoTarget === null) return;
+    setStallItemPhotoError("");
+    setUploadingStallItemPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "dish");
+      const res = await fetch("/api/vendor/photo", { method: "POST", body: fd });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setStallItemPhotoError(
+          data.error ?? t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"),
+        );
+      } else {
+        updateSingleStallItem(stallItemPhotoTarget, { photo: data.url });
+      }
+    } catch {
+      setStallItemPhotoError(t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"));
+    } finally {
+      setUploadingStallItemPhoto(false);
+      setStallItemPhotoTarget(null);
+    }
+  };
+
   const onSave = async () => {
     setSaveError("");
     if (business.trim().length < 2) {
@@ -739,6 +907,37 @@ export default function MenuBuilder() {
           perGuest: Number(essentialRate) || 0,
           includes: essentialIncludes,
         },
+        ...(singleStallMenu &&
+        (singleStallMenu.title.trim() || Number(singleStallMenu.pricePerGuest) > 0)
+          ? {
+              singleStallMenu: {
+                title: singleStallMenu.title.trim(),
+                ...(singleStallMenu.description.trim()
+                  ? { description: singleStallMenu.description.trim() }
+                  : {}),
+                ...(singleStallMenu.coverPhoto
+                  ? { coverPhoto: singleStallMenu.coverPhoto }
+                  : {}),
+                pricePerGuest: Number(singleStallMenu.pricePerGuest) || 0,
+                ...(Number(singleStallMenu.minGuests) > 0
+                  ? { minGuests: Number(singleStallMenu.minGuests) }
+                  : {}),
+                items: singleStallMenu.items
+                  .filter((it) => it.name.trim())
+                  .map((it) => ({
+                    name: it.name.trim(),
+                    diet: it.diet,
+                    ...(Number(it.price) > 0
+                      ? { price: Number(it.price) }
+                      : {}),
+                    ...(it.description.trim()
+                      ? { description: it.description.trim() }
+                      : {}),
+                    ...(it.photo ? { photo: it.photo } : {}),
+                  })),
+              },
+            }
+          : {}),
       };
       const res = await fetch("/api/vendor/menu", {
         method: "PUT",
@@ -789,7 +988,7 @@ export default function MenuBuilder() {
     <div className="space-y-6">
       {/* Status band */}
       <Card padding="none" className="p-5 sm:p-6">
-        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           <h2 className="shrink-0 whitespace-nowrap font-display text-lg font-semibold text-ink">
             {t("Menu Builder", "मेन्यू बिल्डर")}
           </h2>
@@ -1544,6 +1743,362 @@ export default function MenuBuilder() {
           </Button>
         </div>
       </Card>
+
+      {/* Dedicated Single Stall Menu offer — fixed stall menu builder */}
+      {serviceCats.includes("single-stall") && (
+        <Card padding="none" className="p-5 sm:p-6">
+          <h3 className="font-display text-base font-semibold text-ink">
+            <span aria-hidden="true">🎪</span>{" "}
+            {t("Single Stall Menu", "सिंगल स्टॉल मेन्यू")}
+          </h3>
+          <p className="mt-0.5 text-xs text-ink-soft">
+            {t(
+              "Configure your fixed Single Stall offer — title, per-guest rate, minimum headcount, cover photo, and included dishes.",
+              "अपनी समर्पित सिंगल स्टॉल पेशकश कॉन्फ़िगर करें — शीर्षक, प्रति-मेहमान दर, न्यूनतम संख्या, कवर फ़ोटो और शामिल डिश।",
+            )}
+          </p>
+
+          {/* Top details: Cover photo + Title, Price, Guests, Description */}
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+            {/* Cover Photo */}
+            <label
+              className="relative flex h-[6.5rem] w-[6.5rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-dashed border-cream-3 bg-cream/40 text-center transition-colors hover:border-maroon sm:h-28 sm:w-36"
+              aria-label={t("Single Stall cover photo", "सिंगल स्टॉल कवर फ़ोटो")}
+            >
+              {singleStallMenu?.coverPhoto ? (
+                <Image
+                  src={singleStallMenu.coverPhoto}
+                  alt=""
+                  fill
+                  sizes="144px"
+                  className="object-cover"
+                />
+              ) : (
+                <>
+                  <span aria-hidden="true" className="text-xl text-maroon">
+                    ⬆
+                  </span>
+                  <span className="px-1 text-[11px] leading-tight text-ink-soft">
+                    {t("Cover photo", "कवर फ़ोटो")}
+                  </span>
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadSingleStallCoverPhoto(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+
+            <div className="grid flex-1 gap-3 sm:grid-cols-2">
+              {/* Stall Title */}
+              <div className="sm:col-span-2">
+                <input
+                  type="text"
+                  value={singleStallMenu?.title ?? ""}
+                  onChange={(e) => updateSingleStallMenu({ title: e.target.value })}
+                  placeholder={t(
+                    "Stall Title — e.g. Awadhi Chaat & Kebab Counter",
+                    "स्टॉल शीर्षक — उदा. अवधी चाट और कबाब काउंटर",
+                  )}
+                  aria-label={t("Stall Title", "स्टॉल का शीर्षक")}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Price Per Guest */}
+              <div>
+                <input
+                  type="number"
+                  min={0}
+                  value={singleStallMenu?.pricePerGuest ?? ""}
+                  onChange={(e) => updateSingleStallMenu({ pricePerGuest: e.target.value })}
+                  placeholder={t("Price Per Guest (₹)", "प्रति-मेहमान दर (₹)")}
+                  aria-label={t("Price Per Guest", "प्रति-मेहमान दर")}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Minimum Guests */}
+              <div>
+                <input
+                  type="number"
+                  min={1}
+                  value={singleStallMenu?.minGuests ?? ""}
+                  onChange={(e) => updateSingleStallMenu({ minGuests: e.target.value })}
+                  placeholder={t("Min Guests (e.g. 50)", "न्यूनतम मेहमान (उदा. 50)")}
+                  aria-label={t("Minimum Guests", "न्यूनतम मेहमान")}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Optional Short Description */}
+              <div className="sm:col-span-2">
+                <input
+                  type="text"
+                  value={singleStallMenu?.description ?? ""}
+                  onChange={(e) => updateSingleStallMenu({ description: e.target.value })}
+                  placeholder={t(
+                    "Short stall description (optional)",
+                    "संक्षिप्त विवरण (वैकल्पिक)",
+                  )}
+                  aria-label={t("Stall Description", "स्टॉल का विवरण")}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+          {singleStallCoverPhotoError && (
+            <p role="alert" className="mt-2 text-xs font-semibold text-maroon">
+              {singleStallCoverPhotoError}
+            </p>
+          )}
+
+          {/* Included Dishes — Fixed Menu Editor */}
+          <div className="mt-6 border-t border-cream-3 pt-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-display text-sm font-semibold text-ink">
+                  {t("Included Dishes", "शामिल डिश")} ({singleStallMenu?.items.length ?? 0}/30)
+                </h4>
+                <p className="mt-0.5 text-xs text-ink-soft">
+                  {t(
+                    "This is your fixed menu. Customers booking this Single Stall will receive all of these dishes.",
+                    "यह आपका निश्चित मेन्यू है। इस सिंगल स्टॉल को बुक करने वाले ग्राहकों को ये सभी डिश मिलेंगी।",
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Hidden file input for dish item photo upload */}
+            <input
+              ref={stallItemPhotoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={onStallItemPhotoPick}
+              className="sr-only"
+              aria-label={t("Upload dish photo", "डिश फ़ोटो अपलोड करें")}
+            />
+
+            {/* Dish List */}
+            <div className="mt-3 space-y-2">
+              {(!singleStallMenu?.items || singleStallMenu.items.length === 0) ? (
+                <div className="rounded-xl border border-dashed border-cream-3 bg-cream/20 p-4 text-center">
+                  <p className="text-xs font-semibold text-ink">
+                    {t(
+                      "No dishes added to your Single Stall menu yet.",
+                      "आपके सिंगल स्टॉल मेन्यू में अभी कोई डिश नहीं जोड़ी गई है।",
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    {t(
+                      "Add all dishes included in your fixed stall package below. Customers booking this stall receive all of these items.",
+                      "नीचे अपने निश्चित स्टॉल पैकेज में शामिल सभी डिश जोड़ें। इस स्टॉल को बुक करने वाले ग्राहकों को ये सभी आइटम मिलते हैं।",
+                    )}
+                  </p>
+                </div>
+              ) : (
+                singleStallMenu.items.map((it, i) => (
+                  <div
+                    key={`${it.name}-${i}`}
+                    className="flex flex-wrap items-center gap-2 rounded-xl border border-cream-3 bg-cream/30 p-2.5 sm:flex-nowrap"
+                  >
+                    {/* Item Photo */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStallItemPhotoTarget(i);
+                        stallItemPhotoInputRef.current?.click();
+                      }}
+                      disabled={uploadingStallItemPhoto}
+                      title={
+                        it.photo
+                          ? t("Change dish photo", "डिश फ़ोटो बदलें")
+                          : t("Add dish photo", "डिश फ़ोटो जोड़ें")
+                      }
+                      aria-label={
+                        it.photo
+                          ? t(`Change photo for ${it.name}`, `${it.name} की फ़ोटो बदलें`)
+                          : t(`Add photo for ${it.name}`, `${it.name} की फ़ोटो जोड़ें`)
+                      }
+                      className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-cream-3 bg-white text-xs transition hover:border-maroon disabled:cursor-not-allowed"
+                    >
+                      {it.photo ? (
+                        <Image src={it.photo} alt="" fill sizes="32px" className="object-cover" />
+                      ) : (
+                        <span aria-hidden="true">
+                          {uploadingStallItemPhoto && stallItemPhotoTarget === i ? "…" : "📷"}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Veg / Non-Veg toggle */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSingleStallItem(i, {
+                          diet: it.diet === "veg" ? "non-veg" : "veg",
+                        })
+                      }
+                      title={
+                        it.diet === "veg"
+                          ? t("Veg — tap to mark Non-Veg", "वेज — नॉन-वेज करने हेतु टैप करें")
+                          : t("Non-Veg — tap to mark Veg", "नॉन-वेज — वेज करने हेतु टैप करें")
+                      }
+                      aria-label={
+                        it.diet === "veg"
+                          ? t(`${it.name}: Veg`, `${it.name}: वेज`)
+                          : t(`${it.name}: Non-Veg`, `${it.name}: नॉन-वेज`)
+                      }
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-cream-3 bg-white"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={
+                          "inline-block h-3 w-3 rounded-sm border " +
+                          (it.diet === "veg" ? "border-ink" : "border-maroon bg-maroon")
+                        }
+                      />
+                    </button>
+
+                    {/* Dish Name */}
+                    <input
+                      type="text"
+                      value={it.name}
+                      onChange={(e) => updateSingleStallItem(i, { name: e.target.value })}
+                      placeholder={t("Dish name", "डिश का नाम")}
+                      aria-label={t(`Dish ${i + 1} name`, `डिश ${i + 1} का नाम`)}
+                      className={inputClass + " min-w-[120px] flex-1 py-1.5 text-sm"}
+                    />
+
+                    {/* Dish Description (Optional) */}
+                    <input
+                      type="text"
+                      value={it.description ?? ""}
+                      onChange={(e) =>
+                        updateSingleStallItem(i, { description: e.target.value })
+                      }
+                      placeholder={t("Description (optional)", "विवरण (वैकल्पिक)")}
+                      aria-label={t(`Dish ${i + 1} description`, `डिश ${i + 1} का विवरण`)}
+                      className={inputClass + " min-w-[120px] flex-1 py-1.5 text-sm"}
+                    />
+
+                    {/* Per-dish Price (Optional) */}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="text-xs text-ink-soft">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={it.price ?? ""}
+                        onChange={(e) => updateSingleStallItem(i, { price: e.target.value })}
+                        placeholder={t("price", "मूल्य")}
+                        aria-label={t(`Dish ${i + 1} price`, `डिश ${i + 1} का मूल्य`)}
+                        className="w-20 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                      />
+                    </div>
+
+                    {/* Remove button */}
+                    <button
+                      type="button"
+                      onClick={() => removeSingleStallItem(i)}
+                      aria-label={t(`Remove ${it.name}`, `${it.name} हटाएं`)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft transition hover:bg-maroon/10 hover:text-maroon"
+                    >
+                      <span aria-hidden="true" className="text-lg leading-none">×</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {stallItemPhotoError && (
+              <p role="alert" className="mt-2 text-xs font-semibold text-maroon">
+                {stallItemPhotoError}
+              </p>
+            )}
+
+            {/* Add Dish Input Row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setStallDraftDiet((d) => (d === "veg" ? "non-veg" : "veg"))
+                }
+                title={
+                  stallDraftDiet === "veg"
+                    ? t("Veg — tap to change to Non-Veg", "वेज — नॉन-वेज करने के लिए टैप करें")
+                    : t("Non-Veg — tap to change to Veg", "नॉन-वेज — वेज करने के लिए टैप करें")
+                }
+                aria-label={
+                  stallDraftDiet === "veg"
+                    ? t("New dish diet: Veg", "नया डिश आहार: वेज")
+                    : t("New dish diet: Non-Veg", "नया डिश आहार: नॉन-वेज")
+                }
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cream-3 bg-white"
+              >
+                <span
+                  aria-hidden="true"
+                  className={
+                    "inline-block h-3.5 w-3.5 rounded-sm border " +
+                    (stallDraftDiet === "veg" ? "border-ink" : "border-maroon bg-maroon")
+                  }
+                />
+              </button>
+              <input
+                ref={stallDraftNameInputRef}
+                type="text"
+                value={stallDraftName}
+                onChange={(e) => setStallDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddStallItem();
+                  }
+                }}
+                placeholder={t("Dish name (e.g. Aloo Tikki)", "डिश का नाम (उदा. आलू टिक्की)")}
+                className={inputClass + " min-w-[120px] flex-1 py-1.5 text-sm"}
+              />
+              <input
+                type="text"
+                value={stallDraftDesc}
+                onChange={(e) => setStallDraftDesc(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddStallItem();
+                  }
+                }}
+                placeholder={t("Description / ingredients", "विवरण / सामग्री")}
+                className={inputClass + " min-w-[120px] flex-1 py-1.5 text-sm"}
+              />
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-xs text-ink-soft">₹</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={stallDraftPrice}
+                  onChange={(e) => setStallDraftPrice(e.target.value)}
+                  placeholder={t("price", "मूल्य")}
+                  className="w-20 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleAddStallItem}
+                disabled={!stallDraftName.trim() || (singleStallMenu?.items.length ?? 0) >= 30}
+              >
+                + {t("Add Dish", "डिश जोड़ें")}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Essential Service — the vendor's own take on the service-only tier
           customers see on /service-packages. Rate + what's included. */}
