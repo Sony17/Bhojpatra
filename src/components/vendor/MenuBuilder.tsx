@@ -15,6 +15,7 @@ import Image from "next/image";
 import {
   cateringCategories,
   cities,
+  indianStates,
   isLiveStallCategory,
   menuCategories,
   registrationCuisines,
@@ -945,15 +946,30 @@ export default function MenuBuilder() {
             </span>
           </Field>
           <Field label={t("State", "राज्य")}>
-            <input
-              type="text"
+            {/* Same deal as City — the catalog's State filter matches on this
+                exact string, so free text ("Uttarpradesh") would hide the
+                vendor. Any previously saved off-list value is kept as an extra
+                option so nothing silently changes. */}
+            <select
               value={stateName}
               onChange={(e) => {
                 setStateName(e.target.value);
                 setSaved(false);
               }}
               className={inputClass}
-            />
+            >
+              <option value="" disabled>
+                {t("Select your state…", "अपना राज्य चुनें…")}
+              </option>
+              {stateName && !indianStates.includes(stateName) && (
+                <option value={stateName}>{stateName}</option>
+              )}
+              {indianStates.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label={t("Max Capacity (guests / event)", "अधिकतम क्षमता (मेहमान / इवेंट)")}>
             <input
