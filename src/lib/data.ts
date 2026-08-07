@@ -62,6 +62,13 @@ export interface PackageTier {
   /** Short label shown under the price (e.g. "Fixed Menu"). */
   tagline?: string;
   taglineHi?: string;
+  /** The tier's positioning at a glance — three short claims that separate it
+      from the tier above and below (brand reach · menu freedom · occasion
+      scale). Rendered as one bullet-separated line directly under the tier
+      name on every package card, so a guest can tell the tiers apart without
+      reading the whole menu. Keep to three terse phrases. */
+  differentiator?: string[];
+  differentiatorHi?: string[];
   /** Guest-count range the package serves (e.g. "50–300 Guests"). */
   pax?: string;
   paxHi?: string;
@@ -388,6 +395,8 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "Fixed Menu",
     taglineHi: "फिक्स्ड मेन्यू",
+    differentiator: ["One Brand", "Fixed Menu", "Small Functions"],
+    differentiatorHi: ["एक ब्रांड", "फिक्स्ड मेन्यू", "छोटे समारोह"],
     pax: "50 – 300 Guests",
     paxHi: "50 – 300 मेहमान",
     bestFor: "Birthdays · Pujas · Family Gatherings",
@@ -407,8 +416,8 @@ export const packages: PackageTier[] = [
       },
       { label: "1 Sweet", labelHi: "1 मिठाई", standalone: true },
     ],
-    footnote: ["Fixed main course menu with up to 5 vendors in your city."],
-    footnoteHi: ["आपके शहर में 5 वेंडर तक के साथ फिक्स्ड मेन कोर्स मेन्यू।"],
+    footnote: ["Verified vendors from your city — a fixed menu served by one verified vendor."],
+    footnoteHi: ["आपके शहर के वेरिफाइड वेंडर — एक वेरिफाइड वेंडर द्वारा परोसा गया फिक्स्ड मेन्यू।"],
   },
   {
     id: "gold",
@@ -420,6 +429,16 @@ export const packages: PackageTier[] = [
     popular: true,
     tagline: "Popular Choice",
     taglineHi: "लोकप्रिय विकल्प",
+    differentiator: [
+      "Multiple City Brands",
+      "Mix & Match for every category",
+      "Weddings & Celebrations",
+    ],
+    differentiatorHi: [
+      "शहर के कई ब्रांड",
+      "हर कैटेगरी में मिक्स एंड मैच",
+      "शादी और जश्न",
+    ],
     pax: "150 – 10,000 Guests",
     paxHi: "150 – 10,000 मेहमान",
     bestFor: "Weddings · Receptions · Engagements",
@@ -437,8 +456,11 @@ export const packages: PackageTier[] = [
       { label: "Main Course (Pick Any)", labelHi: "मेन कोर्स (कोई भी चुनें)", standalone: true },
       { label: "Sweet Stall (Pick Any)", labelHi: "स्वीट स्टॉल (कोई भी चुनें)", standalone: true },
     ],
-    footnote: ["From 150 guests — multiple choices in your city; choices from multiple vendors for 1,000+ guests"],
-    footnoteHi: ["150 मेहमानों से — आपके शहर में कई विकल्प; 1,000+ मेहमानों के लिए कई वेंडरों से विकल्प"],
+    // Gold's card is the fullest (longest menu + the widest differentiator),
+    // so this note has room for ONE line on the parchment — keep it short or
+    // it clips below the scroll's bottom roll.
+    footnote: ["Your city's best — one best vendor per category."],
+    footnoteHi: ["आपके शहर के बेहतरीन — हर कैटेगरी में एक बेस्ट वेंडर।"],
   },
   {
     id: "platinum",
@@ -449,6 +471,16 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "Premium Experience",
     taglineHi: "प्रीमियम अनुभव",
+    differentiator: [
+      "Premium & Iconic Brands",
+      "No Selection Limits",
+      "Ultimate Freedom",
+    ],
+    differentiatorHi: [
+      "प्रीमियम और आइकॉनिक ब्रांड",
+      "चयन की कोई सीमा नहीं",
+      "पूरी आज़ादी",
+    ],
     pax: "50 – 50,000 Guests",
     paxHi: "50 – 50,000 मेहमान",
     bestFor: "Grand Weddings · Galas · VIP Events",
@@ -465,8 +497,8 @@ export const packages: PackageTier[] = [
       { label: "Sweet Stall (Pick Any)", labelHi: "स्वीट स्टॉल (कोई भी चुनें)" },
       { label: "Premium Famous Vendors", labelHi: "प्रीमियम मशहूर वेंडर" },
     ],
-    footnote: ["From just 50 guests — multiple choices & famous vendors across India"],
-    footnoteHi: ["सिर्फ़ 50 मेहमानों से — पूरे भारत में कई विकल्प और मशहूर वेंडर"],
+    footnote: ["Iconic vendors from across India — multiple iconic vendors in every category."],
+    footnoteHi: ["पूरे भारत के आइकॉनिक वेंडर — हर कैटेगरी में कई आइकॉनिक वेंडर।"],
   },
   {
     id: "custom",
@@ -477,6 +509,16 @@ export const packages: PackageTier[] = [
     unitHi: "/ प्लेट",
     tagline: "One Stall · One Vendor",
     taglineHi: "एक स्टॉल · एक वेंडर",
+    differentiator: [
+      "One Verified City Brand",
+      "Build Your Own Menu",
+      "Any Occasion",
+    ],
+    differentiatorHi: [
+      "शहर का एक वेरिफाइड ब्रांड",
+      "अपना खुद का मेन्यू",
+      "कोई भी अवसर",
+    ],
     bestFor: "Any Occasion, Your Way",
     bestForHi: "कोई भी अवसर, आपके अंदाज़ में",
     image: img("photo-1467003909585-2f8a72700288"),
@@ -487,6 +529,8 @@ export const packages: PackageTier[] = [
       { label: "Add Live Counters & Extras", labelHi: "लाइव काउंटर और एक्स्ट्रा जोड़ें" },
       { label: "Pay Only For What You Select", labelHi: "सिर्फ़ अपनी पसंद के लिए भुगतान करें" },
     ],
+    footnote: ["Verified vendors from your city — one verified vendor, your own menu."],
+    footnoteHi: ["आपके शहर के वेरिफाइड वेंडर — एक वेरिफाइड वेंडर, आपका अपना मेन्यू।"],
   },
 ];
 
@@ -1038,6 +1082,152 @@ export const addOns: AddOn[] = [
   { id: "tableware", name: "Premium Tableware", nameHi: "प्रीमियम टेबलवेयर", description: "Crockery, cutlery & glassware.", price: 25, perPlate: true, icon: "🍽️", image: img("photo-1414235077428-338989a2e8c0", 600), keywords: ["crockery", "cutlery", "glassware", "plates"], category: "service" },
   { id: "decor", name: "Decoration", nameHi: "सजावट", description: "Theme decor, florals & lighting.", price: 35000, perPlate: false, icon: "🎉", image: img("photo-1519225421980-715cb0215aed", 600), keywords: ["decor", "flowers", "florals", "lighting", "theme", "stage"], category: "service" },
 ];
+
+/** One line of a counter's set menu — a dish (with its veg / non-veg mark) on a
+ *  live counter, or an inclusion on a service add-on (those carry no diet). */
+export interface AddOnMenuItem {
+  name: string;
+  nameHi: string;
+  /** Veg / non-veg mark, shown exactly as on the menu step. Counters only. */
+  diet?: DietType;
+}
+
+/** Counter dishes — veg unless the third field says otherwise. */
+const mkCounterMenu = (
+  defs: [name: string, nameHi: string, diet?: DietType][],
+): AddOnMenuItem[] =>
+  defs.map(([name, nameHi, diet]) => ({ name, nameHi, diet: diet ?? "veg" }));
+
+/** Service inclusions — what the add-on covers; no diet mark. */
+const mkServiceMenu = (
+  defs: [name: string, nameHi: string][],
+): AddOnMenuItem[] => defs.map(([name, nameHi]) => ({ name, nameHi }));
+
+/**
+ * Every add-on's SET menu — what the guest actually gets when they add it. The
+ * spread is fixed by the platform (a paan counter is a paan counter whoever
+ * runs it); the vendor chosen on the extras step is who cooks it. Keyed by
+ * `addOns[].id`; service add-ons list their inclusions instead of dishes.
+ *
+ * The extras step shows this docked under the chosen vendor, mirroring the menu
+ * step's vendor → dishes pairing — except nothing here is selectable, since the
+ * counter price already buys the whole list.
+ */
+export const addOnMenus: Record<string, AddOnMenuItem[]> = {
+  pan: mkCounterMenu([
+    ["Banarasi Meetha Paan", "बनारसी मीठा पान"],
+    ["Chocolate Paan", "चॉकलेट पान"],
+    ["Silver Warq Paan", "चाँदी वर्क पान"],
+    ["Fire Paan", "फायर पान"],
+    ["Saada Paan", "सादा पान"],
+    ["Mukhwas & Saunf Tray", "मुखवास और सौंफ ट्रे"],
+  ]),
+  chaat: mkCounterMenu([
+    ["Golgappa / Pani Puri", "गोलगप्पा / पानी पूरी"],
+    ["Aloo Tikki Chaat", "आलू टिक्की चाट"],
+    ["Papdi Chaat", "पापड़ी चाट"],
+    ["Dahi Bhalla", "दही भल्ला"],
+    ["Bhel Puri", "भेल पूरी"],
+    ["Samosa Chaat", "समोसा चाट"],
+  ]),
+  live: mkCounterMenu([
+    ["Masala Dosa", "मसाला डोसा"],
+    ["Uttapam", "उत्तपम"],
+    ["Penne in Pink Sauce", "पेने पिंक सॉस"],
+    ["Tandoori Paneer Tikka", "तंदूरी पनीर टिक्का"],
+    ["Chicken Tikka", "चिकन टिक्का", "non-veg"],
+    ["Tandoori Roti Basket", "तंदूरी रोटी बास्केट"],
+  ]),
+  pizza: mkCounterMenu([
+    ["Margherita", "मार्गेरिटा"],
+    ["Farmhouse Veg", "फार्महाउस वेज"],
+    ["Paneer Tikka Pizza", "पनीर टिक्का पिज़्ज़ा"],
+    ["Chicken Peri-Peri Pizza", "चिकन पेरी-पेरी पिज़्ज़ा", "non-veg"],
+    ["Garlic Bread Sticks", "गार्लिक ब्रेड स्टिक्स"],
+    ["Wood-fired Calzone", "वुड-फायर्ड काल्ज़ोन"],
+  ]),
+  momo: mkCounterMenu([
+    ["Steamed Veg Momo", "स्टीम्ड वेज मोमो"],
+    ["Fried Veg Momo", "फ्राइड वेज मोमो"],
+    ["Paneer Momo", "पनीर मोमो"],
+    ["Chicken Momo", "चिकन मोमो", "non-veg"],
+    ["Tandoori Momo", "तंदूरी मोमो"],
+    ["Schezwan Chutney & Broth", "श्ज़वान चटनी और सूप"],
+  ]),
+  noodle: mkCounterMenu([
+    ["Hakka Noodles", "हक्का नूडल्स"],
+    ["Schezwan Fried Rice", "श्ज़वान फ्राइड राइस"],
+    ["Veg Manchurian", "वेज मंचूरियन"],
+    ["Chilli Paneer", "चिली पनीर"],
+    ["Chilli Chicken", "चिली चिकन", "non-veg"],
+    ["Honey Chilli Potato", "हनी चिली पोटैटो"],
+  ]),
+  waffle: mkCounterMenu([
+    ["Belgian Waffle", "बेल्जियन वॉफल"],
+    ["Nutella Waffle", "नुटेला वॉफल"],
+    ["Butter & Maple Pancakes", "बटर और मेपल पैनकेक"],
+    ["Choco Chip Pancakes", "चोको चिप पैनकेक"],
+    ["Fresh Fruit & Cream", "ताज़े फल और क्रीम"],
+    ["Toppings Bar", "टॉपिंग्स बार"],
+  ]),
+  dessert: mkCounterMenu([
+    ["Live Jalebi with Rabri", "लाइव जलेबी विद रबड़ी"],
+    ["Gulab Jamun", "गुलाब जामुन"],
+    ["Ice Cream (3 flavours)", "आइसक्रीम (3 फ्लेवर)"],
+    ["Kulfi Falooda", "कुल्फी फालूदा"],
+    ["Moong Dal Halwa", "मूंग दाल हलवा"],
+    ["Assorted Mithai", "मिक्स मिठाई"],
+  ]),
+  "hi-tea": mkCounterMenu([
+    ["Masala Chai & Filter Coffee", "मसाला चाय और फ़िल्टर कॉफ़ी"],
+    ["Samosa", "समोसा"],
+    ["Paneer Pakora", "पनीर पकोड़ा"],
+    ["Veg Sandwich", "वेज सैंडविच"],
+    ["Bread Pakora", "ब्रेड पकोड़ा"],
+    ["Cookies & Cake Slice", "कुकीज़ और केक स्लाइस"],
+  ]),
+  coffee: mkCounterMenu([
+    ["Cappuccino", "कैपेचीनो"],
+    ["Cafe Latte", "कैफ़े लाटे"],
+    ["Cold Coffee", "कोल्ड कॉफ़ी"],
+    ["Cutting Chai", "कटिंग चाय"],
+    ["Masala Chai", "मसाला चाय"],
+    ["Hot Chocolate", "हॉट चॉकलेट"],
+  ]),
+  mocktail: mkCounterMenu([
+    ["Virgin Mojito", "वर्जिन मोहितो"],
+    ["Blue Lagoon", "ब्लू लगून"],
+    ["Fresh Lime Soda", "फ्रेश लाइम सोडा"],
+    ["Watermelon Cooler", "वॉटरमेलन कूलर"],
+    ["Fresh Orange Juice", "ताज़ा संतरे का जूस"],
+    ["Fruit Punch", "फ्रूट पंच"],
+  ]),
+  staff: mkServiceMenu([
+    ["Uniformed stewards", "यूनिफ़ॉर्म में स्टीवर्ड"],
+    ["Service captain on floor", "फ्लोर पर सर्विस कैप्टन"],
+    ["Buffet & counter attendants", "बुफ़े और काउंटर अटेंडेंट"],
+    ["Kitchen helpers", "किचन हेल्पर"],
+    ["Setup & cleanup crew", "सेटअप और सफ़ाई टीम"],
+  ]),
+  tableware: mkServiceMenu([
+    ["Ceramic dinner plates", "सेरामिक डिनर प्लेट"],
+    ["Steel cutlery set", "स्टील कटलरी सेट"],
+    ["Glassware & water tumblers", "ग्लासवेयर और पानी के गिलास"],
+    ["Quarter plates & bowls", "क्वार्टर प्लेट और कटोरी"],
+    ["Chafing dishes & serving spoons", "चेफ़िंग डिश और सर्विंग चम्मच"],
+  ]),
+  decor: mkServiceMenu([
+    ["Theme backdrop & stage", "थीम बैकड्रॉप और स्टेज"],
+    ["Fresh floral arrangements", "ताज़े फूलों की सजावट"],
+    ["Table centrepieces", "टेबल सेंटरपीस"],
+    ["Ambient & buffet lighting", "एम्बिएंट और बुफ़े लाइटिंग"],
+    ["Entrance welcome setup", "एंट्रेंस वेलकम सेटअप"],
+  ]),
+};
+
+/** The set menu for an add-on — empty when none is authored, so callers can
+ *  render the block conditionally. */
+export const addOnMenu = (id: string): AddOnMenuItem[] => addOnMenus[id] ?? [];
 
 /**
  * Service package — the labour/coordination of actually running a feast (crew,

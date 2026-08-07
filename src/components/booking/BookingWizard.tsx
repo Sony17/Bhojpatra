@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useLang } from "@/lib/i18n";
@@ -59,6 +60,7 @@ import {
   cities,
   packages,
   addOns,
+  addOnMenu,
   coupons,
   menuCategories,
   bookingMealTimes,
@@ -203,6 +205,17 @@ function clearBookingDraft(): void {
   }
 }
 
+/** A `?vendor=` id we can't resolve to a brand, made readable for the
+ *  "brand not found" notice ("awadhi-royal" → "Awadhi Royal"). Falls back to
+ *  the raw value when it isn't slug-shaped. */
+function prettifyVendorId(id: string): string {
+  const words = id
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+  return words.length ? words.join(" ") : id;
+}
+
 /** Whole days from today (local midnight) until a `YYYY-MM-DD` date.
  *  Returns null for an empty/invalid date. */
 function daysUntil(dateStr: string): number | null {
@@ -269,6 +282,12 @@ export default function BookingWizard() {
   const [packageId, setPackageId] = useState<string>(
     packages.find((p) => p.popular)?.id ?? packages[0].id,
   );
+  // Whether that package id reflects a real decision (card tap, ?package= link,
+  // restored draft) or is still just the "popular" tier we seeded above. Pricing
+  // reads `packageId` either way — this only gates what we're willing to *show*
+  // as a price on Step 1, so a first-time guest is never quoted for a tier they
+  // never picked. See the sticky bar below.
+  const [packageChosen, setPackageChosen] = useState<boolean>(false);
 
   // Single Stall (custom) tier "lens" — which roster the guest browses on the
   // Menu step: Silver/Gold surface their-city vendors mapped to that band;
@@ -418,7 +437,10 @@ export default function BookingWizard() {
     const d = readBookingDraft();
     if (d) {
       if (typeof d.step === "number") setStep(d.step);
-      if (d.packageId) setPackageId(d.packageId);
+      if (d.packageId) {
+        setPackageId(d.packageId);
+        setPackageChosen(true);
+      }
       if (d.stallTier) setStallTier(d.stallTier);
       if (typeof d.activeCat === "number") setActiveCat(d.activeCat);
       if (typeof d.liveCat === "number") setLiveCat(d.liveCat);
@@ -508,7 +530,10 @@ export default function BookingWizard() {
       pkgRequested &&
       effectiveDate !== null &&
       !packageAvailable(pkg!, effectiveDate);
-    if (pkgRequested && !pkgTooSoon) setPackageId(pkg!);
+    if (pkgRequested && !pkgTooSoon) {
+      setPackageId(pkg!);
+      setPackageChosen(true);
+    }
     if (stepParam === "menu" && !pkgTooSoon) setStep(2);
     // A Mehndi booking is a Single Stall order by design — the occasion
     // deep-link (e.g. the home page's Mehndi card) lands straight in the
@@ -516,6 +541,7 @@ export default function BookingWizard() {
     // explicit ?package= tier deep-link still wins.
     if (occ === "mehndi" && !pkgRequested) {
       setPackageId("custom");
+      setPackageChosen(true);
       setStep(2);
     }
     // A brand page ("book this stall") hands off a specific vendor. That's a
@@ -525,6 +551,7 @@ export default function BookingWizard() {
     const vendorParam = sp.get("vendor")?.trim();
     if (vendorParam) {
       setPackageId("custom");
+      setPackageChosen(true);
       setPendingVendorId(vendorParam);
       setStep(2);
     }
@@ -713,6 +740,45 @@ export default function BookingWizard() {
     if (sessionStatus.email) setCustomerEmail((e) => e || sessionStatus.email!);
   }, [sessionStatus]);
 
+  // The account carries no phone number, so a returning customer's mobile comes
+  // from their last booking instead — asking a second time for a number we
+  // already have on file is exactly the friction this avoids. Best-effort: if
+  // the fetch fails (or this is a first booking) the field is simply asked for.
+  const [lastBookingPhone, setLastBookingPhone] = useState<string>("");
+  useEffect(() => {
+    if (!sessionStatus) return;
+    let active = true;
+    fetch("/api/bookings/mine")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { orders?: { phone?: string }[] } | null) => {
+        if (!active) return;
+        // `mine` comes back newest-first — take the most recent number on file.
+        const phone = (data?.orders ?? []).find((o) => o.phone?.trim())?.phone;
+        if (!phone) return;
+        setLastBookingPhone(phone.trim());
+        setCustomerPhone((p) => p || phone.trim());
+      })
+      .catch(() => {
+        /* offline / signed out mid-flight — the guest can still type it */
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionStatus]);
+
+  // What we already hold on file for this guest — the account's name/email and
+  // the phone from their last booking. The Confirm step reads these back as a
+  // "booking as …" line and only asks for what's genuinely missing; a value the
+  // guest edits away from stops matching and reverts to a plain field.
+  const knownContact = useMemo(
+    () => ({
+      name: sessionStatus?.name ?? "",
+      email: sessionStatus?.email ?? "",
+      phone: lastBookingPhone,
+    }),
+    [sessionStatus, lastBookingPhone],
+  );
+
   // A booking can't credit its own booker. Two ways that happens, both dropped:
   //  • same account — the applied code is one of this signed-in account's codes;
   //  • second account — the code's owner (an Individual Referrer / Event Planner)
@@ -744,6 +810,10 @@ export default function BookingWizard() {
   useEffect(() => {
     const phone = customerPhone.replace(/[\s-]/g, "");
     if (!/^[6-9]\d{9}$/.test(phone)) return;
+    // A number prefilled from this customer's last booking isn't a new lead —
+    // they're already a customer, and the field filled itself. Only a number
+    // the guest actually put in here is worth capturing.
+    if (phone === lastBookingPhone.replace(/[\s-]/g, "")) return;
     if (capturedPhones.current.has(phone)) return;
     capturedPhones.current.add(phone);
     void fetch("/api/leads", {
@@ -753,7 +823,7 @@ export default function BookingWizard() {
     }).catch(() => {
       /* offline — the full order still persists on confirm */
     });
-  }, [customerPhone]);
+  }, [customerPhone, lastBookingPhone]);
 
   /* ─── Menu helpers ─────────────────────────────────────────────────── */
   // Short-notice dates can't be sourced for the regular tiers (Silver/Gold/
@@ -794,6 +864,11 @@ export default function BookingWizard() {
   // until (or in case) the fetch answers.
   const [liveMenuCategories, setLiveMenuCategories] =
     useState<MenuCategory[]>(menuCategories);
+  // Whether that fetch has settled (either way). The fixture above means the
+  // roster is never empty, so "this brand isn't in the roster" is only a real
+  // answer once the live data has had its turn — a brand published from a
+  // vendor dashboard exists only in the API payload, not the fixture.
+  const [menuSettled, setMenuSettled] = useState(false);
   useEffect(() => {
     let live = true;
     fetch("/api/menu")
@@ -801,11 +876,19 @@ export default function BookingWizard() {
       .then((d: { categories?: MenuCategory[] } | null) => {
         if (live && d?.categories?.length) setLiveMenuCategories(d.categories);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (live) setMenuSettled(true);
+      });
     return () => {
       live = false;
     };
   }, []);
+
+  // A `/book?vendor=ID` hand-off whose brand we could not resolve. Holds the
+  // brand's display name (or the raw id) so the Menu step can say which one
+  // went missing instead of dropping the guest on an unexplained empty picker.
+  const [missingBrand, setMissingBrand] = useState<string>("");
 
   // Resolve a brand-page vendor hand-off (/book?vendor=ID) once the live menu
   // arrives: pre-select that vendor in every course it publishes and infer its
@@ -845,7 +928,21 @@ export default function BookingWizard() {
       hitCats.push(cat.id);
       if (v.tiers?.length) tiers = v.tiers as VendorTier[];
     }
-    if (Object.keys(preset).length === 0) return; // not loaded yet, or unknown id
+    if (Object.keys(preset).length === 0) {
+      // No course carries this brand. While the live roster is still in flight
+      // that only means "not loaded yet", so keep waiting. Once it has settled
+      // the id is genuinely unknown (a delisted brand, a stale share link, a
+      // hand-typed ?vendor=) — say so and leave the guest on the vendor picker
+      // with nothing pre-selected, rather than an empty step they can't explain.
+      if (!menuSettled) return;
+      const listing = vendorListings.find((l) => l.id === pendingVendorId);
+      setMissingBrand(listing?.name ?? prettifyVendorId(pendingVendorId));
+      setPendingVendorId("");
+      setActiveCat(0);
+      setStep(2);
+      return;
+    }
+    setMissingBrand("");
     setCategoryVendor((m) => ({ ...preset, ...m }));
     setStallTier((cur) => cur || sortTiers(tiers)[0] || "Gold");
     // Land the guest on the step/tab that actually holds this vendor's course.
@@ -868,7 +965,7 @@ export default function BookingWizard() {
       setStep(3);
     }
     setPendingVendorId("");
-  }, [liveMenuCategories, pendingVendorId]);
+  }, [liveMenuCategories, pendingVendorId, menuSettled]);
 
   // The tier "lens" that decides which vendors each course surfaces. Fixed tiers
   // use their own band (Silver shows Silver-mapped vendors, etc.) via the
@@ -949,6 +1046,15 @@ export default function BookingWizard() {
   // dishes allowed from ONE vendor for this course (e.g. one welcome drink).
   const baseAllowanceFor = (catId: string): number =>
     packageCategoryItems[packageId]?.[catId] ?? 1;
+
+  // Whether a step's courses let the guest pick more than one dish anywhere in
+  // the package — step-wide (not the active course) because the first course
+  // (e.g. Welcome) may allow only one dish on tiers that open a wide spread
+  // elsewhere. Uses the base (per-vendor) quota so multi-vendor scaling doesn't
+  // skew it. Feeds the step subtitle, which states the package's capability in
+  // the same line rather than stacking a second note under the head.
+  const multiDishIn = (cats: MenuCategory[]): boolean =>
+    cats.some((c) => baseAllowanceFor(c.id) > 1);
 
   // Selections are filtered at read time against the vendors currently shown
   // (same derive-don't-reconcile approach as the add-on vendor fallback):
@@ -1196,9 +1302,15 @@ export default function BookingWizard() {
 
   // Switching package can leave the headcount outside the new tier's range —
   // pull it back in so the order stays bookable (e.g. Gold→Silver caps 500→300).
+  // Gated on `packageChosen`: until the guest actually picks a tier, `packageId`
+  // is only the seeded "popular" default (Gold, minPax 150), and clamping to it
+  // would silently rewrite a headcount the guest *did* choose — a Hero search
+  // for 100 guests landed on /book showing 150, quoting a bigger order than was
+  // asked for. An unchosen tier must not overrule an explicit guest count.
   useEffect(() => {
+    if (!packageChosen) return;
     setGuests((g) => Math.max(paxMin, Math.min(paxMax, g)));
-  }, [paxMin, paxMax]);
+  }, [paxMin, paxMax, packageChosen]);
 
   const categoryAddTotal = useMemo<number>(
     () =>
@@ -1451,7 +1563,10 @@ export default function BookingWizard() {
   const stepValid = (s: number): boolean => {
     switch (s) {
       case 1:
-        return packageId !== "";
+        // A seeded "popular" tier is not a decision — require a real pick so a
+        // guest never advances (and gets quoted) on a package they never chose.
+        // The `nextBlockers` copy below spells this out.
+        return packageId !== "" && packageChosen;
       case 2:
         // Menu step — can proceed if at least one selection has been made (or no categories)
         return menuStepCategories.length === 0 || hasStepAnySelection(menuStepCategories);
@@ -2325,7 +2440,38 @@ export default function BookingWizard() {
           {/* Builder — below the combined card on mobile, right column on desktop. */}
           <div className="order-3 w-full min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
             {step === 2 ? (
-              singleStall && !stallTier ? (
+              <>
+              {/* A `/book?vendor=` hand-off we couldn't honour (delisted brand,
+                  stale share link, hand-typed id). Say which brand went missing
+                  and leave the guest here on the vendor-picking step with
+                  nothing pre-selected — sits above the Single Stall tier gate so
+                  it's read whichever half of the step is showing. */}
+              {missingBrand && (
+                <div
+                  role="status"
+                  className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-maroon/20 bg-cream-2/60 px-4 py-3"
+                >
+                  <p className="text-sm leading-relaxed text-ink">
+                    <span className="font-semibold text-maroon">
+                      {t("Brand not found", "ब्रांड नहीं मिला")}
+                    </span>{" "}
+                    —{" "}
+                    {t(
+                      `We couldn't find "${missingBrand}". It may no longer be listed. Pick a vendor below to carry on.`,
+                      `"${missingBrand}" नहीं मिला। हो सकता है यह अब सूचीबद्ध न हो। आगे बढ़ने के लिए नीचे से वेंडर चुनें।`,
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setMissingBrand("")}
+                    aria-label={t("Dismiss", "बंद करें")}
+                    className="shrink-0 rounded-full px-2 text-base font-semibold leading-none text-maroon"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              {singleStall && !stallTier ? (
                 <StallTierPicker
                   t={t}
                   lang={lang}
@@ -2347,10 +2493,32 @@ export default function BookingWizard() {
                 lang={lang}
                 t={t}
                 title={t("Build Your Menu", "अपना मेन्यू बनाएं")}
-                subtitle={t(
-                  "Pick vendors and dishes for your plated courses — live counters come next.",
-                  "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
-                )}
+                // One line, not two: what the package unlocks (several vendors
+                // and/or a spread of dishes) is folded into the same sentence
+                // that says what's next, instead of a second note below the
+                // head. Per-course caps are still spelled out by the "N/N
+                // PICKED" counter on each course.
+                subtitle={
+                  multiVendor && multiDishIn(menuStepCategories)
+                    ? t(
+                        "Mix multiple vendors and pick multiple dishes across your plated courses — live counters come next.",
+                        "अपने कोर्सेज़ में कई वेंडर मिलाएं और कई व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                      )
+                    : multiVendor
+                      ? t(
+                          "Mix multiple vendors across your plated courses — live counters come next.",
+                          "अपने कोर्सेज़ में कई वेंडर मिलाएं — लाइव काउंटर अगले चरण में।",
+                        )
+                      : multiDishIn(menuStepCategories)
+                        ? t(
+                            "Pick multiple dishes across your plated courses — live counters come next.",
+                            "अपने कोर्सेज़ में कई व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                          )
+                        : t(
+                            "Pick vendors and dishes for your plated courses — live counters come next.",
+                            "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                          )
+                }
                 multiVendor={multiVendor}
                 // Cap by band, not package id — covers Silver/Gold packages
                 // AND the Single Stall flow once its Silver/Gold lens is set.
@@ -2376,16 +2544,35 @@ export default function BookingWizard() {
                 vendorRatings={vendorRatings}
                   />
                 </>
-              )
+              )}
+              </>
             ) : hasLiveStalls ? (
               <StepMenu
                 lang={lang}
                 t={t}
                 title={t("Choose Your Live Stalls", "अपने लाइव स्टॉल चुनें")}
-                subtitle={t(
-                  "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
-                  "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
-                )}
+                // Same single-line treatment as the plated menu step above.
+                subtitle={
+                  counterMultiVendor && multiDishIn(liveStallCategories)
+                    ? t(
+                        "Mix multiple counter vendors and dishes, cooked fresh in front of your guests — add-ons come next.",
+                        "कई काउंटर वेंडर और व्यंजन चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                      )
+                    : counterMultiVendor
+                      ? t(
+                          "Mix multiple counter vendors, cooked fresh in front of your guests — add-ons come next.",
+                          "कई काउंटर वेंडर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                        )
+                      : multiDishIn(liveStallCategories)
+                        ? t(
+                            "Pick multiple counters, cooked fresh in front of your guests — add-ons come next.",
+                            "कई काउंटर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                          )
+                        : t(
+                            "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
+                            "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
+                          )
+                }
                 multiVendor={counterMultiVendor}
                 maxVendors={
                   effectiveTier === "Silver" || effectiveTier === "Gold"
@@ -2436,6 +2623,7 @@ export default function BookingWizard() {
               // selection — no Next arrow needed.
               setPackageId={(id) => {
                 setPackageId(id);
+                setPackageChosen(true);
                 setStep(2);
               }}
               eventDate={eventDate}
@@ -2533,6 +2721,7 @@ export default function BookingWizard() {
               setCustomerPhone={setCustomerPhone}
               customerEmail={customerEmail}
               setCustomerEmail={setCustomerEmail}
+              knownContact={knownContact}
               referralCode={referralCode}
               setReferralCode={setReferralCode}
               referrerName={referrerName}
@@ -2619,7 +2808,9 @@ export default function BookingWizard() {
           onPrev={menuPrev}
           onNext={menuNext}
           onSkipCurrent={skipCurrentStall}
-          estTotal={grandTotal}
+          // Withheld until the order actually holds something — package ×
+          // guests alone is not a quote. See the sticky-bar note below.
+          estTotal={orderHasItems ? grandTotal : 0}
           guestCount={guests}
           extraBanner={
             menuFullySkipped ? (
@@ -2653,7 +2844,7 @@ export default function BookingWizard() {
             onPrev={livePrev}
             onNext={liveNext}
             onSkipCurrent={skipCurrentLiveStall}
-            estTotal={grandTotal}
+            estTotal={orderHasItems ? grandTotal : 0}
             guestCount={guests}
           />
         ) : (
@@ -2706,26 +2897,50 @@ export default function BookingWizard() {
                 : `${t("Continue", "आगे")} →`}
             </Button>
           </div>
-          {/* Mobile sticky checkout chrome — carries the running estimate (as in
-              the app mockup's persistent bar) above the Back / Continue row. */}
+          {/* Mobile sticky checkout chrome — Back / Continue, with the running
+              estimate above it once there's an order to price.
+
+              A package tier and a headcount are NOT an order: multiplying the
+              seeded "popular" tier by the guest count produces a confident
+              ₹-figure for a feast the guest never assembled, which reads as a
+              quote they're on the hook for. So the number only appears once
+              `orderHasItems` — a built course, a picked stall dish, or an extra
+              — is true, which in practice means it arrives late in the flow and
+              the full breakdown still lands on Review. Until then the bar says
+              plainly that nothing is booked. Desktop already omits the summary
+              rail on Step 1 for the same reason. */}
           <div className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
-              <div className="mb-2 flex items-end justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                    {t("Total (Est.)", "कुल (अनुमानित)")}
+              {orderHasItems ? (
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                      {t("Total (Est.)", "कुल (अनुमानित)")}
+                    </span>
+                    <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
+                      {money(grandTotal)}
+                    </span>
                   </span>
-                  <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
-                    {money(grandTotal)}
+                  <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
+                    {t(
+                      `For ${inr.format(guests)} guests`,
+                      `${inr.format(guests)} मेहमानों के लिए`,
+                    )}
                   </span>
-                </span>
-                <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
-                  {t(
-                    `For ${inr.format(guests)} guests`,
-                    `${inr.format(guests)} मेहमानों के लिए`,
-                  )}
-                </span>
-              </div>
+                </div>
+              ) : (
+                <div className="mb-2 text-[11px] leading-tight text-ink-soft">
+                  {step === 1
+                    ? t(
+                        "Pick a package to start — nothing is booked yet.",
+                        "शुरू करने के लिए पैकेज चुनें — अभी कुछ भी बुक नहीं हुआ है।",
+                      )
+                    : t(
+                        "Your total appears once you add items — nothing is booked yet.",
+                        "आइटम जोड़ते ही आपका कुल दिखेगा — अभी कुछ भी बुक नहीं हुआ है।",
+                      )}
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Button
                   variant="secondary"
@@ -2839,6 +3054,112 @@ function SectionHead({
   );
 }
 
+/* ─── Incomplete-selection popup ─────────────────────────────────────────
+   Fires on every Next / Continue press while the step still has courses short
+   of their dish quota. It lists exactly what's outstanding and lets the guest
+   either stay and finish or move on and come back later — the same message the
+   step used to show as a static banner, promoted to a decision point so it can't
+   be scrolled past. Portalled to <body> so the wizard's stacking contexts can't
+   trap it under the sticky header. */
+function IncompleteSelectionDialog({
+  t,
+  open,
+  missingSummaries,
+  onStay,
+  onContinue,
+}: {
+  t: (en: string, hi: string) => string;
+  open: boolean;
+  missingSummaries: { id: string; name: string; missingCount: number }[];
+  onStay: () => void;
+  onContinue: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onStay();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onStay]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[95] flex items-end justify-center overflow-y-auto bg-[rgba(0,0,0,0.55)] p-0 sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t(
+        "Your selection is partially complete",
+        "आपका चयन आंशिक रूप से पूरा है",
+      )}
+      onClick={onStay}
+    >
+      <div
+        className="w-full max-w-md rounded-t-sheet bg-white p-5 pb-[max(1.25rem,var(--safe-bottom))] shadow-modal sm:rounded-card sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-2.5">
+          <span
+            aria-hidden="true"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream text-base text-maroon"
+          >
+            ℹ
+          </span>
+          <div className="min-w-0">
+            {/* Open Sans, not the display face — this is a UI alert, not a
+                brand moment, and `h2` would otherwise inherit Ananda Neptouch. */}
+            <h2 className="font-sans text-base font-bold leading-snug text-ink">
+              {t(
+                "Your selection is partially complete",
+                "आपका चयन आंशिक रूप से पूरा है",
+              )}
+            </h2>
+            <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+              {t(
+                "You can continue now and finalize the remaining choices later.",
+                "आप अभी आगे बढ़ सकते हैं और बाकी विकल्प बाद में तय कर सकते हैं।",
+              )}
+            </p>
+          </div>
+        </div>
+
+        <ul className="mt-4 divide-y divide-cream-3 rounded-xl border border-cream-3 bg-cream/40">
+          {missingSummaries.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px]"
+            >
+              <span className="min-w-0 truncate font-semibold text-ink">
+                {s.name}
+              </span>
+              <span className="shrink-0 font-bold text-maroon">
+                {s.missingCount} {t("more", "और")}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onStay} className="sm:flex-initial">
+            {t("Keep selecting", "चुनते रहें")}
+          </Button>
+          <Button onClick={onContinue} className="sm:flex-initial">
+            {t("Continue anyway", "फिर भी जारी रखें")} →
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /* ─── Course-step nav (Menu · Live Stall) ────────────────────────────────
    Walks a step's courses tab-by-tab and spills into the wizard at the edges:
    Back off the first course returns to the previous step, Continue past the
@@ -2884,47 +3205,44 @@ function MenuStepNav({
   const atLast = activeCat >= categories.length - 1;
   const activeId = categories[activeCat]?.id ?? "";
 
+  // What's still short of quota, raised as a popup rather than as a banner under
+  // the nav — a guest deep in a long course list never scrolls back down to read
+  // a static hint, so the reminder stands in front of the move it's about and
+  // clears with one tap either way.
+  //
+  // It only fires when the guest actually steps over something. Mid-step that's
+  // the course being left right now: courses further down the sequence haven't
+  // been reached yet, and ones already walked past were raised (and dismissed)
+  // when they were left — re-listing either turns every Next into a nag. On the
+  // last course the step itself is closing, so everything still short is fair to
+  // list one final time.
+  const [askPartial, setAskPartial] = useState(false);
+  const pendingSummaries = atLast
+    ? missingSummaries
+    : missingSummaries.filter((s) => s.id === activeId);
+  const shouldAsk = isPartial && pendingSummaries.length > 0;
+  const handleNext = () => {
+    if (shouldAsk) {
+      setAskPartial(true);
+      return;
+    }
+    onNext();
+  };
+
   return (
     <div className="mt-10 space-y-4">
       {extraBanner}
 
-      {/* Dynamic 3-level partial selection message banner */}
-      {isPartial && missingSummaries.length > 0 && (
-        <div className="rounded-xl border border-cream-3 bg-cream/50 p-3.5 text-xs text-ink-soft shadow-xs sm:rounded-2xl sm:p-4">
-          <div className="flex items-center gap-1.5 font-bold text-ink sm:text-xs">
-            <span aria-hidden="true" className="text-maroon">
-              ℹ
-            </span>
-            <span>
-              {t(
-                "Your selection is partially complete",
-                "आपका चयन आंशिक रूप से पूरा है",
-              )}
-            </span>
-          </div>
-
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-maroon">
-            {missingSummaries.map((s, idx) => (
-              <span key={s.id} className="inline-flex items-center gap-2">
-                <span>
-                  {s.name}: {s.missingCount}{" "}
-                  {t("more", "और")}
-                </span>
-                {idx < missingSummaries.length - 1 && (
-                  <span className="text-ink-soft/40">•</span>
-                )}
-              </span>
-            ))}
-          </div>
-
-          <p className="mt-1.5 text-[11px] text-ink-soft sm:text-xs">
-            {t(
-              "You can continue now and finalize the remaining choices later.",
-              "आप अभी आगे बढ़ सकते हैं और बाकी विकल्प बाद में तय कर सकते हैं।",
-            )}
-          </p>
-        </div>
-      )}
+      <IncompleteSelectionDialog
+        t={t}
+        open={askPartial}
+        missingSummaries={pendingSummaries}
+        onStay={() => setAskPartial(false)}
+        onContinue={() => {
+          setAskPartial(false);
+          onNext();
+        }}
+      />
 
       {/* Mobile — running order estimate (app mockup's persistent summary bar).
           Desktop keeps the price in the side rail / summary panel. */}
@@ -2981,12 +3299,15 @@ function MenuStepNav({
             ))}
 
           {!atLast ? (
-            <Button onClick={onNext} className="w-full flex-1 sm:w-auto sm:flex-initial">
+            <Button
+              onClick={handleNext}
+              className="w-full flex-1 sm:w-auto sm:flex-initial"
+            >
               {t("Next", "अगला")} →
             </Button>
           ) : (
             <Button
-              onClick={onNext}
+              onClick={handleNext}
               disabled={!canAdvance}
               className="w-full flex-1 sm:w-auto sm:flex-initial"
             >
@@ -3717,14 +4038,23 @@ function StepPackage({
           // no sideways swipe); sm+ restores the original snap-carousel → grid.
           // pt keeps the Popular/Premium ribbons (which float above the cards)
           // clear of the availability notice above the grid.
-          "no-scrollbar flex flex-col gap-3 pb-1 pt-7 sm:mx-0 sm:flex-row sm:snap-none sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
+          "no-scrollbar flex flex-col gap-3 pb-1 pt-7 sm:mx-0 sm:flex-row sm:snap-none sm:grid sm:justify-center sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:pt-7 xl:gap-8 " +
           (tiers.length === 1
             ? "sm:grid-cols-1"
             : tiers.length === 2
               ? "sm:grid-cols-2"
               : tiers.length === 3
                 ? "sm:grid-cols-2 lg:grid-cols-3"
-                : "sm:grid-cols-2 lg:grid-cols-4")
+                // Four tiers only go four-across at xl. At lg the columns would
+                // be ~222px, which squeezes the scroll below the width its
+                // written menu can fit in — the parchment clips. Two-across
+                // keeps every menu readable in full until there's room for four.
+                //
+                // Columns are capped at the card's own widest size (not 1fr) and
+                // the track set is centred, so two-across doesn't strand a wide
+                // gutter between the pairs. minmax()'s 0 floor lets the tracks
+                // still shrink on narrower screens.
+                : "sm:grid-cols-[repeat(2,minmax(0,320px))] xl:grid-cols-[repeat(4,minmax(0,320px))]")
         }
       >
         {tiers.map(({ tier, tooSoon, lead, unlock }) => {
@@ -3733,7 +4063,18 @@ function StepPackage({
           return (
             <div
               key={tier.id}
-              className="relative flex w-full flex-col sm:w-auto sm:max-w-none sm:shrink"
+              // Cards are capped a step below their column so the scrolls read
+              // as a tidy row of menus rather than four billboards — and
+              // centred in the column, since the cap leaves slack. Don't cap
+              // below ~265px: past that the parchment's type hits its px floors
+              // and the written menu gets clipped (see PackageScrollCard).
+              //
+              // Keep `w-full` at every breakpoint: with `w-auto`, the `mx-auto`
+              // margins suppress the grid item's default stretch, so it falls
+              // back to shrink-to-fit — and the scroll inside sizes off a
+              // percentage width, which then resolves to zero and the whole
+              // card collapses to 0x0.
+              className="relative mx-auto flex w-full max-w-[320px] flex-col sm:max-w-[300px] xl:max-w-[288px]"
             >
             {tooSoon ? (
               // Too-soon tier: the full scroll, dimmed and inert (not clickable
@@ -3817,23 +4158,26 @@ const STALL_TIER_LENSES: {
   descEn: (city: string) => string;
   descHi: (city: string) => string;
 }[] = [
+  // Wording tracks the tier ladder advertised on the package cards: Silver =
+  // verified brands from your city, Gold = the best of your city, Platinum =
+  // iconic brands from across India.
   {
     id: "Silver",
     nameHi: "सिल्वर",
-    descEn: (c) => `${c || "Your city"}'s Silver stalls`,
-    descHi: (c) => `${c || "आपके शहर"} के सिल्वर स्टॉल`,
+    descEn: (c) => `Verified stalls from ${c || "your city"}`,
+    descHi: (c) => `${c || "आपके शहर"} के वेरिफाइड स्टॉल`,
   },
   {
     id: "Gold",
     nameHi: "गोल्ड",
-    descEn: (c) => `${c || "Your city"}'s Gold stalls`,
-    descHi: (c) => `${c || "आपके शहर"} के गोल्ड स्टॉल`,
+    descEn: (c) => `The best stalls from ${c || "your city"}`,
+    descHi: (c) => `${c || "आपके शहर"} के बेहतरीन स्टॉल`,
   },
   {
     id: "Platinum",
     nameHi: "प्लेटिनम",
-    descEn: () => "Stalls from every city — the full roster",
-    descHi: () => "हर शहर के स्टॉल — पूरा रोस्टर",
+    descEn: () => "Iconic stalls from across India",
+    descHi: () => "पूरे भारत के आइकॉनिक स्टॉल",
   },
 ];
 
@@ -3857,8 +4201,8 @@ function StallTierPicker({
       </h2>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
-          "Your tier decides which stalls you browse. Silver & Gold show your city's stalls; Platinum opens every city.",
-          "आपका टियर तय करता है कि आप कौन-से स्टॉल देखेंगे। सिल्वर और गोल्ड आपके शहर के स्टॉल दिखाते हैं; प्लेटिनम हर शहर खोलता है।",
+          "Your tier decides which stalls you browse. Silver shows your city's verified stalls, Gold its best; Platinum opens the iconic brands from across India.",
+          "आपका टियर तय करता है कि आप कौन-से स्टॉल देखेंगे। सिल्वर आपके शहर के वेरिफाइड स्टॉल दिखाता है, गोल्ड उनमें से बेहतरीन; प्लेटिनम पूरे भारत के आइकॉनिक ब्रांड खोलता है।",
         )}
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -3988,8 +4332,13 @@ function StepMenu({
   // expanded from a previous one.
   const [showAllVendors, setShowAllVendors] = useState(false);
   useEffect(() => setShowAllVendors(false), [maxVendors, activeCat]);
+  // Once a vendor is picked the rest of the roster collapses behind a single
+  // row, so the chosen vendor's menu (below it) leads instead of competing with
+  // a wall of cards. Re-collapses whenever the guest switches course.
+  const [showOthers, setShowOthers] = useState(false);
+  useEffect(() => setShowOthers(false), [activeCat]);
   const [vendorSearch, setVendorSearch] = useState("");
-  // The filter is reveal-on-demand (see toggle by the "Step A" heading), so it
+  // The filter is reveal-on-demand (see toggle by the "Pick a vendor" heading), so it
   // stays collapsed until the guest asks for it.
   const [showSearch, setShowSearch] = useState(false);
   // A query only matches the active course's roster, so collapse & clear it
@@ -4085,13 +4434,17 @@ function StepMenu({
   const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
   const picks = itemsFor(cat.id);
-  // Whether this package lets a guest pick more than one dish in at least one
-  // course. Package-wide (not the active course) so the capability note shows
-  // the moment the menu opens — the first course (e.g. Welcome) may allow only
-  // one dish even on tiers that open a wide spread elsewhere. Uses the base
-  // (per-vendor) quota so multi-vendor scaling doesn't skew the note.
-  const multiDish = categories.some((c) => baseAllowanceFor(c.id) > 1);
-
+  // The browsable roster excludes whatever's already picked — a chosen vendor
+  // shows up above with its menu attached, so leaving it in the strip below
+  // would list it twice.
+  const rosterVendors = filteredVendors.filter((v) => !isSelectedVendor(v));
+  // Everything the collapsed row stands in for — the whole unpicked roster, not
+  // just the capped shortlist, so the count doesn't undersell what's behind it.
+  const otherCount = cat.vendors.length - selectedVendors.length;
+  // With nothing picked the roster is the step. After the first pick it folds
+  // into one row, and only a deliberate tap (or an active search) reopens it.
+  const othersOpen =
+    selectedVendors.length === 0 || showOthers || Boolean(vSearchQuery);
   return (
     <div className="min-w-0">
       <SectionHead
@@ -4117,35 +4470,6 @@ function StepMenu({
             {t("Skip menu · Add extras only", "मेन्यू छोड़ें · सिर्फ़ एक्स्ट्रा")} →
           </button>
         </div>
-      )}
-
-      {/* What this package unlocks — a package that lets the guest mix several
-          vendors and/or pick a spread of dishes says so up front, so they know
-          they can build a broader menu rather than assuming one vendor / one
-          dish. Package-wide, always visible on the menu step (the per-course
-          "N/N PICKED" counter below still spells out each course's exact cap). */}
-      {(multiVendor || multiDish) && (
-        <p className="mb-6 flex min-w-0 w-full items-start gap-2 rounded-2xl border border-maroon/30 bg-cream/40 p-3.5 text-xs text-ink-soft sm:p-4 sm:text-sm">
-          <span aria-hidden="true" className="shrink-0 text-maroon">
-            ★
-          </span>
-          <span className="min-w-0 flex-1 break-words">
-            {multiVendor && multiDish
-              ? t(
-                  "This package lets you mix multiple vendors and pick multiple dishes across your courses.",
-                  "इस पैकेज में आप कई वेंडर मिला सकते हैं और अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
-                )
-              : multiVendor
-                ? t(
-                    "This package lets you mix multiple vendors across your courses.",
-                    "इस पैकेज में आप अपने कोर्सेज़ में कई वेंडर मिला सकते हैं।",
-                  )
-                : t(
-                    "This package lets you pick multiple dishes across your courses.",
-                    "इस पैकेज में आप अपने कोर्सेज़ में कई व्यंजन चुन सकते हैं।",
-                  )}
-          </span>
-        </p>
       )}
 
       {/* Category tabs */}
@@ -4263,12 +4587,265 @@ function StepMenu({
         </div>
       )}
 
-      {/* Step A · Pick a vendor (multiple allowed on Platinum) */}
+      {/* ── Your pick, with its menu docked underneath ───────────────────────
+          The moment a vendor is chosen it leads the step and its dishes hang
+          straight off it, so a dish is never ambiguous about who's cooking it.
+          Multi-vendor tiers repeat the pair (vendor → that vendor's menu) once
+          per pick; every unpicked vendor folds into the single row below. */}
+      {selectedVendors.length > 0 && (
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="font-sans text-lg font-semibold text-maroon sm:text-xl">
+              {t("Choose dishes", "व्यंजन चुनें")}
+            </h4>
+            <span
+              className={
+                "text-[11px] font-bold uppercase tracking-wide text-maroon sm:text-base sm:normal-case sm:tracking-normal " +
+                (picks.length >= allowance ? "sm:text-maroon" : "sm:text-ink-soft")
+              }
+            >
+              {picks.length}/{allowance} {t("PICKED", "चुने गए")}
+            </span>
+          </div>
+
+          {/* Multi-vendor tiers give each vendor its own quota, so the guest can
+              take the full course from every vendor they picked (e.g. a welcome
+              drink from each). Spell that out so the per-vendor counters read as
+              intended, not as one shared cap. */}
+          {multiVendor && selectedVendors.length > 1 && (
+            <p className="-mt-2 text-xs text-ink-soft">
+              {base === 1
+                ? t(
+                    "You can pick one dish from each vendor for this course.",
+                    "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                  )
+                : t(
+                    `You can pick up to ${base} dishes from each vendor for this course.`,
+                    `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
+                  )}
+            </p>
+          )}
+
+          {selectedVendors.map((vendor) => {
+            // On multi-vendor tiers each vendor fills its OWN quota, so the cap
+            // (and counter) are scoped to this vendor's picks.
+            const vendorItemPicks = picks.filter((id) =>
+              id.startsWith(`${vendor.id}-`),
+            );
+            const vendorFull = vendorItemPicks.length >= base;
+            const stat = statFor(vendorRatings, vendor);
+            return (
+              <div
+                key={vendor.id}
+                className="overflow-hidden rounded-2xl border border-maroon bg-white shadow-sm"
+              >
+                {/* Chosen vendor — one tap on "Change" drops it and reopens the
+                    roster, the same as tapping it again in the list. */}
+                <div className="flex items-center gap-2.5 border-b border-cream-3 p-2.5 sm:gap-3 sm:p-3">
+                  <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 sm:h-14 sm:w-14">
+                    <Image
+                      src={vendor.image}
+                      alt={vendor.name}
+                      fill
+                      sizes="(min-width: 640px) 56px, 44px"
+                      className="object-cover"
+                    />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-sans text-sm font-semibold text-maroon sm:text-base">
+                        {vendor.name}
+                      </span>
+                      <span className="shrink-0 rounded-full border border-maroon/30 bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
+                        {t("Selected", "चयनित")}
+                      </span>
+                    </span>
+                    {stat ? (
+                      <span className="mt-0.5 text-xs font-semibold text-maroon">
+                        ★ {stat.rating} ·{" "}
+                        {t(`${stat.count} verified`, `${stat.count} सत्यापित`)}
+                      </span>
+                    ) : vendor.reviews > 0 ? (
+                      <span className="mt-0.5 text-xs text-ink-soft">
+                        ⭐ {vendor.rating}{" "}
+                        <span className="text-ink-soft/70">
+                          ({inr.format(vendor.reviews)})
+                        </span>
+                      </span>
+                    ) : null}
+                    {showItemPrice && vendor.perPlate > 0 && (
+                      <span className="mt-0.5 text-xs font-bold text-maroon">
+                        {money(vendor.perPlate)} / {t("person", "व्यक्ति")}
+                      </span>
+                    )}
+                  </span>
+                  {multiVendor && (
+                    <span
+                      className={
+                        "eyebrow shrink-0 text-[10px] font-semibold " +
+                        (vendorFull ? "text-maroon" : "text-ink-soft")
+                      }
+                    >
+                      {vendorItemPicks.length}/{base}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => pickVendor(cat.id, vendor.id)}
+                    className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:text-xs"
+                  >
+                    {multiVendor ? t("Remove", "हटाएं") : t("Change", "बदलें")}
+                  </button>
+                </div>
+                {/* This vendor's dishes — one row each, single tap to add or
+                    remove. Swiggy/Zomato-style: thumbnail left, control right. */}
+                <div className="flex flex-col gap-2 bg-cream-2/30 p-2.5 sm:p-4">
+                  {vendor.items.map((it: CategoryItem) => {
+                    const active = picks.includes(it.id);
+                    const atCap =
+                      !active &&
+                      (multiVendor ? vendorFull : picks.length >= allowance);
+                    // Veg → green, non-veg → brand maroon. The card border and
+                    // Add control take the diet colour so a dish reads as veg /
+                    // non-veg at a glance (green = #1a7f37, standard veg green).
+                    const veg = it.diet === "veg";
+                    const dietBorder = veg ? "border-[#1a7f37]" : "border-maroon";
+                    const dietRing = veg ? "ring-[#1a7f37]" : "ring-maroon";
+                    const dietBg = veg ? "bg-[#1a7f37]" : "bg-maroon";
+                    const dietText = veg ? "text-[#1a7f37]" : "text-maroon";
+                    return (
+                      <button
+                        key={it.id}
+                        type="button"
+                        onClick={() => toggleItem(cat.id, it.id)}
+                        disabled={atCap}
+                        aria-pressed={active}
+                        className={
+                          "flex w-full items-center gap-3 rounded-2xl border p-1.5 text-left shadow-sm transition sm:gap-4 sm:p-2.5 " +
+                          dietBorder +
+                          " " +
+                          (active
+                            ? "bg-cream-2 ring-1 " + dietRing
+                            : atCap
+                              ? "cursor-not-allowed bg-white opacity-50"
+                              : "bg-white hover:-translate-y-0.5 hover:shadow-md")
+                        }
+                      >
+                        {/* Dish thumbnail — real photo when the vendor uploaded
+                            one, otherwise a deterministic premium food shot. */}
+                        <span className="relative block h-[51px] w-[51px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-16 sm:w-16 sm:rounded-2xl">
+                          <Image
+                            src={it.photo ?? dummyDishPhoto(it.id)}
+                            alt=""
+                            fill
+                            sizes="(min-width: 640px) 64px, 51px"
+                            className="object-cover"
+                          />
+                        </span>
+                        {/* Diet mark + dish name (+ per-delicacy price on Single
+                            Stall, where vendors price each dish). The mark is the
+                            standard dot-in-a-square so it never reads as a second
+                            checkbox next to the Add control. */}
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className={
+                              "grid h-3.5 w-3.5 shrink-0 place-items-center rounded-sm border " +
+                              dietBorder
+                            }
+                          >
+                            <span
+                              className={
+                                "block h-1.5 w-1.5 rounded-full " + dietBg
+                              }
+                            />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-ink sm:text-base">
+                              {it.name}
+                            </span>
+                            {/* Single Stall shows each dish's own price, or the
+                                vendor's course per-plate as the fallback. */}
+                            {showItemPrice &&
+                              (it.price ?? vendor.perPlate) > 0 && (
+                                <span className="block text-xs font-semibold text-maroon">
+                                  {money(it.price ?? vendor.perPlate)}/
+                                  {t("plate", "प्लेट")}
+                                </span>
+                              )}
+                          </span>
+                        </span>
+                        {/* Add / added control — the same single tap adds the
+                            dish and takes it back off. */}
+                        <span
+                          className={
+                            "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition sm:px-5 sm:py-2 sm:text-xs " +
+                            dietBorder +
+                            " " +
+                            (active ? dietBg + " text-cream" : "bg-white " + dietText)
+                          }
+                        >
+                          {active
+                            ? `✓ ${t("Added", "जोड़ा")}`
+                            : t("Add", "जोड़ें")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Every unpicked vendor folds into this single row — one tap reopens the
+          full roster to swap or (on multi-vendor tiers) add another. */}
+      {selectedVendors.length > 0 && otherCount > 0 && !vSearchQuery && (
+        <button
+          type="button"
+          onClick={() => setShowOthers((s) => !s)}
+          aria-expanded={othersOpen}
+          className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-cream-3 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-maroon sm:px-4 sm:py-3"
+        >
+          <span aria-hidden="true" className="flex shrink-0 -space-x-2">
+            {rosterVendors.slice(0, 3).map((v) => (
+              <span
+                key={v.id}
+                className="relative block h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-cream-2"
+              >
+                <Image src={v.image} alt="" fill sizes="32px" className="object-cover" />
+              </span>
+            ))}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+            {multiVendor
+              ? t(
+                  `Add another vendor · ${otherCount} more`,
+                  `और वेंडर जोड़ें · ${otherCount} और`,
+                )
+              : t(
+                  `Change vendor · ${otherCount} more`,
+                  `वेंडर बदलें · ${otherCount} और`,
+                )}
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-base font-semibold leading-none text-maroon"
+          >
+            {othersOpen ? "↑" : "↓"}
+          </span>
+        </button>
+      )}
+
+      {othersOpen && (
+        <>
+      {/* Pick a vendor (multiple allowed on Platinum) */}
       <div className="mt-7 flex items-center justify-between gap-3">
         <h3 className="font-sans text-2xl font-semibold text-maroon">
           {multiVendor
-            ? t("Step A · Pick vendors (select multiple)", "चरण A · वेंडर चुनें (कई चुनें)")
-            : t("Step A · Pick a vendor", "चरण A · वेंडर चुनें")}
+            ? t("Pick vendors (select multiple)", "वेंडर चुनें (कई चुनें)")
+            : t("Pick a vendor", "वेंडर चुनें")}
         </h3>
         {/* Filter is offered only when the roster is long enough to be worth
             typing over — a short shortlist stays clutter-free. */}
@@ -4323,7 +4900,7 @@ function StepMenu({
           tappable row: selection radio · thumbnail · name + rating · affordance.
           The horizontal cards below are kept untouched for tablet / desktop. */}
       <div className="mt-3 sm:hidden">
-        {filteredVendors.length === 0 ? (
+        {rosterVendors.length === 0 ? (
           <p className="py-8 text-center text-sm font-medium text-ink-soft">
             {t(
               `No vendors matching "${vendorSearch}" in this category.`,
@@ -4332,7 +4909,7 @@ function StepMenu({
           </p>
         ) : (
           <ul className="flex flex-col gap-2.5">
-            {filteredVendors.map((v) => {
+            {rosterVendors.map((v) => {
               const selected = selectedIds.includes(v.id);
               const stat = statFor(vendorRatings, v);
               return (
@@ -4436,7 +5013,7 @@ function StepMenu({
         )}
       </div>
       <div className="relative mt-3 hidden sm:block">
-      {filteredVendors.length === 0 ? (
+      {rosterVendors.length === 0 ? (
         <p className="py-8 text-center text-sm font-medium text-ink-soft">
           {t(
             `No vendors matching "${vendorSearch}" in this category.`,
@@ -4451,7 +5028,7 @@ function StepMenu({
         // looked cropped from the top and the red selected ring vanished).
         className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2"
       >
-        {filteredVendors.map((v) => {
+        {rosterVendors.map((v) => {
           const selected = selectedIds.includes(v.id);
           const stat = statFor(vendorRatings, v);
           return (
@@ -4528,7 +5105,7 @@ function StepMenu({
       )}
 
         {/* Scroll hint — more vendors than fit; nudge the guest to scroll. */}
-        {filteredVendors.length > 5 && (
+        {rosterVendors.length > 5 && (
           <>
             <div
               aria-hidden="true"
@@ -4573,237 +5150,24 @@ function StepMenu({
           </button>
         </div>
       )}
+        </>
+      )}
 
-      {/* Step B · Pick items */}
-      <div className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 shadow-sm">
-        {selectedVendors.length === 0 ? (
-          <p className="text-sm text-ink-soft">
-            {multiVendor
-              ? t(
-                  "Pick one or more vendors above to see their menus.",
-                  "उनके मेन्यू देखने के लिए ऊपर एक या अधिक वेंडर चुनें।",
-                )
-              : t(
-                  "Pick a vendor above to see their menu.",
-                  "उनका मेन्यू देखने के लिए ऊपर वेंडर चुनें।",
-                )}
-          </p>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-sans text-2xl font-semibold text-maroon">
-                {multiVendor
-                  ? t("Step B · Pick items across your vendors", "चरण B · अपने वेंडरों से आइटम चुनें")
-                  : t("Step B · Pick items from their menu", "चरण B · उनके मेन्यू से आइटम चुनें")}
-              </h3>
-              <span
-                className={
-                  // Mobile echoes the mockup's red "X/Y ITEMS SELECTED" chip;
-                  // desktop keeps the original larger neutral/maroon counter.
-                  "text-[11px] font-bold uppercase tracking-wide text-maroon sm:text-lg sm:normal-case sm:tracking-normal " +
-                  (picks.length >= allowance ? "sm:text-maroon" : "sm:text-ink-soft")
-                }
-              >
-                {picks.length}/{allowance} {t("PICKED", "चुने गए")}
-              </span>
-            </div>
-
-            {/* Multi-vendor tiers give each vendor its own quota, so the guest
-                can take the full course from every vendor they picked (e.g. a
-                welcome drink from each). Spell that out so the per-vendor
-                counters below read as intended, not as one shared cap. */}
-            {multiVendor && selectedVendors.length > 1 && (
-              <p className="mt-2 text-xs text-ink-soft">
-                {base === 1
-                  ? t(
-                      "You can pick one dish from each vendor for this course.",
-                      "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
-                    )
-                  : t(
-                      `You can pick up to ${base} dishes from each vendor for this course.`,
-                      `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
-                    )}
-              </p>
-            )}
-
-            {/* One menu block per selected vendor — a single block for most
-                tiers, several for Platinum's multi-vendor segments. */}
-            {selectedVendors.map((vendor) => {
-              // On multi-vendor tiers each vendor fills its OWN quota, so the
-              // cap (and counter) are scoped to this vendor's picks.
-              const vendorItemPicks = picks.filter((id) =>
-                id.startsWith(`${vendor.id}-`),
-              );
-              const vendorFull = vendorItemPicks.length >= base;
-              return (
-              <div key={vendor.id} className="mt-4">
-                {/* Mobile — chosen-vendor pill (app mockup): photo · name ·
-                    Selected badge · Change. "Change" toggles the vendor off, the
-                    same as tapping it in the list, so the guest can pick another. */}
-                <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-cream-3 bg-white p-2 shadow-sm sm:hidden">
-                  <span className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-cream-3 bg-cream-2">
-                    <Image
-                      src={vendor.image}
-                      alt={vendor.name}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                    />
-                  </span>
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-ink">
-                      {vendor.name}
-                    </span>
-                    <span className="shrink-0 rounded-full border border-maroon/30 bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
-                      {t("Selected", "चयनित")}
-                    </span>
-                  </span>
-                  {multiVendor && (
-                    <span
-                      className={
-                        "eyebrow shrink-0 text-[10px] font-semibold " +
-                        (vendorFull ? "text-maroon" : "text-ink-soft")
-                      }
-                    >
-                      {vendorItemPicks.length}/{base}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => pickVendor(cat.id, vendor.id)}
-                    className="shrink-0 text-xs font-semibold text-maroon underline-offset-2 hover:underline"
-                  >
-                    {t("Change", "बदलें")}
-                  </button>
-                </div>
-                {/* Desktop — original gold eyebrow header (unchanged). */}
-                <div className="hidden items-center justify-between gap-2 sm:flex">
-                  <p className="eyebrow text-xs font-semibold text-gold">
-                    {vendor.name}
-                  </p>
-                  {multiVendor && (
-                    <span
-                      className={
-                        "eyebrow text-[10px] font-semibold " +
-                        (vendorFull ? "text-maroon" : "text-ink-soft")
-                      }
-                    >
-                      {vendorItemPicks.length}/{base}
-                    </span>
-                  )}
-                </div>
-                {/* Swiggy/Zomato-style menu list — one dish per row, thumbnail
-                    on the left, add/added control on the right. */}
-                <div className="mt-2 flex flex-col gap-2">
-                  {vendor.items.map((it: CategoryItem) => {
-                      const active = picks.includes(it.id);
-                      const atCap =
-                        !active &&
-                        (multiVendor ? vendorFull : picks.length >= allowance);
-                      // Veg → green, non-veg → brand maroon. The card border and
-                      // Add control take the diet colour so a dish reads as veg /
-                      // non-veg at a glance (green = #1a7f37, standard veg green).
-                      const veg = it.diet === "veg";
-                      const dietBorder = veg
-                        ? "border-[#1a7f37]"
-                        : "border-maroon";
-                      const dietRing = veg ? "ring-[#1a7f37]" : "ring-maroon";
-                      const dietBg = veg ? "bg-[#1a7f37]" : "bg-maroon";
-                      const dietText = veg ? "text-[#1a7f37]" : "text-maroon";
-                      return (
-                        <button
-                          key={it.id}
-                          type="button"
-                          onClick={() => toggleItem(cat.id, it.id)}
-                          disabled={atCap}
-                          aria-pressed={active}
-                          className={
-                            "flex w-full items-center gap-3 rounded-2xl border p-1.5 text-left shadow-sm transition sm:gap-4 sm:p-2.5 " +
-                            dietBorder + " " +
-                            (active
-                              ? "bg-cream-2 ring-1 " + dietRing
-                              : atCap
-                                ? "cursor-not-allowed bg-white opacity-50"
-                                : "bg-white hover:-translate-y-0.5 hover:shadow-md")
-                          }
-                        >
-                          {/* Mobile — leading checkbox (app mockup). Reflects the
-                              added state; brand-maroon so no non-brand hue leaks in. */}
-                          <span
-                            aria-hidden="true"
-                            className={
-                              "grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition sm:hidden " +
-                              (active
-                                ? "border-maroon bg-maroon text-cream"
-                                : "border-cream-3 bg-white")
-                            }
-                          >
-                            {active && (
-                              <span className="text-[11px] font-bold leading-none">
-                                ✓
-                              </span>
-                            )}
-                          </span>
-                          {/* Dish thumbnail — real photo when the vendor uploaded
-                              one, otherwise a deterministic premium food shot. */}
-                          <span className="relative block h-[51px] w-[51px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 shadow-sm sm:h-16 sm:w-16 sm:rounded-2xl">
-                            <Image
-                              src={it.photo ?? dummyDishPhoto(it.id)}
-                              alt=""
-                              fill
-                              sizes="(min-width: 640px) 64px, 51px"
-                              className="object-cover"
-                            />
-                          </span>
-                          {/* Diet mark + dish name (+ per-delicacy price on
-                              Single Stall, where vendors price each dish). */}
-                          <span className="flex min-w-0 flex-1 items-center gap-2">
-                            <span
-                              aria-hidden="true"
-                              className={
-                                "inline-block h-3.5 w-3.5 shrink-0 rounded-sm border " +
-                                dietBorder
-                              }
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-ink sm:text-base">
-                                {it.name}
-                              </span>
-                              {/* Single Stall shows each dish's own price, or
-                                  the vendor's course per-plate as the fallback. */}
-                              {showItemPrice &&
-                                (it.price ?? vendor.perPlate) > 0 && (
-                                  <span className="block text-xs font-semibold text-maroon">
-                                    {money(it.price ?? vendor.perPlate)}/
-                                    {t("plate", "प्लेट")}
-                                  </span>
-                                )}
-                            </span>
-                          </span>
-                          {/* Add / added control */}
-                          <span
-                            className={
-                              "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition sm:px-5 sm:py-2 sm:text-xs " +
-                              dietBorder + " " +
-                              (active
-                                ? dietBg + " text-cream"
-                                : "bg-white " + dietText)
-                            }
-                          >
-                            {active
-                              ? `✓ ${t("Added", "जोड़ा")}`
-                              : t("Add", "जोड़ें")}
-                          </span>
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-              );
-            })}
-          </>
-        )}
-      </div>
+      {/* Nothing picked yet — the roster above is the whole step; say what a
+          pick unlocks so the empty space below reads as intentional. */}
+      {selectedVendors.length === 0 && (
+        <p className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 text-sm text-ink-soft shadow-sm">
+          {multiVendor
+            ? t(
+                "Pick one or more vendors above — each one's menu opens right below it.",
+                "ऊपर एक या अधिक वेंडर चुनें — हर वेंडर का मेन्यू उसी के नीचे खुलेगा।",
+              )
+            : t(
+                "Pick a vendor above — their menu opens right below it.",
+                "ऊपर वेंडर चुनें — उनका मेन्यू उसी के नीचे खुलेगा।",
+              )}
+        </p>
+      )}
     </div>
   );
 }
@@ -4848,6 +5212,20 @@ function StepDetails({
   // silently hiding cards with no chip left to clear it.
   const [addOnCat, setAddOnCat] = useState<"all" | AddOnCategory>("all");
   const activeCat = fullFilter ? addOnCat : "all";
+  // Which counters have their vendor roster open, keyed by add-on id. A counter
+  // always carries a vendor (the parent defaults to the first eligible one), so
+  // the roster stays folded behind a single "Change vendor" row and the chosen
+  // brand + its set menu lead instead — exactly as the menu step docks a
+  // vendor's dishes under it. Keeps the next counter within reach on a phone.
+  const [openRosters, setOpenRosters] = useState<Record<string, boolean>>({});
+  const toggleRoster = (addOnId: string) =>
+    setOpenRosters((m) => ({ ...m, [addOnId]: !m[addOnId] }));
+  // Picking on a single-vendor tier replaces the vendor, so the roster has done
+  // its job — fold it back up. Multi-vendor tiers keep it open to add another.
+  const chooseVendor = (addOnId: string, vendorId: string) => {
+    onVendorToggle(addOnId, vendorId);
+    if (!multiVendor) setOpenRosters((m) => ({ ...m, [addOnId]: false }));
+  };
   const query = addOnQuery.trim().toLowerCase();
   const catOf = (a: AddOn): AddOnCategory => a.category ?? "counter";
   const visibleAddOns = addOns.filter((a) => {
@@ -4987,6 +5365,22 @@ function StepDetails({
           // Vendors assigned to this counter — one on single-vendor tiers, or
           // several when the package allows splitting a counter across vendors.
           const pickedVendorIds = active ? vendorIdsFor(a.id) : [];
+          // The chosen brand(s) lead, with this counter's set menu docked under
+          // each; everyone else folds into the roster behind one row.
+          const pickedVendors = eligibleVendors.filter((v) =>
+            pickedVendorIds.includes(v.id),
+          );
+          const rosterVendors = eligibleVendors.filter(
+            (v) => !pickedVendorIds.includes(v.id),
+          );
+          // Nothing picked (no eligible roster at all, or the guest reopened it)
+          // → show the full list; otherwise it stays folded.
+          const rosterOpen =
+            pickedVendors.length === 0 || Boolean(openRosters[a.id]);
+          // What the counter actually serves — fixed by the platform, cooked by
+          // the vendor above it. Services list inclusions instead of dishes.
+          const setMenu = addOnMenu(a.id);
+          const isService = catOf(a) === "service";
           return (
             <div
               key={a.id}
@@ -4999,40 +5393,39 @@ function StepDetails({
                 type="button"
                 aria-pressed={active}
                 onClick={() => toggleAddOn(a.id)}
-                className="flex w-full flex-col text-left sm:flex-row"
+                className="flex w-full items-stretch text-left"
               >
-                {/* Counter photo — a fixed-width thumbnail on wider screens so
-                    the row stays compact; full-width banner on mobile. The
-                    price rides on the image as a pill. */}
-                <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-2 sm:aspect-auto sm:w-52 sm:shrink-0 sm:self-stretch">
+                {/* Counter photo — a left thumbnail at every width, the same
+                    row shape the vendor and dish lists use. A full-bleed
+                    banner cost ~250px of phone screen per counter and pushed
+                    the next one out of sight; the price now reads in the copy
+                    column instead of riding on the image. */}
+                <div className="relative w-24 shrink-0 self-stretch overflow-hidden bg-cream-2 sm:w-40">
                   <Image
                     src={a.image}
                     alt={lang === "hi" ? a.nameHi : a.name}
                     fill
-                    sizes="(min-width: 640px) 208px, 100vw"
+                    sizes="(min-width: 640px) 160px, 96px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <span className="absolute bottom-2 left-2 rounded-full bg-maroon px-2.5 py-1 text-xs font-semibold text-cream shadow-sm">
-                    {a.perPlate
-                      ? `${unitLabel} / ${t("plate", "प्लेट")}`
-                      : unitLabel}
-                  </span>
                 </div>
-                <div className="flex flex-1 items-start gap-3 p-4">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream-2 text-xl"
-                  >
-                    {a.icon}
-                  </span>
+                <div className="flex flex-1 items-start gap-2.5 p-3 sm:gap-3 sm:p-4">
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-display text-base font-semibold text-ink">
+                    <h4 className="font-display text-sm font-semibold text-ink sm:text-base">
+                      <span aria-hidden="true" className="mr-1.5">
+                        {a.icon}
+                      </span>
                       {lang === "hi" ? a.nameHi : a.name}
                     </h4>
-                    <p className="mt-0.5 text-sm text-ink-soft">
+                    <p className="mt-0.5 text-xs text-ink-soft sm:text-sm">
                       {a.description}
                     </p>
-                    <p className="mt-1.5 text-xs text-ink-soft">
+                    <p className="mt-1 text-xs font-bold text-maroon sm:text-sm">
+                      {a.perPlate
+                        ? `${unitLabel} / ${t("plate", "प्लेट")}`
+                        : unitLabel}
+                    </p>
+                    <p className="text-[11px] text-ink-soft">
                       {a.perPlate
                         ? t(
                             `≈ ${guestsLabel} for ${guests} guests`,
@@ -5056,99 +5449,289 @@ function StepDetails({
 
               {/* Vendor for this counter — drawn from the catalogue for the
                   selected package's tier. Shown only once the add-on is on.
-                  Rendered as selectable tiles (not a dropdown) so every option
-                  is visible at a glance and chosen with a single tap. */}
+                  The chosen brand leads with this counter's set menu docked
+                  underneath (the menu step's vendor → dishes pairing), and the
+                  rest of the roster folds behind a single row — so the counter
+                  below stays within reach instead of being pushed off-screen. */}
               {active && (
                 <div className="border-t border-cream-3 px-4 pb-4 pt-3">
-                  <span
-                    id={selectId}
-                    className="block text-xs font-semibold uppercase tracking-wide text-ink-soft"
-                  >
-                    {multiVendor
-                      ? t("Vendors for this counter", "इस काउंटर के लिए वेंडर")
-                      : t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
-                  </span>
-                  {multiVendor && eligibleVendors.length > 0 && (
-                    <p className="mt-1 text-xs text-ink-soft">
-                      {t(
-                        `Split this counter across multiple vendors — ${pickedVendorIds.length} selected.`,
-                        `इस काउंटर को कई वेंडरों में बाँटें — ${pickedVendorIds.length} चुने गए।`,
-                      )}
-                    </p>
-                  )}
                   {eligibleVendors.length === 0 ? (
-                    <p className="mt-1 text-sm text-ink-soft">
-                      {t(
-                        "No vendors available for this package.",
-                        "इस पैकेज के लिए कोई वेंडर उपलब्ध नहीं।",
-                      )}
-                    </p>
+                    <>
+                      <span className="block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                        {t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
+                      </span>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        {t(
+                          "No vendors available for this package.",
+                          "इस पैकेज के लिए कोई वेंडर उपलब्ध नहीं।",
+                        )}
+                      </p>
+                    </>
                   ) : (
-                    <div
-                      role={multiVendor ? "group" : "radiogroup"}
-                      aria-labelledby={selectId}
-                      className="mt-2 grid gap-2 sm:grid-cols-2"
-                    >
-                      {eligibleVendors.map((v) => {
-                        const picked = pickedVendorIds.includes(v.id);
-                        return (
-                          <button
+                    <>
+                      {/* Your brand for this counter, with its set menu below. */}
+                      <div className="flex flex-col gap-3">
+                        {pickedVendors.map((v) => (
+                          <div
                             key={v.id}
-                            type="button"
-                            role={multiVendor ? "checkbox" : "radio"}
-                            aria-checked={picked}
-                            onClick={() => onVendorToggle(a.id, v.id)}
-                            className={
-                              "flex items-center gap-3 rounded-xl border bg-white p-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm " +
-                              (picked
-                                ? "border-maroon ring-2 ring-maroon"
-                                : "border-cream-3")
-                            }
+                            className="overflow-hidden rounded-2xl border border-maroon bg-white shadow-sm"
                           >
-                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-cream-2">
-                              <Image
-                                src={v.image}
-                                alt={v.name}
-                                fill
-                                sizes="44px"
-                                className="object-cover"
-                              />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate font-display text-sm font-semibold text-ink">
-                                {v.name}
+                            <div className="flex items-center gap-2.5 border-b border-cream-3 p-2.5 sm:gap-3 sm:p-3">
+                              <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
+                                <Image
+                                  src={v.image}
+                                  alt={v.name}
+                                  fill
+                                  sizes="44px"
+                                  className="object-cover"
+                                />
                               </span>
-                              <span className="mt-0.5 block text-xs text-ink-soft">
-                                {v.city} · ★ {v.rating} ·{" "}
-                                <span className="font-semibold text-ink">
-                                  {t(
-                                    `from ${money(v.priceFrom)} / plate`,
-                                    `${money(v.priceFrom)} / प्लेट से`,
-                                  )}
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center gap-2">
+                                  <span className="min-w-0 truncate font-display text-sm font-semibold text-ink sm:text-base">
+                                    {v.name}
+                                  </span>
+                                  <span className="shrink-0 rounded-full bg-maroon px-2 py-0.5 text-[10px] font-semibold text-cream">
+                                    {t("Selected", "चयनित")}
+                                  </span>
+                                </span>
+                                <span className="mt-0.5 block text-xs text-ink-soft">
+                                  {v.city} · ★ {v.rating} ·{" "}
+                                  <span className="font-semibold text-ink">
+                                    {t(
+                                      `from ${money(v.priceFrom)} / plate`,
+                                      `${money(v.priceFrom)} / प्लेट से`,
+                                    )}
+                                  </span>
                                 </span>
                               </span>
-                            </span>
-                            <span
-                              className={
-                                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] " +
-                                (picked
-                                  ? "border-maroon bg-maroon text-cream"
-                                  : "border-cream-3 text-transparent")
-                              }
-                            >
-                              ✓
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  multiVendor
+                                    ? onVendorToggle(a.id, v.id)
+                                    : toggleRoster(a.id)
+                                }
+                                className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:text-xs"
+                              >
+                                {multiVendor
+                                  ? t("Remove", "हटाएं")
+                                  : t("Change", "बदलें")}
+                              </button>
+                            </div>
+                            {/* This counter's set menu — fixed, so it reads as
+                                what you get, not as another list to pick from. */}
+                            {setMenu.length > 0 && (
+                              <div className="bg-cream-2/30 p-2.5 sm:p-3">
+                                <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                                  {isService
+                                    ? t("What's included", "क्या शामिल है")
+                                    : t(
+                                        `${v.name} · set menu`,
+                                        `${v.name} · फिक्स्ड मेन्यू`,
+                                      )}
+                                </span>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  {setMenu.map((item) => {
+                                    // Veg → green, non-veg → brand maroon, the
+                                    // same marks the menu step's dishes carry.
+                                    const veg = item.diet === "veg";
+                                    const dietBorder = veg
+                                      ? "border-[#1a7f37]"
+                                      : "border-maroon";
+                                    const dietBg = veg
+                                      ? "bg-[#1a7f37]"
+                                      : "bg-maroon";
+                                    return (
+                                      <div
+                                        key={item.name}
+                                        className="flex items-center gap-2.5 rounded-xl border border-cream-3 bg-white p-1.5 shadow-sm"
+                                      >
+                                        {isService ? (
+                                          <span
+                                            aria-hidden="true"
+                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cream-2 text-sm text-maroon"
+                                          >
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="relative block h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-cream-3 bg-cream-2">
+                                            <Image
+                                              src={dummyDishPhoto(
+                                                `${a.id}-${item.name}`,
+                                              )}
+                                              alt=""
+                                              fill
+                                              sizes="36px"
+                                              className="object-cover"
+                                            />
+                                          </span>
+                                        )}
+                                        {item.diet && (
+                                          <span
+                                            aria-hidden="true"
+                                            className={
+                                              "grid h-3.5 w-3.5 shrink-0 place-items-center rounded-sm border " +
+                                              dietBorder
+                                            }
+                                          >
+                                            <span
+                                              className={
+                                                "block h-1.5 w-1.5 rounded-full " +
+                                                dietBg
+                                              }
+                                            />
+                                          </span>
+                                        )}
+                                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink sm:text-sm">
+                                          {lang === "hi"
+                                            ? item.nameHi
+                                            : item.name}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p className="mt-2 text-[11px] text-ink-soft">
+                                  {isService
+                                    ? t(
+                                        "All of it is covered by this add-on's price.",
+                                        "यह सब इस ऐड-ऑन की क़ीमत में शामिल है।",
+                                      )
+                                    : t(
+                                        "The whole counter is included — nothing to pick.",
+                                        "पूरा काउंटर शामिल है — कुछ चुनने की ज़रूरत नहीं।",
+                                      )}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Every other brand folds into this one row — a tap
+                          reopens the roster to swap (or add, on Platinum). */}
+                      {pickedVendors.length > 0 && rosterVendors.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleRoster(a.id)}
+                          aria-expanded={rosterOpen}
+                          className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-cream-3 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-maroon"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="flex shrink-0 -space-x-2"
+                          >
+                            {rosterVendors.slice(0, 3).map((v) => (
+                              <span
+                                key={v.id}
+                                className="relative block h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-cream-2"
+                              >
+                                <Image
+                                  src={v.image}
+                                  alt=""
+                                  fill
+                                  sizes="32px"
+                                  className="object-cover"
+                                />
+                              </span>
+                            ))}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+                            {multiVendor
+                              ? t(
+                                  `Add another vendor · ${rosterVendors.length} more`,
+                                  `और वेंडर जोड़ें · ${rosterVendors.length} और`,
+                                )
+                              : t(
+                                  `Change vendor · ${rosterVendors.length} more`,
+                                  `वेंडर बदलें · ${rosterVendors.length} और`,
+                                )}
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className="shrink-0 text-base font-semibold leading-none text-maroon"
+                          >
+                            {rosterOpen ? "↑" : "↓"}
+                          </span>
+                        </button>
+                      )}
+
+                      {rosterOpen && (
+                        <>
+                          <span
+                            id={selectId}
+                            className="mt-3 block text-xs font-semibold uppercase tracking-wide text-ink-soft"
+                          >
+                            {multiVendor
+                              ? t(
+                                  "Vendors for this counter",
+                                  "इस काउंटर के लिए वेंडर",
+                                )
+                              : t(
+                                  "Vendor for this counter",
+                                  "इस काउंटर के लिए वेंडर",
+                                )}
+                          </span>
+                          {multiVendor && (
+                            <p className="mt-1 text-xs text-ink-soft">
+                              {t(
+                                `Split this counter across multiple vendors — ${pickedVendorIds.length} selected.`,
+                                `इस काउंटर को कई वेंडरों में बाँटें — ${pickedVendorIds.length} चुने गए।`,
+                              )}
+                            </p>
+                          )}
+                          <div
+                            role="group"
+                            aria-labelledby={selectId}
+                            className="mt-2 grid gap-2 sm:grid-cols-2"
+                          >
+                            {rosterVendors.map((v) => (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => chooseVendor(a.id, v.id)}
+                                className="flex items-center gap-3 rounded-xl border border-cream-3 bg-white p-2 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
+                              >
+                                <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-cream-2">
+                                  <Image
+                                    src={v.image}
+                                    alt={v.name}
+                                    fill
+                                    sizes="44px"
+                                    className="object-cover"
+                                  />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate font-display text-sm font-semibold text-ink">
+                                    {v.name}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-ink-soft">
+                                    {v.city} · ★ {v.rating} ·{" "}
+                                    <span className="font-semibold text-ink">
+                                      {t(
+                                        `from ${money(v.priceFrom)} / plate`,
+                                        `${money(v.priceFrom)} / प्लेट से`,
+                                      )}
+                                    </span>
+                                  </span>
+                                </span>
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-cream-3 text-[11px] text-transparent">
+                                  ✓
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <p className="mt-2 text-xs text-ink-soft">
+                        {t(
+                          `${packageName || "Selected package"} vendors`,
+                          `${packageName || "चयनित पैकेज"} वेंडर`,
+                        )}
+                      </p>
+                    </>
                   )}
-                  <p className="mt-2 text-xs text-ink-soft">
-                    {t(
-                      `${packageName || "Selected package"} vendors`,
-                      `${packageName || "चयनित पैकेज"} वेंडर`,
-                    )}
-                  </p>
                 </div>
               )}
             </div>
@@ -5729,6 +6312,7 @@ function StepConfirm({
   setCustomerPhone,
   customerEmail,
   setCustomerEmail,
+  knownContact,
   referralCode,
   setReferralCode,
   referrerName,
@@ -5786,6 +6370,9 @@ function StepConfirm({
   setCustomerPhone: (v: string) => void;
   customerEmail: string;
   setCustomerEmail: (v: string) => void;
+  /** Contact details we already hold — the signed-in account's name/email and
+   *  the phone from this customer's last booking. Read back, not re-asked. */
+  knownContact: { name: string; email: string; phone: string };
   referralCode: string;
   setReferralCode: (v: string) => void;
   referrerName: string;
@@ -5799,6 +6386,20 @@ function StepConfirm({
   onConfirm: () => void;
   whatsappHref: string;
 }) {
+  // A contact field counts as "already known" only while it still matches what
+  // we have on file — the moment the guest edits it, it's their own input and
+  // goes back to being a plain field.
+  const eq = (a: string, b: string) =>
+    b.trim().length > 0 && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const knownName = eq(customerName, knownContact.name);
+  const knownEmail = eq(customerEmail, knownContact.email);
+  const knownPhone = eq(customerPhone, knownContact.phone);
+  const knowSomething = knownName || knownEmail || knownPhone;
+  // Opened by "Edit" — reveals every field so a guest can book under a
+  // different name, address or number than the one on their account.
+  const [editingContact, setEditingContact] = useState(false);
+  const showContactField = (known: boolean) => editingContact || !known;
+
   return (
     <form
       onSubmit={(e) => {
@@ -6203,53 +6804,107 @@ function StepConfirm({
         )}
       </div>
 
-      {/* Contact — so our team can reach out (required for COD / connect). */}
+      {/* Contact — so our team can reach out (required for COD / connect).
+          Whatever we already hold (the signed-in account's name and email, the
+          number from this customer's last booking) is read back as a single
+          confirmation line instead of being typed a second time; only the
+          fields we genuinely don't have are asked for. "Edit" reopens all of
+          them for a guest booking under different details. */}
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-        <h3 className="font-display text-base font-semibold text-ink">
-          {t("Your contact details", "आपकी संपर्क जानकारी")}
-        </h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-display text-base font-semibold text-ink">
+            {t("Your contact details", "आपकी संपर्क जानकारी")}
+          </h3>
+          {knowSomething && !editingContact && (
+            <button
+              type="button"
+              onClick={() => setEditingContact(true)}
+              className="shrink-0 text-xs font-semibold text-maroon underline-offset-2 hover:underline"
+            >
+              {t("Edit", "बदलें")}
+            </button>
+          )}
+        </div>
+
+        {knowSomething && !editingContact && (
+          <div className="mt-3 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+              {t("Booking as", "बुकिंग इनके नाम")}
+            </p>
+            {knownName && (
+              <p className="mt-0.5 text-sm font-semibold text-ink">
+                {customerName}
+              </p>
+            )}
+            {knownEmail && <p className="text-sm text-ink-soft">{customerEmail}</p>}
+            {knownPhone && <p className="text-sm text-ink-soft">{customerPhone}</p>}
+            <p className="mt-1.5 text-[11px] text-ink-soft">
+              {t(
+                "Already on file from your account — tap Edit if anything changed.",
+                "आपके खाते से ली गई जानकारी — कुछ बदला हो तो बदलें पर टैप करें।",
+              )}
+            </p>
+          </div>
+        )}
+
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-xs font-medium text-ink-soft">
-              {t("Full name", "पूरा नाम")}
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder={t("e.g. Ankit Sharma", "उदा. अंकित शर्मा")}
-              autoComplete="name"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-ink-soft">
-              {t("Phone number", "फ़ोन नंबर")}
-            </label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder={t("10-digit mobile", "10 अंकों का मोबाइल")}
-              autoComplete="tel"
-              inputMode="tel"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-ink-soft">
-              {t("Email", "ईमेल")}
-            </label>
-            <input
-              type="email"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder={t("you@example.com", "you@example.com")}
-              autoComplete="email"
-              inputMode="email"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
-            />
-          </div>
+          {showContactField(knownName) && (
+            <div>
+              <label className="text-xs font-medium text-ink-soft">
+                {t("Full name", "पूरा नाम")}
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder={t("e.g. Ankit Sharma", "उदा. अंकित शर्मा")}
+                autoComplete="name"
+                className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              />
+            </div>
+          )}
+          {showContactField(knownPhone) && (
+            <div>
+              <label className="text-xs font-medium text-ink-soft">
+                {t("Phone number", "फ़ोन नंबर")}
+              </label>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder={t("10-digit mobile", "10 अंकों का मोबाइल")}
+                autoComplete="tel"
+                inputMode="tel"
+                className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              />
+              {/* When name + email came from the account this is the only thing
+                  we're asking for — say why, so it doesn't read as busywork. */}
+              {!editingContact && knownName && knownEmail && (
+                <p className="mt-1 text-[11px] text-ink-soft">
+                  {t(
+                    "The one thing we still need — our team calls this number to confirm your feast.",
+                    "बस यही चाहिए — हमारी टीम पुष्टि के लिए इसी नंबर पर कॉल करेगी।",
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+          {showContactField(knownEmail) && (
+            <div>
+              <label className="text-xs font-medium text-ink-soft">
+                {t("Email", "ईमेल")}
+              </label>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder={t("you@example.com", "you@example.com")}
+                autoComplete="email"
+                inputMode="email"
+                className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              />
+            </div>
+          )}
           {/* Venue — usually pre-filled from the Hero booking bar or the venue
               catalogue, but editable here so it's captured even when the guest
               reached the wizard without one. Spans the full row. */}

@@ -67,7 +67,7 @@ export default function ServicePackages({
           </h2>
           <p className="mt-4 text-base text-ink-soft sm:text-lg">
             {t(
-              "Menu final ho gaya? Ab choose kijiye apna perfect service experience.",
+              "Menu finalized. Now choose your perfect service experience.",
               "मेन्यू फ़ाइनल हो गया? अब चुनिए अपना परफेक्ट सर्विस अनुभव।",
             )}
           </p>
@@ -147,15 +147,30 @@ export default function ServicePackages({
 }
 
 /* ── Per-card visual variant ────────────────────────────────────────────────
-   Four looks, all brand colours: A = white + maroon accents, B = cream + ink
-   accents ("neutral"), C = red fill + cream, D = black fill + cream. */
+   One brand language, four surfaces: the tier is signalled by an escalating
+   fill (white → cream → red → black) while the accents stay red-on-light /
+   cream-on-dark throughout.
+
+   Two rules keep it looking premium:
+   1. Every fill is a *pure* brand hex. Tinted fills (`bg-ink/10` on cream)
+      muddy into khaki/grey — a hue the brand doesn't own — so pills and panels
+      sit on white (light cards) or cream (dark cards) instead. Alpha survives
+      only on 1px hairlines, where it reads as a lighter rule, not a colour.
+   2. The price panel is quiet and the Select control is solid. The old card
+      had it backwards — a heavy filled price slab with a washed-out tint pill
+      under it — so the CTA lost to the price. */
 interface Variant {
   /** Card background + border. */
   card: string;
   /** Centred "Package X" badge overlapping the top edge. */
   badge: string;
+  /** Icon halo — must contrast with `card` (a cream halo on a cream card
+   *  vanished, which is what flattened the mid tier). */
+  halo: string;
   /** Section label pill (INCLUDES / NOT INCLUDED / BEST FOR). */
   label: string;
+  /** View / Hide details control. */
+  toggle: string;
   /** Hairline flanking the section label + section dividers. */
   dash: string;
   /** ✓ include-tick circle. */
@@ -170,71 +185,105 @@ interface Variant {
   muted: string;
   /** Body copy (include / best-for lines). */
   body: string;
-  /** Filled price bar at the card foot. */
-  priceBar: string;
+  /** Quiet price panel at the card foot (surface + border + base text). */
+  price: string;
+  /** "Starting from" eyebrow + the headline per-guest figure. */
+  priceValue: string;
+  /** Hairline between the per-guest figure and the computed feast total. */
+  priceRule: string;
+  /** Select control, unchosen — outlined, so the chosen one clearly wins. */
+  ctaIdle: string;
+  /** Select control, chosen — solid. */
+  ctaOn: string;
   /** Ring colour when this card is the selected service (wizard mode). */
   sel: string;
 }
 
 const VARIANTS: Variant[] = [
-  // Package A — Essential: white surface, maroon accents.
+  // Package A — Essential: white surface, red accents on cream panels.
   {
-    card: "bg-white border-maroon/20",
+    card: "bg-white border-cream",
     badge: "bg-maroon text-cream",
-    label: "bg-maroon/10 text-maroon",
-    dash: "bg-maroon/25",
+    halo: "bg-cream text-maroon",
+    label: "bg-cream text-maroon",
+    toggle: "border border-maroon/30 bg-cream text-maroon",
+    dash: "bg-cream",
     tick: "bg-maroon text-cream",
-    cross: "border-maroon/50 text-maroon",
+    cross: "border-maroon text-maroon",
     marker: "bg-maroon",
     title: "text-maroon",
     muted: "text-ink-soft",
     body: "text-ink",
-    priceBar: "bg-maroon text-cream",
+    price: "border-cream bg-cream text-ink",
+    priceValue: "text-maroon",
+    priceRule: "bg-maroon/20",
+    ctaIdle: "border border-maroon bg-white text-maroon",
+    ctaOn: "bg-maroon text-cream",
     sel: "ring-maroon",
   },
-  // Package B — Standard: cream surface, ink accents (the "neutral" tier).
+  // Package B — Standard: cream surface, white panels, red accents.
   {
-    card: "bg-cream border-ink/15",
-    badge: "bg-ink text-cream",
-    label: "bg-ink/10 text-ink",
-    dash: "bg-ink/20",
-    tick: "bg-ink text-cream",
-    cross: "border-ink/50 text-ink",
-    marker: "bg-ink",
+    card: "bg-cream border-maroon/25",
+    badge: "bg-maroon text-cream",
+    halo: "bg-white text-maroon",
+    label: "bg-white text-maroon",
+    toggle: "border border-maroon/30 bg-white text-maroon",
+    dash: "bg-maroon/25",
+    tick: "bg-maroon text-cream",
+    cross: "border-ink text-ink",
+    marker: "bg-maroon",
     title: "text-ink",
-    muted: "text-ink/70",
+    muted: "text-ink-soft",
     body: "text-ink",
-    priceBar: "bg-ink text-cream",
-    sel: "ring-ink",
+    price: "border-white bg-white text-ink",
+    priceValue: "text-maroon",
+    priceRule: "bg-maroon/20",
+    ctaIdle: "border border-maroon bg-white text-maroon",
+    ctaOn: "bg-maroon text-cream",
+    sel: "ring-maroon",
   },
-  // Package C — Premium: red fill, cream text.
+  // Package C — Premium: red fill, cream text, cream panels.
   {
     card: "bg-maroon border-maroon",
     badge: "bg-cream text-maroon",
-    label: "bg-cream/15 text-cream",
-    dash: "bg-cream/30",
+    halo: "bg-cream text-maroon",
+    label: "bg-cream text-maroon",
+    toggle: "border border-cream text-cream",
+    dash: "bg-cream/40",
     tick: "bg-cream text-maroon",
-    cross: "border-cream/50 text-cream",
+    cross: "border-cream text-cream",
     marker: "bg-cream",
     title: "text-cream",
-    muted: "text-cream/80",
+    muted: "text-cream",
     body: "text-cream",
-    priceBar: "bg-cream text-maroon",
+    price: "border-cream bg-cream text-ink",
+    priceValue: "text-maroon",
+    priceRule: "bg-maroon/20",
+    ctaIdle: "border border-cream text-cream",
+    ctaOn: "bg-cream text-maroon",
     sel: "ring-cream",
   },
-  // Package D — Ultra Luxury: black fill, cream text (top tier).
+  // Package D — Ultra Luxury: black fill, cream text (top tier). Same cream
+  // panels as C, but every accent resolves to ink instead of red — the two
+  // luxury tiers read as a pair without repeating each other.
   {
     card: "bg-ink border-ink",
     badge: "bg-cream text-ink",
-    label: "bg-cream/15 text-cream",
-    dash: "bg-cream/25",
+    halo: "bg-cream text-ink",
+    label: "bg-cream text-ink",
+    toggle: "border border-cream text-cream",
+    dash: "bg-cream/35",
     tick: "bg-cream text-ink",
-    cross: "border-cream/50 text-cream",
+    cross: "border-cream text-cream",
     marker: "bg-cream",
     title: "text-cream",
-    muted: "text-cream/75",
+    muted: "text-cream",
     body: "text-cream",
-    priceBar: "bg-cream text-ink",
+    price: "border-cream bg-cream text-ink",
+    priceValue: "text-ink",
+    priceRule: "bg-ink/20",
+    ctaIdle: "border border-cream text-cream",
+    ctaOn: "bg-cream text-ink",
     sel: "ring-cream",
   },
 ];
@@ -325,7 +374,7 @@ function ServiceCard({
         : {})}
       className={`card-lift relative flex h-full flex-col rounded-card border p-6 pt-8 shadow-card transition duration-300 ${variant.card} ${
         selectable ? "cursor-pointer" : ""
-      } ${selected ? `ring-2 ${variant.sel}` : ""} ${className}`}
+      } ${selected ? `ring-2 shadow-brand ${variant.sel}` : ""} ${className}`}
     >
       {/* Badge — centred, overlapping the top edge. */}
       <span
@@ -334,10 +383,12 @@ function ServiceCard({
         {pkg.badge}
       </span>
 
-      {/* Header — icon, title, subtitle (centred). */}
+      {/* Header — icon, title, subtitle (centred). The halo is per-variant so
+          it never matches the card fill (a cream halo on the cream tier read as
+          a floating glyph with no medallion). */}
       <span
         aria-hidden="true"
-        className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-cream text-3xl shadow-inner ring-1 ring-maroon/15"
+        className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl shadow-card ${variant.halo}`}
       >
         {pkg.icon}
       </span>
@@ -354,7 +405,7 @@ function ServiceCard({
           setExpanded((v) => !v);
         }}
         aria-expanded={expanded}
-        className={`mt-4 flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${variant.label}`}
+        className={`mt-4 flex items-center justify-center gap-1.5 self-center rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${variant.toggle}`}
       >
         <span>
           {expanded
@@ -441,32 +492,51 @@ function ServiceCard({
         </div>
       </div>
 
-      {/* Price bar — pinned to the card foot so all four align. */}
+      {/* Price panel — pinned to the card foot so all four align. Per-guest
+          leads (display face, tier accent colour); the computed feast total is
+          demoted to a sub-line under a hairline. */}
       <div className="mt-auto pt-6">
-        <div className={`rounded-control px-4 py-3 text-center ${variant.priceBar}`}>
-          <p className="text-sm">
-            {t("Starting from", "शुरुआत")}{" "}
-            <span className="font-display font-bold">{priceBand(pkg)}</span>
-          </p>
-          <p className="text-xs opacity-90">{t("per guest", "प्रति मेहमान")}</p>
+        <div className={`overflow-hidden rounded-control border ${variant.price}`}>
+          <div className="px-4 py-3 text-center">
+            <p
+              className={`text-[0.62rem] font-bold uppercase tracking-[0.18em] ${variant.priceValue}`}
+            >
+              {t("Starting from", "शुरुआती कीमत")}
+            </p>
+            <p className="mt-1 flex flex-wrap items-baseline justify-center gap-x-1.5">
+              <span
+                className={`font-display text-2xl leading-none ${variant.priceValue}`}
+              >
+                {priceBand(pkg)}
+              </span>
+              <span className="text-xs">
+                {pkg.perPlate
+                  ? t("per guest", "प्रति मेहमान")
+                  : t("flat", "एकमुश्त")}
+              </span>
+            </p>
+          </div>
           {/* Selectable (wizard): the exact amount this tier adds to the feast. */}
           {selectable && typeof guests === "number" && (
-            <p className="mt-1.5 text-xs font-semibold">
-              {feastPrice > 0
-                ? t(
-                    `${feastLabel} for ${guests} guests`,
-                    `${guests} मेहमानों के लिए ${feastLabel}`,
-                  )
-                : t("Included — no extra charge", "शामिल — कोई अतिरिक्त शुल्क नहीं")}
-            </p>
+            <>
+              <span aria-hidden="true" className={`block h-px ${variant.priceRule}`} />
+              <p className="px-4 py-2 text-center text-xs font-semibold">
+                {feastPrice > 0
+                  ? t(
+                      `${feastLabel} for ${guests} guests`,
+                      `${guests} मेहमानों के लिए ${feastLabel}`,
+                    )
+                  : t("Included — no extra charge", "शामिल — कोई अतिरिक्त शुल्क नहीं")}
+              </p>
+            </>
           )}
         </div>
         {/* Select control — the whole card is the button; this pill mirrors its
-            state so the choice is obvious. */}
+            state so the choice is obvious. Outlined until chosen, then solid. */}
         {selectable && (
           <span
-            className={`mt-3 flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold ${
-              selected ? variant.priceBar : variant.label
+            className={`mt-3 flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold ${
+              selected ? variant.ctaOn : variant.ctaIdle
             }`}
           >
             {selected

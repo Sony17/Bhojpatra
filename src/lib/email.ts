@@ -98,10 +98,22 @@ function fieldRows(fields: AlertField[]): string {
     .join("");
 }
 
+/** Whether outbound mail is configured at all. A global fact about the
+ *  deployment — it says nothing about any particular account, so callers can
+ *  surface it to users without leaking whether an email is registered. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
 /**
  * Send a formatted email via Resend. Best-effort — never throws, so callers
  * can `await` it right after persisting without risking the request.
  * Defaults to the owner alert list; pass `to` for customer confirmations.
+ *
+ * Returns `true` only when Resend accepted the message. Callers that merely
+ * notify the owners can keep ignoring it; anything where the email *is* the
+ * feature (password reset) must check it, or a misconfigured deploy fails
+ * completely silently.
  */
 export async function sendAlert(opts: {
   subject: string;
@@ -116,11 +128,11 @@ export async function sendAlert(opts: {
   groups?: AlertGroup[];
   /** Files to attach, e.g. the invoice PDF. `content` is base64-encoded bytes. */
   attachments?: EmailAttachment[];
-}): Promise<void> {
+}): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.info(`Alert email skipped (RESEND_API_KEY unset): ${opts.subject}`);
-    return;
+    return false;
   }
 
   const to = opts.to
@@ -130,7 +142,7 @@ export async function sendAlert(opts: {
     : recipients();
   if (!to.length) {
     console.info(`Alert email skipped (no recipients): ${opts.subject}`);
-    return;
+    return false;
   }
   const from = process.env.ALERT_EMAIL_FROM ?? DEFAULT_FROM;
 
@@ -200,9 +212,12 @@ export async function sendAlert(opts: {
       console.error(
         `Resend send failed (${res.status}): ${await res.text().catch(() => "")}`,
       );
+      return false;
     }
+    return true;
   } catch (err) {
     console.error("Resend request errored", err);
+    return false;
   }
 }
 
@@ -394,10 +409,10 @@ export async function sendPartnerAlert(partner: PartnerRecord): Promise<void> {
 export async function sendPasswordResetEmail(
   email: string,
   resetUrl: string,
-): Promise<void> {
+): Promise<boolean> {
   const to = email.trim().toLowerCase();
-  if (!to) return;
-  await sendAlert({
+  if (!to) return false;
+  return sendAlert({
     to,
     subject: "Reset your Bhojpatra password",
     heading: "Reset your password",

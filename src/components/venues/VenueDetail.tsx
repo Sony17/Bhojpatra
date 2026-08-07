@@ -12,6 +12,7 @@ import {
   fetchVenueById,
   venueCityName,
   venueDescription,
+  venueImages,
   venueSpaceOptions,
   VENUE_GST_RATE,
   VENUE_ADVANCE_RATE,
@@ -137,6 +138,12 @@ function VenueBooking({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [detailsError, setDetailsError] = useState("");
+
+  // Photo gallery — the owner's uploaded/linked photos, cover first. A single
+  // photo renders as the classic hero; more get a thumbnail strip below it.
+  const photos = useMemo(() => venueImages(venue), [venue]);
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const heroPhoto = photos[photoIdx] ?? photos[0];
 
   // The venue offers more than one space — a banquet hall AND an open lawn (both
   // bookable, each with its own price) plus guest rooms on request. The customer
@@ -450,7 +457,8 @@ function VenueBooking({
         <div>
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-hero border border-maroon/6 bg-cream shadow-card">
             <Image
-              src={venue.image}
+              key={heroPhoto}
+              src={heroPhoto}
               alt={venue.name}
               fill
               priority
@@ -460,7 +468,35 @@ function VenueBooking({
             <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-maroon shadow-sm backdrop-blur-sm">
               {venue.type}
             </span>
+            {photos.length > 1 && (
+              <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                {photoIdx + 1} / {photos.length}
+              </span>
+            )}
           </div>
+
+          {/* Thumbnail strip — only when the owner listed more than one photo. */}
+          {photos.length > 1 && (
+            <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1">
+              {photos.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setPhotoIdx(i)}
+                  aria-label={t(`Photo ${i + 1}`, `फ़ोटो ${i + 1}`)}
+                  aria-pressed={i === photoIdx}
+                  className={
+                    "relative h-16 w-20 shrink-0 overflow-hidden rounded-control border transition " +
+                    (i === photoIdx
+                      ? "border-maroon ring-2 ring-maroon"
+                      : "border-cream-3 opacity-80 hover:opacity-100")
+                  }
+                >
+                  <Image src={src} alt="" fill sizes="80px" className="object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="mt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">

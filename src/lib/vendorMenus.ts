@@ -289,14 +289,46 @@ function placeholderSpecialistSeeds(): LiveVendorRecord[] {
   });
 }
 
+/** Repair a stored dish written by the first placeholder seeder, which saved a
+ *  `[name, diet]` tuple straight into `name` (so every non-veg seed dish carries
+ *  an array name and a wrong "veg" diet). Any consumer calling `name.toLowerCase()`
+ *  — the wizard's vendor search — throws on those rows, so they're normalized on
+ *  read and written back once. Idempotent: well-formed items pass through. */
+function normalizeMenuItem(it: VendorMenuItem): VendorMenuItem {
+  if (Array.isArray(it.name)) {
+    const [name, diet] = it.name as unknown as [unknown, unknown];
+    return { ...it, name: String(name ?? ""), diet: diet === "non-veg" ? "non-veg" : "veg" };
+  }
+  return typeof it.name === "string" ? it : { ...it, name: String(it.name ?? "") };
+}
+
+/** A record with its menu items normalized, or the same object when nothing
+ *  needed fixing (identity lets the caller skip the write). */
+function normalizeVendorItems(r: LiveVendorRecord): LiveVendorRecord {
+  if (!Array.isArray(r.menu)) return r;
+  let changed = false;
+  const menu = r.menu.map((s) => {
+    if (!Array.isArray(s.items)) return s;
+    const items = s.items.map(normalizeMenuItem);
+    if (items.every((it, i) => it === s.items[i])) return s;
+    changed = true;
+    return { ...s, items };
+  });
+  return changed ? { ...r, menu } : r;
+}
+
 /** All vendor records, seeding the fixture specialists on first read. */
 export async function ensureSeededVendors(): Promise<LiveVendorRecord[]> {
-  const rows = await store.list();
-  if (rows.length === 0) {
+  const stored = await store.list();
+  if (stored.length === 0) {
     const seeds = [...seedRecords(), ...placeholderSpecialistSeeds()];
     await store.upsertMany(seeds);
     return seeds;
   }
+  // One-time repair of legacy tuple dish names (see `normalizeMenuItem`).
+  const rows = stored.map(normalizeVendorItems);
+  const repaired = rows.filter((r, i) => r !== stored[i]);
+  if (repaired.length) await store.upsertMany(repaired);
   // Back-fill placeholder specialists added after the store was first seeded:
   // seeding only runs on an empty store, so an existing DB would never gain
   // them (and the catalog "Book" hand-off would keep failing to resolve). Only

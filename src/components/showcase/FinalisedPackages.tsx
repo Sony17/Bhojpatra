@@ -23,6 +23,7 @@ import Image from "next/image";
 import { packages, packageCategoryItems, type PackageTier, type PackageFeature } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import SectionIntro from "@/components/SectionIntro";
+import TierDifferentiator from "@/components/packages/TierDifferentiator";
 import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { isUnoptimized } from "@/lib/homeContent";
@@ -192,7 +193,7 @@ function tierHighlights(id: TierId, s: ReturnType<typeof spec>, t: (en: string, 
       t(`${s.starters} starters`, `${s.starters} स्टार्टर`),
       t("Fixed main-course thali", "फिक्स्ड मेन कोर्स थाली"),
       t(`${s.sweets} sweet`, `${s.sweets} मिठाई`),
-      t("One trusted local vendor", "एक भरोसेमंद लोकल वेंडर"),
+      t("One verified vendor from your city", "आपके शहर का एक वेरिफाइड वेंडर"),
     ];
   if (id === "gold")
     return [
@@ -200,13 +201,13 @@ function tierHighlights(id: TierId, s: ReturnType<typeof spec>, t: (en: string, 
       t(`${s.live} live counter`, `${s.live} लाइव काउंटर`),
       t("Chaat, Chinese & South Indian", "चाट, चाइनीज़ और साउथ इंडियन"),
       t(`${s.sweets} sweets to choose`, `${s.sweets} मिठाई चुनें`),
-      t("Multiple specialist vendors", "कई विशेषज्ञ वेंडर"),
+      t("Your city's best — one per category", "आपके शहर के बेहतरीन — हर कैटेगरी में एक"),
     ];
   return [
     t(`${s.starters} premium starters`, `${s.starters} प्रीमियम स्टार्टर`),
     t(`${s.live} live counters`, `${s.live} लाइव काउंटर`),
     t("Bigger chaat & sweet spread", "बड़ा चाट और मिठाई स्प्रेड"),
-    t("Curated famous vendors, pan-India", "चुनिंदा मशहूर वेंडर, पूरे भारत"),
+    t("Iconic vendors from across India", "पूरे भारत के आइकॉनिक वेंडर"),
   ];
 }
 
@@ -258,6 +259,13 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
 
       {/* Name + positioning */}
       <h3 className={`font-display text-[1.75rem] leading-none sm:text-[2rem] ${accent(id)}`}>{name}</h3>
+      {/* Tier differentiator — the three claims that set this tier apart, the
+          same line the patra scroll cards carry. */}
+      <TierDifferentiator
+        claims={(lang === "hi" ? tier.differentiatorHi : tier.differentiator) ?? []}
+        tone={dark ? "cream" : "maroon"}
+        className="mt-2"
+      />
       {bestFor && <p className={`mt-1.5 text-sm font-medium leading-snug sm:mt-2 ${muted(id)}`}>{bestFor}</p>}
 
       {/* Price */}
@@ -386,6 +394,14 @@ export default function FinalisedPackages() {
                   <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
                     {lang === "hi" ? custom.nameHi : custom.name}
                   </h3>
+                  <TierDifferentiator
+                    claims={
+                      (lang === "hi"
+                        ? custom.differentiatorHi
+                        : custom.differentiator) ?? []
+                    }
+                    className="mt-1.5"
+                  />
                   <p className="mt-1.5 text-sm text-ink-soft">
                     {t(
                       "Pick one vendor, build your own menu, and pay only for what you select.",

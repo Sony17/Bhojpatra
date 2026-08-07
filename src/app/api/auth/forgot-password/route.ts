@@ -1,6 +1,6 @@
 import { findUserByEmail, saveUser } from "@/lib/users";
 import { hashPassword, makeResetToken, hashToken } from "@/lib/auth";
-import { sendPasswordResetEmail, siteBaseUrl } from "@/lib/email";
+import { sendPasswordResetEmail, siteBaseUrl, isEmailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +58,22 @@ export async function POST(request: Request) {
   }
 
   // ── Issue a reset token ─────────────────────────────────────────────────
+  // Mail not configured at all → say so instead of claiming a link was sent.
+  // This is a property of the deployment, identical for every address, so it
+  // reveals nothing about which emails have accounts.
+  if (!isEmailConfigured()) {
+    console.error(
+      "Password reset requested but RESEND_API_KEY is unset — no email can be sent.",
+    );
+    return Response.json(
+      {
+        error:
+          "Password reset is temporarily unavailable. Please contact support.",
+      },
+      { status: 503 },
+    );
+  }
+
   const user = await findUserByEmail(email);
   if (user) {
     const { token: rawToken, hash } = makeResetToken();
@@ -71,7 +87,16 @@ export async function POST(request: Request) {
     const resetUrl =
       `${base}/reset-password?token=${encodeURIComponent(rawToken)}` +
       `&email=${encodeURIComponent(email)}`;
-    await sendPasswordResetEmail(email, resetUrl);
+    // The provider can still reject an individual message (bad `from` domain,
+    // suppressed recipient). Keep the 200 — a per-address error would turn this
+    // endpoint into an account-existence oracle — but log it loudly, since
+    // otherwise a fully broken reset flow looks identical to a working one.
+    const sent = await sendPasswordResetEmail(email, resetUrl);
+    if (!sent) {
+      console.error(
+        `Password reset email was NOT delivered for ${email} — reset link never reached the user.`,
+      );
+    }
   }
 
   return Response.json({ ok: true });

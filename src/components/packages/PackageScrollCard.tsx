@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { type PackageTier, type PackageFeature } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
@@ -30,6 +30,14 @@ const SCROLL_RATIO = "458 / 545";
  * menu is written out at once — no inner scrollbar on any surface. Mobile now
  * shares the roomier desktop box; the cards there are large enough that the
  * full course list still clears the bottom roll before the fold-mounted CTA.
+ *
+ * IMPORTANT — the fit only holds while the written content scales purely in
+ * `cqw`. Every type size below is `max(<floor>px, <n>cqw)`, and the moment a
+ * floor engages the text stops shrinking with the artwork, the menu outgrows
+ * this box and `overflow-hidden` CLIPS it silently. The floors are therefore
+ * set low enough that cqw still governs down to a ~265px-wide card — the
+ * narrowest the card gets at any breakpoint. If you shrink the cards further,
+ * lower the floors to match (and re-check the tallest menu, Gold/Platinum).
  */
 const PARCHMENT = "left-[13%] right-[21%] top-[13.5%] bottom-[17%]";
 
@@ -125,6 +133,11 @@ export default function PackageScrollCard({
   const pax = lang === "hi" ? tier.paxHi : tier.pax;
   const bestFor = lang === "hi" ? tier.bestForHi : tier.bestFor;
   const footnote = lang === "hi" ? tier.footnoteHi : tier.footnote;
+  // Tier differentiator — brand reach · menu freedom · occasion scale. Sits
+  // directly under the name so the tiers read apart at a glance, before the
+  // guest gets to price or menu.
+  const differentiator =
+    (lang === "hi" ? tier.differentiatorHi : tier.differentiator) ?? [];
 
   // Whole-scroll metallic finish — the palette's stand-ins for the metals:
   // brand white reads silver, brand cream reads gold, and brand black reads
@@ -275,16 +288,35 @@ export default function PackageScrollCard({
           {/* ── Header (the "30%") — identity, price, guests, occasion. Kept
               compact and small so the written menu below owns the larger
               share of the scroll. ── */}
-          <h3 className="text-center font-display text-[max(16px,5.8cqw)] leading-none tracking-wide text-maroon">
+          <h3 className="text-center font-display text-[max(14px,5.8cqw)] leading-none tracking-wide text-maroon">
             {tierName}
           </h3>
-          <p className="mt-[1cqw] text-center text-[max(9px,3.1cqw)] leading-none text-ink-soft">
+          {/* Tier differentiator — the three claims that separate this tier
+              from the one above and below it. Rhombus-separated (the same
+              marker the menu uses) so it reads as one engraved line rather
+              than three chips crowding the header. */}
+          {differentiator.length > 0 && (
+            <p className="mt-[1.1cqw] flex flex-wrap items-center justify-center gap-x-[1.2cqw] gap-y-[0.3cqw] text-center text-[max(7px,2.6cqw)] font-semibold leading-tight text-maroon">
+              {differentiator.map((claim, i) => (
+                <Fragment key={claim}>
+                  {i > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="h-[max(3px,0.9cqw)] w-[max(3px,0.9cqw)] shrink-0 rotate-45 bg-maroon/40"
+                    />
+                  )}
+                  <span>{claim}</span>
+                </Fragment>
+              ))}
+            </p>
+          )}
+          <p className="mt-[1.1cqw] text-center text-[max(8px,3.1cqw)] leading-none text-ink-soft">
             <span className="font-semibold text-maroon">@ {tier.price}</span>{" "}
             {lang === "hi" ? tier.unitHi : tier.unit}
           </p>
           {pax && (
             <p
-              className={`mx-auto mt-[1.1cqw] rounded-full px-2.5 py-0.5 text-center text-[max(8px,2.7cqw)] font-semibold tracking-wide ${
+              className={`mx-auto mt-[1.1cqw] rounded-full px-2.5 py-0.5 text-center text-[max(7px,2.7cqw)] font-semibold tracking-wide ${
                 premium
                   ? "bg-ink text-cream"
                   : silver
@@ -296,7 +328,7 @@ export default function PackageScrollCard({
             </p>
           )}
           {bestFor && (
-            <p className="mt-[1.1cqw] text-center text-[max(8px,2.7cqw)] leading-tight text-ink-soft">
+            <p className="mt-[1.1cqw] text-center text-[max(7px,2.7cqw)] leading-tight text-ink-soft">
               <span className="font-semibold text-maroon">
                 {t("Perfect for", "इनके लिए परफेक्ट")}:
               </span>{" "}
@@ -317,7 +349,7 @@ export default function PackageScrollCard({
                 return (
                   <li
                     key={seg.index}
-                    className="flex items-start gap-2 text-left text-[max(11px,3.4cqw)] leading-tight text-ink"
+                    className="flex items-start gap-2 text-left text-[max(9px,3.4cqw)] leading-tight text-ink"
                   >
                     <RhombusMarker />
                     <span>{label}</span>
@@ -339,7 +371,7 @@ export default function PackageScrollCard({
                     return (
                       <li
                         key={index}
-                        className="pl-5 text-left text-[max(11px,3.4cqw)] leading-tight text-ink-soft"
+                        className="pl-5 text-left text-[max(9px,3.4cqw)] leading-tight text-ink-soft"
                       >
                         <span>{label}</span>
                       </li>
@@ -353,7 +385,7 @@ export default function PackageScrollCard({
               if (!accordion) {
                 return (
                   <li key={seg.index}>
-                    <div className="flex items-start gap-2 text-left text-[max(11px,3.4cqw)] font-semibold leading-tight text-maroon">
+                    <div className="flex items-start gap-2 text-left text-[max(9px,3.4cqw)] font-semibold leading-tight text-maroon">
                       <RhombusMarker />
                       <span className="flex-1">{headingLabel}</span>
                     </div>
@@ -375,7 +407,7 @@ export default function PackageScrollCard({
                       toggleCourse(seg.index);
                     }}
                     aria-expanded={hasItems ? isOpen : undefined}
-                    className="flex w-full items-start gap-2 rounded text-left text-[max(11px,3.4cqw)] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
+                    className="flex w-full items-start gap-2 rounded text-left text-[max(9px,3.4cqw)] font-semibold leading-tight text-maroon transition-colors duration-200 hover:bg-cream/50"
                   >
                     <RhombusMarker />
                     <span className="flex-1">{headingLabel}</span>
@@ -384,7 +416,7 @@ export default function PackageScrollCard({
                         {/* Item count — only when more than one line is hidden,
                             so a lone detail row doesn't read as a quantity. */}
                         {seg.items.length > 1 && (
-                          <span className="mt-px shrink-0 rounded-full border border-maroon/25 px-1.5 text-[max(9px,2.9cqw)] font-bold leading-tight text-maroon">
+                          <span className="mt-px shrink-0 rounded-full border border-maroon/25 px-1.5 text-[max(8px,2.9cqw)] font-bold leading-tight text-maroon">
                             {seg.items.length}
                           </span>
                         )}
@@ -392,7 +424,7 @@ export default function PackageScrollCard({
                             "there's more" affordance. */}
                         <span
                           aria-hidden="true"
-                          className={`shrink-0 text-[max(10px,3.6cqw)] leading-none text-maroon/50 transition-transform duration-200 ${
+                          className={`shrink-0 text-[max(9px,3.6cqw)] leading-none text-maroon/50 transition-transform duration-200 ${
                             isOpen ? "rotate-45" : ""
                           }`}
                         >
@@ -410,7 +442,7 @@ export default function PackageScrollCard({
           {/* Closing note — extra-small footnote type so the full sentence
               always fits above the bottom roll, on every surface. */}
           {footnote && footnote.length > 0 && (
-            <div className="mt-[1cqw] text-center text-[max(8px,2.5cqw)] font-medium leading-snug text-ink-soft">
+            <div className="mt-[1cqw] text-center text-[max(6px,2.5cqw)] font-medium leading-snug text-ink-soft">
               {footnote.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}

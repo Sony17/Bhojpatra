@@ -8,6 +8,7 @@ import ScrollWatermark from "@/components/ScrollWatermark";
 import ScrollToTop from "@/components/ScrollToTop";
 import SiteLoader from "@/components/SiteLoader";
 import PwaRegister from "@/components/PwaRegister";
+import InstallAppPrompt from "@/components/InstallAppPrompt";
 import { brand } from "@/lib/design-tokens";
 
 /* The Bhojpatra brand uses exactly two typefaces (per the brand guidelines):
@@ -44,8 +45,12 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/bhojpatra-icon.png",
-    apple: "/bhojpatra-icon.png",
+    icon: [
+      { url: "/bhojpatra-icon.png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
 };
 
@@ -72,6 +77,17 @@ export default function RootLayout({
       lang="en"
       className={`${openSans.variable} ${anandaNeptouch.variable} h-full antialiased`}
     >
+      <head>
+        {/* Chrome can fire `beforeinstallprompt` before React hydrates. Stash it
+            (and cancel the browser's own mini-infobar) so InstallAppPrompt can
+            show the branded card instead, whenever it mounts. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bpInstallPrompt=e;});",
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col overflow-x-hidden bg-bg text-ink">
         <LanguageProvider>
           <ToastProvider>
@@ -79,6 +95,8 @@ export default function RootLayout({
             {children}
             <ScrollWatermark />
           </ToastProvider>
+          {/* Inside the provider — the prompt is bilingual. */}
+          <InstallAppPrompt />
         </LanguageProvider>
         <SiteLoader />
         <PwaRegister />

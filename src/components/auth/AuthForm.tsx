@@ -161,12 +161,29 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     if (isForgot) {
       setSubmitting(true);
       setError("");
-      await fetch("/api/auth/forgot-password", {
+      const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       }).catch(() => null);
       setSubmitting(false);
+      // A non-OK reply here means sending is broken for *everyone* (mail not
+      // configured / server error) — never "no such account", so showing it
+      // leaks nothing. Anything else confirms, so we don't reveal whether the
+      // email is registered.
+      if (!res || !res.ok) {
+        const json = (await res?.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setError(
+          json?.error ??
+            t(
+              "Couldn't send the reset email. Please try again later.",
+              "रीसेट ईमेल नहीं भेजा जा सका। कृपया बाद में पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
       setSubmitted(true); // always confirm — don't leak whether the email exists
       return;
     }

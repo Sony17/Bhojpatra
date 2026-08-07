@@ -5,6 +5,7 @@ import Link from "next/link";
 import { packages } from "@/lib/data";
 import Reveal from "@/components/Reveal";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
+import TierDifferentiator from "@/components/packages/TierDifferentiator";
 import { useLang } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/sitePages";
 import { useHomeContent } from "@/lib/homeContent";
@@ -177,6 +178,17 @@ export default function Packages() {
                       {lang === "hi" ? singleStall.taglineHi : singleStall.tagline}
                     </p>
                   )}
+                  {/* Same tier differentiator the three scrolls carry, so the
+                      Single Stall banner sits on the same ladder rather than
+                      reading as an unrelated offer. */}
+                  <TierDifferentiator
+                    claims={
+                      (lang === "hi"
+                        ? singleStall.differentiatorHi
+                        : singleStall.differentiator) ?? []
+                    }
+                    className="mt-3 justify-center lg:justify-start"
+                  />
                   <p className="mt-4 text-sm text-ink-soft">
                     <span className="text-2xl font-semibold text-maroon">
                       {singleStall.price}
