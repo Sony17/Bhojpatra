@@ -386,18 +386,33 @@ export default function VendorFullMenu({
                 {counters.map((c) => (
                   <div
                     key={c.id}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-cream-3 bg-white p-3 shadow-xs"
+                    className="rounded-xl border border-cream-3 bg-white p-3 shadow-xs"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">{c.icon}</span>
-                      <span className="text-sm font-semibold text-ink">
-                        {lang === "hi" ? c.nameHi : c.name}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">{c.icon}</span>
+                        <span className="text-sm font-semibold text-ink">
+                          {lang === "hi" ? c.nameHi : c.name}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold text-maroon">
+                        ₹{c.price.toLocaleString("en-IN")}
+                        {c.perPlate ? ` / ${t("plate", "प्लेट")}` : ""}
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-maroon">
-                      ₹{c.price.toLocaleString("en-IN")}
-                      {c.perPlate ? ` / ${t("plate", "प्लेट")}` : ""}
-                    </span>
+                    {/* The caterer's own spread on this counter. */}
+                    {c.items.length > 0 && (
+                      <ul className="mt-2.5 flex flex-wrap gap-1.5 border-t border-cream-3 pt-2.5">
+                        {c.items.map((item) => (
+                          <li
+                            key={item.name}
+                            className="rounded-full border border-cream-3 bg-cream/40 px-2.5 py-1 text-[11px] text-ink"
+                          >
+                            {lang === "hi" ? item.nameHi : item.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>

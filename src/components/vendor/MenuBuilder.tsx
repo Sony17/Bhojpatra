@@ -13,29 +13,37 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
+  addOnMenu,
   cateringCategories,
-  cities,
   indianStates,
   isLiveStallCategory,
   menuCategories,
+  packageCategoryItems,
   registrationCuisines,
   servicePackages,
   vendorOfferings,
   type DietType,
+  type MenuCategory,
 } from "@/lib/data";
 import type {
   ModerationStatus,
   VendorBainaBox,
   VendorCounter,
+  VendorCounterExtra,
   VendorEssentialService,
   VendorMenuSection,
 } from "@/lib/vendorMenus";
-import { TIER_ORDER, type VendorTier } from "@/lib/admin/types";
+import { TIER_ORDER, sortTiers, type VendorTier } from "@/lib/admin/types";
 import { money } from "@/lib/money";
+import { useLocations } from "@/lib/locations";
 import { useLang } from "@/lib/i18n";
 import { Button, Card } from "@/components/ui";
 
 const GALLERY_MAX = 8;
+
+/** Sentinel option value for "my city isn't listed" — swaps the City select for
+ *  a free-text box. Never a real city name, so it can't collide with one. */
+const OTHER_CITY = "__other__";
 
 const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30";
@@ -60,6 +68,10 @@ interface DraftSection {
   enabled: boolean;
   perPlate: string;
   items: DraftItem[];
+  /** How many dishes a guest picks from this course, per feast band (form
+   *  strings). Blank = use the platform's number for that band; "0" = the
+   *  vendor doesn't serve this course on that band at all. */
+  tierItems: Partial<Record<VendorTier, string>>;
 }
 
 interface VendorPayload {
@@ -104,6 +116,9 @@ interface DraftBox {
 /** Max extra custom sizes per box (matches the server-side cap). */
 const MAX_BOX_CUSTOM_SIZES = 4;
 
+/** Max items a vendor may add to one counter (matches the server-side cap). */
+const MAX_COUNTER_EXTRAS = 12;
+
 /** Signature dishes are all-or-nothing: a vendor features exactly this many, or
  *  none (matches the server-side `FEATURED_COUNT`). */
 const FEATURED_COUNT = 4;
@@ -121,11 +136,42 @@ const TIER_BAND_HINTS: Record<VendorTier, string> = {
   Platinum: "₹1500+",
 };
 
+/** The non-band segments in the order the segment bar shows them — the three
+ *  feast bands lead, then the categories a caterer names for itself (single
+ *  stall, baina box) before the platform's own two. `full-catering` is absent
+ *  on purpose: the Silver/Gold/Platinum chips are its buttons. */
+const SEGMENT_CATEGORY_IDS = [
+  "single-stall",
+  "baina-box",
+  "live-stall",
+  "essential",
+];
+
+/** Segment rows, top to bottom: the feast menu first, then the rest in the
+ *  same order as the chips above them. */
+const SEGMENT_ROW_IDS = ["full-catering", ...SEGMENT_CATEGORY_IDS];
+
+/** The platform's dish count for a course on each feast band — shown as the
+ *  placeholder in a course's per-band row, so a blank field visibly reads as
+ *  "use whatever Bhojpatra sets" rather than "none". */
+const platformItemsFor = (catId: string): Partial<Record<VendorTier, number>> =>
+  Object.fromEntries(
+    TIER_ORDER.flatMap((tier) => {
+      const n = packageCategoryItems[tier.toLowerCase()]?.[catId];
+      return n === undefined ? [] : [[tier, n]];
+    }),
+  );
+
 const emptySections = (): Record<string, DraftSection> =>
   Object.fromEntries(
     menuCategories.map((c) => [
       c.id,
-      { enabled: false, perPlate: "", items: [] as DraftItem[] },
+      {
+        enabled: false,
+        perPlate: "",
+        items: [] as DraftItem[],
+        tierItems: {} as Partial<Record<VendorTier, string>>,
+      },
     ]),
   );
 
@@ -143,6 +189,9 @@ const DISH_SUGGESTIONS: Record<string, DraftItem[]> = Object.fromEntries(
 
 export default function MenuBuilder() {
   const { t, lang } = useLang();
+  // Serviceable cities the admin has opened (seed list until they load), so a
+  // newly added city shows up here without a code change.
+  const locations = useLocations();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -151,6 +200,8 @@ export default function MenuBuilder() {
 
   const [business, setBusiness] = useState("");
   const [city, setCity] = useState("");
+  /** True once the vendor picks "Other" — the City select becomes a text box. */
+  const [cityOther, setCityOther] = useState(false);
   const [stateName, setStateName] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [cuisineDraft, setCuisineDraft] = useState("");
@@ -170,9 +221,32 @@ export default function MenuBuilder() {
   // Live counters & services the vendor offers: offering id → own-price string
   // (a present key = offered; an empty value = charge the platform default).
   const [counters, setCounters] = useState<Record<string, string>>({});
+  // What each declared counter actually serves: offering id → the set-menu item
+  // names ticked, seeded to the counter's full platform list when it's switched
+  // on so a vendor who ignores the picker still offers everything.
+  const [counterItems, setCounterItems] = useState<Record<string, string[]>>(
+    {},
+  );
+  // The vendor's own additions to a counter, beyond the platform list.
+  const [counterExtras, setCounterExtras] = useState<
+    Record<string, VendorCounterExtra[]>
+  >({});
+  // Counters the vendor has paused: offering id → true. The rate, the ticked
+  // spread and their own extras all stay saved; the counter simply drops off
+  // every customer surface until it's un-paused.
+  const [counterHidden, setCounterHidden] = useState<Record<string, boolean>>(
+    {},
+  );
+  // Draft "add your own" row per counter — the typed name and its veg/non-veg
+  // mark, cleared back into `counterExtras` when the vendor adds it.
+  const [extraDraft, setExtraDraft] = useState<Record<string, string>>({});
+  const [extraDiet, setExtraDiet] = useState<Record<string, DietType>>({});
   // Catering categories served — the same offering types customers browse on
   // the frontend (full catering, single stall, live stall, baina box, …).
   const [serviceCats, setServiceCats] = useState<string[]>([]);
+  /** Which category's menu is expanded. One at a time keeps the page short on
+   *  a phone; `null` = every menu collapsed to its pricing summary. */
+  const [openCat, setOpenCat] = useState<string | null>(null);
   /** Marketplace tier bands the vendor places themselves in (empty = auto). */
   const [tiers, setTiers] = useState<VendorTier[]>([]);
   // Baina Box menu — the vendor's own boxes (baina-box category).
@@ -246,6 +320,32 @@ export default function MenuBuilder() {
                   ]),
                 ),
               );
+              // No saved narrowing means the counter's whole platform set menu
+              // — expand it here so the picker opens fully ticked. A saved
+              // empty list is a real answer ("only my own items"), so it's
+              // kept as-is rather than re-expanded.
+              setCounterItems(
+                Object.fromEntries(
+                  src.counters.map((c) => [
+                    c.id,
+                    c.items ?? addOnMenu(c.id).map((m) => m.name),
+                  ]),
+                ),
+              );
+              setCounterExtras(
+                Object.fromEntries(
+                  src.counters
+                    .filter((c) => c.extras?.length)
+                    .map((c) => [c.id, c.extras!]),
+                ),
+              );
+              // Paused counters — everything they typed is still here, it just
+              // doesn't reach customers until they un-pause it.
+              setCounterHidden(
+                Object.fromEntries(
+                  src.counters.filter((c) => c.hidden).map((c) => [c.id, true]),
+                ),
+              );
             }
             // Categories likewise carry over from the saved profile or, first
             // time in, from the registration application.
@@ -254,7 +354,19 @@ export default function MenuBuilder() {
             // application has none). Reconciled against live dishes on render.
             if (src.featured) setFeatured(src.featured);
             // Tiers: saved selection, or the review/price-derived prefill.
-            if (src.tiers?.length) setTiers(src.tiers);
+            // Records written before the segment bar can carry bands without
+            // the Full Catering declaration those bands now imply — reconcile
+            // on the way in, so a lit Silver/Gold/Platinum chip always has its
+            // plated menu underneath it (and an already-published course list
+            // never becomes unreachable).
+            if (src.tiers?.length) {
+              setTiers(src.tiers);
+              setServiceCats((prev) =>
+                prev.includes("full-catering")
+                  ? prev
+                  : [...prev, "full-catering"],
+              );
+            }
             if (src.bainaBoxes) {
               setBoxes(
                 src.bainaBoxes.map((b) => ({
@@ -298,6 +410,12 @@ export default function MenuBuilder() {
                     ...(it.photo ? { photo: it.photo } : {}),
                     ...(it.price != null ? { price: String(it.price) } : {}),
                   })),
+                  tierItems: Object.fromEntries(
+                    TIER_ORDER.flatMap((tier) => {
+                      const n = s.tierItems?.[tier];
+                      return n === undefined ? [] : [[tier, String(n)]];
+                    }),
+                  ),
                 };
               }
               return next;
@@ -330,6 +448,14 @@ export default function MenuBuilder() {
     updateSection(catId, { items: [...cur.items, { name, diet: item.diet }] });
   };
 
+  /** Set (or clear, on a blank) this course's dish count for one feast band. */
+  const setTierItems = (catId: string, tier: VendorTier, value: string) => {
+    const next = { ...sections[catId].tierItems };
+    if (value.trim() === "") delete next[tier];
+    else next[tier] = value;
+    updateSection(catId, { tierItems: next });
+  };
+
   const removeItem = (catId: string, index: number) => {
     updateSection(catId, {
       items: sections[catId].items.filter((_, i) => i !== index),
@@ -358,6 +484,19 @@ export default function MenuBuilder() {
   // individually — the plated-course dishes gain an optional per-dish ₹ field;
   // a blank one falls back to the course per-plate rate.
   const offersSingleStall = serviceCats.includes("single-stall");
+
+  // The two halves of the course list: plated courses feed Full Catering and
+  // Single Stall, live stations (Live Counters, Chaat, Chinese, South Indian)
+  // feed the Live Stall category.
+  const platedCats = menuCategories.filter((c) => !isLiveStallCategory(c.id));
+  const liveCats = menuCategories.filter((c) => isLiveStallCategory(c.id));
+
+  // Only the segments the vendor ticked get an editor — in segment-bar order.
+  const visibleCats = SEGMENT_ROW_IDS.flatMap((id) => {
+    if (!serviceCats.includes(id)) return [];
+    const c = cateringCategories.find((cat) => cat.id === id);
+    return c ? [c] : [];
+  });
 
   const publishedDishes = Object.values(sections)
     .filter((s) => s.enabled)
@@ -483,14 +622,22 @@ export default function MenuBuilder() {
   };
 
   // Toggle a live counter / service on or off. Turning it on seeds the vendor's
-  // price with the platform default so it's editable but never blank.
+  // price with the platform default so it's editable but never blank, and ticks
+  // the counter's whole set menu — trimming it is the opt-in, not the chore.
   const toggleCounter = (id: string, defaultPrice: number) => {
+    const turningOn = !(id in counters);
     setCounters((prev) => {
       const next = { ...prev };
-      if (id in next) delete next[id];
-      else next[id] = String(defaultPrice);
+      if (turningOn) next[id] = String(defaultPrice);
+      else delete next[id];
       return next;
     });
+    if (turningOn) {
+      setCounterItems((prev) => ({
+        ...prev,
+        [id]: prev[id]?.length ? prev[id] : addOnMenu(id).map((m) => m.name),
+      }));
+    }
     setSaved(false);
   };
 
@@ -499,10 +646,112 @@ export default function MenuBuilder() {
     setSaved(false);
   };
 
+  /** Pause / un-pause a declared counter. Unlike unticking it, everything the
+   *  vendor set (rate, spread, their own extras) stays exactly as typed. */
+  const toggleCounterHidden = (id: string) => {
+    setCounterHidden((prev) => {
+      const next = { ...prev };
+      if (next[id]) delete next[id];
+      else next[id] = true;
+      return next;
+    });
+    setSaved(false);
+  };
+
+  /** Tick / untick one item of a counter's set menu. The last item can't be
+   *  dropped unless the vendor has added their own — a counter that serves
+   *  nothing is just a counter you don't run, so untick the counter instead. */
+  const toggleCounterItem = (id: string, name: string) => {
+    setCounterItems((prev) => {
+      const current = prev[id] ?? addOnMenu(id).map((m) => m.name);
+      const next = current.includes(name)
+        ? current.filter((n) => n !== name)
+        : [...current, name];
+      if (!next.length && !counterExtras[id]?.length) return prev;
+      return { ...prev, [id]: next };
+    });
+    setSaved(false);
+  };
+
+  /** Restore every item on a counter's set menu (the vendor's own stay put). */
+  const selectAllCounterItems = (id: string) => {
+    setCounterItems((prev) => ({
+      ...prev,
+      [id]: addOnMenu(id).map((m) => m.name),
+    }));
+    setSaved(false);
+  };
+
+  /** Commit the "add your own" draft for a counter. Blank names and anything
+   *  already on the list (platform or vendor-added) are ignored. */
+  const addCounterExtra = (id: string, isService: boolean) => {
+    const name = (extraDraft[id] ?? "").trim();
+    if (!name) return;
+    const taken = new Set([
+      ...addOnMenu(id).map((m) => m.name.toLowerCase()),
+      ...(counterExtras[id] ?? []).map((e) => e.name.toLowerCase()),
+    ]);
+    if (taken.has(name.toLowerCase())) {
+      setExtraDraft((prev) => ({ ...prev, [id]: "" }));
+      return;
+    }
+    if ((counterExtras[id]?.length ?? 0) >= MAX_COUNTER_EXTRAS) return;
+    setCounterExtras((prev) => ({
+      ...prev,
+      [id]: [
+        ...(prev[id] ?? []),
+        // Services list inclusions, which carry no veg / non-veg mark.
+        { name, ...(isService ? {} : { diet: extraDiet[id] ?? "veg" }) },
+      ],
+    }));
+    setExtraDraft((prev) => ({ ...prev, [id]: "" }));
+    setSaved(false);
+  };
+
+  /** Drop one of the vendor's own items — unless it's the last thing the
+   *  counter serves (no platform items ticked either), which would leave an
+   *  empty counter on their public profile. */
+  const removeCounterExtra = (id: string, name: string) => {
+    setCounterExtras((prev) => {
+      const next = (prev[id] ?? []).filter((e) => e.name !== name);
+      if (!next.length && !counterItems[id]?.length) return prev;
+      const copy = { ...prev };
+      if (next.length) copy[id] = next;
+      else delete copy[id];
+      return copy;
+    });
+    setSaved(false);
+  };
+
   const toggleServiceCat = (id: string) => {
+    const turningOn = !serviceCats.includes(id);
     setServiceCats((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
     );
+    // Declaring a category is only half the job — open its menu straight away
+    // so the vendor lands on the dishes and prices they now have to fill in.
+    if (turningOn) setOpenCat(id);
+    setSaved(false);
+  };
+
+  /** The Silver/Gold/Platinum chips are the Full Catering segment's buttons:
+   *  the bands they tick are their catalog placement, and having any band at
+   *  all is what declares the category (and reveals its plated menu). Dropping
+   *  the last band withdraws Full Catering — the saved courses stay put, they
+   *  just stop being offered. */
+  const toggleTier = (tier: VendorTier) => {
+    const next = tiers.includes(tier)
+      ? tiers.filter((v) => v !== tier)
+      : [...tiers, tier];
+    setTiers(next);
+    if (next.length) {
+      if (!serviceCats.includes("full-catering")) {
+        ensureServiceCat("full-catering");
+        setOpenCat("full-catering");
+      }
+    } else {
+      setServiceCats((prev) => prev.filter((c) => c !== "full-catering"));
+    }
     setSaved(false);
   };
 
@@ -697,16 +946,48 @@ export default function MenuBuilder() {
               ...(Number(it.price) > 0 ? { price: Number(it.price) } : {}),
             })),
             ...(sections[c.id].enabled ? {} : { hidden: true }),
+            // Per-band dish counts, blanks dropped so those bands keep the
+            // platform's number. "0" is kept — it means "not on that band".
+            ...(() => {
+              const t = Object.fromEntries(
+                TIER_ORDER.flatMap((tier) => {
+                  const raw = sections[c.id].tierItems[tier];
+                  return raw === undefined || raw.trim() === ""
+                    ? []
+                    : [[tier, Number(raw)]];
+                }),
+              );
+              return Object.keys(t).length ? { tierItems: t } : {};
+            })(),
           })),
         // Signature dishes — reconciled to live dishes; empty means "none".
         featured: validFeatured,
         // Only send offerings the vendor still recognises; an own-price is
         // optional (blank falls back to the platform default server-side).
+        // `items` rides along only when the set menu was actually trimmed, or
+        // when the vendor added their own (which has to pin down the platform
+        // picks too) — an untouched counter stays "the whole platform list".
         counters: vendorOfferings
           .filter((o) => o.id in counters)
           .map((o) => {
             const price = Number(counters[o.id]);
-            return { id: o.id, ...(price > 0 ? { price } : {}) };
+            const setMenu = addOnMenu(o.id);
+            const picked = (counterItems[o.id] ?? []).filter((name) =>
+              setMenu.some((m) => m.name === name),
+            );
+            const extras = counterExtras[o.id] ?? [];
+            // Send the pick only when it differs from "all of ours" — an empty
+            // pick alongside own items means they serve only their own.
+            const pin =
+              picked.length + extras.length > 0 &&
+              (picked.length < setMenu.length || extras.length > 0);
+            return {
+              id: o.id,
+              ...(price > 0 ? { price } : {}),
+              ...(counterHidden[o.id] ? { hidden: true } : {}),
+              ...(pin ? { items: picked } : {}),
+              ...(extras.length ? { extras } : {}),
+            };
           }),
         serviceCategories: serviceCats,
         // Deselecting every tier falls back server-side to the assigned /
@@ -785,6 +1066,360 @@ export default function MenuBuilder() {
       </Card>
     );
   }
+
+  /** Baina Box menu — the box offerings customers browse from the home
+   *  "Baina Box" section. Adding a box auto-declares the category. */
+  const bainaBoxPanel = (
+    <>
+      <p className="text-xs text-ink-soft">
+        {t(
+          "Sweet, bhaji & gifting boxes booked in ½ kg, 1 kg or your own custom sizes — shown to customers browsing Baina Boxes.",
+          "½ किलो, 1 किलो या आपके अपने कस्टम साइज़ में बुक होने वाले मिठाई, भाजी और गिफ्ट बॉक्स — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखते हैं।",
+        )}
+      </p>
+      <div className="mt-3 space-y-3">
+        {boxes.map((b, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-cream-3 bg-cream/30 p-4"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-ink">
+                {t("Box", "बॉक्स")} {i + 1}
+              </p>
+              <button
+                type="button"
+                onClick={() => removeBox(i)}
+                aria-label={t(`Remove box ${i + 1}`, `बॉक्स ${i + 1} हटाएं`)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-3 flex gap-3">
+              {/* Box photo — uploaded to the shared dish-photo store; shown
+                  on the customer-facing box card. */}
+              <label
+                className="relative flex h-[6.5rem] w-[6.5rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-dashed border-cream-3 bg-cream/40 text-center transition-colors hover:border-maroon"
+                aria-label={t(
+                  `Box ${i + 1} photo`,
+                  `बॉक्स ${i + 1} फ़ोटो`,
+                )}
+              >
+                {b.photo ? (
+                  <Image
+                    src={b.photo}
+                    alt=""
+                    fill
+                    sizes="104px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <>
+                    <span aria-hidden="true" className="text-xl text-maroon">
+                      ⬆
+                    </span>
+                    <span className="px-1 text-[11px] leading-tight text-ink-soft">
+                      {t("Add photo", "फ़ोटो जोड़ें")}
+                    </span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadBoxPhoto(i, file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <div className="grid flex-1 gap-3 sm:grid-cols-2">
+                <input
+                  type="text"
+                  value={b.name}
+                  onChange={(e) => updateBox(i, { name: e.target.value })}
+                  placeholder={t("e.g. Royal Mithai Box", "उदा. रॉयल मिठाई बॉक्स")}
+                  aria-label={t("Box name", "बॉक्स का नाम")}
+                  className={inputClass + " sm:col-span-2"}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={b.price}
+                  onChange={(e) => updateBox(i, { price: e.target.value })}
+                  placeholder={t("½ kg box price (₹)", "½ किलो बॉक्स मूल्य (₹)")}
+                  aria-label={t("½ kg box price", "½ किलो बॉक्स मूल्य")}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={b.price1kg}
+                  onChange={(e) => updateBox(i, { price1kg: e.target.value })}
+                  placeholder={t(
+                    "1 kg box price (₹, optional)",
+                    "1 किलो बॉक्स मूल्य (₹, वैकल्पिक)",
+                  )}
+                  aria-label={t("1 kg box price", "1 किलो बॉक्स मूल्य")}
+                  className={inputClass}
+                />
+                {/* Extra vendor-defined sizes (250 g, 2 kg, …), each with
+                    its own price. */}
+                {b.customSizes.map((s, si) => (
+                  <div
+                    key={si}
+                    className="flex items-center gap-3 sm:col-span-2"
+                  >
+                    <input
+                      type="text"
+                      value={s.label}
+                      onChange={(e) =>
+                        updateBoxSize(i, si, { label: e.target.value })
+                      }
+                      placeholder={t(
+                        "Size — e.g. 250 g, 2 kg",
+                        "साइज़ — उदा. 250 ग्राम, 2 किलो",
+                      )}
+                      aria-label={t("Custom size", "कस्टम साइज़")}
+                      className={inputClass + " flex-1"}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={s.price}
+                      onChange={(e) =>
+                        updateBoxSize(i, si, { price: e.target.value })
+                      }
+                      placeholder={t("Price (₹)", "मूल्य (₹)")}
+                      aria-label={t(
+                        "Custom size price",
+                        "कस्टम साइज़ मूल्य",
+                      )}
+                      className={inputClass + " w-32 flex-none sm:w-40"}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeBoxSize(i, si)}
+                      aria-label={t(
+                        "Remove custom size",
+                        "कस्टम साइज़ हटाएं",
+                      )}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {b.customSizes.length < MAX_BOX_CUSTOM_SIZES && (
+                  <button
+                    type="button"
+                    onClick={() => addBoxSize(i)}
+                    className="justify-self-start text-left text-xs font-semibold text-maroon hover:underline sm:col-span-2"
+                  >
+                    + {t("Add custom size (250 g, 2 kg…)", "कस्टम साइज़ जोड़ें (250 ग्राम, 2 किलो…)")}
+                  </button>
+                )}
+                <input
+                  type="text"
+                  value={b.contents}
+                  onChange={(e) => updateBox(i, { contents: e.target.value })}
+                  placeholder={t(
+                    "Contents, comma separated — e.g. Kaju Katli, Motichoor Ladoo, Dry Fruits",
+                    "सामग्री, अल्पविराम से अलग — उदा. काजू कतली, मोतीचूर लड्डू, ड्राई फ्रूट्स",
+                  )}
+                  aria-label={t("Box contents", "बॉक्स सामग्री")}
+                  className={inputClass + " sm:col-span-2"}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+        {boxPhotoError && (
+          <p role="alert" className="text-xs font-semibold text-maroon">
+            {boxPhotoError}
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={addBox}
+          disabled={boxes.length >= 12}
+        >
+          + {t("Add Box", "बॉक्स जोड़ें")}
+        </Button>
+      </div>
+    </>
+  );
+
+  /** Essential Service — the vendor's own take on the service-only tier
+   *  customers see on /service-packages. Rate + what's included. */
+  const essentialPanel = (
+    <>
+      <p className="text-xs text-ink-soft">
+        {t(
+          "Serving crew, buffet setup & essentials at your own per-guest rate — for single stalls and small functions.",
+          "सिंगल स्टॉल और छोटे आयोजनों के लिए आपकी अपनी प्रति-मेहमान दर पर सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान।",
+        )}
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-sm text-ink-soft">₹</span>
+        <input
+          type="number"
+          min={0}
+          value={essentialRate}
+          onChange={(e) => onEssentialRate(e.target.value)}
+          placeholder="40"
+          aria-label={t("Per-guest rate", "प्रति-मेहमान दर")}
+          className="w-24 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+        />
+        <span className="text-sm text-ink-soft">
+          / {t("guest", "मेहमान")}
+        </span>
+      </div>
+      <span className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        {t("What you include", "आप क्या शामिल करते हैं")}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {Array.from(
+          new Set([...ESSENTIAL_SUGGESTIONS, ...essentialIncludes]),
+        ).map((item) => (
+          <Chip
+            key={item}
+            label={item}
+            active={essentialIncludes.includes(item)}
+            onClick={() => toggleEssentialInclude(item)}
+          />
+        ))}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <input
+          type="text"
+          value={essentialDraft}
+          onChange={(e) => setEssentialDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addEssentialCustom();
+            }
+          }}
+          placeholder={t("Add your own item…", "अपना आइटम जोड़ें…")}
+          className={inputClass + " max-w-xs"}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={addEssentialCustom}
+          disabled={!essentialDraft.trim()}
+        >
+          + {t("Add", "जोड़ें")}
+        </Button>
+      </div>
+    </>
+  );
+
+  /* ── Catering-category panels ──────────────────────────────────────────
+     Each category row carries its own menu, collapsed to a one-line pricing
+     summary until the vendor opens it. */
+
+  /** Live courses + cheapest per-plate rate across a set of courses. */
+  const courseStats = (cats: MenuCategory[]) => {
+    const on = cats.filter((c) => sections[c.id]?.enabled);
+    const rates = on
+      .map((c) => Number(sections[c.id].perPlate))
+      .filter((n) => n > 0);
+    return {
+      courses: on.length,
+      dishes: on.reduce((n, c) => n + sections[c.id].items.length, 0),
+      from: rates.length ? Math.min(...rates) : 0,
+    };
+  };
+
+  /** The pricing line shown on a collapsed category — so a vendor can read
+   *  their rates without opening a single menu. */
+  const categorySummary = (id: string): string => {
+    switch (id) {
+      case "full-catering":
+      case "live-stall": {
+        const s = courseStats(id === "live-stall" ? liveCats : platedCats);
+        // The feast row leads with the bands it's ticked into — that's what
+        // Silver/Gold/Platinum mean once the chips are collapsed out of sight.
+        const bands =
+          id === "full-catering"
+            ? `${TIER_ORDER.filter((x) => tiers.includes(x)).join(" · ")} · `
+            : "";
+        if (!s.courses)
+          return bands + t("No courses live yet", "अभी कोई कोर्स लाइव नहीं");
+        return bands + t(
+          `${s.courses} ${s.courses === 1 ? "course" : "courses"} live · ${s.dishes} dishes${s.from ? ` · from ${money(s.from)}/plate` : ""}`,
+          `${s.courses} कोर्स लाइव · ${s.dishes} डिश${s.from ? ` · ${money(s.from)}/प्लेट से` : ""}`,
+        );
+      }
+      case "single-stall": {
+        const priced = platedCats
+          .flatMap((c) => (sections[c.id]?.enabled ? sections[c.id].items : []))
+          .map((it) => Number(it.price))
+          .filter((n) => n > 0);
+        if (!priced.length)
+          return t("No per-dish prices yet", "अभी प्रति-डिश मूल्य नहीं");
+        return t(
+          `${priced.length} dishes priced · from ${money(Math.min(...priced))}/plate`,
+          `${priced.length} डिश की कीमत तय · ${money(Math.min(...priced))}/प्लेट से`,
+        );
+      }
+      case "baina-box": {
+        const named = boxes.filter((b) => b.name.trim());
+        if (!named.length) return t("No boxes yet", "अभी कोई बॉक्स नहीं");
+        const prices = named.map((b) => Number(b.price)).filter((n) => n > 0);
+        return t(
+          `${named.length} ${named.length === 1 ? "box" : "boxes"}${prices.length ? ` · from ${money(Math.min(...prices))}` : ""}`,
+          `${named.length} बॉक्स${prices.length ? ` · ${money(Math.min(...prices))} से` : ""}`,
+        );
+      }
+      case "essential": {
+        const rate = Number(essentialRate);
+        if (!rate) return t("Rate not set yet", "अभी दर तय नहीं");
+        return t(
+          `${money(rate)}/guest · ${essentialIncludes.length} included`,
+          `${money(rate)}/मेहमान · ${essentialIncludes.length} शामिल`,
+        );
+      }
+      default:
+        return "";
+    }
+  };
+
+  /** The course editors for one half of the menu. */
+  const renderCourses = (cats: MenuCategory[], priceable: boolean) =>
+    cats.map((cat) => {
+      const s = sections[cat.id];
+      return (
+        <CategorySection
+          key={cat.id}
+          icon={cat.icon}
+          name={lang === "hi" ? cat.nameHi : cat.name}
+          blurb={lang === "hi" ? cat.blurbHi : cat.blurb}
+          suggestions={DISH_SUGGESTIONS[cat.id] ?? []}
+          section={s}
+          onToggle={() => updateSection(cat.id, { enabled: !s.enabled })}
+          onPerPlate={(v) => updateSection(cat.id, { perPlate: v })}
+          onAddItem={(item) => addItem(cat.id, item)}
+          onRemoveItem={(i) => removeItem(cat.id, i)}
+          onToggleDiet={(i) => toggleItemDiet(cat.id, i)}
+          onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
+          priceable={priceable}
+          onItemPrice={(i, v) => setItemPrice(cat.id, i, v)}
+          bands={sortTiers(tiers)}
+          platformItems={platformItemsFor(cat.id)}
+          onTierItems={(tier, v) => setTierItems(cat.id, tier, v)}
+        />
+      );
+    });
+
+  const panelNote = (text: string) => (
+    <p className="text-xs text-ink-soft">{text}</p>
+  );
 
   return (
     <div className="space-y-6">
@@ -914,30 +1549,67 @@ export default function MenuBuilder() {
             />
           </Field>
           <Field label={t("City", "शहर")}>
-            {/* Platform cities only — the booking wizard matches caterers to
-                the customer's event city by this exact name. A previously
+            {/* The booking wizard matches caterers to the customer's event city
+                by this exact name, so the serviceable list comes first — but a
+                city we don't list yet can be typed in via "Other". A previously
                 saved / application-prefilled city outside the list is kept as
                 an extra option so nothing silently changes. */}
-            <select
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setSaved(false);
-              }}
-              className={inputClass}
-            >
-              <option value="" disabled>
-                {t("Select your city…", "अपना शहर चुनें…")}
-              </option>
-              {city && !cities.some((c) => c.name === city) && (
-                <option value={city}>{city}</option>
-              )}
-              {cities.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {t(c.name, c.nameHi)}
+            {cityOther ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  value={city}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    setSaved(false);
+                  }}
+                  placeholder={t("Type your city", "अपना शहर लिखें")}
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCityOther(false);
+                    setCity("");
+                    setSaved(false);
+                  }}
+                  className="shrink-0 text-xs font-semibold text-maroon underline underline-offset-2"
+                >
+                  {t("Pick from list", "सूची से चुनें")}
+                </button>
+              </div>
+            ) : (
+              <select
+                value={city}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === OTHER_CITY) {
+                    setCityOther(true);
+                    setCity("");
+                  } else {
+                    setCity(next);
+                  }
+                  setSaved(false);
+                }}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  {t("Select your city…", "अपना शहर चुनें…")}
                 </option>
-              ))}
-            </select>
+                {city && !locations.some((c) => c.name === city) && (
+                  <option value={city}>{city}</option>
+                )}
+                {locations.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {t(c.name, c.nameHi)}
+                  </option>
+                ))}
+                <option value={OTHER_CITY}>
+                  {t("Other — add my city", "अन्य — मेरा शहर जोड़ें")}
+                </option>
+              </select>
+            )}
             <span className="mt-1 block text-xs text-ink-soft">
               {t(
                 "Customers booking an event in this city will see your menu.",
@@ -1078,39 +1750,6 @@ export default function MenuBuilder() {
               </Button>
             </div>
           </div>
-
-          {/* Marketplace tiers — self-placement into the Silver/Gold/Platinum
-              bands. Drives the /vendors catalog card and the tier lens the
-              /book wizard applies per course — including the Single Stall
-              flow's tier picker. */}
-          <div className="sm:col-span-2 lg:col-span-3">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
-              {t("Marketplace Tiers", "मार्केटप्लेस टियर")}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {TIER_ORDER.map((tier) => (
-                <Chip
-                  key={tier}
-                  label={`${tier} · ${TIER_BAND_HINTS[tier]}`}
-                  active={tiers.includes(tier)}
-                  onClick={() => {
-                    setTiers((prev) =>
-                      prev.includes(tier)
-                        ? prev.filter((v) => v !== tier)
-                        : [...prev, tier],
-                    );
-                    setSaved(false);
-                  }}
-                />
-              ))}
-            </div>
-            <span className="mt-1.5 block text-xs text-ink-soft">
-              {t(
-                "Pick every band you serve. This places your card in the vendor catalog and decides which tier shows your stalls in the Single Stall booking flow. Leave all off to be placed automatically by your prices.",
-                "जिन बैंड में आप सेवा देते हैं वे सभी चुनें। इसी से वेंडर कैटलॉग में आपका कार्ड और Single Stall बुकिंग में आपके स्टॉल का टियर तय होता है। सभी खाली छोड़ने पर आपकी कीमतों से अपने-आप तय होगा।",
-              )}
-            </span>
-          </div>
         </div>
       </Card>
 
@@ -1180,128 +1819,154 @@ export default function MenuBuilder() {
         )}
       </Card>
 
-      {/* Catering categories — the same offering types the customer frontend
-          sells (feast packages, single stall, live stall, baina box, essential
-          service), declared here so the backend entry mirrors the storefront. */}
+      {/* What the caterer sells, as one row of segment buttons — the three
+          feast bands (Silver/Gold/Platinum, which together are Full Catering)
+          plus the service categories. A segment's menu editor only exists once
+          its button is ticked, so the form is exactly as long as what they
+          actually offer. */}
       <Card padding="none" className="p-5 sm:p-6">
         <h3 className="font-display text-base font-semibold text-ink">
-          {t("Catering Categories", "कैटरिंग श्रेणियां")}
+          {t("What You Sell", "आप क्या बेचते हैं")}
         </h3>
         <p className="mt-0.5 text-xs text-ink-soft">
           {t(
-            "Pick everything you offer — customers browse and book by these categories.",
-            "जो भी आप देते हैं उसे चुनें — ग्राहक इन्हीं श्रेणियों से ब्राउज़ और बुक करते हैं।",
+            "Tick every segment you serve — each one opens its own menu below, and customers browse and book by these.",
+            "जो भी सेगमेंट आप देते हैं उन्हें टिक करें — हर एक का अपना मेन्यू नीचे खुलेगा, और ग्राहक इन्हीं से ब्राउज़ व बुक करते हैं।",
           )}
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {cateringCategories.map((c) => {
-            const on = serviceCats.includes(c.id);
+        <div className="-mx-5 mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+          {TIER_ORDER.map((tier) => (
+            <Chip
+              key={tier}
+              label={`${tier} · ${TIER_BAND_HINTS[tier]}`}
+              active={tiers.includes(tier)}
+              onClick={() => toggleTier(tier)}
+            />
+          ))}
+          {SEGMENT_CATEGORY_IDS.map((id) => {
+            const c = cateringCategories.find((cat) => cat.id === id);
+            if (!c) return null;
             return (
-              <button
+              <Chip
                 key={c.id}
-                type="button"
-                aria-pressed={on}
+                label={`${c.icon} ${lang === "hi" ? c.nameHi : c.name}`}
+                active={serviceCats.includes(c.id)}
                 onClick={() => toggleServiceCat(c.id)}
-                className={
-                  "flex items-start gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors " +
-                  (on
-                    ? "border-maroon bg-maroon-soft/30"
-                    : "border-cream-3 bg-cream/40 hover:border-maroon")
-                }
-              >
-                <span aria-hidden="true" className="text-xl">{c.icon}</span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-ink">
-                    {lang === "hi" ? c.nameHi : c.name}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-ink-soft">
-                    {lang === "hi" ? c.blurbHi : c.blurb}
-                  </span>
-                </span>
-                <span
-                  aria-hidden="true"
-                  className={
-                    "ml-auto shrink-0 text-base " +
-                    (on ? "text-maroon" : "text-cream-3")
-                  }
-                >
-                  ✓
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Course sections, grouped by the catering category they feed. Plated
-          courses power the Full Catering packages and Single Stall bookings;
-          live stations power the /book wizard's dedicated Live Stall step
-          (and the richer feast tiers). Same dish data as before — the split
-          mirrors the customer-facing booking flow. */}
-      {[
-        {
-          key: "plated",
-          icon: "🍲",
-          title: t(
-            "Full Catering & Single Stall Menu",
-            "फुल कैटरिंग और सिंगल स्टॉल मेन्यू",
-          ),
-          sub: t(
-            "Plated courses — served in your Silver–Platinum feast packages and single-stall bookings.",
-            "प्लेटेड कोर्स — आपके सिल्वर–प्लैटिनम फ़ीस्ट पैकेज और सिंगल स्टॉल बुकिंग में परोसे जाते हैं।",
-          ),
-          cats: menuCategories.filter((c) => !isLiveStallCategory(c.id)),
-        },
-        {
-          key: "live",
-          icon: "🍳",
-          title: t("Live Stall Menu", "लाइव स्टॉल मेन्यू"),
-          sub: t(
-            "Live stations cooked in front of guests — the Live Stall step of a booking, also part of Gold & Platinum feasts.",
-            "मेहमानों के सामने बनने वाले लाइव स्टेशन — बुकिंग का लाइव स्टॉल चरण, गोल्ड और प्लैटिनम भोज का हिस्सा भी।",
-          ),
-          cats: menuCategories.filter((c) => isLiveStallCategory(c.id)),
-        },
-      ].map((group) => (
-        <div key={group.key} className="space-y-4">
-          <div className="flex items-start gap-3 pt-2">
-            <span aria-hidden="true" className="text-xl">
-              {group.icon}
-            </span>
-            <div>
-              <h3 className="font-display text-base font-semibold text-ink">
-                {group.title}
-              </h3>
-              <p className="mt-0.5 text-xs text-ink-soft">{group.sub}</p>
-            </div>
-          </div>
-          {group.cats.map((cat) => {
-            const s = sections[cat.id];
-            return (
-              <CategorySection
-                key={cat.id}
-                icon={cat.icon}
-                name={lang === "hi" ? cat.nameHi : cat.name}
-                blurb={lang === "hi" ? cat.blurbHi : cat.blurb}
-                suggestions={DISH_SUGGESTIONS[cat.id] ?? []}
-                section={s}
-                onToggle={() =>
-                  updateSection(cat.id, { enabled: !s.enabled })
-                }
-                onPerPlate={(v) => updateSection(cat.id, { perPlate: v })}
-                onAddItem={(item) => addItem(cat.id, item)}
-                onRemoveItem={(i) => removeItem(cat.id, i)}
-                onToggleDiet={(i) => toggleItemDiet(cat.id, i)}
-                onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
-                // Single Stall vendors price each plated delicacy individually;
-                // live-stall dishes bill as counters, so no per-dish field.
-                priceable={group.key === "plated" && offersSingleStall}
-                onItemPrice={(i, v) => setItemPrice(cat.id, i, v)}
               />
             );
           })}
         </div>
-      ))}
+        <p className="mt-2 text-xs text-ink-soft">
+          {t(
+            "Silver, Gold and Platinum are your feast bands — they share one plated menu and decide where your card sits in the catalog. Leave all three off and we place you by your prices.",
+            "सिल्वर, गोल्ड और प्लैटिनम आपके फ़ीस्ट बैंड हैं — इनका प्लेटेड मेन्यू एक ही रहता है और इसी से कैटलॉग में आपके कार्ड की जगह तय होती है। तीनों खाली छोड़ने पर आपकी कीमतों से जगह तय होगी।",
+          )}
+        </p>
+        {visibleCats.length === 0 && (
+          <p className="mt-4 rounded-lg border border-dashed border-cream-3 bg-cream/40 px-3.5 py-3 text-xs text-ink-soft">
+            {t(
+              "Nothing ticked yet — pick a segment above and its menu appears here.",
+              "अभी कुछ टिक नहीं है — ऊपर कोई सेगमेंट चुनें, उसका मेन्यू यहाँ दिखेगा।",
+            )}
+          </p>
+        )}
+        <div className="mt-4 space-y-3">
+          {visibleCats.map((c) => {
+            const open = openCat === c.id;
+            return (
+              <div
+                key={c.id}
+                className="overflow-hidden rounded-xl border border-maroon bg-maroon-soft/30 transition-colors"
+              >
+                <div className="flex items-start gap-3 px-3.5 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenCat(open ? null : c.id)}
+                    aria-expanded={open}
+                    aria-controls={`cat-menu-${c.id}`}
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                  >
+                    <span aria-hidden="true" className="text-xl">{c.icon}</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-ink">
+                        {lang === "hi" ? c.nameHi : c.name}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-ink-soft">
+                        {lang === "hi" ? c.blurbHi : c.blurb}
+                      </span>
+                      <span className="mt-1 block text-xs font-semibold text-maroon">
+                        {categorySummary(c.id)}
+                      </span>
+                    </span>
+                  </button>
+                  {/* Ticking lives entirely in the segment bar above — this row
+                      exists because the segment is on, so it only opens and
+                      closes. */}
+                  <button
+                    type="button"
+                    onClick={() => setOpenCat(open ? null : c.id)}
+                    aria-expanded={open}
+                    aria-controls={`cat-menu-${c.id}`}
+                    className="shrink-0 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold text-maroon transition hover:underline"
+                  >
+                    {open
+                      ? t("Hide menu", "मेन्यू छिपाएं")
+                      : t("Menu", "मेन्यू")}{" "}
+                    <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+                  </button>
+                </div>
+
+                {open && (
+                  <div
+                    id={`cat-menu-${c.id}`}
+                    className="space-y-3 border-t border-cream-3 bg-white px-3.5 py-4"
+                  >
+                    {/* Plated courses power both Full Catering feasts and
+                        Single Stall bookings — the same dishes, priced two
+                        ways: a per-plate course rate for feasts, an optional
+                        per-delicacy rate for single stalls. */}
+                    {c.id === "full-catering" && (
+                      <>
+                        {panelNote(
+                          t(
+                            "Plated courses served in your Silver–Platinum feast packages. Set a per-plate rate per course, then add its dishes.",
+                            "आपके सिल्वर–प्लैटिनम फ़ीस्ट पैकेज में परोसे जाने वाले प्लेटेड कोर्स। हर कोर्स की प्रति-प्लेट दर तय करें, फिर उसकी डिश जोड़ें।",
+                          ),
+                        )}
+                        {renderCourses(platedCats, offersSingleStall)}
+                      </>
+                    )}
+                    {c.id === "single-stall" && (
+                      <>
+                        {panelNote(
+                          t(
+                            "Single Stall sells the same plated courses — price each delicacy individually here. A blank price falls back to that course's per-plate rate.",
+                            "सिंगल स्टॉल वही प्लेटेड कोर्स बेचता है — यहाँ हर डिश की अलग कीमत डालें। खाली छोड़ने पर उस कोर्स की प्रति-प्लेट दर लगेगी।",
+                          ),
+                        )}
+                        {renderCourses(platedCats, true)}
+                      </>
+                    )}
+                    {c.id === "live-stall" && (
+                      <>
+                        {panelNote(
+                          t(
+                            "Live stations cooked in front of guests — Live Counters, Chaat, Chinese and South Indian. These power the Live Stall step of a booking and the Gold & Platinum feasts.",
+                            "मेहमानों के सामने बनने वाले लाइव स्टेशन — लाइव काउंटर, चाट, चाइनीज़ और साउथ इंडियन। ये बुकिंग के लाइव स्टॉल चरण और गोल्ड व प्लैटिनम भोज में लगते हैं।",
+                          ),
+                        )}
+                        {renderCourses(liveCats, false)}
+                      </>
+                    )}
+                    {c.id === "baina-box" && bainaBoxPanel}
+                    {c.id === "essential" && essentialPanel}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Signature dishes — the up-to-four "famous for" tags shown on the
           vendor's catalog card. The pool is the vendor's own live dishes, so a
@@ -1373,262 +2038,6 @@ export default function MenuBuilder() {
         )}
       </Card>
 
-      {/* Baina Box menu — the box offerings customers browse from the home
-          "Baina Box" section. Adding a box auto-declares the category. */}
-      <Card padding="none" className="p-5 sm:p-6">
-        <h3 className="font-display text-base font-semibold text-ink">
-          <span aria-hidden="true">🎁</span>{" "}
-          {t("Baina Box Menu", "बैना बॉक्स मेन्यू")}
-        </h3>
-        <p className="mt-0.5 text-xs text-ink-soft">
-          {t(
-            "Sweet, bhaji & gifting boxes booked in ½ kg, 1 kg or your own custom sizes — shown to customers browsing Baina Boxes.",
-            "½ किलो, 1 किलो या आपके अपने कस्टम साइज़ में बुक होने वाले मिठाई, भाजी और गिफ्ट बॉक्स — बैना बॉक्स ब्राउज़ करने वाले ग्राहकों को दिखते हैं।",
-          )}
-        </p>
-        <div className="mt-4 space-y-3">
-          {boxes.map((b, i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-cream-3 bg-cream/30 p-4"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-ink">
-                  {t("Box", "बॉक्स")} {i + 1}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => removeBox(i)}
-                  aria-label={t(`Remove box ${i + 1}`, `बॉक्स ${i + 1} हटाएं`)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="mt-3 flex gap-3">
-                {/* Box photo — uploaded to the shared dish-photo store; shown
-                    on the customer-facing box card. */}
-                <label
-                  className="relative flex h-[6.5rem] w-[6.5rem] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-dashed border-cream-3 bg-cream/40 text-center transition-colors hover:border-maroon"
-                  aria-label={t(
-                    `Box ${i + 1} photo`,
-                    `बॉक्स ${i + 1} फ़ोटो`,
-                  )}
-                >
-                  {b.photo ? (
-                    <Image
-                      src={b.photo}
-                      alt=""
-                      fill
-                      sizes="104px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <>
-                      <span aria-hidden="true" className="text-xl text-maroon">
-                        ⬆
-                      </span>
-                      <span className="px-1 text-[11px] leading-tight text-ink-soft">
-                        {t("Add photo", "फ़ोटो जोड़ें")}
-                      </span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void uploadBoxPhoto(i, file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <div className="grid flex-1 gap-3 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    value={b.name}
-                    onChange={(e) => updateBox(i, { name: e.target.value })}
-                    placeholder={t("e.g. Royal Mithai Box", "उदा. रॉयल मिठाई बॉक्स")}
-                    aria-label={t("Box name", "बॉक्स का नाम")}
-                    className={inputClass + " sm:col-span-2"}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={b.price}
-                    onChange={(e) => updateBox(i, { price: e.target.value })}
-                    placeholder={t("½ kg box price (₹)", "½ किलो बॉक्स मूल्य (₹)")}
-                    aria-label={t("½ kg box price", "½ किलो बॉक्स मूल्य")}
-                    className={inputClass}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={b.price1kg}
-                    onChange={(e) => updateBox(i, { price1kg: e.target.value })}
-                    placeholder={t(
-                      "1 kg box price (₹, optional)",
-                      "1 किलो बॉक्स मूल्य (₹, वैकल्पिक)",
-                    )}
-                    aria-label={t("1 kg box price", "1 किलो बॉक्स मूल्य")}
-                    className={inputClass}
-                  />
-                  {/* Extra vendor-defined sizes (250 g, 2 kg, …), each with
-                      its own price. */}
-                  {b.customSizes.map((s, si) => (
-                    <div
-                      key={si}
-                      className="flex items-center gap-3 sm:col-span-2"
-                    >
-                      <input
-                        type="text"
-                        value={s.label}
-                        onChange={(e) =>
-                          updateBoxSize(i, si, { label: e.target.value })
-                        }
-                        placeholder={t(
-                          "Size — e.g. 250 g, 2 kg",
-                          "साइज़ — उदा. 250 ग्राम, 2 किलो",
-                        )}
-                        aria-label={t("Custom size", "कस्टम साइज़")}
-                        className={inputClass + " flex-1"}
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={s.price}
-                        onChange={(e) =>
-                          updateBoxSize(i, si, { price: e.target.value })
-                        }
-                        placeholder={t("Price (₹)", "मूल्य (₹)")}
-                        aria-label={t(
-                          "Custom size price",
-                          "कस्टम साइज़ मूल्य",
-                        )}
-                        className={inputClass + " w-32 flex-none sm:w-40"}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeBoxSize(i, si)}
-                        aria-label={t(
-                          "Remove custom size",
-                          "कस्टम साइज़ हटाएं",
-                        )}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-maroon/10 hover:text-maroon"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {b.customSizes.length < MAX_BOX_CUSTOM_SIZES && (
-                    <button
-                      type="button"
-                      onClick={() => addBoxSize(i)}
-                      className="justify-self-start text-left text-xs font-semibold text-maroon hover:underline sm:col-span-2"
-                    >
-                      + {t("Add custom size (250 g, 2 kg…)", "कस्टम साइज़ जोड़ें (250 ग्राम, 2 किलो…)")}
-                    </button>
-                  )}
-                  <input
-                    type="text"
-                    value={b.contents}
-                    onChange={(e) => updateBox(i, { contents: e.target.value })}
-                    placeholder={t(
-                      "Contents, comma separated — e.g. Kaju Katli, Motichoor Ladoo, Dry Fruits",
-                      "सामग्री, अल्पविराम से अलग — उदा. काजू कतली, मोतीचूर लड्डू, ड्राई फ्रूट्स",
-                    )}
-                    aria-label={t("Box contents", "बॉक्स सामग्री")}
-                    className={inputClass + " sm:col-span-2"}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-          {boxPhotoError && (
-            <p role="alert" className="text-xs font-semibold text-maroon">
-              {boxPhotoError}
-            </p>
-          )}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={addBox}
-            disabled={boxes.length >= 12}
-          >
-            + {t("Add Box", "बॉक्स जोड़ें")}
-          </Button>
-        </div>
-      </Card>
-
-      {/* Essential Service — the vendor's own take on the service-only tier
-          customers see on /service-packages. Rate + what's included. */}
-      <Card padding="none" className="p-5 sm:p-6">
-        <h3 className="font-display text-base font-semibold text-ink">
-          <span aria-hidden="true">🍽️</span>{" "}
-          {t("Essential Service", "एसेंशियल सर्विस")}
-        </h3>
-        <p className="mt-0.5 text-xs text-ink-soft">
-          {t(
-            "Serving crew, buffet setup & essentials at your own per-guest rate — for single stalls and small functions.",
-            "सिंगल स्टॉल और छोटे आयोजनों के लिए आपकी अपनी प्रति-मेहमान दर पर सर्विस स्टाफ, बुफे सेटअप और ज़रूरी सामान।",
-          )}
-        </p>
-        <div className="mt-4 flex items-center gap-2">
-          <span className="text-sm text-ink-soft">₹</span>
-          <input
-            type="number"
-            min={0}
-            value={essentialRate}
-            onChange={(e) => onEssentialRate(e.target.value)}
-            placeholder="40"
-            aria-label={t("Per-guest rate", "प्रति-मेहमान दर")}
-            className="w-24 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
-          />
-          <span className="text-sm text-ink-soft">
-            / {t("guest", "मेहमान")}
-          </span>
-        </div>
-        <span className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          {t("What you include", "आप क्या शामिल करते हैं")}
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {Array.from(
-            new Set([...ESSENTIAL_SUGGESTIONS, ...essentialIncludes]),
-          ).map((item) => (
-            <Chip
-              key={item}
-              label={item}
-              active={essentialIncludes.includes(item)}
-              onClick={() => toggleEssentialInclude(item)}
-            />
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <input
-            type="text"
-            value={essentialDraft}
-            onChange={(e) => setEssentialDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addEssentialCustom();
-              }
-            }}
-            placeholder={t("Add your own item…", "अपना आइटम जोड़ें…")}
-            className={inputClass + " max-w-xs"}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={addEssentialCustom}
-            disabled={!essentialDraft.trim()}
-          >
-            + {t("Add", "जोड़ें")}
-          </Button>
-        </div>
-      </Card>
-
       {/* Live counters & services — the same extras the /book wizard sells, so a
           vendor can advertise every counter/service they run at their own rate. */}
       <Card padding="none" className="p-5 sm:p-6">
@@ -1637,8 +2046,8 @@ export default function MenuBuilder() {
         </h3>
         <p className="mt-0.5 text-xs text-ink-soft">
           {t(
-            "Tick everything you offer, then set your own rate. Shown on your public profile.",
-            "जो भी आप देते हैं उसे चुनें, फिर अपना रेट डालें। आपके सार्वजनिक प्रोफ़ाइल पर दिखेगा।",
+            "Tick everything you offer, set your own rate, then trim each counter's list to exactly what you serve. Shown on your public profile.",
+            "जो भी आप देते हैं उसे चुनें, अपना रेट डालें, फिर हर काउंटर की सूची में से वही रखें जो आप परोसते हैं। आपके सार्वजनिक प्रोफ़ाइल पर दिखेगा।",
           )}
         </p>
         {(["counter", "service"] as const).map((group) => {
@@ -1654,48 +2063,273 @@ export default function MenuBuilder() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {items.map((o) => {
                   const on = o.id in counters;
+                  // What this offering can serve (platform set menu) vs what
+                  // the vendor has ticked. Services list inclusions, counters
+                  // list dishes — same picker either way.
+                  const setMenu = addOnMenu(o.id);
+                  const picked = counterItems[o.id] ?? [];
+                  const extras = counterExtras[o.id] ?? [];
+                  const isService = o.category === "service";
+                  const extrasFull = extras.length >= MAX_COUNTER_EXTRAS;
+                  const paused = on && Boolean(counterHidden[o.id]);
+                  // What this add-on actually costs right now: the vendor's own
+                  // rate once they've typed one, otherwise the platform's. Shown
+                  // on every row, ticked or not, so no add-on is ever priceless.
+                  const rate = on
+                    ? Number(counters[o.id]) > 0
+                      ? Number(counters[o.id])
+                      : o.price
+                    : o.price;
+                  const unit = o.perPlate
+                    ? t("per plate", "प्रति प्लेट")
+                    : t("flat fee", "एकमुश्त शुल्क");
                   return (
                     <div
                       key={o.id}
                       className={
-                        "flex items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors " +
-                        (on
-                          ? "border-maroon bg-maroon-soft/30"
-                          : "border-cream-3 bg-cream/40")
+                        "rounded-xl border transition-colors " +
+                        (paused
+                          ? "border-dashed border-maroon/40 bg-cream/40"
+                          : on
+                            ? "border-maroon bg-maroon-soft/30"
+                            : "border-cream-3 bg-cream/40")
                       }
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggleCounter(o.id, o.price)}
-                        aria-pressed={on}
-                        className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                      >
-                        <span aria-hidden="true" className="text-xl">{o.icon}</span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-ink">
-                            {lang === "hi" ? o.nameHi : o.name}
+                      <div className="flex items-center gap-3 px-3.5 py-2.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleCounter(o.id, o.price)}
+                          aria-pressed={on}
+                          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                        >
+                          <span aria-hidden="true" className="text-xl">{o.icon}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-ink">
+                              {lang === "hi" ? o.nameHi : o.name}
+                            </span>
+                            <span className="block text-xs text-ink-soft">
+                              {on
+                                ? `${money(rate)} · ${unit}`
+                                : `${t("from", "से")} ${money(o.price)} · ${unit}`}
+                            </span>
                           </span>
-                          <span className="block text-xs text-ink-soft">
-                            {on
-                              ? o.perPlate
-                                ? t("per plate", "प्रति प्लेट")
-                                : t("flat fee", "एकमुश्त शुल्क")
-                              : `${t("from", "से")} ${money(o.price)}`}
-                          </span>
-                        </span>
-                      </button>
+                        </button>
+                        {on && (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="text-sm text-ink-soft">₹</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={counters[o.id]}
+                              onChange={(e) => setCounterPrice(o.id, e.target.value)}
+                              placeholder={String(o.price)}
+                              aria-label={`${o.name} ${t("price", "मूल्य")}`}
+                              className="w-20 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pause instead of untick — keeps the rate and the whole
+                          spread saved while taking the add-on off every
+                          customer surface. */}
                       {on && (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <span className="text-sm text-ink-soft">₹</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={counters[o.id]}
-                            onChange={(e) => setCounterPrice(o.id, e.target.value)}
-                            placeholder={String(o.price)}
-                            aria-label={`${o.name} ${t("price", "मूल्य")}`}
-                            className="w-20 rounded-lg border border-cream-3 bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
-                          />
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-cream-3 px-3.5 py-2">
+                          <span className="text-[11px] text-ink-soft">
+                            {paused
+                              ? t(
+                                  "Hidden from customers — saved, not shown.",
+                                  "ग्राहकों से छिपा — सहेजा है, दिख नहीं रहा।",
+                                )
+                              : t(
+                                  "Live on your profile and in bookings.",
+                                  "आपके प्रोफ़ाइल और बुकिंग में लाइव।",
+                                )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleCounterHidden(o.id)}
+                            aria-pressed={paused}
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon/5"
+                          >
+                            {paused ? t("Show", "दिखाएं") : t("Hide", "छिपाएं")}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* The counter's own list — every item the /book wizard
+                          can show under this counter, so a vendor declares the
+                          exact spread instead of inheriting all of it. */}
+                      {on && setMenu.length > 0 && (
+                        <div className="border-t border-cream-3 px-3.5 pb-3 pt-2.5">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+                              {isService
+                                ? t("What you include", "आप क्या शामिल करते हैं")
+                                : t("What you serve", "आप क्या परोसते हैं")}
+                              {" · "}
+                              {picked.length}/{setMenu.length}
+                              {extras.length > 0 &&
+                                ` + ${extras.length} ${t("yours", "आपके")}`}
+                            </span>
+                            {picked.length < setMenu.length && (
+                              <button
+                                type="button"
+                                onClick={() => selectAllCounterItems(o.id)}
+                                className="text-[11px] font-semibold text-maroon underline underline-offset-2"
+                              >
+                                {t("Select all", "सभी चुनें")}
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {setMenu.map((m) => {
+                              const itemOn = picked.includes(m.name);
+                              return (
+                                <button
+                                  key={m.name}
+                                  type="button"
+                                  aria-pressed={itemOn}
+                                  onClick={() => toggleCounterItem(o.id, m.name)}
+                                  className={
+                                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors " +
+                                    (itemOn
+                                      ? "border-maroon bg-maroon text-cream"
+                                      : "border-cream-3 bg-white text-ink-soft")
+                                  }
+                                >
+                                  {/* Veg / non-veg mark, in brand ink vs red —
+                                      the same distinction the menu step draws. */}
+                                  {m.diet && (
+                                    <span
+                                      aria-hidden="true"
+                                      className={
+                                        "grid h-3 w-3 shrink-0 place-items-center rounded-sm border " +
+                                        (itemOn
+                                          ? "border-cream"
+                                          : m.diet === "veg"
+                                            ? "border-ink"
+                                            : "border-maroon")
+                                      }
+                                    >
+                                      <span
+                                        className={
+                                          "block h-1 w-1 rounded-full " +
+                                          (itemOn
+                                            ? "bg-cream"
+                                            : m.diet === "veg"
+                                              ? "bg-ink"
+                                              : "bg-maroon")
+                                        }
+                                      />
+                                    </span>
+                                  )}
+                                  {lang === "hi" ? m.nameHi : m.name}
+                                </button>
+                              );
+                            })}
+                            {/* The vendor's own items sit in the same row as
+                                the platform ones — customers read one list, so
+                                the builder shows one list. Tap × to drop. */}
+                            {extras.map((e) => (
+                              <span
+                                key={e.name}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-maroon bg-maroon px-2.5 py-1 text-[11px] font-medium text-cream"
+                              >
+                                {e.diet && (
+                                  <span
+                                    aria-hidden="true"
+                                    className="grid h-3 w-3 shrink-0 place-items-center rounded-sm border border-cream"
+                                  >
+                                    <span className="block h-1 w-1 rounded-full bg-cream" />
+                                  </span>
+                                )}
+                                {e.name}
+                                <button
+                                  type="button"
+                                  onClick={() => removeCounterExtra(o.id, e.name)}
+                                  aria-label={`${t("Remove", "हटाएं")} ${e.name}`}
+                                  className="-mr-0.5 text-sm leading-none text-cream"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Add your own — anything this vendor serves on the
+                              counter that the platform list never named. */}
+                          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={extraDraft[o.id] ?? ""}
+                              onChange={(ev) =>
+                                setExtraDraft((prev) => ({
+                                  ...prev,
+                                  [o.id]: ev.target.value,
+                                }))
+                              }
+                              onKeyDown={(ev) => {
+                                if (ev.key !== "Enter") return;
+                                ev.preventDefault();
+                                addCounterExtra(o.id, isService);
+                              }}
+                              disabled={extrasFull}
+                              maxLength={80}
+                              placeholder={
+                                extrasFull
+                                  ? t(
+                                      `Limit ${MAX_COUNTER_EXTRAS} reached`,
+                                      `अधिकतम ${MAX_COUNTER_EXTRAS} तक`,
+                                    )
+                                  : isService
+                                    ? t("Add your own inclusion", "अपना आइटम जोड़ें")
+                                    : t("Add your own dish", "अपनी डिश जोड़ें")
+                              }
+                              aria-label={`${o.name} — ${t("add your own item", "अपना आइटम जोड़ें")}`}
+                              className="min-w-0 flex-1 rounded-lg border border-cream-3 bg-white px-2.5 py-1.5 text-[11px] text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30 disabled:opacity-50"
+                            />
+                            {/* Counters carry a veg / non-veg mark; service
+                                inclusions don't, so the toggle stays hidden. */}
+                            {!isService &&
+                              (["veg", "non-veg"] as const).map((d) => {
+                                const dietOn = (extraDiet[o.id] ?? "veg") === d;
+                                return (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    aria-pressed={dietOn}
+                                    disabled={extrasFull}
+                                    onClick={() =>
+                                      setExtraDiet((prev) => ({
+                                        ...prev,
+                                        [o.id]: d,
+                                      }))
+                                    }
+                                    className={
+                                      "rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50 " +
+                                      (dietOn
+                                        ? "border-maroon bg-maroon text-cream"
+                                        : "border-cream-3 bg-white text-ink-soft")
+                                    }
+                                  >
+                                    {d === "veg"
+                                      ? t("Veg", "शाकाहारी")
+                                      : t("Non-veg", "मांसाहारी")}
+                                  </button>
+                                );
+                              })}
+                            <button
+                              type="button"
+                              onClick={() => addCounterExtra(o.id, isService)}
+                              disabled={
+                                extrasFull || !(extraDraft[o.id] ?? "").trim()
+                              }
+                              className="rounded-lg border border-maroon bg-white px-3 py-1.5 text-[11px] font-semibold text-maroon transition-colors hover:bg-maroon hover:text-cream disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-maroon"
+                            >
+                              {t("Add", "जोड़ें")}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1762,6 +2396,9 @@ function CategorySection({
   onUploadItemPhoto,
   priceable = false,
   onItemPrice,
+  bands,
+  platformItems,
+  onTierItems,
 }: {
   icon: string;
   name: string;
@@ -1777,11 +2414,21 @@ function CategorySection({
   /** Single Stall vendors price each dish — shows a per-dish ₹ field. */
   priceable?: boolean;
   onItemPrice?: (index: number, value: string) => void;
+  /** Feast bands the vendor sells — the per-band dish-count row is drawn for
+   *  these only, so a Silver-only caterer isn't asked about Platinum. */
+  bands: VendorTier[];
+  /** Platform dish counts for this course, per band — shown as the placeholder
+   *  so a blank field visibly means "use ours". */
+  platformItems: Partial<Record<VendorTier, number>>;
+  onTierItems: (tier: VendorTier, value: string) => void;
 }) {
   const { t } = useLang();
   const [draftName, setDraftName] = useState("");
   const [draftDiet, setDraftDiet] = useState<DietType>("veg");
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  /** A served course opens by default; collapsing leaves just its rate and
+   *  dish count on the header, so a long menu stays scannable. */
+  const [collapsed, setCollapsed] = useState(false);
 
   // Per-dish photo picker: one hidden input, retargeted to the dish whose
   // camera button was tapped.
@@ -1832,23 +2479,52 @@ function CategorySection({
           <div>
             <h3 className="font-display text-base font-semibold text-ink">{name}</h3>
             <p className="text-xs text-ink-soft">{blurb}</p>
+            {/* Rate + dish count stay on the header, so a collapsed course
+                still shows what it costs. */}
+            {section.enabled && (
+              <p className="mt-0.5 text-xs font-semibold text-maroon">
+                {Number(section.perPlate) > 0
+                  ? `${money(Number(section.perPlate))} / ${t("plate", "प्लेट")}`
+                  : t("No rate set", "दर तय नहीं")}
+                {" · "}
+                {section.items.length}{" "}
+                {t(section.items.length === 1 ? "dish" : "dishes", "डिश")}
+              </p>
+            )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={section.enabled}
-          className={
-            "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
-            (section.enabled
-              ? "bg-maroon text-cream"
-              : "bg-cream-2 text-ink-soft hover:bg-cream-3")
-          }
-        >
-          {section.enabled
-            ? `✓ ${t("Serving", "परोसा जा रहा")}`
-            : t("I serve this", "मैं यह परोसता हूँ")}
-        </button>
+        <div className="flex items-center gap-2">
+          {section.enabled && (
+            <button
+              type="button"
+              onClick={() => setCollapsed((v) => !v)}
+              aria-expanded={!collapsed}
+              className="whitespace-nowrap rounded-full px-2 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+            >
+              {collapsed ? t("Show", "दिखाएं") : t("Hide", "छिपाएं")}{" "}
+              <span aria-hidden="true">{collapsed ? "▼" : "▲"}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              // Turning a course back on always reveals its dishes.
+              if (!section.enabled) setCollapsed(false);
+              onToggle();
+            }}
+            aria-pressed={section.enabled}
+            className={
+              "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors " +
+              (section.enabled
+                ? "bg-maroon text-cream"
+                : "bg-cream-2 text-ink-soft hover:bg-cream-3")
+            }
+          >
+            {section.enabled
+              ? `✓ ${t("Serving", "परोसा जा रहा")}`
+              : t("I serve this", "मैं यह परोसता हूँ")}
+          </button>
+        </div>
       </div>
 
       {!section.enabled && section.items.length > 0 && (
@@ -1860,7 +2536,7 @@ function CategorySection({
         </p>
       )}
 
-      {section.enabled && (
+      {section.enabled && !collapsed && (
         <div className="mt-5 space-y-4">
           <div className="max-w-xs">
             <Field
@@ -1878,6 +2554,70 @@ function CategorySection({
               />
             </Field>
           </div>
+
+          {/* Per-band dish count — the caterer's own answer to "how many
+              starters does Silver get?". Blank keeps the platform number for
+              that band; 0 takes this course off the band entirely. Only the
+              bands they actually sell are shown. */}
+          {bands.length > 0 && (
+            <div className="rounded-xl border border-cream-3 bg-cream/40 p-3.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                {t("Dishes per band", "प्रति बैंड डिश")}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-soft">
+                {t(
+                  "How many dishes a guest picks from this course on each of your bands. Leave blank to use ours; put 0 to drop this course from a band.",
+                  "आपके हर बैंड पर ग्राहक इस कोर्स से कितनी डिश चुनेगा। हमारी संख्या के लिए खाली छोड़ें; किसी बैंड से यह कोर्स हटाने के लिए 0 डालें।",
+                )}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {bands.map((tier) => {
+                  const raw = section.tierItems[tier] ?? "";
+                  const off = raw.trim() !== "" && Number(raw) === 0;
+                  return (
+                    <label
+                      key={tier}
+                      className="flex min-w-0 items-center gap-2 rounded-lg border border-cream-3 bg-white px-2.5 py-1.5"
+                    >
+                      <span
+                        className={
+                          "text-xs font-semibold " +
+                          (off ? "text-ink-soft line-through" : "text-ink")
+                        }
+                      >
+                        {tier}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={24}
+                        value={raw}
+                        onChange={(e) => onTierItems(tier, e.target.value)}
+                        placeholder={String(platformItems[tier] ?? 1)}
+                        aria-label={t(
+                          `${tier} dishes from ${name}`,
+                          `${name} से ${tier} डिश`,
+                        )}
+                        className="w-16 rounded-md border border-cream-3 bg-cream/40 px-2 py-1 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+              {bands.some(
+                (tier) =>
+                  (section.tierItems[tier] ?? "").trim() !== "" &&
+                  Number(section.tierItems[tier]) === 0,
+              ) && (
+                <p className="mt-2 text-xs font-semibold text-maroon">
+                  {t(
+                    "Bands set to 0 won't show this course — customers on those bands won't see you here.",
+                    "0 वाले बैंड पर यह कोर्स नहीं दिखेगा — उन बैंड के ग्राहक आपको यहाँ नहीं देखेंगे।",
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Dishes */}
           <div>
@@ -2061,26 +2801,48 @@ function CategorySection({
               placeholder={t("Dish name, e.g. Paneer Tikka", "डिश का नाम, जैसे पनीर टिक्का")}
               className={inputClass + " max-w-xs"}
             />
-            <button
-              type="button"
-              onClick={() => setDraftDiet(draftDiet === "veg" ? "non-veg" : "veg")}
-              aria-pressed={draftDiet === "non-veg"}
-              className={
-                "flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition " +
-                (draftDiet === "veg"
-                  ? "border-cream-3 bg-white text-ink"
-                  : "border-maroon bg-white text-maroon")
-              }
+            {/* Veg and Non-Veg both stand on the row as their own button — a
+                single flip-flop label never says whether it's showing what the
+                dish IS or what tapping would make it. */}
+            <div
+              role="radiogroup"
+              aria-label={t("Dish type", "डिश का प्रकार")}
+              className="flex items-center gap-2"
             >
-              <span
-                aria-hidden="true"
-                className={
-                  "inline-block h-2.5 w-2.5 rounded-sm border " +
-                  (draftDiet === "veg" ? "border-ink" : "border-maroon bg-maroon")
-                }
-              />
-              {draftDiet === "veg" ? t("Veg", "वेज") : t("Non-Veg", "नॉन-वेज")}
-            </button>
+              {(["veg", "non-veg"] as DietType[]).map((diet) => {
+                const on = draftDiet === diet;
+                return (
+                  <button
+                    key={diet}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setDraftDiet(diet)}
+                    className={
+                      "flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition " +
+                      (on
+                        ? "border-maroon bg-maroon text-cream"
+                        : "border-cream-3 bg-white text-ink-soft hover:border-maroon")
+                    }
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={
+                        "inline-block h-2.5 w-2.5 rounded-sm border " +
+                        (diet === "veg"
+                          ? on
+                            ? "border-cream"
+                            : "border-ink"
+                          : on
+                            ? "border-cream bg-cream"
+                            : "border-maroon bg-maroon")
+                      }
+                    />
+                    {diet === "veg" ? t("Veg", "वेज") : t("Non-Veg", "नॉन-वेज")}
+                  </button>
+                );
+              })}
+            </div>
             <Button
               variant="secondary"
               onClick={submitDraft}

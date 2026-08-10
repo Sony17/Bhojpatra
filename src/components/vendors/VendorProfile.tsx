@@ -175,19 +175,35 @@ export default function VendorProfile({
           </h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {profile.counters.map((c) => (
-              <Card key={c.id} padding="none" className="flex items-center gap-3 p-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream text-lg">
-                  <span aria-hidden="true">{c.icon}</span>
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate font-medium text-ink">
-                    {lang === "hi" ? c.nameHi : c.name}
+              <Card key={c.id} padding="none" className="p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cream text-lg">
+                    <span aria-hidden="true">{c.icon}</span>
                   </span>
-                  <span className="block text-sm text-ink-soft">
-                    ₹{inr.format(c.price)}
-                    {c.perPlate ? `/${t("plate", "प्लेट")}` : ` ${t("flat", "एकमुश्त")}`}
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-ink">
+                      {lang === "hi" ? c.nameHi : c.name}
+                    </span>
+                    <span className="block text-sm text-ink-soft">
+                      ₹{inr.format(c.price)}
+                      {c.perPlate ? `/${t("plate", "प्लेट")}` : ` ${t("flat", "एकमुश्त")}`}
+                    </span>
                   </span>
-                </span>
+                </div>
+                {/* Exactly what this caterer serves on the counter — their own
+                    pick from its set menu, not the untrimmed platform list. */}
+                {c.items.length > 0 && (
+                  <ul className="mt-3 flex flex-wrap gap-1.5 border-t border-cream-3 pt-3">
+                    {c.items.map((item) => (
+                      <li
+                        key={item.name}
+                        className="rounded-full border border-cream-3 bg-cream/40 px-2.5 py-1 text-xs text-ink"
+                      >
+                        {lang === "hi" ? item.nameHi : item.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </Card>
             ))}
           </div>

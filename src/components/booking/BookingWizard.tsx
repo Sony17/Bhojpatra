@@ -1013,7 +1013,12 @@ export default function BookingWizard() {
             !v.live ||
             !cityName ||
             v.city?.toLowerCase() === cityName;
-          return tierOk && cityOk;
+          // Course gate: a caterer who set their own per-band quota for this
+          // course and put 0 on the active band doesn't serve it there — they
+          // drop out of this roster rather than appear with nothing to pick.
+          const courseOk =
+            !effectiveTier || v.tierItems?.[effectiveTier] !== 0;
+          return tierOk && cityOk && courseOk;
         }),
       }));
   }, [packageId, effectiveTier, liveMenuCategories, cityId]);
@@ -1044,8 +1049,22 @@ export default function BookingWizard() {
 
   // The base per-course dish quota from the package config — the number of
   // dishes allowed from ONE vendor for this course (e.g. one welcome drink).
-  const baseAllowanceFor = (catId: string): number =>
+  const platformAllowanceFor = (catId: string): number =>
     packageCategoryItems[packageId]?.[catId] ?? 1;
+
+  // A caterer can publish their own per-band quota for a course from their
+  // dashboard ("Silver gets 2 starters, Platinum gets 6"). Theirs wins for
+  // their own stall; the platform number stays the fallback for curated seeds
+  // and for anyone who never set one. A `0` never reaches here — those vendors
+  // are filtered out of the course roster above.
+  const baseAllowanceFor = (catId: string, vendorId?: string): number => {
+    const platform = platformAllowanceFor(catId);
+    if (!vendorId || !effectiveTier) return platform;
+    const own = activeCategories
+      .find((c) => c.id === catId)
+      ?.vendors.find((v) => v.id === vendorId)?.tierItems?.[effectiveTier];
+    return own && own > 0 ? own : platform;
+  };
 
   // Whether a step's courses let the guest pick more than one dish anywhere in
   // the package — step-wide (not the active course) because the first course
@@ -1089,19 +1108,28 @@ export default function BookingWizard() {
   // from every vendor — so the course total scales with the vendors picked.
   // Single-vendor tiers keep the flat quota. Drives the "N/N PICKED" counter.
   const allowanceFor = (catId: string): number => {
-    const base = baseAllowanceFor(catId);
-    if (!multiVendorFor(catId)) return base;
-    return base * Math.max(1, vendorsFor(catId).length);
+    const chosen = vendorsFor(catId);
+    if (!multiVendorFor(catId)) {
+      // One stall: its own quota is the course total (platform base until the
+      // guest has actually picked a caterer).
+      return baseAllowanceFor(catId, chosen[0]);
+    }
+    // Several stalls: each contributes its own quota, so the course total is
+    // their sum rather than one number times the head-count.
+    if (chosen.length === 0) return baseAllowanceFor(catId);
+    return chosen.reduce((sum, vid) => sum + baseAllowanceFor(catId, vid), 0);
   };
 
   const categoryComplete = (cat: MenuCategory): boolean => {
     const chosen = vendorsFor(cat.id);
     if (chosen.length === 0) return false;
-    const base = baseAllowanceFor(cat.id);
     // Multi-vendor: every chosen vendor must contribute its own full quota.
     if (multiVendorFor(cat.id))
-      return chosen.every((vid) => vendorPicks(cat.id, vid).length >= base);
-    return itemsFor(cat.id).length >= base;
+      return chosen.every(
+        (vid) =>
+          vendorPicks(cat.id, vid).length >= baseAllowanceFor(cat.id, vid),
+      );
+    return itemsFor(cat.id).length >= baseAllowanceFor(cat.id, chosen[0]);
   };
 
   // The Single Stall (custom) plan lets a guest skip courses they don't want.
@@ -1249,10 +1277,12 @@ export default function BookingWizard() {
       setCategoryItems((m) => ({ ...m, [catId]: cur.filter((x) => x !== itemId) }));
       return;
     }
-    const base = baseAllowanceFor(catId);
+    // The cap is the owning caterer's own quota, so two stalls on one course
+    // can open different numbers of dishes.
+    const vid = vendorOfItem(catId, itemId);
+    const base = baseAllowanceFor(catId, vid);
     if (multiVendorFor(catId)) {
       // Per-vendor cap — each vendor may fill its own quota independently.
-      const vid = vendorOfItem(catId, itemId);
       if (vid && vendorPicks(catId, vid).length >= base) return;
     } else if (cur.length >= base) {
       return; // at the package cap
@@ -4313,8 +4343,9 @@ function StepMenu({
   toggleItem: (catId: string, itemId: string) => void;
   /** Effective course allowance — scaled by vendor count on multi-vendor tiers. */
   allowanceFor: (catId: string) => number;
-  /** Per-vendor dish quota (the package's base, unscaled). */
-  baseAllowanceFor: (catId: string) => number;
+  /** Per-vendor dish quota (unscaled). Pass a vendor id to get that caterer's
+   *  own published quota for the band; without one, the package's base. */
+  baseAllowanceFor: (catId: string, vendorId?: string) => number;
   categoryComplete: (cat: MenuCategory) => boolean;
   isSkipped: (catId: string) => boolean;
   unskipCat: (catId: string) => void;
@@ -4431,8 +4462,15 @@ function StepMenu({
     },
   );
   const allowance = allowanceFor(cat.id); // effective total (scaled per vendor)
-  const base = baseAllowanceFor(cat.id); // per-vendor quota for this course
   const selectedVendors = cat.vendors.filter((v) => selectedIds.includes(v.id));
+  // Each chosen caterer may publish its own quota for this course, so the
+  // "one dish from each vendor" line only holds when they all agree; when they
+  // don't, `null` sends the copy to the per-card counts instead.
+  const uniformBase: number | null = (() => {
+    const bases = selectedVendors.map((v) => baseAllowanceFor(cat.id, v.id));
+    if (bases.length === 0) return baseAllowanceFor(cat.id);
+    return bases.every((n) => n === bases[0]) ? bases[0] : null;
+  })();
   const picks = itemsFor(cat.id);
   // The browsable roster excludes whatever's already picked — a chosen vendor
   // shows up above with its menu attached, so leaving it in the strip below
@@ -4614,15 +4652,20 @@ function StepMenu({
               intended, not as one shared cap. */}
           {multiVendor && selectedVendors.length > 1 && (
             <p className="-mt-2 text-xs text-ink-soft">
-              {base === 1
+              {uniformBase === null
                 ? t(
-                    "You can pick one dish from each vendor for this course.",
-                    "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                    "Each vendor opens up its own number of dishes for this course — the count is on their card.",
+                    "इस कोर्स के लिए हर वेंडर अपनी अलग संख्या में व्यंजन देता है — गिनती उनके कार्ड पर है।",
                   )
-                : t(
-                    `You can pick up to ${base} dishes from each vendor for this course.`,
-                    `इस कोर्स के लिए आप हर वेंडर से ${base} व्यंजन तक चुन सकते हैं।`,
-                  )}
+                : uniformBase === 1
+                  ? t(
+                      "You can pick one dish from each vendor for this course.",
+                      "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                    )
+                  : t(
+                      `You can pick up to ${uniformBase} dishes from each vendor for this course.`,
+                      `इस कोर्स के लिए आप हर वेंडर से ${uniformBase} व्यंजन तक चुन सकते हैं।`,
+                    )}
             </p>
           )}
 
@@ -4632,7 +4675,10 @@ function StepMenu({
             const vendorItemPicks = picks.filter((id) =>
               id.startsWith(`${vendor.id}-`),
             );
-            const vendorFull = vendorItemPicks.length >= base;
+            // This caterer's own quota for the course, which may differ from
+            // the package base and from the stall next to it.
+            const vendorBase = baseAllowanceFor(cat.id, vendor.id);
+            const vendorFull = vendorItemPicks.length >= vendorBase;
             const stat = statFor(vendorRatings, vendor);
             return (
               <div
@@ -4686,7 +4732,7 @@ function StepMenu({
                         (vendorFull ? "text-maroon" : "text-ink-soft")
                       }
                     >
-                      {vendorItemPicks.length}/{base}
+                      {vendorItemPicks.length}/{vendorBase}
                     </span>
                   )}
                   <button
@@ -5377,9 +5423,15 @@ function StepDetails({
           // → show the full list; otherwise it stays folded.
           const rosterOpen =
             pickedVendors.length === 0 || Boolean(openRosters[a.id]);
-          // What the counter actually serves — fixed by the platform, cooked by
-          // the vendor above it. Services list inclusions instead of dishes.
+          // What the counter serves — the platform set menu, narrowed per
+          // vendor to the items they declared in their dashboard (a vendor
+          // that never trimmed it still serves the lot). Services list
+          // inclusions instead of dishes.
           const setMenu = addOnMenu(a.id);
+          const setMenuFor = (v: VendorListing) =>
+            v.offeringItems?.[a.id]?.length
+              ? v.offeringItems[a.id]
+              : setMenu;
           const isService = catOf(a) === "service";
           return (
             <div
@@ -5471,7 +5523,9 @@ function StepDetails({
                     <>
                       {/* Your brand for this counter, with its set menu below. */}
                       <div className="flex flex-col gap-3">
-                        {pickedVendors.map((v) => (
+                        {pickedVendors.map((v) => {
+                          const vendorMenu = setMenuFor(v);
+                          return (
                           <div
                             key={v.id}
                             className="overflow-hidden rounded-2xl border border-maroon bg-white shadow-sm"
@@ -5521,7 +5575,7 @@ function StepDetails({
                             </div>
                             {/* This counter's set menu — fixed, so it reads as
                                 what you get, not as another list to pick from. */}
-                            {setMenu.length > 0 && (
+                            {vendorMenu.length > 0 && (
                               <div className="bg-cream-2/30 p-2.5 sm:p-3">
                                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                                   {isService
@@ -5532,7 +5586,7 @@ function StepDetails({
                                       )}
                                 </span>
                                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                  {setMenu.map((item) => {
+                                  {vendorMenu.map((item) => {
                                     // Veg → green, non-veg → brand maroon, the
                                     // same marks the menu step's dishes carry.
                                     const veg = item.diet === "veg";
@@ -5606,7 +5660,8 @@ function StepDetails({
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Every other brand folds into this one row — a tap

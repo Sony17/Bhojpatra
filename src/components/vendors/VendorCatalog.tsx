@@ -6,12 +6,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   bookingTimeSlots,
-  cateringCategories,
   cateringCategoryIds,
   cities,
   formatClockTime,
-  indianStates,
   listingCateringCategories,
+  listingOfferings,
   mealPeriodForTime,
   mealTypeOptions,
   type VendorListing,
@@ -120,6 +119,58 @@ const tierBadgeClass = (tier: Tier): string => {
   }
 };
 
+/**
+ * The browse lens — one chip row spanning every way Bhojpatra sells: the
+ * catering categories, the marketplace tier bands and the add-on counters.
+ * Exactly one is ever active, and every card in the grid then wears that tag
+ * alone. A caterer who also runs a Single Stall and a Baina Box reads as
+ * whichever the guest asked for, never all three at once.
+ */
+type LensId =
+  | ""
+  | "full-catering"
+  | "single-stall"
+  | "live-stall"
+  | "baina-box"
+  | "essential"
+  | "addons"
+  | Tier;
+
+const TIER_LENS_IDS: readonly string[] = ["Silver", "Gold", "Platinum"];
+
+const isTierLens = (id: LensId): id is Tier => TIER_LENS_IDS.includes(id);
+
+interface Lens {
+  id: Exclude<LensId, "">;
+  /** Customer-facing wording, which can differ from the vendor-facing category
+   *  name — a vendor declares "Full Catering", a guest browses "Caterers". */
+  label: string;
+  labelHi: string;
+  icon?: string;
+  match: (v: VendorListing) => boolean;
+}
+
+/** Live vendors match a category on their declared set, curated seeds on the
+ *  derived one. */
+const inCategory =
+  (id: string) =>
+  (v: VendorListing): boolean =>
+    listingCateringCategories(v).includes(id);
+
+const LENSES: Lens[] = [
+  { id: "full-catering", label: "Caterers", labelHi: "कैटरर", icon: "🍲", match: inCategory("full-catering") },
+  { id: "single-stall", label: "Single Stall", labelHi: "सिंगल स्टॉल", icon: "🍢", match: inCategory("single-stall") },
+  { id: "live-stall", label: "Live Stall", labelHi: "लाइव स्टॉल", icon: "🍳", match: inCategory("live-stall") },
+  { id: "baina-box", label: "Baina Box", labelHi: "बैना बॉक्स", icon: "🎁", match: inCategory("baina-box") },
+  { id: "Silver", label: "Silver", labelHi: "सिल्वर", match: (v) => v.tiers.includes("Silver") },
+  { id: "Gold", label: "Gold", labelHi: "गोल्ड", match: (v) => v.tiers.includes("Gold") },
+  { id: "Platinum", label: "Platinum", labelHi: "प्लैटिनम", match: (v) => v.tiers.includes("Platinum") },
+  { id: "addons", label: "Add-ons", labelHi: "ऐड-ऑन", icon: "➕", match: (v) => listingOfferings(v).length > 0 },
+  { id: "essential", label: "Service Package", labelHi: "सर्विस पैकेज", icon: "🍽️", match: inCategory("essential") },
+];
+
+const LENS_BY_ID = new Map<string, Lens>(LENSES.map((l) => [l.id, l]));
+
 export default function VendorCatalog() {
   const { t, lang } = useLang();
   const locations = useLocations();
@@ -227,6 +278,11 @@ export default function VendorCatalog() {
     const tv = searchParams.get("tier");
     return TIER_OPTIONS.includes(tv as TierFilter) ? (tv as TierFilter) : ALL;
   });
+  // The "Add-ons" lens — caterers who run at least one of the counters/services
+  // the wizard's Extras step sells (pan, chaat, live woks, staff, decor…).
+  const [addOnsOnly, setAddOnsOnly] = useState<boolean>(
+    () => searchParams.get("addons") === "1",
+  );
   const [price, setPrice] = useState<PriceRange>(() => {
     const p = searchParams.get("price");
     if (PRICE_RANGES.some((r) => r.value === p)) return p as PriceRange;
@@ -314,9 +370,35 @@ export default function VendorCatalog() {
   // catalog: only location & price filters are relevant. Cuisine, tier, diet and
   // meal-type ("Serves") filters are hidden and neutralised below.
   const isBainaSearch = query.trim().toLowerCase().includes("baina");
-  // Picking the Baina Box category behaves exactly like a Baina search — the
-  // promo hero, the boxed heading and the slimmed-down filter set.
-  const bainaMode = isBainaSearch || category === "baina-box";
+  // Picking the Baina Box lens behaves exactly like a Baina search — the promo
+  // hero, the boxed heading and the slimmed-down filter set. Search text only
+  // *implies* the lens while nothing else is picked, so choosing Caterers or
+  // Platinum with "baina" still in the box does what the chip says.
+  const bainaMode =
+    category === "baina-box" ||
+    (isBainaSearch && category === "" && !addOnsOnly && tier === ALL);
+
+  /** The one active lens, read back off the filter states the chips write.
+   *  A category chip wins; a bare "baina" search implies the Baina lens;
+   *  otherwise it's the tier band or the add-ons pick. */
+  const lens: LensId = category
+    ? (category as LensId)
+    : bainaMode
+      ? "baina-box"
+      : addOnsOnly
+        ? "addons"
+        : tier !== ALL
+          ? tier
+          : "";
+
+  /** The lens row is single-select: picking one clears whatever else was set,
+   *  so the grid can only ever be showing — and tagging — one thing at a time. */
+  const selectLens = (next: LensId) => {
+    const asTier = isTierLens(next);
+    setCategory(asTier || next === "addons" ? "" : next);
+    setTier(asTier ? next : ALL);
+    setAddOnsOnly(next === "addons");
+  };
 
   // The filter controls that make sense for the current lens; anything hidden
   // is also neutralised in the result filter so a stale value can't silently
@@ -335,6 +417,15 @@ export default function VendorCatalog() {
   // Distinct cities, in first-seen order.
   const cityOptions = useMemo(
     () => Array.from(new Set(allVendors.map((v) => v.city))),
+    [allVendors],
+  );
+
+  // Distinct states that actually have vendors, alphabetical. Derived rather
+  // than listing all of `indianStates` — vendors can register from anywhere,
+  // but a filter offering 30-odd states that match nothing is just noise.
+  const stateOptions = useMemo(
+    () =>
+      Array.from(new Set(allVendors.map((v) => v.state).filter(Boolean))).sort(),
     [allVendors],
   );
 
@@ -388,6 +479,10 @@ export default function VendorCatalog() {
           : category === "" ||
             listingCateringCategories(v).includes(category);
 
+      // The Add-ons lens: caterers running at least one platform counter or
+      // service. Live vendors declare theirs, curated seeds derive them.
+      const matchesAddOns = !addOnsOnly || listingOfferings(v).length > 0;
+
       const matchesMeals =
         !visibleFilters.has("meals") ||
         meals.length === 0 ||
@@ -404,6 +499,7 @@ export default function VendorCatalog() {
       return (
         matchesQuery &&
         matchesCategory &&
+        matchesAddOns &&
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
         (!visibleFilters.has("cuisine") || cuisine === ALL || v.cuisines.includes(cuisine)) &&
@@ -448,6 +544,7 @@ export default function VendorCatalog() {
     query,
     bainaMode,
     category,
+    addOnsOnly,
     visibleFilters,
     city,
     state,
@@ -460,9 +557,28 @@ export default function VendorCatalog() {
     sort,
   ]);
 
+  /** How many caterers each lens would surface, counted against the always-on
+   *  search + location narrowing so the numbers track what the guest has
+   *  already scoped to. A lens nobody serves yet simply shows no count. */
+  const lensCounts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const inScope = allVendors.filter(
+      (v) =>
+        (q === "" ||
+          v.name.toLowerCase().includes(q) ||
+          v.cuisines.some((c) => c.toLowerCase().includes(q))) &&
+        (city === ALL || v.city === city) &&
+        (state === ALL || v.state === state),
+    );
+    const counts: Record<string, number> = {};
+    for (const l of LENSES) counts[l.id] = inScope.filter(l.match).length;
+    return counts;
+  }, [allVendors, query, city, state]);
+
   const hasActiveFilters =
     query !== "" ||
     category !== "" ||
+    addOnsOnly ||
     city !== ALL ||
     state !== ALL ||
     cuisine !== ALL ||
@@ -489,6 +605,7 @@ export default function VendorCatalog() {
   const resetFilters = () => {
     setQuery("");
     setCategory("");
+    setAddOnsOnly(false);
     setCity(ALL);
     setState(ALL);
     setCuisine(ALL);
@@ -562,30 +679,24 @@ export default function VendorCatalog() {
         )}
       </div>
 
-      {/* The catering categories, written out up front — pick one to focus
-          the grid and trim the filters to what that offering needs. */}
-      <CategoryChips
-        className="mt-4 px-1"
-        label={t("Catering categories", "कैटरिंग श्रेणियाँ")}
-      >
-        <CategoryChip
-          selected={category === "" && !bainaMode}
-          onClick={() => setCategory("")}
-        >
+      {/* Every way Bhojpatra sells, written out up front — categories, tier
+          bands and add-ons in one row. Pick one to focus the grid, trim the
+          filters to what that offering needs, and pin every card to that tag. */}
+      <CategoryChips className="mt-4 px-1" label={t("Browse by", "इसके अनुसार देखें")}>
+        <CategoryChip selected={lens === ""} onClick={() => selectLens("")}>
           {t("All", "सभी")}
         </CategoryChip>
-        {cateringCategories.map((c) => (
+        {LENSES.map((l) => (
           <CategoryChip
-            key={c.id}
-            selected={
-              category === c.id || (c.id === "baina-box" && bainaMode)
+            key={l.id}
+            selected={lens === l.id}
+            count={lensCounts[l.id]}
+            onClick={() => selectLens(lens === l.id ? "" : l.id)}
+            leftIcon={
+              l.icon ? <span aria-hidden="true">{l.icon}</span> : undefined
             }
-            onClick={() =>
-              setCategory((prev) => (prev === c.id ? "" : c.id))
-            }
-            leftIcon={<span aria-hidden="true">{c.icon}</span>}
           >
-            {lang === "hi" ? c.nameHi : c.name}
+            {lang === "hi" ? l.labelHi : l.label}
           </CategoryChip>
         ))}
       </CategoryChips>
@@ -724,7 +835,7 @@ export default function VendorCatalog() {
               onChange={setState}
               options={[
                 { value: ALL, label: t("All States", "सभी राज्य") },
-                ...indianStates.map((s) => ({ value: s, label: s })),
+                ...stateOptions.map((s) => ({ value: s, label: s })),
               ]}
             />
             {showFilter("cuisine") && (
@@ -795,7 +906,7 @@ export default function VendorCatalog() {
             onChange={setState}
             options={[
               { value: ALL, label: t("All States", "सभी राज्य") },
-              ...indianStates.map((s) => ({ value: s, label: s })),
+              ...stateOptions.map((s) => ({ value: s, label: s })),
             ]}
           />
           {showFilter("cuisine") && (
@@ -956,6 +1067,10 @@ export default function VendorCatalog() {
               vendor={vendor}
               stats={statFor(ratings, vendor)}
               isBainaSearch={isBainaSearch}
+              // Browsing a lens pins every card to it: a Gold search never
+              // shows a Silver tag, and a Single Stall search never shows a
+              // Baina Box one — even on a caterer who is genuinely all three.
+              lens={lens}
             />
           ))}
         </ul>
@@ -1039,10 +1154,15 @@ function VendorCard({
   vendor,
   stats,
   isBainaSearch,
+  lens,
 }: {
   vendor: VendorListing;
   stats?: VendorRatingSummary;
   isBainaSearch?: boolean;
+  /** The lens being browsed. The card then advertises that one thing — the
+   *  other categories and tier bands a vendor serves are irrelevant to this
+   *  search and would only muddy the result. */
+  lens: LensId;
 }) {
   const { t } = useLang();
   const { has, toggle, isFull } = useCompare();
@@ -1076,6 +1196,27 @@ function VendorCard({
         return tier;
     }
   };
+
+  // Exactly one tag rides on the photo, and the lens decides which. A tier lens
+  // pins it to the searched band (a Gold search never shows Silver, even on a
+  // caterer who serves both); a category or add-ons lens names that offering
+  // instead. Browsing with no lens falls back to the caterer's leading band.
+  const lensDef = lens ? LENS_BY_ID.get(lens) : undefined;
+  const shownTier = isTierLens(lens)
+    ? vendor.tiers.includes(lens)
+      ? lens
+      : undefined
+    : lens
+      ? undefined
+      : vendor.tiers[0];
+  const badge = shownTier
+    ? { label: tierBadgeLabel(shownTier), className: tierBadgeClass(shownTier) }
+    : lensDef
+      ? {
+          label: t(lensDef.label, lensDef.labelHi),
+          className: "bg-white/95 text-maroon",
+        }
+      : undefined;
 
   const dietBadgeLabel = (value: VendorListing["diet"]): string => {
     switch (value) {
@@ -1198,14 +1339,14 @@ function VendorCard({
               {t("New", "नया")}
             </span>
           )}
-          {vendor.tiers[0] && (
+          {badge && (
             <span
               className={
                 "rounded px-1.5 py-0.5 text-[10px] font-semibold shadow-sm " +
-                tierBadgeClass(vendor.tiers[0])
+                badge.className
               }
             >
-              {tierBadgeLabel(vendor.tiers[0])}
+              {badge.label}
             </span>
           )}
         </div>

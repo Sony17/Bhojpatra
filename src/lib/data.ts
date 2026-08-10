@@ -1486,6 +1486,12 @@ export interface CategoryVendor {
    *  the fixed Silver/Gold rosters. Absent on the static fallback fixture, where
    *  no tier gate is applied (behaviour stays unchanged until /api/menu answers). */
   tiers?: ("Silver" | "Gold" | "Platinum")[];
+  /** How many dishes this vendor lets a guest pick from THIS course, per feast
+   *  band — set by the caterer in their dashboard and overriding the platform's
+   *  `packageCategoryItems` for them alone. A missing tier keeps the platform
+   *  number; `0` drops the vendor from this course's roster on that band.
+   *  Absent on the static fallback fixture and on curated seeds. */
+  tierItems?: Partial<Record<"Silver" | "Gold" | "Platinum", number>>;
   /** Minimum advance-booking notice (in days) this stall needs before the event —
    *  the "as per vendor specification" rule for the Custom single-stall flow.
    *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */
@@ -1649,6 +1655,50 @@ export const menuCategories: MenuCategory[] = [
     ],
   },
   {
+    id: "pizza",
+    name: "Pizza",
+    nameHi: "पिज़्ज़ा",
+    icon: "🍕",
+    blurb: "Hand-tossed pizzas, baked live at the counter.",
+    blurbHi: "काउंटर पर ताज़ा बेक होते हैंड-टॉस्ड पिज़्ज़ा।",
+    vendors: [
+      { id: "pz-forno", name: "Forno Live", rating: 4.8, reviews: 214, perPlate: 120, image: vImg("photo-1513104890138-7c749659a591"),
+        items: mkItems("pz-forno", [["Margherita"], ["Farmhouse"], ["Tandoori Paneer"], ["Corn & Olive"], ["Chicken Tikka Pizza", "non-veg"], ["Four Cheese"]]) },
+      { id: "pz-napoli", name: "Napoli Express", rating: 4.7, reviews: 178, perPlate: 110, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pz-napoli", [["Margherita"], ["Veggie Supreme"], ["Peri Peri Paneer"], ["Pesto Veg"], ["BBQ Chicken", "non-veg"], ["Cheese Burst"]]) },
+      { id: "pz-woodfire", name: "Wood-Fired Co.", rating: 4.8, reviews: 236, perPlate: 140, image: vImg("photo-1513104890138-7c749659a591"),
+        items: mkItems("pz-woodfire", [["Margherita"], ["Four Cheese"], ["Tandoori Paneer"], ["Farmhouse"], ["Chicken Tikka Pizza", "non-veg"], ["Mushroom & Truffle"]]) },
+      { id: "pz-slice", name: "Slice Society", rating: 4.6, reviews: 152, perPlate: 95, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pz-slice", [["Margherita"], ["Corn & Olive"], ["Veggie Supreme"], ["Cheese Burst"], ["Peri Peri Paneer"], ["Farmhouse"]]) },
+      { id: "pz-crust", name: "Crust & Co.", rating: 4.7, reviews: 190, perPlate: 125, image: vImg("photo-1513104890138-7c749659a591"),
+        items: mkItems("pz-crust", [["Thin Crust Margherita"], ["Pesto Veg"], ["Four Cheese"], ["Tandoori Paneer"], ["BBQ Chicken", "non-veg"], ["Mushroom & Truffle"]]) },
+      { id: "pz-mill", name: "Margherita Mill", rating: 4.6, reviews: 141, perPlate: 100, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pz-mill", [["Margherita"], ["Farmhouse"], ["Corn & Olive"], ["Veggie Supreme"], ["Cheese Burst"], ["Peri Peri Paneer"]]) },
+    ],
+  },
+  {
+    id: "pasta",
+    name: "Pasta",
+    nameHi: "पास्ता",
+    icon: "🍝",
+    blurb: "Pastas tossed to order in front of guests.",
+    blurbHi: "मेहमानों के सामने ऑर्डर पर बनते पास्ता।",
+    vendors: [
+      { id: "pa-alfredo", name: "Alfredo Station", rating: 4.8, reviews: 205, perPlate: 110, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("pa-alfredo", [["Penne Alfredo"], ["White Sauce Pasta"], ["Mac & Cheese"], ["Aglio e Olio"], ["Chicken Alfredo", "non-veg"], ["Baked Pasta"]]) },
+      { id: "pa-roma", name: "Roma Pasta Bar", rating: 4.7, reviews: 176, perPlate: 100, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pa-roma", [["Arrabbiata"], ["Pesto Pasta"], ["Spaghetti Napolitana"], ["Penne Alfredo"], ["Aglio e Olio"], ["Lasagna"]]) },
+      { id: "pa-penne", name: "Penne Lane", rating: 4.6, reviews: 148, perPlate: 90, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("pa-penne", [["Penne Alfredo"], ["Arrabbiata"], ["Mac & Cheese"], ["White Sauce Pasta"], ["Pesto Pasta"], ["Baked Pasta"]]) },
+      { id: "pa-basil", name: "Basil & Cream", rating: 4.7, reviews: 192, perPlate: 115, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pa-basil", [["Pesto Pasta"], ["Ravioli"], ["Penne Alfredo"], ["Lasagna"], ["Aglio e Olio"], ["Chicken Alfredo", "non-veg"]]) },
+      { id: "pa-tossed", name: "Tossed Live", rating: 4.6, reviews: 134, perPlate: 85, image: vImg("photo-1585032226651-759b368d7246"),
+        items: mkItems("pa-tossed", [["Arrabbiata"], ["White Sauce Pasta"], ["Aglio e Olio"], ["Mac & Cheese"], ["Spaghetti Napolitana"], ["Pesto Pasta"]]) },
+      { id: "pa-olive", name: "Olive Kitchen", rating: 4.8, reviews: 218, perPlate: 125, image: vImg("photo-1567188040759-fb8a883dc6d8"),
+        items: mkItems("pa-olive", [["Ravioli"], ["Lasagna"], ["Pesto Pasta"], ["Penne Alfredo"], ["Baked Pasta"], ["Chicken Alfredo", "non-veg"]]) },
+    ],
+  },
+  {
     id: "main",
     name: "Main Course",
     nameHi: "मेन कोर्स",
@@ -1668,6 +1718,28 @@ export const menuCategories: MenuCategory[] = [
         items: mkItems("mc-mughal", [["Shahi Paneer"], ["Dal Bukhara"], ["Mutton Korma", "non-veg"], ["Murgh Makhani", "non-veg"], ["Hyderabadi Biryani"], ["Sheermal"]]) },
       { id: "mc-rasoi", name: "Rasoi Royale", rating: 4.7, reviews: 221, perPlate: 80, image: vImg("photo-1414235077428-338989a2e8c0"),
         items: mkItems("mc-rasoi", [["Kadhai Paneer"], ["Dal Tadka"], ["Veg Biryani"], ["Chicken Curry", "non-veg"], ["Mix Veg"], ["Butter Naan"]]) },
+    ],
+  },
+  {
+    id: "breads",
+    name: "Breads",
+    nameHi: "ब्रेड",
+    icon: "🫓",
+    blurb: "Tandoori rotis, naans and parathas, hot off the tandoor.",
+    blurbHi: "तंदूर से गरमागरम रोटी, नान और पराठे।",
+    vendors: [
+      { id: "br-tandoor", name: "Tandoor Roti House", rating: 4.8, reviews: 226, perPlate: 35, image: vImg("photo-1414235077428-338989a2e8c0"),
+        items: mkItems("br-tandoor", [["Butter Naan"], ["Tandoori Roti"], ["Lachha Parantha"], ["Garlic Naan"], ["Missi Roti"], ["Rumali Roti"]]) },
+      { id: "br-naan", name: "Naan Nirvana", rating: 4.7, reviews: 184, perPlate: 40, image: vImg("photo-1556910103-1c02745aae4d"),
+        items: mkItems("br-naan", [["Butter Naan"], ["Garlic Naan"], ["Cheese Naan"], ["Kulcha"], ["Tandoori Roti"], ["Lachha Parantha"]]) },
+      { id: "br-sheermal", name: "Sheermal & Co.", rating: 4.8, reviews: 198, perPlate: 45, image: vImg("photo-1414235077428-338989a2e8c0"),
+        items: mkItems("br-sheermal", [["Sheermal"], ["Taftan"], ["Rumali Roti"], ["Butter Naan"], ["Khasta Roti"], ["Warqi Parantha"]]) },
+      { id: "br-chulha", name: "Chulha Breads", rating: 4.6, reviews: 142, perPlate: 28, image: vImg("photo-1556910103-1c02745aae4d"),
+        items: mkItems("br-chulha", [["Tandoori Roti"], ["Missi Roti"], ["Bajre ki Roti"], ["Makki di Roti"], ["Puri"], ["Lachha Parantha"]]) },
+      { id: "br-parantha", name: "Parantha Point", rating: 4.7, reviews: 167, perPlate: 38, image: vImg("photo-1414235077428-338989a2e8c0"),
+        items: mkItems("br-parantha", [["Lachha Parantha"], ["Aloo Parantha"], ["Pudina Parantha"], ["Warqi Parantha"], ["Puri"], ["Bhatura"]]) },
+      { id: "br-kulcha", name: "Kulcha King", rating: 4.6, reviews: 155, perPlate: 32, image: vImg("photo-1556910103-1c02745aae4d"),
+        items: mkItems("br-kulcha", [["Amritsari Kulcha"], ["Stuffed Kulcha"], ["Butter Naan"], ["Bhatura"], ["Tandoori Roti"], ["Garlic Naan"]]) },
     ],
   },
   {
@@ -1705,10 +1777,10 @@ export const menuCategories: MenuCategory[] = [
  *   • Custom  — everything (build your own)
  */
 export const packageCategories: Record<string, string[]> = {
-  silver: ["welcome", "starters", "main", "sweets"],
-  gold: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "main", "sweets"],
-  platinum: ["welcome", "starters", "chaat", "live", "main", "sweets"],
-  custom: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "main", "sweets"],
+  silver: ["welcome", "starters", "main", "breads", "sweets"],
+  gold: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "pizza", "pasta", "main", "breads", "sweets"],
+  platinum: ["welcome", "starters", "chaat", "live", "pizza", "pasta", "main", "breads", "sweets"],
+  custom: ["welcome", "starters", "live", "chaat", "chinese", "south-indian", "pizza", "pasta", "main", "breads", "sweets"],
 };
 
 /**
@@ -1723,6 +1795,8 @@ export const LIVE_STALL_CATEGORY_IDS = [
   "chaat",
   "chinese",
   "south-indian",
+  "pizza",
+  "pasta",
 ] as const;
 
 /** True when a menu category id is a live-station segment (see above). */
@@ -1735,10 +1809,10 @@ export const isLiveStallCategory = (id: string): boolean =>
  * Keys are kept in step with `packageCategories` above.
  */
 export const packageCategoryItems: Record<string, Record<string, number>> = {
-  silver: { welcome: 1, starters: 2, main: 3, sweets: 1 },
-  gold: { welcome: 1, starters: 5, live: 1, chaat: 2, chinese: 2, "south-indian": 2, main: 5, sweets: 3 },
-  platinum: { welcome: 2, starters: 6, chaat: 3, live: 2, main: 6, sweets: 4 },
-  custom: { welcome: 2, starters: 6, live: 2, chaat: 3, chinese: 3, "south-indian": 3, main: 6, sweets: 4 },
+  silver: { welcome: 1, starters: 2, main: 3, breads: 1, sweets: 1 },
+  gold: { welcome: 1, starters: 5, live: 1, chaat: 2, chinese: 2, "south-indian": 2, pizza: 2, pasta: 2, main: 5, breads: 2, sweets: 3 },
+  platinum: { welcome: 2, starters: 6, chaat: 3, live: 2, pizza: 3, pasta: 3, main: 6, breads: 2, sweets: 4 },
+  custom: { welcome: 2, starters: 6, live: 2, chaat: 3, chinese: 3, "south-indian": 3, pizza: 3, pasta: 3, main: 6, breads: 2, sweets: 4 },
 };
 
 /** Base per-plate price for a package id (₹). Custom bills only what's chosen. */
@@ -1811,6 +1885,15 @@ export interface VendorListing {
    *  vendors carry their dashboard-declared set; curated seeds omit this and
    *  the catalog derives it via `listingCateringCategories`. */
   serviceCategories?: string[];
+  /** Add-on counters & services the vendor declared (`vendorOfferings` ids).
+   *  Live vendors carry their dashboard-declared set; curated seeds omit this
+   *  and the catalog derives it via `listingOfferings`. */
+  offerings?: string[];
+  /** Per-counter spread — offering id → the items this vendor actually serves
+   *  on it: their pick of the platform set menu plus anything they added
+   *  themselves. Only present for counters the vendor edited in their
+   *  dashboard; a missing key means the whole platform set menu. */
+  offeringItems?: Record<string, AddOnMenuItem[]>;
   /** The vendor's signature dishes — exactly four dish names they self-select
    *  as what they're famous for, shown as tags on the catalog card. Absent /
    *  empty when the vendor hasn't chosen four. */
@@ -1909,9 +1992,22 @@ export function servingTimeLabel(mealTime?: string, eventTime?: string): string 
     .join(" · ");
 }
 
+/** Every Indian state and union territory, alphabetical — the canonical
+ *  spelling for a vendor's / venue's `state`. Vendor-facing forms pick from
+ *  this list rather than free text so the catalog's State filter (which matches
+ *  the string exactly) can never miss a listing over "Uttarpradesh" vs
+ *  "Uttar Pradesh". Keep "Delhi" spelled exactly so — the seeded listings and
+ *  live rows use it. The catalog filter itself lists only the states that
+ *  actually have vendors, so growing this list doesn't bloat it. */
 export const indianStates: string[] = [
-  "Uttar Pradesh", "Delhi", "Maharashtra", "Karnataka", "West Bengal",
-  "Telangana", "Rajasthan", "Tamil Nadu",
+  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam",
+  "Bihar", "Chandigarh", "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat",
+  "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka",
+  "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+  "Uttarakhand", "West Bengal",
 ];
 
 export const vendorListings: VendorListing[] = [
@@ -2357,6 +2453,24 @@ export function listingCateringCategories(v: VendorListing): string[] {
   if (v.mealTypes.includes("Live Counters")) cats.push("live-stall");
   if (v.cuisines.includes("Baina Boxes")) cats.push("baina-box");
   return cats;
+}
+
+/** Add-on counters & services a catalog listing runs — the /vendors "Add-ons"
+ *  lens, drawn from the same vocabulary the /book wizard's Extras step sells
+ *  (`addOns` / `vendorOfferings`). Live vendors declare theirs (`offerings`);
+ *  curated seeds derive from what the listing already shows: a live-counter
+ *  caterer runs the live station, a chaat / beverage / decor specialist runs
+ *  their namesake counter, and a dessert menu implies the sweets counter. */
+export function listingOfferings(v: VendorListing): string[] {
+  if (v.offerings?.length) return v.offerings;
+  const ids: string[] = [];
+  if (v.mealTypes.includes("Live Counters")) ids.push("live");
+  if (v.cuisines.includes("Chaat")) ids.push("chaat");
+  if (v.cuisines.includes("Beverages")) ids.push("mocktail", "coffee");
+  if (v.cuisines.includes("Decor")) ids.push("decor");
+  if (v.mealTypes.includes("Desserts") || v.cuisines.includes("Sweets"))
+    ids.push("dessert");
+  return ids;
 }
 
 /* ───────────────────────────────────────────────────────────────────────

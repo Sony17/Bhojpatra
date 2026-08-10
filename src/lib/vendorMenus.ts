@@ -25,17 +25,24 @@ import {
   type TopVendors,
 } from "@/lib/topVendorsData";
 import {
+  addOnMenu,
   cateringCategories,
   cateringCategoryIds,
   menuCategories,
   vendorListings,
   vendorOfferings,
   vendorOfferingIds,
+  type AddOnMenuItem,
   type DietType,
   type MenuCategory,
   type VendorListing,
 } from "@/lib/data";
-import { parseTiers, sortTiers, type VendorTier } from "@/lib/admin/types";
+import {
+  TIER_ORDER,
+  parseTiers,
+  sortTiers,
+  type VendorTier,
+} from "@/lib/admin/types";
 
 export interface VendorMenuItem {
   name: string;
@@ -64,6 +71,13 @@ export interface VendorMenuSection {
   items: VendorMenuItem[];
   /** Paused by the vendor: dishes stay saved but customers don't see them. */
   hidden?: boolean;
+  /** How many dishes this vendor lets a guest pick from this course, per feast
+   *  band — the vendor's own answer to the platform's `packageCategoryItems`.
+   *  A tier that's absent falls back to the platform number; `0` means the
+   *  vendor doesn't serve this course on that band at all, so the /book wizard
+   *  leaves them out of its roster there. Lets a caterer say "Silver gets 2
+   *  starters, Platinum gets 6" and drop a segment from the cheaper bands. */
+  tierItems?: Partial<Record<VendorTier, number>>;
 }
 
 /** One Baina Box the vendor sells — the sweet/gifting boxes customers browse
@@ -109,7 +123,31 @@ export interface VendorCounter {
   id: string;
   /** Vendor's own price (₹); falls back to the platform default when absent. */
   price?: number;
+  /** Which sub-items of the counter's platform set menu (`addOnMenus[id]`) this
+   *  vendor actually serves, by item name. Absent = the whole list, so a vendor
+   *  who never touches the picker keeps offering everything; an empty array is
+   *  meaningful and means "none of theirs, only my own `extras`". */
+  items?: string[];
+  /** The vendor's own additions to this counter — dishes (or, on a service,
+   *  inclusions) the platform set menu never named. Shown alongside the picked
+   *  platform items wherever the counter's spread is listed. */
+  extras?: VendorCounterExtra[];
+  /** Paused by the vendor: the counter (its rate, its spread and the vendor's
+   *  own extras) stays saved but drops off every customer surface, exactly like
+   *  a hidden menu section. Lets a caterer park a counter they're between
+   *  suppliers on without losing what they typed. */
+  hidden?: boolean;
 }
+
+/** One vendor-authored item on a counter. `diet` is carried for counters (the
+ *  veg / non-veg mark customers read) and left off for service inclusions. */
+export interface VendorCounterExtra {
+  name: string;
+  diet?: DietType;
+}
+
+/** Most items a vendor may add to a single counter beyond the platform list. */
+const MAX_COUNTER_EXTRAS = 12;
 
 export interface LiveVendorRecord {
   id: string;
@@ -329,13 +367,17 @@ export async function ensureSeededVendors(): Promise<LiveVendorRecord[]> {
   const rows = stored.map(normalizeVendorItems);
   const repaired = rows.filter((r, i) => r !== stored[i]);
   if (repaired.length) await store.upsertMany(repaired);
-  // Back-fill placeholder specialists added after the store was first seeded:
-  // seeding only runs on an empty store, so an existing DB would never gain
-  // them (and the catalog "Book" hand-off would keep failing to resolve). Only
-  // the ids that are actually missing are written — a one-time top-up that
-  // never overwrites an admin edit or a re-onboarded vendor on the same id.
+  // Back-fill seeds added after the store was first seeded: seeding only runs
+  // on an empty store, so an existing DB would never gain them — a placeholder
+  // specialist's "Book" hand-off would keep failing to resolve, and a course
+  // added to the taxonomy later (Breads, Pizza, Pasta) would open with an empty
+  // roster. Only the ids that are actually missing are written — a one-time
+  // top-up that never overwrites an admin edit or a re-onboarded vendor on the
+  // same id.
   const have = new Set(rows.map((r) => r.id));
-  const missing = placeholderSpecialistSeeds().filter((s) => !have.has(s.id));
+  const missing = [...seedRecords(), ...placeholderSpecialistSeeds()].filter(
+    (s) => !have.has(s.id),
+  );
   if (missing.length === 0) return rows;
   await store.upsertMany(missing);
   return [...rows, ...missing];
@@ -404,6 +446,11 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           // identical to the catalog card (`toVendorListing`), so the wizard's
           // tier lens and the /vendors listing agree on where a vendor sits.
           tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
+          // The caterer's own per-band dish quota for this course, when they
+          // set one — the wizard prefers it over `packageCategoryItems`.
+          ...(section.tierItems && Object.keys(section.tierItems).length
+            ? { tierItems: section.tierItems }
+            : {}),
           items: section.items.map((it, i) => ({
             id: `${r.id}-${i}`,
             name: it.name,
@@ -444,7 +491,10 @@ const CATEGORY_MEAL_TYPES: Record<string, string[]> = {
   chaat: ["Live Counters"],
   chinese: ["Main Course"],
   "south-indian": ["Breakfast", "Main Course"],
+  pizza: ["Live Counters"],
+  pasta: ["Live Counters"],
   main: ["Lunch", "Dinner", "Main Course"],
+  breads: ["Main Course"],
   sweets: ["Desserts"],
 };
 
@@ -471,7 +521,9 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
       ...visible.flatMap((s) => CATEGORY_MEAL_TYPES[s.categoryId] ?? []),
       // A declared Hi-tea add-on counter advertises the 4–6 PM chai-nasta
       // service on the catalog's "Serves" filter — no menu section maps to it.
-      ...(r.counters?.some((c) => c.id === "hi-tea") ? ["Hi-tea"] : []),
+      ...(r.counters?.some((c) => c.id === "hi-tea" && !c.hidden)
+        ? ["Hi-tea"]
+        : []),
     ]),
   );
   return {
@@ -494,6 +546,24 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     image: r.image,
     ...(r.serviceCategories?.length
       ? { serviceCategories: r.serviceCategories }
+      : {}),
+    // Declared counters & services drive the catalog's "Add-ons" lens, and the
+    // per-counter spread travels with them so the /book wizard lists this
+    // vendor's own items rather than the untrimmed platform set menu. Only
+    // counters the vendor actually edited carry a list.
+    ...(r.counters?.length
+      ? {
+          offerings: r.counters.map((c) => c.id),
+          ...(r.counters.some((c) => c.items || c.extras?.length)
+            ? {
+                offeringItems: Object.fromEntries(
+                  r.counters
+                    .filter((c) => c.items || c.extras?.length)
+                    .map((c) => [c.id, counterItems(c)]),
+                ),
+              }
+            : {}),
+        }
       : {}),
     // Signature dishes: only surface names that still map to a visible menu
     // item (a later menu edit could have removed one). Kept in the vendor's
@@ -556,6 +626,10 @@ export interface PublicVendorProfile {
     price: number;
     perPlate: boolean;
     category: string;
+    /** The counter's set-menu items this vendor serves (dishes for a counter,
+     *  inclusions for a service) — the whole platform list unless they trimmed
+     *  it in the dashboard. */
+    items: AddOnMenuItem[];
   }[];
   /** Catering categories the vendor serves, resolved for display — the same
    *  offering types the customer frontend sells (see `cateringCategories`). */
@@ -609,6 +683,9 @@ export function resolveVendorCounters(
 ): PublicVendorProfile["counters"] {
   if (!counters?.length) return [];
   return counters.flatMap((c) => {
+    // A paused counter stays in the vendor's record but off every customer
+    // surface — same rule a hidden menu section follows.
+    if (c.hidden) return [];
     const o = vendorOfferings.find((v) => v.id === c.id);
     if (!o) return [];
     return [
@@ -620,9 +697,33 @@ export function resolveVendorCounters(
         price: c.price ?? o.price,
         perPlate: o.perPlate,
         category: o.category,
+        items: counterItems(c),
       },
     ];
   });
+}
+
+/** The set-menu items a declared counter actually serves: the vendor's own
+ *  selection projected back onto the platform list (so order and Hindi names
+ *  stay ours) or the full list when they haven't trimmed it, followed by
+ *  whatever they added themselves. A vendor-authored item has no translation,
+ *  so it reads the same in both languages. */
+export function counterItems(c: VendorCounter): AddOnMenuItem[] {
+  const platform = addOnMenu(c.id);
+  let kept = platform;
+  if (c.items) {
+    const picked = new Set(c.items);
+    kept = platform.filter((m) => picked.has(m.name));
+  }
+  const extras = (c.extras ?? []).map((e) => ({
+    name: e.name,
+    nameHi: e.name,
+    ...(e.diet ? { diet: e.diet } : {}),
+  }));
+  const spread = [...kept, ...extras];
+  // A counter that resolves to nothing (a platform item renamed out from under
+  // a saved pick, say) falls back to the full list rather than reading empty.
+  return spread.length ? spread : platform;
 }
 
 /** Project a record for the public detail page, or null when the vendor
@@ -919,11 +1020,23 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
         ...(price !== null && price > 0 ? { price } : {}),
       });
     }
+    // The vendor's own per-band dish quota for this course. Only the three
+    // known bands are read, each clamped to a sane count; `0` is meaningful
+    // ("I don't serve this course on that band") so it survives, while a blank
+    // / invalid entry is simply dropped back to the platform number.
+    const tierItems: Partial<Record<VendorTier, number>> = {};
+    const rawTierItems = (s.tierItems ?? {}) as Record<string, unknown>;
+    for (const tier of TIER_ORDER) {
+      const n = cleanMoney(rawTierItems[tier], MAX_ITEMS_PER_SECTION);
+      if (n !== null) tierItems[tier] = n;
+    }
+
     menu.push({
       categoryId,
       perPlate,
       items,
       ...(s.hidden === true ? { hidden: true } : {}),
+      ...(Object.keys(tierItems).length ? { tierItems } : {}),
     });
   }
 
@@ -952,6 +1065,11 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
 
   // Live counters & services — each must be a known platform offering; an
   // optional own-price overrides the platform default. Duplicates are dropped.
+  // `items` narrows the counter's platform set menu to what this vendor serves:
+  // only names on that menu survive, and picking all of them (or none) is
+  // stored as "the whole list" so the default stays implicit. `extras` are the
+  // vendor's own additions — free text, so they're length-capped, de-duped, and
+  // never allowed to shadow a platform item name.
   const counters: VendorCounter[] = [];
   if (Array.isArray(body.counters)) {
     const seenCounters = new Set<string>();
@@ -961,7 +1079,53 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       if (!OFFERING_IDS.has(id) || seenCounters.has(id)) continue;
       seenCounters.add(id);
       const price = cleanMoney(c.price, 1_000_000);
-      counters.push({ id, ...(price ? { price } : {}) });
+      const setMenu = addOnMenu(id);
+      const allowed = new Set(setMenu.map((m) => m.name));
+      const picked = Array.isArray(c.items)
+        ? Array.from(
+            new Set(
+              c.items
+                .slice(0, allowed.size)
+                .map((n) => cleanString(n, 80))
+                .filter((n) => allowed.has(n)),
+            ),
+          )
+        : [];
+
+      // A service lists inclusions, which carry no veg / non-veg mark.
+      const isService =
+        vendorOfferings.find((o) => o.id === id)?.category === "service";
+      const extras: VendorCounterExtra[] = [];
+      if (Array.isArray(c.extras)) {
+        const seenExtras = new Set(allowed);
+        for (const rawExtra of c.extras.slice(0, MAX_COUNTER_EXTRAS)) {
+          const e = (rawExtra ?? {}) as Record<string, unknown>;
+          const name = cleanString(e.name, 80);
+          if (!name || seenExtras.has(name)) continue;
+          seenExtras.add(name);
+          extras.push({
+            name,
+            ...(isService ? {} : { diet: e.diet === "non-veg" ? "non-veg" : "veg" }),
+          });
+        }
+      }
+
+      // Ticking every platform item is the default, so it isn't stored — unless
+      // the vendor added their own, where "all of ours plus theirs" has to be
+      // told apart from a later platform item joining the list. An empty pick
+      // is stored (the vendor serves only their own) but never one that would
+      // leave the counter with nothing on it.
+      const pin =
+        Array.isArray(c.items) &&
+        picked.length + extras.length > 0 &&
+        (picked.length < allowed.size || extras.length > 0);
+      counters.push({
+        id,
+        ...(price ? { price } : {}),
+        ...(c.hidden === true ? { hidden: true } : {}),
+        ...(pin ? { items: picked } : {}),
+        ...(extras.length ? { extras } : {}),
+      });
     }
   }
 
