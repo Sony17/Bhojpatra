@@ -48,8 +48,16 @@ export async function GET(
   if (!venue || !isVenuePublic(venue)) {
     return Response.json({ error: "Venue not found." }, { status: 404 });
   }
+  // Sanitize the gallery on the way out as well — a stored non-servable URL
+  // must never reach a `next/image` and crash the detail page.
   return Response.json({
-    venue: { ...venue, image: sanitizeVenueImage(venue.image) },
+    venue: {
+      ...venue,
+      image: sanitizeVenueImage(venue.image),
+      ...(venue.images
+        ? { images: venue.images.filter((s) => isServableVenueImage(s)) }
+        : {}),
+    },
   });
 }
 

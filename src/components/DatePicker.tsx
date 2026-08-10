@@ -28,6 +28,13 @@ function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** Local calendar date → `YYYY-MM-DD` (never UTC — `toISOString` shifts days). */
+function isoOf(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 function formatDate(d: Date, lang: "en" | "hi") {
   const month =
     lang === "hi" ? MONTHS_HI[d.getMonth()] : MONTHS[d.getMonth()].slice(0, 3);
@@ -45,6 +52,7 @@ export default function DatePicker({
   defaultDaysAhead,
   valueIso,
   minDaysAhead = 1,
+  bookedDates,
   onChange,
 }: {
   placeholder?: string;
@@ -66,6 +74,9 @@ export default function DatePicker({
   /** Minimum advance notice, in days — dates before `today + minDaysAhead` are
    *  disabled (e.g. a wedding that needs 30 days' lead). Defaults to 1 (tomorrow). */
   minDaysAhead?: number;
+  /** Dates already taken as `YYYY-MM-DD` — a venue's existing bookings. These
+   *  paint red and can't be picked, and a legend explains the colour. */
+  bookedDates?: string[];
   onChange?: (date: Date) => void;
 }) {
   const { lang, t } = useLang();
@@ -143,6 +154,9 @@ export default function DatePicker({
   }, [open, positionPopup]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
+
+  // Already-taken dates, as a set for O(1) lookup while painting the grid.
+  const booked = useMemo(() => new Set(bookedDates ?? []), [bookedDates]);
 
   // The earliest selectable day — today plus the required advance notice. Dates
   // before this are disabled in the grid (defaults to tomorrow).
@@ -314,9 +328,11 @@ export default function DatePicker({
           <div className="grid grid-cols-7 gap-0.5">
             {cells.map((date, i) => {
               if (!date) return <div key={i} className="h-9" />;
+              // Already booked at this venue — shown, but not pickable.
+              const isBooked = booked.has(isoOf(date));
               // Disabled = before the earliest allowed date (past days, plus any
               // that fall short of the occasion's required lead time).
-              const isDisabled = date < minDate;
+              const isDisabled = date < minDate || isBooked;
               const isToday = date.getTime() === today.getTime();
               const isSel =
                 selected !== null && date.getTime() === selected.getTime();
@@ -326,6 +342,11 @@ export default function DatePicker({
                   type="button"
                   disabled={isDisabled}
                   aria-pressed={isSel}
+                  aria-label={
+                    isBooked
+                      ? `${date.getDate()} — ${t("already booked", "पहले से बुक")}`
+                      : undefined
+                  }
                   onClick={() => {
                     setSelected(date);
                     onChange?.(date);
@@ -334,11 +355,13 @@ export default function DatePicker({
                   className={`flex h-9 items-center justify-center rounded-lg text-sm transition-colors ${
                     isSel
                       ? "bg-maroon font-semibold text-cream"
-                      : isDisabled
-                        ? "cursor-not-allowed text-ink/25"
-                        : isToday
-                          ? "font-semibold text-maroon hover:bg-cream/60"
-                          : "text-ink hover:bg-cream/60"
+                      : isBooked
+                        ? "cursor-not-allowed bg-maroon/15 font-semibold text-maroon line-through"
+                        : isDisabled
+                          ? "cursor-not-allowed text-ink/25"
+                          : isToday
+                            ? "font-semibold text-maroon hover:bg-cream/60"
+                            : "text-ink hover:bg-cream/60"
                   }`}
                 >
                   {date.getDate()}
@@ -346,6 +369,17 @@ export default function DatePicker({
               );
             })}
           </div>
+
+          {/* Legend — only worth the space once there's something red to explain. */}
+          {booked.size > 0 && (
+            <p className="mt-2 flex items-center gap-1.5 border-t border-cream-3 pt-2 text-xs text-ink/60">
+              <span
+                aria-hidden="true"
+                className="inline-block h-3 w-3 shrink-0 rounded bg-maroon/15"
+              />
+              {t("Already booked — pick another date", "पहले से बुक — दूसरी तारीख़ चुनें")}
+            </p>
+          )}
           </div>,
           document.body,
         )}

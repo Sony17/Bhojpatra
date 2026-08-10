@@ -6,7 +6,10 @@ import {
   isServableVenueImage,
   isVenuePublic,
   isVenueSpaceKey,
+  clampUnits,
   VENUE_MAX_IMAGES,
+  VENUE_MAX_UNITS,
+  VENUE_MAX_SPACE_UNITS,
   type VenueRecord,
   type VenueSpacePrice,
 } from "@/lib/venues";
@@ -101,7 +104,14 @@ export async function POST(request: Request) {
         );
       }
       if (!spaces.some((x) => x.key === s.key)) {
-        spaces.push({ key: s.key, price: spacePrice });
+        // How many of this space the venue has (2 lawns, 10 guest rooms). Halls
+        // and lawns each become their own selectable card, so they take the
+        // tighter cap; rooms are a quantity and take the larger one.
+        const units = clampUnits(
+          s.units,
+          s.key === "rooms" ? VENUE_MAX_UNITS : VENUE_MAX_SPACE_UNITS,
+        );
+        spaces.push({ key: s.key, price: spacePrice, units });
       }
     }
     // Guest rooms are on-request only — a venue can't be *just* rooms.

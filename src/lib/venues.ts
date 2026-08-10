@@ -51,6 +51,24 @@ export type VenueSpaceKey =
 export interface VenueSpacePrice {
   key: VenueSpaceKey;
   price: number;
+  /** How many of this space the venue has. Two lawns list as "Open Lawn 1" and
+   *  "Open Lawn 2" (each separately bookable); guest rooms use it as the
+   *  inventory the room counter is capped at. Absent = one. */
+  units?: number;
+}
+
+/** Ceiling on how many of one space a venue can declare (2 lawns, 40 rooms…).
+ *  Halls/lawns become one selectable card each, so they get the tighter cap. */
+export const VENUE_MAX_UNITS = 40;
+export const VENUE_MAX_SPACE_UNITS = 6;
+
+/** Guest rooms a venue is assumed to have when the owner didn't say. */
+export const VENUE_DEFAULT_ROOMS = 10;
+
+/** Sanitise an owner-entered unit count into `1…max`. */
+export function clampUnits(n: unknown, max = VENUE_MAX_UNITS): number {
+  const v = Math.round(Number(n));
+  return Number.isFinite(v) && v > 0 ? Math.min(v, max) : 1;
 }
 
 /** Cap on the photos a venue lists (cover = first). */
@@ -216,6 +234,10 @@ export function venueTypeLabel(type: string, lang: "en" | "hi"): string {
  * rooms offered per-room, `subject` to availability rather than booked online.
  */
 export interface VenueSpaceOption {
+  /** Unique id for this *instance* — "banquet", "lawn-1", "lawn-2", "rooms".
+   *  A venue with two lawns yields two options, each independently selectable,
+   *  so this (not `key`) is what a customer's selection is keyed on. */
+  id: string;
   key: VenueSpaceKey;
   en: string;
   hi: string;
@@ -225,12 +247,14 @@ export interface VenueSpaceOption {
   /** Offered on request, subject to availability (guest rooms) — not a hall the
    *  customer commits to and pays for online. */
   subject?: boolean;
+  /** Guest rooms only: how many the venue has, i.e. the counter's ceiling. */
+  units?: number;
 }
 
-/** Everything about a space category except its price — the fixed vocabulary
- *  the owner form offers and the customer surfaces label from. Order here is
- *  display order everywhere. */
-export const VENUE_SPACE_CATALOG: Omit<VenueSpaceOption, "price">[] = [
+/** Everything about a space category except its price/instance identity — the
+ *  fixed vocabulary the owner form offers and the customer surfaces label from.
+ *  Order here is display order everywhere. */
+export const VENUE_SPACE_CATALOG: Omit<VenueSpaceOption, "price" | "id">[] = [
   { key: "banquet", en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️" },
   { key: "lawn", en: "Open Lawn", hi: "खुला लॉन", icon: "🌿" },
   { key: "terrace", en: "Rooftop / Terrace", hi: "रूफ़टॉप / छत", icon: "🌇" },
@@ -249,11 +273,39 @@ export const VENUE_LAWN_PREMIUM = 1.2;
 export const VENUE_ROOM_RATE = 0.05;
 
 /**
- * The spaces a venue offers. When the owner set them explicitly (`spaces` on
- * the record), those categories + prices are the truth. Otherwise — seed and
- * legacy venues — the classic trio is derived from the headline fee: a banquet
- * hall (the "from" price), an open lawn (a step up), and guest rooms (per
- * room, subject to availability).
+ * Expand one space category into the individually bookable options it stands
+ * for. A venue with two lawns lists "Open Lawn 1" and "Open Lawn 2" — separate
+ * cards the customer ticks independently. Guest rooms are the exception: they
+ * stay a single card carrying the room inventory, because the customer picks a
+ * *quantity* of rooms rather than which particular room.
+ */
+function expandSpace(
+  base: Omit<VenueSpaceOption, "price" | "id">,
+  price: number,
+  units: number,
+): VenueSpaceOption[] {
+  if (base.subject) {
+    return [{ ...base, id: base.key, price, units: clampUnits(units) }];
+  }
+  const count = clampUnits(units, VENUE_MAX_SPACE_UNITS);
+  if (count <= 1) return [{ ...base, id: base.key, price }];
+  return Array.from({ length: count }, (_, i) => ({
+    ...base,
+    id: `${base.key}-${i + 1}`,
+    en: `${base.en} ${i + 1}`,
+    hi: `${base.hi} ${i + 1}`,
+    price,
+  }));
+}
+
+/**
+ * The spaces a venue offers, one entry per individually bookable space. When
+ * the owner set them explicitly (`spaces` on the record), those categories,
+ * prices and unit counts are the truth. Otherwise — seed and legacy venues —
+ * the classic trio is derived from the headline fee: a banquet hall (the "from"
+ * price), an open lawn (a step up), and guest rooms (per room, subject to
+ * availability). A lawn-type venue derives two lawns, since that's what a venue
+ * that leads with its lawn almost always has.
  */
 export function venueSpaceOptions(
   venue: Venue & { price?: number; spaces?: VenueSpacePrice[] },
@@ -262,7 +314,12 @@ export function venueSpaceOptions(
     // Catalog order, not submission order, so surfaces stay consistent.
     return VENUE_SPACE_CATALOG.flatMap((c) => {
       const set = venue.spaces!.find((s) => s.key === c.key);
-      return set && set.price > 0 ? [{ ...c, price: set.price }] : [];
+      if (!set || set.price <= 0) return [];
+      return expandSpace(
+        c,
+        set.price,
+        set.units ?? (c.key === "rooms" ? VENUE_DEFAULT_ROOMS : 1),
+      );
     });
   }
   const base =
@@ -270,16 +327,23 @@ export function venueSpaceOptions(
       ? venue.price
       : parseVenuePrice(venue.priceFrom);
   const rooms = Math.max(2000, Math.round((base * VENUE_ROOM_RATE) / 500) * 500);
+  const lawns = venue.type === "Open Lawn" ? 2 : 1;
   return [
-    { key: "banquet", en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️", price: base },
-    {
-      key: "lawn",
-      en: "Open Lawn",
-      hi: "खुला लॉन",
-      icon: "🌿",
-      price: Math.round(base * VENUE_LAWN_PREMIUM),
-    },
-    { key: "rooms", en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", price: rooms, subject: true },
+    ...expandSpace(
+      { key: "banquet", en: "Banquet Hall", hi: "बैंक्वेट हॉल", icon: "🏛️" },
+      base,
+      1,
+    ),
+    ...expandSpace(
+      { key: "lawn", en: "Open Lawn", hi: "खुला लॉन", icon: "🌿" },
+      Math.round(base * VENUE_LAWN_PREMIUM),
+      lawns,
+    ),
+    ...expandSpace(
+      { key: "rooms", en: "Guest Rooms", hi: "अतिथि कक्ष", icon: "🛏️", subject: true },
+      rooms,
+      VENUE_DEFAULT_ROOMS,
+    ),
   ];
 }
 
@@ -289,6 +353,49 @@ export function bookableSpaces(
   venue: Venue & { price?: number },
 ): VenueSpaceOption[] {
   return venueSpaceOptions(venue).filter((s) => !s.subject);
+}
+
+/** Localised name of one space instance ("Open Lawn 2" / "खुला लॉन 2"). */
+export function spaceName(s: VenueSpaceOption, lang: "en" | "hi"): string {
+  return lang === "hi" ? s.hi : s.en;
+}
+
+/**
+ * What the chosen spaces come to before tax: every ticked hall/lawn at its own
+ * fee, plus the per-room rate times however many guest rooms were asked for.
+ * A customer can book the hall *and* both lawns *and* six rooms in one go, so
+ * the quote is a sum rather than one selected space's price.
+ */
+export function venueQuote(
+  spaces: VenueSpaceOption[],
+  selectedIds: Iterable<string>,
+  roomCount = 0,
+): number {
+  const picked = new Set(selectedIds);
+  const halls = spaces
+    .filter((s) => !s.subject && picked.has(s.id))
+    .reduce((sum, s) => sum + s.price, 0);
+  const roomsSpace = spaces.find((s) => s.subject);
+  const rooms = roomsSpace
+    ? Math.max(0, Math.min(roomCount, roomsSpace.units ?? VENUE_DEFAULT_ROOMS)) *
+      roomsSpace.price
+    : 0;
+  return halls + rooms;
+}
+
+/** One entry per space *category* (both lawns collapse to "Open Lawn") — what
+ *  prose about the venue should list rather than every numbered instance. */
+export function venueSpaceKinds(
+  venue: Venue & { price?: number; spaces?: VenueSpacePrice[] },
+): VenueSpaceOption[] {
+  const seen = new Set<VenueSpaceKey>();
+  return venueSpaceOptions(venue).flatMap((s) => {
+    if (seen.has(s.key)) return [];
+    seen.add(s.key);
+    const base = VENUE_SPACE_CATALOG.find((c) => c.key === s.key);
+    // Strip the "1" suffix an expanded instance carries — prose wants the kind.
+    return [{ ...s, en: base?.en ?? s.en, hi: base?.hi ?? s.hi }];
+  });
 }
 
 /** "a, b और c" / "a, b and c" list joiner for the generated copy. */
@@ -311,7 +418,9 @@ export function venueDescription(
 ): string {
   const type = venueTypeLabel(venue.type, lang).toLowerCase();
   const locality = venue.location ? `${venue.location}, ` : "";
-  const explicit = venue.spaces?.length ? venueSpaceOptions(venue) : null;
+  // Prose lists categories, not numbered instances — "an open lawn", never
+  // "an open lawn 1 and an open lawn 2".
+  const explicit = venue.spaces?.length ? venueSpaceKinds(venue) : null;
   if (lang === "hi") {
     const cap = venue.capacity
       ? `, जिसमें ${venue.capacity.replace(/Guests/gi, "मेहमान")} की क्षमता है`
@@ -394,13 +503,40 @@ export function mergeVenues(registered: BookableVenue[]): BookableVenue[] {
  * Owner-registered venues live behind /api/venues; the seed catalogue ships in
  * the bundle. These helpers fetch the registered set and combine the two. */
 
+/**
+ * Venues already pulled down this session, keyed by id.
+ *
+ * The catalogue lists every venue in full, so by the time a customer taps a
+ * card we *already* hold that venue's record. Remembering it here lets the
+ * detail page paint instantly on the soft navigation instead of blocking on a
+ * fresh round trip (module state survives client-side navigation). The network
+ * fetch still runs behind the paint to refresh what's shown.
+ */
+const venueCache = new Map<string, BookableVenue>();
+
+/** Remember venues fetched by any surface so a later lookup is instant. */
+export function rememberVenues(list: BookableVenue[]): void {
+  for (const v of list) venueCache.set(v.id, v);
+}
+
+/**
+ * The venue we can render *right now* without waiting on the network — one
+ * cached from the catalogue, else the static seed. `undefined` means we hold
+ * nothing and the caller must wait for `fetchVenueById`.
+ */
+export function cachedVenue(id: string): BookableVenue | undefined {
+  return venueCache.get(id) ?? staticBookableVenues.find((v) => v.id === id);
+}
+
 /** Fetch every owner-registered venue (empty on any failure — seed still shows). */
 export async function fetchRegisteredVenues(): Promise<BookableVenue[]> {
   try {
     const res = await fetch("/api/venues");
     if (!res.ok) return [];
     const data = (await res.json()) as { venues?: VenueRecord[] };
-    return (data.venues ?? []).map(recordToBookable);
+    const venues = (data.venues ?? []).map(recordToBookable);
+    rememberVenues(venues);
+    return venues;
   } catch {
     return [];
   }
@@ -411,17 +547,30 @@ export async function fetchAllVenues(): Promise<BookableVenue[]> {
   return mergeVenues(await fetchRegisteredVenues());
 }
 
-/** Resolve one venue by id — checks the registered store, then the seed. */
+/**
+ * Resolve one venue by id — checks the registered store, then the seed.
+ *
+ * Hits `/api/venues/[id]`, which reads the single row by primary key. The old
+ * `/api/venues?id=` path pulled the *entire* venues table over the wire and
+ * filtered it in JS, which is what made tapping a venue card feel dead.
+ */
 export async function fetchVenueById(id: string): Promise<BookableVenue | null> {
   const fromSeed = staticBookableVenues.find((v) => v.id === id);
   try {
-    const res = await fetch(`/api/venues?id=${encodeURIComponent(id)}`);
+    const res = await fetch(`/api/venues/${encodeURIComponent(id)}`);
     if (res.ok) {
       const data = (await res.json()) as { venue?: VenueRecord | null };
-      if (data.venue) return recordToBookable(data.venue);
+      if (data.venue) {
+        const venue = recordToBookable(data.venue);
+        venueCache.set(venue.id, venue);
+        return venue;
+      }
     }
+    // A definitive miss (404 / unpublished) — only the seed can still answer.
+    return fromSeed ?? null;
   } catch {
-    /* offline — fall back to the seed */
+    // Offline or a network blip: keep whatever we already hold rather than
+    // downgrading an already-rendered venue to "not found".
+    return cachedVenue(id) ?? null;
   }
-  return fromSeed ?? null;
 }

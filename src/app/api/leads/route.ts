@@ -30,6 +30,10 @@ const CALLBACK_TOPICS = [
   "Rewards & referrals",
 ];
 
+/** How a venue enquiry asked to be followed up — the three hand-offs offered
+ *  on a venue page once the guest has entered their name and number. */
+const VENUE_TOPICS = ["Chat", "Call", "Site visit"];
+
 // De-duplicated by email (the id-field); a repeat sign-up updates in place.
 const store = createStore<Lead>({
   table: "leads",
@@ -71,15 +75,17 @@ export async function POST(request: Request) {
     "booking-intent",
     "home-booking-form",
     "support-callback",
+    "venue-enquiry",
   ];
   const leadSource =
     typeof source === "string" && ALLOWED_SOURCES.includes(source)
       ? source
       : "home-promo";
   const isCallback = leadSource === "support-callback";
+  const isVenue = leadSource === "venue-enquiry";
 
-  // A callback request is only actionable with a number to ring back on.
-  if (isCallback && !validPhone) {
+  // A callback or venue enquiry is only actionable with a number to ring back on.
+  if ((isCallback || isVenue) && !validPhone) {
     return Response.json(
       { error: "Please enter a valid 10-digit mobile number." },
       { status: 400 },
@@ -94,8 +100,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const allowedTopics = isVenue ? VENUE_TOPICS : CALLBACK_TOPICS;
   const cleanTopic =
-    typeof topic === "string" && CALLBACK_TOPICS.includes(topic.trim())
+    typeof topic === "string" && allowedTopics.includes(topic.trim())
       ? topic.trim()
       : "";
   const cleanNote =
@@ -106,7 +113,14 @@ export async function POST(request: Request) {
     // sentinel so it stays distinct from a promo/email lead for the same person
     // (one open callback per number, refreshed on re-request), while promo and
     // phone-only leads key on their email/phone as before.
-    email: isCallback ? `cb:${cleanedPhone}` : cleanEmail || cleanedPhone,
+    // A venue enquiry keys on `venue:`+phone for the same reason, so wanting a
+    // visit to a venue never collides with (or gets swallowed by) an existing
+    // promo lead for that number.
+    email: isCallback
+      ? `cb:${cleanedPhone}`
+      : isVenue
+        ? `venue:${cleanedPhone}`
+        : cleanEmail || cleanedPhone,
     phone: validPhone ? cleanedPhone : "",
     source: leadSource,
     createdAt: new Date().toISOString(),
@@ -115,9 +129,10 @@ export async function POST(request: Request) {
   };
 
   try {
-    if (isCallback) {
-      // Always record (and alert on) a callback — the team needs to ring back,
-      // and a re-request should refresh the topic/note rather than be dropped.
+    if (isCallback || isVenue) {
+      // Always record (and alert on) a callback or venue enquiry — the team
+      // needs to reach out, and a re-request should refresh the topic/note
+      // (a different venue, a new date) rather than be dropped as a duplicate.
       await store.upsert(lead);
       await sendLeadAlert(lead);
     } else {

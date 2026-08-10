@@ -308,14 +308,23 @@ export async function sendPaymentAlert(payment: StoredPayment): Promise<void> {
 export async function sendLeadAlert(lead: Lead): Promise<void> {
   if (!ALERT_ENABLED.lead) return;
   const isCallback = lead.source === "support-callback";
+  const isVenue = lead.source === "venue-enquiry";
+  // Both of these key on a `cb:` / `venue:` +phone sentinel rather than a real
+  // address, so neither shows an "Email" row.
+  const phoneKeyed = isCallback || isVenue;
   await sendAlert({
     subject: isCallback
       ? `Callback requested — +91 ${lead.phone}`
-      : `New lead — ${lead.email || lead.phone}`,
-    heading: isCallback ? "Callback requested (call within 10 mins)" : "New lead / enquiry",
+      : isVenue
+        ? `Venue enquiry (${lead.topic || "follow-up"}) — +91 ${lead.phone}`
+        : `New lead — ${lead.email || lead.phone}`,
+    heading: isCallback
+      ? "Callback requested (call within 10 mins)"
+      : isVenue
+        ? "Venue enquiry — customer wants to be contacted"
+        : "New lead / enquiry",
     fields: [
-      // A callback's `email` is a `cb:`+phone sentinel, not a real address.
-      ...(isCallback ? [] : [{ label: "Email", value: lead.email || "—" }]),
+      ...(phoneKeyed ? [] : [{ label: "Email", value: lead.email || "—" }]),
       { label: "Phone", value: lead.phone || "—" },
       { label: "Source", value: lead.source },
       ...(lead.topic ? [{ label: "Topic", value: lead.topic }] : []),

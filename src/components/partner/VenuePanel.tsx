@@ -16,17 +16,23 @@ import {
   formatVenuePrice,
   isServableVenueImage,
   venueCityName,
+  clampUnits,
+  VENUE_DEFAULT_ROOMS,
+  VENUE_MAX_UNITS,
+  VENUE_MAX_SPACE_UNITS,
   type VenueRecord,
   type VenueSpaceKey,
 } from "@/lib/venues";
 
 const inputClass = "mt-1.5 " + controlClass;
 
-/** One row of the "Spaces & pricing" fieldset — offered on/off + its fee. */
+/** One row of the "Spaces & pricing" fieldset — offered on/off, its fee, and
+ *  how many the venue has (2 lawns list separately; 10 rooms cap the counter). */
 interface SpaceForm {
   key: VenueSpaceKey;
   on: boolean;
   price: string;
+  units: string;
 }
 
 interface VenueForm {
@@ -53,6 +59,7 @@ function freshForm(): VenueForm {
       key: c.key,
       on: c.key === "banquet",
       price: "",
+      units: c.key === "rooms" ? String(VENUE_DEFAULT_ROOMS) : "1",
     })),
     images: [],
   };
@@ -106,7 +113,7 @@ export default function VenuePanel({
 
   function setSpace(
     key: VenueSpaceKey,
-    patch: Partial<Pick<SpaceForm, "on" | "price">>,
+    patch: Partial<Pick<SpaceForm, "on" | "price" | "units">>,
   ) {
     setForm((prev) => ({
       ...prev,
@@ -165,6 +172,9 @@ export default function VenuePanel({
           key: c.key,
           on: price != null,
           price: price != null ? String(price) : "",
+          units: String(
+            saved?.units ?? (c.key === "rooms" ? VENUE_DEFAULT_ROOMS : 1),
+          ),
         };
       }),
       images: (v.images?.length ? v.images : [v.image]).filter(
@@ -295,6 +305,10 @@ export default function VenuePanel({
           spaces: chosen.map((s) => ({
             key: s.key,
             price: parseVenuePrice(s.price),
+            units: clampUnits(
+              s.units,
+              s.key === "rooms" ? VENUE_MAX_UNITS : VENUE_MAX_SPACE_UNITS,
+            ),
           })),
           images: form.images,
         }),
@@ -454,7 +468,10 @@ export default function VenuePanel({
 
             {/* Spaces & pricing — tick what the venue offers; each space gets
                 its own fee and the cheapest becomes the "starts at" price. */}
-            <fieldset className="block sm:col-span-2">
+            {/* `min-w-0`: a grid item defaults to `min-width: auto`, so without
+                it the widest row here (label + count + price) forces the whole
+                column wider than the card on a phone. */}
+            <fieldset className="block min-w-0 sm:col-span-2">
               <legend className="text-xs font-medium text-ink-soft">
                 {t("Spaces & pricing (₹)", "स्थान और कीमतें (₹)")}
               </legend>
@@ -465,11 +482,11 @@ export default function VenuePanel({
                     <div
                       key={s.key}
                       className={
-                        "flex items-center gap-3 rounded-control border p-2.5 transition-colors " +
+                        "flex items-center gap-2 rounded-control border p-2.5 transition-colors sm:gap-3 " +
                         (s.on ? "border-maroon/40 bg-cream-2/40" : "border-cream-3")
                       }
                     >
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 sm:gap-2.5">
                         <input
                           type="checkbox"
                           checked={s.on}
@@ -491,7 +508,25 @@ export default function VenuePanel({
                           )}
                         </span>
                       </label>
-                      <div className="w-28 shrink-0">
+                      {/* How many of this space you have. Two lawns list to
+                          customers as "Open Lawn 1" and "Open Lawn 2", each
+                          bookable on its own; rooms cap the room counter. */}
+                      <div className="w-14 shrink-0">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={s.units}
+                          onChange={(e) => setSpace(s.key, { units: e.target.value })}
+                          placeholder={s.key === "rooms" ? "10" : "1"}
+                          disabled={!s.on}
+                          aria-label={t(
+                            `How many ${cat.en}`,
+                            `कितने ${cat.hi}`,
+                          )}
+                          className={controlClass + " text-center"}
+                        />
+                      </div>
+                      <div className="w-24 shrink-0 sm:w-28">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -512,8 +547,8 @@ export default function VenuePanel({
               </div>
               <span className="mt-1 block text-xs text-ink-soft/80">
                 {t(
-                  "The cheapest space becomes your “starts at” price on the venue card.",
-                  "सबसे सस्ती कीमत वेन्यू कार्ड पर आपकी “से शुरू” कीमत बनेगी।",
+                  "Middle box = how many you have (2 lawns list as “Open Lawn 1” and “Open Lawn 2”). The cheapest space becomes your “starts at” price on the venue card.",
+                  "बीच का बॉक्स = आपके पास कितने हैं (2 लॉन “खुला लॉन 1” और “खुला लॉन 2” के रूप में दिखेंगे)। सबसे सस्ती कीमत वेन्यू कार्ड पर आपकी “से शुरू” कीमत बनेगी।",
                 )}
               </span>
             </fieldset>
