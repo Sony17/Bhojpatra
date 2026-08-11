@@ -27,6 +27,7 @@ export default function ServicePackages({
   onSelect,
   guests,
   embedded = false,
+  hideIntro = false,
 }: {
   packages?: ServicePackage[];
   /** The chosen package id (single-select) — only meaningful with `onSelect`. */
@@ -37,6 +38,10 @@ export default function ServicePackages({
   guests?: number;
   /** Drop the marketing `<section>` chrome so it nests inside the wizard step. */
   embedded?: boolean;
+  /** Drop the display heading too — for hosts that bring their own (the Single
+   *  Stall wizard, where the step's section heading already frames the cards
+   *  and says the package is optional). */
+  hideIntro?: boolean;
 }) {
   const { lang, t } = useLang();
   const selectable = typeof onSelect === "function";
@@ -45,13 +50,19 @@ export default function ServicePackages({
   // mobile reduces them to a chip-tab row showing one card at a time (the
   // already-chosen tier first in wizard mode). Tablet/desktop keep the
   // side-by-side comparison grid.
-  const [activeIdx, setActiveIdx] = useState(() => {
-    const i = packages.findIndex((p) => p.id === selectedId);
-    return i >= 0 ? i : 0;
-  });
-  // `packages` can re-hydrate from the admin-configured set — keep the open
-  // tab in range so mobile never shows an empty step.
-  const shownIdx = Math.min(activeIdx, Math.max(0, packages.length - 1));
+  //
+  // The open tab FOLLOWS the selection until the guest picks a chip themselves
+  // (`null` = following). Deriving it rather than seeding state at mount matters
+  // because both inputs arrive late: `packages` re-hydrates from the
+  // admin-configured set, and `selectedId` can be restored from a saved draft.
+  // Frozen at mount, a restored tier could sit on a card mobile keeps hidden —
+  // the guest would see an unselected tab while still being billed for it.
+  const [pickedIdx, setPickedIdx] = useState<number | null>(null);
+  const selectedIdx = packages.findIndex((p) => p.id === selectedId);
+  const shownIdx = Math.min(
+    pickedIdx ?? (selectedIdx >= 0 ? selectedIdx : 0),
+    Math.max(0, packages.length - 1),
+  );
 
   const body = (
     <div
@@ -59,27 +70,29 @@ export default function ServicePackages({
         embedded ? "relative w-full" : "relative w-full px-5 sm:px-8 lg:px-12"
       }
     >
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 className="flex items-center justify-center gap-3 font-display text-3xl uppercase tracking-wide text-maroon sm:text-4xl">
-            <Flourish className="hidden text-maroon/50 sm:block" />
-            {t("Choose Your Service Package", "अपना सर्विस पैकेज चुनें")}
-            <Flourish className="hidden rotate-180 text-maroon/50 sm:block" />
-          </h2>
-          <p className="mt-4 text-base text-ink-soft sm:text-lg">
-            {t(
-              "Menu finalized. Now choose your perfect service experience.",
-              "मेन्यू फ़ाइनल हो गया? अब चुनिए अपना परफेक्ट सर्विस अनुभव।",
-            )}
-          </p>
-        </Reveal>
+        {!hideIntro && (
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <h2 className="flex items-center justify-center gap-3 font-display text-3xl uppercase tracking-wide text-maroon sm:text-4xl">
+              <Flourish className="hidden text-maroon/50 sm:block" />
+              {t("Choose Your Service Package", "अपना सर्विस पैकेज चुनें")}
+              <Flourish className="hidden rotate-180 text-maroon/50 sm:block" />
+            </h2>
+            <p className="mt-4 text-base text-ink-soft sm:text-lg">
+              {t(
+                "Menu finalized. Now choose your perfect service experience.",
+                "मेन्यू फ़ाइनल हो गया? अब चुनिए अपना परफेक्ट सर्विस अनुभव।",
+              )}
+            </p>
+          </Reveal>
+        )}
 
-        <Reveal className="mx-auto mt-10 max-w-7xl sm:hidden">
+        <Reveal className={`mx-auto max-w-7xl sm:hidden ${hideIntro ? "" : "mt-10"}`}>
           <CategoryChips label={t("Service packages", "सर्विस पैकेज")}>
             {packages.map((pkg, i) => (
               <CategoryChip
                 key={pkg.id}
                 selected={i === shownIdx}
-                onClick={() => setActiveIdx(i)}
+                onClick={() => setPickedIdx(i)}
                 leftIcon={<span aria-hidden="true">{pkg.icon}</span>}
               >
                 {lang === "hi" ? pkg.nameHi : pkg.name}
@@ -90,7 +103,9 @@ export default function ServicePackages({
 
         <Reveal
           stagger
-          className="mx-auto mt-5 grid max-w-7xl grid-cols-1 items-stretch gap-6 sm:mt-14 sm:grid-cols-2 xl:grid-cols-4"
+          className={`mx-auto mt-5 grid max-w-7xl grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4 ${
+            hideIntro ? "" : "sm:mt-14"
+          }`}
         >
           {packages.map((pkg, i) => (
             <ServiceCard
@@ -103,6 +118,11 @@ export default function ServicePackages({
               selected={pkg.id === selectedId}
               onSelect={onSelect}
               guests={guests}
+              // Without the intro there's no h2 above these, so the tier names
+              // would sit level with the host's own section heading rather than
+              // under it — four headings a screen reader reads as peers of
+              // "Serving & essentials" instead of options inside it.
+              titleAs={hideIntro ? "h4" : "h3"}
               className={i === shownIdx ? undefined : "max-sm:hidden"}
             />
           ))}
@@ -334,6 +354,7 @@ function ServiceCard({
   selected = false,
   onSelect,
   guests,
+  titleAs: Title = "h3",
   className = "",
 }: {
   pkg: ServicePackage;
@@ -344,6 +365,8 @@ function ServiceCard({
   selected?: boolean;
   onSelect?: (id: string) => void;
   guests?: number;
+  /** Heading level for the tier name — depends on what sits above the cards. */
+  titleAs?: "h3" | "h4";
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -365,6 +388,13 @@ function ServiceCard({
             "aria-pressed": selected,
             onClick: choose,
             onKeyDown: (e: KeyboardEvent) => {
+              // Only the card itself activates on Enter/Space. Without this
+              // guard a keypress on the nested "View details" button bubbles
+              // up here, and the preventDefault() below cancels that button's
+              // own activation — so the details never open and the card
+              // toggles instead, which on a host that deselects on re-tap
+              // (Single Stall) silently drops a chosen paid tier.
+              if (e.target !== e.currentTarget) return;
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 choose();
@@ -392,9 +422,9 @@ function ServiceCard({
       >
         {pkg.icon}
       </span>
-      <h3 className={`mt-4 text-center font-display text-2xl leading-tight ${variant.title}`}>
+      <Title className={`mt-4 text-center font-display text-2xl leading-tight ${variant.title}`}>
         {name}
-      </h3>
+      </Title>
       <p className={`mt-1 text-center text-sm ${variant.muted}`}>{subtitle}</p>
 
       {/* Expand / Collapse toggle button */}
@@ -520,13 +550,17 @@ function ServiceCard({
           {selectable && typeof guests === "number" && (
             <>
               <span aria-hidden="true" className={`block h-px ${variant.priceRule}`} />
+              {/* A ₹0 tier adds nothing to the total — but "Included" would
+                  claim it comes with the order whether or not it's chosen,
+                  which is false wherever the package is optional (Single
+                  Stall). State the charge, not the entitlement. */}
               <p className="px-4 py-2 text-center text-xs font-semibold">
                 {feastPrice > 0
                   ? t(
                       `${feastLabel} for ${guests} guests`,
                       `${guests} मेहमानों के लिए ${feastLabel}`,
                     )
-                  : t("Included — no extra charge", "शामिल — कोई अतिरिक्त शुल्क नहीं")}
+                  : t("No extra charge", "कोई अतिरिक्त शुल्क नहीं")}
               </p>
             </>
           )}

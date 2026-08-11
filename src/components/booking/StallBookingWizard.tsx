@@ -21,6 +21,7 @@ import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
+import ServicePackages from "@/components/sections/ServicePackages";
 import {
   WizardHero,
   ProgressRail,
@@ -168,20 +169,6 @@ interface StallOption {
  *  spread however many dishes it holds — use `coursePrice` for that. */
 function dishPrice(item: CategoryItem, course: StallCourse): number {
   return item.price ?? course.perPlate;
-}
-
-/** What one plate of a single dish costs the guest. A varied course bills each
- *  delicacy at its own price. A fixed course bills `perPlate` for the whole
- *  spread, so the honest per-dish figure is that rate split across the dishes —
- *  rounded so the shares add back up to the course rate exactly, with the last
- *  dish absorbing the remainder. */
-function dishPerPlate(course: StallCourse, index: number): number {
-  const item = course.items[index];
-  if (!course.fixed) return dishPrice(item, course);
-  const n = course.items.length;
-  if (n === 0) return 0;
-  const each = Math.round(course.perPlate / n);
-  return index === n - 1 ? course.perPlate - each * (n - 1) : each;
 }
 
 /** The veg / non-veg mark. This is the one place the four-colour brand palette
@@ -1867,14 +1854,6 @@ function StepStallMenu({
               `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
               `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
             )}
-            {/* The per-dish figures below are a split of this one rate, not
-                extra charges — say so before the guest adds them up. */}
-            <span className="mt-0.5 block text-xs text-ink-soft">
-              {t(
-                "Each dish below shows its share of that rate — together they come to the course price, not on top of it.",
-                "नीचे हर डिश उसी दर में अपना हिस्सा दिखाती है — सब मिलाकर वही कोर्स मूल्य बनता है, उसके ऊपर कुछ नहीं।",
-              )}
-            </span>
           </span>
           <button
             type="button"
@@ -1895,9 +1874,9 @@ function StepStallMenu({
       )}
 
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-        {course.items.map((it, i) => {
+        {course.items.map((it) => {
           const active = picks.includes(it.id);
-          const price = dishPerPlate(course, i);
+          const price = dishPrice(it, course);
           const mark = DIET_MARK[it.diet];
           // On a set menu the row states what's coming; only a varied course
           // turns it into a control.
@@ -1934,23 +1913,27 @@ function StepStallMenu({
                   </span>
                   {it.name}
                 </span>
-                {/* Every delicacy carries a price: its own on a varied course,
-                    its share of the set rate on a fixed one (the shares add
-                    back up to the course's per-plate exactly). A varied dish is
-                    billed on its own, so its headcount total trails the
-                    per-plate; a set-menu dish can't be bought separately, and
-                    the course footer already totals the spread — a per-dish
-                    total there is only something to mis-add. */}
-                <span className="mt-0.5 block text-xs text-ink-soft">
-                  <span className="font-semibold text-ink">{money(price)}</span>{" "}
-                  / {t("plate", "प्लेट")}
-                  {!course.fixed && guests > 0 && (
-                    <span className="whitespace-nowrap">
-                      {" · "}
-                      {money(price * guests)}
-                    </span>
-                  )}
-                </span>
+                {/* Only a varied course prices a dish, because only there does
+                    the guest buy one: the price is the vendor's own, and the
+                    headcount total trails it. A set menu sells the spread at a
+                    single rate — dividing that rate by the dish count would
+                    print a per-dish figure nobody is billed, and leave the last
+                    dish wearing the rounding remainder. The rate belongs to the
+                    course, so it is stated once, on the course. */}
+                {!course.fixed && (
+                  <span className="mt-0.5 block text-xs text-ink-soft">
+                    <span className="font-semibold text-ink">
+                      {money(price)}
+                    </span>{" "}
+                    / {t("plate", "प्लेट")}
+                    {guests > 0 && (
+                      <span className="whitespace-nowrap">
+                        {" · "}
+                        {money(price * guests)}
+                      </span>
+                    )}
+                  </span>
+                )}
               </span>
               <span
                 className={
@@ -2079,8 +2062,12 @@ function StepStallDetails({
       />
 
 
-      {/* Service package — optional here, unlike the tiered feast flow where a
-          full-service crew is part of the package promise. */}
+      {/* Service package — the same tiered Essentials comparison the feast
+          wizard makes its own step of (Package A is pitched "For Single Stall &
+          Small Functions", so this flow gets the full cards, not a cut-down
+          list). Optional here, unlike the tiered feast flow where a
+          full-service crew is part of the package promise — hence the skip
+          control, and re-tapping the chosen tier also clears it. */}
       {services.length > 0 && (
         <>
           <h3 className="mt-9 text-lg font-semibold text-ink">
@@ -2095,50 +2082,49 @@ function StepStallDetails({
               "सर्विस स्टाफ, बुफे सेटअप और क्रॉकरी जोड़ें — या छोड़ दें अगर वेन्यू पहले से दे रहा है।",
             )}
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              type="button"
-              aria-pressed={serviceId === ""}
-              onClick={() => setServiceId("")}
-              className={
-                "rounded-2xl border p-4 text-left transition " +
-                (serviceId === ""
-                  ? "border-maroon/40 bg-cream/35 shadow-soft"
-                  : "border-cream-3 bg-white hover:bg-cream-2")
-              }
-            >
+          <button
+            type="button"
+            aria-pressed={serviceId === ""}
+            onClick={() => setServiceId("")}
+            className={
+              "mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border p-4 text-left transition " +
+              (serviceId === ""
+                ? "border-maroon/40 bg-cream/35 shadow-soft"
+                : "border-cream-3 bg-white hover:bg-cream-2")
+            }
+          >
+            <span className="min-w-0">
               <span className="block text-sm font-semibold text-ink">
                 {t("No service needed", "कोई सर्विस नहीं चाहिए")}
               </span>
               <span className="mt-0.5 block text-xs text-ink-soft">
                 {t("Just the stall", "सिर्फ़ स्टॉल")}
               </span>
-            </button>
-            {services.map((s) => {
-              const active = s.id === serviceId;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setServiceId(s.id)}
-                  className={
-                    "rounded-2xl border p-4 text-left transition " +
-                    (active
-                      ? "border-maroon/40 bg-cream/35 shadow-soft"
-                      : "border-cream-3 bg-white hover:bg-cream-2")
-                  }
-                >
-                  <span className="block text-sm font-semibold text-ink">
-                    {s.name}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-ink-soft">
-                    {money(s.priceMin)}
-                    {s.perPlate ? ` / ${t("guest", "मेहमान")}` : ""}
-                  </span>
-                </button>
-              );
-            })}
+            </span>
+            <span
+              className={
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold " +
+                (serviceId === ""
+                  ? "border-maroon/40 bg-cream text-maroon"
+                  : "border-cream-3 text-ink-soft")
+              }
+            >
+              {serviceId === ""
+                ? `✓ ${t("Selected", "चुना गया")}`
+                : t("Skip service", "सर्विस छोड़ें")}
+            </span>
+          </button>
+          <div className="mt-4">
+            <ServicePackages
+              packages={services}
+              selectedId={serviceId}
+              // Tapping the already-chosen tier clears it back to "no service"
+              // — the optionality the feast flow doesn't have.
+              onSelect={(id) => setServiceId(id === serviceId ? "" : id)}
+              guests={guests}
+              embedded
+              hideIntro
+            />
           </div>
         </>
       )}
