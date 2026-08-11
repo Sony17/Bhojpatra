@@ -9,7 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
-import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
+import type { BainaOrderVendor } from "@/lib/bainaBoxData";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -43,6 +43,13 @@ function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
+/** How an ordered line reads in the summary and on the receipt. A vendor sells
+ *  the same box in several sizes, so the size has to ride along with the name —
+ *  except when it adds nothing ("Kaju Katli (Box)"). */
+function lineLabel(l: { name: string; unit: string }): string {
+  return l.unit.trim().toLowerCase() === "box" ? l.name : `${l.name} · ${l.unit}`;
+}
+
 /**
  * The Baina Box order flow — pick boxes with a quantity stepper, choose a
  * delivery date and confirm. Unlike the feast wizard (per-plate catering with a
@@ -51,11 +58,22 @@ function isValidEmail(v: string): boolean {
  * /api/bookings ("Bhojpatra connects you" — nothing collected online; our team
  * calls to arrange payment & delivery), so they land in My Bookings, the admin
  * console and the confirmation emails like any other booking.
+ *
+ * Both box sellers use this one panel: the curated Baina Box storefronts
+ * (/baina-box/<slug>) and any live vendor who published a box menu in their
+ * dashboard, whose boxes render on their own profile page.
  */
 export default function BainaBoxOrderPanel({
   data,
+  heading,
+  allHref,
 }: {
-  data: BainaBoxVendorData;
+  data: BainaOrderVendor;
+  /** Section heading over the box grid. Defaults to "Order Sweets & Boxes". */
+  heading?: string;
+  /** When set, a "View All →" link beside the heading (the curated storefronts
+   *  point it at the Baina Box marketplace; a live vendor has nowhere to go). */
+  allHref?: string;
 }) {
   const { t } = useLang();
   // null = signed out, undefined = still resolving — the tri-state keeps the
@@ -132,7 +150,7 @@ export default function BainaBoxOrderPanel({
       "",
       ...lines.map(
         (l) =>
-          `${l.name} — ${l.qty} × ₹${l.price.toLocaleString("en-IN")} = ₹${(
+          `${lineLabel(l)} — ${l.qty} × ₹${l.price.toLocaleString("en-IN")} = ₹${(
             l.qty * l.price
           ).toLocaleString("en-IN")}`,
       ),
@@ -241,14 +259,16 @@ export default function BainaBoxOrderPanel({
       <div className="mt-12 border-t border-cream-3 pt-8">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
-            {t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
+            {heading ?? t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}
           </h2>
-          <Link
-            href="/baina-box"
-            className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-          >
-            {t("View All →", "सभी देखें →")}
-          </Link>
+          {allHref && (
+            <Link
+              href={allHref}
+              className="text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
+            >
+              {t("View All →", "सभी देखें →")}
+            </Link>
+          )}
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
@@ -262,19 +282,35 @@ export default function BainaBoxOrderPanel({
                 }`}
               >
                 <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-cream">
-                  <Image
-                    src={prod.image}
-                    alt={prod.name}
-                    fill
-                    sizes="(min-width: 640px) 250px, 180px"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
+                  {prod.image ? (
+                    <Image
+                      src={prod.image}
+                      alt={prod.name}
+                      fill
+                      sizes="(min-width: 640px) 250px, 180px"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    // A vendor-published box with no photo — keep the tile's
+                    // shape rather than collapsing the grid row.
+                    <span
+                      aria-hidden="true"
+                      className="flex h-full w-full items-center justify-center text-2xl text-maroon/40"
+                    >
+                      🎁
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-1 flex-col justify-between">
                   <div>
                     <h3 className="font-sans text-sm font-bold text-ink">
                       {prod.name}
                     </h3>
+                    {prod.desc && (
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-soft">
+                        {prod.desc}
+                      </p>
+                    )}
                     <p className="mt-1 font-display text-base font-bold text-maroon">
                       ₹{prod.price.toLocaleString("en-IN")}{" "}
                       <span className="text-xs font-normal text-ink-soft">
@@ -331,7 +367,7 @@ export default function BainaBoxOrderPanel({
                 {lines.map((l) => (
                   <li key={l.id} className="flex items-center justify-between gap-3 py-2">
                     <span className="min-w-0 truncate text-ink">
-                      {l.name}{" "}
+                      {lineLabel(l)}{" "}
                       <span className="text-ink-soft">× {l.qty}</span>
                     </span>
                     <span className="shrink-0 font-semibold text-ink">

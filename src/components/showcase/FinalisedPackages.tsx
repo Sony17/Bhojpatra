@@ -404,23 +404,25 @@ export default function FinalisedPackages() {
                   />
                   <p className="mt-1.5 text-sm text-ink-soft">
                     {t(
-                      "Pick one vendor, build your own menu, and pay only for what you select.",
-                      "एक वेंडर चुनें, अपना मेन्यू बनाएं, और सिर्फ़ अपनी पसंद के लिए भुगतान करें।",
+                      "Pick one verified stall and get its fixed menu — every dish served, at one flat per-plate price.",
+                      "एक वेरिफाइड स्टॉल चुनें और उसका फिक्स्ड मेन्यू पाएं — हर व्यंजन परोसा जाएगा, एक फ्लैट प्रति-प्लेट कीमत पर।",
                     )}
                   </p>
                 </div>
+                {/* Stalls are chosen on the Brands page; the wizard opens from
+                    a brand's Book Now with that stall already loaded. */}
                 <Button
-                  href="/book?package=custom&step=menu"
+                  href="/vendors?category=single-stall"
                   variant="primary"
                   rightIcon={<span aria-hidden="true">→</span>}
                   className="shrink-0"
                   aria-label={t(
-                    "Build your Single Stall",
-                    "अपना सिंगल स्टॉल बनाएं",
+                    "Book a Single Stall",
+                    "सिंगल स्टॉल बुक करें",
                   )}
                 >
                   <span className="font-display leading-none">
-                    {t("Build your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                    {t("Book a Single Stall", "सिंगल स्टॉल बुक करें")}
                   </span>
                 </Button>
               </div>

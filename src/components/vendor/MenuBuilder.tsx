@@ -25,13 +25,16 @@ import {
   type DietType,
   type MenuCategory,
 } from "@/lib/data";
-import type {
-  ModerationStatus,
-  VendorBainaBox,
-  VendorCounter,
-  VendorCounterExtra,
-  VendorEssentialService,
-  VendorMenuSection,
+import {
+  DEFAULT_MENU_TYPE,
+  menuTypeOf,
+  type ModerationStatus,
+  type SingleStallMenuType,
+  type VendorBainaBox,
+  type VendorCounter,
+  type VendorCounterExtra,
+  type VendorEssentialService,
+  type VendorMenuSection,
 } from "@/lib/vendorMenus";
 import { TIER_ORDER, sortTiers, type VendorTier } from "@/lib/admin/types";
 import { money } from "@/lib/money";
@@ -72,6 +75,9 @@ interface DraftSection {
    *  strings). Blank = use the platform's number for that band; "0" = the
    *  vendor doesn't serve this course on that band at all. */
   tierItems: Partial<Record<VendorTier, string>>;
+  /** How this course sells as a Single Stall: a set spread every guest gets
+   *  ("fixed"), or a build-your-own where they pick delicacies ("varied"). */
+  menuType: SingleStallMenuType;
 }
 
 interface VendorPayload {
@@ -171,6 +177,7 @@ const emptySections = (): Record<string, DraftSection> =>
         perPlate: "",
         items: [] as DraftItem[],
         tierItems: {} as Partial<Record<VendorTier, string>>,
+        menuType: DEFAULT_MENU_TYPE,
       },
     ]),
   );
@@ -416,6 +423,7 @@ export default function MenuBuilder() {
                       return n === undefined ? [] : [[tier, String(n)]];
                     }),
                   ),
+                  menuType: menuTypeOf(s),
                 };
               }
               return next;
@@ -959,6 +967,11 @@ export default function MenuBuilder() {
               );
               return Object.keys(t).length ? { tierItems: t } : {};
             })(),
+            // Single Stall menu style. Only "varied" travels — "fixed" is the
+            // platform default, so an untouched course stays a set menu.
+            ...(sections[c.id].menuType === "varied"
+              ? { menuType: "varied" as const }
+              : {}),
           })),
         // Signature dishes — reconciled to live dishes; empty means "none".
         featured: validFeatured,
@@ -1410,6 +1423,7 @@ export default function MenuBuilder() {
           onUploadItemPhoto={(i, file) => uploadDishPhoto(cat.id, i, file)}
           priceable={priceable}
           onItemPrice={(i, v) => setItemPrice(cat.id, i, v)}
+          onMenuType={(v) => updateSection(cat.id, { menuType: v })}
           bands={sortTiers(tiers)}
           platformItems={platformItemsFor(cat.id)}
           onTierItems={(tier, v) => setTierItems(cat.id, tier, v)}
@@ -1940,8 +1954,8 @@ export default function MenuBuilder() {
                       <>
                         {panelNote(
                           t(
-                            "Single Stall sells the same plated courses — price each delicacy individually here. A blank price falls back to that course's per-plate rate.",
-                            "सिंगल स्टॉल वही प्लेटेड कोर्स बेचता है — यहाँ हर डिश की अलग कीमत डालें। खाली छोड़ने पर उस कोर्स की प्रति-प्लेट दर लगेगी।",
+                            "Single Stall sells the same plated courses. For each course, choose a fixed menu — your whole spread, served as-is at the course's per-plate rate, with nothing for the customer to change — or a varied menu, where they pick delicacies and you price each one.",
+                            "सिंगल स्टॉल वही प्लेटेड कोर्स बेचता है। हर कोर्स के लिए चुनें — तय मेन्यू, यानी आपका पूरा स्प्रेड कोर्स की प्रति-प्लेट दर पर वैसा ही परोसा जाए और ग्राहक कुछ न बदले; या चयन वाला मेन्यू, जिसमें ग्राहक डिश चुनते हैं और आप हर डिश की कीमत तय करते हैं।",
                           ),
                         )}
                         {renderCourses(platedCats, true)}
@@ -2396,6 +2410,7 @@ function CategorySection({
   onUploadItemPhoto,
   priceable = false,
   onItemPrice,
+  onMenuType,
   bands,
   platformItems,
   onTierItems,
@@ -2411,9 +2426,11 @@ function CategorySection({
   onRemoveItem: (index: number) => void;
   onToggleDiet: (index: number) => void;
   onUploadItemPhoto: (index: number, file: File) => Promise<string | null>;
-  /** Single Stall vendors price each dish — shows a per-dish ₹ field. */
+  /** Single Stall vendors choose a menu style here, and a varied one prices
+   *  each dish — shows the fixed/varied switch and the per-dish ₹ fields. */
   priceable?: boolean;
   onItemPrice?: (index: number, value: string) => void;
+  onMenuType?: (value: SingleStallMenuType) => void;
   /** Feast bands the vendor sells — the per-band dish-count row is drawn for
    *  these only, so a Silver-only caterer isn't asked about Platinum. */
   bands: VendorTier[];
@@ -2429,6 +2446,10 @@ function CategorySection({
   /** A served course opens by default; collapsing leaves just its rate and
    *  dish count on the header, so a long menu stays scannable. */
   const [collapsed, setCollapsed] = useState(false);
+
+  /** Per-dish ₹ fields only make sense on a varied Single Stall — a fixed menu
+   *  charges one per-plate rate for the whole spread. */
+  const perDishPricing = priceable && section.menuType === "varied";
 
   // Per-dish photo picker: one hidden input, retargeted to the dish whose
   // camera button was tapped.
@@ -2489,6 +2510,16 @@ function CategorySection({
                 {" · "}
                 {section.items.length}{" "}
                 {t(section.items.length === 1 ? "dish" : "dishes", "डिश")}
+                {/* Single Stall style rides the header too, so a collapsed
+                    course still shows whether customers can customise it. */}
+                {priceable && (
+                  <>
+                    {" · "}
+                    {section.menuType === "varied"
+                      ? t("varied menu", "चयन वाला मेन्यू")
+                      : t("fixed menu", "तय मेन्यू")}
+                  </>
+                )}
               </p>
             )}
           </div>
@@ -2554,6 +2585,76 @@ function CategorySection({
               />
             </Field>
           </div>
+
+          {/* Single Stall menu style — the one decision that says whether a
+              customer may customise this stall. Fixed (the default) serves the
+              whole spread at the per-plate rate above; varied hands them the
+              dish picker and bills per delicacy. Only shown to caterers who
+              actually sell Single Stall; the feast bands always run on the
+              per-band dish count below, whichever style is picked. */}
+          {priceable && onMenuType && (
+            <fieldset className="rounded-xl border border-cream-3 bg-cream/40 p-3.5">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                {t("Single Stall menu", "सिंगल स्टॉल मेन्यू")}
+              </legend>
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      value: "fixed" as const,
+                      label: t("Fixed menu", "तय मेन्यू"),
+                      hint: t(
+                        "Every dish below is served. Customers can't change it, and you charge the per-plate rate above for the whole spread.",
+                        "नीचे की हर डिश परोसी जाएगी। ग्राहक इसे बदल नहीं सकते, और पूरे स्प्रेड के लिए आप ऊपर वाली प्रति-प्लेट दर लेते हैं।",
+                      ),
+                    },
+                    {
+                      value: "varied" as const,
+                      label: t("Varied menu", "चयन वाला मेन्यू"),
+                      hint: t(
+                        "Customers pick the delicacies they want and pay for each. Set a price per dish below.",
+                        "ग्राहक अपनी पसंद की डिश चुनते हैं और हर डिश का भुगतान करते हैं। नीचे हर डिश की कीमत डालें।",
+                      ),
+                    },
+                  ] satisfies {
+                    value: SingleStallMenuType;
+                    label: string;
+                    hint: string;
+                  }[]
+                ).map((opt) => {
+                  const on = section.menuType === opt.value;
+                  return (
+                    <label
+                      key={opt.value}
+                      className={
+                        "flex cursor-pointer items-start gap-2.5 rounded-lg border bg-white p-3 transition " +
+                        (on
+                          ? "border-maroon ring-1 ring-maroon/30"
+                          : "border-cream-3 hover:border-maroon")
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name={`menu-type-${name}`}
+                        value={opt.value}
+                        checked={on}
+                        onChange={() => onMenuType(opt.value)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-maroon"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink">
+                          {opt.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-ink-soft">
+                          {opt.hint}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
 
           {/* Per-band dish count — the caterer's own answer to "how many
               starters does Silver get?". Blank keeps the platform number for
@@ -2626,10 +2727,15 @@ function CategorySection({
             </p>
             {priceable && (
               <p className="mb-2 text-xs text-ink-soft">
-                {t(
-                  "You offer Single Stall — set a ₹ price per plate for any delicacy (optional; blank uses this course's per-plate rate).",
-                  "आप सिंगल स्टॉल देते हैं — किसी भी डिश के लिए प्रति-प्लेट ₹ मूल्य डालें (वैकल्पिक; खाली रहने पर इस कोर्स की प्रति-प्लेट दर लगेगी)।",
-                )}
+                {perDishPricing
+                  ? t(
+                      "Your Single Stall is a varied menu — set a ₹ price per plate for any delicacy (optional; blank uses this course's per-plate rate).",
+                      "आपका सिंगल स्टॉल चयन वाला मेन्यू है — किसी भी डिश के लिए प्रति-प्लेट ₹ मूल्य डालें (वैकल्पिक; खाली रहने पर इस कोर्स की प्रति-प्लेट दर लगेगी)।",
+                    )
+                  : t(
+                      "Your Single Stall is a fixed menu — every dish here is served to every guest at the per-plate rate above, so there's nothing to price individually.",
+                      "आपका सिंगल स्टॉल तय मेन्यू है — यहाँ की हर डिश हर मेहमान को ऊपर वाली प्रति-प्लेट दर पर परोसी जाएगी, इसलिए अलग कीमत डालने की ज़रूरत नहीं।",
+                    )}
               </p>
             )}
             {section.items.length === 0 ? (
@@ -2706,7 +2812,7 @@ function CategorySection({
                       />
                     </button>
                     {it.name}
-                    {priceable && (
+                    {perDishPricing && (
                       <span className="flex items-center gap-0.5">
                         <span className="text-xs text-ink-soft">₹</span>
                         <input

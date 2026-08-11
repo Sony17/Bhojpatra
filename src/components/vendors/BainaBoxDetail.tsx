@@ -24,9 +24,7 @@ export default function BainaBoxDetail({
   const inCompare = has(data.vendorId);
   const compareDisabled = !inCompare && isFull;
 
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
-    data.vendorId,
-  )}&step=menu`;
+  const bookHref = `/book/stall?vendor=${encodeURIComponent(data.vendorId)}`;
 
   const photos = useMemo(
     () => [data.heroImage, ...(data.gallery ?? []).filter((g) => g !== data.heroImage)],
@@ -155,7 +153,7 @@ export default function BainaBoxDetail({
             {/* Rating & Reviews */}
             <div className="mt-2 flex items-center gap-2 text-sm">
               <div className="flex items-center gap-1 font-bold text-maroon">
-                <span className="text-amber-500">★</span>
+                <span className="text-maroon">★</span>
                 <span>{data.rating}</span>
               </div>
               <span className="text-ink-soft">
@@ -273,7 +271,7 @@ export default function BainaBoxDetail({
         {/* ── Order Sweets & Boxes — per-box ordering (qty → date → confirm).
             The feast wizard hand-off above stays for full catering; this panel
             is how a box order actually completes. ── */}
-        <BainaBoxOrderPanel data={data} />
+        <BainaBoxOrderPanel data={data} allHref="/baina-box" />
 
         <CompareTray />
 

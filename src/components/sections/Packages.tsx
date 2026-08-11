@@ -143,9 +143,10 @@ export default function Packages() {
           ))}
         </Reveal>
 
-        {/* ── Single Stall — the build-your-own tier, surfaced beneath the three
-            headline scrolls as one premium banner (its full flow lives in
-            /book). Styled like an engraved invitation — an inset maroon
+        {/* ── Single Stall — one verified stall serving its own fixed menu,
+            surfaced beneath the three headline scrolls as one premium banner
+            (its full flow lives in /book/stall). Styled like an engraved
+            invitation — an inset maroon
             hairline frame on a warm cream-washed surface with an ornament
             flourish — so it reads elevated and bespoke without a heavy colour
             block. ── */}
@@ -167,7 +168,7 @@ export default function Packages() {
                 {/* Identity · price · CTA */}
                 <div className="text-center lg:max-w-xs lg:shrink-0 lg:text-left">
                   <p className="eyebrow text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-soft">
-                    {t("Build Your Own", "अपना खुद का बनाएं")}
+                    {t("One Verified Vendor", "एक वेरिफाइड वेंडर")}
                   </p>
                   <h3 className="mt-2 font-display text-3xl leading-none tracking-wide text-maroon sm:text-4xl">
                     {lang === "hi" ? singleStall.nameHi : singleStall.name}
@@ -195,13 +196,16 @@ export default function Packages() {
                     </span>{" "}
                     {lang === "hi" ? singleStall.unitHi : singleStall.unit}
                   </p>
+                  {/* Single Stall starts by choosing the stall, and stalls are
+                      browsed on the Brands page — the wizard is entered from a
+                      brand's own Book Now. */}
                   <Link
-                    href="/book?package=custom&step=menu"
-                    aria-label={t("Build Your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                    href="/vendors?category=single-stall"
+                    aria-label={t("Book a Single Stall", "सिंगल स्टॉल बुक करें")}
                     className="btn-sheen mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-maroon px-6 text-sm font-semibold tracking-wide text-cream shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-110 active:scale-95"
                   >
                     <span className="font-display leading-none">
-                      {t("Build Your Single Stall", "अपना सिंगल स्टॉल बनाएं")}
+                      {t("Book a Single Stall", "सिंगल स्टॉल बुक करें")}
                     </span>
                     <span aria-hidden="true" className="leading-none">
                       →

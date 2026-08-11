@@ -47,7 +47,11 @@ export default function ListingCard({
         className="focus-ring absolute inset-0 z-0 rounded-hero"
         aria-label={title}
       />
-      <div className="relative aspect-[4/3] overflow-hidden bg-cream">
+      {/* Photo, veil and badges are decorative and sit *after* the link in DOM
+          order, so without this they'd win the hit test and swallow every tap
+          on the top two-thirds of the card — leaving only the text strip
+          tappable. `pointer-events-none` lets taps fall through to the link. */}
+      <div className="pointer-events-none relative aspect-[4/3] overflow-hidden bg-cream">
         <Image
           src={image}
           alt={imageAlt}

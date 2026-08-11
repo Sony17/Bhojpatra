@@ -78,6 +78,29 @@ export interface VendorMenuSection {
    *  leaves them out of its roster there. Lets a caterer say "Silver gets 2
    *  starters, Platinum gets 6" and drop a segment from the cheaper bands. */
   tierItems?: Partial<Record<VendorTier, number>>;
+  /** How this course sells as a Single Stall. `"fixed"` (the default, and what
+   *  a section with no value means) is a set spread: every published dish is
+   *  served, the guest customises nothing, and the stall bills at this course's
+   *  `perPlate`. `"varied"` is the older build-your-own stall — the guest picks
+   *  delicacies and pays each dish's own `price`. Read only in the Single Stall
+   *  flow; the Silver/Gold/Platinum feasts always run on the per-band dish
+   *  quota above, whatever this says. */
+  menuType?: SingleStallMenuType;
+}
+
+/** Single Stall menu style — see `VendorMenuSection.menuType`. */
+export type SingleStallMenuType = "fixed" | "varied";
+
+/** The platform default when a vendor never answered: a Single Stall serves its
+ *  whole published spread and customers don't customise it. */
+export const DEFAULT_MENU_TYPE: SingleStallMenuType = "fixed";
+
+/** A section's effective menu style, defaulting anything unset (older records,
+ *  curated seeds) to the platform default. */
+export function menuTypeOf(
+  section: Pick<VendorMenuSection, "menuType">,
+): SingleStallMenuType {
+  return section.menuType === "varied" ? "varied" : DEFAULT_MENU_TYPE;
 }
 
 /** One Baina Box the vendor sells — the sweet/gifting boxes customers browse
@@ -451,6 +474,9 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           ...(section.tierItems && Object.keys(section.tierItems).length
             ? { tierItems: section.tierItems }
             : {}),
+          // How this stall sells on Single Stall — resolved here (rather than
+          // left undefined) so the wizard never has to know the default.
+          menuType: menuTypeOf(section),
           items: section.items.map((it, i) => ({
             id: `${r.id}-${i}`,
             name: it.name,
@@ -1037,6 +1063,9 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       items,
       ...(s.hidden === true ? { hidden: true } : {}),
       ...(Object.keys(tierItems).length ? { tierItems } : {}),
+      // Single Stall menu style. Only "varied" is stored — "fixed" is the
+      // platform default, so an absent value already reads right.
+      ...(s.menuType === "varied" ? { menuType: "varied" as const } : {}),
     });
   }
 

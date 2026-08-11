@@ -801,7 +801,19 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
       tiers: stored.packages?.tiers?.length
         ? stored.packages.tiers.map((t) =>
             t.id === "custom" || t.name?.toLowerCase().includes("customised") || t.name?.toLowerCase().includes("customized")
-              ? { ...t, name: "Single Stall", nameHi: "सिंगल स्टॉल" }
+              ? {
+                  ...t,
+                  name: "Single Stall",
+                  nameHi: "सिंगल स्टॉल",
+                  // Content saved while Single Stall was still the
+                  // build-your-own tier carries "Your Price" — wrong now that
+                  // it sells one stall's fixed menu. Heal it to the seed the
+                  // same way the name is healed above.
+                  price: /your price/i.test(t.price ?? "")
+                    ? (d.packages.tiers.find((x) => x.id === "custom")?.price ??
+                      t.price)
+                    : t.price,
+                }
               : t
           )
         : d.packages.tiers,

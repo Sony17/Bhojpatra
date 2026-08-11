@@ -504,33 +504,42 @@ export const packages: PackageTier[] = [
     id: "custom",
     name: "Single Stall",
     nameHi: "सिंगल स्टॉल",
-    price: "Your Price",
+    // A stall sells at its own per-plate rate, so there's no single headline
+    // number here the way Silver/Gold/Platinum have one — the stall's rate is
+    // shown once a guest picks it.
+    price: "Stall Price",
     unit: "/ Plate",
     unitHi: "/ प्लेट",
-    tagline: "One Stall · One Vendor",
-    taglineHi: "एक स्टॉल · एक वेंडर",
+    tagline: "One Stall · One Verified Vendor",
+    taglineHi: "एक स्टॉल · एक वेरिफाइड वेंडर",
     differentiator: [
       "One Verified City Brand",
-      "Build Your Own Menu",
+      "Fixed Menu",
       "Any Occasion",
     ],
     differentiatorHi: [
       "शहर का एक वेरिफाइड ब्रांड",
-      "अपना खुद का मेन्यू",
+      "फिक्स्ड मेन्यू",
       "कोई भी अवसर",
     ],
-    bestFor: "Any Occasion, Your Way",
-    bestForHi: "कोई भी अवसर, आपके अंदाज़ में",
+    bestFor: "Any Occasion, One Trusted Stall",
+    bestForHi: "कोई भी अवसर, एक भरोसेमंद स्टॉल",
     image: img("photo-1467003909585-2f8a72700288"),
+    // The stall's own set spread — every dish on it is served, so nothing here
+    // promises dish-by-dish customisation (`menuType: "fixed"` is the platform
+    // default every stall falls back to).
     features: [
-      { label: "Single Stall · Single Vendor", labelHi: "सिंगल स्टॉल · सिंगल वेंडर" },
-      { label: "Build Your Own Menu", labelHi: "अपना खुद का मेन्यू बनाएं" },
-      { label: "Pick Any Cuisines & Courses", labelHi: "कोई भी व्यंजन और कोर्स चुनें" },
-      { label: "Add Live Counters & Extras", labelHi: "लाइव काउंटर और एक्स्ट्रा जोड़ें" },
-      { label: "Pay Only For What You Select", labelHi: "सिर्फ़ अपनी पसंद के लिए भुगतान करें" },
+      { label: "Single Stall · Single Verified Vendor", labelHi: "सिंगल स्टॉल · एक वेरिफाइड वेंडर" },
+      { label: "Fixed Set Menu — Every Dish Served", labelHi: "फिक्स्ड सेट मेन्यू — हर व्यंजन परोसा जाएगा", heading: true },
+      {
+        label: "Welcome Drink, Starters, Main Course & Sweet — as the stall serves them",
+        labelHi: "वेलकम ड्रिंक, स्टार्टर, मेन कोर्स और मिठाई — जैसे स्टॉल परोसता है",
+      },
+      { label: "Add Live Counters & Extras", labelHi: "लाइव काउंटर और एक्स्ट्रा जोड़ें", standalone: true },
+      { label: "One Flat Per-Plate Price", labelHi: "एक फ्लैट प्रति-प्लेट कीमत" },
     ],
-    footnote: ["Verified vendors from your city — one verified vendor, your own menu."],
-    footnoteHi: ["आपके शहर के वेरिफाइड वेंडर — एक वेरिफाइड वेंडर, आपका अपना मेन्यू।"],
+    footnote: ["Verified vendors from your city — a fixed menu served by one verified vendor."],
+    footnoteHi: ["आपके शहर के वेरिफाइड वेंडर — एक वेरिफाइड वेंडर द्वारा परोसा गया फिक्स्ड मेन्यू।"],
   },
 ];
 
@@ -1492,6 +1501,14 @@ export interface CategoryVendor {
    *  number; `0` drops the vendor from this course's roster on that band.
    *  Absent on the static fallback fixture and on curated seeds. */
   tierItems?: Partial<Record<"Silver" | "Gold" | "Platinum", number>>;
+  /** How this stall sells on Single Stall, set by the caterer in their
+   *  dashboard. `"fixed"` — a set spread: every dish below is served, the guest
+   *  customises nothing, and the stall bills at `perPlate`. `"varied"` — the
+   *  guest picks delicacies and pays each dish's own `price`. Absent (curated
+   *  seeds, the static fallback fixture) reads as `"fixed"`, the platform
+   *  default. Ignored on the Silver/Gold/Platinum feasts, which always run on
+   *  the per-band dish quota. */
+  menuType?: "fixed" | "varied";
   /** Minimum advance-booking notice (in days) this stall needs before the event —
    *  the "as per vendor specification" rule for the Custom single-stall flow.
    *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */

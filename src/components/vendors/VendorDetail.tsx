@@ -531,9 +531,9 @@ function VendorProfile({
   // resolve by id; a curated seed id absent from the booking menu falls back to
   // the tier picker.
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
-    vendor.id,
-  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
+  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
+    cityId ? `&city=${cityId}` : ""
+  }`;
 
   // A live aggregate from the reviews just loaded for this vendor, so a rating
   // submitted from the panel below is reflected immediately (the shared

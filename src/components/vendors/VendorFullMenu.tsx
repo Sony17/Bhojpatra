@@ -120,7 +120,7 @@ export default function VendorFullMenu({
   const reviews = profile?.reviews ?? listing?.reviews ?? 100;
   const verified = profile?.verified ?? listing?.verified ?? false;
   const cuisines = profile?.cuisines ?? listing?.cuisines ?? [];
-  const bookHref = `/book?vendor=${vendorId}`;
+  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendorId)}`;
 
   // Assemble full menu categories
   const categories: FullMenuCategory[] = [];

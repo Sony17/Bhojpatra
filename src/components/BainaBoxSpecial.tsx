@@ -1,12 +1,16 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 
-/** Where the CTA always points — the curated Baina Box catalogue. */
-const BAINA_HREF = "/vendors?q=Baina+Box";
+/** Where the CTA always points — the Baina Box marketplace, which lists every
+ *  sweet house and opens each one's boxes. (It used to point at
+ *  `/vendors?q=Baina+Box`; that is where this banner is rendered, so the CTA
+ *  linked to the page the visitor was already on and read as a dead button.) */
+const BAINA_HREF = "/baina-box";
 
 /**
  * "Baina Box, specially by Bhojpatra" — an elegant signature block for
@@ -27,6 +31,11 @@ export default function BainaBoxSpecial({
 }) {
   const { lang, t } = useLang();
   const { bainaBoxSpecial: special } = useHomeContent();
+  // The banner also heads the Baina Box marketplace itself. Sending a visitor
+  // to the page they are already on is a dead click, so the strip stays there
+  // purely as the signature promo and drops its CTA.
+  const pathname = usePathname();
+  const showCta = pathname !== BAINA_HREF;
 
   if (!special.enabled) return null;
 
@@ -38,7 +47,8 @@ export default function BainaBoxSpecial({
   if (isSearch) {
     // Short 50/50 promo strip, ~20% of the viewport tall on every device:
     // the poster fills the left half (cover-cropped to the strip height),
-    // the right half carries only the signature heading and the CTA.
+    // the right half carries only the signature heading and the CTA — or, on
+    // the marketplace the CTA leads to, the signature line in its place.
     return (
       <section
         className="overflow-hidden rounded-card border border-cream-3 bg-cream/40 shadow-card ring-1 ring-cream"
@@ -63,14 +73,20 @@ export default function BainaBoxSpecial({
             </h3>
             {/* max-w-full + wrap: the admin-editable CTA label must never
                 spill out of this narrow column on phones. */}
-            <Button
-              href={BAINA_HREF}
-              variant="secondary"
-              size="sm"
-              className="btn-sheen max-w-full !whitespace-normal text-center"
-            >
-              {cta}
-            </Button>
+            {showCta ? (
+              <Button
+                href={BAINA_HREF}
+                variant="secondary"
+                size="sm"
+                className="btn-sheen max-w-full !whitespace-normal text-center"
+              >
+                {cta}
+              </Button>
+            ) : (
+              <p className="line-clamp-3 font-script text-sm text-ink-soft sm:text-base">
+                {body}
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -90,11 +106,13 @@ export default function BainaBoxSpecial({
         {heading}
       </h3>
       <p className="mt-3 max-w-md font-script text-xl text-ink-soft">{body}</p>
-      <div>
-        <Button href={BAINA_HREF} variant="secondary" className="btn-sheen mt-6">
-          {cta}
-        </Button>
-      </div>
+      {showCta && (
+        <div>
+          <Button href={BAINA_HREF} variant="secondary" className="btn-sheen mt-6">
+            {cta}
+          </Button>
+        </div>
+      )}
     </div>
   );
 

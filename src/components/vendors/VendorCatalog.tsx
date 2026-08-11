@@ -1066,7 +1066,10 @@ export default function VendorCatalog() {
               key={vendor.id}
               vendor={vendor}
               stats={statFor(ratings, vendor)}
-              isBainaSearch={isBainaSearch}
+              // Whether the card sends the visitor into the Baina Box flow —
+              // the lens, not the search text, so the "Baina Box" chip routes
+              // exactly like typing "baina" does.
+              bainaMode={bainaMode}
               // Browsing a lens pins every card to it: a Gold search never
               // shows a Silver tag, and a Single Stall search never shows a
               // Baina Box one — even on a caterer who is genuinely all three.
@@ -1153,12 +1156,14 @@ function FilterSelect({
 function VendorCard({
   vendor,
   stats,
-  isBainaSearch,
+  bainaMode,
   lens,
 }: {
   vendor: VendorListing;
   stats?: VendorRatingSummary;
-  isBainaSearch?: boolean;
+  /** Browsing the Baina Box lens (chip or "baina" search) — a brand with a
+   *  Baina Box storefront then links there instead of to its caterer page. */
+  bainaMode?: boolean;
   /** The lens being browsed. The card then advertises that one thing — the
    *  other categories and tier bands a vendor serves are irrelevant to this
    *  search and would only muddy the result. */
@@ -1170,19 +1175,28 @@ function VendorCard({
   const compareDisabled = !inCompare && isFull;
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
 
-  const bainaVendorData = isBainaSearch
+  const bainaVendorData = bainaMode
     ? getBainaBoxVendorByVendorId(vendor.id)
     : undefined;
   const vendorHref = bainaVendorData
     ? `/baina-box/${bainaVendorData.slug}`
     : `/vendors/${vendor.id}`;
 
-  // "Book" from a brand card starts a Single Stall with this vendor pre-selected
-  // (still changeable in the wizard). Live vendors resolve by id; a curated seed
-  // id absent from the booking menu simply falls back to the tier picker.
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(
-    vendor.id,
-  )}${cityId ? `&city=${cityId}` : ""}&step=menu`;
+  // "Book" from a brand card starts a Single Stall order with this vendor
+  // pre-selected (still changeable in that wizard). Live vendors resolve by id;
+  // a curated seed id absent from the booking menu falls back to the stall picker.
+  // Boxes are ordered per box, not per plate, so a Baina Box brand goes to its
+  // own order panel instead — the flow that actually sells what the lens shows.
+  // Curated brands have a storefront; a live vendor's boxes are ordered from
+  // the same panel on their profile (the anchor is simply absent, landing them
+  // on the profile, if they declared the category but published no boxes).
+  const bookHref = bainaVendorData
+    ? `/baina-box/${bainaVendorData.slug}#baina-order`
+    : bainaMode
+      ? `/vendors/${vendor.id}#baina-order`
+      : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
+          cityId ? `&city=${cityId}` : ""
+        }`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
@@ -1314,9 +1328,7 @@ function VendorCard({
           {vendor.reviews > 0 || stats ? (
             <Link
               href={
-                isBainaSearch && bainaVendorData
-                  ? vendorHref
-                  : `/vendors/${vendor.id}#reviews`
+                bainaVendorData ? vendorHref : `/vendors/${vendor.id}#reviews`
               }
               className="relative z-10 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm"
               aria-label={t(

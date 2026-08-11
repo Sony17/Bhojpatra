@@ -69,7 +69,7 @@ export default function BainaBoxOverview() {
 
                 {/* Rating Badge */}
                 <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-bold text-ink shadow-sm backdrop-blur-sm">
-                  <span className="text-amber-500">★</span>
+                  <span className="text-maroon">★</span>
                   <span>{vendor.rating}</span>
                   <span className="font-normal text-ink-soft">
                     ({vendor.reviews})

@@ -141,7 +141,7 @@ export default function AccountsDashboard() {
       },
       {
         type: "partner" as const,
-        title: t("Become a referral partner", "रेफ़रल पार्टनर बनें"),
+        title: t("Become a partner", "पार्टनर बनें"),
         hint: t("Share your code and earn on every confirmed booking.", "अपना कोड साझा करें और हर पुष्ट बुकिंग पर कमाएं।"),
         href: "/signup?type=partner",
       },
@@ -251,7 +251,7 @@ export default function AccountsDashboard() {
           (session.accounts.includes("partner") &&
             venueMemberships.length === 0)) && (
           <SectionCard
-            title={t("Referral Partner", "रेफ़रल पार्टनर")}
+            title={t("Partner", "पार्टनर")}
             badge={t(ACCOUNT_LABEL.partner.en, ACCOUNT_LABEL.partner.hi)}
             href={DASHBOARD_PATH.partner}
             cta={t("Open referral dashboard", "रेफ़रल डैशबोर्ड खोलें")}

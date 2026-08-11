@@ -6,7 +6,7 @@
  * Reached from the /vendors catalog; the CTA hands off to the /book wizard.
  */
 
-import Image from "next/image";
+import { useMemo } from "react";
 import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
@@ -14,8 +14,10 @@ import { useCompare } from "@/lib/compare";
 import StickyBookingBar from "@/components/StickyBookingBar";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import VendorActionRow from "@/components/vendors/VendorActionRow";
+import BainaBoxOrderPanel from "@/components/vendors/BainaBoxOrderPanel";
 import { Button, Card, Badge, AppBar, ImageCarousel } from "@/components/ui";
 import { inr } from "@/lib/money";
+import { bainaProductsFromVendorBoxes } from "@/lib/bainaBoxData";
 
 export default function VendorProfile({
   profile,
@@ -23,10 +25,16 @@ export default function VendorProfile({
   profile: PublicVendorProfile;
 }) {
   const { t, lang } = useLang();
+  // The vendor's published boxes, flattened to one orderable line per size.
+  const bainaProducts = useMemo(
+    () => bainaProductsFromVendorBoxes(profile.bainaBoxes),
+    [profile.bainaBoxes],
+  );
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(profile.id);
   const compareDisabled = !inCompare && isFull;
-  const bookHref = `/book?package=custom&vendor=${encodeURIComponent(profile.id)}&step=menu`;
+  // Booking one brand is a Single Stall order, which has its own wizard.
+  const bookHref = `/book/stall?vendor=${encodeURIComponent(profile.id)}`;
   const allPhotos = [profile.image, ...profile.gallery.filter((g) => g !== profile.image)];
 
   return (
@@ -210,71 +218,20 @@ export default function VendorProfile({
         </div>
       )}
 
-      {/* Baina Box menu — photo-led box cards (image, name, contents, and the
-          ½ kg / 1 kg / custom-size booking prices). */}
-      {profile.bainaBoxes.length > 0 && (
-        <div className="mt-12">
-          <h2 className="font-display text-2xl text-ink">
-            <span aria-hidden="true">🎁</span> {t("Our Baina Boxes", "हमारे बैना बॉक्स")}
-          </h2>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {profile.bainaBoxes.map((b, i) => (
-              <Card
-                key={`${b.name}-${i}`}
-                padding="none"
-                className="overflow-hidden"
-              >
-                {b.photo && (
-                  <div className="relative aspect-[4/3] w-full bg-cream">
-                    <Image
-                      src={b.photo}
-                      alt={b.name}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-                <div className="p-4">
-                  <p className="font-display font-semibold text-ink">
-                    {b.name}
-                  </p>
-                  {b.contents && (
-                    <p className="mt-1 text-sm text-ink-soft">{b.contents}</p>
-                  )}
-                  <p className="mt-2 text-lg font-semibold text-maroon">
-                    ₹{inr.format(b.price)}
-                    <span className="text-sm font-normal text-ink-soft">
-                      {" "}
-                      / {t("½ kg box", "½ किलो बॉक्स")}
-                    </span>
-                  </p>
-                  {b.price1kg != null && b.price1kg > 0 && (
-                    <p className="text-lg font-semibold text-maroon">
-                      ₹{inr.format(b.price1kg)}
-                      <span className="text-sm font-normal text-ink-soft">
-                        {" "}
-                        / {t("1 kg box", "1 किलो बॉक्स")}
-                      </span>
-                    </p>
-                  )}
-                  {(b.customSizes ?? []).map((s) => (
-                    <p
-                      key={s.label}
-                      className="text-lg font-semibold text-maroon"
-                    >
-                      ₹{inr.format(s.price)}
-                      <span className="text-sm font-normal text-ink-soft">
-                        {" "}
-                        / {s.label} {t("box", "बॉक्स")}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+      {/* Baina Box menu — the same per-box order panel the curated Baina Box
+          storefronts use, so a vendor who published a box menu is orderable
+          here (per box, at their own ½ kg / 1 kg / custom-size prices) instead
+          of only being on show. Every size is its own line. */}
+      {bainaProducts.length > 0 && (
+        <BainaBoxOrderPanel
+          data={{
+            vendorId: profile.id,
+            name: profile.business,
+            location: profile.city,
+            products: bainaProducts,
+          }}
+          heading={`🎁 ${t("Our Baina Boxes", "हमारे बैना बॉक्स")}`}
+        />
       )}
 
       {/* Essential Service offer — service crew & setup at the vendor's rate. */}

@@ -3,6 +3,20 @@ import PublicShell from "@/components/app/PublicShell";
 import VenueDetail from "@/components/venues/VenueDetail";
 import { staticBookableVenues } from "@/lib/venues";
 
+/**
+ * Prerender the seeded catalogue at build time. A dynamic segment with no
+ * `generateStaticParams` falls back to per-request rendering, which means
+ * `<Link>` can't prefetch the route and every tap pays a server round trip
+ * before anything moves. These ids are known at build, so the seeded venues
+ * become static and their cards prefetch in full — the tap is instant.
+ *
+ * Owner-registered venues aren't known here; `dynamicParams` (default) still
+ * renders those on demand, with `loading.tsx` covering the wait.
+ */
+export function generateStaticParams(): { id: string }[] {
+  return staticBookableVenues.map((v) => ({ id: v.id }));
+}
+
 /** Venue detail + booking route. `params` is async in this Next version. */
 export async function generateMetadata({
   params,

@@ -87,7 +87,7 @@ export const DASHBOARD_PATH: Record<AccountType, string> = {
 export const ACCOUNT_LABEL: Record<AccountType, { en: string; hi: string }> = {
   customer: { en: "Customer", hi: "ग्राहक" },
   vendor: { en: "Vendor", hi: "वेंडर" },
-  partner: { en: "Referral Partner", hi: "रेफ़रल पार्टनर" },
+  partner: { en: "Partner", hi: "पार्टनर" },
 };
 
 /** Shape the authenticated user into the session the app consumes. Admins have
