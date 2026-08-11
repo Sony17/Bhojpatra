@@ -69,6 +69,7 @@ import {
   type BookingStatus,
 } from "@/lib/data";
 import { type VendorTier } from "@/lib/admin/types";
+import { dishOnTier, ownCourseQuota, tierRate } from "@/lib/tiers";
 import { slugifyName } from "@/lib/bookings";
 import { seedStallDraftBrief } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
@@ -126,21 +127,19 @@ const PACKAGE_VENDOR_TIERS: Record<string, VendorListing["tiers"]> = {
   platinum: ["Platinum"],
 };
 
-/** A caterer's own published dish quota for a course. Under a band (a fixed
- *  package) that's the number they set for it; with no band — Single Stall
- *  browses every stall, unfiltered — it's the most generous quota they
- *  published, so `0` only reads as "I don't serve this course" when they put 0
- *  on every band. `undefined` = never set one, so the platform quota applies. */
-function ownCourseQuota(
-  tierItems: Partial<Record<VendorTier, number>> | undefined,
-  tier: VendorTier | null,
-): number | undefined {
-  if (!tierItems) return undefined;
-  if (tier) return tierItems[tier];
-  const set = Object.values(tierItems).filter(
-    (n): n is number => typeof n === "number",
-  );
-  return set.length ? Math.max(...set) : undefined;
+/** A caterer as the band being browsed sees them: only the dishes they serve on
+ *  that band, priced at that band's rate. Every downstream read — the dish
+ *  picker, the quota counter, pricing, the invoice, the WhatsApp summary — runs
+ *  off `activeCategories`, so narrowing once here is what keeps a Platinum-only
+ *  delicacy out of a Silver order rather than each of them remembering to ask.
+ *  Off a band (Single Stall) it's a no-op: every dish, the flat rate. */
+function onBand(v: CategoryVendor, tier: VendorTier | null): CategoryVendor {
+  if (!tier) return v;
+  const items = v.items.filter((it) => dishOnTier(it, tier));
+  const perPlate = tierRate(v, tier);
+  return items.length === v.items.length && perPlate === v.perPlate
+    ? v
+    : { ...v, items, perPlate };
 }
 
 type Lang = "en" | "hi";
@@ -942,7 +941,12 @@ export default function BookingWizard() {
       .filter((c): c is MenuCategory => Boolean(c))
       .map((c) => ({
         ...c,
-        vendors: c.vendors.filter((v) => {
+        // Each caterer is narrowed to the band being browsed BEFORE the gates,
+        // so "does this stall serve anything here?" is asked of the dishes the
+        // guest would actually get, not of the vendor's whole published menu.
+        vendors: c.vendors
+          .map((v) => onBand(v, effectiveTier))
+          .filter((v) => {
           // Tier gate: Platinum surfaces every band; Silver/Gold only vendors
           // mapped to that tier (a vendor's course↔tier mapping). Vendors with
           // no tier data — the static fallback before /api/menu answers — are
@@ -963,8 +967,12 @@ export default function BookingWizard() {
           // Course gate: a caterer who set their own per-band quota for this
           // course and put 0 on it doesn't serve it — they drop out of this
           // roster rather than appear with nothing to pick. Off a band (Single
-          // Stall) that means 0 on every quota they published.
-          const courseOk = ownCourseQuota(v.tierItems, effectiveTier) !== 0;
+          // Stall) that means 0 on every quota they published. A caterer who
+          // kept every dish in this course off the band lands in the same
+          // place: nothing to serve, so nothing to show.
+          const courseOk =
+            ownCourseQuota(v.tierItems, effectiveTier) !== 0 &&
+            v.items.length > 0;
           return tierOk && cityOk && courseOk;
         }),
       }));
@@ -1028,7 +1036,12 @@ export default function BookingWizard() {
     // the moment it's picked, and the counter honest (6/6, not 6/1).
     if (vendor && isFixedStall(vendor)) return vendor.items.length;
     const own = ownCourseQuota(vendor?.tierItems, effectiveTier);
-    return own && own > 0 ? own : platform;
+    const asked = own && own > 0 ? own : platform;
+    // Never ask for more dishes than this stall actually has on this band —
+    // whether the number came from the caterer or from our own package config.
+    // Unclamped, the guest sits at "4 of 6 picked" with nothing left to tap and
+    // the course can never complete, which can block the whole order.
+    return vendor ? Math.min(asked, vendor.items.length) : asked;
   };
 
   // Whether a step's courses let the guest pick more than one dish anywhere in
@@ -2471,6 +2484,8 @@ export default function BookingWizard() {
                 toggleItem={toggleItem}
                 allowanceFor={allowanceFor}
                 baseAllowanceFor={baseAllowanceFor}
+                platformAllowanceFor={platformAllowanceFor}
+                tierName={effectiveTier}
                 categoryComplete={categoryComplete}
                 isSkipped={isSkipped}
                 unskipCat={unskipCat}
@@ -2522,6 +2537,8 @@ export default function BookingWizard() {
                 toggleItem={toggleItem}
                 allowanceFor={allowanceFor}
                 baseAllowanceFor={baseAllowanceFor}
+                platformAllowanceFor={platformAllowanceFor}
+                tierName={effectiveTier}
                 categoryComplete={categoryComplete}
                 isSkipped={isSkipped}
                 unskipCat={unskipCat}
@@ -3474,6 +3491,8 @@ function StepMenu({
   toggleItem,
   allowanceFor,
   baseAllowanceFor,
+  platformAllowanceFor,
+  tierName,
   categoryComplete,
   isSkipped,
   unskipCat,
@@ -3501,6 +3520,12 @@ function StepMenu({
   /** Per-vendor dish quota (unscaled). Pass a vendor id to get that caterer's
    *  own published quota for the band; without one, the package's base. */
   baseAllowanceFor: (catId: string, vendorId?: string) => number;
+  /** The package's own standard for a course — the number the home page's tier
+   *  card advertises. Compared against the caterer's to keep the two honest. */
+  platformAllowanceFor: (catId: string) => number;
+  /** Band being browsed, named for the copy ("…on Gold"). Null on Single Stall,
+   *  which has no band and so no standard to differ from. */
+  tierName: VendorTier | null;
   categoryComplete: (cat: MenuCategory) => boolean;
   isSkipped: (catId: string) => boolean;
   unskipCat: (catId: string) => void;
@@ -3630,6 +3655,27 @@ function StepMenu({
     const bases = selectedVendors.map((v) => baseAllowanceFor(cat.id, v.id));
     if (bases.length === 0) return baseAllowanceFor(cat.id);
     return bases.every((n) => n === bases[0]) ? bases[0] : null;
+  })();
+  // The tier card on the home page advertises a standard count for this course
+  // ("5 Starters"), but a caterer may publish their own — and once one is
+  // picked, theirs is the number on screen. Name whose it is, or the wizard
+  // silently contradicts the card the guest chose their package from.
+  const platformBase = platformAllowanceFor(cat.id);
+  const quotaNote = (() => {
+    if (!tierName) return "";
+    const off = selectedVendors.filter(
+      (v) => baseAllowanceFor(cat.id, v.id) !== platformBase,
+    );
+    if (off.length === 0) return "";
+    return off
+      .map((v) => {
+        const n = baseAllowanceFor(cat.id, v.id);
+        return t(
+          `${v.name} serves ${n} ${n === 1 ? "dish" : "dishes"} from this course on ${tierName} — our ${tierName} standard is ${platformBase}.`,
+          `${v.name} ${tierName} पर इस कोर्स से ${n} डिश देते हैं — हमारा ${tierName} मानक ${platformBase} है।`,
+        );
+      })
+      .join(" ");
   })();
   const picks = itemsFor(cat.id);
   // Every stall picked for this course serves a set spread, so the whole block
@@ -3826,6 +3872,12 @@ function StepMenu({
                 "यह स्टॉल तय मेन्यू परोसता है — नीचे की हर डिश आपके आयोजन में आएगी, एक ही प्रति-प्लेट दर पर। कुछ चुनना नहीं है।",
               )}
             </p>
+          )}
+
+          {/* Whose count this is, whenever the caterer's differs from the tier
+              card's. Kept next to the counter it explains. */}
+          {!allFixed && quotaNote && (
+            <p className="-mt-2 text-xs text-ink-soft">{quotaNote}</p>
           )}
 
           {/* Multi-vendor tiers give each vendor its own quota, so the guest can

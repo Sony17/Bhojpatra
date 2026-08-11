@@ -37,6 +37,7 @@ import {
   type VendorMenuSection,
 } from "@/lib/vendorMenus";
 import { TIER_ORDER, sortTiers, type VendorTier } from "@/lib/admin/types";
+import { dishOnTier, effectiveTiers } from "@/lib/tiers";
 import { money } from "@/lib/money";
 import { useLocations } from "@/lib/locations";
 import { useLang } from "@/lib/i18n";
@@ -60,6 +61,10 @@ interface DraftItem {
    *  vendors on their plated dishes. Blank for vendors who don't sell Single
    *  Stall. */
   price?: string;
+  /** Feast bands this dish is served on. Absent = every band the vendor sells
+   *  (the default a new dish is born with), so the band chips only ever record
+   *  a deliberate restriction. */
+  tiers?: VendorTier[];
 }
 
 interface GalleryPhoto {
@@ -75,6 +80,9 @@ interface DraftSection {
    *  strings). Blank = use the platform's number for that band; "0" = the
    *  vendor doesn't serve this course on that band at all. */
   tierItems: Partial<Record<VendorTier, string>>;
+  /** This course's per-plate rate on each band (form strings). Blank = charge
+   *  the flat `perPlate` above, so pricing a band apart is opt-in. */
+  tierPerPlate: Partial<Record<VendorTier, string>>;
   /** How this course sells as a Single Stall: a set spread every guest gets
    *  ("fixed"), or a build-your-own where they pick delicacies ("varied"). */
   menuType: SingleStallMenuType;
@@ -177,6 +185,7 @@ const emptySections = (): Record<string, DraftSection> =>
         perPlate: "",
         items: [] as DraftItem[],
         tierItems: {} as Partial<Record<VendorTier, string>>,
+        tierPerPlate: {} as Partial<Record<VendorTier, string>>,
         menuType: DEFAULT_MENU_TYPE,
       },
     ]),
@@ -416,10 +425,17 @@ export default function MenuBuilder() {
                     diet: it.diet,
                     ...(it.photo ? { photo: it.photo } : {}),
                     ...(it.price != null ? { price: String(it.price) } : {}),
+                    ...(it.tiers?.length ? { tiers: it.tiers } : {}),
                   })),
                   tierItems: Object.fromEntries(
                     TIER_ORDER.flatMap((tier) => {
                       const n = s.tierItems?.[tier];
+                      return n === undefined ? [] : [[tier, String(n)]];
+                    }),
+                  ),
+                  tierPerPlate: Object.fromEntries(
+                    TIER_ORDER.flatMap((tier) => {
+                      const n = s.tierPerPlate?.[tier];
                       return n === undefined ? [] : [[tier, String(n)]];
                     }),
                   ),
@@ -464,6 +480,14 @@ export default function MenuBuilder() {
     updateSection(catId, { tierItems: next });
   };
 
+  /** Set (or clear, on a blank) this course's per-plate rate for one band. */
+  const setTierPerPlate = (catId: string, tier: VendorTier, value: string) => {
+    const next = { ...sections[catId].tierPerPlate };
+    if (value.trim() === "") delete next[tier];
+    else next[tier] = value;
+    updateSection(catId, { tierPerPlate: next });
+  };
+
   const removeItem = (catId: string, index: number) => {
     updateSection(catId, {
       items: sections[catId].items.filter((_, i) => i !== index),
@@ -485,6 +509,27 @@ export default function MenuBuilder() {
       items: sections[catId].items.map((it, i) =>
         i === index ? { ...it, price: value } : it,
       ),
+    });
+  };
+
+  /** Serve / stop serving one dish on one band. A dish with no list is on every
+   *  band, so the first tap turns "all" into "all but this one"; ticking the
+   *  last band back on drops the list again, keeping "everywhere" implicit
+   *  (and so still correct if the vendor's bands change later). Un-ticking the
+   *  final band is ignored — a dish served nowhere is a deleted dish. */
+  const toggleItemTier = (catId: string, index: number, tier: VendorTier) => {
+    const bands = sortTiers(effectiveTiers(tiers, Number(priceFrom) || 0));
+    updateSection(catId, {
+      items: sections[catId].items.map((it, i) => {
+        if (i !== index) return it;
+        const on = it.tiers?.length ? it.tiers : bands;
+        const next = on.includes(tier)
+          ? on.filter((x) => x !== tier)
+          : sortTiers([...on, tier]);
+        if (next.length === 0) return it;
+        const { tiers: _all, ...rest } = it;
+        return next.length === bands.length ? rest : { ...rest, tiers: next };
+      }),
     });
   };
 
@@ -952,6 +997,9 @@ export default function MenuBuilder() {
               diet: it.diet,
               ...(it.photo ? { photo: it.photo } : {}),
               ...(Number(it.price) > 0 ? { price: Number(it.price) } : {}),
+              // Bands this dish is served on — only sent when it's a real
+              // restriction (the server drops any list covering every band).
+              ...(it.tiers?.length ? { tiers: it.tiers } : {}),
             })),
             ...(sections[c.id].enabled ? {} : { hidden: true }),
             // Per-band dish counts, blanks dropped so those bands keep the
@@ -966,6 +1014,19 @@ export default function MenuBuilder() {
                 }),
               );
               return Object.keys(t).length ? { tierItems: t } : {};
+            })(),
+            // Per-band per-plate rates, same rule: a blank band bills the flat
+            // rate above, so only bands priced apart travel.
+            ...(() => {
+              const t = Object.fromEntries(
+                TIER_ORDER.flatMap((tier) => {
+                  const raw = sections[c.id].tierPerPlate[tier];
+                  return raw === undefined || Number(raw) <= 0
+                    ? []
+                    : [[tier, Number(raw)]];
+                }),
+              );
+              return Object.keys(t).length ? { tierPerPlate: t } : {};
             })(),
             // Single Stall menu style. Only "varied" travels — "fixed" is the
             // platform default, so an untouched course stays a set menu.
@@ -1403,6 +1464,10 @@ export default function MenuBuilder() {
     }
   };
 
+  /** Feast bands every course editor asks about — the vendor's own selection,
+   *  falling back to the price-derived bands the catalog would place them in. */
+  const courseBands = sortTiers(effectiveTiers(tiers, Number(priceFrom) || 0));
+
   /** The course editors for one half of the menu. */
   const renderCourses = (cats: MenuCategory[], priceable: boolean) =>
     cats.map((cat) => {
@@ -1424,9 +1489,16 @@ export default function MenuBuilder() {
           priceable={priceable}
           onItemPrice={(i, v) => setItemPrice(cat.id, i, v)}
           onMenuType={(v) => updateSection(cat.id, { menuType: v })}
-          bands={sortTiers(tiers)}
+          // The bands the caterer is actually browsed in — their own picks, or
+          // the price-derived ones when they've picked none. Without the
+          // fallback, a caterer who never ticked a band still appeared on those
+          // bands but had no way to say what they serve there.
+          bands={courseBands}
+          bandsDerived={tiers.length === 0}
           platformItems={platformItemsFor(cat.id)}
           onTierItems={(tier, v) => setTierItems(cat.id, tier, v)}
+          onTierPerPlate={(tier, v) => setTierPerPlate(cat.id, tier, v)}
+          onToggleItemTier={(i, tier) => toggleItemTier(cat.id, i, tier)}
         />
       );
     });
@@ -2412,8 +2484,11 @@ function CategorySection({
   onItemPrice,
   onMenuType,
   bands,
+  bandsDerived,
   platformItems,
   onTierItems,
+  onTierPerPlate,
+  onToggleItemTier,
 }: {
   icon: string;
   name: string;
@@ -2431,13 +2506,18 @@ function CategorySection({
   priceable?: boolean;
   onItemPrice?: (index: number, value: string) => void;
   onMenuType?: (value: SingleStallMenuType) => void;
-  /** Feast bands the vendor sells — the per-band dish-count row is drawn for
-   *  these only, so a Silver-only caterer isn't asked about Platinum. */
+  /** Feast bands the vendor sells — the per-band row is drawn for these only,
+   *  so a Silver-only caterer isn't asked about Platinum. */
   bands: VendorTier[];
+  /** True when those bands came from the vendor's prices rather than their own
+   *  choice — said out loud, so the numbers don't look like someone else's. */
+  bandsDerived: boolean;
   /** Platform dish counts for this course, per band — shown as the placeholder
    *  so a blank field visibly means "use ours". */
   platformItems: Partial<Record<VendorTier, number>>;
   onTierItems: (tier: VendorTier, value: string) => void;
+  onTierPerPlate: (tier: VendorTier, value: string) => void;
+  onToggleItemTier: (index: number, tier: VendorTier) => void;
 }) {
   const { t } = useLang();
   const [draftName, setDraftName] = useState("");
@@ -2656,29 +2736,52 @@ function CategorySection({
             </fieldset>
           )}
 
-          {/* Per-band dish count — the caterer's own answer to "how many
-              starters does Silver get?". Blank keeps the platform number for
-              that band; 0 takes this course off the band entirely. Only the
-              bands they actually sell are shown. */}
+          {/* Per-band row — the caterer's own answer to "how many starters does
+              Silver get, and what does that cost?". A blank count keeps the
+              platform number for that band and a blank rate bills the flat rate
+              above; 0 dishes takes this course off the band entirely. Only the
+              bands they're actually browsed in are shown. */}
           {bands.length > 0 && (
             <div className="rounded-xl border border-cream-3 bg-cream/40 p-3.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                {t("Dishes per band", "प्रति बैंड डिश")}
+                {t("Your bands", "आपके बैंड")}
               </p>
               <p className="mt-0.5 text-xs text-ink-soft">
                 {t(
-                  "How many dishes a guest picks from this course on each of your bands. Leave blank to use ours; put 0 to drop this course from a band.",
-                  "आपके हर बैंड पर ग्राहक इस कोर्स से कितनी डिश चुनेगा। हमारी संख्या के लिए खाली छोड़ें; किसी बैंड से यह कोर्स हटाने के लिए 0 डालें।",
+                  "How many dishes a guest picks from this course on each band, and what you charge there. Leave the count blank to use ours and the rate blank to charge your flat rate; put 0 dishes to drop this course from a band.",
+                  "हर बैंड पर ग्राहक इस कोर्स से कितनी डिश चुनेगा, और वहाँ आप क्या लेते हैं। हमारी संख्या के लिए गिनती खाली छोड़ें और अपनी सामान्य दर के लिए रेट खाली छोड़ें; किसी बैंड से यह कोर्स हटाने के लिए 0 डिश डालें।",
                 )}
               </p>
+              {/* Bands nobody picked are our guess from their prices — say so,
+                  or the numbers read as someone else's decision. */}
+              {bandsDerived && (
+                <p className="mt-1.5 text-xs text-ink-soft">
+                  {t(
+                    "You haven't chosen your bands, so we place you by your prices. Pick them under Segments to change this.",
+                    "आपने अपने बैंड नहीं चुने हैं, इसलिए हम आपकी कीमतों के आधार पर तय करते हैं। बदलने के लिए सेगमेंट में चुनें।",
+                  )}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-3">
                 {bands.map((tier) => {
                   const raw = section.tierItems[tier] ?? "";
                   const off = raw.trim() !== "" && Number(raw) === 0;
+                  // Dishes this band can actually be offered — a dish kept off
+                  // the band doesn't count towards filling its quota.
+                  const available = section.items.filter((it) =>
+                    dishOnTier(it, tier),
+                  ).length;
+                  const asked = raw.trim() === ""
+                    ? (platformItems[tier] ?? 1)
+                    : Number(raw);
+                  const short = !off && asked > available;
                   return (
-                    <label
+                    <div
                       key={tier}
-                      className="flex min-w-0 items-center gap-2 rounded-lg border border-cream-3 bg-white px-2.5 py-1.5"
+                      className={
+                        "flex min-w-0 flex-col gap-1.5 rounded-lg border bg-white px-2.5 py-2 " +
+                        (short ? "border-maroon" : "border-cream-3")
+                      }
                     >
                       <span
                         className={
@@ -2688,20 +2791,56 @@ function CategorySection({
                       >
                         {tier}
                       </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={24}
-                        value={raw}
-                        onChange={(e) => onTierItems(tier, e.target.value)}
-                        placeholder={String(platformItems[tier] ?? 1)}
-                        aria-label={t(
-                          `${tier} dishes from ${name}`,
-                          `${name} से ${tier} डिश`,
-                        )}
-                        className="w-16 rounded-md border border-cream-3 bg-cream/40 px-2 py-1 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
-                      />
-                    </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          max={24}
+                          value={raw}
+                          onChange={(e) => onTierItems(tier, e.target.value)}
+                          placeholder={String(platformItems[tier] ?? 1)}
+                          aria-label={t(
+                            `${tier} dishes from ${name}`,
+                            `${name} से ${tier} डिश`,
+                          )}
+                          className="w-14 rounded-md border border-cream-3 bg-cream/40 px-2 py-1 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
+                        />
+                        <span className="text-[11px] text-ink-soft">
+                          {t("dishes", "डिश")}
+                        </span>
+                        <span aria-hidden="true" className="text-ink-soft/60">
+                          ·
+                        </span>
+                        <span className="text-[11px] text-ink-soft">₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={section.tierPerPlate[tier] ?? ""}
+                          onChange={(e) => onTierPerPlate(tier, e.target.value)}
+                          placeholder={section.perPlate || "0"}
+                          disabled={off}
+                          aria-label={t(
+                            `${tier} per-plate rate for ${name}`,
+                            `${name} के लिए ${tier} प्रति-प्लेट दर`,
+                          )}
+                          className="w-16 rounded-md border border-cream-3 bg-cream/40 px-2 py-1 text-sm text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30 disabled:opacity-40"
+                        />
+                        <span className="text-[11px] text-ink-soft">
+                          /{t("plate", "प्लेट")}
+                        </span>
+                      </div>
+                      {/* A count nobody can fill leaves the guest stuck at
+                          "4 of 6 picked" with nothing left to tap, so it's
+                          flagged on the exact band it applies to. */}
+                      {short && (
+                        <span className="text-[11px] font-semibold text-maroon">
+                          {t(
+                            `Only ${available} dish${available === 1 ? "" : "es"} on ${tier} — add more or we'll serve ${available}.`,
+                            `${tier} पर सिर्फ़ ${available} डिश हैं — और जोड़ें, वरना ${available} ही परोसी जाएँगी।`,
+                          )}
+                        </span>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -2736,6 +2875,14 @@ function CategorySection({
                       "Your Single Stall is a fixed menu — every dish here is served to every guest at the per-plate rate above, so there's nothing to price individually.",
                       "आपका सिंगल स्टॉल तय मेन्यू है — यहाँ की हर डिश हर मेहमान को ऊपर वाली प्रति-प्लेट दर पर परोसी जाएगी, इसलिए अलग कीमत डालने की ज़रूरत नहीं।",
                     )}
+              </p>
+            )}
+            {bands.length > 1 && section.items.length > 0 && (
+              <p className="mb-2 text-xs text-ink-soft">
+                {t(
+                  `Every dish is served on all your bands (${bands.map((b) => b.charAt(0)).join(" · ")}). Tap a letter to keep a dish off that band — a premium delicacy can stay Platinum-only.`,
+                  `हर डिश आपके सभी बैंड (${bands.map((b) => b.charAt(0)).join(" · ")}) पर परोसी जाती है। किसी बैंड से हटाने के लिए उस अक्षर पर टैप करें — कोई ख़ास डिश सिर्फ़ प्लैटिनम पर रखी जा सकती है।`,
+                )}
               </p>
             )}
             {section.items.length === 0 ? (
@@ -2827,6 +2974,53 @@ function CategorySection({
                           )}
                           className="w-16 rounded-full border border-cream-3 bg-white px-2 py-1 text-xs text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30"
                         />
+                      </span>
+                    )}
+                    {/* Which bands serve this dish. A capped count alone can't
+                        say "my raan is Platinum only" — without this, a Silver
+                        guest picks a premium delicacy at the Silver rate. Every
+                        dish starts on every band; tap a letter to take it off
+                        one. Pointless for a single-band caterer, so hidden. */}
+                    {bands.length > 1 && (
+                      <span
+                        role="group"
+                        aria-label={t(
+                          `Bands serving ${it.name}`,
+                          `${it.name} किन बैंड पर`,
+                        )}
+                        className="flex items-center gap-0.5"
+                      >
+                        {bands.map((tier) => {
+                          const on = dishOnTier(it, tier);
+                          return (
+                            <button
+                              key={tier}
+                              type="button"
+                              onClick={() => onToggleItemTier(i, tier)}
+                              aria-pressed={on}
+                              title={t(
+                                on
+                                  ? `Served on ${tier} — tap to remove`
+                                  : `Not on ${tier} — tap to serve`,
+                                on
+                                  ? `${tier} पर परोसा जाता है — हटाने हेतु टैप करें`
+                                  : `${tier} पर नहीं — जोड़ने हेतु टैप करें`,
+                              )}
+                              aria-label={t(
+                                `${it.name} on ${tier}`,
+                                `${it.name} — ${tier}`,
+                              )}
+                              className={
+                                "flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold transition " +
+                                (on
+                                  ? "border-maroon bg-maroon text-cream"
+                                  : "border-cream-3 bg-white text-ink-soft hover:border-maroon")
+                              }
+                            >
+                              {tier.charAt(0)}
+                            </button>
+                          );
+                        })}
                       </span>
                     )}
                     <button

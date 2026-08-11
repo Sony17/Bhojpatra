@@ -12,12 +12,14 @@ import {
   findVendorByOwner,
   newVendorId,
   photoIdFromUrl,
+  pruneMenuBands,
   saveVendor,
   validateVendorMenuInput,
   type LiveVendorRecord,
   type ModerationStatus,
   type VendorBainaBox,
 } from "@/lib/vendorMenus";
+import { effectiveTiers } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -117,22 +119,36 @@ export async function PUT(request: Request) {
     const ownedDishPhotoIds = new Set(
       (await listPhotosByOwner(guard.id, "dish")).map((p) => p.id),
     );
-    const menu = check.value.menu.map((s) => ({
+    const withOwnPhotos = check.value.menu.map((s) => ({
       ...s,
       items: s.items.map((it) => {
         if (!it.photo) return it;
         const photoId = photoIdFromUrl(it.photo);
-        // Strip only the disallowed photo — keep the dish's name, diet and any
-        // per-delicacy price.
+        // Strip only the disallowed photo — keep the dish's name, diet, any
+        // per-delicacy price and the bands it's served on.
         return photoId && ownedDishPhotoIds.has(photoId)
           ? it
           : {
               name: it.name,
               diet: it.diet,
               ...(it.price != null ? { price: it.price } : {}),
+              ...(it.tiers ? { tiers: it.tiers } : {}),
             };
       }),
     }));
+
+    // Marketplace tiers: the vendor's own dashboard selection wins, then the
+    // admin's review decision, then whatever was already on the record.
+    const tiers = check.value.tiers ?? app?.assignedTiers ?? existing?.tiers;
+    // Reconcile the menu's per-band data against the bands this record actually
+    // sells (price-derived when none is set — those vendors still appear on
+    // those bands, so their numbers still have to make sense). Drops data for
+    // bands they've stopped selling and caps any quota at the dishes really
+    // available on that band, so the wizard can never ask for more than exists.
+    const menu = pruneMenuBands(
+      withOwnPhotos,
+      effectiveTiers(tiers, check.value.priceFrom),
+    );
 
     // Baina Box photos ride the same "dish" photo store — strip any reference
     // to a photo this vendor doesn't own.
@@ -171,10 +187,9 @@ export async function PUT(request: Request) {
       rating: existing?.rating ?? 0,
       reviews: existing?.reviews ?? 0,
       verified,
-      // Marketplace tiers: the vendor's own dashboard selection wins, then the
-      // admin's review decision, then whatever was already on the record;
-      // price-derived bands fill in on the catalog when none is set.
-      tiers: check.value.tiers ?? app?.assignedTiers ?? existing?.tiers,
+      // Resolved above (the menu's band data is pruned against it); price-derived
+      // bands still fill in on the catalog when none is set.
+      tiers,
       moderation,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

@@ -1467,6 +1467,12 @@ export interface CategoryItem {
    *  next to the dish in the Single Stall booking flow. Absent on seeds and on
    *  vendors that don't sell Single Stall (those courses price per-plate only). */
   price?: number;
+  /** Feast bands this dish is served on, set by the caterer per dish. Absent —
+   *  the default, and every seed — means every band they sell, so a menu that
+   *  never touches this reads exactly as it always did. A dish listed for
+   *  Platinum only never reaches a Silver guest's picker. Ignored off a band
+   *  (Single Stall browses one stall's whole spread). */
+  tiers?: ("Silver" | "Gold" | "Platinum")[];
 }
 
 export interface CategoryVendor {
@@ -1478,8 +1484,15 @@ export interface CategoryVendor {
    *  registration and shown as a "Google" badge on their card. */
   googleRating?: number;
   googleReviews?: number;
-  /** Per-plate amount added on top of the package base when this vendor is chosen. */
+  /** Per-plate amount added on top of the package base when this vendor is
+   *  chosen — already resolved to the band being browsed (see `tierPerPlate`),
+   *  so pricing never has to know which band it's on. */
   perPlate: number;
+  /** The caterer's own per-plate uplift for THIS course on each band, when they
+   *  price a band differently (a six-dish Platinum spread costing more than a
+   *  two-dish Silver one). A band with no entry bills the flat `perPlate`.
+   *  Carried for display; the wizard reads the already-resolved `perPlate`. */
+  tierPerPlate?: Partial<Record<"Silver" | "Gold" | "Platinum", number>>;
   image: string;
   items: CategoryItem[];
   /** True for live (account-owned) vendors assembled from the vendor store —

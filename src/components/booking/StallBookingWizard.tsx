@@ -50,6 +50,7 @@ import {
   dummyDishPhoto,
   type MenuCategory,
   type CategoryItem,
+  type DietType,
   type Coupon,
   type BookingStatus,
 } from "@/lib/data";
@@ -168,6 +169,29 @@ interface StallOption {
 function dishPrice(item: CategoryItem, course: StallCourse): number {
   return item.price ?? course.perPlate;
 }
+
+/** What one plate of a single dish costs the guest. A varied course bills each
+ *  delicacy at its own price. A fixed course bills `perPlate` for the whole
+ *  spread, so the honest per-dish figure is that rate split across the dishes —
+ *  rounded so the shares add back up to the course rate exactly, with the last
+ *  dish absorbing the remainder. */
+function dishPerPlate(course: StallCourse, index: number): number {
+  const item = course.items[index];
+  if (!course.fixed) return dishPrice(item, course);
+  const n = course.items.length;
+  if (n === 0) return 0;
+  const each = Math.round(course.perPlate / n);
+  return index === n - 1 ? course.perPlate - each * (n - 1) : each;
+}
+
+/** The veg / non-veg mark. This is the one place the four-colour brand palette
+ *  gives way: in India the green-dot / red-dot square is a statutory FSSAI food
+ *  label, and guests read it as a symbol rather than as brand colour. Non-veg
+ *  keeps brand red. */
+const DIET_MARK: Record<DietType, string> = {
+  veg: "#008000",
+  "non-veg": "#B92025",
+};
 
 /** What one course adds to the per-plate, given the guest's picks. A fixed
  *  course is all-or-nothing at its own rate; a varied one bills dish by dish. */
@@ -1415,6 +1439,7 @@ export default function StallBookingWizard() {
                 toggleCourse={toggleCourse}
                 perPlate={perPlate}
                 pickedCount={pickedCount}
+                guests={guests}
                 brandsHref={BRANDS_HREF}
               />
             ) : (
@@ -1702,6 +1727,7 @@ function StepStallMenu({
   toggleCourse,
   perPlate,
   pickedCount,
+  guests,
   brandsHref,
 }: {
   t: (en: string, hi: string) => string;
@@ -1715,6 +1741,9 @@ function StepStallMenu({
   toggleCourse: (catId: string) => void;
   perPlate: number;
   pickedCount: number;
+  /** Headcount from the event brief — turns every per-plate figure on this step
+   *  into the total the guest actually pays. */
+  guests: number;
   /** Where a different stall is picked — the Brands page, not a step in here. */
   brandsHref: string;
 }) {
@@ -1838,6 +1867,14 @@ function StepStallMenu({
               `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
               `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
             )}
+            {/* The per-dish figures below are a split of this one rate, not
+                extra charges — say so before the guest adds them up. */}
+            <span className="mt-0.5 block text-xs text-ink-soft">
+              {t(
+                "Each dish below shows its share of that rate — together they come to the course price, not on top of it.",
+                "नीचे हर डिश उसी दर में अपना हिस्सा दिखाती है — सब मिलाकर वही कोर्स मूल्य बनता है, उसके ऊपर कुछ नहीं।",
+              )}
+            </span>
           </span>
           <button
             type="button"
@@ -1858,9 +1895,10 @@ function StepStallMenu({
       )}
 
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-        {course.items.map((it) => {
+        {course.items.map((it, i) => {
           const active = picks.includes(it.id);
-          const price = dishPrice(it, course);
+          const price = dishPerPlate(course, i);
+          const mark = DIET_MARK[it.diet];
           // On a set menu the row states what's coming; only a varied course
           // turns it into a control.
           const body = (
@@ -1873,30 +1911,46 @@ function StepStallMenu({
                   sizes="56px"
                   className="object-cover"
                 />
+                {/* FSSAI veg / non-veg mark, sat on the photo the way a menu
+                    card prints it — not floating out in the row. */}
+                <span
+                  aria-hidden="true"
+                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
+                  style={{ borderColor: mark }}
+                >
+                  <span
+                    className="block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: mark }}
+                  />
+                </span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  {/* Diet marker in brand ink/red — never a green dot. */}
-                  <span
-                    aria-hidden="true"
-                    className={
-                      "inline-block h-2.5 w-2.5 shrink-0 rounded-full border " +
-                      (it.diet === "veg"
-                        ? "border-ink bg-white"
-                        : "border-maroon bg-maroon")
-                    }
-                  />
-                  <span className="truncate text-sm font-semibold text-ink">
-                    {it.name}
+                <span className="block truncate text-sm font-semibold text-ink">
+                  <span className="sr-only">
+                    {it.diet === "veg"
+                      ? t("Veg", "शाकाहारी")
+                      : t("Non-veg", "मांसाहारी")}
+                    {" · "}
                   </span>
+                  {it.name}
                 </span>
-                {/* A set menu carries one rate for the whole spread, so a
-                    per-dish price here would read as an extra charge. */}
-                {!course.fixed && (
-                  <span className="mt-0.5 block text-xs text-ink-soft">
-                    {money(price)} / {t("plate", "प्लेट")}
-                  </span>
-                )}
+                {/* Every delicacy carries a price: its own on a varied course,
+                    its share of the set rate on a fixed one (the shares add
+                    back up to the course's per-plate exactly). A varied dish is
+                    billed on its own, so its headcount total trails the
+                    per-plate; a set-menu dish can't be bought separately, and
+                    the course footer already totals the spread — a per-dish
+                    total there is only something to mis-add. */}
+                <span className="mt-0.5 block text-xs text-ink-soft">
+                  <span className="font-semibold text-ink">{money(price)}</span>{" "}
+                  / {t("plate", "प्लेट")}
+                  {!course.fixed && guests > 0 && (
+                    <span className="whitespace-nowrap">
+                      {" · "}
+                      {money(price * guests)}
+                    </span>
+                  )}
+                </span>
               </span>
               <span
                 className={
@@ -1948,11 +2002,21 @@ function StepStallMenu({
             ? t("dishes included", "व्यंजन शामिल")
             : t("dishes selected", "व्यंजन चुने गए")}
         </span>
-        <span className="text-lg font-semibold text-maroon">
-          {money(perPlate)}{" "}
-          <span className="text-sm font-normal text-ink-soft">
-            / {t("plate", "प्लेट")}
+        <span className="text-right">
+          <span className="block text-lg font-semibold text-maroon">
+            {money(perPlate)}{" "}
+            <span className="text-sm font-normal text-ink-soft">
+              / {t("plate", "प्लेट")}
+            </span>
           </span>
+          {/* Per-plate is the number a Single Stall guest shops on; the menu
+              total trails it so the headcount arithmetic is still visible. */}
+          {guests > 0 && (
+            <span className="block text-xs text-ink-soft">
+              {money(perPlate * guests)} ·{" "}
+              {t(`${inr.format(guests)} guests`, `${inr.format(guests)} मेहमान`)}
+            </span>
+          )}
         </span>
       </div>
     </div>

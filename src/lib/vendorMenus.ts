@@ -43,6 +43,13 @@ import {
   sortTiers,
   type VendorTier,
 } from "@/lib/admin/types";
+import {
+  dishOnTier,
+  effectiveTiers,
+  pruneDishTiers,
+  pruneTierMap,
+  tiersForPrice,
+} from "@/lib/tiers";
 
 export interface VendorMenuItem {
   name: string;
@@ -53,6 +60,12 @@ export interface VendorMenuItem {
    *  Optional: when absent, the dish falls back to its course per-plate rate.
    *  Only surfaced in the Single Stall flow. */
   price?: number;
+  /** Feast bands this dish is served on. Absent = every band the vendor sells
+   *  (the default, so an untouched menu is unchanged); a subset lets a caterer
+   *  keep a premium delicacy off the cheaper bands instead of only capping how
+   *  many dishes those bands pick. Stored only while it's a real restriction —
+   *  see `pruneDishTiers`. */
+  tiers?: VendorTier[];
 }
 
 /** Content moderation for live vendors — a pre-approval model: new/edited menus
@@ -78,6 +91,12 @@ export interface VendorMenuSection {
    *  leaves them out of its roster there. Lets a caterer say "Silver gets 2
    *  starters, Platinum gets 6" and drop a segment from the cheaper bands. */
   tierItems?: Partial<Record<VendorTier, number>>;
+  /** Per-plate uplift for this course on each band, when the caterer prices the
+   *  bands differently — a six-dish Platinum spread is not the same cost as a
+   *  two-dish Silver one. A band with no entry bills the flat `perPlate` above,
+   *  so this stays entirely optional. Read on the feast bands only; Single
+   *  Stall has no band and always bills `perPlate`. */
+  tierPerPlate?: Partial<Record<VendorTier, number>>;
   /** How this course sells as a Single Stall. `"fixed"` (the default, and what
    *  a section with no value means) is a set spread: every published dish is
    *  served, the guest customises nothing, and the stall bills at this course's
@@ -474,6 +493,12 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           ...(section.tierItems && Object.keys(section.tierItems).length
             ? { tierItems: section.tierItems }
             : {}),
+          // Per-band rates for this course, when the caterer prices the bands
+          // apart. The wizard resolves `perPlate` from these once it knows the
+          // band being browsed; they travel so the roster card can show them.
+          ...(section.tierPerPlate && Object.keys(section.tierPerPlate).length
+            ? { tierPerPlate: section.tierPerPlate }
+            : {}),
           // How this stall sells on Single Stall — resolved here (rather than
           // left undefined) so the wizard never has to know the default.
           menuType: menuTypeOf(section),
@@ -483,6 +508,11 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             diet: it.diet,
             ...(it.photo ? { photo: it.photo } : {}),
             ...(it.price != null ? { price: it.price } : {}),
+            // Which bands serve this dish (absent = all of them). Item ids stay
+            // index-based over the WHOLE section, so a band that hides a dish
+            // never renumbers the rest — a stored pick keeps pointing at the
+            // dish it was made against.
+            ...(it.tiers?.length ? { tiers: it.tiers } : {}),
           })),
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
         },
@@ -524,12 +554,10 @@ const CATEGORY_MEAL_TYPES: Record<string, string[]> = {
   sweets: ["Desserts"],
 };
 
-/** Tier bands mirror the catalog's price-range filter (`PRICE_RANGES`). */
-function tiersFor(priceFrom: number): VendorListing["tiers"] {
-  if (priceFrom <= 999) return ["Silver", "Gold"];
-  if (priceFrom <= 1250) return ["Silver", "Gold", "Platinum"];
-  return ["Gold", "Platinum"];
-}
+/** Tier bands mirror the catalog's price-range filter (`PRICE_RANGES`). Shared
+ *  with the vendor dashboard through `@/lib/tiers`, so the bands a caterer is
+ *  asked to configure are exactly the ones customers browse them in. */
+const tiersFor = tiersForPrice;
 
 /** Project a live vendor record onto the catalog listing shape. Only records
  *  owned by a real vendor account with a published dish are listed — the
@@ -635,13 +663,29 @@ export interface PublicVendorProfile {
   googleReviews?: number;
   verified: boolean;
   gallery: string[];
+  /** Feast bands this caterer sells (their own selection, else price-derived) —
+   *  the bands the per-course numbers below are keyed by, so the public menu
+   *  page can show a customer exactly what each band buys before they book. */
+  tiers: VendorTier[];
   menu: {
     categoryId: string;
     name: string;
     nameHi: string;
     icon: string;
     perPlate: number;
-    items: { name: string; diet: DietType; photo?: string; price?: number }[];
+    /** Dishes a guest picks from this course on each band. A band with no entry
+     *  follows the platform number, so the page fills those in itself. */
+    tierItems?: Partial<Record<VendorTier, number>>;
+    /** Per-plate rate on each band; a band with no entry bills `perPlate`. */
+    tierPerPlate?: Partial<Record<VendorTier, number>>;
+    items: {
+      name: string;
+      diet: DietType;
+      photo?: string;
+      price?: number;
+      /** Bands this dish is served on; absent = every band above. */
+      tiers?: VendorTier[];
+    }[];
   }[];
   /** Live counters & services the vendor offers, resolved for display. */
   counters: {
@@ -776,6 +820,7 @@ export function toPublicVendorProfile(
     ...(r.googleReviews !== undefined ? { googleReviews: r.googleReviews } : {}),
     verified: r.verified,
     gallery,
+    tiers: effectiveTiers(r.tiers, r.priceFrom),
     menu: visible.flatMap((s) => {
       const cat = menuCategories.find((c) => c.id === s.categoryId);
       if (!cat) return [];
@@ -786,6 +831,15 @@ export function toPublicVendorProfile(
           nameHi: cat.nameHi,
           icon: cat.icon,
           perPlate: s.perPlate,
+          // The band breakdown travels with the course so the public menu shows
+          // the same numbers the /book wizard will enforce — a customer reading
+          // "Gold: 5 dishes · ₹260/plate" here gets exactly that in the wizard.
+          ...(s.tierItems && Object.keys(s.tierItems).length
+            ? { tierItems: s.tierItems }
+            : {}),
+          ...(s.tierPerPlate && Object.keys(s.tierPerPlate).length
+            ? { tierPerPlate: s.tierPerPlate }
+            : {}),
           items: s.items,
         },
       ];
@@ -956,6 +1010,55 @@ export function cleanGoogleReviews(v: unknown): number | undefined {
   return Math.floor(n);
 }
 
+/** Reconcile a validated menu against the bands the caterer actually sells.
+ *  Run by the save route once the record's final tiers are known — validation
+ *  alone can't do it, because the tiers may come from the admin's review
+ *  decision or the existing record rather than this request. Three repairs, all
+ *  of which fix a way the stored menu could otherwise lie to customers:
+ *
+ *    1. Band data for a band they don't sell is dropped, so an old "Platinum: 6"
+ *       can't come back to life unseen the day their bands change.
+ *    2. A dish's band list is narrowed to those bands, and dropped entirely when
+ *       it covers all of them ("served everywhere" stays implicit).
+ *    3. A band's dish quota is capped at the dishes actually available on that
+ *       band — asking a guest for 6 dishes out of 4 leaves the course forever
+ *       incomplete and can block the whole order. Capping to 0 is meaningful and
+ *       correct: no dishes on that band means the course isn't served there. */
+export function pruneMenuBands(
+  menu: VendorMenuSection[],
+  bands: VendorTier[],
+): VendorMenuSection[] {
+  return menu.map((s) => {
+    const items: VendorMenuItem[] = s.items.map((it) => {
+      const tiers = pruneDishTiers(it.tiers, bands);
+      // Identity only when both are undefined — an untouched dish stays as-is.
+      if (tiers === it.tiers) return it;
+      const { tiers: _dropped, ...rest } = it;
+      return tiers ? { ...rest, tiers } : rest;
+    });
+    const pruned = pruneTierMap(s.tierItems, bands);
+    const tierItems = pruned
+      ? Object.fromEntries(
+          Object.entries(pruned).map(([tier, n]) => [
+            tier,
+            Math.min(
+              n,
+              items.filter((it) => dishOnTier(it, tier as VendorTier)).length,
+            ),
+          ]),
+        )
+      : undefined;
+    const tierPerPlate = pruneTierMap(s.tierPerPlate, bands);
+    const { tierItems: _oldItems, tierPerPlate: _oldRates, ...rest } = s;
+    return {
+      ...rest,
+      items,
+      ...(tierItems ? { tierItems } : {}),
+      ...(tierPerPlate ? { tierPerPlate } : {}),
+    };
+  });
+}
+
 type Check = { ok: true; value: VendorMenuInput } | { ok: false; error: string };
 
 const cleanString = (v: unknown, max: number): string =>
@@ -1039,11 +1142,17 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       // Single-Stall requirement below rejects the save if any visible plated
       // dish is left without one.
       const price = cleanMoney(it.price, 100000);
+      // Bands this dish is served on. Unknown values are dropped; an empty
+      // result is stored as "no restriction" rather than "served nowhere" —
+      // `pruneMenuBands` below then drops any list that covers every band the
+      // caterer sells, so "everywhere" stays implicit.
+      const itemTiers = parseTiers(it.tiers);
       items.push({
         name,
         diet,
         ...(photo ? { photo } : {}),
         ...(price !== null && price > 0 ? { price } : {}),
+        ...(itemTiers.length ? { tiers: itemTiers } : {}),
       });
     }
     // The vendor's own per-band dish quota for this course. Only the three
@@ -1057,12 +1166,22 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       if (n !== null) tierItems[tier] = n;
     }
 
+    // The caterer's own per-plate rate for this course on a band. Blank / 0
+    // drops back to the flat `perPlate`, so pricing a band apart is opt-in.
+    const tierPerPlate: Partial<Record<VendorTier, number>> = {};
+    const rawTierRates = (s.tierPerPlate ?? {}) as Record<string, unknown>;
+    for (const tier of TIER_ORDER) {
+      const n = cleanMoney(rawTierRates[tier], 10000);
+      if (n !== null && n > 0) tierPerPlate[tier] = n;
+    }
+
     menu.push({
       categoryId,
       perPlate,
       items,
       ...(s.hidden === true ? { hidden: true } : {}),
       ...(Object.keys(tierItems).length ? { tierItems } : {}),
+      ...(Object.keys(tierPerPlate).length ? { tierPerPlate } : {}),
       // Single Stall menu style. Only "varied" is stored — "fixed" is the
       // platform default, so an absent value already reads right.
       ...(s.menuType === "varied" ? { menuType: "varied" as const } : {}),
