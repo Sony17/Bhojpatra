@@ -1033,12 +1033,13 @@ export function pruneMenuBands(
       const tiers = pruneDishTiers(it.tiers, bands);
       // Identity only when both are undefined — an untouched dish stays as-is.
       if (tiers === it.tiers) return it;
-      const { tiers: _dropped, ...rest } = it;
-      return tiers ? { ...rest, tiers } : rest;
+      const dish = { ...it };
+      delete dish.tiers;
+      return tiers ? { ...dish, tiers } : dish;
     });
     const pruned = pruneTierMap(s.tierItems, bands);
     const tierItems = pruned
-      ? Object.fromEntries(
+      ? (Object.fromEntries(
           Object.entries(pruned).map(([tier, n]) => [
             tier,
             Math.min(
@@ -1046,16 +1047,17 @@ export function pruneMenuBands(
               items.filter((it) => dishOnTier(it, tier as VendorTier)).length,
             ),
           ]),
-        )
+        ) as Partial<Record<VendorTier, number>>)
       : undefined;
     const tierPerPlate = pruneTierMap(s.tierPerPlate, bands);
-    const { tierItems: _oldItems, tierPerPlate: _oldRates, ...rest } = s;
-    return {
-      ...rest,
-      items,
-      ...(tierItems ? { tierItems } : {}),
-      ...(tierPerPlate ? { tierPerPlate } : {}),
-    };
+    const next: VendorMenuSection = { ...s, items };
+    // Rebuilt rather than spread over: a band the caterer no longer sells has
+    // to leave the record, not merely be overwritten where it overlaps.
+    delete next.tierItems;
+    delete next.tierPerPlate;
+    if (tierItems) next.tierItems = tierItems;
+    if (tierPerPlate) next.tierPerPlate = tierPerPlate;
+    return next;
   });
 }
 

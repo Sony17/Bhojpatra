@@ -527,8 +527,9 @@ export default function MenuBuilder() {
           ? on.filter((x) => x !== tier)
           : sortTiers([...on, tier]);
         if (next.length === 0) return it;
-        const { tiers: _all, ...rest } = it;
-        return next.length === bands.length ? rest : { ...rest, tiers: next };
+        const dish = { ...it };
+        delete dish.tiers;
+        return next.length === bands.length ? dish : { ...dish, tiers: next };
       }),
     });
   };

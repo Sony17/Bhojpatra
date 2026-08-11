@@ -7,7 +7,9 @@ import { useLang } from "@/lib/i18n";
 import { AppBar, Button, Card, CategoryChip, CategoryChips } from "@/components/ui";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
 import type { PublicVendorProfile, VendorBainaBox, VendorEssentialService } from "@/lib/vendorMenus";
-import type { VendorListing } from "@/lib/data";
+import { packageCategoryItems, type VendorListing } from "@/lib/data";
+import type { VendorTier } from "@/lib/admin/types";
+import { dishOnTier, tierRate } from "@/lib/tiers";
 import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 
 export interface FullMenuItem {
@@ -16,6 +18,19 @@ export interface FullMenuItem {
   diet?: string;
   photo?: string;
   icon?: string;
+  /** Feast bands this dish is served on — absent means every band the caterer
+   *  sells, which is the norm, so the marks only appear where they inform. */
+  tiers?: VendorTier[];
+}
+
+/** What one feast band buys from a course, already resolved the way the /book
+ *  wizard will resolve it: the caterer's own dish count (or the platform's when
+ *  they set none), capped at the dishes actually on that band, plus the rate
+ *  they charge there. `dishes: 0` means the course isn't served on that band. */
+export interface CourseBand {
+  tier: VendorTier;
+  dishes: number;
+  perPlate: number;
 }
 
 export interface FullMenuCategory {
@@ -24,6 +39,9 @@ export interface FullMenuCategory {
   nameHi?: string;
   icon?: string;
   perPlate?: number;
+  /** Per-band breakdown; empty for the static-listing fallback, which has no
+   *  published menu to break down. */
+  bands?: CourseBand[];
   items: FullMenuItem[];
 }
 
@@ -133,10 +151,26 @@ export default function VendorFullMenu({
         nameHi: m.nameHi,
         icon: m.icon,
         perPlate: m.perPlate,
+        // Resolve each band exactly as the wizard does — caterer's count first,
+        // platform's as the fallback, capped at the dishes really on that band —
+        // so what a customer reads here is what the booking flow will offer.
+        bands: profile.tiers.map((tier) => {
+          const available = m.items.filter((it) => dishOnTier(it, tier)).length;
+          const asked =
+            m.tierItems?.[tier] ??
+            packageCategoryItems[tier.toLowerCase()]?.[m.categoryId] ??
+            0;
+          return {
+            tier,
+            dishes: Math.min(asked, available),
+            perPlate: tierRate(m, tier),
+          };
+        }),
         items: m.items.map((it) => ({
           name: it.name,
           diet: it.diet,
           photo: it.photo,
+          tiers: it.tiers,
         })),
       });
     }
@@ -293,6 +327,48 @@ export default function VendorFullMenu({
                 )}
               </div>
 
+              {/* What each feast band buys from this course. Tier badges alone
+                  said which bands this caterer sits in but never what a band
+                  actually gets, so the numbers only surfaced deep in the booking
+                  flow. These are the same numbers /book will enforce. */}
+              {cat.bands && cat.bands.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+                    {t("What each tier gets", "हर टियर में क्या मिलता है")}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {cat.bands.map((b) => (
+                      <span
+                        key={b.tier}
+                        className={
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] " +
+                          (b.dishes === 0
+                            ? "border-cream-3 bg-cream/40 text-ink-soft"
+                            : "border-maroon/30 bg-white text-ink")
+                        }
+                      >
+                        <span className="font-bold text-maroon">{b.tier}</span>
+                        {b.dishes === 0 ? (
+                          <span>{t("not served", "उपलब्ध नहीं")}</span>
+                        ) : (
+                          <>
+                            <span>
+                              {b.dishes}{" "}
+                              {t(b.dishes === 1 ? "dish" : "dishes", "डिश")}
+                            </span>
+                            {b.perPlate > 0 && (
+                              <span className="text-ink-soft">
+                                · +₹{b.perPlate}/{t("plate", "प्लेट")}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Items Grid */}
               <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {cat.items.map((item, idx) => {
@@ -339,6 +415,18 @@ export default function VendorFullMenu({
                             {lang === "hi" && item.nameHi ? item.nameHi : item.name}
                           </p>
                         </div>
+                        {/* A dish the caterer keeps off some bands says so —
+                            otherwise a Silver guest reads the full spread and
+                            then can't find half of it in the booking flow.
+                            Dishes served everywhere carry no list, so no mark. */}
+                        {item.tiers && item.tiers.length > 0 && (
+                          <p className="mt-1 text-[11px] font-semibold text-maroon">
+                            {t(
+                              `${item.tiers.join(" · ")} only`,
+                              `केवल ${item.tiers.join(" · ")}`,
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );

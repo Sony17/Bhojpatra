@@ -1066,8 +1066,23 @@ export default function BookingWizard() {
   };
   const itemsFor = (catId: string): string[] => {
     const chosen = vendorsFor(catId);
+    // Picks are validated against the dishes actually on offer right now, not
+    // just their vendor prefix. A dish the caterer serves on Platinum only has
+    // to stop counting the moment the guest drops to Silver — whether by
+    // switching package or by resuming a draft built on a richer band —
+    // otherwise a course reads complete on a dish that's no longer in the
+    // picker, and gets billed. Falls back to the prefix test for a course
+    // outside the current package, where there's no roster to check against.
+    const visible = activeCategories.find((c) => c.id === catId)?.vendors;
+    const offered = visible
+      ? new Set(
+          visible
+            .filter((v) => chosen.includes(v.id))
+            .flatMap((v) => v.items.map((it) => it.id)),
+        )
+      : null;
     const stored = (categoryItems[catId] ?? []).filter((id) =>
-      chosen.some((vid) => id.startsWith(`${vid}-`)),
+      offered ? offered.has(id) : chosen.some((vid) => id.startsWith(`${vid}-`)),
     );
     // A fixed stall's dishes are all in, always — derived here rather than
     // written into state when it's picked, so switching plan (Gold → Single
@@ -3470,6 +3485,17 @@ function StepPackage({
           );
         })}
       </div>
+
+      {/* The dish counts printed on these scrolls are the package's own
+          standard. A caterer may serve more or fewer from a course — the next
+          step shows each brand's exact count on their card, and bills their
+          rate. Said here so the card and the wizard never appear to disagree. */}
+      <p className="mt-5 text-center text-xs text-ink-soft">
+        {t(
+          "Dish counts above are our standard for each tier. Some brands serve more (or fewer) from a course — you'll see each brand's own count on their card in the next step.",
+          "ऊपर दी गई डिश संख्या हर टियर के लिए हमारा मानक है। कुछ ब्रांड किसी कोर्स से इससे ज़्यादा (या कम) परोसते हैं — अगले चरण में हर ब्रांड के कार्ड पर उनकी अपनी संख्या दिखेगी।",
+        )}
+      </p>
     </div>
   );
 }
@@ -3677,6 +3703,18 @@ function StepMenu({
       })
       .join(" ");
   })();
+  // What a stall gives on the band being browsed, shown on its roster card so
+  // brands can be compared BEFORE one is picked — the per-vendor counter only
+  // ever appeared after selection, which made the caterer's own count a
+  // surprise. Off a band (Single Stall) there's no per-band count to state.
+  const bandLine = (v: CategoryVendor): string => {
+    if (!tierName || fixedStall(v)) return "";
+    const n = baseAllowanceFor(cat.id, v.id);
+    return t(
+      `${n} ${n === 1 ? "dish" : "dishes"} on ${tierName}`,
+      `${tierName} पर ${n} डिश`,
+    );
+  };
   const picks = itemsFor(cat.id);
   // Every stall picked for this course serves a set spread, so the whole block
   // below reads as "here's what's coming" rather than as a dish picker. Fixed
@@ -4292,6 +4330,11 @@ function StepMenu({
                           {t(`${stat.count} verified`, `${stat.count} सत्यापित`)}
                         </span>
                       )}
+                      {bandLine(v) && (
+                        <span className="mt-0.5 text-xs text-ink-soft">
+                          {bandLine(v)}
+                        </span>
+                      )}
                       {/* Vendor's own per-person price — Single Stall only
                           (`showItemPrice`), where vendors price individually.
                           Fixed tiers price via the package, so no price here. */}
@@ -4405,6 +4448,9 @@ function StepMenu({
                       `${stat.count} सत्यापित`,
                     )}
                   </p>
+                )}
+                {bandLine(v) && (
+                  <p className="mt-1 text-xs text-ink-soft">{bandLine(v)}</p>
                 )}
               </div>
               <span

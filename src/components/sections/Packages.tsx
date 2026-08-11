@@ -278,11 +278,15 @@ export default function Packages() {
               </span>
             </Button>
           </div>
-          {/* Disclaimer — small un-boxed footnote clubbed under the box above. */}
+          {/* Disclaimer — small un-boxed footnote clubbed under the box above.
+              The dish counts on the scrolls are the platform's standard per
+              tier; a caterer can publish their own for a course (and price it
+              apart), so the booking flow may show a different number against a
+              given brand. Said here rather than left for the guest to discover. */}
           <p className="mt-3 px-2 text-center text-xs text-ink-soft">
             {t(
-              "Prices are approximate. Final price may vary as per menu & vendor selection.",
-              "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है।",
+              "Prices are approximate. Final price may vary as per menu & vendor selection. Dish counts shown are our standard for each tier — some brands serve more (or fewer) from a course, shown on their card while booking.",
+              "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है। दिखाई गई डिश संख्या हर टियर के लिए हमारा मानक है — कुछ ब्रांड किसी कोर्स से इससे ज़्यादा (या कम) परोसते हैं, जो बुकिंग के समय उनके कार्ड पर दिखेगा।",
             )}
           </p>
         </Reveal>
