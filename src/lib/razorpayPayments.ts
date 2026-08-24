@@ -26,7 +26,10 @@ export async function recordRazorpayPayment(opts: {
   if (existing) return existing;
 
   const payment: StoredPayment = {
-    id: `PMT-W${(payments.length + 1).toString().padStart(4, "0")}`,
+    // The id IS the order id, so even when verify and the webhook race past
+    // the txnRef check above simultaneously, both upserts land on the same
+    // primary key — one row, never a duplicate (unlike a counter-derived id).
+    id: `PMT-${opts.orderId.replace(/^order_/, "R")}`,
     bookingId: opts.bookingId,
     customer: opts.customer?.trim() || "Online Booking",
     method: "Razorpay",

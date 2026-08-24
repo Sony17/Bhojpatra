@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import {
+  captureRazorpayPayment,
   fetchRazorpayPayment,
   isRazorpayConfigured,
   verifyCheckoutSignature,
@@ -65,8 +66,14 @@ export async function POST(request: Request) {
 
   try {
     // The signature proves authenticity; the fetch pins amount + status.
-    const payment = await fetchRazorpayPayment(paymentId);
+    let payment = await fetchRazorpayPayment(paymentId);
     if (payment.order_id !== orderId) {
+      return Response.json(
+        { error: "Payment verification failed." },
+        { status: 400 },
+      );
+    }
+    if (payment.currency && payment.currency !== "INR") {
       return Response.json(
         { error: "Payment verification failed." },
         { status: 400 },
@@ -77,6 +84,18 @@ export async function POST(request: Request) {
         { error: "Payment was not completed." },
         { status: 400 },
       );
+    }
+
+    // Orders are created with auto-capture, but if the payment still sits at
+    // authorized, capture it now — authorized funds auto-refund if left. A
+    // capture failure isn't fatal (funds are reserved; the webhook records the
+    // eventual capture), so record either way.
+    if (payment.status === "authorized") {
+      try {
+        payment = await captureRazorpayPayment(paymentId, payment.amount);
+      } catch (err) {
+        console.error("Razorpay capture failed; recording authorized", err);
+      }
     }
 
     const recorded = await recordRazorpayPayment({

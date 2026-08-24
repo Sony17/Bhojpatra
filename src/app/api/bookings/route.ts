@@ -16,6 +16,7 @@ import { createStore, readSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import type { PartnerRecord } from "@/app/api/partners/route";
+import type { StoredPayment } from "@/app/api/payments/route";
 import {
   sendBookingConfirmation,
   sendOrderAlert,
@@ -109,6 +110,14 @@ const store = createStore<StoredOrder>({
 const partnerStore = createStore<PartnerRecord>({
   table: "partners",
   idField: "code",
+});
+
+// The payments ledger — the authority on what has actually been paid. Both
+// online flows (Razorpay verify, manual UPI) record the payment BEFORE the
+// booking is confirmed, so at confirm time any genuine advance is already here.
+const paymentStore = createStore<StoredPayment>({
+  table: "payments",
+  idField: "id",
 });
 
 // List recorded orders, newest first (used by the admin booking console).
@@ -244,6 +253,31 @@ export async function POST(request: Request) {
 
   const paidAmt = typeof paid === "number" ? paid : Number(paid);
 
+  // Money integrity: the claimed `paid` must be backed by the payments ledger —
+  // a booking can claim at most what checkout actually recorded against its id,
+  // so a forged request can't invent a paid-and-confirmed order. Zero-paid
+  // bookings (Connect / pay-later) skip the lookup entirely.
+  let paidVerified = 0;
+  if (Number.isFinite(paidAmt) && paidAmt > 0) {
+    const recordedSum = (await paymentStore.list())
+      .filter(
+        (p) =>
+          p.bookingId === id &&
+          (p.status === "Advance Received" || p.status === "Settled"),
+      )
+      .reduce((sum, p) => sum + p.amount, 0);
+    if (recordedSum <= 0) {
+      return Response.json(
+        {
+          error:
+            "We couldn't verify your payment. If money left your account, don't pay again — contact us with your booking ID and we'll match it.",
+        },
+        { status: 400 },
+      );
+    }
+    paidVerified = Math.min(Math.round(paidAmt), recordedSum);
+  }
+
   // Self-referral guard (authoritative): an Individual Referrer / Event Planner
   // can't credit their own booking. If the applied code belongs to this same
   // account, drop the attribution rather than blocking the booking — the code is
@@ -301,7 +335,7 @@ export async function POST(request: Request) {
       ? { venue: venue.trim() }
       : {}),
     amount: Math.round(amt),
-    paid: Number.isFinite(paidAmt) && paidAmt > 0 ? Math.round(paidAmt) : 0,
+    paid: paidVerified,
     paymentMethod,
     ...(typeof paymentRef === "string" && paymentRef.trim()
       ? { paymentRef: paymentRef.trim() }

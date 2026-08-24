@@ -93,8 +93,23 @@ export async function createRazorpayOrder(opts: {
       // Razorpay caps receipts at 40 chars.
       receipt: opts.receipt.slice(0, 40),
       notes: opts.notes,
+      // Auto-capture on authorization, independent of the dashboard's capture
+      // setting — an authorized-but-uncaptured payment is money we never get.
+      payment_capture: 1,
     },
   });
+}
+
+/** Capture an authorized payment (amount in paise) — the backstop for when
+ *  auto-capture didn't happen. Razorpay auto-refunds uncaptured funds. */
+export async function captureRazorpayPayment(
+  paymentId: string,
+  amountPaise: number,
+): Promise<RazorpayPayment> {
+  return razorpayRequest<RazorpayPayment>(
+    `/payments/${encodeURIComponent(paymentId)}/capture`,
+    { method: "POST", body: { amount: amountPaise, currency: "INR" } },
+  );
 }
 
 /** Fetch a payment so the recorded amount/order come from Razorpay, never the client. */
