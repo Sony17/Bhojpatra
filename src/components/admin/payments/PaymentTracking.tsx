@@ -21,7 +21,7 @@ interface LivePayment {
   id: string;
   bookingId: string;
   customer: string;
-  method: "UPI" | "QR";
+  method: "UPI" | "QR" | "Razorpay";
   type: "Advance";
   amount: number;
   status: "Advance Received";
@@ -60,6 +60,7 @@ const STATUS_OPTIONS = [
 
 const METHOD_OPTIONS = [
   { label: "All Methods", value: "All" },
+  { label: "Razorpay", value: "Razorpay" },
   { label: "UPI", value: "UPI" },
   { label: "QR", value: "QR" },
   { label: "Card", value: "Card" },

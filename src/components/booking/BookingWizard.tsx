@@ -2719,6 +2719,7 @@ export default function BookingWizard() {
               guests={guests}
               grandTotal={grandTotal}
               paidAmount={paidAmount}
+              paymentRef={paymentRef}
               referrerName={referrerName}
               onDownload={downloadMenu}
               whatsappHref={whatsappHref}

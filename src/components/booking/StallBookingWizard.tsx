@@ -1352,6 +1352,7 @@ export default function StallBookingWizard() {
           guests={guests}
           grandTotal={grandTotal}
           paidAmount={paidAmount}
+          paymentRef={paymentRef}
           referrerName={selfReferral ? "" : referrerName}
           onDownload={downloadMenu}
           whatsappHref={whatsappHref}

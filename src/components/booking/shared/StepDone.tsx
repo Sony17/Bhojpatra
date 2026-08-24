@@ -22,6 +22,7 @@ export default function StepDone({
   guests,
   grandTotal,
   paidAmount,
+  paymentRef,
   referrerName,
   onDownload,
   whatsappHref,
@@ -35,6 +36,9 @@ export default function StepDone({
   guests: number;
   grandTotal: number;
   paidAmount: number;
+  /** The payment reference behind `paidAmount` — the Razorpay payment id for
+   *  gateway payments, or the customer's UPI UTR for the manual flow. */
+  paymentRef?: string;
   referrerName: string;
   onDownload: () => void;
   whatsappHref: string;
@@ -120,6 +124,11 @@ export default function StepDone({
                   {fullyPaid ? t("Paid", "भुगतान") : t("Advance Paid", "एडवांस भुगतान")}
                 </dt>
                 <dd className="font-semibold text-maroon">{money(paidAmount)}</dd>
+                {paymentRef && (
+                  <dd className="break-all text-xs text-ink-soft">
+                    {t("Payment ref", "भुगतान रेफ़रेंस")}: {paymentRef}
+                  </dd>
+                )}
               </div>
               {!fullyPaid && (
                 <div>

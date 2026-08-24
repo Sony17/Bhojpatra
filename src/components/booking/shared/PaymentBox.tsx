@@ -19,11 +19,21 @@ import {
   type OrderPaymentMethod,
 } from "@/lib/orderPayment";
 import { emiOptionsForEvent, buildEmiPlan } from "@/lib/emi";
+import {
+  startRazorpayCheckout,
+  RazorpayCheckoutError,
+} from "@/lib/razorpayCheckout";
 
 /* ─── Choose a payment method ──────────────────────────────────────────
  * Shared by both booking flows (`/book` and `/book/stall`). Ways to settle a
  * booking, selected by the parent wizard so the chosen method travels with the
  * order to the admin console:
+ *   • Razorpay — when the gateway keypair is configured (surfaced to the client
+ *     as `razorpayKeyId` on /api/admin/payment-settings), the online choice is
+ *     Razorpay Checkout: UPI, cards & netbanking in Razorpay's modal, verified
+ *     server-side (signature + payment fetch) before /api/payments/razorpay/verify
+ *     records the advance. No customer-entered UTR. Replaces the manual modes
+ *     below whenever it's available.
  *   • UPI / QR — pay online now against the merchant's UPI VPA. The QR is a real
  *     NPCI `upi://pay?...` deep-link rendered by our /api/payments/qr route, so
  *     any UPI app can scan it. There's no gateway callback, so settlement is
@@ -63,21 +73,29 @@ export default function PaymentBox({
   setEmiCount: (n: number) => void;
 }) {
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
+  // Razorpay publishable key id — non-empty means the gateway is configured
+  // and the online path runs through Razorpay Checkout instead of manual UPI.
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  // Informational (non-error) line under the pay button — e.g. the customer
+  // closed the checkout without paying. Softer styling than `error`.
+  const [notice, setNotice] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   // The transaction / UTR the customer got from their UPI app — captured here so
   // it travels onto the payment record and the order before the booking is
   // confirmed, letting the team reconcile the transfer.
   const [txnId, setTxnId] = useState<string>("");
 
-  // Pull the live merchant VPA (admin-configurable); fall back to the default.
+  // Pull the live merchant VPA (admin-configurable) plus the gateway key;
+  // fall back to the default manual-UPI merchant.
   useEffect(() => {
     let active = true;
     fetch("/api/admin/payment-settings")
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
-        if (active && cfg && typeof cfg.vpa === "string") {
+        if (!active || !cfg) return;
+        if (typeof cfg.vpa === "string") {
           setMerchant({
             vpa: cfg.vpa,
             payeeName: cfg.payeeName ?? DEFAULT_MERCHANT.payeeName,
@@ -85,12 +103,24 @@ export default function PaymentBox({
               typeof cfg.qrImage === "string" ? cfg.qrImage : undefined,
           });
         }
+        if (typeof cfg.razorpayKeyId === "string" && cfg.razorpayKeyId) {
+          setRazorpayKeyId(cfg.razorpayKeyId);
+        }
       })
       .catch(() => {});
     return () => {
       active = false;
     };
   }, []);
+
+  // With the gateway on, the manual UPI/QR modes aren't offered — upgrade any
+  // lingering UPI/QR selection (the wizards default to "UPI") to Razorpay so
+  // the method saved on the order matches how the advance was actually paid.
+  useEffect(() => {
+    if (razorpayKeyId && (payMethod === "UPI" || payMethod === "QR")) {
+      setPayMethod("Razorpay");
+    }
+  }, [razorpayKeyId, payMethod, setPayMethod]);
 
   const total = Math.round(grandTotal);
   // A fixed 10% advance confirms the booking; the 90% balance is settled later
@@ -180,6 +210,70 @@ export default function PaymentBox({
     }
   };
 
+  // Gateway path — Razorpay Checkout collects the advance and the verify route
+  // records it (gateway-verified, so there's no UTR to ask for). On success the
+  // wizard auto-confirms exactly like the manual flow.
+  const payViaRazorpay = async () => {
+    setSubmitting(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await startRazorpayCheckout({
+        bookingId,
+        amount,
+        note,
+        customerName: customerName.trim(),
+        customerEmail,
+        customerPhone,
+      });
+      onPaid(result.amountPaid, result.paymentId);
+    } catch (err) {
+      if (err instanceof RazorpayCheckoutError && err.code === "dismissed") {
+        // Closing the modal without attempting a payment isn't an error — a
+        // soft reassurance that nothing was charged, with the ways forward.
+        setNotice(
+          t(
+            "Payment not completed — nothing was charged. Try again when you're ready, or choose “Bhojpatra connects you” to pay later.",
+            "भुगतान पूरा नहीं हुआ — कोई राशि नहीं कटी। तैयार होने पर फिर कोशिश करें, या बाद में भुगतान के लिए “भोजपत्र आपसे संपर्क करेगा” चुनें।",
+          ),
+        );
+      } else if (
+        err instanceof RazorpayCheckoutError &&
+        err.code === "failed"
+      ) {
+        // A payment attempt failed and the customer left the modal — surface
+        // the gateway's reason so they know what to fix before retrying.
+        setError(
+          t(
+            `Payment failed: ${err.message} Nothing was charged — you can try again.`,
+            `भुगतान विफल: ${err.message} कोई राशि नहीं कटी — आप फिर कोशिश कर सकते हैं।`,
+          ),
+        );
+      } else if (
+        err instanceof RazorpayCheckoutError &&
+        err.code === "verify"
+      ) {
+        // Money may have moved but our confirm call didn't land — the webhook
+        // still records it, so above all stop them paying twice.
+        setError(
+          t(
+            "Your payment went through but we couldn't confirm it here. Don't pay again — it will be recorded automatically. If your booking doesn't confirm shortly, contact us with your booking ID.",
+            "आपका भुगतान हो गया लेकिन हम यहाँ इसकी पुष्टि नहीं कर सके। दोबारा भुगतान न करें — यह अपने आप दर्ज हो जाएगा। यदि आपकी बुकिंग जल्द कन्फर्म न हो, तो अपनी बुकिंग आईडी के साथ हमसे संपर्क करें।",
+          ),
+        );
+      } else {
+        setError(
+          t(
+            "Couldn't start the payment. Try again.",
+            "भुगतान शुरू नहीं हो सका। फिर कोशिश करें।",
+          ),
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const copyVpa = async () => {
     try {
       await navigator.clipboard.writeText(merchant.vpa);
@@ -217,6 +311,9 @@ export default function PaymentBox({
   }
 
   const online = isOnlineMethod(payMethod);
+  // Whether the online path runs through Razorpay Checkout (gateway configured)
+  // rather than the manual UPI/QR deep-link flow.
+  const gatewayMode = payMethod === "Razorpay";
 
   return (
     <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
@@ -242,7 +339,7 @@ export default function PaymentBox({
           type="button"
           aria-pressed={online}
           onClick={() => {
-            if (!online) setPayMethod("UPI");
+            if (!online) setPayMethod(razorpayKeyId ? "Razorpay" : "UPI");
           }}
           className={
             "flex flex-col rounded-2xl border px-4 py-3 text-left transition " +
@@ -251,9 +348,15 @@ export default function PaymentBox({
               : "border-cream-3 bg-white hover:bg-cream-2")
           }
         >
-          <span className="text-sm font-semibold text-ink">{t("UPI", "UPI")}</span>
+          <span className="text-sm font-semibold text-ink">
+            {razorpayKeyId
+              ? t(ORDER_PAYMENT_LABELS.Razorpay.en, ORDER_PAYMENT_LABELS.Razorpay.hi)
+              : t("UPI", "UPI")}
+          </span>
           <span className="mt-0.5 text-xs text-ink-soft">
-            {t("Pay 10% advance online now", "अभी 10% एडवांस ऑनलाइन दें")}
+            {razorpayKeyId
+              ? t(ORDER_PAYMENT_HINTS.Razorpay.en, ORDER_PAYMENT_HINTS.Razorpay.hi)
+              : t("Pay 10% advance online now", "अभी 10% एडवांस ऑनलाइन दें")}
           </span>
         </button>
         <button
@@ -281,7 +384,9 @@ export default function PaymentBox({
 
       {online ? (
         <>
-          {/* Sub-mode — pay the advance via a UPI ID or by scanning a QR. */}
+          {/* Sub-mode — pay the advance via a UPI ID or by scanning a QR.
+              (Manual flow only; Razorpay's modal offers its own methods.) */}
+          {!gatewayMode && (
           <div className="mt-4">
             <p className="text-sm font-semibold text-ink">
               {t("Choose how to pay the advance", "एडवांस कैसे दें, चुनें")}
@@ -313,6 +418,7 @@ export default function PaymentBox({
               })}
             </div>
           </div>
+          )}
 
           {/* The advance that confirms the booking — fixed at 10%. */}
           <div className="mt-4 rounded-2xl border border-maroon/30 bg-cream/35 p-4">
@@ -324,7 +430,7 @@ export default function PaymentBox({
             </p>
           </div>
 
-          {payMethod === "QR" ? (
+          {gatewayMode ? null : payMethod === "QR" ? (
             <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -386,7 +492,9 @@ export default function PaymentBox({
 
           {/* Transaction ID — the reference the customer's UPI app shows after
               paying. Required before we record the payment and confirm, so the
-              team can reconcile the transfer. */}
+              team can reconcile the transfer. (Manual flow only — gateway
+              payments are verified server-side, nothing to type.) */}
+          {!gatewayMode && (
           <div className="mt-4">
             <label htmlFor="upi-txn-id" className="text-sm font-semibold text-ink">
               {t("UPI Transaction ID", "UPI लेनदेन आईडी")}
@@ -411,6 +519,7 @@ export default function PaymentBox({
               )}
             </p>
           </div>
+          )}
 
           {/* Balance preference — how to settle the remaining 90% after the
               advance: in one payment, or split into EMIs (offered when the event
@@ -488,19 +597,39 @@ export default function PaymentBox({
           {error && (
             <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
           )}
+          {notice && !error && (
+            <p className="mt-3 text-sm text-ink-soft">{notice}</p>
+          )}
 
-          {/* One tap records the advance and confirms the booking — no need to
-              scroll down to a separate confirm button. */}
+          {/* One tap pays/records the advance and confirms the booking — no
+              need to scroll down to a separate confirm button. Gateway mode
+              opens Razorpay Checkout; the manual flow records the typed UTR. */}
           <button
             type="button"
-            onClick={markPaid}
-            disabled={submitting || !isValidTxnId(txnId) || !contactReady}
+            onClick={gatewayMode ? payViaRazorpay : markPaid}
+            disabled={
+              submitting ||
+              !contactReady ||
+              (!gatewayMode && !isValidTxnId(txnId))
+            }
             className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 disabled:opacity-60"
           >
             {submitting
               ? t("Confirming…", "पुष्टि हो रही है…")
-              : `${t("Pay & Confirm", "भुगतान करें और पुष्टि करें")} ${money(amount)}`}
+              : `${
+                  gatewayMode
+                    ? t("Pay Securely", "सुरक्षित भुगतान करें")
+                    : t("Pay & Confirm", "भुगतान करें और पुष्टि करें")
+                } ${money(amount)}`}
           </button>
+          {gatewayMode && (
+            <p className="mt-2 text-xs text-ink-soft">
+              {t(
+                "Your booking confirms automatically once the payment succeeds. Secured by Razorpay.",
+                "भुगतान सफल होते ही आपकी बुकिंग अपने आप कन्फर्म हो जाएगी। Razorpay द्वारा सुरक्षित।",
+              )}
+            </p>
+          )}
           {!contactReady && (
             <p className="mt-2 text-xs font-medium text-maroon">
               {t(

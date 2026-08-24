@@ -8,7 +8,7 @@ import { sendPaymentAlert } from "@/lib/email";
 // cache this handler.
 export const dynamic = "force-dynamic";
 
-export type StoredPaymentMethod = "UPI" | "QR";
+export type StoredPaymentMethod = "UPI" | "QR" | "Razorpay";
 // A payment starts life as an advance and can later be settled or refunded by
 // the admin payment tracker (`/api/payments/[id]`).
 export type StoredPaymentStatus =
@@ -35,8 +35,13 @@ export interface StoredPayment {
   // The customer-entered UPI transaction reference (UTR) captured at checkout —
   // proof of the transfer, used to reconcile against the bank statement. The
   // `txnRef` above is our merchant-side reference (idempotency key); this is the
-  // number the payer's own app produced.
+  // number the payer's own app produced. For gateway payments this holds the
+  // Razorpay payment id instead (the payer-side reference shown on their receipt).
   customerTxnId?: string;
+  // Gateway references, set only on method "Razorpay" (txnRef then holds the
+  // order id, which is also the idempotency key across verify + webhook).
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
   status: StoredPaymentStatus;
   createdAt: string;
 }

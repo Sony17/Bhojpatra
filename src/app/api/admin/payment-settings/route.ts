@@ -6,6 +6,7 @@ import {
 } from "@/lib/upi";
 import { readSingleton, writeSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
+import { isRazorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
 
 // Merchant UPI identity used by checkout. The admin sets this once and it is
 // persisted to Postgres (Neon); the booking wizard reads it (with
@@ -20,7 +21,15 @@ async function readSettings(): Promise<UpiPayeeConfig> {
 }
 
 export async function GET() {
-  return Response.json(await readSettings());
+  // Checkout reads this to decide its mode: `razorpayKeyId` present means the
+  // gateway is on and replaces the manual UPI/QR flow. The key id is the
+  // publishable half of the keypair — safe to expose; the secret never leaves
+  // the server.
+  const settings = await readSettings();
+  return Response.json({
+    ...settings,
+    ...(isRazorpayConfigured() ? { razorpayKeyId: razorpayKeyId() } : {}),
+  });
 }
 
 export async function POST(request: Request) {

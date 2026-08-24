@@ -223,7 +223,7 @@ export interface CustomerQuery {
 
 /* ── Payments ────────────────────────────────────────────────────────────── */
 
-export type PaymentMethod = "UPI" | "QR" | "Card";
+export type PaymentMethod = "UPI" | "QR" | "Card" | "Razorpay";
 export type PaymentType = "Advance" | "Balance" | "Refund";
 export type PaymentStatus = "Settled" | "Pending" | "Advance Received" | "Refunded";
 
