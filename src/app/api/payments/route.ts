@@ -42,6 +42,8 @@ export interface StoredPayment {
   // order id, which is also the idempotency key across verify + webhook).
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  // Set when this payment was refunded through the Razorpay Refund API.
+  razorpayRefundId?: string;
   status: StoredPaymentStatus;
   createdAt: string;
 }

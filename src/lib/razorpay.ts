@@ -112,6 +112,26 @@ export async function captureRazorpayPayment(
   );
 }
 
+export interface RazorpayRefund {
+  id: string;
+  payment_id: string;
+  /** Paise. */
+  amount: number;
+  status: string;
+}
+
+/** Refund a captured payment, fully or partially (amount in paise). The money
+ *  moves back to the customer's original instrument in 5–7 working days. */
+export async function refundRazorpayPayment(
+  paymentId: string,
+  amountPaise: number,
+): Promise<RazorpayRefund> {
+  return razorpayRequest<RazorpayRefund>(
+    `/payments/${encodeURIComponent(paymentId)}/refund`,
+    { method: "POST", body: { amount: amountPaise } },
+  );
+}
+
 /** Fetch a payment so the recorded amount/order come from Razorpay, never the client. */
 export async function fetchRazorpayPayment(
   paymentId: string,

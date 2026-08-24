@@ -42,6 +42,9 @@ export interface StoredRefund {
   processedAt?: string;
   /** Optional note the admin left when actioning it. */
   adminNote?: string;
+  /** Razorpay refund id (`rfnd_…`) when Processing executed a real gateway
+   *  refund; absent for refunds settled manually outside the gateway. */
+  gatewayRefundId?: string;
 }
 
 export const store = createStore<StoredRefund>({

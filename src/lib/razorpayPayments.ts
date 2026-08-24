@@ -6,6 +6,7 @@
 
 import { createStore } from "@/lib/store";
 import { sendPaymentAlert } from "@/lib/email";
+import { refundRazorpayPayment } from "@/lib/razorpay";
 import type { StoredPayment } from "@/app/api/payments/route";
 
 const store = createStore<StoredPayment>({
@@ -50,4 +51,44 @@ export async function recordRazorpayPayment(opts: {
   await sendPaymentAlert(payment);
 
   return payment;
+}
+
+/** Execute a gateway refund for a booking's Razorpay advance and mark the
+ *  ledger row Refunded. Returns null when the booking has no refundable
+ *  gateway payment (the caller falls back to the manual refund rail); throws
+ *  when Razorpay refuses the refund, so the caller must NOT mark anything
+ *  processed on that path. */
+export async function refundBookingGatewayPayment(
+  bookingId: string,
+  amountRupees: number,
+): Promise<{ refundId: string; paymentRecordId: string } | null> {
+  const payments = await store.list();
+  const candidates = payments.filter(
+    (p) =>
+      p.bookingId === bookingId &&
+      p.method === "Razorpay" &&
+      p.razorpayPaymentId &&
+      (p.status === "Advance Received" || p.status === "Settled"),
+  );
+  if (!candidates.length) return null;
+
+  // Prefer a payment large enough to cover the whole refund; otherwise refund
+  // (partially) against the largest one — anything beyond it stays manual.
+  const target =
+    candidates.find((p) => p.amount >= amountRupees) ??
+    candidates.sort((a, b) => b.amount - a.amount)[0];
+  const amount = Math.min(Math.round(amountRupees), target.amount);
+
+  const refund = await refundRazorpayPayment(
+    target.razorpayPaymentId!,
+    amount * 100,
+  );
+
+  await store.upsert({
+    ...target,
+    status: "Refunded",
+    razorpayRefundId: refund.id,
+  });
+
+  return { refundId: refund.id, paymentRecordId: target.id };
 }

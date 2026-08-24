@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { isValidEmail } from "@/lib/validate";
 import { money } from "@/lib/money";
 import { ADVANCE_RATE } from "@/lib/bookingPricing";
@@ -81,6 +82,9 @@ export default function PaymentBox({
   // Informational (non-error) line under the pay button — e.g. the customer
   // closed the checkout without paying. Softer styling than `error`.
   const [notice, setNotice] = useState<string>("");
+  // A gateway payment attempt actually failed (vs. a form/validation error) —
+  // renders the full failure panel with retry / go-home actions.
+  const [failedPayment, setFailedPayment] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   // The transaction / UTR the customer got from their UPI app — captured here so
   // it travels onto the payment record and the order before the booking is
@@ -217,6 +221,7 @@ export default function PaymentBox({
     setSubmitting(true);
     setError("");
     setNotice("");
+    setFailedPayment(false);
     try {
       const result = await startRazorpayCheckout({
         bookingId,
@@ -241,12 +246,13 @@ export default function PaymentBox({
         err instanceof RazorpayCheckoutError &&
         err.code === "failed"
       ) {
-        // A payment attempt failed and the customer left the modal — surface
-        // the gateway's reason so they know what to fix before retrying.
+        // A payment attempt failed and the customer left the modal — show the
+        // failure panel with the gateway's reason and the ways forward.
+        setFailedPayment(true);
         setError(
           t(
-            `Payment failed: ${err.message} Nothing was charged — you can try again.`,
-            `भुगतान विफल: ${err.message} कोई राशि नहीं कटी — आप फिर कोशिश कर सकते हैं।`,
+            `${err.message} Nothing was charged.`,
+            `${err.message} कोई राशि नहीं कटी।`,
           ),
         );
       } else if (
@@ -594,9 +600,35 @@ export default function PaymentBox({
             )}
           </div>
 
-          {error && (
-            <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
-          )}
+          {error &&
+            (failedPayment ? (
+              /* A real payment attempt failed — full panel: what happened, and
+                 the two ways forward (retry here, or back to the home page). */
+              <div className="mt-4 rounded-2xl border border-maroon bg-maroon/5 p-4">
+                <p className="font-display text-base font-semibold text-maroon">
+                  ✕ {t("Payment Failed", "भुगतान विफल")}
+                </p>
+                <p className="mt-1 text-sm text-ink">{error}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={payViaRazorpay}
+                    disabled={submitting}
+                    className="rounded-full bg-maroon px-5 py-2 text-xs font-semibold text-cream transition hover:bg-maroon/90 disabled:opacity-60"
+                  >
+                    {t("Try Again", "फिर कोशिश करें")}
+                  </button>
+                  <Link
+                    href="/"
+                    className="rounded-full border border-maroon px-5 py-2 text-xs font-semibold text-maroon transition hover:bg-maroon/5"
+                  >
+                    {t("Back to Bhojpatra Home", "भोजपत्र होम पर वापस जाएं")}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm font-medium text-maroon">{error}</p>
+            ))}
           {notice && !error && (
             <p className="mt-3 text-sm text-ink-soft">{notice}</p>
           )}

@@ -1,5 +1,6 @@
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
+import { refundRazorpayPayment } from "@/lib/razorpay";
 import {
   STORED_PAYMENT_STATUSES,
   type StoredPayment,
@@ -59,6 +60,35 @@ export async function PATCH(
   }
 
   const next: StoredPayment = { ...payment, status: body.status };
+
+  // Flipping a gateway payment to Refunded moves REAL money — execute the
+  // Razorpay refund first and only persist the status if it succeeds. Manual
+  // (UPI/QR) payments keep the plain status flip: the team refunds those
+  // outside the gateway.
+  if (
+    body.status === "Refunded" &&
+    payment.status !== "Refunded" &&
+    payment.method === "Razorpay" &&
+    payment.razorpayPaymentId
+  ) {
+    try {
+      const refund = await refundRazorpayPayment(
+        payment.razorpayPaymentId,
+        payment.amount * 100,
+      );
+      next.razorpayRefundId = refund.id;
+    } catch (err) {
+      console.error("Razorpay refund failed", err);
+      return Response.json(
+        {
+          error:
+            "Razorpay rejected the refund — nothing was changed. Check the payment on the Razorpay dashboard and try again.",
+        },
+        { status: 502 },
+      );
+    }
+  }
+
   try {
     await store.upsert(next);
   } catch (err) {
