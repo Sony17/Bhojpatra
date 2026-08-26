@@ -46,11 +46,22 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole();
+  if (guard instanceof Response) return guard;
+  const isAdmin = guard.role === "admin";
+
   const { id } = await ctx.params;
   const order = await store.get(decodeURIComponent(id));
   if (!order) {
     return Response.json({ error: "Booking not found." }, { status: 404 });
   }
+
+  // A customer may only view a booking they own; admins may view any booking.
+  // Legacy orders with no recorded owner stay admin-only.
+  if (!isAdmin && (!order.userId || order.userId !== guard.id)) {
+    return Response.json({ error: "Not allowed." }, { status: 403 });
+  }
+
   return Response.json({ order });
 }
 

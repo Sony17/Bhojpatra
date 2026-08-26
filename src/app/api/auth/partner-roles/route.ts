@@ -6,9 +6,16 @@
  */
 import { getSessionUser } from "@/lib/auth";
 import { getUserById, saveUser, toPublicUser, grantAccount } from "@/lib/users";
+import { createStore } from "@/lib/store";
 import type { PartnerRole } from "@/lib/session";
+import type { PartnerRecord } from "@/app/api/partners/route";
 
 export const dynamic = "force-dynamic";
+
+const partnersStore = createStore<PartnerRecord>({
+  table: "partners",
+  idField: "code",
+});
 
 function isPartnerRole(v: unknown): v is PartnerRole {
   return v === "planner" || v === "individual" || v === "venue";
@@ -40,6 +47,25 @@ export async function POST(request: Request) {
   const record = await getUserById(publicUser.id);
   if (!record) {
     return Response.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  // Validate that the requested referralCode does not belong to another partner account.
+  const existingPartner =
+    (await partnersStore.get(referralCode.toUpperCase())) ??
+    (await partnersStore.get(referralCode));
+
+  if (existingPartner && !existingPartner.deleted) {
+    const isOwner =
+      (existingPartner.ownerUserId && existingPartner.ownerUserId === record.id) ||
+      (existingPartner.email && existingPartner.email.toLowerCase() === record.email.toLowerCase()) ||
+      Boolean(record.partnerRoles?.some((r) => r.referralCode === existingPartner.code));
+
+    if (!isOwner) {
+      return Response.json(
+        { error: "This referral code belongs to another partner." },
+        { status: 403 },
+      );
+    }
   }
 
   const roles = record.partnerRoles ?? [];

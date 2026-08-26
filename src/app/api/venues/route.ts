@@ -15,13 +15,16 @@ import {
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
 import { sendVenueAlert } from "@/lib/email";
+import { getSessionUser, requireRole } from "@/lib/auth";
 
 // Owner-registered venues are written at publish time to Postgres (Neon) so the
 // venue catalogue, the booking flow and the owner's dashboard can read them —
 // never prerender or cache this.
 export const dynamic = "force-dynamic";
 
-const store = createStore<VenueRecord>({
+type StoredVenue = VenueRecord & { ownerUserId?: string };
+
+const store = createStore<StoredVenue>({
   table: "venues",
   idField: "id",
 });
@@ -56,7 +59,18 @@ export async function GET(request: Request) {
   }
   if (owner) {
     // The owner's own dashboard sees every venue it published, pending ones
-    // included, so it can show each one's approval state.
+    // included, so it can show each one's approval state. Gated to the owner
+    // partner or an admin so unapproved/pending venues are never exposed.
+    const user = await getSessionUser();
+    if (!user) {
+      return Response.json({ error: "Not signed in." }, { status: 401 });
+    }
+    const isOwnerOrAdmin =
+      user.role === "admin" ||
+      Boolean(user.partnerRoles?.some((r) => r.referralCode === owner));
+    if (!isOwnerOrAdmin) {
+      return Response.json({ error: "Not allowed." }, { status: 403 });
+    }
     return Response.json({
       venues: venues.filter((v) => v.ownerCode === owner).reverse(),
     });
@@ -66,6 +80,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireRole("partner", "admin");
+  if (guard instanceof Response) return guard;
+  const isAdmin = guard.role === "admin";
+
   let body: unknown;
   try {
     body = await request.json();
@@ -78,6 +96,17 @@ export async function POST(request: Request) {
   const ownerCode = str(b.ownerCode);
   if (!ownerCode || !/^REF-/.test(ownerCode)) {
     return Response.json({ error: "Missing venue-owner code." }, { status: 400 });
+  }
+
+  // Non-admin partners may only publish or manage venues under their own verified referral code.
+  if (!isAdmin) {
+    const holdsCode = guard.partnerRoles?.some((r) => r.referralCode === ownerCode);
+    if (!holdsCode) {
+      return Response.json(
+        { error: "You may only manage venues under your own referral code." },
+        { status: 403 },
+      );
+    }
   }
 
   const name = str(b.name);
@@ -174,13 +203,19 @@ export async function POST(request: Request) {
   }
 
   const existing = venues.find((v) => v.id === id);
-  // Only the owning partner may edit an existing venue.
-  if (existing && existing.ownerCode !== ownerCode) {
-    return Response.json({ error: "This venue belongs to another owner." }, { status: 403 });
+  // Only the owning partner or an admin may edit an existing venue.
+  if (existing && !isAdmin) {
+    const isOwner =
+      (existing.ownerUserId && existing.ownerUserId === guard.id) ||
+      Boolean(guard.partnerRoles?.some((r) => r.referralCode === existing.ownerCode));
+    if (!isOwner) {
+      return Response.json({ error: "This venue belongs to another owner." }, { status: 403 });
+    }
   }
 
-  const record: VenueRecord = {
+  const record: StoredVenue = {
     id,
+    ownerUserId: existing?.ownerUserId ?? guard.id,
     name,
     city,
     location: str(b.location) ?? "",
@@ -197,7 +232,7 @@ export async function POST(request: Request) {
     image: sanitizeVenueImage(gallery[0]),
     ...(gallery.length ? { images: gallery } : {}),
     ...(spaces ? { spaces } : {}),
-    ownerCode,
+    ownerCode: existing?.ownerCode ?? ownerCode,
     ownerName: str(b.ownerName),
     phone: str(b.phone),
     createdAt: existing?.createdAt ?? new Date().toISOString(),

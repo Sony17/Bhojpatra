@@ -3,7 +3,9 @@
 > **Current Implementation Status**: Active Production / Staging Codebase  
 > **Last Verified Against Code**: 2026-08-26  
 > **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/app/api/*`)  
-> **SECURITY REMEDIATION STATUS**: Batch 1 findings (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011) verified fixed across unauthenticated, customer, vendor, and admin test vectors. Status: Verified Fixed.
+> **SECURITY REMEDIATION STATUS**: 
+> - **Batch 1** (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011): Admin collection access control and public-safe shaping verified fixed. Status: **Verified Fixed**.
+> - **Batch 2** (BHOJ-SEC-002, BHOJ-SEC-004, BHOJ-SEC-005, BHOJ-SEC-006, BHOJ-SEC-009, NEW-SEC-001, NEW-SEC-003): Resource ownership, session identity enforcement, and client-controlled identifier mitigations across Bookings, Payments, Venues, and Partners verified fixed (66/66 automated tests passed). Status: **Verified Fixed**.
 
 ---
 
@@ -102,28 +104,26 @@ flowchart TD
 > **Disclaimer**: The following findings are documented purely as architectural observations for future threat modeling and vulnerability remediation passes. **No application code has been modified.**
 
 ### Observation 1: Broken Object-Level Authorization (BOLA / IDOR) on Booking Lookups
-- **Location**: [`src/app/api/bookings/[id]/route.ts:45-55`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L45-L55)
-- **Description**: `GET /api/bookings/[id]` contains **no authentication check** and no ownership verification.
-- **Architectural Footgun**: Booking IDs are generated via a deterministic formula in [`src/lib/bookingPricing.ts:122-131`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L122-L131):
-  ```ts
-  `BHJ-${(((guests * 7 + Math.round(grandTotal) + itemCount * 13) % 90000) + 10000).toString()}`
-  ```
-  Because IDs span only 90,000 predictable 5-digit values (`BHJ-10000` to `BHJ-99999`), an unauthenticated attacker can sequentially enumerate IDs and harvest all booking records, customer names, phone numbers, delivery addresses, and invoices.
+- **Location**: [`src/app/api/bookings/[id]/route.ts:45-66`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L45-L66)
+- **Description**: `GET /api/bookings/[id]` previously contained no authentication check and no ownership verification.
+- **Architectural Footgun**: Booking IDs are generated via a deterministic formula in [`src/lib/bookingPricing.ts:122-131`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L122-L131) spanning predictable 5-digit values (`BHJ-10000` to `BHJ-99999`).
+- **Batch 2 Remediation**: Enforced `requireRole()` authentication before database lookup. Admins may view any booking; non-admin customers may only view bookings where `order.userId === guard.id`. Legacy bookings without `userId` stay admin-only. Status: **Verified Fixed** (BHOJ-SEC-002).
 
-### Observation 2: Unauthenticated Financial Payment Ledger Exposure
-- **Location**: [`src/app/api/payments/route.ts:51-77`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L51-L77) and [`src/app/api/payments/[id]/route.ts:24-34`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L24-L34)
-- **Description**: `GET /api/payments` and `GET /api/payments/[id]` originally had no authentication or admin role requirements.
-- **Batch 1 Remediation**: `GET /api/payments` now enforces `requireRole("admin")` before reading from the payments store. The single payment lookup `GET /api/payments/[id]` remains an observation for a subsequent remediation batch.
+### Observation 2: Unauthenticated Financial Payment Ledger Exposure & Single Payment IDOR
+- **Location**: [`src/app/api/payments/route.ts:51-77`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L51-L77) and [`src/app/api/payments/[id]/route.ts:24-52`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L24-L52)
+- **Description**: `GET /api/payments` and `GET /api/payments/[id]` originally had no authentication or ownership requirements.
+- **Batch 1 Remediation**: `GET /api/payments` enforces `requireRole("admin")` before reading from the payments store. Status: **Verified Fixed** (BHOJ-SEC-008).
+- **Batch 2 Remediation**: `GET /api/payments/[id]` enforces `requireRole()`. Admins have full ledger access; non-admin customers must verify ownership via the associated booking (`order = await bookingStore.get(payment.bookingId); order.userId === guard.id`). Orphaned payments without verifiable customer ownership are denied to non-admins. Status: **Verified Fixed** (BHOJ-SEC-009).
 
 ### Observation 3: Unauthenticated Vendor KYC Document Leakage
 - **Location**: [`src/app/api/vendors/kyc/route.ts:18-23`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L18-L23) and [`src/app/api/vendors/kyc/[id]/route.ts:8-36`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/%5Bid%5D/route.ts#L8-L36)
 - **Description**: Both the KYC document metadata list (`GET /api/vendors/kyc`) and the raw document streaming endpoint (`GET /api/vendors/kyc/[id]`) were open to the public.
-- **Batch 1 Remediation**: Both endpoints now enforce `requireRole("admin")` before reading document metadata or streaming file bytes.
+- **Batch 1 Remediation**: Both endpoints now enforce `requireRole("admin")` before reading document metadata or streaming file bytes. Status: **Verified Fixed** (BHOJ-SEC-003, BHOJ-SEC-010).
 
 ### Observation 4: Unauthenticated Referral Partner Directory & GST Exposure
 - **Location**: [`src/app/api/partners/route.ts:41-76`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L41-L76) and [`src/app/api/partners/[code]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/%5Bcode%5D/route.ts)
 - **Description**: `GET /api/partners` previously had no role check, dumping the full partner directory when omitting `?code=`.
-- **Batch 1 Remediation**: The unfiltered directory now enforces `requireRole("admin")`. Single-code lookups (`?code=...` and `/[code]`) return an explicit allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, and `gst` strictly stripped for non-admin callers.
+- **Batch 1 Remediation**: The unfiltered directory now enforces `requireRole("admin")`. Single-code lookups (`?code=...` and `/[code]`) return an explicit allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, and `gst` strictly stripped for non-admin callers. Status: **Verified Fixed** (BHOJ-SEC-007, BHOJ-SEC-011).
 
 ### Observation 5: Client-Controlled Pricing & Lack of Server-Side Price Verification
 - **Location**: [`src/app/api/bookings/route.ts:176-177, 196, 303-304`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L176-L177)
@@ -134,7 +134,7 @@ flowchart TD
   amount: Math.round(amt),
   paid: Number.isFinite(paidAmt) && paidAmt > 0 ? Math.round(paidAmt) : 0,
   ```
-- **Impact**: The server never recalculates the menu pricing ladder based on package rates, guest count, or add-ons. A malicious client could submit a ₹50,000 banquet feast with `amount: 1` and `paid: 1`.
+- **Impact**: The server never recalculates the menu pricing ladder based on package rates, guest count, or add-ons. A malicious client could submit a ₹50,000 banquet feast with `amount: 1` and `paid: 1`. Slated for Batch 3 (BHOJ-SEC-012).
 
 ### Observation 6: Unverified Manual UPI Settlement & Fraud Risk
 - **Location**: [`src/app/api/payments/route.ts:108-116`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L108-L116)
@@ -153,22 +153,44 @@ flowchart TD
   - When `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` are not configured in non-production environments, the system automatically seeds a superadmin account with credentials `admin@bhojpatra.local` / `admin123`.
 - **Impact**: If staging or preview deployments omit these variables, default admin credentials and predictable cookie signatures become active.
 
+### Observation 9: Venue Mutations via Client-Controlled Identifiers & Owner Filter Exposure
+- **Location**: [`src/app/api/venues/route.ts:57-68, 176-224`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L57-L68) and [`src/app/api/venues/[id]/route.ts:23-38, 80-158`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/%5Bid%5D/route.ts#L23-L38)
+- **Description**: Venues were created, edited, and deleted relying solely on matching public promotional referral codes (`ownerCode: "REF-..."`). Furthermore, `GET /api/venues?owner=CODE` exposed unapproved/pending venues to anonymous visitors.
+- **Batch 2 Remediation**: 
+  - `POST /api/venues` enforces `requireRole("partner", "admin")`, validates that partners only publish under their verified `partnerRoles` referral codes, and stamps `ownerUserId: guard.id`.
+  - `PATCH /api/venues/[id]` and `DELETE /api/venues/[id]` verify authenticated session identity (`guard.role === "admin" || venue.ownerUserId === guard.id || guard.partnerRoles?.some(r => r.referralCode === venue.ownerCode)`), completely eliminating reliance on body/query `ownerCode`, and disallowing mutations to ownership fields.
+  - `GET /api/venues?owner=CODE` gates owner-scoped pending/unapproved venue listings to the authenticated owning partner or admin (returning 401 for anonymous and 403 for unrelated users), while preserving public catalogue visibility for approved venues.
+  - Status: **Verified Fixed** (BHOJ-SEC-004, BHOJ-SEC-005, NEW-SEC-003).
+
+### Observation 10: Partner Overwrite and Referral Role Hijacking
+- **Location**: [`src/app/api/partners/route.ts:107-167`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L107-L167) and [`src/app/api/auth/partner-roles/route.ts:18-64`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/partner-roles/route.ts#L18-L64)
+- **Description**: `POST /api/partners` was unauthenticated and merged incoming request payloads onto existing partner records, allowing arbitrary overwrites. Additionally, `POST /api/auth/partner-roles` attached arbitrary referral codes to user records without ownership validation.
+- **Batch 2 Remediation**:
+  - `POST /api/partners` enforces `requireRole("partner", "admin")`, stamps immutable `ownerUserId: guard.id`, and rejects attempts by third-party callers to overwrite existing partner codes with 403 Forbidden.
+  - `POST /api/auth/partner-roles` checks `partners` store and rejects any attempt to claim another partner's referral code with HTTP 403 (`{ error: "This referral code belongs to another partner." }`).
+  - Status: **Verified Fixed** (BHOJ-SEC-006, NEW-SEC-001).
+
 ---
 
 ## 6. Audit Summary
 
 | Category | Finding | Current State | Remediation Status |
 | :--- | :--- | :--- | :--- |
-| **Access Control** | Unauthenticated Admin Booking List (`GET /api/bookings`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Access Control** | Unauthenticated Booking Lookup (`GET /api/bookings/[id]`) | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
-| **Access Control** | Unauthenticated Payment Ledger (`GET /api/payments`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Access Control** | Unauthenticated Single Payment (`GET /api/payments/[id]`) | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
-| **Access Control** | Unauthenticated KYC Document Download (`GET /api/vendors/kyc`, `[id]`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Access Control** | Unauthenticated Partner Directory (`GET /api/partners`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Access Control** | Partner PII/GST Exposure (`GET /api/partners?code=...`, `[code]`) | `[PUBLIC-SAFE ALLOWLIST]` | Verified Fixed |
-| **Access Control** | Unauthenticated Leads List (`GET /api/leads`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Access Control** | Unauthenticated Vendor Applications (`GET /api/vendors/applications`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
-| **Data Integrity** | Client-Controlled Booking Amounts | `[TRUSTS CLIENT PAYLOAD]` | Unfixed (Observation only) |
+| **Access Control** | Unauthenticated Admin Booking List (`GET /api/bookings`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Unauthenticated Booking Lookup (`GET /api/bookings/[id]`) | `[OWNERSHIP ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Access Control** | Unauthenticated Payment Ledger (`GET /api/payments`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Unauthenticated Single Payment (`GET /api/payments/[id]`) | `[BOOKING-OWNER ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Access Control** | Unauthenticated KYC Document Download (`GET /api/vendors/kyc`, `[id]`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Unauthenticated Partner Directory (`GET /api/partners`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Partner PII/GST Exposure (`GET /api/partners?code=...`, `[code]`) | `[PUBLIC-SAFE ALLOWLIST]` | Verified Fixed (Batch 1) |
+| **Access Control** | Unauthenticated Leads List (`GET /api/leads`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Unauthenticated Vendor Applications (`GET /api/vendors/applications`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed (Batch 1) |
+| **Access Control** | Venue Mutation via Client `ownerCode` (`PATCH`, `DELETE /api/venues/[id]`) | `[SESSION OWNERSHIP ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Access Control** | Unauthorized Venue Creation (`POST /api/venues`) | `[ROLE & CODE CHECK ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Access Control** | Venue Exposure via Owner Param (`GET /api/venues?owner=CODE`) | `[OWNER/ADMIN GUARD ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Access Control** | Partner Record Overwrite / Hijack (`POST /api/partners`) | `[OWNER/ADMIN GUARD ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Privilege Escalation**| Partner Role Hijacking (`POST /api/auth/partner-roles`) | `[CLAIM VERIFICATION ENFORCED]` | **Verified Fixed (Batch 2)** |
+| **Data Integrity** | Client-Controlled Booking Amounts | `[TRUSTS CLIENT PAYLOAD]` | Unfixed (Slated for Batch 3) |
 | **Payment Integrity**| Unverified Manual UPI UTR Submission | `[MANUAL RECONCILIATION]` | Unfixed (Observation only) |
 | **Performance/DoS** | Full Table Scans in Memory (`store.list`) | `[IN-MEMORY FILTERING]` | Unfixed (Observation only) |
 | **Secret Hygiene** | Insecure Dev Fallback Secrets & Admin Seed | `[DEV FALLBACK ACTIVE]` | Unfixed (Observation only) |

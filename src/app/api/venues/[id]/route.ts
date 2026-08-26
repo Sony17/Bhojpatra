@@ -8,9 +8,14 @@ import {
   type VenueRecord,
 } from "@/lib/venues";
 
+import { requireRole } from "@/lib/auth";
+import type { PublicUser } from "@/lib/users";
+
 export const dynamic = "force-dynamic";
 
-const store = createStore<VenueRecord>({
+type StoredVenue = VenueRecord & { ownerUserId?: string };
+
+const store = createStore<StoredVenue>({
   table: "venues",
   idField: "id",
 });
@@ -18,17 +23,28 @@ const store = createStore<VenueRecord>({
 const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() ? v.trim() : undefined;
 
-/** Owner-scoped mutation guard: the caller must pass `ownerCode` matching the
- *  venue's owner. Returns the venue, or a Response to short-circuit with. */
-async function loadOwned(
+function isVenueOwner(user: PublicUser, venue: StoredVenue): boolean {
+  if (user.role === "admin") return true;
+  if (venue.ownerUserId) {
+    return venue.ownerUserId === user.id;
+  }
+  // Legacy fallback: match venue.ownerCode against the partner's verified referral codes
+  return Boolean(
+    user.partnerRoles?.some((r) => r.referralCode === venue.ownerCode),
+  );
+}
+
+/** Session-verified venue ownership guard: the caller must be admin or the owning partner.
+ *  Returns the venue, or a Response to short-circuit with. */
+async function loadOwnedVenue(
   id: string,
-  ownerCode: string | undefined,
-): Promise<VenueRecord | Response> {
+  user: PublicUser,
+): Promise<StoredVenue | Response> {
   const venue = await store.get(decodeURIComponent(id));
   if (!venue || venue.deleted) {
     return Response.json({ error: "Venue not found." }, { status: 404 });
   }
-  if (!ownerCode || venue.ownerCode !== ownerCode) {
+  if (!isVenueOwner(user, venue)) {
     return Response.json(
       { error: "This venue belongs to another owner." },
       { status: 403 },
@@ -61,11 +77,14 @@ export async function GET(
   });
 }
 
-// PATCH /api/venues/[id] → owner edits venue fields (must pass ownerCode)
+// PATCH /api/venues/[id] → owner edits venue fields (must be signed-in owner or admin)
 export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole("partner", "admin");
+  if (guard instanceof Response) return guard;
+
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
   try {
@@ -74,10 +93,14 @@ export async function PATCH(
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const loaded = await loadOwned(id, str(body.ownerCode));
+  const loaded = await loadOwnedVenue(id, guard);
   if (loaded instanceof Response) return loaded;
 
-  const next: VenueRecord = { ...loaded };
+  const next: StoredVenue = { ...loaded };
+  // Crucial: ownership fields can NEVER be modified by a client PATCH payload
+  next.ownerUserId = loaded.ownerUserId;
+  next.ownerCode = loaded.ownerCode;
+
   if (str(body.name)) next.name = str(body.name)!;
   if (str(body.city)) next.city = str(body.city)!;
   if (body.location !== undefined) next.location = str(body.location) ?? "";
@@ -125,15 +148,16 @@ export async function PATCH(
   return Response.json({ venue: next });
 }
 
-// DELETE /api/venues/[id]?ownerCode=REF-… → owner soft-deletes their venue
+// DELETE /api/venues/[id] → owner soft-deletes their venue (signed-in owner or admin)
 export async function DELETE(
-  request: Request,
+  _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole("partner", "admin");
+  if (guard instanceof Response) return guard;
+
   const { id } = await ctx.params;
-  const ownerCode =
-    new URL(request.url).searchParams.get("ownerCode") ?? undefined;
-  const loaded = await loadOwned(id, ownerCode ?? undefined);
+  const loaded = await loadOwnedVenue(id, guard);
   if (loaded instanceof Response) return loaded;
 
   await store.upsert({ ...loaded, deleted: true });

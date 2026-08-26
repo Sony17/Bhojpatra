@@ -6,11 +6,17 @@ import {
   type StoredPayment,
   type StoredPaymentStatus,
 } from "../route";
+import type { StoredOrder } from "../../bookings/route";
 
 export const dynamic = "force-dynamic";
 
 const store = createStore<StoredPayment>({
   table: "payments",
+  idField: "id",
+});
+
+const bookingStore = createStore<StoredOrder>({
+  table: "bookings",
   idField: "id",
 });
 
@@ -26,11 +32,30 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole();
+  if (guard instanceof Response) return guard;
+  const isAdmin = guard.role === "admin";
+
   const { id } = await ctx.params;
   const payment = await store.get(decodeURIComponent(id));
   if (!payment) {
     return Response.json({ error: "Payment not found." }, { status: 404 });
   }
+
+  // Admins may access any payment ledger entry.
+  if (isAdmin) {
+    return Response.json({ payment });
+  }
+
+  // Non-admin: determine ownership through the payment's associated booking.
+  const order = payment.bookingId
+    ? await bookingStore.get(payment.bookingId)
+    : null;
+
+  if (!order || !order.userId || order.userId !== guard.id) {
+    return Response.json({ error: "Not allowed." }, { status: 403 });
+  }
+
   return Response.json({ payment });
 }
 

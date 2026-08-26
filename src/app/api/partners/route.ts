@@ -22,6 +22,8 @@ export interface PartnerRecord {
   createdAt: string;
   /** Soft-deleted by the admin; hidden from lookups and lists. */
   deleted?: boolean;
+  /** Owner user ID linking this referral code to a specific authenticated user account. */
+  ownerUserId?: string;
 }
 
 export interface PublicPartner {
@@ -105,6 +107,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireRole("partner", "admin");
+  if (guard instanceof Response) return guard;
+  const isAdmin = guard.role === "admin";
+
   let body: unknown;
   try {
     body = await request.json();
@@ -130,6 +136,21 @@ export async function POST(request: Request) {
     );
   }
 
+  const existing = await store.get(code);
+  // An existing partner may only be updated by its verified owner or an admin.
+  if (existing && !isAdmin) {
+    const isOwner =
+      (existing.ownerUserId && existing.ownerUserId === guard.id) ||
+      (existing.email && existing.email.toLowerCase() === guard.email.toLowerCase()) ||
+      Boolean(guard.partnerRoles?.some((r) => r.referralCode === existing.code));
+    if (!isOwner) {
+      return Response.json(
+        { error: "This referral code belongs to another partner." },
+        { status: 403 },
+      );
+    }
+  }
+
   const partner: PartnerRecord = {
     code,
     name: str(name) ?? "Bhojpatra Partner",
@@ -139,13 +160,20 @@ export async function POST(request: Request) {
     email: str(email),
     city: str(city),
     gst: gstValue,
-    createdAt: new Date().toISOString(),
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    ownerUserId: existing?.ownerUserId ?? guard.id,
   };
 
   // Idempotent on the referral code so a re-submit updates the existing record
-  // rather than duplicating it.
-  const existing = await store.get(partner.code);
-  const merged = existing ? { ...existing, ...partner } : partner;
+  // rather than duplicating it. Never allow body fields to hijack ownership.
+  const merged: PartnerRecord = existing
+    ? {
+        ...existing,
+        ...partner,
+        ownerUserId: existing.ownerUserId ?? guard.id,
+      }
+    : partner;
+
   try {
     await store.upsert(merged);
   } catch (err) {
