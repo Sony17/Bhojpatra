@@ -28,8 +28,9 @@ flowchart TD
     end
 
     subgraph ServerLayer["Next.js Route Handlers"]
-        SessionCheck["Session & Role Check\n(src/lib/auth.ts: requireRole)"]
-        ServerValidation["Validation & Notice Gate\n(src/lib/validate.ts, lead rules)"]
+        SessionCheck["Session & Role Guard\n(src/lib/auth.ts: requireRole)"]
+        OwnershipCheck["Resource Ownership Verification\n(order.userId, booking.userId, ownerUserId)"]
+        ServerValidation["Validation & Notice Gate\n(lead notice, GST format, self-referral)"]
         DataTransform["Data Normalization & Record Building\n(src/app/api/*/route.ts)"]
     end
 
@@ -49,7 +50,8 @@ flowchart TD
     PricingCalc --> HttpRequest
     HttpRequest --> ProxyGate
     ProxyGate --> SessionCheck
-    SessionCheck --> ServerValidation
+    SessionCheck --> OwnershipCheck
+    OwnershipCheck --> ServerValidation
     ServerValidation --> DataTransform
     DataTransform --> StoreAbstraction
     DataTransform --> VercelBlobStorage
@@ -114,6 +116,41 @@ sequenceDiagram
     Wizard->>Customer: Displays StepDone confirmation screen & download receipt
 ```
 
+### 4.2 Booking Read & Ownership Verification Flow (`GET /api/bookings/[id]`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller as Client (Customer / Vendor / Admin)
+    participant ApiBooking as GET /api/bookings/[id]
+    participant Auth as src/lib/auth.ts (requireRole)
+    participant Store as src/lib/store.ts
+    participant DB as Neon Postgres (bookings)
+
+    Caller->>ApiBooking: GET /api/bookings/[id] (Cookie: bp_session)
+    ApiBooking->>Auth: requireRole()
+    alt Not Signed In
+        Auth-->>ApiBooking: 401 Unauthorized { error: "Not signed in." }
+        ApiBooking-->>Caller: HTTP 401
+    else Authenticated
+        Auth-->>ApiBooking: Returns session user (guard)
+        ApiBooking->>Store: get(id)
+        Store->>DB: SELECT data FROM bookings WHERE id = $1
+        DB-->>Store: Returns booking record
+        alt Booking Not Found
+            ApiBooking-->>Caller: HTTP 404 { error: "Booking not found." }
+        else Admin Caller
+            ApiBooking-->>Caller: HTTP 200 { order }
+        else Non-Admin Customer Caller
+            alt order.userId === guard.id (Legitimate Owner)
+                ApiBooking-->>Caller: HTTP 200 { order }
+            else order.userId !== guard.id OR legacy booking without userId
+                ApiBooking-->>Caller: HTTP 403 { error: "Not allowed." }
+            end
+        end
+    end
+```
+
 ---
 
 ## 5. Payment Processing Data Flow (UPI Implementation)
@@ -152,6 +189,45 @@ sequenceDiagram
     Admin->>DB: PATCH /api/payments/[id] { status: "Settled" }
 ```
 
+### 5.2 Payment Read & Indirect Ownership Derivation Flow (`GET /api/payments/[id]`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller as Client (Customer / Admin)
+    participant ApiPayment as GET /api/payments/[id]
+    participant Auth as src/lib/auth.ts (requireRole)
+    participant PmtStore as payments Store
+    participant BkgStore as bookings Store
+    participant DB as Neon Postgres
+
+    Caller->>ApiPayment: GET /api/payments/[id] (Cookie: bp_session)
+    ApiPayment->>Auth: requireRole()
+    alt Not Signed In
+        Auth-->>ApiPayment: 401 Unauthorized
+        ApiPayment-->>Caller: HTTP 401 { error: "Not signed in." }
+    else Authenticated
+        Auth-->>ApiPayment: Returns session user (guard)
+        ApiPayment->>PmtStore: get(id)
+        PmtStore->>DB: SELECT data FROM payments WHERE id = $1
+        DB-->>PmtStore: Returns payment record
+        alt Payment Not Found
+            ApiPayment-->>Caller: HTTP 404 { error: "Payment not found." }
+        else Admin Caller
+            ApiPayment-->>Caller: HTTP 200 { payment }
+        else Non-Admin Customer Caller
+            ApiPayment->>BkgStore: get(payment.bookingId)
+            BkgStore->>DB: SELECT data FROM bookings WHERE id = payment.bookingId
+            DB-->>BkgStore: Returns order record
+            alt order exists AND order.userId === guard.id
+                ApiPayment-->>Caller: HTTP 200 { payment }
+            else Orphaned Payment OR order.userId !== guard.id
+                ApiPayment-->>Caller: HTTP 403 { error: "Not allowed." }
+            end
+        end
+    end
+```
+
 ---
 
 ## 6. Vendor Onboarding & KYC Data Flow
@@ -183,15 +259,103 @@ sequenceDiagram
 
 ---
 
-## 7. External Integrations Data Flow
+## 7. Venue Management & Ownership Data Flow
 
-### 7.1 WhatsApp Click-to-Chat Flow
+Venues are registered and managed by partners or platform admins. Ownership is strictly verified against the authenticated user session (`ownerUserId`), distinguishing between business attribution (`ownerCode`) and technical authorization (`ownerUserId`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Partner as Partner / Admin (Browser)
+    participant ApiVenues as /api/venues & /api/venues/[id]
+    participant Auth as src/lib/auth.ts (requireRole / getSessionUser)
+    participant Store as src/lib/store.ts
+    participant DB as Neon Postgres (venues)
+
+    alt 1. Create Venue (POST /api/venues)
+        Partner->>ApiVenues: POST /api/venues { name, city, ownerCode, ... }
+        ApiVenues->>Auth: requireRole("partner", "admin")
+        alt Non-Admin Partner
+            ApiVenues->>ApiVenues: Verifies guard.partnerRoles holds submitted ownerCode
+        end
+        ApiVenues->>Store: upsert({ ...venue, ownerUserId: guard.id })
+        Store->>DB: INSERT INTO venues (id, data) VALUES ($1, $2::jsonb)
+        ApiVenues-->>Partner: HTTP 201 { ok: true, venue }
+    else 2. Modify / Delete Venue (PATCH & DELETE /api/venues/[id])
+        Partner->>ApiVenues: PATCH/DELETE /api/venues/[id]
+        ApiVenues->>Auth: requireRole("partner", "admin")
+        ApiVenues->>Store: get(id)
+        ApiVenues->>ApiVenues: Checks isVenueOwner(guard, venue): venue.ownerUserId === guard.id OR legacy partnerRoles code match
+        ApiVenues->>ApiVenues: Invariant: next.ownerUserId = loaded.ownerUserId; next.ownerCode = loaded.ownerCode (ignores tamper)
+        ApiVenues->>Store: upsert(venue)
+        ApiVenues-->>Partner: HTTP 200 { venue } (or soft-deleted: true)
+    else 3. Owner Filtered Venues (GET /api/venues?owner=CODE)
+        Partner->>ApiVenues: GET /api/venues?owner=CODE
+        ApiVenues->>Auth: getSessionUser()
+        alt Not Signed In
+            ApiVenues-->>Partner: HTTP 401 { error: "Not signed in." }
+        else Signed In
+            ApiVenues->>ApiVenues: Checks isOwnerOrAdmin: user.role === "admin" OR user.partnerRoles holds CODE
+            alt Authorized
+                ApiVenues-->>Partner: HTTP 200 { venues: [pending + approved] }
+            else Unauthorized User / Different Partner
+                ApiVenues-->>Partner: HTTP 403 { error: "Not allowed." }
+            end
+        end
+    end
+```
+
+---
+
+## 8. Partner Onboarding & Referral Attribution Data Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Partner (Browser)
+    participant ApiPartners as POST /api/partners
+    participant ApiRoles as POST /api/auth/partner-roles
+    participant Auth as src/lib/auth.ts
+    participant PStore as partners Store
+    participant UStore as users Store
+    participant DB as Neon Postgres
+
+    alt 1. Create / Update Partner Record (POST /api/partners)
+        User->>ApiPartners: POST /api/partners { code, name, type, gst, ... }
+        ApiPartners->>Auth: requireRole("partner", "admin")
+        ApiPartners->>PStore: get(code)
+        alt Existing Record Owned by Another Partner
+            ApiPartners-->>User: HTTP 403 { error: "This referral code belongs to another partner." }
+        else Legitimate Owner or Fresh Code
+            ApiPartners->>PStore: upsert({ ...partner, ownerUserId: guard.id })
+            PStore->>DB: INSERT INTO partners (id, data)
+            ApiPartners-->>User: HTTP 200 { ok: true, partner }
+        end
+    else 2. Claim Partner Role (POST /api/auth/partner-roles)
+        User->>ApiRoles: POST /api/auth/partner-roles { type, referralCode }
+        ApiRoles->>Auth: getSessionUser()
+        ApiRoles->>PStore: get(referralCode)
+        alt Code Registered to Another Partner
+            ApiRoles-->>User: HTTP 403 { error: "This referral code belongs to another partner." }
+        else Code Unclaimed or Owned by User
+            ApiRoles->>UStore: saveUser(user with attached partnerRole & 'partner' account)
+            UStore->>DB: UPDATE users SET data = $2
+            ApiRoles-->>User: HTTP 200 { ok: true, user }
+        end
+    end
+```
+
+---
+
+## 9. External Integrations Data Flow
+
+### 9.1 WhatsApp Click-to-Chat Flow
 - **Initiation**: Customer clicks WhatsApp icon on floating widget ([`FloatingChat.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/FloatingChat.tsx)), vendor profile ([`VendorActionRow.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/vendors/VendorActionRow.tsx)), or share buttons ([`WhatsAppShareButton.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/WhatsAppShareButton.tsx)).
 - **Mechanism**: Browser navigation to `https://wa.me/911234567890?text=${encodeURIComponent(text)}`.
 - **Payload**: Pre-populated text containing catering requirements, event date, guest count, or referral link.
 - **Server Involvement**: **Zero**. Operates client-side without webhook callbacks or delivery tracking.
 
-### 7.2 Transactional Email Alerts (Resend)
+### 9.2 Transactional Email Alerts (Resend)
 - **Initiation**: Triggered asynchronously during `POST /api/bookings`, `POST /api/payments`, `POST /api/leads`, `POST /api/vendors/applications`, and `POST /api/venues`.
 - **Mechanism**: Direct HTTP POST from Next.js server to `https://api.resend.com/emails` with Bearer token authentication (`RESEND_API_KEY`).
 - **Payload**:
@@ -200,22 +364,30 @@ sequenceDiagram
 
 ---
 
-## 8. Trust Boundaries & Validation Matrix
+## 10. Trust Boundaries & Validation Matrix
 
 | Data Flow Point | Origin | Destination | Validation Enforcement Point | Architectural Observation |
 | :--- | :--- | :--- | :--- | :--- |
 | **User Identity** | Browser Cookie | Server Handlers | [`src/lib/auth.ts:122-134`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L122-L134) | Verified server-side via HMAC cookie + DB session lookup. `userId` taken from session, not payload. |
-| **Booking Amount** | Client Wizard | `POST /api/bookings` | **None** ([`route.ts:196`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L196)) | **Client Trust Boundary**: Server blindly accepts `Math.round(amt)` and `paid` without recalculating items or pricing ladder. |
-| **Advance Notice** | Client Wizard | `POST /api/bookings` | [`route.ts:208-239`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L208-L239) | Server enforces advance notice days calculated from package and occasion lead rules. |
-| **Self-Referral** | Client Wizard | `POST /api/bookings` | [`route.ts:251-268`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L251-L268) | Server checks partner code against current user accounts and phone numbers to disallow self-attribution. |
-| **Payment UTR** | Client Input | `POST /api/payments` | [`route.ts:110`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L110) | Syntactic regex check only (`/^[A-Z0-9]{6,24}$/`). No automated bank/gateway verification. |
-| **KYC File Upload** | Multipart Form | `POST /api/vendors/kyc` | [`route.ts:46-59`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L46-L59) | MIME-type whitelist (PDF, JPG, PNG) and 5MB size limit enforced server-side. |
-| **Booking Lookup** | Client Request | `GET /api/bookings/[id]` | **None** ([`[id]/route.ts:45`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L45)) | Missing authorization check; returns full booking details to any unauthenticated caller. |
-| **Payment Lookup** | Client Request | `GET /api/payments` | **None** ([`route.ts:51`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L51)) | Missing authorization check; returns all payments to any unauthenticated caller. |
+| **Booking Creation Amount** | Client Wizard | `POST /api/bookings` | **None** ([`route.ts:196`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L196)) | **Client Trust Boundary**: Server accepts `Math.round(amt)` and `paid` without recalculating items or pricing ladder. (Slated for Batch 3). |
+| **Booking Advance Notice** | Client Wizard | `POST /api/bookings` | [`route.ts:208-239`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L208-L239) | Server enforces advance notice days calculated from package and occasion lead rules. |
+| **Booking Self-Referral** | Client Wizard | `POST /api/bookings` | [`route.ts:251-268`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L251-L268) | Server checks partner code against current user accounts and phone numbers to disallow self-attribution. |
+| **Single Booking Lookup** | Client Request | `GET /api/bookings/[id]` | [`[id]/route.ts:49-65`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L49-L65) | **Session Ownership Enforced**: `requireRole()` checks caller; non-admins permitted only if `order.userId === guard.id`. Legacy records without `userId` are admin-only. |
+| **Admin Booking Collection** | Client Request | `GET /api/bookings` | [`route.ts:27-30`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L27-L30) | **Role Guard Enforced**: `requireRole("admin")` blocks unauthenticated (401) and non-admin callers (403). |
+| **Single Payment Lookup** | Client Request | `GET /api/payments/[id]` | [`[id]/route.ts:35-51`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L35-L51) | **Indirect Booking Ownership Enforced**: `requireRole()` checks caller; queries `bookingStore.get(payment.bookingId)`; allows only if `order.userId === guard.id` or admin. |
+| **Admin Payment Ledger** | Client Request | `GET /api/payments` | [`route.ts:54-57`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L54-L57) | **Role Guard Enforced**: `requireRole("admin")` blocks unauthenticated (401) and non-admin callers (403). |
+| **Payment UTR Submission** | Client Input | `POST /api/payments` | [`route.ts:110`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L110) | Syntactic regex check only (`/^[A-Z0-9]{6,24}$/`). Manual offline verification against bank statements. |
+| **Venue Mutations** | Client Request | `POST /api/venues`, `PATCH`, `DELETE /api/venues/[id]` | [`venues/route.ts:83-111`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L83-L111), [`[id]/route.ts:36-43`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/%5Bid%5D/route.ts#L36-L43) | **Session Ownership Enforced**: `requireRole("partner", "admin")`; checks `venue.ownerUserId === guard.id` (or held partnerRoles code); ignores client `ownerCode`/`ownerUserId` tampering. |
+| **Venue Owner Filter** | Client Request | `GET /api/venues?owner=CODE` | [`venues/route.ts:64-73`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L64-L73) | **Owner/Admin Guard Enforced**: `getSessionUser()` validates caller is admin or holds `CODE` in `partnerRoles`; prevents leaking unapproved/pending venues. |
+| **Partner Overwrite** | Client Request | `POST /api/partners` | [`partners/route.ts:110-153`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L110-L153) | **Owner/Admin Guard Enforced**: `requireRole("partner", "admin")`; verifies `existing.ownerUserId === guard.id` before allowing updates; stamps immutable `ownerUserId`. |
+| **Partner Role Claiming** | Client Request | `POST /api/auth/partner-roles` | [`partner-roles/route.ts:52-64`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/partner-roles/route.ts#L52-L64) | **Claim Verification Enforced**: Checks `partners` store; rejects attempts to claim codes registered to other users (403). |
+| **Public Partner Lookup** | Client Request | `GET /api/partners?code=...`, `[code]` | [`partners/route.ts:46-60`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L46-L60), [`[code]/route.ts:16-24`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/%5Bcode%5D/route.ts#L16-L24) | **Public Allowlist Shaping**: Returns safe fields (`code`, `name`, `type`, `businessName`); strictly strips `phone`, `email`, `gst`, `createdAt`, and `ownerUserId`. |
+| **KYC File Upload** | Multipart Form | `POST /api/vendors/kyc` | [`kyc/route.ts:46-59`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L46-L59) | MIME-type whitelist (PDF, JPG, PNG) and 5MB size limit enforced server-side. |
+| **KYC Document Access** | Client Request | `GET /api/vendors/kyc`, `[id]` | [`kyc/route.ts:25-28`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L25-L28), [`[id]/route.ts:14-17`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/%5Bid%5D/route.ts#L14-L17) | **Admin Guard Enforced**: `requireRole("admin")` blocks unauthenticated and non-admin access. |
 
 ---
 
-## 9. Missing & Unimplemented Flows
+## 11. Missing & Unimplemented Flows
 
 1. `[NOT IMPLEMENTED]` **Razorpay Gateway Flow**: No order creation endpoint (`/api/razorpay/order`), no checkout SDK handler, no webhook handler (`/api/razorpay/webhook`), and no HMAC signature verification.
 2. `[NOT IMPLEMENTED]` **Automated WhatsApp Transactional Updates**: No webhook receiver for WhatsApp messages and no automated outbound WhatsApp messaging via WhatsApp Cloud API.

@@ -54,7 +54,7 @@ flowchart TD
 
     subgraph Server["Next.js Server Runtime"]
         RouteHandlers["API Route Handlers\n(src/app/api/*)"]
-        AuthGuards["Authoritative Role Guards\n(src/lib/auth.ts)"]
+        AuthGuards["Authoritative Role & Ownership Guards\n(src/lib/auth.ts, object-level checks)"]
         StoreLayer["Store Abstraction\n(src/lib/store.ts)"]
         PricingEngine["Pricing & Tiers Engine\n(src/lib/bookingPricing.ts, tiers.ts)"]
     end
@@ -153,7 +153,12 @@ Bhojpatra/
 
 ### 5.3 Server & API Layer (`src/app/api/*`)
 - **Authentication**: Pure Node.js `crypto` with `scrypt` password hashing and opaque session tokens stored in the `sessions` table ([`src/lib/auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts)).
-- **Authoritative Authorization**: Function [`requireRole(...roles)`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L138) checks cookie signature, fetches live session from Neon DB, checks expiration, and validates user roles (`admin`, `vendor`, `partner`, `customer`).
+- **Authoritative Role Guards**: Function [`requireRole(...roles)`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L138) validates the HMAC-signed session cookie against active sessions in Neon DB, checks expiration, and validates caller roles (`admin`, `vendor`, `partner`, `customer`). Collection endpoints (e.g. `GET /api/bookings`, `GET /api/payments`, `GET /api/leads`, `GET /api/vendors/applications`, `GET /api/vendors/kyc`, `GET /api/partners`) enforce `requireRole("admin")`.
+- **Object-Level Resource Ownership Guards**:
+  - **Bookings (`GET /api/bookings/[id]`)**: Restricts access to the authenticated customer who owns the booking (`order.userId === session.id`) or platform admins. Legacy records without `userId` are admin-only.
+  - **Payments (`GET /api/payments/[id]`)**: Restricts access via the payment's associated booking (`payment.bookingId -> booking.userId === session.id`) or platform admins. Orphaned payments are admin-only.
+  - **Venues (`POST /api/venues`, `PATCH /api/venues/[id]`, `DELETE /api/venues/[id]`, `GET /api/venues?owner=CODE`)**: Enforces session-based ownership via `ownerUserId` (with a verified `partnerRoles` referral code fallback for legacy venues). Mutations completely ignore client-submitted `ownerCode` and `ownerUserId` overrides. Unapproved/pending venues are only visible to the owning partner or admin.
+  - **Partners (`POST /api/partners`, `POST /api/auth/partner-roles`)**: Stamps immutable `ownerUserId`, prevents cross-account overwrites of partner referral records, and verifies referral code uniqueness against the `partners` store to prevent role hijacking.
 - **Dynamic Handlers**: All routes declare `export const dynamic = "force-dynamic"` to bypass Next.js static caching.
 
 ### 5.4 Data Persistence Layer (`src/lib/store.ts`)
@@ -161,6 +166,24 @@ Bhojpatra/
 - **Architecture Pattern**: Document-Store on Relational Postgres. Each record is stored in `data jsonb` with `id text primary key` and `seq bigint generated always as identity`.
 - Implements `createStore<T>({ table, idField })` providing `list()`, `get(id)`, `upsert(record)`, `upsertMany(records)`, and `remove(id)`.
 - Implements singletons via the `settings` key/value table.
+
+### 5.5 Public vs. Private Data Taxonomy
+- **Public Data**:
+  - Marketplace catalog (`/`, `/occasions`, `/vendors`, `/venues`), published caterer profiles, dish menus, and approved venue listings.
+  - Public referral partner lookup (`GET /api/partners?code=...` & `GET /api/partners/[code]`): returns strictly allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, `gst`, `createdAt`, `deleted`, and `ownerUserId` stripped.
+- **Authenticated Data**:
+  - Claiming fresh partner roles (`POST /api/auth/partner-roles`).
+  - Active session resolution (`GET /api/auth/session`).
+- **Owner-Only Data**:
+  - Single booking details (`GET /api/bookings/[id]`).
+  - Customer booking history (`GET /api/bookings/mine`).
+  - Single payment transaction details (`GET /api/payments/[id]`).
+  - Partner private/pending venue management (`GET /api/venues?owner=CODE`, `PATCH /api/venues/[id]`, `DELETE /api/venues/[id]`).
+  - Partner profile settings (`POST /api/partners`).
+- **Admin-Only Data**:
+  - Administrative collections: `GET /api/bookings`, `GET /api/payments`, `GET /api/leads`, `GET /api/vendors/applications`, `GET /api/vendors/kyc`, `GET /api/partners`.
+  - Raw vendor KYC document downloads (`GET /api/vendors/kyc/[id]`).
+  - Legacy or orphaned records without identifiable user ownership.
 
 ---
 

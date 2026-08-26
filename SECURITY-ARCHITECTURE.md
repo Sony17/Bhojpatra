@@ -55,10 +55,22 @@ A single user account can hold multiple roles simultaneously via the `accounts` 
 | Surface Area | Gate Location | Mechanism | Enforcement Level |
 | :--- | :--- | :--- | :--- |
 | **Page Navigation** | [`src/proxy.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/proxy.ts) | HMAC Cookie Signature Check | Coarse (redirects unauthenticated page requests) |
-| **User APIs** | [`src/app/api/auth/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth) | `requireRole()` / `getSessionUser()` | Authoritative (checks DB session & user status) |
-| **Vendor APIs** | [`src/app/api/vendor/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendor) | `requireRole("vendor")` | Authoritative |
-| **Admin APIs** | [`src/app/api/admin/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/admin) | `requireRole("admin")` | Authoritative (where applied) |
-| **Database** | Postgres Engine | None | Application-level only (no RLS) |
+| **Admin Collection APIs** | `src/app/api/bookings`, `payments`, `leads`, `vendors/applications`, `vendors/kyc`, `partners` | `requireRole("admin")` | Authoritative Role Guard (Batch 1) |
+| **Single Booking Lookup** | [`src/app/api/bookings/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts) | `requireRole()` + `order.userId === session.id` | Authoritative Resource Ownership (Batch 2) |
+| **Single Payment Lookup** | [`src/app/api/payments/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts) | `requireRole()` + `booking.userId === session.id` | Authoritative Resource Ownership (Batch 2) |
+| **Venue Mutations & Owner Filter** | [`src/app/api/venues/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts), [`src/app/api/venues/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/%5Bid%5D/route.ts) | `requireRole("partner", "admin")` + `venue.ownerUserId` | Authoritative Resource Ownership (Batch 2) |
+| **Partner Management** | [`src/app/api/partners/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts), [`src/app/api/auth/partner-roles/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/partner-roles/route.ts) | `requireRole("partner", "admin")` + store uniqueness checks | Authoritative Resource Ownership (Batch 2) |
+| **Public Partner Lookup** | [`src/app/api/partners/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts) (`?code=`), `[code]` | Public-safe allowlist projection | Authoritative Public Shaping (Batch 1) |
+| **Vendor Portal APIs** | [`src/app/api/vendor/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendor) | `requireRole("vendor")` | Authoritative Role Guard |
+| **Admin Console APIs** | [`src/app/api/admin/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/admin) | `requireRole("admin")` | Authoritative Role Guard |
+| **Database** | Postgres Engine | Application-level checks | Application-level only (no DB-level RLS) |
+
+### 3.3 Resource Ownership Model
+The system enforces explicit resource ownership across all protected domains:
+1. **Bookings**: Authenticated session identity (`session.id`) is stamped onto `order.userId` at creation. Single-order lookups require `order.userId === session.id` or administrative privilege.
+2. **Payments**: Payments do not record `userId` directly; ownership is derived indirectly through the linked booking (`payment.bookingId -> booking.userId === session.id`). Non-owners and unlinked/orphaned payments are denied to non-admins.
+3. **Venues**: Technical authorization is governed by `venue.ownerUserId` (references `users.id`), stamped upon creation. Business/promotional attribution is tracked via `venue.ownerCode`. Legacy venues without `ownerUserId` fall back to verified `partnerRoles` referral codes. Ownership fields are immutable via PATCH.
+4. **Partners**: Partner records are owned by `partner.ownerUserId`. Cross-account overwrites are rejected with HTTP 403. Referral code claiming verifies against the `partners` store to prevent role hijacking.
 
 ---
 
@@ -67,8 +79,10 @@ A single user account can hold multiple roles simultaneously via the `accounts` 
 ```mermaid
 flowchart TD
     subgraph UntrustedZone["Untrusted Client Zone (Browser)"]
-        BrowserUser["Anonymous Visitor / Malicious Actor"]
-        AuthUser["Authenticated User (Customer / Vendor / Admin)"]
+        AnonUser["Anonymous Visitor / Attacker"]
+        AuthCust["Authenticated Customer"]
+        AuthPartner["Authenticated Partner / Vendor"]
+        AuthAdmin["Authenticated Admin"]
     end
 
     subgraph EdgeGate["Coarse Edge Gate"]
@@ -76,32 +90,43 @@ flowchart TD
     end
 
     subgraph ServerZone["Next.js Server API Boundary"]
-        GuardedRoutes["Protected Route Handlers\n(requireRole guard)"]
-        UnguardedRoutes["Unguarded Route Handlers\n(GET /api/bookings/[id], GET /api/payments, etc.)"]
+        AdminGuards["Admin Collection Handlers\n(requireRole('admin'))\n/api/bookings, /api/payments, /api/leads, etc."]
+        OwnershipGuards["Resource Ownership Handlers\n(requireRole() + Ownership Checks)\n/api/bookings/[id], /api/payments/[id], /api/venues/[id]"]
+        PartnerGuards["Partner Role & Store Guards\n/api/partners, /api/auth/partner-roles"]
+        ShapedPublic["Public-Safe Shaped Handlers\n/api/partners?code=..."]
+        PublicCatalog["Public Catalog Handlers\n/api/venues, /api/vendors"]
     end
 
     subgraph DataZone["Secure Storage Zone"]
         NeonDB[("Neon Postgres\n(data jsonb)")]
-        VercelBlob[("Vercel Blob Storage\n(KYC & Photos)")]
+        VercelBlob[("Vercel Blob Storage\n(KYC docs & photos)")]
     end
 
-    BrowserUser -.->|Unauthenticated HTTP| UnguardedRoutes
-    BrowserUser -->|Page Request| Proxy
-    AuthUser -->|Signed Cookie HTTP| GuardedRoutes
+    AnonUser -->|Public GET| PublicCatalog
+    AnonUser -->|Referral Code Check| ShapedPublic
+    AnonUser -.->|Unauthenticated Request| Proxy
+    AnonUser -.->|Unauthenticated Request| AdminGuards
+    AnonUser -.->|Unauthenticated Request| OwnershipGuards
 
-    Proxy -->|Pass / Redirect| GuardedRoutes
-    GuardedRoutes -->|Authorized DB Queries| NeonDB
-    GuardedRoutes -->|Token Access| VercelBlob
+    AuthCust -->|Cookie HTTP| OwnershipGuards
+    AuthPartner -->|Cookie HTTP| PartnerGuards
+    AuthPartner -->|Cookie HTTP| OwnershipGuards
+    AuthAdmin -->|Cookie HTTP| AdminGuards
+    AuthAdmin -->|Cookie HTTP| OwnershipGuards
 
-    UnguardedRoutes ==>|UNRESTRICTED READS| NeonDB
-    UnguardedRoutes ==>|UNRESTRICTED READS| VercelBlob
+    AdminGuards -->|Authorized Admin Queries| NeonDB
+    AdminGuards -->|Authorized Admin Streams| VercelBlob
+    OwnershipGuards -->|Owner-Verified Queries| NeonDB
+    PartnerGuards -->|Claim-Verified Queries| NeonDB
+    ShapedPublic -->|Allowlisted Public Projections| NeonDB
+    PublicCatalog -->|Approved Public Catalog Only| NeonDB
 ```
 
 ---
 
 ## 5. Security-Relevant Architecture Observations (Audit Log)
 
-> **Disclaimer**: The following findings are documented purely as architectural observations for future threat modeling and vulnerability remediation passes. **No application code has been modified.**
+> **Remediation Status**: Findings remediated in Batch 1 (commit `2eff3e7`) and Batch 2 (commit `85d9e7b`) are documented below with verified fix status and exact source references. Observations for future batches (e.g. Batch 3) are noted accordingly.
 
 ### Observation 1: Broken Object-Level Authorization (BOLA / IDOR) on Booking Lookups
 - **Location**: [`src/app/api/bookings/[id]/route.ts:45-66`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L45-L66)

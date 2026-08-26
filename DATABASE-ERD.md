@@ -46,7 +46,8 @@ erDiagram
     USERS ||--o{ BOOKINGS : "owns (booking.userId)"
     USERS ||--o{ VENDORS : "owns caterer profile (vendor.ownerId)"
     USERS ||--o{ VENDOR_PHOTOS : "owns photos (photo.ownerUserId)"
-    USERS ||--o{ PARTNERS : "associated partner role"
+    USERS ||--o{ PARTNERS : "owns partner record (partner.ownerUserId)"
+    USERS ||--o{ VENUES : "owns venue record (venue.ownerUserId)"
 
     BOOKINGS ||--o{ PAYMENTS : "tracks advance & balance (payment.bookingId)"
     BOOKINGS ||--o{ REFUNDS : "claims refund (refund.bookingId)"
@@ -82,7 +83,7 @@ erDiagram
 
     BOOKINGS {
         string id PK "BHJ-xxxxx"
-        string userId FK "references USERS.id (optional on legacy)"
+        string userId FK "references USERS.id (required on new, absent on legacy)"
         string customer
         string phone
         string email
@@ -100,7 +101,7 @@ erDiagram
 
     PAYMENTS {
         string id PK "PMT-Wxxxx"
-        string bookingId FK "references BOOKINGS.id"
+        string bookingId FK "references BOOKINGS.id (used for customer ownership derivation)"
         string customer
         string method "UPI | QR"
         number amount
@@ -133,6 +134,7 @@ erDiagram
 
     PARTNERS {
         string code PK "referral code"
+        string ownerUserId FK "references USERS.id (technical ownership, optional on legacy)"
         string name
         string type "planner | individual | venue"
         string phone
@@ -167,6 +169,8 @@ erDiagram
 
     VENUES {
         string id PK "VNU-xxxxxxxx"
+        string ownerUserId FK "references USERS.id (technical ownership, optional on legacy)"
+        string ownerCode "business referral attribution (REF-xxxxx)"
         string name
         string city
         string location
@@ -196,17 +200,17 @@ The database comprises **22 distinct tables**:
 
 | # | Table Name | Key Field | Primary Application Entity & Responsibilities | Sensitive Data |
 | :- | :--- | :--- | :--- | :--- |
-| 1 | `bookings` | `id` | Customer feast, stall, and baina orders placed through wizards | **High** (PII, addresses, phones) |
-| 2 | `payments` | `id` | UPI advance and balance transaction records and customer UTRs | **High** (Financial transactions, UTR) |
+| 1 | `bookings` | `id` | Customer feast, stall, and baina orders; `userId` links order to authenticated user for customer ownership | **High** (PII, addresses, phones) |
+| 2 | `payments` | `id` | UPI advance/balance records; `bookingId` establishes indirect customer ownership | **High** (Financial transactions, UTR) |
 | 3 | `refunds` | `id` | Customer refund claims lifecycle (`Requested` → `Approved` → `Processed`) | Medium (Order values, bank details) |
 | 4 | `settlements` | `id` | Payout reconciliation records between Bhojpatra and caterers | Medium (Vendor earnings, margins) |
-| 5 | `leads` | `email` | Promotional callback requests, lead capture widgets | Medium (Customer emails, phones) |
-| 6 | `partners` | `code` | Event planners, venue owners, individual referrers | **High** (Partner PII, phone, GST) |
-| 7 | `venues` | `id` | Partner venue properties (banquet halls, lawns, resorts) | Low (Public venue directory) |
-| 8 | `vendor_applications`| `id` | Inbound onboarding submissions from caterers seeking listing | **High** (Owner phone, email, GST, FSSAI) |
+| 5 | `leads` | `email` | Promotional callback requests, lead capture widgets (admin-only access) | Medium (Customer emails, phones) |
+| 6 | `partners` | `code` | Event planners, venue owners, referrers; `ownerUserId` links record to owning partner | **High** (Partner PII, phone, GST) |
+| 7 | `venues` | `id` | Partner venue properties; `ownerUserId` enforces technical ownership, `ownerCode` tracks attribution | Low (Public venue directory; pending is owner-only) |
+| 8 | `vendor_applications`| `id` | Inbound onboarding submissions from caterers seeking listing (admin-only access) | **High** (Owner phone, email, GST, FSSAI) |
 | 9 | `vendors` | `id` | Live published caterer profiles, courses, and tier rates | Low (Marketplace catalog data) |
 | 10| `vendor_photos` | `id` | Metadata linking vendor profile/dish images to Vercel Blob URLs | Low (Image metadata) |
-| 11| `kyc_documents` | `id` | Metadata linking vendor PAN, GST, FSSAI docs to Vercel Blob | **Critical** (Legal KYC documents) |
+| 11| `kyc_documents` | `id` | Metadata linking vendor PAN, GST, FSSAI docs to Vercel Blob (admin-only access) | **Critical** (Legal KYC documents) |
 | 12| `settings` | `key` | Platform singletons (Merchant UPI VPA, custom QR image) | Medium (Merchant VPA, banking config) |
 | 13| `customers` | `id` | Admin CRM customer directory (spend history, booking counts) | **High** (Customer directory PII) |
 | 14| `coupons` | `id` | Promotional discount codes, caps, validity periods | Low (Public discount codes) |
@@ -223,18 +227,18 @@ The database comprises **22 distinct tables**:
 
 ## 4. Application Module Read/Write Ownership
 
-| Table | Read Access (Source Code Files) | Write / Update Access (Source Code Files) |
+| Table | Read Access (Source Code Files & Security Rules) | Write / Update Access (Source Code Files & Security Rules) |
 | :--- | :--- | :--- |
-| `bookings` | `src/app/api/bookings/route.ts`<br>`src/app/api/bookings/[id]/route.ts`<br>`src/app/api/bookings/mine/route.ts`<br>`src/lib/settlements.ts` | `src/app/api/bookings/route.ts`<br>`src/app/api/bookings/[id]/route.ts` |
-| `payments` | `src/app/api/payments/route.ts`<br>`src/app/api/payments/[id]/route.ts` | `src/app/api/payments/route.ts`<br>`src/app/api/payments/[id]/route.ts` |
+| `bookings` | `src/app/api/bookings/route.ts` *(Admin-only collection)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner: `order.userId === session.id` or Admin)*<br>`src/app/api/bookings/mine/route.ts` *(Customer session filter)*<br>`src/lib/settlements.ts` | `src/app/api/bookings/route.ts` *(Authenticated order creation with `userId: session.id`)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner / Admin status transitions)* |
+| `payments` | `src/app/api/payments/route.ts` *(Admin-only collection)*<br>`src/app/api/payments/[id]/route.ts` *(Booking owner via `payment.bookingId` or Admin)* | `src/app/api/payments/route.ts` *(Customer UTR submission)*<br>`src/app/api/payments/[id]/route.ts` *(Admin settlement)* |
 | `refunds` | `src/app/api/refunds/route.ts`<br>`src/app/api/refunds/[id]/route.ts` | `src/app/api/refunds/route.ts`<br>`src/app/api/refunds/[id]/route.ts` |
 | `settlements` | `src/app/api/settlements/route.ts` | `src/app/api/settlements/route.ts` |
-| `leads` | `src/app/api/leads/route.ts`<br>`src/app/api/leads/[email]/route.ts` | `src/app/api/leads/route.ts`<br>`src/app/api/leads/[email]/route.ts` |
-| `partners` | `src/app/api/partners/route.ts`<br>`src/app/api/partners/[code]/route.ts`<br>`src/app/api/bookings/route.ts` | `src/app/api/partners/route.ts`<br>`src/app/api/partners/[code]/route.ts` |
-| `venues` | `src/app/api/venues/route.ts`<br>`src/app/api/venues/[id]/route.ts`<br>`src/app/api/venues/moderation/route.ts` | `src/app/api/venues/route.ts`<br>`src/app/api/venues/moderation/[id]/route.ts` |
-| `vendor_applications` | `src/app/api/vendors/applications/route.ts`<br>`src/app/api/vendors/moderation/route.ts` | `src/app/api/vendors/applications/route.ts`<br>`src/app/api/vendors/moderation/[id]/route.ts` |
+| `leads` | `src/app/api/leads/route.ts` *(Admin-only)*<br>`src/app/api/leads/[email]/route.ts` | `src/app/api/leads/route.ts`<br>`src/app/api/leads/[email]/route.ts` |
+| `partners` | `src/app/api/partners/route.ts` *(Admin-only without ?code=)*<br>`src/app/api/partners/[code]/route.ts` & `?code=` *(Public allowlisted fields)*<br>`src/app/api/auth/partner-roles/route.ts` *(Claim verification against store)* | `src/app/api/partners/route.ts` *(Verified owner: `partner.ownerUserId === session.id` or Admin)* |
+| `venues` | `src/app/api/venues/route.ts` *(Public approved; pending restricted to owner session or Admin)*<br>`src/app/api/venues/[id]/route.ts` *(Public venue details)*<br>`src/app/api/venues/moderation/route.ts` *(Admin moderation)* | `src/app/api/venues/route.ts` *(Partner creation with `ownerUserId: session.id`)*<br>`src/app/api/venues/[id]/route.ts` *(Session owner or Admin mutations/deletion)*<br>`src/app/api/venues/moderation/[id]/route.ts` *(Admin)* |
+| `vendor_applications` | `src/app/api/vendors/applications/route.ts` *(Admin-only)*<br>`src/app/api/vendors/moderation/route.ts` *(Admin)* | `src/app/api/vendors/applications/route.ts`<br>`src/app/api/vendors/moderation/[id]/route.ts` |
 | `vendors` | `src/app/api/vendors/route.ts`<br>`src/app/api/vendor/menu/route.ts`<br>`src/app/api/vendors/[id]/route.ts` | `src/app/api/vendor/menu/route.ts`<br>`src/app/api/admin/vendors/route.ts` |
-| `kyc_documents` | `src/app/api/vendors/kyc/route.ts`<br>`src/app/api/vendors/kyc/[id]/route.ts` | `src/app/api/vendors/kyc/route.ts` |
+| `kyc_documents` | `src/app/api/vendors/kyc/route.ts` *(Admin-only)*<br>`src/app/api/vendors/kyc/[id]/route.ts` *(Admin-only streaming)* | `src/app/api/vendors/kyc/route.ts` |
 | `settings` | `src/app/api/admin/payment-settings/route.ts`<br>`src/app/api/admin/occasions/route.ts`<br>`src/app/api/admin/services/route.ts`<br>`src/app/api/content/route.ts` | `src/app/api/admin/payment-settings/route.ts`<br>`src/app/api/admin/occasions/route.ts`<br>`src/app/api/admin/services/route.ts`<br>`src/app/api/content/route.ts` |
 | `users` | `src/lib/users.ts`<br>`src/lib/auth.ts`<br>`src/app/api/auth/*` | `src/lib/users.ts`<br>`src/lib/auth.ts`<br>`src/app/api/auth/*` |
 | `sessions` | `src/lib/auth.ts`<br>`src/app/api/auth/session/route.ts` | `src/lib/auth.ts`<br>`src/app/api/auth/logout/route.ts` |

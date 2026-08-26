@@ -164,6 +164,15 @@ Defined in [`src/app/api/bookings/[id]/route.ts:18-36`](file:///c:/Users/Zeeshaa
 | `Completed` | `Confirmed` | **Yes** | **Yes** | Reopens booking; sets `reopened: true` to prevent auto-complete sweep |
 | `Cancelled` | Any | **No** | **No** | Terminal state; no transitions permitted |
 
+### 3.1 Booking Retrieval & Ownership Security Model
+
+Defined in [`src/app/api/bookings/[id]/route.ts:49-65`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L49-L65) and [`src/app/api/bookings/mine/route.ts:43-63`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/mine/route.ts#L43-L63):
+
+- **Single Order Inspection (`GET /api/bookings/[id]`)**: Requires authenticated session identity. Platform administrators can inspect any order; non-admin customers may only retrieve orders where `order.userId === guard.id`. Anonymous callers receive HTTP 401, while unauthorized callers receive HTTP 403.
+- **Legacy Orders**: Historical orders created before session tracking that lack `userId` are accessible exclusively to platform administrators (non-admin callers receive HTTP 403).
+- **Customer Order History (`GET /api/bookings/mine`)**: Derives identity strictly from the active session (`guard.id`) and filters the database records to return only the customer's own orders.
+- **Status Mutations (`PATCH /api/bookings/[id]`)**: Enforces `order.userId === guard.id` or admin role before applying state transitions from the authority matrix.
+
 ---
 
 ## 4. Code References & Verification Notes
