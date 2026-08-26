@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { requireRole } from "@/lib/auth";
 import {
   readVendorApplications,
   toAdminApplication,
@@ -209,6 +210,9 @@ export async function POST(request: Request) {
 // Backward-compatible `{ applications }`; adds a `Paginated` envelope (over
 // `data`) when a filter/pagination param is present.
 export async function GET(request: Request) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const records = await readVendorApplications();
   records.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
   const applications = records.map(toAdminApplication);

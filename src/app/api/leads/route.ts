@@ -1,5 +1,6 @@
 import { createStore } from "@/lib/store";
 import { sendLeadAlert } from "@/lib/email";
+import { requireRole } from "@/lib/auth";
 
 // Leads are captured at request time to Postgres (Neon) — never prerender or
 // cache this handler.
@@ -162,6 +163,9 @@ export async function POST(request: Request) {
 // Admin → Lead Generation reads the captured leads here. Newest first so the
 // most recent promo sign-ups surface at the top of the table.
 export async function GET() {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const leads = await store.list();
   leads.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return Response.json({ leads });

@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { requireRole } from "@/lib/auth";
 import {
   KYC_ALLOWED_TYPES,
   KYC_MAX_BYTES,
@@ -16,6 +17,9 @@ export const dynamic = "force-dynamic";
 
 // List uploaded documents, newest first (for the admin KYC review console).
 export async function GET() {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const docs = await readKycDocuments();
   return Response.json({
     documents: docs.slice().reverse().map(publicKycShape),

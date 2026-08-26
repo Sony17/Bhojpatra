@@ -1,5 +1,5 @@
 import { createStore } from "@/lib/store";
-import { requireRole } from "@/lib/auth";
+import { getSessionUser, requireRole } from "@/lib/auth";
 import type { PartnerRecord } from "../route";
 
 export const dynamic = "force-dynamic";
@@ -12,17 +12,34 @@ const store = createStore<PartnerRecord>({
 const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.trim() ? v.trim() : undefined;
 
+function toPublicPartner(p: PartnerRecord) {
+  return {
+    code: p.code,
+    name: p.name,
+    type: p.type,
+    ...(p.businessName ? { businessName: p.businessName } : {}),
+  };
+}
+
 // GET /api/partners/[code]
 export async function GET(
   _request: Request,
   ctx: { params: Promise<{ code: string }> },
 ) {
   const { code } = await ctx.params;
-  const partner = await store.get(decodeURIComponent(code));
+  const rawCode = decodeURIComponent(code).trim();
+  const partner =
+    (await store.get(rawCode.toUpperCase())) ?? (await store.get(rawCode));
   if (!partner || partner.deleted) {
     return Response.json({ error: "Partner not found." }, { status: 404 });
   }
-  return Response.json({ partner });
+
+  const user = await getSessionUser();
+  if (user?.role === "admin") {
+    return Response.json({ partner });
+  }
+
+  return Response.json({ partner: toPublicPartner(partner) });
 }
 
 // PATCH /api/partners/[code] → edit contact details

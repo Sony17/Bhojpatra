@@ -56,6 +56,9 @@ const store = createStore<StoredPayment>({
 // List recorded payments, newest first (used by the admin payment tracker).
 // Backward-compatible `{ payments }`; adds a `Paginated` envelope when filtered.
 export async function GET(request: Request) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const payments = (await store.list()).slice().reverse();
   const { q, status, method, page, pageSize, hasQuery } = parseListQuery(
     request.url,

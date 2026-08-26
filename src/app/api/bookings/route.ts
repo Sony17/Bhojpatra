@@ -125,6 +125,9 @@ const paymentStore = createStore<StoredPayment>({
 // When any filter/pagination param is present it ALSO returns a `Paginated`
 // envelope (`data/page/pageSize/total`) over the filtered set.
 export async function GET(request: Request) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const orders = (await store.list()).slice().reverse();
   const { q, status, city, page, pageSize, hasQuery } = parseListQuery(
     request.url,

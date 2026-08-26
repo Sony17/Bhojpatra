@@ -3,7 +3,7 @@
 > **Current Implementation Status**: Active Production / Staging Codebase  
 > **Last Verified Against Code**: 2026-08-26  
 > **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/app/api/*`)  
-> **IMPORTANT NOTICE**: This document represents a **read-only architectural audit**. **No security fixes or code modifications have been applied** during this mapping phase.
+> **SECURITY REMEDIATION STATUS**: Batch 1 findings (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011) verified fixed across unauthenticated, customer, vendor, and admin test vectors. Status: Verified Fixed.
 
 ---
 
@@ -112,17 +112,18 @@ flowchart TD
 
 ### Observation 2: Unauthenticated Financial Payment Ledger Exposure
 - **Location**: [`src/app/api/payments/route.ts:51-77`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L51-L77) and [`src/app/api/payments/[id]/route.ts:24-34`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L24-L34)
-- **Description**: `GET /api/payments` and `GET /api/payments/[id]` have **no authentication or admin role requirements**.
-- **Impact**: Any unauthenticated client on the Internet can query the complete payment ledger, retrieving customer names, booking references, advance amounts, customer VPAs, and bank UTR numbers.
+- **Description**: `GET /api/payments` and `GET /api/payments/[id]` originally had no authentication or admin role requirements.
+- **Batch 1 Remediation**: `GET /api/payments` now enforces `requireRole("admin")` before reading from the payments store. The single payment lookup `GET /api/payments/[id]` remains an observation for a subsequent remediation batch.
 
 ### Observation 3: Unauthenticated Vendor KYC Document Leakage
 - **Location**: [`src/app/api/vendors/kyc/route.ts:18-23`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L18-L23) and [`src/app/api/vendors/kyc/[id]/route.ts:8-36`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/%5Bid%5D/route.ts#L8-L36)
-- **Description**: Both the KYC document metadata list (`GET /api/vendors/kyc`) and the raw document streaming endpoint (`GET /api/vendors/kyc/[id]`) are **completely open to the public**.
-- **Impact**: Anyone can view and download confidential legal business documents (PAN cards, GST certificates, FSSAI licenses, and identity proofs) submitted by caterers.
+- **Description**: Both the KYC document metadata list (`GET /api/vendors/kyc`) and the raw document streaming endpoint (`GET /api/vendors/kyc/[id]`) were open to the public.
+- **Batch 1 Remediation**: Both endpoints now enforce `requireRole("admin")` before reading document metadata or streaming file bytes.
 
 ### Observation 4: Unauthenticated Referral Partner Directory & GST Exposure
-- **Location**: [`src/app/api/partners/route.ts:41-76`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L41-L76)
-- **Description**: `GET /api/partners` has **no role check**. It was intended to allow looking up a single code via `?code=...`, but omitting the parameter lists every partner in the database, including business names, personal phones, emails, cities, and GST numbers.
+- **Location**: [`src/app/api/partners/route.ts:41-76`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L41-L76) and [`src/app/api/partners/[code]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/%5Bcode%5D/route.ts)
+- **Description**: `GET /api/partners` previously had no role check, dumping the full partner directory when omitting `?code=`.
+- **Batch 1 Remediation**: The unfiltered directory now enforces `requireRole("admin")`. Single-code lookups (`?code=...` and `/[code]`) return an explicit allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, and `gst` strictly stripped for non-admin callers.
 
 ### Observation 5: Client-Controlled Pricing & Lack of Server-Side Price Verification
 - **Location**: [`src/app/api/bookings/route.ts:176-177, 196, 303-304`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L176-L177)
@@ -158,10 +159,15 @@ flowchart TD
 
 | Category | Finding | Current State | Remediation Status |
 | :--- | :--- | :--- | :--- |
-| **Access Control** | Unauthenticated Booking Lookup | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
-| **Access Control** | Unauthenticated Payment Ledger | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
-| **Access Control** | Unauthenticated KYC Document Download | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
-| **Access Control** | Unauthenticated Partner Directory | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
+| **Access Control** | Unauthenticated Admin Booking List (`GET /api/bookings`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
+| **Access Control** | Unauthenticated Booking Lookup (`GET /api/bookings/[id]`) | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
+| **Access Control** | Unauthenticated Payment Ledger (`GET /api/payments`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
+| **Access Control** | Unauthenticated Single Payment (`GET /api/payments/[id]`) | `[IMPLEMENTED AS UNGUARDED]` | Unfixed (Observation only) |
+| **Access Control** | Unauthenticated KYC Document Download (`GET /api/vendors/kyc`, `[id]`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
+| **Access Control** | Unauthenticated Partner Directory (`GET /api/partners`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
+| **Access Control** | Partner PII/GST Exposure (`GET /api/partners?code=...`, `[code]`) | `[PUBLIC-SAFE ALLOWLIST]` | Verified Fixed |
+| **Access Control** | Unauthenticated Leads List (`GET /api/leads`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
+| **Access Control** | Unauthenticated Vendor Applications (`GET /api/vendors/applications`) | `[ADMIN GUARD ENFORCED]` | Verified Fixed |
 | **Data Integrity** | Client-Controlled Booking Amounts | `[TRUSTS CLIENT PAYLOAD]` | Unfixed (Observation only) |
 | **Payment Integrity**| Unverified Manual UPI UTR Submission | `[MANUAL RECONCILIATION]` | Unfixed (Observation only) |
 | **Performance/DoS** | Full Table Scans in Memory (`store.list`) | `[IN-MEMORY FILTERING]` | Unfixed (Observation only) |

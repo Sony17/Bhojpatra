@@ -2,6 +2,7 @@ import type { PartnerRole } from "@/lib/session";
 import { createStore } from "@/lib/store";
 import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendPartnerAlert } from "@/lib/email";
+import { getSessionUser, requireRole } from "@/lib/auth";
 
 // Referral partners are written at signup to Postgres (Neon) so the booking
 // wizard can resolve a referral code to a name and the admin can see who's
@@ -23,6 +24,22 @@ export interface PartnerRecord {
   deleted?: boolean;
 }
 
+export interface PublicPartner {
+  code: string;
+  name: string;
+  type: PartnerRole;
+  businessName?: string;
+}
+
+function toPublicPartner(p: PartnerRecord): PublicPartner {
+  return {
+    code: p.code,
+    name: p.name,
+    type: p.type,
+    ...(p.businessName ? { businessName: p.businessName } : {}),
+  };
+}
+
 const store = createStore<PartnerRecord>({
   table: "partners",
   idField: "code",
@@ -41,12 +58,28 @@ const str = (v: unknown): string | undefined =>
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+
+  if (code) {
+    const rawCode = code.trim();
+    const partner =
+      (await store.get(rawCode.toUpperCase())) ?? (await store.get(rawCode));
+    if (!partner || partner.deleted) {
+      return Response.json({ partner: null });
+    }
+
+    const user = await getSessionUser();
+    if (user?.role === "admin") {
+      return Response.json({ partner });
+    }
+
+    return Response.json({ partner: toPublicPartner(partner) });
+  }
+
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const all = await store.list();
   const live = all.filter((p) => !p.deleted);
-  if (code) {
-    const partner = live.find((p) => p.code === code) ?? null;
-    return Response.json({ partner });
-  }
   const partners = live.slice().reverse();
   const { q, type, page, pageSize, hasQuery } = parseListQuery(request.url);
   if (!hasQuery) return Response.json({ partners });

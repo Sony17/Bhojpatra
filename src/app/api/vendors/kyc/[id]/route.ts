@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import { readKycDocuments, readKycFile } from "@/lib/kyc";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+
   const { id } = await ctx.params;
 
   const docs = await readKycDocuments();
