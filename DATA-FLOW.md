@@ -1,7 +1,7 @@
 # Bhojpatra Data Flow Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 4 Synchronization)
 > **Source of Truth**: Repository source files (`src/app/api/*`, `src/lib/*`, `src/components/*`)  
 
 ---
@@ -365,6 +365,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor User as User / Partner (Browser)
+    participant ApiSignup as POST /api/auth/signup
     participant ApiPartners as POST /api/partners
     participant ApiRoles as POST /api/auth/partner-roles
     participant Auth as src/lib/auth.ts
@@ -372,7 +373,18 @@ sequenceDiagram
     participant UStore as users Store
     participant DB as Neon Postgres
 
-    alt 1. Create / Update Partner Record (POST /api/partners)
+    alt 1. Register with Partner Role on Signup (POST /api/auth/signup)
+        User->>ApiSignup: POST /api/auth/signup { email, pass, role: "partner", partnerRoles: [{ type, referralCode }] }
+        ApiSignup->>ApiSignup: Validate partnerRoles structure, type & format (^REF-[A-Z0-9-]+$)
+        ApiSignup->>PStore: get(referralCode)
+        alt Referral Code Belongs to Another Registered Partner
+            ApiSignup-->>User: HTTP 403 { error: "This referral code belongs to another partner." }
+        else Code Fresh / Unclaimed or Owned by Registering User
+            ApiSignup->>UStore: saveUser(user with validated partnerRoles & accounts)
+            UStore->>DB: INSERT INTO users (id, data)
+            ApiSignup-->>User: HTTP 201 { user } (Session Cookie Set)
+        end
+    else 2. Create / Update Partner Record (POST /api/partners)
         User->>ApiPartners: POST /api/partners { code, name, type, gst, ... }
         ApiPartners->>Auth: requireRole("partner", "admin")
         ApiPartners->>PStore: get(code)
@@ -383,7 +395,7 @@ sequenceDiagram
             PStore->>DB: INSERT INTO partners (id, data)
             ApiPartners-->>User: HTTP 200 { ok: true, partner }
         end
-    else 2. Claim Partner Role (POST /api/auth/partner-roles)
+    else 3. Claim Partner Role on Existing Account (POST /api/auth/partner-roles)
         User->>ApiRoles: POST /api/auth/partner-roles { type, referralCode }
         ApiRoles->>Auth: getSessionUser()
         ApiRoles->>PStore: get(referralCode)
@@ -399,15 +411,54 @@ sequenceDiagram
 
 ---
 
-## 9. External Integrations Data Flow
+## 9. Customer Review Submission Data Flow
 
-### 9.1 WhatsApp Click-to-Chat Flow
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as Authenticated Customer (Browser)
+    participant ApiReviews as POST /api/reviews
+    participant Auth as src/lib/auth.ts (requireRole)
+    participant BStore as bookings Store (Neon Postgres)
+    participant RStore as reviews Store (Neon Postgres)
+
+    Customer->>ApiReviews: POST /api/reviews { bookingId, name, reviews: [...] }
+    ApiReviews->>Auth: requireRole("customer")
+    alt Anonymous or Non-Customer Session
+        Auth-->>Customer: HTTP 401 Unauthorized / HTTP 403 Forbidden
+    else Customer Session Active
+        ApiReviews->>BStore: get(bookingId)
+        alt Booking Not Found
+            BStore-->>Customer: HTTP 404 Not Found { error: "Booking not found." }
+        else Booking Exists
+            ApiReviews->>ApiReviews: Verify Ownership (order.userId === session.id OR email match)
+            alt Non-Owner Caller
+                ApiReviews-->>Customer: HTTP 403 Forbidden { error: "Not allowed." }
+            else Verified Booking Owner
+                ApiReviews->>ApiReviews: Verify Lifecycle (order.status === "Completed")
+                alt Order Not Completed (Pending / Confirmed / Cancelled)
+                    ApiReviews-->>Customer: HTTP 400 Bad Request { error: "Reviews can only be submitted for completed bookings." }
+                else Order Completed
+                    ApiReviews->>ApiReviews: Bind Authoritative Context (occasion = order.occasion, city = order.city)
+                    ApiReviews->>RStore: upsertMany(reviews with composite key `${order.id}:${key}`)
+                    RStore-->>Customer: HTTP 201 Created { ok: true, reviews }
+                end
+            end
+        end
+    end
+```
+
+---
+
+## 10. External Integrations Data Flow
+
+### 10.1 WhatsApp Click-to-Chat Flow
 - **Initiation**: Customer clicks WhatsApp icon on floating widget ([`FloatingChat.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/FloatingChat.tsx)), vendor profile ([`VendorActionRow.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/vendors/VendorActionRow.tsx)), or share buttons ([`WhatsAppShareButton.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/WhatsAppShareButton.tsx)).
 - **Mechanism**: Browser navigation to `https://wa.me/911234567890?text=${encodeURIComponent(text)}`.
 - **Payload**: Pre-populated text containing catering requirements, event date, guest count, or referral link.
 - **Server Involvement**: **Zero**. Operates client-side without webhook callbacks or delivery tracking.
 
-### 9.2 Transactional Email Alerts (Resend)
+### 10.2 Transactional Email Alerts (Resend)
 - **Initiation**: Triggered asynchronously during `POST /api/bookings`, `POST /api/payments`, `POST /api/leads`, `POST /api/vendors/applications`, and `POST /api/venues`.
 - **Mechanism**: Direct HTTP POST from Next.js server to `https://api.resend.com/emails` with Bearer token authentication (`RESEND_API_KEY`).
 - **Payload**:
@@ -416,7 +467,7 @@ sequenceDiagram
 
 ---
 
-## 10. Trust Boundaries & Validation Matrix
+## 11. Trust Boundaries & Validation Matrix
 
 | Data Flow Point | Origin | Destination | Validation Enforcement Point | Architectural Observation |
 | :--- | :--- | :--- | :--- | :--- |
@@ -435,13 +486,15 @@ sequenceDiagram
 | **Venue Owner Filter** | Client Request | `GET /api/venues?owner=CODE` | [`venues/route.ts:64-73`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L64-L73) | **Owner/Admin Guard Enforced**: `getSessionUser()` validates caller is admin or holds `CODE` in `partnerRoles`; prevents leaking unapproved/pending venues. |
 | **Partner Overwrite** | Client Request | `POST /api/partners` | [`partners/route.ts:110-153`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L110-L153) | **Owner/Admin Guard Enforced**: `requireRole("partner", "admin")`; verifies `existing.ownerUserId === guard.id` before allowing updates; stamps immutable `ownerUserId`. |
 | **Partner Role Claiming** | Client Request | `POST /api/auth/partner-roles` | [`partner-roles/route.ts:52-64`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/partner-roles/route.ts#L52-L64) | **Claim Verification Enforced**: Checks `partners` store; rejects attempts to claim codes registered to other users (403). |
+| **Signup Partner Role Claiming** | Client Input | `POST /api/auth/signup` | [`signup/route.ts:50-135`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/signup/route.ts#L50-L135) | **Partner Store Ownership Verification**: Validates schema and role types (`planner`, `individual`, `venue`) and format (`^REF-[A-Z0-9-]+$`). Rejects attempts to claim registered codes belonging to other partners with HTTP 403 Forbidden. Client-supplied code cannot grant access to another partner's assets. |
+| **Review Submission** | Client Input | `POST /api/reviews` | [`reviews/route.ts:110-170`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/reviews/route.ts#L110-L170) | **Session & Booking Validation Enforced**: `requireRole("customer")` authenticates caller; verifies booking exists in `bookings` store (404); verifies ownership (`order.userId === session.id` or email fallback; 403); verifies `order.status === "Completed"` (400). Authoritatively binds `occasion` and `city` from booking record; client-submitted context overrides ignored. Composite upsert `${bookingId}:${key}`. |
 | **Public Partner Lookup** | Client Request | `GET /api/partners?code=...`, `[code]` | [`partners/route.ts:46-60`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L46-L60), [`[code]/route.ts:16-24`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/%5Bcode%5D/route.ts#L16-L24) | **Public Allowlist Shaping**: Returns safe fields (`code`, `name`, `type`, `businessName`); strictly strips `phone`, `email`, `gst`, `createdAt`, and `ownerUserId`. |
 | **KYC File Upload** | Multipart Form | `POST /api/vendors/kyc` | [`kyc/route.ts:46-59`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L46-L59) | MIME-type whitelist (PDF, JPG, PNG) and 5MB size limit enforced server-side. |
 | **KYC Document Access** | Client Request | `GET /api/vendors/kyc`, `[id]` | [`kyc/route.ts:25-28`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/route.ts#L25-L28), [`[id]/route.ts:14-17`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendors/kyc/%5Bid%5D/route.ts#L14-L17) | **Admin Guard Enforced**: `requireRole("admin")` blocks unauthenticated and non-admin access. |
 
 ---
 
-## 11. Missing & Unimplemented Flows
+## 12. Missing & Unimplemented Flows
 
 1. `[NOT IMPLEMENTED]` **Razorpay Gateway Flow**: No order creation endpoint (`/api/razorpay/order`), no checkout SDK handler, no webhook handler (`/api/razorpay/webhook`), and no HMAC signature verification.
 2. `[NOT IMPLEMENTED]` **Automated WhatsApp Transactional Updates**: No webhook receiver for WhatsApp messages and no automated outbound WhatsApp messaging via WhatsApp Cloud API.

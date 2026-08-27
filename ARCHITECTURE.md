@@ -1,7 +1,7 @@
 # Bhojpatra System Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 4 Synchronization)
 > **Source of Truth**: Repository source files (`src/`, `schema.sql`, `package.json`)  
 
 ---
@@ -99,43 +99,37 @@ flowchart TD
 ```
 Bhojpatra/
 ├── src/
-│   ├── proxy.ts                  # Next.js 16 coarse authentication middleware
-│   ├── app/                      # Next.js App Router root
-│   │   ├── (auth)/               # Route group: login, signup, forgot/reset password
-│   │   ├── account/              # User settings, profile, password, roles
-│   │   ├── admin/                # 20+ Admin dashboard sub-routes
-│   │   ├── api/                  # 70 REST API route endpoints
-│   │   ├── baina-box/            # Baina Box marketplace & brand storefronts
-│   │   ├── book/                 # Feast (/book) and Single Stall (/book/stall) wizards
-│   │   ├── bookings/             # My Bookings customer dashboard & invoice viewer
-│   │   ├── dashboard/            # Unified multi-role portal (Customer/Vendor/Partner)
-│   │   ├── partner/              # Partner pitch & referral partner dashboard
-│   │   ├── vendor/               # Vendor registration wizard & vendor dashboard
-│   │   ├── vendors/              # Public vendor catalog, profile, and menu pages
-│   │   ├── venues/               # Venue catalog & venue detail pages
-│   │   ├── layout.tsx            # Global HTML shell & root styling
-│   │   ├── page.tsx              # Public marketplace landing page
-│   │   └── globals.css           # Tailwind 4 theme & Bhojpatra brand tokens
-│   ├── components/               # React UI Components
-│   │   ├── admin/                # Admin management views, tables, sidebars
-│   │   ├── auth/                 # LoginGate, login/signup forms
-│   │   ├── booking/              # BookingWizard, StallBookingWizard, shared checkout
-│   │   ├── ui/                   # Core atomic design primitives (Button, Chip, Modal)
-│   │   ├── vendor/               # MenuBuilder, VendorRegister
-│   │   └── vendors/              # BainaBoxOrderPanel, VendorProfile, VendorCatalog
-│   └── lib/                      # Core Business Logic & Data Stores
-│       ├── auth.ts               # scrypt password hashing & session management
-│       ├── cookieSign.ts         # HMAC-SHA256 cookie signing
-│       ├── invoiceSign.ts        # HMAC-SHA256 invoice token signing & timing-safe verification
-│       ├── store.ts              # Neon Postgres query runner & store abstraction
-│       ├── data.ts               # Static seed catalog, occasions, packages, cities
-│       ├── bookingPricing.ts     # Authoritative server pricing engine, ladder, GST, advance calculation
-│       ├── bookings.ts           # Customer booking queries & client sync
-│       ├── invoice.ts            # Authoritative invoice data structure & signed share link helper
-│       ├── upi.ts                # NPCI UPI URI generation & VPA validation
-│       ├── email.ts              # Resend REST client & alert formatting
-│       ├── vendorMenus.ts        # Live vendor menus & dish tier management
-│       └── kyc.ts                # Vercel Blob KYC upload & retrieval helpers
+│   ├── app/                      # Next.js App Router (pages, layouts, route handlers)
+│   │   ├── api/                  # REST API endpoints (all dynamic = "force-dynamic")
+│   │   │   ├── auth/             # Login, signup, session, password reset, partner-roles
+│   │   │   ├── bookings/         # Booking CRUD, mine, invoice signed retrieval
+│   │   │   ├── payments/         # Payment recording, settlement, UTR conflict checks
+│   │   │   ├── partners/         # Referral partner directory & public allowlist lookup
+│   │   │   ├── venues/           # Venue management & owner-filtered queries
+│   │   │   ├── vendors/          # Vendor catalogue, onboarding applications, KYC uploads
+│   │   │   ├── reviews/          # Customer reviews, moderation & photo serving
+│   │   │   ├── leads/            # Inbound lead captures
+│   │   │   ├── coupons/          # Promotional discounts & validation
+│   │   │   ├── campaigns/        # Homepage popups & marketing banners
+│   │   │   └── admin/            # Administrative stats, analytics & moderation
+│   │   ├── book/                 # Multi-step customer booking wizards
+│   │   ├── vendor/               # Vendor registration & dashboard
+│   │   ├── partner/              # Partner registration & dashboard
+│   │   └── admin/                # Platform management console
+│   ├── components/               # UI components (atoms, sections, wizards, dashboards)
+│   ├── lib/                      # Core domain logic, utilities, and integrations
+│   │   ├── auth.ts               # Session token verification, scrypt hashing, requireRole
+│   │   ├── users.ts              # User accounts, grantAccount, account union
+│   │   ├── store.ts              # Neon Postgres query runner & store abstraction
+│   │   ├── data.ts               # Static seed catalog, occasions, packages, cities
+│   │   ├── bookingPricing.ts     # Authoritative server pricing engine, ladder, GST, advance calculation
+│   │   ├── bookings.ts           # Customer booking queries & client sync
+│   │   ├── invoice.ts            # Authoritative invoice data structure & signed share link helper
+│   │   ├── invoiceSign.ts        # HMAC-SHA256 URL token signing & verification
+│   │   ├── upi.ts                # NPCI UPI URI generation & VPA validation
+│   │   ├── email.ts              # Resend REST client & alert formatting
+│   │   ├── vendorMenus.ts        # Live vendor menus & dish tier management
+│   │   └── kyc.ts                # Vercel Blob KYC upload & retrieval helpers
 ├── public/                       # Static branding images & icons
 ├── schema.sql                    # Postgres schema definition (22 tables)
 └── package.json                  # Dependencies, scripts, and runtime engines
@@ -174,6 +168,17 @@ Bhojpatra/
   - Invoices are synthesized authoritatively on the server, pinned to `order.amount` and verified `order.paid`. Client invoice overrides are ignored.
   - Public invoice sharing uses HMAC-SHA256 signed URLs (`/bookings/invoice?id=BHJ-xxxxx&sig=...`). Endpoint `GET /api/bookings/[id]/invoice` verifies the cryptographic signature or validates that the caller is the booking owner or platform admin, rejecting unsigned or tampered requests with HTTP 403 Forbidden.
 - **EMI Auto-Credit Removal (`PATCH /api/bookings/[id]`)**: Eliminated customer auto-credit (`next.paid = order.amount`). Customers cannot transition a booking from `"Pending"` to `"Confirmed"` unless verified ledger payments satisfy the required advance.
+- **Customer Review Submission Authorization (`POST /api/reviews`)**:
+  - Requires authenticated customer authorization via `requireRole("customer")`.
+  - Verifies booking existence against the Neon Postgres `bookings` store (rejecting non-existent orders with HTTP 404 Not Found).
+  - Enforces booking ownership server-side (`order.userId === session.id` or email fallback for legacy orders; rejecting non-owners with HTTP 403 Forbidden).
+  - Enforces review eligibility requiring `order.status === "Completed"` (rejecting reviews on `Pending`, `Confirmed`, or `Cancelled` orders with HTTP 400 Bad Request).
+  - Authoritatively derives `occasion` and `city` context from the trusted order record, completely ignoring client overrides.
+  - Preserves in-place composite review updates (`${bookingId}:${vendorKey}`) without duplicating records.
+- **Signup Partner Role Validation (`POST /api/auth/signup`)**:
+  - Validates `partnerRoles` payload structure and role types (`planner`, `individual`, `venue`).
+  - Enforces standard referral code format (`/^REF-[A-Z0-9-]+$/i`).
+  - Queries the authoritative `partners` store to prevent unauthorized referral code claims: permits unclaimed/fresh codes for legitimate partner registrations, but strictly blocks attackers from claiming referral codes belonging to existing partners with HTTP 403 Forbidden.
 - **Dynamic Handlers**: All routes declare `export const dynamic = "force-dynamic"` to bypass Next.js static caching.
 
 ### 5.4 Data Persistence Layer (`src/lib/store.ts`)
@@ -185,6 +190,7 @@ Bhojpatra/
 ### 5.5 Public vs. Private Data Taxonomy
 - **Public Data**:
   - Marketplace catalog (`/`, `/occasions`, `/vendors`, `/venues`), published caterer profiles, dish menus, and approved venue listings.
+  - Published customer reviews (`GET /api/reviews`): Excludes reviews hidden by admin moderation.
   - Public referral partner lookup (`GET /api/partners?code=...` & `GET /api/partners/[code]`): returns strictly allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, `gst`, `createdAt`, `deleted`, and `ownerUserId` stripped.
   - Cryptographically Signed Invoices (`GET /api/bookings/[id]/invoice?sig=...`): Accessible publicly only when accompanied by a valid HMAC-SHA256 signature matching the booking ID.
 - **Authenticated Data**:
@@ -193,6 +199,7 @@ Bhojpatra/
 - **Owner-Only Data**:
   - Single booking details (`GET /api/bookings/[id]`).
   - Customer booking history (`GET /api/bookings/mine`).
+  - Review submission and editing for completed bookings (`POST /api/reviews`).
   - Single payment transaction details (`GET /api/payments/[id]`).
   - Partner private/pending venue management (`GET /api/venues?owner=CODE`, `PATCH /api/venues/[id]`, `DELETE /api/venues/[id]`).
   - Partner profile settings (`POST /api/partners`).

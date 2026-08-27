@@ -1,12 +1,13 @@
 # Bhojpatra Security Architecture & Observations
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 4 Synchronization)
 > **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/lib/invoiceSign.ts`, `src/lib/bookingPricing.ts`, `src/app/api/*`)  
 > **SECURITY REMEDIATION STATUS**: 
 > - **Batch 1** (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011): Admin collection access control and public-safe shaping verified fixed. Status: **Verified Fixed**.
 > - **Batch 2** (BHOJ-SEC-002, BHOJ-SEC-004, BHOJ-SEC-005, BHOJ-SEC-006, BHOJ-SEC-009, NEW-SEC-001, NEW-SEC-003): Resource ownership, session identity enforcement, and client-controlled identifier mitigations across Bookings, Payments, Venues, and Partners verified fixed (66/66 automated tests passed). Status: **Verified Fixed**.
 > - **Batch 3** (BHOJ-SEC-012, NEW-SEC-002, BHOJ-SEC-014, EMI Confirmation Bypass): Authoritative server-side pricing recalculation with <= ₹1 tolerance, decoupled manual UPI payment verification (Submitted -> admin Settled with UTR deduplication), authoritative invoice synthesis with HMAC-SHA256 signed public access, and removal of customer EMI auto-credit bypass verified fixed (20/20 automated tests passed). Status: **Verified Fixed**.
+> - **Batch 4** (BHOJ-SEC-013, Signup Partner Role Injection): Customer review submission authorization (`requireRole("customer")`), booking existence validation, ownership verification, completed-state requirement, authoritative context binding, and authoritative partners store validation on signup partner role claims verified fixed (18/18 automated tests passed). Status: **Verified Fixed**.
 
 ---
 
@@ -219,6 +220,29 @@ flowchart TD
   - Enforced a transition gate: customer attempts to transition `Pending` to `Confirmed` without verified ledger payments meeting the required advance are rejected with HTTP 400 Bad Request (`{ error: "Cannot confirm booking without verified payment." }`).
   - Status: **Verified Fixed (Batch 3)**.
 
+### Observation 13: Unauthenticated Review Injection & Missing Booking Validation (BHOJ-SEC-013)
+- **Location**: [`src/app/api/reviews/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/reviews/route.ts)
+- **Previous Risk**: The `POST /api/reviews` endpoint accepted submissions anonymously without session authentication, without verifying whether the referenced `bookingId` existed in the database, without validating booking ownership, and without checking order lifecycle status. Any client could inject fake reviews, forge ratings, spoof event occasions/cities, or review non-completed/non-existent bookings.
+- **Batch 4 Remediation**:
+  - Enforced customer session authentication via `requireRole("customer")` (HTTP 401/403).
+  - Validated booking existence against the Neon Postgres `bookings` store (HTTP 404 if not found).
+  - Enforced strict booking ownership server-side: `order.userId === session.id` (or email match for legacy bookings), rejecting non-owners with HTTP 403 Forbidden.
+  - Enforced lifecycle state validation: requires `order.status === "Completed"`, rejecting `Pending`, `Confirmed`, or `Cancelled` orders with HTTP 400 Bad Request.
+  - Authoritatively bound `occasion` and `city` context from the verified booking record, completely ignoring client overrides.
+  - Preserved in-place review updates via composite key `${bookingId}:${key}` and retained public read access on `GET /api/reviews`.
+  - Status: **Verified Fixed (Batch 4)**.
+
+### Observation 14: Signup Partner Role Injection & Referral Code Hijacking
+- **Location**: [`src/app/api/auth/signup/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/signup/route.ts)
+- **Previous Risk**: `POST /api/auth/signup` accepted client-supplied `partnerRoles` without validating the referral code against the authoritative `partners` store. An attacker could register with an existing partner's referral code, acquire that partner role, and subsequently hijack venue management rights and partner directory assets protected by Batch 2 controls.
+- **Batch 4 Remediation**:
+  - Added strict schema and type validation for `partnerRoles` array items (`planner`, `individual`, `venue`) and format validation for referral codes (`/^REF-[A-Z0-9-]+$/i`).
+  - Added authoritative lookup against the Neon Postgres `partners` store (`partnersStore.get(referralCode)`).
+  - For new signups, rejected attempts to claim an existing registered partner's code with HTTP 403 Forbidden (`{ error: "This referral code belongs to another partner." }`).
+  - For existing account attachments, verified caller ownership (`ownerUserId` or matching email) before permitting attachment, blocking non-owners with HTTP 403 Forbidden.
+  - Legitimate fresh/unclaimed referral codes continue to succeed seamlessly.
+  - Status: **Verified Fixed (Batch 4)**.
+
 ---
 
 ## 6. Audit Summary
@@ -243,5 +267,10 @@ flowchart TD
 | **Payment Integrity**| Unverified Manual UPI UTR Submission | `[SUBMITTED STATUS & DEDUPLICATION ENFORCED]` | **Verified Fixed (Batch 3)** |
 | **Invoice Integrity**| Client-Controlled Invoices & Base64 URL Tampering | `[SERVER INVOICE & HMAC-SIGNED ACCESS ENFORCED]` | **Verified Fixed (Batch 3)** |
 | **Payment Integrity**| EMI Self-Confirmation Payment Credit Manufacture | `[VERIFIED ADVANCE GATE ENFORCED]` | **Verified Fixed (Batch 3)** |
+| **Integrity / Auth** | Unauthenticated Review Injection (`POST /api/reviews`, BHOJ-SEC-013) | `[SESSION, BOOKING & STATUS ENFORCED]` | **Verified Fixed (Batch 4)** |
+| **Privilege Escalation**| Signup Partner Role Injection (`POST /api/auth/signup`) | `[PARTNER STORE VALIDATION ENFORCED]` | **Verified Fixed (Batch 4)** |
+| **Authentication** | Missing Session Invalidation on Password Reset (NEW-SEC-004) | `[TOKEN INVALIDATION ONLY]` | Outstanding (Batch 5) |
+| **Session Security**| Plaintext Session Token Storage (NEW-SEC-005) | `[PLAINTEXT TOKENS IN DB]` | Outstanding (Batch 5) |
+| **Rate Limiting** | Missing Rate Limiting on Auth/Payment Routes (NEW-SEC-006) | `[UNTHROTTLED HANDLERS]` | Outstanding (Batch 5) |
 | **Performance/DoS** | Full Table Scans in Memory (`store.list`) | `[IN-MEMORY FILTERING]` | Unfixed (Observation only) |
 | **Secret Hygiene** | Insecure Dev Fallback Secrets & Admin Seed | `[DEV FALLBACK ACTIVE]` | Unfixed (Observation only) |
