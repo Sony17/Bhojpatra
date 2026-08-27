@@ -1246,6 +1246,26 @@ export default function StallBookingWizard() {
             : referralCode.trim() || undefined,
           referrerName: selfReferral ? undefined : referrerName || undefined,
           referrerType: selfReferral ? undefined : referrerType || undefined,
+          stallId,
+          categoryItems,
+          selectedAddOns,
+          serviceId,
+          venueFee,
+          couponCode: appliedCoupon?.code,
+          pricingInputs: {
+            bookingType: "stall",
+            packageId: STALL_PACKAGE_ID,
+            stallId,
+            categoryItems,
+            guests,
+            selectedAddOns,
+            serviceId,
+            venueFee,
+            couponCode: appliedCoupon?.code,
+            referralCode: selfReferral
+              ? undefined
+              : referralCode.trim() || undefined,
+          },
           ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
           ...(selectedService
             ? {

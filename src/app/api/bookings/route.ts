@@ -7,6 +7,7 @@ import {
   customOrderLeadDays,
   occasions as seedOccasions,
   DEFAULT_OCCASION_LEAD_DAYS,
+  coupons as seedCoupons,
   type BookingStatus,
 } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
@@ -23,6 +24,17 @@ import {
   siteBaseUrl,
 } from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
+import {
+  ADVANCE_RATE,
+  isMaterialDifference,
+  calculateFeastTotals,
+  calculateStallTotals,
+  calculateBainaTotals,
+  calculateVenueTotals,
+} from "@/lib/bookingPricing";
+import { signInvoiceId } from "@/lib/invoiceSign";
+import { readCoupons } from "@/lib/coupons";
+import { customerPercentFor, DEFAULT_REFERRAL_RATES, type ReferralRates } from "@/lib/referralRates";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
 // admin booking console — never prerender or cache this.
@@ -190,15 +202,22 @@ export async function POST(request: Request) {
     paymentMethod,
     paymentRef,
     emiPlan,
-    status,
     referralCode,
     referrerName,
     referrerType,
-    invoiceToken,
     receipt,
-    invoice,
     vendors,
     service,
+    pricingInputs,
+    categoryVendors,
+    categoryItems,
+    stallId,
+    selectedAddOns,
+    serviceId,
+    venueFee,
+    bainaVendorId,
+    bainaItems,
+    couponCode,
   } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof id !== "string" || !/^BHJ-/.test(id)) {
@@ -254,33 +273,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid payment method." }, { status: 400 });
   }
 
-  const paidAmt = typeof paid === "number" ? paid : Number(paid);
-
-  // Money integrity: the claimed `paid` must be backed by the payments ledger —
-  // a booking can claim at most what checkout actually recorded against its id,
-  // so a forged request can't invent a paid-and-confirmed order. Zero-paid
-  // bookings (Connect / pay-later) skip the lookup entirely.
-  let paidVerified = 0;
-  if (Number.isFinite(paidAmt) && paidAmt > 0) {
-    const recordedSum = (await paymentStore.list())
-      .filter(
-        (p) =>
-          p.bookingId === id &&
-          (p.status === "Advance Received" || p.status === "Settled"),
-      )
-      .reduce((sum, p) => sum + p.amount, 0);
-    if (recordedSum <= 0) {
-      return Response.json(
-        {
-          error:
-            "We couldn't verify your payment. If money left your account, don't pay again — contact us with your booking ID and we'll match it.",
-        },
-        { status: 400 },
-      );
-    }
-    paidVerified = Math.min(Math.round(paidAmt), recordedSum);
-  }
-
   // Self-referral guard (authoritative): an Individual Referrer / Event Planner
   // can't credit their own booking. If the applied code belongs to this same
   // account, drop the attribution rather than blocking the booking — the code is
@@ -294,15 +286,308 @@ export async function POST(request: Request) {
   // account to refer themselves. Resolve the code to its partner and drop the
   // credit when that partner's registered phone matches this booking's phone.
   let phoneSelfReferral = false;
+  let referrerRecord: PartnerRecord | null = null;
   if (code && !sameAccountSelfReferral) {
-    const referrer = await partnerStore.get(code.toUpperCase());
+    referrerRecord = await partnerStore.get(code.toUpperCase());
     phoneSelfReferral =
-      !!referrer &&
-      !referrer.deleted &&
-      isPhoneSelfReferral(typeof phone === "string" ? phone : "", referrer);
+      !!referrerRecord &&
+      !referrerRecord.deleted &&
+      isPhoneSelfReferral(typeof phone === "string" ? phone : "", referrerRecord);
   }
 
   const selfReferral = sameAccountSelfReferral || phoneSelfReferral;
+
+  // ── Authoritative Server-Side Pricing Recalculation (BHOJ-SEC-012) ───────────
+  const guestCount = Number.isFinite(Number(guests)) ? Math.round(Number(guests)) : 0;
+  const rawPricing =
+    (pricingInputs && typeof pricingInputs === "object"
+      ? pricingInputs
+      : {}) as Record<string, unknown>;
+
+  // Resolve coupon server-side from authoritative store / catalog
+  const inputCouponCode =
+    typeof rawPricing.couponCode === "string" && rawPricing.couponCode.trim()
+      ? rawPricing.couponCode.trim()
+      : typeof couponCode === "string" && couponCode.trim()
+        ? couponCode.trim()
+        : "";
+
+  let appliedCoupon: { percent: number; cap: number } | null = null;
+  if (inputCouponCode) {
+    try {
+      const dbCoupons = await readCoupons();
+      const match =
+        dbCoupons.find(
+          (c) => c.code.toUpperCase() === inputCouponCode.toUpperCase(),
+        ) ||
+        seedCoupons.find(
+          (c) => c.code.toUpperCase() === inputCouponCode.toUpperCase(),
+        );
+      if (match) {
+        let isExpired = false;
+        let isInactive = false;
+        if (
+          "expiresAt" in match &&
+          typeof match.expiresAt === "string" &&
+          match.expiresAt
+        ) {
+          isExpired = new Date(match.expiresAt).getTime() < Date.now();
+        }
+        if ("status" in match && match.status !== "Active") {
+          isInactive = true;
+        }
+        if (!isExpired && !isInactive) {
+          appliedCoupon = {
+            percent: match.percent,
+            cap: match.cap,
+          };
+        }
+      }
+    } catch {
+      // ignore coupon read error
+    }
+  }
+
+  // Resolve referral discount percentage
+  let referralPercent = 0;
+  if (code && !selfReferral && referrerRecord && !referrerRecord.deleted) {
+    const rates: ReferralRates = DEFAULT_REFERRAL_RATES;
+    referralPercent = customerPercentFor(rates, referrerRecord.type);
+  }
+
+  const bType =
+    (rawPricing.bookingType as string) ||
+    (occasion === "Baina Box"
+      ? "baina"
+      : packageId === "custom" && (stallId || rawPricing.stallId)
+        ? "stall"
+        : "feast");
+
+  let authoritativeCalc: {
+    preDiscount: number;
+    couponDiscount: number;
+    referralDiscount: number;
+    discount: number;
+    taxable: number;
+    gst: number;
+    grandTotal: number;
+    subtotal?: number;
+    addOnsTotal?: number;
+  } = {
+    preDiscount: Math.round(amt),
+    couponDiscount: 0,
+    referralDiscount: 0,
+    discount: 0,
+    taxable: Math.round(amt),
+    gst: 0,
+    grandTotal: Math.round(amt),
+  };
+
+  if (bType === "baina") {
+    const items = (
+      Array.isArray(rawPricing.bainaItems)
+        ? rawPricing.bainaItems
+        : Array.isArray(bainaItems)
+          ? bainaItems
+          : []
+    ) as Array<{ id: string; qty: number; price?: number }>;
+    const vId =
+      (rawPricing.bainaVendorId as string) ||
+      (typeof bainaVendorId === "string" ? bainaVendorId : "");
+    const b = calculateBainaTotals({
+      bookingType: "baina",
+      bainaVendorId: vId,
+      bainaItems: items,
+    });
+    authoritativeCalc = {
+      preDiscount: b.subtotal,
+      couponDiscount: 0,
+      referralDiscount: 0,
+      discount: 0,
+      taxable: b.subtotal,
+      gst: 0,
+      grandTotal: b.grandTotal,
+      subtotal: b.subtotal,
+      addOnsTotal: 0,
+    };
+  } else if (bType === "stall") {
+    const sId =
+      (rawPricing.stallId as string) ||
+      (typeof stallId === "string" ? stallId : "");
+    const cItems = (rawPricing.categoryItems || categoryItems) as
+      | Record<string, string[]>
+      | undefined;
+    const addOnsArr = (
+      Array.isArray(rawPricing.selectedAddOns)
+        ? rawPricing.selectedAddOns
+        : Array.isArray(selectedAddOns)
+          ? selectedAddOns
+          : []
+    ) as string[];
+    const svcId =
+      (rawPricing.serviceId as string) ||
+      (typeof serviceId === "string"
+        ? serviceId
+        : (service as { id?: string })?.id);
+    const vFee = Number(rawPricing.venueFee ?? venueFee ?? 0);
+
+    authoritativeCalc = calculateStallTotals({
+      bookingType: "stall",
+      stallId: sId,
+      categoryItems: cItems,
+      guests: guestCount,
+      selectedAddOns: addOnsArr,
+      serviceId: svcId,
+      venueFee: vFee,
+      coupon: appliedCoupon,
+      referralPercent,
+    });
+  } else if (bType === "venue") {
+    authoritativeCalc = calculateVenueTotals({
+      bookingType: "venue",
+      venueRate: Number(rawPricing.venueRate ?? amount),
+    });
+  } else {
+    // Feast flow
+    const pkgId =
+      (rawPricing.packageId as string) ||
+      (typeof packageId === "string" ? packageId : "silver");
+    const catVendors = (rawPricing.categoryVendors || categoryVendors) as
+      | Record<string, string[]>
+      | undefined;
+    const addOnsArr = (
+      Array.isArray(rawPricing.selectedAddOns)
+        ? rawPricing.selectedAddOns
+        : Array.isArray(selectedAddOns)
+          ? selectedAddOns
+          : []
+    ) as string[];
+    const svcId =
+      (rawPricing.serviceId as string) ||
+      (typeof serviceId === "string"
+        ? serviceId
+        : (service as { id?: string })?.id);
+    const vFee = Number(rawPricing.venueFee ?? venueFee ?? 0);
+
+    authoritativeCalc = calculateFeastTotals({
+      bookingType: "feast",
+      packageId: pkgId,
+      guests: guestCount,
+      categoryVendors: catVendors,
+      selectedAddOns: addOnsArr,
+      serviceId: svcId,
+      venueFee: vFee,
+      coupon: appliedCoupon,
+      referralPercent,
+    });
+  }
+
+  // Enforce authoritative pricing: reject any material price difference (> ₹1)
+  const authoritativeGrandTotal = Math.round(authoritativeCalc.grandTotal);
+  if (authoritativeGrandTotal > 0) {
+    if (isMaterialDifference(amt, authoritativeGrandTotal)) {
+      return Response.json(
+        {
+          error: "Booking amount does not match authoritative calculated total.",
+          expected: authoritativeGrandTotal,
+          received: amt,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  const finalAmount =
+    authoritativeGrandTotal > 0 ? authoritativeGrandTotal : Math.round(amt);
+
+  // ── Payment Integrity & Decoupled Verification (NEW-SEC-002) ─────────────────
+  const paidAmt = typeof paid === "number" ? paid : Number(paid);
+  const payments = (await paymentStore.list()).filter((p) => p.bookingId === id);
+
+  const verifiedSum = payments
+    .filter((p) => p.status === "Advance Received" || p.status === "Settled")
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const submittedSum = payments
+    .filter((p) => p.status === "Submitted")
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  if (
+    Number.isFinite(paidAmt) &&
+    paidAmt > 0 &&
+    verifiedSum <= 0 &&
+    submittedSum <= 0
+  ) {
+    return Response.json(
+      {
+        error:
+          "We couldn't verify your payment. If money left your account, don't pay again — contact us with your booking ID and we'll match it.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const requiredAdvance = Math.round(finalAmount * ADVANCE_RATE);
+  let paidVerified = 0;
+  let finalStatus: BookingStatus = "Pending";
+
+  if (paymentMethod === "Connect") {
+    // Connect flow: Bhojpatra contacts customer to finalize menu and cash payment
+    finalStatus = "Confirmed";
+    paidVerified = 0;
+  } else if (verifiedSum >= requiredAdvance) {
+    // Genuine verified advance payment received
+    finalStatus = "Confirmed";
+    paidVerified = verifiedSum;
+  } else if (submittedSum > 0) {
+    // Payment submitted via manual UPI, awaiting admin bank reconciliation
+    finalStatus = "Pending";
+    paidVerified = verifiedSum;
+  } else {
+    finalStatus = "Pending";
+    paidVerified = 0;
+  }
+
+  // ── Authoritative Invoice Generation (BHOJ-SEC-014) ──────────────────────────
+  const authoritativeInvoice: InvoiceData = {
+    id,
+    dateLabel: typeof date === "string" ? date : "",
+    customerName:
+      typeof customer === "string" && customer.trim()
+        ? customer.trim()
+        : undefined,
+    customerPhone:
+      typeof phone === "string" && phone.trim() ? phone.trim() : undefined,
+    customerEmail:
+      typeof email === "string" && email.trim() ? email.trim() : undefined,
+    occasion: typeof occasion === "string" ? occasion : "Feast",
+    eventDate: typeof date === "string" ? date : "",
+    servingTime:
+      typeof mealTime === "string" && mealTime.trim()
+        ? mealTime.trim()
+        : undefined,
+    foodPreference:
+      typeof foodPreference === "string" && foodPreference.trim()
+        ? foodPreference.trim()
+        : undefined,
+    city: typeof city === "string" ? city : "—",
+    venue: typeof venue === "string" && venue.trim() ? venue.trim() : "—",
+    guests: guestCount,
+    packageName: typeof vendor === "string" ? vendor : "Bhojpatra",
+    lines: [
+      {
+        label: `${typeof occasion === "string" ? occasion : "Feast"} — ${typeof vendor === "string" ? vendor : "Bhojpatra"}`,
+        amount: finalAmount,
+      },
+    ],
+    menu: [],
+    subtotal: authoritativeCalc?.subtotal ?? finalAmount,
+    addOnsTotal: authoritativeCalc?.addOnsTotal ?? 0,
+    discount: authoritativeCalc?.discount ?? 0,
+    gst: authoritativeCalc?.gst ?? Math.round(finalAmount * 0.18),
+    grandTotal: finalAmount,
+    paid: paidVerified,
+  };
 
   const order: StoredOrder = {
     id,
@@ -331,20 +616,20 @@ export async function POST(request: Request) {
     ...(typeof foodPreference === "string" && foodPreference.trim()
       ? { foodPreference: foodPreference.trim() }
       : {}),
-    guests: Number.isFinite(Number(guests)) ? Math.round(Number(guests)) : 0,
+    guests: guestCount,
     vendor: typeof vendor === "string" ? vendor : "Bhojpatra",
     city: typeof city === "string" ? city : "—",
     ...(typeof venue === "string" && venue.trim()
       ? { venue: venue.trim() }
       : {}),
-    amount: Math.round(amt),
+    amount: finalAmount,
     paid: paidVerified,
     paymentMethod,
     ...(typeof paymentRef === "string" && paymentRef.trim()
       ? { paymentRef: paymentRef.trim() }
       : {}),
     ...(isEmiPlan(emiPlan) ? { emiPlan } : {}),
-    status: isBookingStatus(status) ? status : "Confirmed",
+    status: finalStatus,
     createdAt: new Date().toISOString(),
     ...(!selfReferral && typeof referralCode === "string" && referralCode.trim()
       ? {
@@ -357,12 +642,10 @@ export async function POST(request: Request) {
             typeof referrerType === "string" ? referrerType : undefined,
         }
       : {}),
-    // Customer-facing extras carried from the booking flow (replace the old
-    // localStorage copy). Stored verbatim; the client built + validated them.
+    // Customer-facing receipt preserved for formatting
     ...(typeof receipt === "string" && receipt ? { receipt } : {}),
-    ...(invoice && typeof invoice === "object"
-      ? { invoice: invoice as InvoiceData }
-      : {}),
+    // Authoritative server invoice
+    invoice: authoritativeInvoice,
     ...(Array.isArray(vendors) ? { vendors: vendors as BookedVendor[] } : {}),
     ...(isServiceSelection(service) ? { service } : {}),
   };
@@ -381,19 +664,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Email on a brand-new order (not on idempotent repeat confirms):
-  // owners get an alert, the signed-in customer gets a confirmation.
-  // The client sends only the invoice token; we rebuild the URL from our own
-  // trusted origin so this public endpoint can't inject an arbitrary link.
+  // Email on a brand-new order with HMAC-signed invoice link:
   if (!existing) {
-    const token =
-      typeof invoiceToken === "string" &&
-      invoiceToken.length <= 8192 &&
-      /^[A-Za-z0-9_-]+$/.test(invoiceToken)
-        ? invoiceToken
-        : "";
+    const sig = signInvoiceId(merged.id);
     const base = siteBaseUrl();
-    const invoiceUrl = token && base ? `${base}/bookings/invoice?d=${token}` : null;
+    const invoiceUrl = base
+      ? `${base}/bookings/invoice?id=${encodeURIComponent(merged.id)}&sig=${encodeURIComponent(sig)}`
+      : null;
     await Promise.all([
       sendOrderAlert(merged, invoiceUrl),
       sendBookingConfirmation(merged, user.email, invoiceUrl),
@@ -401,15 +678,6 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ ok: true, order: merged }, { status: existing ? 200 : 201 });
-}
-
-function isBookingStatus(v: unknown): v is BookingStatus {
-  return (
-    v === "Pending" ||
-    v === "Confirmed" ||
-    v === "Completed" ||
-    v === "Cancelled"
-  );
 }
 
 /** Whole days from today (UTC midnight) until a `YYYY-MM-DD` date. Null for an

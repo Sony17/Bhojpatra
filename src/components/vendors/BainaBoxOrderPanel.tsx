@@ -184,6 +184,14 @@ export default function BainaBoxOrderPanel({
           paymentMethod: "Connect",
           status: "Confirmed",
           vendors: [{ id: data.vendorId, name: data.name }],
+          bainaVendorId: data.vendorId,
+          bainaItems: lines.map((l) => ({ id: l.id, qty: l.qty, price: l.price })),
+          pricingInputs: {
+            bookingType: "baina",
+            packageId: "custom",
+            bainaVendorId: data.vendorId,
+            bainaItems: lines.map((l) => ({ id: l.id, qty: l.qty, price: l.price })),
+          },
           receipt,
         }),
       });

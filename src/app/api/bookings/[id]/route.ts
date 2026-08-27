@@ -1,9 +1,9 @@
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import type { BookingStatus } from "@/lib/data";
-import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import type { StoredOrder } from "../route";
+import { ADVANCE_RATE } from "@/lib/bookingPricing";
 
 export const dynamic = "force-dynamic";
 
@@ -112,11 +112,15 @@ export async function PATCH(
     }
     next.status = body.status;
 
-    // A pending order is an EMI booking (advance paid, balance financed). When a
-    // customer confirms it they're settling that outstanding balance in full, so
-    // record it here — the client never sends `paid`, keeping money server-side.
+    // A customer cannot manufacture payment credit or confirm an unpaid/unverified booking.
     if (!isAdmin && order.status === "Pending" && next.status === "Confirmed") {
-      next.paid = order.amount;
+      const advanceNeeded = Math.round(order.amount * ADVANCE_RATE);
+      if (order.paid < advanceNeeded) {
+        return Response.json(
+          { error: "Cannot confirm booking without verified payment." },
+          { status: 400 },
+        );
+      }
     }
   }
 
@@ -158,8 +162,10 @@ export async function PATCH(
   if (body.reopened !== undefined) {
     next.reopened = Boolean(body.reopened);
   }
-  if (body.invoice && typeof body.invoice === "object") {
-    next.invoice = body.invoice as InvoiceData;
+  // Invoice data cannot be overwritten by the client — sync paid and amount
+  if (next.invoice) {
+    next.invoice.paid = next.paid;
+    next.invoice.grandTotal = next.amount;
   }
   if (Array.isArray(body.vendors)) {
     next.vendors = body.vendors as BookedVendor[];

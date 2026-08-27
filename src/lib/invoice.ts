@@ -734,9 +734,12 @@ export function decodeInvoice(token: string): InvoiceData | null {
 }
 
 /** Full, shareable URL that renders this invoice in the public viewer. */
-export function invoiceShareUrl(data: InvoiceData): string {
+export function invoiceShareUrl(data: InvoiceData, sig?: string): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  return `${origin}/bookings/invoice?d=${encodeInvoice(data)}`;
+  if (sig) {
+    return `${origin}/bookings/invoice?id=${encodeURIComponent(data.id)}&sig=${encodeURIComponent(sig)}`;
+  }
+  return `${origin}/bookings/invoice?id=${encodeURIComponent(data.id)}`;
 }
 
 /** Resolve the actual font-family string behind the `.font-display` class

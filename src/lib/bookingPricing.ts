@@ -117,6 +117,264 @@ export function computeOrderTotals({
   };
 }
 
+export interface FeastPricingInput {
+  bookingType?: "feast";
+  packageId: string;
+  guests: number;
+  categoryVendors?: Record<string, string[]>;
+  selectedAddOns?: string[];
+  serviceId?: string;
+  venueFee?: number;
+  coupon?: { percent: number; cap: number } | null;
+  referralPercent?: number;
+}
+
+export interface StallPricingInput {
+  bookingType: "stall";
+  packageId?: "custom";
+  stallId?: string;
+  categoryItems?: Record<string, string[]>;
+  guests: number;
+  selectedAddOns?: string[];
+  serviceId?: string;
+  venueFee?: number;
+  coupon?: { percent: number; cap: number } | null;
+  referralPercent?: number;
+}
+
+export interface BainaPricingInput {
+  bookingType: "baina";
+  bainaVendorId?: string;
+  bainaItems: Array<{ id: string; qty: number; price?: number }>;
+}
+
+export interface VenuePricingInput {
+  bookingType: "venue";
+  venueId?: string;
+  venueRate?: number;
+  spaceRates?: number;
+  slotRate?: number;
+  serviceRate?: number;
+  addOnsRate?: number;
+  discount?: number;
+}
+
+export type NormalizedPricingInput =
+  | FeastPricingInput
+  | StallPricingInput
+  | BainaPricingInput
+  | VenuePricingInput;
+
+import {
+  packageBasePerPlate,
+  packageCategories,
+  menuCategories,
+  addOns,
+  servicePackages,
+} from "@/lib/data";
+import { BAINA_BOX_VENDOR_DATA } from "@/lib/bainaBoxData";
+
+/**
+ * Checks whether a client-submitted amount differs materially from the server-calculated
+ * amount. Allows up to 1 rupee rounding tolerance.
+ */
+export function isMaterialDifference(
+  clientAmt: number,
+  serverAmt: number,
+  maxTolerance = 1,
+): boolean {
+  if (!Number.isFinite(clientAmt) || !Number.isFinite(serverAmt)) return true;
+  return Math.abs(clientAmt - serverAmt) > maxTolerance;
+}
+
+/**
+ * Authoritatively calculates Feast totals on the server from raw catalog data.
+ */
+export function calculateFeastTotals(input: FeastPricingInput): OrderTotals {
+  const guests = Math.max(
+    1,
+    Math.min(MAX_GUESTS, Math.round(input.guests || MIN_GUESTS)),
+  );
+  const basePerPlate = packageBasePerPlate[input.packageId] ?? 0;
+
+  let categoryAddTotal = 0;
+  const activeCatIds =
+    packageCategories[input.packageId] ?? Object.keys(input.categoryVendors ?? {});
+
+  if (input.categoryVendors) {
+    for (const catId of activeCatIds) {
+      const cat = menuCategories.find((c) => c.id === catId);
+      if (!cat) continue;
+      const vendorIds = input.categoryVendors[catId] ?? [];
+      for (const vid of vendorIds) {
+        const v = cat.vendors.find((item) => item.id === vid);
+        if (v && Number.isFinite(v.perPlate)) {
+          categoryAddTotal += v.perPlate;
+        }
+      }
+    }
+  }
+
+  const perPlate = basePerPlate + categoryAddTotal;
+  const subtotal = perPlate * guests;
+
+  let addOnsTotal = 0;
+  if (Array.isArray(input.selectedAddOns)) {
+    for (const aid of input.selectedAddOns) {
+      const item = addOns.find((a) => a.id === aid);
+      if (item && Number.isFinite(item.price)) {
+        addOnsTotal += item.perPlate ? item.price * guests : item.price;
+      }
+    }
+  }
+
+  let serviceTotal = 0;
+  if (input.serviceId) {
+    const s = servicePackages.find((pkg) => pkg.id === input.serviceId);
+    if (s && Number.isFinite(s.priceMin)) {
+      serviceTotal = s.perPlate ? s.priceMin * guests : s.priceMin;
+    }
+  }
+
+  const venueFee = Math.max(0, input.venueFee ?? 0);
+
+  return computeOrderTotals({
+    subtotal,
+    addOnsTotal,
+    venueFee,
+    serviceTotal,
+    coupon: input.coupon,
+    referralPercent: input.referralPercent ?? 0,
+  });
+}
+
+/**
+ * Authoritatively calculates Single Stall totals.
+ */
+export function calculateStallTotals(input: StallPricingInput): OrderTotals {
+  const guests = Math.max(
+    1,
+    Math.min(MAX_GUESTS, Math.round(input.guests || MIN_GUESTS)),
+  );
+
+  let perPlate = 0;
+  if (input.stallId) {
+    for (const cat of menuCategories) {
+      const v = cat.vendors.find((ven) => ven.id === input.stallId);
+      if (v) {
+        if (Number.isFinite(v.perPlate)) {
+          perPlate = v.perPlate;
+          if (input.categoryItems && v.items && v.items.length > 0) {
+            const pickedDishIds = Object.values(input.categoryItems).flat();
+            const customDishSum = v.items
+              .filter(
+                (it) =>
+                  pickedDishIds.includes(it.id) &&
+                  it.price != null &&
+                  it.price > 0,
+              )
+              .reduce((acc, it) => acc + (it.price ?? 0), 0);
+            if (customDishSum > 0) {
+              perPlate = customDishSum;
+            }
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  const subtotal = perPlate * guests;
+
+  let addOnsTotal = 0;
+  if (Array.isArray(input.selectedAddOns)) {
+    for (const aid of input.selectedAddOns) {
+      const item = addOns.find((a) => a.id === aid);
+      if (item && Number.isFinite(item.price)) {
+        addOnsTotal += item.perPlate ? item.price * guests : item.price;
+      }
+    }
+  }
+
+  let serviceTotal = 0;
+  if (input.serviceId) {
+    const s = servicePackages.find((pkg) => pkg.id === input.serviceId);
+    if (s && Number.isFinite(s.priceMin)) {
+      serviceTotal = s.perPlate ? s.priceMin * guests : s.priceMin;
+    }
+  }
+
+  const venueFee = Math.max(0, input.venueFee ?? 0);
+
+  return computeOrderTotals({
+    subtotal,
+    addOnsTotal,
+    venueFee,
+    serviceTotal,
+    coupon: input.coupon,
+    referralPercent: input.referralPercent ?? 0,
+  });
+}
+
+/**
+ * Authoritatively calculates Baina Box totals.
+ */
+export function calculateBainaTotals(input: BainaPricingInput): {
+  subtotal: number;
+  grandTotal: number;
+} {
+  let subtotal = 0;
+  const vendor =
+    (input.bainaVendorId && BAINA_BOX_VENDOR_DATA[input.bainaVendorId]) ||
+    Object.values(BAINA_BOX_VENDOR_DATA).find(
+      (v) => v.vendorId === input.bainaVendorId || v.slug === input.bainaVendorId,
+    );
+
+  for (const item of input.bainaItems || []) {
+    const qty = Math.max(0, Math.round(item.qty || 0));
+    if (qty <= 0) continue;
+    let unitPrice = item.price ?? 0;
+    if (vendor) {
+      const product = vendor.products.find((p) => p.id === item.id);
+      if (product && Number.isFinite(product.price)) {
+        unitPrice = product.price;
+      }
+    }
+    subtotal += qty * unitPrice;
+  }
+
+  return {
+    subtotal,
+    grandTotal: subtotal,
+  };
+}
+
+/**
+ * Authoritatively calculates Venue booking totals.
+ */
+export function calculateVenueTotals(input: VenuePricingInput): OrderTotals {
+  const preDiscount = Math.max(
+    0,
+    (input.venueRate ?? 0) +
+      (input.spaceRates ?? 0) +
+      (input.slotRate ?? 0) +
+      (input.serviceRate ?? 0) +
+      (input.addOnsRate ?? 0),
+  );
+  const discount = Math.max(0, Math.min(input.discount ?? 0, preDiscount));
+  const taxable = preDiscount - discount;
+  const gst = taxable * GST_RATE;
+  return {
+    preDiscount,
+    couponDiscount: 0,
+    referralDiscount: 0,
+    discount,
+    taxable,
+    gst,
+    grandTotal: taxable + gst,
+  };
+}
+
 /** Deterministic booking id derived from the order itself (no random / clock),
  *  so re-rendering the confirm step never renumbers a booking mid-flow. */
 export function deriveBookingId(

@@ -39,6 +39,8 @@ function isPastEvent(label: string): boolean {
   return event.getTime() < today.getTime();
 }
 
+import { signInvoiceId } from "@/lib/invoiceSign";
+
 // GET /api/bookings/mine → { orders } — the customer's own orders, newest first.
 export async function GET() {
   const guard = await requireRole();
@@ -59,5 +61,13 @@ export async function GET() {
     }
   }
 
-  return Response.json({ orders: mine.slice().reverse() });
+  const enriched = mine
+    .slice()
+    .reverse()
+    .map((o) => ({
+      ...o,
+      invoiceSig: signInvoiceId(o.id),
+    }));
+
+  return Response.json({ orders: enriched });
 }

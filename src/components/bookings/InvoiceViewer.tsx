@@ -1,25 +1,76 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { decodeInvoice, downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
+import { downloadInvoice, invoiceShareUrl, type InvoiceData } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
 
 /**
- * Public, shareable invoice viewer. The whole invoice travels in the `?d=`
- * query (see `invoiceShareUrl`), so a recipient can open the link without an
- * account or our backend, preview the branded invoice and download the exact
- * same PDF. No data is read from the opener's device.
+ * Public, shareable invoice viewer.
+ * Fetches the authoritative, server-verified invoice using the booking ID and HMAC signature.
+ * Rejects unsigned or arbitrary Base64url JSON tokens.
  */
 export default function InvoiceViewer() {
   const { t } = useLang();
   const params = useSearchParams();
-  const token = params.get("d");
-  const data = useMemo(() => (token ? decodeInvoice(token) : null), [token]);
+  const id = params.get("id");
+  const sig = params.get("sig") ?? "";
 
-  if (!data) {
+  const [data, setData] = useState<InvoiceData | null>(null);
+  const [loading, setLoading] = useState<boolean>(Boolean(id));
+  const [error, setError] = useState<string>(
+    id ? "" : "Missing invoice reference.",
+  );
+
+  useEffect(() => {
+    if (!id) return;
+
+    let active = true;
+    const fetchUrl = `/api/bookings/${encodeURIComponent(id)}/invoice${
+      sig ? `?sig=${encodeURIComponent(sig)}` : ""
+    }`;
+
+    fetch(fetchUrl)
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error || "Invoice not found or unauthorized.");
+        }
+        return res.json();
+      })
+      .then((json: { ok?: boolean; invoice?: InvoiceData }) => {
+        if (active && json.invoice) {
+          setData(json.invoice);
+        }
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setError(err.message);
+          setData(null);
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id, sig]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-md px-5 py-24 text-center">
+        <p className="text-sm text-ink-soft">
+          {t("Loading verified invoice…", "सत्यापित इनवॉइस लोड हो रहा है…")}
+        </p>
+      </div>
+    );
+  }
+
+  if (!data || error) {
     return (
       <div className="mx-auto max-w-md px-5 py-24 text-center">
         <h1 className="font-display text-2xl text-ink">
@@ -27,8 +78,8 @@ export default function InvoiceViewer() {
         </h1>
         <p className="mt-2 text-sm text-ink-soft">
           {t(
-            "This invoice link is incomplete or has expired. Please ask for a fresh link.",
-            "यह इनवॉइस लिंक अधूरा या समाप्त हो गया है। कृपया नया लिंक माँगें।",
+            "This invoice link is invalid, incomplete or has expired. Please ask for a fresh link.",
+            "यह इनवॉइस लिंक अमान्य, अधूरा या समाप्त हो गया है। कृपया नया लिंक माँगें।",
           )}
         </p>
         <Button href="/" variant="primary" className="mt-6">
@@ -41,6 +92,7 @@ export default function InvoiceViewer() {
   const waHref = `https://wa.me/?text=${encodeURIComponent(
     `${t("Bhojpatra invoice", "भोजपत्र इनवॉइस")} ${data.id} — ${invoiceShareUrl(
       data,
+      sig,
     )}`,
   )}`;
 

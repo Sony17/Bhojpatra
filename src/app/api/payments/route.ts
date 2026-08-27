@@ -12,11 +12,13 @@ export type StoredPaymentMethod = "UPI" | "QR" | "Razorpay";
 // A payment starts life as an advance and can later be settled or refunded by
 // the admin payment tracker (`/api/payments/[id]`).
 export type StoredPaymentStatus =
+  | "Submitted"
   | "Advance Received"
   | "Settled"
   | "Pending"
   | "Refunded";
 export const STORED_PAYMENT_STATUSES: StoredPaymentStatus[] = [
+  "Submitted",
   "Advance Received",
   "Settled",
   "Pending",
@@ -131,11 +133,36 @@ export async function POST(request: Request) {
 
   const payments = await store.list();
 
+  // Prevent reuse of the same customerTxnId / UTR across any other booking.
+  const duplicateUtr = payments.find(
+    (p) =>
+      p.customerTxnId &&
+      normalizeTxnId(p.customerTxnId) === customerRef &&
+      p.bookingId !== bookingId,
+  );
+  if (duplicateUtr) {
+    return Response.json(
+      { error: "This transaction ID has already been recorded." },
+      { status: 409 },
+    );
+  }
+
   // Idempotent on the transaction reference so a repeat confirmation (e.g. the
   // customer double-taps "I've paid") doesn't create a duplicate record.
   const existing = payments.find((p) => p.txnRef === ref);
   if (existing) {
     return Response.json({ ok: true, payment: existing }, { status: 200 });
+  }
+
+  // Also prevent duplicate payments for the same booking with identical UTR
+  const sameBookingDuplicate = payments.find(
+    (p) =>
+      p.bookingId === bookingId &&
+      p.customerTxnId &&
+      normalizeTxnId(p.customerTxnId) === customerRef,
+  );
+  if (sameBookingDuplicate) {
+    return Response.json({ ok: true, payment: sameBookingDuplicate }, { status: 200 });
   }
 
   const payment: StoredPayment = {
@@ -151,7 +178,9 @@ export async function POST(request: Request) {
     vpa: vpa.trim(),
     txnRef: ref,
     customerTxnId: customerRef,
-    status: "Advance Received",
+    // Customer-submitted UTR is evidence of a claim, NOT proof of settled money.
+    // It remains "Submitted" until an authorized admin verifies it.
+    status: "Submitted",
     createdAt: new Date().toISOString(),
   };
 

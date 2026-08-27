@@ -1223,7 +1223,10 @@ function BookingDetailsModal({
     };
   }, [onClose]);
 
-  const shareUrl = invoiceShareUrl(invoice);
+  const shareUrl = invoiceShareUrl(
+    invoice,
+    (booking as { invoiceSig?: string }).invoiceSig,
+  );
   const balance = Math.max(0, booking.amount - booking.paid);
   const waMessage =
     `${t("Here's my Bhojpatra invoice", "यह मेरा भोजपत्र इनवॉइस है")} — ${booking.occasion} (${booking.id})\n` +

@@ -7,6 +7,7 @@ import {
   type StoredPaymentStatus,
 } from "../route";
 import type { StoredOrder } from "../../bookings/route";
+import { ADVANCE_RATE } from "@/lib/bookingPricing";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,37 @@ export async function PATCH(
 
   try {
     await store.upsert(next);
+
+    // Reconcile with the linked booking when payment is Settled or Advance Received
+    if (next.status === "Settled" || next.status === "Advance Received") {
+      try {
+        const booking = await bookingStore.get(next.bookingId);
+        if (booking) {
+          const allPayments = await store.list();
+          const verifiedSum = allPayments
+            .filter(
+              (p) =>
+                p.bookingId === next.bookingId &&
+                (p.id === next.id
+                  ? next.status === "Settled" || next.status === "Advance Received"
+                  : p.status === "Settled" || p.status === "Advance Received"),
+            )
+            .reduce((s, p) => s + p.amount, 0);
+
+          booking.paid = verifiedSum;
+          const advanceNeeded = Math.round(booking.amount * ADVANCE_RATE);
+          if (booking.paid >= advanceNeeded && booking.status === "Pending") {
+            booking.status = "Confirmed";
+          }
+          if (booking.invoice) {
+            booking.invoice.paid = booking.paid;
+          }
+          await bookingStore.upsert(booking);
+        }
+      } catch (bookingErr) {
+        console.error("Failed to reconcile booking with settled payment", bookingErr);
+      }
+    }
   } catch (err) {
     console.error("Failed to update payment", err);
     return Response.json(

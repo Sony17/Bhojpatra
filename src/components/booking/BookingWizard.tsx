@@ -2198,6 +2198,22 @@ export default function BookingWizard() {
           referralCode: selfReferral ? undefined : referralCode.trim() || undefined,
           referrerName: selfReferral ? undefined : referrerName || undefined,
           referrerType: selfReferral ? undefined : referrerType || undefined,
+          couponCode: appliedCoupon?.code,
+          categoryVendors: categoryVendor,
+          selectedAddOns,
+          serviceId,
+          venueFee,
+          pricingInputs: {
+            bookingType: "feast",
+            packageId,
+            guests,
+            categoryVendors: categoryVendor,
+            selectedAddOns,
+            serviceId,
+            venueFee,
+            couponCode: appliedCoupon?.code,
+            referralCode: selfReferral ? undefined : referralCode.trim() || undefined,
+          },
           // Customer-facing extras stored on the order (My Bookings needs these).
           ...(bookedVendors.length ? { vendors: bookedVendors } : {}),
           // The feast-wide service package (its price is already in `amount`).
