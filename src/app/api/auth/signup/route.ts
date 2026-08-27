@@ -14,13 +14,30 @@ import {
   createSession,
   getSessionUser,
 } from "@/lib/auth";
-import type { AccountType, PartnerMembership } from "@/lib/session";
+import { createStore } from "@/lib/store";
+import type { AccountType, PartnerMembership, PartnerRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 // Public signup can only create these roles — never an admin.
 const PUBLIC_ROLES: UserRole[] = ["customer", "vendor", "partner"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface MinimalPartnerRecord {
+  code: string;
+  email?: string;
+  ownerUserId?: string;
+  deleted?: boolean;
+}
+
+const partnersStore = createStore<MinimalPartnerRecord>({
+  table: "partners",
+  idField: "code",
+});
+
+function isPartnerRole(v: unknown): v is PartnerRole {
+  return v === "planner" || v === "individual" || v === "venue";
+}
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -53,10 +70,32 @@ export async function POST(request: Request) {
   }
   const accountType = role as AccountType;
 
-  const partnerRoles =
-    accountType === "partner" && Array.isArray(body.partnerRoles)
-      ? (body.partnerRoles as PartnerMembership[])
-      : undefined;
+  // Validate partner roles structure and types if supplied
+  let partnerRoles: PartnerMembership[] | undefined;
+  if (accountType === "partner" && body.partnerRoles !== undefined) {
+    if (!Array.isArray(body.partnerRoles)) {
+      return Response.json({ error: "Invalid partner roles." }, { status: 400 });
+    }
+    const validated: PartnerMembership[] = [];
+    for (const item of body.partnerRoles) {
+      if (!item || typeof item !== "object") {
+        return Response.json({ error: "Invalid partner role." }, { status: 400 });
+      }
+      const raw = item as Record<string, unknown>;
+      if (!isPartnerRole(raw.type)) {
+        return Response.json({ error: "Invalid partner role type." }, { status: 400 });
+      }
+      const code = typeof raw.referralCode === "string" ? raw.referralCode.trim() : "";
+      if (!code || !/^REF-[A-Z0-9-]+$/i.test(code)) {
+        return Response.json({ error: "Invalid referral code." }, { status: 400 });
+      }
+      if (!validated.some((r) => r.type === raw.type)) {
+        validated.push({ type: raw.type, referralCode: code });
+      }
+    }
+    partnerRoles = validated;
+  }
+
   const name =
     typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined;
 
@@ -79,6 +118,29 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
+    }
+
+    // Verify that none of the requested referral codes belong to another partner
+    if (partnerRoles?.length) {
+      for (const m of partnerRoles) {
+        const existingPartner =
+          (await partnersStore.get(m.referralCode.toUpperCase())) ??
+          (await partnersStore.get(m.referralCode));
+
+        if (existingPartner && !existingPartner.deleted) {
+          const isOwner =
+            (existingPartner.ownerUserId && existingPartner.ownerUserId === existing.id) ||
+            (existingPartner.email && existingPartner.email.toLowerCase() === existing.email.toLowerCase()) ||
+            Boolean(existing.partnerRoles?.some((r) => r.referralCode.toUpperCase() === existingPartner.code.toUpperCase()));
+
+          if (!isOwner) {
+            return Response.json(
+              { error: "This referral code belongs to another partner." },
+              { status: 403 },
+            );
+          }
+        }
+      }
     }
 
     grantAccount(existing, accountType);
@@ -105,6 +167,28 @@ export async function POST(request: Request) {
   }
 
   // ── New person → fresh record ─────────────────────────────────────────────
+  // Verify that any requested referral codes do not belong to another partner
+  if (partnerRoles?.length) {
+    for (const m of partnerRoles) {
+      const existingPartner =
+        (await partnersStore.get(m.referralCode.toUpperCase())) ??
+        (await partnersStore.get(m.referralCode));
+
+      if (existingPartner && !existingPartner.deleted) {
+        const isMatch =
+          existingPartner.email &&
+          existingPartner.email.toLowerCase() === email.toLowerCase();
+
+        if (!isMatch) {
+          return Response.json(
+            { error: "This referral code belongs to another partner." },
+            { status: 403 },
+          );
+        }
+      }
+    }
+  }
+
   const user: UserRecord = {
     id: newUserId(),
     email,

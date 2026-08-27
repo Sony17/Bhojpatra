@@ -1,4 +1,6 @@
 import { createStore } from "@/lib/store";
+import { requireRole } from "@/lib/auth";
+import type { BookingStatus } from "@/lib/data";
 
 // Reviews are written at request time to Postgres (Neon) — never prerender or
 // cache this handler.
@@ -36,6 +38,21 @@ export interface StoredReview {
 // booking; re-submitting updates in place.
 const store = createStore<StoredReview>({
   table: "reviews",
+  idField: "id",
+});
+
+interface MinimalBooking {
+  id: string;
+  userId?: string;
+  email?: string;
+  customer?: string;
+  occasion?: string;
+  city?: string;
+  status: BookingStatus;
+}
+
+const bookingsStore = createStore<MinimalBooking>({
+  table: "bookings",
   idField: "id",
 });
 
@@ -109,6 +126,11 @@ function buildReview(
 }
 
 export async function POST(request: Request) {
+  // Only authenticated customers (or accounts with customer privileges) may leave reviews.
+  const guard = await requireRole("customer");
+  if (guard instanceof Response) return guard;
+  const user = guard;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -125,11 +147,35 @@ export async function POST(request: Request) {
     );
   }
 
+  // Authoritatively verify that the booking exists.
+  const order = await bookingsStore.get(bookingId);
+  if (!order) {
+    return Response.json({ error: "Booking not found." }, { status: 404 });
+  }
+
+  // Verify ownership: must belong to the authenticated caller (with email fallback for legacy orders).
+  const isOwner =
+    order.userId
+      ? order.userId === user.id
+      : Boolean(order.email && order.email.toLowerCase() === user.email.toLowerCase());
+  if (!isOwner) {
+    return Response.json({ error: "Not allowed." }, { status: 403 });
+  }
+
+  // Reviews are strictly permitted only for completed orders.
+  if (order.status !== "Completed") {
+    return Response.json(
+      { error: "Reviews can only be submitted for completed bookings." },
+      { status: 400 },
+    );
+  }
+
+  // Authoritatively bind event context from the verified booking record.
   const ctx = {
-    bookingId,
-    name: str(b.name),
-    occasion: str(b.occasion),
-    city: str(b.city),
+    bookingId: order.id,
+    name: str(b.name) || user.name || order.customer || "Guest",
+    occasion: order.occasion || str(b.occasion),
+    city: order.city || str(b.city),
   };
 
   // Batch (per-vendor) submission when `reviews` is an array; otherwise treat the
