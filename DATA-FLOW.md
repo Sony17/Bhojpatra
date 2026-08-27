@@ -1,7 +1,7 @@
 # Bhojpatra Data Flow Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-26  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
 > **Source of Truth**: Repository source files (`src/app/api/*`, `src/lib/*`, `src/components/*`)  
 
 ---
@@ -30,7 +30,9 @@ flowchart TD
     subgraph ServerLayer["Next.js Route Handlers"]
         SessionCheck["Session & Role Guard\n(src/lib/auth.ts: requireRole)"]
         OwnershipCheck["Resource Ownership Verification\n(order.userId, booking.userId, ownerUserId)"]
-        ServerValidation["Validation & Notice Gate\n(lead notice, GST format, self-referral)"]
+        PricingEngine["Authoritative Server Pricing Engine\n(src/lib/bookingPricing.ts: calculate*Totals)"]
+        InvoiceEngine["Invoice Signing & Verification\n(src/lib/invoiceSign.ts)"]
+        ServerValidation["Validation & Notice Gate\n(lead notice, GST format, self-referral, tolerance)"]
         DataTransform["Data Normalization & Record Building\n(src/app/api/*/route.ts)"]
     end
 
@@ -51,7 +53,9 @@ flowchart TD
     HttpRequest --> ProxyGate
     ProxyGate --> SessionCheck
     SessionCheck --> OwnershipCheck
-    OwnershipCheck --> ServerValidation
+    OwnershipCheck --> PricingEngine
+    PricingEngine --> InvoiceEngine
+    InvoiceEngine --> ServerValidation
     ServerValidation --> DataTransform
     DataTransform --> StoreAbstraction
     DataTransform --> VercelBlobStorage
@@ -74,15 +78,18 @@ flowchart TD
    - Courses (Starters, Main Course, Breads, Rice, Desserts, Live Counters) are populated.
    - For Feast bookings, customers select dishes within allocated quotas determined by package tier (Silver, Gold, Platinum) via [`src/lib/tiers.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/tiers.ts).
 
-### 3.2 Pricing Ladder Computation (Client-Side)
-The order total is calculated on the client inside [`src/lib/bookingPricing.ts:86-118`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L86-L118):
+### 3.2 Pricing Ladder Computation
+The order total is calculated in two phases:
+1. **Interactive Client Estimation**: During checkout, [`src/lib/bookingPricing.ts:86-118`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L86-L118) renders live pricing feedback for the user:
 $$\text{Pre-Discount Subtotal} = (\text{Base Plate Rate} \times \text{Guests}) + \text{Add-ons}$$
 $$\text{Coupon Discount} = \min\left(\frac{\text{Pre-Discount} \times \text{Coupon \%}}{100}, \text{Coupon Cap}\right)$$
 $$\text{Referral Discount} = \min\left(\frac{\text{Pre-Discount} \times \text{Referral \%}}{100}, \text{Pre-Discount} - \text{Coupon Discount}\right)$$
 $$\text{Taxable Amount} = \text{Pre-Discount} - \text{Total Discount} + \text{Venue Fee} + \text{Service Tier Fee}$$
 $$\text{GST} = \text{Taxable Amount} \times 0.18$$
 $$\text{Grand Total} = \text{Taxable Amount} + \text{GST}$$
-$$\text{Advance Required (10\%)} = \text{Grand Total} \times 0.10$$
+$$\text{Advance Required (25\%)} = \text{Grand Total} \times 0.25$$
+
+2. **Authoritative Server Recalculation**: On submission to `POST /api/bookings`, the server independently reconstructs the calculation from catalog rates, selected dishes, add-ons, service tier, valid coupons, and referral rules using [`src/lib/bookingPricing.ts:193-350`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L193-L350). The client amount is compared against the authoritative total; differences $> ₹1$ are rejected with HTTP 400 Bad Request (`isMaterialDifference`). The server total is the authoritative `amount`.
 
 ---
 
@@ -102,18 +109,26 @@ sequenceDiagram
     Customer->>Wizard: Fills guest details, date, menu, payment details
     Wizard->>Wizard: Computes totals & derives Booking ID (BHJ-xxxxx)
     Customer->>Wizard: Clicks "Confirm & Place Order"
-    Wizard->>Proxy: POST /api/bookings with order payload
+    Wizard->>Proxy: POST /api/bookings with order payload + pricingInputs
     Proxy->>Proxy: Verifies session cookie signature
     Proxy->>ApiBookings: Forwards authorized request
     ApiBookings->>ApiBookings: requireRole() ensures user is logged in
-    ApiBookings->>ApiBookings: Validates advance notice date rule
-    ApiBookings->>ApiBookings: Validates self-referral checks
-    ApiBookings->>Store: upsert(orderRecord)
-    Store->>DB: INSERT INTO bookings (id, data) VALUES ($1, $2::jsonb) ON CONFLICT DO UPDATE
-    DB-->>Store: OK
-    ApiBookings-)Email: sendOrderAlert(order) & sendBookingConfirmation(order)
-    ApiBookings-->>Wizard: HTTP 200/201 { ok: true, order }
-    Wizard->>Customer: Displays StepDone confirmation screen & download receipt
+    ApiBookings->>ApiBookings: Authoritatively recalculates order totals from catalog
+    alt Material Price Discrepancy (> ₹1)
+        ApiBookings-->>Wizard: HTTP 400 { error: "Booking amount does not match authoritative calculated total." }
+    else Authoritative Price Valid
+        ApiBookings->>ApiBookings: Validates advance notice date rule
+        ApiBookings->>ApiBookings: Validates self-referral checks
+        ApiBookings->>ApiBookings: Queries paymentStore: unverified manual UPI -> status: "Pending", paid: 0; Connect -> status: "Confirmed", paid: 0
+        ApiBookings->>ApiBookings: Authoritatively synthesizes InvoiceData (grandTotal = amount, paid = verifiedPaid)
+        ApiBookings->>Store: upsert(orderRecord)
+        Store->>DB: INSERT INTO bookings (id, data) VALUES ($1, $2::jsonb) ON CONFLICT DO UPDATE
+        DB-->>Store: OK
+        ApiBookings->>ApiBookings: signInvoiceId(order.id) -> HMAC signed share link
+        ApiBookings-)Email: sendOrderAlert(order, signedUrl) & sendBookingConfirmation(order, signedUrl)
+        ApiBookings-->>Wizard: HTTP 200/201 { ok: true, order }
+        Wizard->>Customer: Displays StepDone confirmation screen & download receipt
+    end
 ```
 
 ### 4.2 Booking Read & Ownership Verification Flow (`GET /api/bookings/[id]`)
@@ -176,17 +191,24 @@ sequenceDiagram
     Checkout->>UpiLib: buildUpiUri({ vpa, payeeName, amount, txnRef })
     UpiLib-->>Checkout: Returns upi://pay?... URI
     Checkout->>Customer: Renders dynamic QR code or opens UPI App deep link
-    Customer->>UpiApp: Transfers 10% advance amount to merchant VPA
+    Customer->>UpiApp: Transfers 25% advance amount to merchant VPA
     UpiApp-->>Customer: Displays payment confirmation & 12-digit UTR (RRN)
     Customer->>Checkout: Enters 12-digit UTR into input field and taps "I've Paid"
     Checkout->>ApiPayments: POST /api/payments { bookingId, amount, vpa, txnRef, customerTxnId }
     ApiPayments->>ApiPayments: Validates UTR format (isValidTxnId: 6-24 alphanumerics)
-    ApiPayments->>Store: upsert(paymentRecord)
-    Store->>DB: INSERT INTO payments (id, data) VALUES ($1, $2::jsonb)
-    DB-->>Store: OK
-    ApiPayments-->>Checkout: HTTP 201 { ok: true, payment }
-    Admin->>Bank: Reviews daily bank credit statement
-    Admin->>DB: PATCH /api/payments/[id] { status: "Settled" }
+    ApiPayments->>Store: Checks duplicate customerTxnId across other bookings
+    alt Duplicate UTR Used for Different Booking
+        ApiPayments-->>Checkout: HTTP 409 { error: "This transaction ID has already been recorded." }
+    else Valid New Submission
+        ApiPayments->>Store: upsert(paymentRecord with status: "Submitted")
+        Store->>DB: INSERT INTO payments (id, data) VALUES ($1, $2::jsonb)
+        DB-->>Store: OK
+        ApiPayments-->>Checkout: HTTP 201 { ok: true, payment (status: "Submitted") }
+        Admin->>Bank: Reviews daily bank credit statement against UTR
+        Admin->>DB: PATCH /api/payments/[id] { status: "Settled" }
+        DB->>DB: Updates payment.status = "Settled"
+        DB->>DB: Auto-reconciles linked booking: updates booking.paid and promotes booking.status = "Confirmed"
+    end
 ```
 
 ### 5.2 Payment Read & Indirect Ownership Derivation Flow (`GET /api/payments/[id]`)
@@ -223,6 +245,36 @@ sequenceDiagram
                 ApiPayment-->>Caller: HTTP 200 { payment }
             else Orphaned Payment OR order.userId !== guard.id
                 ApiPayment-->>Caller: HTTP 403 { error: "Not allowed." }
+            end
+        end
+    end
+```
+
+### 5.3 Authoritative Invoice Access & Cryptographic Share Flow (`GET /api/bookings/[id]/invoice?sig=...`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller as Bearer / Customer / Admin
+    participant ApiInvoice as GET /api/bookings/[id]/invoice
+    participant SigLib as src/lib/invoiceSign.ts
+    participant Auth as src/lib/auth.ts (getSessionUser)
+    participant Store as bookings Store
+    participant DB as Neon Postgres
+
+    Caller->>ApiInvoice: GET /api/bookings/[id]/invoice?sig=HEX_SIG
+    ApiInvoice->>Store: get(id)
+    alt Booking Not Found
+        ApiInvoice-->>Caller: HTTP 404 { error: "Booking not found." }
+    else Booking Found
+        alt Valid HMAC-SHA256 Signature (verifyInvoiceSignature(id, sig))
+            ApiInvoice-->>Caller: HTTP 200 { ok: true, invoice (pinned to order.amount & order.paid) }
+        else Unsigned or Invalid Signature
+            ApiInvoice->>Auth: getSessionUser()
+            alt Caller is Admin OR order.userId === session.id
+                ApiInvoice-->>Caller: HTTP 200 { ok: true, invoice }
+            else Unauthenticated or Non-Owner
+                ApiInvoice-->>Caller: HTTP 403 { error: "Not authorized to view this invoice." }
             end
         end
     end
@@ -369,14 +421,16 @@ sequenceDiagram
 | Data Flow Point | Origin | Destination | Validation Enforcement Point | Architectural Observation |
 | :--- | :--- | :--- | :--- | :--- |
 | **User Identity** | Browser Cookie | Server Handlers | [`src/lib/auth.ts:122-134`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L122-L134) | Verified server-side via HMAC cookie + DB session lookup. `userId` taken from session, not payload. |
-| **Booking Creation Amount** | Client Wizard | `POST /api/bookings` | **None** ([`route.ts:196`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L196)) | **Client Trust Boundary**: Server accepts `Math.round(amt)` and `paid` without recalculating items or pricing ladder. (Slated for Batch 3). |
+| **Booking Creation Amount** | Client Wizard | `POST /api/bookings` | [`route.ts:380-480`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L380-L480), [`bookingPricing.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts) | **Authoritative Server Pricing Enforced**: Server recalculates totals from catalog rates, add-ons, service tier, coupons, and referrals. Rejects material difference ($> ₹1$) with HTTP 400. Client amounts can never dictate the recorded total. |
 | **Booking Advance Notice** | Client Wizard | `POST /api/bookings` | [`route.ts:208-239`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L208-L239) | Server enforces advance notice days calculated from package and occasion lead rules. |
 | **Booking Self-Referral** | Client Wizard | `POST /api/bookings` | [`route.ts:251-268`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L251-L268) | Server checks partner code against current user accounts and phone numbers to disallow self-attribution. |
 | **Single Booking Lookup** | Client Request | `GET /api/bookings/[id]` | [`[id]/route.ts:49-65`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L49-L65) | **Session Ownership Enforced**: `requireRole()` checks caller; non-admins permitted only if `order.userId === guard.id`. Legacy records without `userId` are admin-only. |
+| **Customer Booking Transitions** | Client Request | `PATCH /api/bookings/[id]` | [`[id]/route.ts:110-125`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L110-L125) | **Verified Advance Enforced**: Customer cannot transition `Pending` -> `Confirmed` without verified ledger payment ($paid \ge advanceNeeded$). EMI auto-credit removed. Client invoice overrides ignored. |
+| **Public Invoice Access** | Client Request | `GET /api/bookings/[id]/invoice?sig=...` | [`invoice/route.ts:1-75`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/invoice/route.ts#L1-L75), [`invoiceSign.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/invoiceSign.ts) | **Cryptographic Signature Enforced**: Valid HMAC-SHA256 signature required for public sharing. Unsigned or tampered requests return 403 unless authenticated as owner or admin. Arbitrary Base64 decoding eliminated. |
 | **Admin Booking Collection** | Client Request | `GET /api/bookings` | [`route.ts:27-30`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L27-L30) | **Role Guard Enforced**: `requireRole("admin")` blocks unauthenticated (401) and non-admin callers (403). |
 | **Single Payment Lookup** | Client Request | `GET /api/payments/[id]` | [`[id]/route.ts:35-51`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L35-L51) | **Indirect Booking Ownership Enforced**: `requireRole()` checks caller; queries `bookingStore.get(payment.bookingId)`; allows only if `order.userId === guard.id` or admin. |
 | **Admin Payment Ledger** | Client Request | `GET /api/payments` | [`route.ts:54-57`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L54-L57) | **Role Guard Enforced**: `requireRole("admin")` blocks unauthenticated (401) and non-admin callers (403). |
-| **Payment UTR Submission** | Client Input | `POST /api/payments` | [`route.ts:110`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L110) | Syntactic regex check only (`/^[A-Z0-9]{6,24}$/`). Manual offline verification against bank statements. |
+| **Payment UTR Submission** | Client Input | `POST /api/payments` | [`route.ts:130-185`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L130-L185) | **Deduplication & Decoupled State Enforced**: Stamped with `status: "Submitted"` (never `"Advance Received"`). Checked for duplicate UTR across other bookings (HTTP 409 Conflict). Admin settles to `"Settled"` via bank statement match. |
 | **Venue Mutations** | Client Request | `POST /api/venues`, `PATCH`, `DELETE /api/venues/[id]` | [`venues/route.ts:83-111`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L83-L111), [`[id]/route.ts:36-43`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/%5Bid%5D/route.ts#L36-L43) | **Session Ownership Enforced**: `requireRole("partner", "admin")`; checks `venue.ownerUserId === guard.id` (or held partnerRoles code); ignores client `ownerCode`/`ownerUserId` tampering. |
 | **Venue Owner Filter** | Client Request | `GET /api/venues?owner=CODE` | [`venues/route.ts:64-73`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts#L64-L73) | **Owner/Admin Guard Enforced**: `getSessionUser()` validates caller is admin or holds `CODE` in `partnerRoles`; prevents leaking unapproved/pending venues. |
 | **Partner Overwrite** | Client Request | `POST /api/partners` | [`partners/route.ts:110-153`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts#L110-L153) | **Owner/Admin Guard Enforced**: `requireRole("partner", "admin")`; verifies `existing.ownerUserId === guard.id` before allowing updates; stamps immutable `ownerUserId`. |
@@ -391,4 +445,3 @@ sequenceDiagram
 
 1. `[NOT IMPLEMENTED]` **Razorpay Gateway Flow**: No order creation endpoint (`/api/razorpay/order`), no checkout SDK handler, no webhook handler (`/api/razorpay/webhook`), and no HMAC signature verification.
 2. `[NOT IMPLEMENTED]` **Automated WhatsApp Transactional Updates**: No webhook receiver for WhatsApp messages and no automated outbound WhatsApp messaging via WhatsApp Cloud API.
-3. `[NOT IMPLEMENTED]` **Server-Side Price Validation**: The pricing ladder is not executed on the server before persisting a booking order.

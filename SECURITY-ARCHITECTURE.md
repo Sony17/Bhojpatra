@@ -1,11 +1,12 @@
 # Bhojpatra Security Architecture & Observations
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-26  
-> **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/app/api/*`)  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
+> **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/lib/invoiceSign.ts`, `src/lib/bookingPricing.ts`, `src/app/api/*`)  
 > **SECURITY REMEDIATION STATUS**: 
 > - **Batch 1** (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011): Admin collection access control and public-safe shaping verified fixed. Status: **Verified Fixed**.
 > - **Batch 2** (BHOJ-SEC-002, BHOJ-SEC-004, BHOJ-SEC-005, BHOJ-SEC-006, BHOJ-SEC-009, NEW-SEC-001, NEW-SEC-003): Resource ownership, session identity enforcement, and client-controlled identifier mitigations across Bookings, Payments, Venues, and Partners verified fixed (66/66 automated tests passed). Status: **Verified Fixed**.
+> - **Batch 3** (BHOJ-SEC-012, NEW-SEC-002, BHOJ-SEC-014, EMI Confirmation Bypass): Authoritative server-side pricing recalculation with <= ₹1 tolerance, decoupled manual UPI payment verification (Submitted -> admin Settled with UTR deduplication), authoritative invoice synthesis with HMAC-SHA256 signed public access, and removal of customer EMI auto-credit bypass verified fixed (20/20 automated tests passed). Status: **Verified Fixed**.
 
 ---
 
@@ -61,6 +62,10 @@ A single user account can hold multiple roles simultaneously via the `accounts` 
 | **Venue Mutations & Owner Filter** | [`src/app/api/venues/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/route.ts), [`src/app/api/venues/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/venues/%5Bid%5D/route.ts) | `requireRole("partner", "admin")` + `venue.ownerUserId` | Authoritative Resource Ownership (Batch 2) |
 | **Partner Management** | [`src/app/api/partners/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts), [`src/app/api/auth/partner-roles/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/partner-roles/route.ts) | `requireRole("partner", "admin")` + store uniqueness checks | Authoritative Resource Ownership (Batch 2) |
 | **Public Partner Lookup** | [`src/app/api/partners/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/partners/route.ts) (`?code=`), `[code]` | Public-safe allowlist projection | Authoritative Public Shaping (Batch 1) |
+| **Booking Creation Pricing** | [`src/app/api/bookings/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts) | Server-side authoritative recalculation (`src/lib/bookingPricing.ts`) | Authoritative Price & Tolerance Guard ($\le$ ₹1) (Batch 3) |
+| **Manual UPI Payment Gate** | [`src/app/api/payments/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts), [`src/app/api/payments/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts) | Initial `Submitted` status, cross-booking UTR deduplication (409 Conflict), admin settlement auto-reconciliation | Authoritative Payment State Machine (Batch 3) |
+| **Public Invoice Access** | [`src/app/api/bookings/[id]/invoice/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/invoice/route.ts) | HMAC-SHA256 signature verification (`src/lib/invoiceSign.ts`) or owner/admin session | Cryptographic Invoice Guard (Batch 3) |
+| **Booking Status Transitions** | [`src/app/api/bookings/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts) | Advance payment verification gate; client invoice override elimination; auto-credit bypass removed | Financial Integrity Guard (Batch 3) |
 | **Vendor Portal APIs** | [`src/app/api/vendor/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/vendor) | `requireRole("vendor")` | Authoritative Role Guard |
 | **Admin Console APIs** | [`src/app/api/admin/*`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/admin) | `requireRole("admin")` | Authoritative Role Guard |
 | **Database** | Postgres Engine | Application-level checks | Application-level only (no DB-level RLS) |
@@ -150,21 +155,21 @@ flowchart TD
 - **Description**: `GET /api/partners` previously had no role check, dumping the full partner directory when omitting `?code=`.
 - **Batch 1 Remediation**: The unfiltered directory now enforces `requireRole("admin")`. Single-code lookups (`?code=...` and `/[code]`) return an explicit allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, and `gst` strictly stripped for non-admin callers. Status: **Verified Fixed** (BHOJ-SEC-007, BHOJ-SEC-011).
 
-### Observation 5: Client-Controlled Pricing & Lack of Server-Side Price Verification
-- **Location**: [`src/app/api/bookings/route.ts:176-177, 196, 303-304`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L176-L177)
-- **Description**: In `POST /api/bookings`, the server extracts `amount` and `paid` directly from the client's JSON request body and persists them:
-  ```ts
-  const amt = typeof amount === "number" ? amount : Number(amount);
-  ...
-  amount: Math.round(amt),
-  paid: Number.isFinite(paidAmt) && paidAmt > 0 ? Math.round(paidAmt) : 0,
-  ```
-- **Impact**: The server never recalculates the menu pricing ladder based on package rates, guest count, or add-ons. A malicious client could submit a ₹50,000 banquet feast with `amount: 1` and `paid: 1`. Slated for Batch 3 (BHOJ-SEC-012).
+### Observation 5: Client-Controlled Pricing & Lack of Server-Side Price Verification (BHOJ-SEC-012)
+- **Location**: [`src/app/api/bookings/route.ts:380-480`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L380-L480) and [`src/lib/bookingPricing.ts:193-350`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts#L193-L350)
+- **Description**: `POST /api/bookings` originally extracted `amount` and `paid` directly from the client request body without recalculating catalog rates or validating items.
+- **Batch 3 Remediation**: Implemented authoritative server pricing calculation functions in `src/lib/bookingPricing.ts` (`calculateFeastTotals`, `calculateStallTotals`, `calculateBainaTotals`, `calculateVenueTotals`). In `POST /api/bookings`, the server reconstructs order totals independently from catalog rates, selected items, add-ons, service tier, verified active coupons, and referral rules. Client claimed amount is checked against the server total; differences $> ₹1$ are rejected with HTTP 400 Bad Request (`{ error: "Booking amount does not match authoritative calculated total." }`). Status: **Verified Fixed (Batch 3)**.
 
-### Observation 6: Unverified Manual UPI Settlement & Fraud Risk
-- **Location**: [`src/app/api/payments/route.ts:108-116`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L108-L116)
-- **Description**: Online payments record a customer-entered transaction ID (UTR / RRN) validated only against a generic regular expression (`/^[A-Z0-9]{6,24}$/`).
-- **Impact**: Without an integrated payment gateway (e.g. Razorpay) or automated bank reconciliation webhooks, bookings can be marked with arbitrary fake UTR numbers, requiring manual administrative detection against bank statements.
+### Observation 6: Unverified Manual UPI Settlement & UTR Replay Fraud (NEW-SEC-002)
+- **Location**: [`src/app/api/payments/route.ts:130-185`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts#L130-L185) and [`src/app/api/payments/[id]/route.ts:117-152`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts#L117-L152)
+- **Description**: `POST /api/payments` automatically granted newly submitted customer UTR references `status: "Advance Received"`, allowing unpaid bookings to be marked as confirmed. Furthermore, UTR numbers could be reused across bookings.
+- **Batch 3 Remediation**:
+  - Customer manual UPI submissions are assigned initial `status: "Submitted"` (never `"Advance Received"`).
+  - Cross-booking UTR deduplication: `POST /api/payments` checks the ledger and rejects duplicate transaction IDs across other bookings with HTTP 409 Conflict.
+  - Decoupled booking creation: unverified manual payments yield `order.status: "Pending"` and `order.paid: 0`.
+  - Admin settlement & auto-reconciliation: when an admin verifies the bank statement and calls `PATCH /api/payments/[id]` `{ status: "Settled" }`, the handler updates verified `paid` and promotes `order.status` to `"Confirmed"` when advance requirement (25%) is satisfied.
+  - Preserved legitimate `"Connect"` flow (`status: "Confirmed"`, `paid: 0`).
+  - Status: **Verified Fixed (Batch 3)**.
 
 ### Observation 7: Full Table Scans & Denial of Service (DoS) Risk
 - **Location**: [`src/lib/store.ts:158-163`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/store.ts#L158-L163) and [`src/lib/users.ts:111-115`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/users.ts#L111-L115)
@@ -195,6 +200,25 @@ flowchart TD
   - `POST /api/auth/partner-roles` checks `partners` store and rejects any attempt to claim another partner's referral code with HTTP 403 (`{ error: "This referral code belongs to another partner." }`).
   - Status: **Verified Fixed** (BHOJ-SEC-006, NEW-SEC-001).
 
+### Observation 11: Invoice Financial Data Manipulation & Unsigned Public URLs (BHOJ-SEC-014)
+- **Location**: [`src/app/api/bookings/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts), [`src/app/api/bookings/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts), [`src/app/api/bookings/[id]/invoice/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/invoice/route.ts), [`src/lib/invoiceSign.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/invoiceSign.ts), [`src/components/bookings/InvoiceViewer.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/bookings/InvoiceViewer.tsx)
+- **Description**: The browser generated `InvoiceData` client-side, stored it unvalidated in `POST /api/bookings` and `PATCH /api/bookings/[id]`, and shared invoices publicly via arbitrary Base64 URL decoding (`?d=...`).
+- **Batch 3 Remediation**:
+  - Client invoice overrides in `POST` and `PATCH` are completely ignored.
+  - The server authoritatively synthesizes `InvoiceData`, pinning `grandTotal` to server `order.amount` and `paid` to verified `order.paid`.
+  - Implemented HMAC-SHA256 token signing (`signInvoiceId`) and constant-time verification (`verifyInvoiceSignature`) in `src/lib/invoiceSign.ts`.
+  - Created `GET /api/bookings/[id]/invoice?sig=...` granting access only with a valid HMAC signature, booking owner session, or admin session (returning 403 for unverified access).
+  - Migrated `InvoiceViewer.tsx` to fetch authoritative data from the server API; removed arbitrary Base64 decoding.
+  - Status: **Verified Fixed (Batch 3)**.
+
+### Observation 12: EMI Confirmation / Payment Credit Manufacture Bypass
+- **Location**: [`src/app/api/bookings/[id]/route.ts:110-125`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L110-L125)
+- **Description**: `PATCH /api/bookings/[id]` contained logic where transitioning status from `Pending` to `Confirmed` automatically set `next.paid = order.amount`, allowing customers to self-credit unpaid bookings.
+- **Batch 3 Remediation**:
+  - Deleted the auto-credit code block.
+  - Enforced a transition gate: customer attempts to transition `Pending` to `Confirmed` without verified ledger payments meeting the required advance are rejected with HTTP 400 Bad Request (`{ error: "Cannot confirm booking without verified payment." }`).
+  - Status: **Verified Fixed (Batch 3)**.
+
 ---
 
 ## 6. Audit Summary
@@ -215,7 +239,9 @@ flowchart TD
 | **Access Control** | Venue Exposure via Owner Param (`GET /api/venues?owner=CODE`) | `[OWNER/ADMIN GUARD ENFORCED]` | **Verified Fixed (Batch 2)** |
 | **Access Control** | Partner Record Overwrite / Hijack (`POST /api/partners`) | `[OWNER/ADMIN GUARD ENFORCED]` | **Verified Fixed (Batch 2)** |
 | **Privilege Escalation**| Partner Role Hijacking (`POST /api/auth/partner-roles`) | `[CLAIM VERIFICATION ENFORCED]` | **Verified Fixed (Batch 2)** |
-| **Data Integrity** | Client-Controlled Booking Amounts | `[TRUSTS CLIENT PAYLOAD]` | Unfixed (Slated for Batch 3) |
-| **Payment Integrity**| Unverified Manual UPI UTR Submission | `[MANUAL RECONCILIATION]` | Unfixed (Observation only) |
+| **Data Integrity** | Client-Controlled Booking Amounts | `[SERVER PRICING RECALCULATION ENFORCED]` | **Verified Fixed (Batch 3)** |
+| **Payment Integrity**| Unverified Manual UPI UTR Submission | `[SUBMITTED STATUS & DEDUPLICATION ENFORCED]` | **Verified Fixed (Batch 3)** |
+| **Invoice Integrity**| Client-Controlled Invoices & Base64 URL Tampering | `[SERVER INVOICE & HMAC-SIGNED ACCESS ENFORCED]` | **Verified Fixed (Batch 3)** |
+| **Payment Integrity**| EMI Self-Confirmation Payment Credit Manufacture | `[VERIFIED ADVANCE GATE ENFORCED]` | **Verified Fixed (Batch 3)** |
 | **Performance/DoS** | Full Table Scans in Memory (`store.list`) | `[IN-MEMORY FILTERING]` | Unfixed (Observation only) |
 | **Secret Hygiene** | Insecure Dev Fallback Secrets & Admin Seed | `[DEV FALLBACK ACTIVE]` | Unfixed (Observation only) |

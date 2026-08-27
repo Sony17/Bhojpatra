@@ -1,7 +1,7 @@
 # Bhojpatra Database Architecture & ERD
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-26  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
 > **Source of Truth**: [`schema.sql`](file:///c:/Users/Zeeshaan/Bhojpatra/schema.sql) and [`src/lib/store.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/store.ts)  
 
 ---
@@ -93,10 +93,12 @@ erDiagram
         string vendor
         string city
         string venue "freeform text / address string (not a FK)"
-        number amount "client-provided total"
-        number paid "client-provided paid"
+        number amount "authoritatively calculated server total (<= ₹1 tolerance check)"
+        number paid "server-verified paid amount (only Settled / Advance Received contribute)"
         string paymentMethod "UPI | QR | Connect"
         string status "Pending | Confirmed | Completed | Cancelled"
+        jsonb invoice "authoritative synthesized InvoiceData (pinned to amount & verified paid)"
+        jsonb pricingInputs "normalized client inputs used for server pricing recalculation"
     }
 
     PAYMENTS {
@@ -107,8 +109,8 @@ erDiagram
         number amount
         string vpa
         string txnRef "BHJ-xxxxx-ADVANCE"
-        string customerTxnId "customer-entered UTR/RRN"
-        string status "Advance Received | Settled | Pending | Refunded"
+        string customerTxnId "customer-entered UTR/RRN (deduplicated across bookings)"
+        string status "Submitted | Advance Received | Settled | Pending | Refunded"
     }
 
     VENDORS {
@@ -229,8 +231,8 @@ The database comprises **22 distinct tables**:
 
 | Table | Read Access (Source Code Files & Security Rules) | Write / Update Access (Source Code Files & Security Rules) |
 | :--- | :--- | :--- |
-| `bookings` | `src/app/api/bookings/route.ts` *(Admin-only collection)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner: `order.userId === session.id` or Admin)*<br>`src/app/api/bookings/mine/route.ts` *(Customer session filter)*<br>`src/lib/settlements.ts` | `src/app/api/bookings/route.ts` *(Authenticated order creation with `userId: session.id`)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner / Admin status transitions)* |
-| `payments` | `src/app/api/payments/route.ts` *(Admin-only collection)*<br>`src/app/api/payments/[id]/route.ts` *(Booking owner via `payment.bookingId` or Admin)* | `src/app/api/payments/route.ts` *(Customer UTR submission)*<br>`src/app/api/payments/[id]/route.ts` *(Admin settlement)* |
+| `bookings` | `src/app/api/bookings/route.ts` *(Admin-only collection)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner: `order.userId === session.id` or Admin)*<br>`src/app/api/bookings/[id]/invoice/route.ts` *(HMAC signature or Owner/Admin session)*<br>`src/app/api/bookings/mine/route.ts` *(Customer session filter)*<br>`src/lib/settlements.ts` | `src/app/api/bookings/route.ts` *(Authenticated order creation with `userId: session.id`, server pricing recalculation, & server-synthesized invoice)*<br>`src/app/api/bookings/[id]/route.ts` *(Customer owner / Admin status transitions; advance verification enforced)*<br>`src/app/api/payments/[id]/route.ts` *(Admin settlement auto-reconciliation)* |
+| `payments` | `src/app/api/payments/route.ts` *(Admin-only collection)*<br>`src/app/api/payments/[id]/route.ts` *(Booking owner via `payment.bookingId` or Admin)* | `src/app/api/payments/route.ts` *(Customer manual UTR submission with `Submitted` status & duplicate prevention)*<br>`src/app/api/payments/[id]/route.ts` *(Admin settlement & auto-reconciliation of linked booking)* |
 | `refunds` | `src/app/api/refunds/route.ts`<br>`src/app/api/refunds/[id]/route.ts` | `src/app/api/refunds/route.ts`<br>`src/app/api/refunds/[id]/route.ts` |
 | `settlements` | `src/app/api/settlements/route.ts` | `src/app/api/settlements/route.ts` |
 | `leads` | `src/app/api/leads/route.ts` *(Admin-only)*<br>`src/app/api/leads/[email]/route.ts` | `src/app/api/leads/route.ts`<br>`src/app/api/leads/[email]/route.ts` |

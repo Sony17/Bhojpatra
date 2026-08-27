@@ -1,7 +1,7 @@
 # Bhojpatra System Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-26  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
 > **Source of Truth**: Repository source files (`src/`, `schema.sql`, `package.json`)  
 
 ---
@@ -31,7 +31,7 @@ The application is structured as a full-stack Next.js application deploying on V
 | **Database Driver** | `@neondatabase/serverless` | `^1.1.0` | [`package.json:13`](file:///c:/Users/Zeeshaan/Bhojpatra/package.json#L13) |
 | **Storage Driver** | `@vercel/blob` | `^2.5.0` | [`package.json:14`](file:///c:/Users/Zeeshaan/Bhojpatra/package.json#L14) |
 | **Utilities** | `qrcode` | `^1.5.4` | [`package.json:17`](file:///c:/Users/Zeeshaan/Bhojpatra/package.json#L17) |
-| **Payment Gateway** | **None** (Direct UPI QR / Intent only) | N/A | [`src/lib/upi.ts:1-7`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/upi.ts#L1-L7) |
+| **Payment Gateway** | **None** (Direct UPI QR / Intent with decoupled `Submitted` → `Settled` admin verification & Connect offline flow) | N/A | [`src/lib/upi.ts:1-7`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/upi.ts#L1-L7), [`src/app/api/payments/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/route.ts) |
 | **Email Gateway** | Resend REST API | Direct HTTP | [`src/lib/email.ts:1-8`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/email.ts#L1-L8) |
 
 ---
@@ -56,7 +56,8 @@ flowchart TD
         RouteHandlers["API Route Handlers\n(src/app/api/*)"]
         AuthGuards["Authoritative Role & Ownership Guards\n(src/lib/auth.ts, object-level checks)"]
         StoreLayer["Store Abstraction\n(src/lib/store.ts)"]
-        PricingEngine["Pricing & Tiers Engine\n(src/lib/bookingPricing.ts, tiers.ts)"]
+        PricingEngine["Authoritative Server Pricing Engine\n(src/lib/bookingPricing.ts, tiers.ts)"]
+        InvoiceEngine["Invoice Cryptography & Validation\n(src/lib/invoiceSign.ts, invoice.ts)"]
     end
 
     subgraph Persistence["Storage & Database Tier"]
@@ -80,6 +81,7 @@ flowchart TD
     Proxy --> RouteHandlers
     RouteHandlers --> AuthGuards
     RouteHandlers --> PricingEngine
+    RouteHandlers --> InvoiceEngine
     RouteHandlers --> StoreLayer
 
     StoreLayer --> NeonDB
@@ -124,10 +126,12 @@ Bhojpatra/
 │   └── lib/                      # Core Business Logic & Data Stores
 │       ├── auth.ts               # scrypt password hashing & session management
 │       ├── cookieSign.ts         # HMAC-SHA256 cookie signing
+│       ├── invoiceSign.ts        # HMAC-SHA256 invoice token signing & timing-safe verification
 │       ├── store.ts              # Neon Postgres query runner & store abstraction
 │       ├── data.ts               # Static seed catalog, occasions, packages, cities
-│       ├── bookingPricing.ts     # Pricing ladder, GST, advance calculation
+│       ├── bookingPricing.ts     # Authoritative server pricing engine, ladder, GST, advance calculation
 │       ├── bookings.ts           # Customer booking queries & client sync
+│       ├── invoice.ts            # Authoritative invoice data structure & signed share link helper
 │       ├── upi.ts                # NPCI UPI URI generation & VPA validation
 │       ├── email.ts              # Resend REST client & alert formatting
 │       ├── vendorMenus.ts        # Live vendor menus & dish tier management
@@ -159,6 +163,17 @@ Bhojpatra/
   - **Payments (`GET /api/payments/[id]`)**: Restricts access via the payment's associated booking (`payment.bookingId -> booking.userId === session.id`) or platform admins. Orphaned payments are admin-only.
   - **Venues (`POST /api/venues`, `PATCH /api/venues/[id]`, `DELETE /api/venues/[id]`, `GET /api/venues?owner=CODE`)**: Enforces session-based ownership via `ownerUserId` (with a verified `partnerRoles` referral code fallback for legacy venues). Mutations completely ignore client-submitted `ownerCode` and `ownerUserId` overrides. Unapproved/pending venues are only visible to the owning partner or admin.
   - **Partners (`POST /api/partners`, `POST /api/auth/partner-roles`)**: Stamps immutable `ownerUserId`, prevents cross-account overwrites of partner referral records, and verifies referral code uniqueness against the `partners` store to prevent role hijacking.
+- **Authoritative Server Pricing Engine (`POST /api/bookings`)**: Enforces server-side recalculation of order amounts across Feast, Single Stall, Baina Box, and Venue bookings using catalog rates, add-on costs, service tiers, verified coupons, and referral discount rules. The client's claimed amount is verified against the server total; differences $> ₹1$ are rejected with HTTP 400 Bad Request.
+- **Decoupled Payment Verification (`POST /api/payments`, `PATCH /api/payments/[id]`)**:
+  - Customer manual UPI submissions are assigned status `"Submitted"` (never `"Advance Received"`).
+  - Duplicate UTR reuse across bookings is rejected with HTTP 409 Conflict.
+  - Only payments marked `"Settled"` or `"Advance Received"` by an authorized admin contribute to `order.paid`.
+  - Bookings with manual payments in `"Submitted"` state are created as `"Pending"` with `paid = 0`. Admin settlement via `PATCH /api/payments/[id]` auto-reconciles the linked booking, crediting verified `paid` and promoting `order.status` to `"Confirmed"` when the advance requirement (25%) is met.
+  - The `"Connect"` payment method preserves its operational workflow, creating an immediately `"Confirmed"` booking with `paid = 0`.
+- **Invoice Integrity & Signed Access (`GET /api/bookings/[id]/invoice`, `src/lib/invoiceSign.ts`)**:
+  - Invoices are synthesized authoritatively on the server, pinned to `order.amount` and verified `order.paid`. Client invoice overrides are ignored.
+  - Public invoice sharing uses HMAC-SHA256 signed URLs (`/bookings/invoice?id=BHJ-xxxxx&sig=...`). Endpoint `GET /api/bookings/[id]/invoice` verifies the cryptographic signature or validates that the caller is the booking owner or platform admin, rejecting unsigned or tampered requests with HTTP 403 Forbidden.
+- **EMI Auto-Credit Removal (`PATCH /api/bookings/[id]`)**: Eliminated customer auto-credit (`next.paid = order.amount`). Customers cannot transition a booking from `"Pending"` to `"Confirmed"` unless verified ledger payments satisfy the required advance.
 - **Dynamic Handlers**: All routes declare `export const dynamic = "force-dynamic"` to bypass Next.js static caching.
 
 ### 5.4 Data Persistence Layer (`src/lib/store.ts`)
@@ -171,6 +186,7 @@ Bhojpatra/
 - **Public Data**:
   - Marketplace catalog (`/`, `/occasions`, `/vendors`, `/venues`), published caterer profiles, dish menus, and approved venue listings.
   - Public referral partner lookup (`GET /api/partners?code=...` & `GET /api/partners/[code]`): returns strictly allowlisted `PublicPartner` (`code`, `name`, `type`, `businessName`), with `phone`, `email`, `gst`, `createdAt`, `deleted`, and `ownerUserId` stripped.
+  - Cryptographically Signed Invoices (`GET /api/bookings/[id]/invoice?sig=...`): Accessible publicly only when accompanied by a valid HMAC-SHA256 signature matching the booking ID.
 - **Authenticated Data**:
   - Claiming fresh partner roles (`POST /api/auth/partner-roles`).
   - Active session resolution (`GET /api/auth/session`).

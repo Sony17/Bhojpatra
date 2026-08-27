@@ -1,7 +1,7 @@
 # Bhojpatra Booking Flows Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-26  
+> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
 > **Source of Truth**: Repository source files (`src/components/booking/*`, `src/app/api/bookings/*`, `src/lib/bookingPricing.ts`)  
 
 ---
@@ -18,8 +18,8 @@ Bhojpatra caters to different event scales and culinary formats. The codebase im
 | **Primary Component** | [`BookingWizard.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/booking/BookingWizard.tsx) | [`StallBookingWizard.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/booking/StallBookingWizard.tsx) | Sub-step in `BookingWizard.tsx` | [`BainaBoxOrderPanel.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/vendors/BainaBoxOrderPanel.tsx) |
 | **Wizard Steps** | **6 Steps**: Package → Menu → Live Stall → Add-ons → Essentials → Review | **3 Steps**: Menu → Details → Confirm | Step 3 within Feast wizard | In-panel stepper + delivery form |
 | **Guest Limits** | Min: 50, Max: 50,000 | Min: 50, Max: 50,000 | Governed by Feast order | **No guest minimum** (ordered per box) |
-| **Pricing Model** | Per-plate base rate + vendor uplifts + add-ons | Item sum × guests or fixed station charge | Included in Gold/Platinum or priced per stall | Unit price × quantity stepper |
-| **Payment Options** | 10% Advance (UPI/QR), EMI, or Connect | 10% Advance (UPI/QR) or Connect | Included in parent order | "Connect" (Manual call / offline payment) |
+| **Pricing Model** | Per-plate base rate + vendor uplifts + add-ons (Authoritative Server Recalculation) | Item sum × guests or fixed station charge (Authoritative Server Recalculation) | Included in Gold/Platinum or priced per stall | Unit price × quantity stepper (Catalog lookup) |
+| **Payment Options** | 25% Advance (Manual UPI with `Submitted` status) or Connect | 25% Advance (Manual UPI) or Connect | Included in parent order | "Connect" (Manual call / offline payment, `Confirmed`, `paid: 0`) |
 | **Backend Handler** | `POST /api/bookings` | `POST /api/bookings` (`packageId: "custom"`) | `POST /api/bookings` (part of feast) | `POST /api/bookings` (`id: BHJ-B...`) |
 
 ---
@@ -49,7 +49,8 @@ flowchart LR
     Step3 --> Step4["4. Details & Add-ons\n(Date, Guests, Slot)"]
     Step4 --> Step5["5. Essentials\n(Service & Staffing)"]
     Step5 --> Step6["6. Checkout & UPI\n(Advance / Connect)"]
-    Step6 --> Done["StepDone\n(Invoice & Order ID)"]
+    Step6 --> ServerCheck["Server Pricing Check\n(Authoritative <= ₹1)"]
+    ServerCheck --> Done["StepDone\n(HMAC Signed Invoice & Order ID)"]
 ```
 
 ---
@@ -137,10 +138,10 @@ flowchart LR
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending: Created with partial payment / EMI / pending advance
-    [*] --> Confirmed: Created with full advance / Baina Connect order
+    [*] --> Pending: Created with manual UPI (Payment 'Submitted', paid = 0)
+    [*] --> Confirmed: Created with Connect method (paid = 0) / Prior verified advance
 
-    Pending --> Confirmed: Customer pays EMI balance / Admin confirms payment
+    Pending --> Confirmed: Admin marks payment 'Settled' (paid >= advance) / Verified advance received
     Pending --> Cancelled: Customer cancels / Admin cancels
 
     Confirmed --> Completed: Event date passes (Auto-complete sweep) / Customer marks done / Admin marks done
@@ -153,11 +154,11 @@ stateDiagram-v2
 
 ### Transition Authority Matrix
 
-Defined in [`src/app/api/bookings/[id]/route.ts:18-36`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L18-L36):
+Defined in [`src/app/api/bookings/[id]/route.ts:18-36, 110-125`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts#L18-L36):
 
 | Current Status | Target Status | Allowed for Customer? | Allowed for Admin? | Transition Conditions |
 | :--- | :--- | :--- | :--- | :--- |
-| `Pending` | `Confirmed` | **Yes** | **Yes** | Customer settles remaining advance via payment box |
+| `Pending` | `Confirmed` | **Conditional** | **Yes** | **Enforced**: Customer cannot self-confirm unless verified payments in database satisfy advance ($paid \ge advanceNeeded$). Auto-credit bypass (`next.paid = order.amount`) permanently removed. Admin settlement via `PATCH /api/payments/[id]` auto-promotes to `Confirmed`. |
 | `Pending` | `Cancelled` | **Yes** | **Yes** | Customer or admin cancels unpaid draft |
 | `Confirmed` | `Completed` | **Yes** | **Yes** | Event finished; customer can leave reviews |
 | `Confirmed` | `Cancelled` | **Yes** | **Yes** | Terminal cancellation |
@@ -170,8 +171,20 @@ Defined in [`src/app/api/bookings/[id]/route.ts:49-65`](file:///c:/Users/Zeeshaa
 
 - **Single Order Inspection (`GET /api/bookings/[id]`)**: Requires authenticated session identity. Platform administrators can inspect any order; non-admin customers may only retrieve orders where `order.userId === guard.id`. Anonymous callers receive HTTP 401, while unauthorized callers receive HTTP 403.
 - **Legacy Orders**: Historical orders created before session tracking that lack `userId` are accessible exclusively to platform administrators (non-admin callers receive HTTP 403).
-- **Customer Order History (`GET /api/bookings/mine`)**: Derives identity strictly from the active session (`guard.id`) and filters the database records to return only the customer's own orders.
-- **Status Mutations (`PATCH /api/bookings/[id]`)**: Enforces `order.userId === guard.id` or admin role before applying state transitions from the authority matrix.
+- **Customer Order History (`GET /api/bookings/mine`)**: Derives identity strictly from the active session (`guard.id`), filters database records to return only the customer's own orders, and attaches pre-computed `invoiceSig` tokens for secure invoice sharing.
+- **Status Mutations (`PATCH /api/bookings/[id]`)**: Enforces `order.userId === guard.id` or admin role before applying state transitions from the authority matrix. Client attempts to overwrite `invoice` financial data are ignored.
+
+### 3.2 Authoritative Invoice Access & Cryptographic URL Signing
+
+Defined in [`src/app/api/bookings/[id]/invoice/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/invoice/route.ts) and [`src/lib/invoiceSign.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/invoiceSign.ts):
+
+- **Authoritative Data Source**: Invoices are synthesized server-side from verified booking records. The grand total is pinned to `order.amount` and payments to verified `order.paid`.
+- **Signed URL Mechanism**: Public invoice links follow the structure `/bookings/invoice?id=BHJ-xxxxx&sig=[HMAC_SHA256_HEX]`. The signature is computed over `bookingId` using `SESSION_SECRET`.
+- **Verification Gate**: Endpoint `GET /api/bookings/[id]/invoice?sig=...` grants access if:
+  1. `verifyInvoiceSignature(bookingId, sig)` returns `true` (constant-time verification), OR
+  2. The caller's session is an administrator, OR
+  3. The caller's session is the verified booking owner (`order.userId === session.id`).
+- Unsigned or tampered requests are rejected with HTTP 403 Forbidden. Client-side Base64 decoding of invoice data (`?d=...`) has been eradicated.
 
 ---
 
