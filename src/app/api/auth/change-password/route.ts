@@ -1,5 +1,12 @@
-import { getSessionUser, verifyPassword, hashPassword } from "@/lib/auth";
+import {
+  getSessionUser,
+  verifyPassword,
+  hashPassword,
+  destroyUserSessions,
+  createSession,
+} from "@/lib/auth";
 import { getUserById, saveUser } from "@/lib/users";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -8,11 +15,28 @@ export const dynamic = "force-dynamic";
  * hijacked session can't silently rotate credentials) and rehashes the new one
  * with scrypt. Scoped to the caller's own account — the session identifies who,
  * never the request body. Used by the admin console's "Change Password" tab.
+ *
+ * Security: Upon successful password update, revokes all existing active sessions
+ * across all devices and immediately establishes a fresh rotated session for the
+ * current client (NEW-SEC-007).
  */
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
     return Response.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  // Rate limit: 5 attempts / 15 min per authenticated user
+  const userLimit = checkRateLimit(
+    `change-pw:user:${sessionUser.id}`,
+    5,
+    900,
+  );
+  if (!userLimit.allowed) {
+    return rateLimitResponse(
+      userLimit,
+      "Too many password change attempts. Please try again later.",
+    );
   }
 
   let body: Record<string, unknown>;
@@ -61,6 +85,20 @@ export async function POST(request: Request) {
 
   user.passwordHash = await hashPassword(newPassword);
   await saveUser(user);
+
+  try {
+    await destroyUserSessions(user.id);
+    await createSession(user);
+  } catch (err) {
+    console.error("Session rotation failed after password change", err);
+    return Response.json(
+      {
+        error:
+          "Password changed, but failed to refresh session. Please log in again.",
+      },
+      { status: 500 },
+    );
+  }
 
   return Response.json({ ok: true });
 }

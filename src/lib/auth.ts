@@ -75,7 +75,7 @@ export async function verifyPassword(pw: string, stored: string): Promise<boolea
 /* ── Session store + cookie signing ──────────────────────────────────────── */
 
 interface SessionRecord {
-  id: string; // opaque token
+  id: string; // SHA-256 derived session token hash
   userId: string;
   role: UserRole;
   createdAt: string;
@@ -87,13 +87,21 @@ const sessionStore = createStore<SessionRecord>({
   idField: "id",
 });
 
+/** Deterministic one-way hash for session tokens stored in the database. */
+export function hashSessionToken(token: string): string {
+  return createHash("sha256")
+    .update(`session:${token}:${getSessionSecret()}`)
+    .digest("hex");
+}
+
 /** Create a session for a user and set the signed cookie. */
 export async function createSession(user: UserRecord): Promise<void> {
   const token = randomUUID();
+  const hashedId = hashSessionToken(token);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
   await sessionStore.upsert({
-    id: token,
+    id: hashedId,
     userId: user.id,
     role: user.role,
     createdAt: now.toISOString(),
@@ -113,8 +121,17 @@ export async function createSession(user: UserRecord): Promise<void> {
 export async function destroySession(): Promise<void> {
   const store = await cookies();
   const token = verifyCookieValue(store.get(SESSION_COOKIE)?.value);
-  if (token) await sessionStore.remove(token);
+  if (token) await sessionStore.remove(hashSessionToken(token));
   store.delete(SESSION_COOKIE);
+}
+
+/** Invalidate every active session belonging to a user (e.g. after password reset). */
+export async function destroyUserSessions(userId: string): Promise<void> {
+  const sessions = await sessionStore.list();
+  const userSessions = sessions.filter((s) => s.userId === userId);
+  for (const session of userSessions) {
+    await sessionStore.remove(session.id);
+  }
 }
 
 /** Authoritative check: resolve the current signed-in user, or null. Verifies
@@ -123,10 +140,11 @@ export async function getSessionUser(): Promise<PublicUser | null> {
   const store = await cookies();
   const token = verifyCookieValue(store.get(SESSION_COOKIE)?.value);
   if (!token) return null;
-  const session = await sessionStore.get(token);
+  const hashedId = hashSessionToken(token);
+  const session = await sessionStore.get(hashedId);
   if (!session) return null;
   if (new Date(session.expiresAt).getTime() < Date.now()) {
-    await sessionStore.remove(token);
+    await sessionStore.remove(hashedId);
     return null;
   }
   const user = await getUserById(session.userId);

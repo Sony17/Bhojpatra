@@ -16,6 +16,11 @@ import {
 } from "@/lib/auth";
 import { createStore } from "@/lib/store";
 import type { AccountType, PartnerMembership, PartnerRole } from "@/lib/session";
+import {
+  getClientIp,
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +50,16 @@ export async function POST(request: Request) {
     body = ((await request.json()) ?? {}) as Record<string, unknown>;
   } catch {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const clientIp = getClientIp(request);
+  // Rate limit: 5 signups / 10 min per IP
+  const ipLimit = checkRateLimit(`signup:ip:${clientIp}`, 5, 600);
+  if (!ipLimit.allowed) {
+    return rateLimitResponse(
+      ipLimit,
+      "Too many accounts created from this IP. Please try again later.",
+    );
   }
 
   const email =

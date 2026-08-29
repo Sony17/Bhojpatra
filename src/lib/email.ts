@@ -65,12 +65,49 @@ function recipients(): string[] {
     .filter(Boolean);
 }
 
-/** Absolute origin for links in emails, or "" when it can't be determined. */
+/**
+ * Absolute canonical origin for links in outbound transactional emails.
+ *
+ * Trusted resolution order (NEW-SEC-008):
+ * 1. SITE_URL
+ * 2. NEXT_PUBLIC_SITE_URL
+ * 3. VERCEL_PROJECT_PRODUCTION_URL
+ * 4. VERCEL_URL
+ *
+ * In non-production environments (NODE_ENV !== "production"), falls back safely
+ * to http://localhost:3000 for local developer workflows.
+ * In production, returns "" if no trusted canonical origin is configured, preventing
+ * reliance on untrusted client Host / forwarded headers.
+ */
 export function siteBaseUrl(): string {
-  const explicit = process.env.SITE_URL?.trim();
-  if (explicit) return explicit.replace(/\/+$/, "");
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel) return `https://${vercel.replace(/\/+$/, "")}`;
+  const explicit = (
+    process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL
+  )?.trim();
+  if (explicit) {
+    let url = explicit.replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    return url;
+  }
+
+  const vercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProd) {
+    const host = vercelProd.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    return `https://${host}`;
+  }
+
+  const vercelPreview = process.env.VERCEL_URL?.trim();
+  if (vercelPreview) {
+    const host = vercelPreview.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    return `https://${host}`;
+  }
+
+  // Safe development/testing fallback restricted strictly to localhost
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3000";
+  }
+
   return "";
 }
 

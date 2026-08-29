@@ -1,6 +1,16 @@
 import { findUserByEmail, saveUser } from "@/lib/users";
-import { hashPassword, makeResetToken, hashToken } from "@/lib/auth";
+import {
+  hashPassword,
+  makeResetToken,
+  hashToken,
+  destroyUserSessions,
+} from "@/lib/auth";
 import { sendPasswordResetEmail, siteBaseUrl, isEmailConfigured } from "@/lib/email";
+import {
+  getClientIp,
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +35,28 @@ export async function POST(request: Request) {
     typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email) {
     return Response.json({ error: "Enter your email." }, { status: 400 });
+  }
+
+  const clientIp = getClientIp(request);
+
+  // Rate limit: 10 requests / 15 min per IP; 3 requests / 15 min per (IP + email)
+  const ipLimit = checkRateLimit(`forgot-pw:ip:${clientIp}`, 10, 900);
+  if (!ipLimit.allowed) {
+    return rateLimitResponse(
+      ipLimit,
+      "Too many password reset requests from this IP. Please try again later.",
+    );
+  }
+  const emailLimit = checkRateLimit(
+    `forgot-pw:target:${clientIp}:${email}`,
+    3,
+    900,
+  );
+  if (!emailLimit.allowed) {
+    return rateLimitResponse(
+      emailLimit,
+      "Too many password reset requests for this email. Please try again later.",
+    );
   }
 
   const token = typeof body.token === "string" ? body.token : "";
@@ -54,6 +86,7 @@ export async function POST(request: Request) {
     delete user.resetTokenHash;
     delete user.resetExpires;
     await saveUser(user);
+    await destroyUserSessions(user.id);
     return Response.json({ ok: true, reset: true });
   }
 
@@ -74,6 +107,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const base = siteBaseUrl();
+  if (!base) {
+    console.error(
+      "Password reset requested but no canonical SITE_URL is configured — refusing to construct reset URL from untrusted request Host headers.",
+    );
+    return Response.json(
+      {
+        error:
+          "Password reset is temporarily unavailable. Please contact support.",
+      },
+      { status: 503 },
+    );
+  }
+
   const user = await findUserByEmail(email);
   if (user) {
     const { token: rawToken, hash } = makeResetToken();
@@ -81,9 +128,7 @@ export async function POST(request: Request) {
     user.resetExpires = new Date(Date.now() + RESET_TTL_MS).toISOString();
     await saveUser(user);
 
-    // Email the reset link. Fall back to the request's own origin when neither
-    // SITE_URL nor the Vercel URL is configured, so the link is always absolute.
-    const base = siteBaseUrl() || new URL(request.url).origin;
+    // Email the reset link using the strictly verified canonical base URL (NEW-SEC-008).
     const resetUrl =
       `${base}/reset-password?token=${encodeURIComponent(rawToken)}` +
       `&email=${encodeURIComponent(email)}`;

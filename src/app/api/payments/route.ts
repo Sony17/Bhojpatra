@@ -3,6 +3,11 @@ import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { parseListQuery } from "@/lib/validate";
 import { sendPaymentAlert } from "@/lib/email";
+import {
+  getClientIp,
+  checkRateLimit,
+  rateLimitResponse,
+} from "@/lib/rateLimit";
 
 // Payments are recorded at request time to Postgres (Neon) — never prerender or
 // cache this handler.
@@ -93,6 +98,20 @@ export async function POST(request: Request) {
   // posts (the booking UI gates payment behind login before reaching here).
   const guard = await requireRole();
   if (guard instanceof Response) return guard;
+
+  const clientIp = getClientIp(request);
+  // Rate limit: 5 submissions / 5 min per user/IP
+  const pmtLimit = checkRateLimit(
+    `payment:user:${guard.id}:${clientIp}`,
+    5,
+    300,
+  );
+  if (!pmtLimit.allowed) {
+    return rateLimitResponse(
+      pmtLimit,
+      "Too many payment submissions. Please wait before trying again.",
+    );
+  }
 
   let body: unknown;
   try {
