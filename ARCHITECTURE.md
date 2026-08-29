@@ -1,7 +1,7 @@
 # Bhojpatra System Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 4 Synchronization)
+> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
 > **Source of Truth**: Repository source files (`src/`, `schema.sql`, `package.json`)  
 
 ---
@@ -129,7 +129,8 @@ Bhojpatra/
 │   │   ├── upi.ts                # NPCI UPI URI generation & VPA validation
 │   │   ├── email.ts              # Resend REST client & alert formatting
 │   │   ├── vendorMenus.ts        # Live vendor menus & dish tier management
-│   │   └── kyc.ts                # Vercel Blob KYC upload & retrieval helpers
+│   │   ├── kyc.ts                # Vercel Blob KYC upload & retrieval helpers
+│   │   └── rateLimit.ts          # Zero-dependency in-memory sliding window rate limiter (Batch 5)
 ├── public/                       # Static branding images & icons
 ├── schema.sql                    # Postgres schema definition (22 tables)
 └── package.json                  # Dependencies, scripts, and runtime engines
@@ -150,7 +151,25 @@ Bhojpatra/
 - **Does not hit the database**; redirects anonymous visitors to `/login` or `/admin/login`.
 
 ### 5.3 Server & API Layer (`src/app/api/*`)
-- **Authentication**: Pure Node.js `crypto` with `scrypt` password hashing and opaque session tokens stored in the `sessions` table ([`src/lib/auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts)).
+- **Rate Limiting Layer (`src/lib/rateLimit.ts`, Batch 5)**:
+  - Enforces request throttling prior to CPU-intensive cryptographic operations (e.g. `scrypt` hashing) and database queries.
+  - Implemented as an in-memory sliding-window bucket store (`Map<string, RateLimitRecord>`) with bounded memory management and automatic TTL pruning.
+  - Extracts and validates client IP addresses safely from trusted proxy headers (`x-real-ip`, `cf-connecting-ip`, or first valid hop in `x-forwarded-for`) with regex validation and fallback to `127.0.0.1`.
+  - Protected endpoints and authoritative limits:
+    - **Login (`POST /api/auth/login`)**: 5 attempts / 60s per `(IP + email target)`; 15 attempts / 60s per IP.
+    - **Signup (`POST /api/auth/signup`)**: 5 requests / 10m per IP.
+    - **Forgot Password (`POST /api/auth/forgot-password`)**: 3 requests / 15m per `(IP + email target)`; 10 requests / 15m per IP.
+    - **Change Password (`POST /api/auth/change-password`)**: 5 attempts / 15m per authenticated user.
+    - **Payment Submissions (`POST /api/payments`)**: 5 submissions / 5m per authenticated user + IP.
+  - **429 Response & Headers**: Returns HTTP 429 Too Many Requests with standard RFC headers: `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+  - **Serverless Runtime Boundary**: The limiter operates within the memory scope of individual serverless/container runtimes. It provides effective best-effort protection against single-runtime brute-force bursts rather than globally coordinated distributed quota enforcement across multiple stateless serverless instances.
+- **Authentication & Hashed Session Management (`src/lib/auth.ts`, Batch 5)**:
+  - **Password Hashing**: Pure Node.js `crypto` with `scrypt` (parameters $N=16384, r=8, p=1$) and timing-safe verification.
+  - **Hashed Session Storage (NEW-SEC-005)**: Eliminates plaintext session token storage in the database. The client cookie retains the raw token and HMAC signature (`[raw_token].[hmac_sha256]`), while the Postgres `sessions` table stores the deterministic SHA-256 derived hash `hashSessionToken(rawToken)`.
+    - `createSession(user)` generates a random UUID, computes the SHA-256 hash for database insertion (`sessions.id`), and sets the signed cookie containing the raw token.
+    - `getSessionUser()` extracts and verifies the raw token from the cookie, computes the SHA-256 hash, and retrieves the session row by hashed ID.
+    - `destroySession()` computes the SHA-256 hash from the cookie token to remove the database row and clears the cookie.
+  - **Session Revocation on Password Reset (NEW-SEC-004)**: Helper function `destroyUserSessions(userId: string)` queries active sessions and purges all records belonging to the target user. `POST /api/auth/forgot-password` executes `destroyUserSessions(user.id)` upon completing a password reset, immediately terminating all existing sessions across all browsers and devices.
 - **Authoritative Role Guards**: Function [`requireRole(...roles)`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L138) validates the HMAC-signed session cookie against active sessions in Neon DB, checks expiration, and validates caller roles (`admin`, `vendor`, `partner`, `customer`). Collection endpoints (e.g. `GET /api/bookings`, `GET /api/payments`, `GET /api/leads`, `GET /api/vendors/applications`, `GET /api/vendors/kyc`, `GET /api/partners`) enforce `requireRole("admin")`.
 - **Object-Level Resource Ownership Guards**:
   - **Bookings (`GET /api/bookings/[id]`)**: Restricts access to the authenticated customer who owns the booking (`order.userId === session.id`) or platform admins. Legacy records without `userId` are admin-only.

@@ -1,7 +1,7 @@
 # Bhojpatra Data Flow Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 4 Synchronization)
+> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
 > **Source of Truth**: Repository source files (`src/app/api/*`, `src/lib/*`, `src/components/*`)  
 
 ---
@@ -24,11 +24,12 @@ flowchart TD
 
     subgraph TransportBoundary["Network & Edge Gate"]
         HttpRequest["HTTP REST Request (JSON / Multipart)"]
-        ProxyGate["Next.js Proxy (src/proxy.ts)\nCookie Signature Check"]
+        RateLimitGate["Rate Limiter (src/lib/rateLimit.ts)\nIP & Target Rate Limiting Gate"]
+        ProxyGate["Next.js Proxy (src/proxy.ts)\nCoarse Cookie Signature Check"]
     end
 
     subgraph ServerLayer["Next.js Route Handlers"]
-        SessionCheck["Session & Role Guard\n(src/lib/auth.ts: requireRole)"]
+        SessionCheck["Session & Role Guard\n(src/lib/auth.ts: requireRole & hashSessionToken)"]
         OwnershipCheck["Resource Ownership Verification\n(order.userId, booking.userId, ownerUserId)"]
         PricingEngine["Authoritative Server Pricing Engine\n(src/lib/bookingPricing.ts: calculate*Totals)"]
         InvoiceEngine["Invoice Signing & Verification\n(src/lib/invoiceSign.ts)"]
@@ -50,7 +51,8 @@ flowchart TD
     FormInput --> ClientState
     ClientState --> PricingCalc
     PricingCalc --> HttpRequest
-    HttpRequest --> ProxyGate
+    HttpRequest --> RateLimitGate
+    RateLimitGate --> ProxyGate
     ProxyGate --> SessionCheck
     SessionCheck --> OwnershipCheck
     OwnershipCheck --> PricingEngine
@@ -450,15 +452,122 @@ sequenceDiagram
 
 ---
 
-## 10. External Integrations Data Flow
+## 10. Authentication, Session & Password Reset Data Flow
 
-### 10.1 WhatsApp Click-to-Chat Flow
+### 10.1 Session Validation & Hashed Token Lookup (`src/lib/auth.ts`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client (Browser)
+    participant Route as Next.js API Route / Proxy
+    participant Auth as src/lib/auth.ts (getSessionUser)
+    participant CookieSign as src/lib/cookieSign.ts (verifyCookieValue)
+    participant Store as sessions Store (Neon Postgres)
+    participant UserStore as users Store (Neon Postgres)
+
+    Client->>Route: HTTP Request (Cookie: bp_session=RAW_TOKEN.HMAC_SIG)
+    Route->>Auth: getSessionUser()
+    Auth->>CookieSign: verifyCookieValue("RAW_TOKEN.HMAC_SIG")
+    alt Invalid HMAC Signature
+        CookieSign-->>Auth: null
+        Auth-->>Route: null (Unauthenticated)
+    else Valid HMAC Signature
+        CookieSign-->>Auth: RAW_TOKEN
+        Auth->>Auth: hashSessionToken(RAW_TOKEN) -> SHA256_HEX_DIGEST
+        Auth->>Store: get(SHA256_HEX_DIGEST)
+        Store-->>Auth: SessionRecord { id: SHA256_HEX_DIGEST, userId, expiresAt }
+        alt Session Not Found
+            Auth-->>Route: null (Session Missing / Revoked)
+        else Session Expired (expiresAt < now)
+            Auth->>Store: remove(SHA256_HEX_DIGEST)
+            Auth-->>Route: null (Session Expired & Purged)
+        else Session Active & Valid
+            Auth->>UserStore: getUserById(session.userId)
+            UserStore-->>Auth: UserRecord
+            Auth-->>Route: PublicUser (Authorized)
+        end
+    end
+```
+
+### 10.2 Password Reset & Comprehensive Session Revocation Flow (`POST /api/auth/forgot-password`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Attacker (Browser)
+    participant Route as POST /api/auth/forgot-password
+    participant RateLimiter as src/lib/rateLimit.ts (checkRateLimit)
+    participant Auth as src/lib/auth.ts (hashToken, hashPassword, destroyUserSessions)
+    participant UserStore as users Store (Neon Postgres)
+    participant SessStore as sessions Store (Neon Postgres)
+
+    User->>Route: POST /api/auth/forgot-password { email, token, password }
+    Route->>RateLimiter: checkRateLimit("forgot-pw:ip:CLIENT_IP", 10, 900)
+    Route->>RateLimiter: checkRateLimit("forgot-pw:target:CLIENT_IP:email", 3, 900)
+    alt Rate Limit Exceeded
+        RateLimiter-->>Route: { allowed: false, retryAfter: 45 }
+        Route-->>User: HTTP 429 Too Many Requests (Retry-After: 45)
+    else Rate Limit Permitted
+        Route->>UserStore: findUserByEmail(email)
+        UserStore-->>Route: UserRecord
+        Route->>Auth: hashToken(token) === user.resetTokenHash AND expires > now
+        alt Invalid or Expired Reset Token
+            Route-->>User: HTTP 400 Bad Request { error: "This reset link is invalid or has expired." }
+        else Reset Token Valid
+            Route->>Auth: hashPassword(password) -> scryptHash
+            Route->>Route: Update user.passwordHash; delete resetTokenHash & resetExpires
+            Route->>UserStore: saveUser(user)
+            Route->>Auth: destroyUserSessions(user.id)
+            Auth->>SessStore: list() -> filters all sessions where s.userId === user.id
+            loop For each active session of user
+                Auth->>SessStore: remove(session.id)
+            end
+            Route-->>User: HTTP 200 OK { ok: true, reset: true }
+        end
+    end
+```
+
+### 10.3 In-Memory Rate Limiting Enforcement Flow (`src/lib/rateLimit.ts`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client / Script (HTTP Request)
+    participant Handler as Protected Route (Login / Signup / Forgot-PW / Payments)
+    participant RateLimiter as src/lib/rateLimit.ts
+    participant BucketMap as In-Memory Sliding Window Store (Map)
+
+    Client->>Handler: HTTP Request with Headers
+    Handler->>RateLimiter: getClientIp(request) -> safe IP parsing
+    Handler->>RateLimiter: checkRateLimit(key, maxRequests, windowSeconds)
+    RateLimiter->>BucketMap: Lookup / Initialize Bucket for key
+    alt Current Window Expired
+        RateLimiter->>BucketMap: Reset count = 1, resetTime = now + windowSeconds
+        RateLimiter-->>Handler: { allowed: true, remaining: max - 1 }
+        Handler->>Handler: Proceed to authentication & business logic
+    else Within Window AND count < maxRequests
+        RateLimiter->>BucketMap: count = count + 1
+        RateLimiter-->>Handler: { allowed: true, remaining: max - count }
+        Handler->>Handler: Proceed to authentication & business logic
+    else Within Window AND count >= maxRequests
+        RateLimiter->>BucketMap: count = count + 1
+        RateLimiter-->>Handler: { allowed: false, remaining: 0, retryAfter: secondsUntilReset }
+        Handler-->>Client: HTTP 429 Too Many Requests (Retry-After, X-RateLimit-* headers)
+    end
+```
+
+---
+
+## 11. External Integrations Data Flow
+
+### 11.1 WhatsApp Click-to-Chat Flow
 - **Initiation**: Customer clicks WhatsApp icon on floating widget ([`FloatingChat.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/FloatingChat.tsx)), vendor profile ([`VendorActionRow.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/vendors/VendorActionRow.tsx)), or share buttons ([`WhatsAppShareButton.tsx`](file:///c:/Users/Zeeshaan/Bhojpatra/src/components/WhatsAppShareButton.tsx)).
 - **Mechanism**: Browser navigation to `https://wa.me/911234567890?text=${encodeURIComponent(text)}`.
 - **Payload**: Pre-populated text containing catering requirements, event date, guest count, or referral link.
 - **Server Involvement**: **Zero**. Operates client-side without webhook callbacks or delivery tracking.
 
-### 10.2 Transactional Email Alerts (Resend)
+### 11.2 Transactional Email Alerts (Resend)
 - **Initiation**: Triggered asynchronously during `POST /api/bookings`, `POST /api/payments`, `POST /api/leads`, `POST /api/vendors/applications`, and `POST /api/venues`.
 - **Mechanism**: Direct HTTP POST from Next.js server to `https://api.resend.com/emails` with Bearer token authentication (`RESEND_API_KEY`).
 - **Payload**:
@@ -467,11 +576,13 @@ sequenceDiagram
 
 ---
 
-## 11. Trust Boundaries & Validation Matrix
+## 12. Trust Boundaries & Validation Matrix
 
 | Data Flow Point | Origin | Destination | Validation Enforcement Point | Architectural Observation |
 | :--- | :--- | :--- | :--- | :--- |
-| **User Identity** | Browser Cookie | Server Handlers | [`src/lib/auth.ts:122-134`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L122-L134) | Verified server-side via HMAC cookie + DB session lookup. `userId` taken from session, not payload. |
+| **API Request Rate Limiting** | Client Requests | Protected Route Handlers | [`src/lib/rateLimit.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/rateLimit.ts) | **In-Memory Rate Limiting Enforced (Batch 5)**: Sliding-window rate limiter throttles burst requests on `login` (5/60s target, 15/60s IP), `signup` (5/10m IP), `forgot-password` (3/15m target, 10/15m IP), `change-password` (5/15m user), and `payments` (5/5m user/IP). Returns HTTP 429 with `Retry-After` and `X-RateLimit-*` headers. Per-runtime/best-effort serverless memory boundary. |
+| **User Identity & Session Token Lookup** | Browser Cookie | Server Handlers | [`src/lib/auth.ts:89-140`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L89-L140), [`cookieSign.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/cookieSign.ts) | **Hashed Session DB Lookup Enforced (Batch 5)**: Client cookie holds raw token and signature; server verifies signature and derives SHA-256 hash `hashSessionToken(rawToken)` to query the `sessions` table. Raw tokens are never stored in plaintext in the database. `userId` taken from session, not payload. |
+| **Password Reset Session Invalidation** | Client Request | `POST /api/auth/forgot-password` | [`forgot-password/route.ts:55-60`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts#L55-L60), [`auth.ts:123-131`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L123-L131) | **Universal User Session Revocation Enforced (Batch 5)**: Upon successful password reset completion, `destroyUserSessions(user.id)` purges all active session rows from Postgres for that user across all devices. |
 | **Booking Creation Amount** | Client Wizard | `POST /api/bookings` | [`route.ts:380-480`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L380-L480), [`bookingPricing.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts) | **Authoritative Server Pricing Enforced**: Server recalculates totals from catalog rates, add-ons, service tier, coupons, and referrals. Rejects material difference ($> ₹1$) with HTTP 400. Client amounts can never dictate the recorded total. |
 | **Booking Advance Notice** | Client Wizard | `POST /api/bookings` | [`route.ts:208-239`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L208-L239) | Server enforces advance notice days calculated from package and occasion lead rules. |
 | **Booking Self-Referral** | Client Wizard | `POST /api/bookings` | [`route.ts:251-268`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L251-L268) | Server checks partner code against current user accounts and phone numbers to disallow self-attribution. |
@@ -494,7 +605,7 @@ sequenceDiagram
 
 ---
 
-## 12. Missing & Unimplemented Flows
+## 13. Missing & Unimplemented Flows
 
 1. `[NOT IMPLEMENTED]` **Razorpay Gateway Flow**: No order creation endpoint (`/api/razorpay/order`), no checkout SDK handler, no webhook handler (`/api/razorpay/webhook`), and no HMAC signature verification.
 2. `[NOT IMPLEMENTED]` **Automated WhatsApp Transactional Updates**: No webhook receiver for WhatsApp messages and no automated outbound WhatsApp messaging via WhatsApp Cloud API.

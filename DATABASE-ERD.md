@@ -1,7 +1,7 @@
 # Bhojpatra Database Architecture & ERD
 
-> **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-27 (Post-Batch 3 Synchronization)  
+> **Current Implementation Status**: Active Production / Staging Codebase
+> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
 > **Source of Truth**: [`schema.sql`](file:///c:/Users/Zeeshaan/Bhojpatra/schema.sql) and [`src/lib/store.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/store.ts)  
 
 ---
@@ -74,7 +74,7 @@ erDiagram
     }
 
     SESSIONS {
-        string id PK "opaque UUID token"
+        string id PK "SHA-256 derived session token hash"
         string userId FK "references USERS.id"
         string role
         string createdAt
@@ -223,7 +223,7 @@ The database comprises **22 distinct tables**:
 | 19| `review_photos` | `id` | Metadata for customer-uploaded review photos in Vercel Blob | Low (Photo metadata) |
 | 20| `support_tickets` | `id` | Customer support complaints raised from My Bookings | Medium (Customer issue logs) |
 | 21| `users` | `id` | Authenticated users (customers, vendors, partners, admins) | **Critical** (scrypt password hashes, email) |
-| 22| `sessions` | `id` | Opaque session tokens, role caches, and expiration timestamps | **Critical** (Session authentication tokens) |
+| 22| `sessions` | `id` | Deterministic SHA-256 derived session token hashes (`hashSessionToken`), userId, role caches, and expiration timestamps | **Critical** (Hashed session authentication records) |
 
 ---
 
@@ -243,7 +243,7 @@ The database comprises **22 distinct tables**:
 | `kyc_documents` | `src/app/api/vendors/kyc/route.ts` *(Admin-only)*<br>`src/app/api/vendors/kyc/[id]/route.ts` *(Admin-only streaming)* | `src/app/api/vendors/kyc/route.ts` |
 | `settings` | `src/app/api/admin/payment-settings/route.ts`<br>`src/app/api/admin/occasions/route.ts`<br>`src/app/api/admin/services/route.ts`<br>`src/app/api/content/route.ts` | `src/app/api/admin/payment-settings/route.ts`<br>`src/app/api/admin/occasions/route.ts`<br>`src/app/api/admin/services/route.ts`<br>`src/app/api/content/route.ts` |
 | `users` | `src/lib/users.ts`<br>`src/lib/auth.ts`<br>`src/app/api/auth/*` | `src/lib/users.ts`<br>`src/lib/auth.ts`<br>`src/app/api/auth/*` |
-| `sessions` | `src/lib/auth.ts`<br>`src/app/api/auth/session/route.ts` | `src/lib/auth.ts`<br>`src/app/api/auth/logout/route.ts` |
+| `sessions` | `src/lib/auth.ts` (`getSessionUser`)<br>`src/app/api/auth/session/route.ts` *(DB lookup by `hashSessionToken(token)`)* | `src/lib/auth.ts` (`createSession` inserts `hashSessionToken(token)`, `destroySession` removes `hashSessionToken(token)`, `destroyUserSessions` purges all sessions matching `userId`)<br>`src/app/api/auth/forgot-password/route.ts` *(Revokes all active user sessions upon password reset)*<br>`src/app/api/auth/logout/route.ts` |
 
 ---
 
@@ -263,3 +263,8 @@ The database comprises **22 distinct tables**:
    - In [`src/lib/store.ts:177-180`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/store.ts#L177-L180), `upsertMany` executes an unbatched loop of individual queries without a `BEGIN...COMMIT` transaction block.
 6. **Full Table Scans & Memory Overhead**:
    - Store lookups by fields other than `id` (e.g. `findUserByEmail` in [`src/lib/users.ts:111-115`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/users.ts#L111-L115)) call `store.list()`, performing `SELECT data FROM [table] ORDER BY seq ASC` to scan the entire dataset into Vercel function RAM.
+7. **Hashed Session Identifiers & Lifecycle Management (Batch 5)**:
+   - In [`src/lib/auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts), `sessions.id` stores the 64-character SHA-256 derived hash `hashSessionToken(token)` computed via `createHash("sha256").update(\`session:${token}:${getSessionSecret()}\`).digest("hex")`.
+   - Raw UUID tokens are never stored in plaintext within the database (`id` or `data.id`), eliminating session hijacking risks from database read replica exposure, backup snapshots, or SQL read injection.
+   - Preserves complete compatibility with `schema.sql` (`sessions.id text primary key`).
+   - Session lifecycle: Single sessions are purged on `destroySession()` or expiration. Comprehensive session invalidation is enforced via `destroyUserSessions(userId)`, purging all session rows for that user upon password reset completion.
