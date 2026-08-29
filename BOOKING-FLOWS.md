@@ -1,7 +1,7 @@
 # Bhojpatra Booking Flows Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase
-> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Verification)
+> **Last Verified Against Code**: 2026-08-29 (Post-Batch 6 Verification)
 > **Source of Truth**: Repository source files (`src/components/booking/*`, `src/app/api/bookings/*`, `src/lib/bookingPricing.ts`)  
 
 ---

@@ -1,7 +1,7 @@
 # Bhojpatra Data Flow Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
+> **Last Verified Against Code**: 2026-08-29 (Post-Batch 6 Synchronization)
 > **Source of Truth**: Repository source files (`src/app/api/*`, `src/lib/*`, `src/components/*`)  
 
 ---
@@ -490,13 +490,100 @@ sequenceDiagram
     end
 ```
 
-### 10.2 Password Reset & Comprehensive Session Revocation Flow (`POST /api/auth/forgot-password`)
+### 10.2 Authenticated Password Change & Session Rotation Flow (`POST /api/auth/change-password`, NEW-SEC-007)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User / Attacker (Browser)
-    participant Route as POST /api/auth/forgot-password
+    actor User as Authenticated User (Browser)
+    participant Route as POST /api/auth/change-password
+    participant RateLimiter as src/lib/rateLimit.ts (checkRateLimit)
+    participant Auth as src/lib/auth.ts (getSessionUser, verifyPassword, hashPassword, destroyUserSessions, createSession)
+    participant UserStore as users Store (Neon Postgres)
+    participant SessStore as sessions Store (Neon Postgres)
+
+    User->>Route: POST /api/auth/change-password { currentPassword, newPassword } (Cookie: S1)
+    Route->>Auth: getSessionUser() -> validates caller identity
+    Route->>RateLimiter: checkRateLimit("change-pw:user:USER_ID", 5, 900)
+    alt Rate Limit Exceeded
+        RateLimiter-->>Route: { allowed: false, retryAfter: seconds }
+        Route-->>User: HTTP 429 Too Many Requests
+    else Rate Limit Permitted
+        Route->>UserStore: getUserById(USER_ID)
+        UserStore-->>Route: UserRecord (with passwordHash)
+        Route->>Auth: verifyPassword(currentPassword, user.passwordHash)
+        alt Current Password Incorrect or New Password Invalid
+            Route-->>User: HTTP 400 Bad Request { error: "Your current password is incorrect." }
+            Note over SessStore: Active sessions remain untouched on failed attempts
+        else Current Password Verified
+            Route->>Auth: hashPassword(newPassword) -> scryptHash
+            Route->>UserStore: saveUser(user with updated passwordHash)
+            Route->>Auth: destroyUserSessions(user.id)
+            Auth->>SessStore: list() -> filters all sessions where s.userId === user.id
+            loop Purge ALL active sessions of user (across all devices & S1)
+                Auth->>SessStore: remove(session.id)
+            end
+            Route->>Auth: createSession(user) -> generates fresh randomUUID() [S_NEW]
+            Auth->>SessStore: upsert({ id: hashSessionToken(S_NEW), userId, ... })
+            Auth->>Route: sets signed Set-Cookie: bp_session=S_NEW.SIG
+            Route-->>User: HTTP 200 OK { ok: true } (Set-Cookie: bp_session=S_NEW.SIG)
+            Note over User: Current browser stays seamlessly logged in with rotated session S_NEW;<br/>Old session S1 and all concurrent sessions S2, S3 on other devices are dead.
+        end
+    end
+```
+
+### 10.3 Password Reset Request & Canonical Outbound URL Flow (`POST /api/auth/forgot-password`, NEW-SEC-008)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Requester as Requester / Attacker (HTTP Client)
+    participant Route as POST /api/auth/forgot-password { email }
+    participant RateLimiter as src/lib/rateLimit.ts (checkRateLimit)
+    participant EmailLib as src/lib/email.ts (siteBaseUrl, isEmailConfigured)
+    participant UserStore as users Store (Neon Postgres)
+    participant Resend as Resend Email API
+    actor Victim as Legitimate Account Owner (Inbox)
+
+    Requester->>Route: POST /api/auth/forgot-password { email } (Headers: Host: evil.com, X-Forwarded-Host: evil.com)
+    Route->>RateLimiter: checkRateLimit("forgot-pw:ip:CLIENT_IP", 10, 900)
+    Route->>RateLimiter: checkRateLimit("forgot-pw:target:CLIENT_IP:email", 3, 900)
+    alt Rate Limit Exceeded
+        RateLimiter-->>Route: { allowed: false, retryAfter: 45 }
+        Route-->>Requester: HTTP 429 Too Many Requests
+    else Rate Limit Permitted
+        Route->>EmailLib: isEmailConfigured()
+        alt Mail Service Unset
+            Route-->>Requester: HTTP 503 Service Unavailable
+        else Mail Service Configured
+            Route->>EmailLib: siteBaseUrl()
+            Note over EmailLib: Evaluates trusted order:<br/>1. SITE_URL<br/>2. NEXT_PUBLIC_SITE_URL<br/>3. VERCEL_PROJECT_PRODUCTION_URL<br/>4. VERCEL_URL<br/>5. localhost (dev only)<br/>NEVER reads incoming Host / X-Forwarded-Host headers!
+            alt No Canonical Origin in Production
+                EmailLib-->>Route: "" (Fail Safe)
+                Route-->>Requester: HTTP 503 Service Unavailable (Refuses to construct untrusted URL)
+            else Canonical Base URL Resolved (e.g. https://bhojpatra.com)
+                EmailLib-->>Route: "https://bhojpatra.com"
+                Route->>UserStore: findUserByEmail(email)
+                alt User Exists
+                    Route->>Route: makeResetToken() -> { token: rawToken, hash: tokenHash }
+                    Route->>UserStore: saveUser(user with resetTokenHash & resetExpires)
+                    Route->>Route: Construct resetUrl = "https://bhojpatra.com/reset-password?token=RAW_TOKEN&email=..."
+                    Route-)Resend: sendPasswordResetEmail(email, resetUrl)
+                    Resend-)Victim: Delivers reset link strictly containing canonical domain
+                end
+                Route-->>Requester: HTTP 200 OK { ok: true } (Account enumeration protected)
+            end
+        end
+    end
+```
+
+### 10.4 Password Reset Token Completion & Session Revocation (`POST /api/auth/forgot-password`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Browser)
+    participant Route as POST /api/auth/forgot-password { email, token, password }
     participant RateLimiter as src/lib/rateLimit.ts (checkRateLimit)
     participant Auth as src/lib/auth.ts (hashToken, hashPassword, destroyUserSessions)
     participant UserStore as users Store (Neon Postgres)
@@ -528,7 +615,7 @@ sequenceDiagram
     end
 ```
 
-### 10.3 In-Memory Rate Limiting Enforcement Flow (`src/lib/rateLimit.ts`)
+### 10.5 In-Memory Rate Limiting Enforcement Flow (`src/lib/rateLimit.ts`)
 
 ```mermaid
 sequenceDiagram
@@ -572,6 +659,7 @@ sequenceDiagram
 - **Mechanism**: Direct HTTP POST from Next.js server to `https://api.resend.com/emails` with Bearer token authentication (`RESEND_API_KEY`).
 - **Payload**:
   - Customer email: HTML booking confirmation containing event summary and invoice download link (`SITE_URL/bookings/invoice?data=...`).
+  - Password Reset: Transactional email with secure password-reset link constructed exclusively via canonical base URL (`siteBaseUrl()`), never reflecting incoming client `Host` headers (NEW-SEC-008).
   - Owner alerts: Detailed markdown/HTML alert sent to `ALERT_EMAIL_TO` (`ankit23690@gmail.com,sohni2012@gmail.com`).
 
 ---
@@ -582,7 +670,9 @@ sequenceDiagram
 | :--- | :--- | :--- | :--- | :--- |
 | **API Request Rate Limiting** | Client Requests | Protected Route Handlers | [`src/lib/rateLimit.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/rateLimit.ts) | **In-Memory Rate Limiting Enforced (Batch 5)**: Sliding-window rate limiter throttles burst requests on `login` (5/60s target, 15/60s IP), `signup` (5/10m IP), `forgot-password` (3/15m target, 10/15m IP), `change-password` (5/15m user), and `payments` (5/5m user/IP). Returns HTTP 429 with `Retry-After` and `X-RateLimit-*` headers. Per-runtime/best-effort serverless memory boundary. |
 | **User Identity & Session Token Lookup** | Browser Cookie | Server Handlers | [`src/lib/auth.ts:89-140`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L89-L140), [`cookieSign.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/cookieSign.ts) | **Hashed Session DB Lookup Enforced (Batch 5)**: Client cookie holds raw token and signature; server verifies signature and derives SHA-256 hash `hashSessionToken(rawToken)` to query the `sessions` table. Raw tokens are never stored in plaintext in the database. `userId` taken from session, not payload. |
-| **Password Reset Session Invalidation** | Client Request | `POST /api/auth/forgot-password` | [`forgot-password/route.ts:55-60`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts#L55-L60), [`auth.ts:123-131`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L123-L131) | **Universal User Session Revocation Enforced (Batch 5)**: Upon successful password reset completion, `destroyUserSessions(user.id)` purges all active session rows from Postgres for that user across all devices. |
+| **Password Reset Session Invalidation** | Client Request | `POST /api/auth/forgot-password` | [`forgot-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts), [`auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts) | **Universal User Session Revocation Enforced (Batch 5)**: Upon successful password reset completion, `destroyUserSessions(user.id)` purges all active session rows from Postgres for that user across all devices. |
+| **Password Change Session Rotation** | Client Request | `POST /api/auth/change-password` | [`change-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/change-password/route.ts), [`auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts) | **Session Invalidation & Rotation Enforced (Batch 6, NEW-SEC-007)**: Upon successful password update, purges all active sessions across all devices via `destroyUserSessions(user.id)` and immediately establishes a fresh rotated session for the caller via `createSession(user)`. |
+| **Canonical Password-Reset URL Generation** | Server Context | `POST /api/auth/forgot-password` | [`email.ts:siteBaseUrl`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/email.ts), [`forgot-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts) | **Canonical Origin Enforced (Batch 6, NEW-SEC-008)**: Outbound reset link origin resolved strictly from trusted environment variables (`SITE_URL` $\to$ `NEXT_PUBLIC_SITE_URL` $\to$ `VERCEL_PROJECT_PRODUCTION_URL` $\to$ `VERCEL_URL` $\to$ localhost in dev). Ignores incoming `Host` / `X-Forwarded-Host` headers; fails safely with 503 if unconfigured in production. |
 | **Booking Creation Amount** | Client Wizard | `POST /api/bookings` | [`route.ts:380-480`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L380-L480), [`bookingPricing.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/bookingPricing.ts) | **Authoritative Server Pricing Enforced**: Server recalculates totals from catalog rates, add-ons, service tier, coupons, and referrals. Rejects material difference ($> ₹1$) with HTTP 400. Client amounts can never dictate the recorded total. |
 | **Booking Advance Notice** | Client Wizard | `POST /api/bookings` | [`route.ts:208-239`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L208-L239) | Server enforces advance notice days calculated from package and occasion lead rules. |
 | **Booking Self-Referral** | Client Wizard | `POST /api/bookings` | [`route.ts:251-268`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/route.ts#L251-L268) | Server checks partner code against current user accounts and phone numbers to disallow self-attribution. |

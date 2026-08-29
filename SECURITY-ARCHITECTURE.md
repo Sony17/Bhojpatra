@@ -1,14 +1,15 @@
 # Bhojpatra Security Architecture & Observations
 
 > **Current Implementation Status**: Active Production / Staging Codebase
-> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
-> **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/lib/invoiceSign.ts`, `src/lib/bookingPricing.ts`, `src/lib/rateLimit.ts`, `src/app/api/*`)
+> **Last Verified Against Code**: 2026-08-29 (Post-Batch 6 Synchronization)
+> **Source of Truth**: Repository source files (`src/proxy.ts`, `src/lib/auth.ts`, `src/lib/cookieSign.ts`, `src/lib/invoiceSign.ts`, `src/lib/bookingPricing.ts`, `src/lib/rateLimit.ts`, `src/lib/email.ts`, `src/app/api/*`)
 > **SECURITY REMEDIATION STATUS**:
 > - **Batch 1** (BHOJ-SEC-001, BHOJ-SEC-003, BHOJ-SEC-007, BHOJ-SEC-008, BHOJ-SEC-010, BHOJ-SEC-011): Admin collection access control and public-safe shaping verified fixed. Status: **Verified Fixed**.
 > - **Batch 2** (BHOJ-SEC-002, BHOJ-SEC-004, BHOJ-SEC-005, BHOJ-SEC-006, BHOJ-SEC-009, NEW-SEC-001, NEW-SEC-003): Resource ownership, session identity enforcement, and client-controlled identifier mitigations across Bookings, Payments, Venues, and Partners verified fixed (66/66 automated tests passed). Status: **Verified Fixed**.
 > - **Batch 3** (BHOJ-SEC-012, NEW-SEC-002, BHOJ-SEC-014, EMI Confirmation Bypass): Authoritative server-side pricing recalculation with <= ₹1 tolerance, decoupled manual UPI payment verification (Submitted -> admin Settled with UTR deduplication), authoritative invoice synthesis with HMAC-SHA256 signed public access, and removal of customer EMI auto-credit bypass verified fixed (20/20 automated tests passed). Status: **Verified Fixed**.
 > - **Batch 4** (BHOJ-SEC-013, Signup Partner Role Injection): Customer review submission authorization (`requireRole("customer")`), booking existence validation, ownership verification, completed-state requirement, authoritative context binding, and authoritative partners store validation on signup partner role claims verified fixed (18/18 automated tests passed). Status: **Verified Fixed**.
 > - **Batch 5** (NEW-SEC-004, NEW-SEC-005, NEW-SEC-006): Session revocation after password reset (`destroyUserSessions`), deterministic SHA-256 session token hashing in Neon DB (`hashSessionToken`), and zero-dependency in-memory sliding-window rate limiting across login, signup, password reset, password change, and payment submissions verified fixed (18/18 automated tests passed). Status: **Verified Fixed**.
+> - **Batch 6** (NEW-SEC-007, NEW-SEC-008): Authenticated password-change session invalidation and rotation (`destroyUserSessions` + `createSession` with fresh `bp_session` cookie) and canonical password-reset URL resolution (`siteBaseUrl()` with Host-header poisoning protection) verified fixed (17/17 automated tests passed). Status: **Verified Fixed**.
 
 ---
 
@@ -32,7 +33,7 @@ Data isolation relies almost entirely on application-level logic; because databa
 - **Storage Format**: `scrypt$16384$8$1$[salt_base64]$[key_base64]` persisted inside `data.passwordHash` in the `users` table.
 - **Verification**: Evaluated using `crypto.timingSafeEqual` to eliminate timing side-channel attacks ([`src/lib/auth.ts:72`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L72)).
 
-### 2.2 Hashed Session Management & Invalidation Lifecycle (Batch 5)
+### 2.2 Hashed Session Management & Invalidation Lifecycle (Batches 5 & 6)
 - **Token Generation**: Cryptographically strong UUID (`randomUUID()`).
 - **Session Lifespan**: 30 days (`SESSION_TTL_SECONDS = 2,592,000`).
 - **Client Cookie Token**:
@@ -49,6 +50,13 @@ Data isolation relies almost entirely on application-level logic; because databa
 - **Session Invalidation on Password Reset (NEW-SEC-004)**:
   - Helper `destroyUserSessions(userId: string)` queries active session rows and purges all records where `session.userId === userId`.
   - `POST /api/auth/forgot-password` executes `destroyUserSessions(user.id)` upon password reset completion, instantly terminating all active sessions for that user across all devices.
+- **Authenticated Password-Change Session Rotation (NEW-SEC-007, Batch 6)**:
+  - In `POST /api/auth/change-password`, after verifying current password and saving new scrypt hash, handler executes `await destroyUserSessions(user.id)` followed immediately by `await createSession(user)`.
+  - All existing pre-change sessions (across all secondary devices and caller's previous session ID) are purged from the database.
+  - Exactly one fresh session token is generated, SHA-256 hashed into Postgres, and returned as a new signed `bp_session` cookie, keeping the caller seamlessly logged in while eliminating all concurrent session risks.
+- **Canonical Outbound URL Resolution & Host Protection (NEW-SEC-008, Batch 6)**:
+  - `siteBaseUrl()` in `src/lib/email.ts` resolves origins strictly from trusted environment variables (`SITE_URL` $\to$ `NEXT_PUBLIC_SITE_URL` $\to$ `VERCEL_PROJECT_PRODUCTION_URL` $\to$ `VERCEL_URL` $\to$ localhost in dev).
+  - Unsafe request `Host` / `X-Forwarded-Host` header reflection is eliminated. Production fails safely with 503 if unconfigured. Plaintext reset tokens travel exclusively via trusted canonical email URLs while database stores `resetTokenHash`.
 
 ---
 
@@ -71,6 +79,8 @@ A single user account can hold multiple roles simultaneously via the `accounts` 
 | **Page Navigation** | [`src/proxy.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/proxy.ts) | HMAC Cookie Signature Check | Coarse (redirects unauthenticated page requests) |
 | **Session DB Storage** | [`src/lib/auth.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts) | Deterministic SHA-256 session token hashing (`hashSessionToken`) | Cryptographic Storage Guard (Batch 5) |
 | **Password Reset Invalidation**| [`src/app/api/auth/forgot-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts) | `destroyUserSessions(user.id)` purge of all active user sessions | Authoritative Session Revocation (Batch 5) |
+| **Password Change Rotation** | [`src/app/api/auth/change-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/change-password/route.ts) | `destroyUserSessions(user.id)` + `createSession(user)` cookie rotation | Authoritative Session Invalidation & Rotation (Batch 6) |
+| **Canonical Outbound URLs** | [`src/lib/email.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/email.ts), [`src/app/api/auth/forgot-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts) | `siteBaseUrl()` strictly resolves trusted environment origin without Host header fallback | Host Header Poisoning Protection (Batch 6) |
 | **Admin Collection APIs** | `src/app/api/bookings`, `payments`, `leads`, `vendors/applications`, `vendors/kyc`, `partners` | `requireRole("admin")` | Authoritative Role Guard (Batch 1) |
 | **Single Booking Lookup** | [`src/app/api/bookings/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/bookings/%5Bid%5D/route.ts) | `requireRole()` + `order.userId === session.id` | Authoritative Resource Ownership (Batch 2) |
 | **Single Payment Lookup** | [`src/app/api/payments/[id]/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/payments/%5Bid%5D/route.ts) | `requireRole()` + `booking.userId === session.id` | Authoritative Resource Ownership (Batch 2) |
@@ -303,21 +313,23 @@ flowchart TD
   - Documented serverless runtime boundaries (in-memory per-runtime protection, best-effort mitigation).
   - Status: **Verified Fixed (Batch 5)**.
 
-### Observation 18 / Future Finding: Authenticated Password-Change Session Invalidation / Rotation (NEW-SEC-007)
-- **Location**: [`src/app/api/auth/change-password/route.ts:60-66`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/change-password/route.ts#L60-L66)
-- **Description**: While `POST /api/auth/forgot-password` now invalidates all active user sessions (Batch 5), `POST /api/auth/change-password` updates `user.passwordHash` without invalidating other active concurrent sessions or rotating the caller's current session token. If an account is compromised or password changed from an active device, concurrent sessions on other devices remain active.
-- **Impact**: Medium — concurrent sessions remain alive after authenticated password change.
-- **Exploitability**: Medium — requires concurrent active attacker session and user password update without explicit logout.
-- **Confidence**: High (verified in code).
-- **Suggested Future Batch**: Batch 6.
+### Observation 18: Authenticated Password-Change Session Invalidation & Rotation (NEW-SEC-007)
+- **Location**: [`src/app/api/auth/change-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/change-password/route.ts)
+- **Previous Risk**: While `POST /api/auth/forgot-password` invalidated sessions upon reset, `POST /api/auth/change-password` updated `user.passwordHash` without invalidating existing concurrent sessions or rotating the caller's session token. Concurrent attacker sessions on secondary devices remained valid until manual expiration.
+- **Batch 6 Remediation**:
+  - In `POST /api/auth/change-password`, after verifying current credentials and persisting the new scrypt hash, the handler executes `await destroyUserSessions(user.id)` to purge all active sessions across all devices from Postgres.
+  - Immediately executes `await createSession(user)` to generate a fresh `randomUUID()`, store its deterministic SHA-256 hash in `sessions.id`, and attach the signed `bp_session` cookie to the HTTP 200 response.
+  - Keeps the active user seamlessly authenticated on the current browser while terminating all other sessions.
+  - Status: **Verified Fixed (Batch 6)**.
 
-### Observation 19 / Future Finding: Password-Reset URL Origin / Host Header Trust (NEW-SEC-008)
-- **Location**: [`src/app/api/auth/forgot-password/route.ts:86-89`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts#L86-L89)
-- **Description**: In `POST /api/auth/forgot-password`, when `SITE_URL` and Vercel system environment variables are unset, the password reset email URL falls back to `new URL(request.url).origin`. If an untrusted proxy forwards an arbitrary `Host` or `X-Forwarded-Host` header, the generated reset link could embed an attacker-controlled origin.
-- **Impact**: Medium — password reset token leakage via Host header poisoning if deployed behind a misconfigured edge proxy.
-- **Exploitability**: Low — requires unset `SITE_URL` and edge reverse proxy permitting arbitrary Host header reflection.
-- **Confidence**: High (verified in code).
-- **Suggested Future Batch**: Batch 6.
+### Observation 19: Password-Reset URL Origin & Host Header Poisoning Protection (NEW-SEC-008)
+- **Location**: [`src/lib/email.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/email.ts), [`src/app/api/auth/forgot-password/route.ts`](file:///c:/Users/Zeeshaan/Bhojpatra/src/app/api/auth/forgot-password/route.ts)
+- **Previous Risk**: When `SITE_URL` and Vercel system environment variables were unset, password-reset email links fell back to `new URL(request.url).origin`, allowing attackers to inject malicious domains via manipulated `Host` or `X-Forwarded-Host` headers to steal password-reset tokens.
+- **Batch 6 Remediation**:
+  - Implemented authoritative `siteBaseUrl()` in `src/lib/email.ts` that resolves strictly from trusted environment variables (`SITE_URL` $\to$ `NEXT_PUBLIC_SITE_URL` $\to$ `VERCEL_PROJECT_PRODUCTION_URL` $\to$ `VERCEL_URL` $\to$ `http://localhost:3000` in non-production environments).
+  - In production (`NODE_ENV === "production"`), `siteBaseUrl()` returns `""` if no trusted environment variable is configured, causing `POST /api/auth/forgot-password` to fail safely with HTTP 503 Service Unavailable before looking up accounts or generating tokens.
+  - Eliminated all fallbacks to incoming HTTP request `Host` / `X-Forwarded-Host` headers across outbound email URL synthesis.
+  - Status: **Verified Fixed (Batch 6)**.
 
 ---
 
@@ -348,7 +360,7 @@ flowchart TD
 | **Authentication** | Missing Session Invalidation on Password Reset (NEW-SEC-004) | `[ALL USER SESSIONS PURGED ON RESET]` | **Verified Fixed (Batch 5)** |
 | **Session Security**| Plaintext Session Token Storage (NEW-SEC-005) | `[DETERMINISTIC SHA-256 HASH IN DB]` | **Verified Fixed (Batch 5)** |
 | **Rate Limiting** | Missing Rate Limiting on Auth/Payment Routes (NEW-SEC-006) | `[IN-MEMORY SLIDING WINDOW ENFORCED]` | **Verified Fixed (Batch 5)** |
-| **Session Security**| Authenticated Password-Change Session Invalidation / Rotation (NEW-SEC-007) | `[SESSIONS UNTOUCHED ON PW CHANGE]` | Outstanding (Future Batch) |
-| **Authentication** | Password-Reset URL Origin / Host Header Trust (NEW-SEC-008) | `[REQUEST ORIGIN FALLBACK]` | Outstanding (Future Batch) |
+| **Session Security**| Authenticated Password-Change Session Invalidation / Rotation (NEW-SEC-007) | `[ALL SESSIONS REVOKED & ROTATED]` | **Verified Fixed (Batch 6)** |
+| **Authentication** | Password-Reset URL Origin / Host Header Trust (NEW-SEC-008) | `[CANONICAL ORIGIN ENFORCED]` | **Verified Fixed (Batch 6)** |
 | **Performance/DoS** | Full Table Scans in Memory (`store.list`) | `[IN-MEMORY FILTERING]` | Unfixed (Observation only) |
 | **Secret Hygiene** | Insecure Dev Fallback Secrets & Admin Seed | `[DEV FALLBACK ACTIVE]` | Unfixed (Observation only) |

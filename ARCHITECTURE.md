@@ -1,7 +1,7 @@
 # Bhojpatra System Architecture
 
 > **Current Implementation Status**: Active Production / Staging Codebase  
-> **Last Verified Against Code**: 2026-08-28 (Post-Batch 5 Synchronization)
+> **Last Verified Against Code**: 2026-08-29 (Post-Batch 6 Synchronization)
 > **Source of Truth**: Repository source files (`src/`, `schema.sql`, `package.json`)  
 
 ---
@@ -101,7 +101,7 @@ Bhojpatra/
 ├── src/
 │   ├── app/                      # Next.js App Router (pages, layouts, route handlers)
 │   │   ├── api/                  # REST API endpoints (all dynamic = "force-dynamic")
-│   │   │   ├── auth/             # Login, signup, session, password reset, partner-roles
+│   │   │   ├── auth/             # Login, signup, session, password reset, partner-roles, change-password
 │   │   │   ├── bookings/         # Booking CRUD, mine, invoice signed retrieval
 │   │   │   ├── payments/         # Payment recording, settlement, UTR conflict checks
 │   │   │   ├── partners/         # Referral partner directory & public allowlist lookup
@@ -118,7 +118,7 @@ Bhojpatra/
 │   │   └── admin/                # Platform management console
 │   ├── components/               # UI components (atoms, sections, wizards, dashboards)
 │   ├── lib/                      # Core domain logic, utilities, and integrations
-│   │   ├── auth.ts               # Session token verification, scrypt hashing, requireRole
+│   │   ├── auth.ts               # Session token verification, scrypt hashing, requireRole, destroyUserSessions
 │   │   ├── users.ts              # User accounts, grantAccount, account union
 │   │   ├── store.ts              # Neon Postgres query runner & store abstraction
 │   │   ├── data.ts               # Static seed catalog, occasions, packages, cities
@@ -127,7 +127,7 @@ Bhojpatra/
 │   │   ├── invoice.ts            # Authoritative invoice data structure & signed share link helper
 │   │   ├── invoiceSign.ts        # HMAC-SHA256 URL token signing & verification
 │   │   ├── upi.ts                # NPCI UPI URI generation & VPA validation
-│   │   ├── email.ts              # Resend REST client & alert formatting
+│   │   ├── email.ts              # Resend REST client, alert formatting, & canonical siteBaseUrl resolution
 │   │   ├── vendorMenus.ts        # Live vendor menus & dish tier management
 │   │   ├── kyc.ts                # Vercel Blob KYC upload & retrieval helpers
 │   │   └── rateLimit.ts          # Zero-dependency in-memory sliding window rate limiter (Batch 5)
@@ -163,13 +163,24 @@ Bhojpatra/
     - **Payment Submissions (`POST /api/payments`)**: 5 submissions / 5m per authenticated user + IP.
   - **429 Response & Headers**: Returns HTTP 429 Too Many Requests with standard RFC headers: `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
   - **Serverless Runtime Boundary**: The limiter operates within the memory scope of individual serverless/container runtimes. It provides effective best-effort protection against single-runtime brute-force bursts rather than globally coordinated distributed quota enforcement across multiple stateless serverless instances.
-- **Authentication & Hashed Session Management (`src/lib/auth.ts`, Batch 5)**:
+- **Authentication & Hashed Session Management (`src/lib/auth.ts`, Batches 5 & 6)**:
   - **Password Hashing**: Pure Node.js `crypto` with `scrypt` (parameters $N=16384, r=8, p=1$) and timing-safe verification.
   - **Hashed Session Storage (NEW-SEC-005)**: Eliminates plaintext session token storage in the database. The client cookie retains the raw token and HMAC signature (`[raw_token].[hmac_sha256]`), while the Postgres `sessions` table stores the deterministic SHA-256 derived hash `hashSessionToken(rawToken)`.
     - `createSession(user)` generates a random UUID, computes the SHA-256 hash for database insertion (`sessions.id`), and sets the signed cookie containing the raw token.
     - `getSessionUser()` extracts and verifies the raw token from the cookie, computes the SHA-256 hash, and retrieves the session row by hashed ID.
     - `destroySession()` computes the SHA-256 hash from the cookie token to remove the database row and clears the cookie.
   - **Session Revocation on Password Reset (NEW-SEC-004)**: Helper function `destroyUserSessions(userId: string)` queries active sessions and purges all records belonging to the target user. `POST /api/auth/forgot-password` executes `destroyUserSessions(user.id)` upon completing a password reset, immediately terminating all existing sessions across all browsers and devices.
+  - **Authenticated Password-Change Session Invalidation & Rotation (NEW-SEC-007, Batch 6)**: In `POST /api/auth/change-password`, upon successful verification of current credentials and persistence of the new `passwordHash`, the handler invokes `await destroyUserSessions(user.id)` to purge all existing sessions from Postgres across all devices. It then immediately executes `await createSession(user)` to issue a fresh rotated session token (SHA-256 hashed in DB) and attach a new signed `bp_session` cookie to the HTTP response. All pre-change sessions on secondary/stolen devices are terminated, while the current browser remains seamlessly signed in.
+- **Canonical Outbound URL & Host Header Protection (`src/lib/email.ts`, `src/app/api/auth/forgot-password`, NEW-SEC-008, Batch 6)**:
+  - Centralized in `siteBaseUrl()` in `src/lib/email.ts`.
+  - Authoritative precedence order for outbound links:
+    1. `process.env.SITE_URL` (trimmed and normalized with `https://` prefix)
+    2. `process.env.NEXT_PUBLIC_SITE_URL`
+    3. `process.env.VERCEL_PROJECT_PRODUCTION_URL` (`https://${host}`)
+    4. `process.env.VERCEL_URL` (`https://${host}`)
+    5. Non-production fallback (`process.env.NODE_ENV !== "production"`): `http://localhost:3000`
+  - In production (`NODE_ENV === "production"`), `siteBaseUrl()` returns `""` if no trusted canonical origin is configured.
+  - `POST /api/auth/forgot-password` strictly eliminates the unvalidated `new URL(request.url).origin` fallback and ignores incoming `Host` / `X-Forwarded-Host` headers. If unconfigured in production, it fails safely with HTTP 503 Service Unavailable, preventing attacker-poisoned password reset email links. Plaintext reset tokens travel exclusively via trusted canonical email links, while stored tokens remain cryptographically hashed.
 - **Authoritative Role Guards**: Function [`requireRole(...roles)`](file:///c:/Users/Zeeshaan/Bhojpatra/src/lib/auth.ts#L138) validates the HMAC-signed session cookie against active sessions in Neon DB, checks expiration, and validates caller roles (`admin`, `vendor`, `partner`, `customer`). Collection endpoints (e.g. `GET /api/bookings`, `GET /api/payments`, `GET /api/leads`, `GET /api/vendors/applications`, `GET /api/vendors/kyc`, `GET /api/partners`) enforce `requireRole("admin")`.
 - **Object-Level Resource Ownership Guards**:
   - **Bookings (`GET /api/bookings/[id]`)**: Restricts access to the authenticated customer who owns the booking (`order.userId === session.id`) or platform admins. Legacy records without `userId` are admin-only.
