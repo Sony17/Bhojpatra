@@ -5,7 +5,6 @@ import PromoBanner from "@/components/sections/PromoBanner";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import BainaBoxes from "@/components/sections/BainaBoxes";
-import Packages from "@/components/sections/Packages";
 import Gallery from "@/components/sections/Gallery";
 import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
@@ -31,7 +30,6 @@ export default function Home() {
       <div className="home-band-cream">
         <TopCategories />
       </div>
-      <Packages />
       <BainaBoxes />
       <div className="home-band-cream">
         <Gallery />

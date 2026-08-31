@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { vendorListings, cities, type VendorListing } from "@/lib/data";
+import { vendorListings, cities, listingCateringCategories, type VendorListing } from "@/lib/data";
 import {
   slugifyName,
   fetchMyBookings,
@@ -23,6 +23,7 @@ import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
 import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
+import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 
 /** One customer review as returned by `GET /api/reviews`. */
 interface StoredReview {
@@ -525,15 +526,26 @@ function VendorProfile({
     }
   };
 
-  // "Book this caterer" starts a Single Stall with this vendor pre-selected
-  // (still changeable in the wizard). City is stored by name here but the wizard
-  // keys off the city id, so bridge through the `cities` table. Live vendors
-  // resolve by id; a curated seed id absent from the booking menu falls back to
-  // the tier picker.
+  // "Book this caterer" routes to the right booking experience:
+  // - Baina Box vendors stay in Baina order panel (/baina-box/<slug>#baina-order or #baina-order)
+  // - Live Counter specialists go to dedicated Live Stall flow (/book/live-stall?vendor=<id>)
+  // - Single Stall / caterers go to Single Stall wizard (/book/stall?vendor=<id>)
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
-    cityId ? `&city=${cityId}` : ""
-  }`;
+  const bainaVendorData = getBainaBoxVendorByVendorId(vendor.id);
+  const vendorCats = listingCateringCategories(vendor);
+  const isBaina = vendorCats.includes("baina-box") || Boolean(bainaVendorData);
+  const isLive = vendorCats.includes("live-stall") || vendorCats.includes("live-counters");
+  const bookHref = bainaVendorData
+    ? `/baina-box/${bainaVendorData.slug}#baina-order`
+    : isBaina
+      ? "#baina-order"
+      : isLive
+        ? `/book/live-stall?vendor=${encodeURIComponent(vendor.id)}${
+            cityId ? `&city=${cityId}` : ""
+          }`
+        : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
+            cityId ? `&city=${cityId}` : ""
+          }`;
 
   // A live aggregate from the reviews just loaded for this vendor, so a rating
   // submitted from the panel below is reflected immediately (the shared

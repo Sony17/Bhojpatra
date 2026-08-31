@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 import { AppBar, Button, Card, CategoryChip, CategoryChips } from "@/components/ui";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
 import type { PublicVendorProfile, VendorBainaBox, VendorEssentialService } from "@/lib/vendorMenus";
-import { packageCategoryItems, type VendorListing } from "@/lib/data";
+import { packageCategoryItems, listingCateringCategories, type VendorListing } from "@/lib/data";
 import type { VendorTier } from "@/lib/admin/types";
 import { dishOnTier, tierRate } from "@/lib/tiers";
 import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
@@ -138,7 +138,17 @@ export default function VendorFullMenu({
   const reviews = profile?.reviews ?? listing?.reviews ?? 100;
   const verified = profile?.verified ?? listing?.verified ?? false;
   const cuisines = profile?.cuisines ?? listing?.cuisines ?? [];
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendorId)}`;
+  const listingCats = listing ? listingCateringCategories(listing) : [];
+  const isBaina = listingCats.includes("baina-box") || Boolean(profile?.serviceCategories?.some(c => c.id === "baina-box")) || Boolean(profile?.bainaBoxes?.length) || Boolean(getBainaBoxVendorByVendorId(vendorId));
+  const isLive = listingCats.includes("live-stall") || listingCats.includes("live-counters") || Boolean(profile?.serviceCategories?.some(c => c.id === "live-stall" || c.id === "live-counters"));
+  const bainaVendorData = getBainaBoxVendorByVendorId(vendorId);
+  const bookHref = bainaVendorData
+    ? `/baina-box/${bainaVendorData.slug}#baina-order`
+    : isBaina
+      ? `/vendors/${vendorId}#baina-order`
+      : isLive
+        ? `/book/live-stall?vendor=${encodeURIComponent(vendorId)}`
+        : `/book/stall?vendor=${encodeURIComponent(vendorId)}`;
 
   // Assemble full menu categories
   const categories: FullMenuCategory[] = [];

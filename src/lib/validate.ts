@@ -13,16 +13,29 @@ export const PHONE_RE = /^[6-9]\d{9}$/;
 export const GST_RE =
   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
-/** Strip spaces/dashes and an optional +91 / 0091 / 91 / 0 prefix. */
+/** Normalise an Indian mobile to 10 digits, handling +91, 0091, 91 (12-digit), and 0 (11-digit) prefixes safely without corrupting 10-digit numbers starting with 91. */
 export function normalizePhone(raw: string): string {
-  return raw.replace(/[\s-]/g, "").replace(/^(\+91|0091|91|0)/, "");
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+  if (digits.length === 10) {
+    return digits;
+  }
+  if (/^(\+91|0091)\d{10}$/.test(raw.replace(/[\s-]/g, ""))) {
+    return raw.replace(/[\s-]/g, "").replace(/^(\+91|0091)/, "");
+  }
+  return digits;
 }
 
 export function isValidEmail(v: unknown): v is string {
   return typeof v === "string" && EMAIL_RE.test(v.trim());
 }
 
-/** Accepts a raw phone string; validates after normalizing. */
+/** Accepts a raw phone string; validates that normalized number is a 10-digit Indian mobile starting with 6-9. */
 export function isValidPhone(v: unknown): v is string {
   return typeof v === "string" && PHONE_RE.test(normalizePhone(v.trim()));
 }

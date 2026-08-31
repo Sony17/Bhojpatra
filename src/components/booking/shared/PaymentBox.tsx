@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { isValidEmail } from "@/lib/validate";
+import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { money } from "@/lib/money";
 import { ADVANCE_RATE } from "@/lib/bookingPricing";
 import {
@@ -148,7 +148,7 @@ export default function PaymentBox({
   // advance succeeds (handleConfirm enforces the same three fields).
   const contactReady =
     customerName.trim().length > 0 &&
-    customerPhone.replace(/\D/g, "").length >= 10 &&
+    isValidPhone(customerPhone) &&
     isValidEmail(customerEmail);
   // A stable ref for the advance so a retry stays idempotent on the txn key.
   const txnRef = upiTxnRef(bookingId, "ADVANCE");

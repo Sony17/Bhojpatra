@@ -24,7 +24,7 @@ export default function BainaBoxDetail({
   const inCompare = has(data.vendorId);
   const compareDisabled = !inCompare && isFull;
 
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(data.vendorId)}`;
+  const bookHref = "#baina-order";
 
   const photos = useMemo(
     () => [data.heroImage, ...(data.gallery ?? []).filter((g) => g !== data.heroImage)],

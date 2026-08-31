@@ -1182,21 +1182,22 @@ function VendorCard({
     ? `/baina-box/${bainaVendorData.slug}`
     : `/vendors/${vendor.id}`;
 
-  // "Book" from a brand card starts a Single Stall order with this vendor
-  // pre-selected (still changeable in that wizard). Live vendors resolve by id;
-  // a curated seed id absent from the booking menu falls back to the stall picker.
-  // Boxes are ordered per box, not per plate, so a Baina Box brand goes to its
-  // own order panel instead — the flow that actually sells what the lens shows.
-  // Curated brands have a storefront; a live vendor's boxes are ordered from
-  // the same panel on their profile (the anchor is simply absent, landing them
-  // on the profile, if they declared the category but published no boxes).
+  // "Book" from a brand card starts the appropriate booking flow:
+  // - Baina Box vendors stay in Baina order panel (/baina-box/<slug>#baina-order or /vendors/<id>#baina-order)
+  // - Live Counter specialists go to dedicated Live Stall flow (/book/live-stall?vendor=<id>)
+  // - Single Stall / caterers go to Single Stall wizard (/book/stall?vendor=<id>)
+  const isLiveStall = lens === "live-stall" || inCategory("live-stall")(vendor) || inCategory("live-counters")(vendor);
   const bookHref = bainaVendorData
     ? `/baina-box/${bainaVendorData.slug}#baina-order`
     : bainaMode
       ? `/vendors/${vendor.id}#baina-order`
-      : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
-          cityId ? `&city=${cityId}` : ""
-        }`;
+      : isLiveStall
+        ? `/book/live-stall?vendor=${encodeURIComponent(vendor.id)}${
+            cityId ? `&city=${cityId}` : ""
+          }`
+        : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
+            cityId ? `&city=${cityId}` : ""
+          }`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {

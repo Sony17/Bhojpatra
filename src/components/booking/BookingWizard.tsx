@@ -19,7 +19,7 @@ import {
   type PartnerRole,
 } from "@/lib/session";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
-import { isValidEmail } from "@/lib/validate";
+import { isValidEmail, isValidPhone, normalizePhone } from "@/lib/validate";
 import {
   DEFAULT_REFERRAL_RATES,
   customerPercentFor,
@@ -461,6 +461,14 @@ export default function BookingWizard() {
       window.location.replace(`/book/stall${qs ? `?${qs}` : ""}`);
       return;
     }
+    if (pkg === "live-stall" || sp.get("flow") === "live-stall") {
+      const fwd = new URLSearchParams(sp);
+      fwd.delete("package");
+      fwd.delete("flow");
+      const qs = fwd.toString();
+      window.location.replace(`/book/live-stall${qs ? `?${qs}` : ""}`);
+      return;
+    }
     // Occasion may be a seed id, an admin-added id (resolved once the list
     // loads), or the "Other" sentinel carrying a typed name in `occName`.
     const occName = sp.get("occName")?.trim();
@@ -759,12 +767,12 @@ export default function BookingWizard() {
   // de-duped by phone in the API, and once per number here.
   const capturedPhones = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const phone = customerPhone.replace(/[\s-]/g, "");
-    if (!/^[6-9]\d{9}$/.test(phone)) return;
+    const phone = normalizePhone(customerPhone);
+    if (!isValidPhone(phone)) return;
     // A number prefilled from this customer's last booking isn't a new lead —
     // they're already a customer, and the field filled itself. Only a number
     // the guest actually put in here is worth capturing.
-    if (phone === lastBookingPhone.replace(/[\s-]/g, "")) return;
+    if (phone === normalizePhone(lastBookingPhone)) return;
     if (capturedPhones.current.has(phone)) return;
     capturedPhones.current.add(phone);
     void fetch("/api/leads", {
@@ -2083,9 +2091,9 @@ export default function BookingWizard() {
       setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
     }
-    if (customerPhone.replace(/\D/g, "").length < 10) {
+    if (!isValidPhone(customerPhone)) {
       setConfirmError(
-        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+        t("Please enter a valid 10-digit mobile number.", "कृपया सही 10-अंकीय मोबाइल नंबर दर्ज करें।"),
       );
       return;
     }
@@ -2603,22 +2611,41 @@ export default function BookingWizard() {
             />
           )}
           {step === 4 && (
-            <StepExtras
-              lang={lang}
-              t={t}
-              guests={guests}
-              selectedAddOns={selectedAddOns}
-              toggleAddOn={toggleAddOn}
-              packageName={selectedPackage?.name ?? ""}
-              multiVendor={counterMultiVendor}
-              eligibleVendors={eligibleAddOnVendors}
-              vendorIdsFor={addOnVendorIds}
-              onVendorToggle={toggleAddOnVendor}
-              // Gold & Platinum unlock the full extras filter (browse by
-              // counters vs whole-event services); Single Stall & Silver keep
-              // just the free-text search.
-              fullFilter={packageId === "gold" || packageId === "platinum"}
-            />
+            <>
+              {guests < 50 && (
+                <div className="mb-6 flex items-start gap-3 rounded-2xl border border-maroon/20 bg-cream/40 p-4">
+                  <span className="text-xl">🎁</span>
+                  <div className="text-xs text-ink">
+                    <span className="font-bold text-maroon">
+                      {t("Planning for fewer than 50 guests?", "50 से कम मेहमानों का आयोजन?")}
+                    </span>{" "}
+                    {t(
+                      "Full feast packages are designed for gatherings of 50+ guests. For intimate parties and celebrations, explore our tailored Baina Boxes.",
+                      "फुल फीस्ट पैकेज 50+ मेहमानों के लिए डिज़ाइन किए गए हैं। छोटे आयोजनों के लिए हमारे बैना बॉक्स देखें।",
+                    )}{" "}
+                    <a href="/baina-box" className="font-semibold text-maroon underline hover:text-ink">
+                      {t("Order Baina Box", "बैना बॉक्स ऑर्डर करें")} →
+                    </a>
+                  </div>
+                </div>
+              )}
+              <StepExtras
+                lang={lang}
+                t={t}
+                guests={guests}
+                selectedAddOns={selectedAddOns}
+                toggleAddOn={toggleAddOn}
+                packageName={selectedPackage?.name ?? ""}
+                multiVendor={counterMultiVendor}
+                eligibleVendors={eligibleAddOnVendors}
+                vendorIdsFor={addOnVendorIds}
+                onVendorToggle={toggleAddOnVendor}
+                // Gold & Platinum unlock the full extras filter (browse by
+                // counters vs whole-event services); Single Stall & Silver keep
+                // just the free-text search.
+                fullFilter={packageId === "gold" || packageId === "platinum"}
+              />
+            </>
           )}
           {/* Essentials step (5) — the mandatory "Choose Your Service Package"
               comparison. Single-select; the chosen tier's price folds into the
@@ -2661,9 +2688,11 @@ export default function BookingWizard() {
               addOnVendorNames={addOnVendorNames}
               serviceName={selectedService?.name}
               serviceTotal={serviceTotal}
+              onEditBrief={() => setStep(1)}
               onEditMenu={() => setStep(2)}
               onEditCourse={editCourse}
               onRemoveVendor={removeVendor}
+              onEditLive={() => setStep(3)}
               onEditExtras={() => setStep(4)}
               onEditService={() => setStep(5)}
               couponInput={couponInput}
@@ -3497,6 +3526,67 @@ function StepPackage({
           "ऊपर दी गई डिश संख्या हर टियर के लिए हमारा मानक है। कुछ ब्रांड किसी कोर्स से इससे ज़्यादा (या कम) परोसते हैं — अगले चरण में हर ब्रांड के कार्ड पर उनकी अपनी संख्या दिखेगी।",
         )}
       </p>
+
+      {/* Cross-links for Intimate Gatherings & Standalone Live Stations */}
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {/* Baina Box Discovery Card for smaller parties */}
+        <div className="relative overflow-hidden rounded-2xl border border-cream bg-gradient-to-br from-cream/40 via-white to-cream/20 p-5 shadow-card">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-maroon text-lg text-cream">
+              🎁
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow text-[10px] font-bold text-maroon">
+                {t("FOR SMALLER PARTIES & GIFTING", "छोटे आयोजनों और उपहारों के लिए")}
+              </p>
+              <h3 className="font-display text-base font-bold text-ink">
+                {t("Baina Box by Bhojpatra", "भोजपत्र का बैना बॉक्स")}
+              </h3>
+              <p className="mt-1 text-xs text-ink-soft">
+                {t(
+                  "Hosting an intimate celebration under 50 guests or looking for ceremonial gift hampers? Order customized Baina Boxes with no guest minimums.",
+                  "50 से कम मेहमानों का पारिवारिक आयोजन या उपहार के लिए डिब्बे? बिना किसी न्यूनतम मेहमान सीमा के कस्टमाइज़्ड बैना बॉक्स ऑर्डर करें।",
+                )}
+              </p>
+              <a
+                href="/baina-box"
+                className="btn-sheen mt-3 inline-flex min-h-8 items-center gap-1 rounded-full bg-maroon px-4 text-xs font-semibold text-cream shadow-card transition hover:-translate-y-0.5"
+              >
+                {t("Explore Baina Boxes", "बैना बॉक्स देखें")} →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Stall Discovery Card */}
+        <div className="relative overflow-hidden rounded-2xl border border-cream bg-gradient-to-br from-cream/40 via-white to-cream/20 p-5 shadow-card">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/30 text-lg text-maroon">
+              🍳
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow text-[10px] font-bold text-maroon">
+                {t("INTERACTIVE STATIONS", "इंटरएक्टिव स्टेशन")}
+              </p>
+              <h3 className="font-display text-base font-bold text-ink">
+                {t("Live Stall Specialists", "लाइव स्टॉल स्पेशलिस्ट")}
+              </h3>
+              <p className="mt-1 text-xs text-ink-soft">
+                {t(
+                  "Want standalone live food counters — Chaat, Dosa, Chinese, Pasta, and specialist cooking stations? Book directly with live stall specialists.",
+                  "अलग से लाइव फ़ूड काउंटर चाहिए — चाट, डोसा, चाइनीज़, पास्ता? सीधे लाइव स्टॉल विशेषज्ञों से बुक करें।",
+                )}
+              </p>
+              <a
+                href="/book/live-stall"
+                className="btn-sheen mt-3 inline-flex min-h-8 items-center gap-1 rounded-full border border-maroon bg-white px-4 text-xs font-semibold text-maroon shadow-card transition hover:bg-cream"
+              >
+                {t("Book Live Stall", "लाइव स्टॉल बुक करें")} →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4558,9 +4648,11 @@ function StepConfirm({
   addOnVendorNames,
   serviceName,
   serviceTotal,
+  onEditBrief,
   onEditMenu,
   onEditCourse,
   onRemoveVendor,
+  onEditLive,
   onEditExtras,
   onEditService,
   couponInput,
@@ -4614,11 +4706,13 @@ function StepConfirm({
   addOnVendorNames: (addOnId: string) => string[];
   serviceName?: string;
   serviceTotal: number;
+  onEditBrief?: () => void;
   onEditMenu: () => void;
   /** Jump back to the build step focused on one course (per-course "Edit"). */
   onEditCourse: (catId: string) => void;
   /** Drop one vendor's picks from a course (per-vendor "Remove"). */
   onRemoveVendor: (catId: string, vendorId: string) => void;
+  onEditLive?: () => void;
   onEditExtras: () => void;
   onEditService: () => void;
   couponInput: string;
@@ -4658,6 +4752,34 @@ function StepConfirm({
   onConfirm: () => void;
   whatsappHref: string;
 }) {
+  const selectedCards = categories
+    .map((cat) => {
+      const chosen = categoryVendor[cat.id] ?? [];
+      const rows = cat.vendors
+        .filter((v) => chosen.includes(v.id))
+        .map((v) => ({
+          vendor: v,
+          picks: v.items
+            .filter((it) => itemsFor(cat.id).includes(it.id))
+            .map((it) => it.name),
+        }))
+        .filter((r) => r.picks.length > 0);
+      return { cat, rows };
+    })
+    .filter((c) => c.rows.length > 0);
+
+  const totalDishes = selectedCards.reduce(
+    (sum, c) => sum + c.rows.reduce((rSum, r) => rSum + r.picks.length, 0),
+    0,
+  );
+
+  const incompleteCategories = categories.filter((cat) => {
+    const isLive = isLiveStallCategory?.(cat.id);
+    if (isLive) return false;
+    const picks = itemsFor(cat.id);
+    return picks.length === 0;
+  });
+
   return (
     <form
       onSubmit={(e) => {
@@ -4668,6 +4790,111 @@ function StepConfirm({
       <SectionHead
         title={t("Review & Confirm", "समीक्षा और पुष्टि")}
       />
+
+      {/* ── Post-selection confirmation & quick navigation card (Row 45) ── */}
+      <div className="mb-6 overflow-hidden rounded-2xl border border-maroon/20 bg-gradient-to-br from-cream/40 via-white to-cream/20 p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-maroon/10 pb-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-base font-bold text-cream shadow-sm">
+              ✓
+            </span>
+            <div>
+              <h3 className="font-display text-lg font-bold text-maroon sm:text-xl">
+                {t("Selections Confirmed", "चयन की पुष्टि")}
+              </h3>
+              <p className="text-xs text-ink-soft sm:text-sm">
+                {t(
+                  "All your event choices and menu items are captured below. Click any section to modify.",
+                  "आपके सभी इवेंट विकल्प और मेन्यू आइटम नीचे दर्ज हैं। बदलने के लिए किसी भी भाग पर क्लिक करें।",
+                )}
+              </p>
+            </div>
+          </div>
+          {onEditBrief && (
+            <button
+              type="button"
+              onClick={onEditBrief}
+              className="btn-sheen inline-flex items-center gap-1.5 rounded-full bg-cream/80 px-3.5 py-1.5 text-xs font-semibold text-maroon ring-1 ring-maroon/25 transition hover:bg-cream"
+            >
+              <span>{t("Edit Event Brief", "इवेंट विवरण बदलें")}</span>
+              <span>→</span>
+            </button>
+          )}
+        </div>
+
+        {/* Quick jump navigation chips */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-ink-soft">
+            {t("Jump to edit:", "सीधे बदलने जाएं:")}
+          </span>
+          {onEditBrief && (
+            <button
+              type="button"
+              onClick={onEditBrief}
+              className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+            >
+              <span>🏷️ {packageName || t("Package", "पैकेज")}</span>
+              <span className="text-maroon">✎</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onEditMenu}
+            className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+          >
+            <span>🍲 {t(`${totalDishes} Dishes Selected`, `${totalDishes} व्यंजन चुने गए`)}</span>
+            <span className="text-maroon">✎</span>
+          </button>
+          {onEditLive && (
+            <button
+              type="button"
+              onClick={onEditLive}
+              className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+            >
+              <span>🔥 {t("Live Stalls", "लाइव स्टॉल")}</span>
+              <span className="text-maroon">✎</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onEditExtras}
+            className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+          >
+            <span>✨ {t(`${selectedAddOns.length} Add-ons`, `${selectedAddOns.length} एक्स्ट्रा`)}</span>
+            <span className="text-maroon">✎</span>
+          </button>
+          {serviceName && (
+            <button
+              type="button"
+              onClick={onEditService}
+              className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+            >
+              <span>👔 {serviceName}</span>
+              <span className="text-maroon">✎</span>
+            </button>
+          )}
+        </div>
+
+        {/* Incomplete / missing items alert banner if any course was skipped */}
+        {incompleteCategories.length > 0 && (
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gold/40 bg-gold/10 px-3.5 py-2 text-xs">
+            <span className="font-medium text-ink">
+              💡{" "}
+              {t(
+                `Unselected courses: ${incompleteCategories.map((c) => t(c.name, c.nameHi)).join(", ")}`,
+                `बिना चयन के कोर्स: ${incompleteCategories.map((c) => t(c.name, c.nameHi)).join(", ")}`,
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => onEditCourse(incompleteCategories[0].id)}
+              className="font-semibold text-maroon underline underline-offset-2 hover:text-ink"
+            >
+              {t("Select now →", "अभी चुनें →")}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Snapshot */}
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">

@@ -9,6 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
+import { isValidEmail, isValidPhone } from "@/lib/validate";
 import type { BainaOrderVendor } from "@/lib/bainaBoxData";
 
 const MONTHS = [
@@ -39,9 +40,7 @@ function orderRef(seed: string): string {
   return `BHJ-B${(Math.abs(h) % 90000) + 10000}`;
 }
 
-function isValidEmail(v: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
+
 
 /** How an ordered line reads in the summary and on the receipt. A vendor sells
  *  the same box in several sizes, so the size has to ride along with the name —
@@ -125,9 +124,9 @@ export default function BainaBoxOrderPanel({
       setError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
     }
-    if (phone.replace(/\D/g, "").length < 10) {
+    if (!isValidPhone(phone)) {
       setError(
-        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+        t("Please enter a valid 10-digit mobile number.", "कृपया सही 10-अंकीय मोबाइल नंबर दर्ज करें।"),
       );
       return;
     }
@@ -257,6 +256,21 @@ export default function BainaBoxOrderPanel({
     <>
       {/* ── Boxes & sweets grid — pick quantities ─────────────────────── */}
       <div className="mt-12 border-t border-cream-3 pt-8">
+        {/* Positioning banner: Smaller Parties & Festive Gifting */}
+        <div className="mb-6 flex items-center gap-2.5 rounded-xl border border-maroon/20 bg-cream/40 px-4 py-2.5 text-xs text-ink">
+          <span className="text-base" aria-hidden="true">🎁</span>
+          <span>
+            <strong className="font-semibold text-maroon">
+              {t("Tailored for Intimate Gatherings & Festive Gifting", "छोटे आयोजनों और उपहारों के लिए उपयुक्त")}
+            </strong>
+            {" — "}
+            {t(
+              "No minimum guest count required. Order customized sweet & savoury hampers for any party size.",
+              "कोई न्यूनतम मेहमान सीमा नहीं। किसी भी संख्या के लिए कस्टमाइज़्ड डिब्बे ऑर्डर करें।",
+            )}
+          </span>
+        </div>
+
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-bold text-maroon sm:text-2xl">
             {heading ?? t("Order Sweets & Boxes", "मिठाई और डिब्बे ऑर्डर करें")}

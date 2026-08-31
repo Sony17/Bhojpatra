@@ -33,8 +33,13 @@ export default function VendorProfile({
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(profile.id);
   const compareDisabled = !inCompare && isFull;
-  // Booking one brand is a Single Stall order, which has its own wizard.
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(profile.id)}`;
+  const isBaina = Boolean(profile.serviceCategories?.some(c => c.id === "baina-box")) || (bainaProducts.length > 0);
+  const isLive = Boolean(profile.serviceCategories?.some(c => c.id === "live-stall" || c.id === "live-counters"));
+  const bookHref = isBaina
+    ? "#baina-order"
+    : isLive
+      ? `/book/live-stall?vendor=${encodeURIComponent(profile.id)}`
+      : `/book/stall?vendor=${encodeURIComponent(profile.id)}`;
   const allPhotos = [profile.image, ...profile.gallery.filter((g) => g !== profile.image)];
 
   return (

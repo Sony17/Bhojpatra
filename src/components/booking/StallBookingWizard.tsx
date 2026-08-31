@@ -9,7 +9,7 @@ import {
   type PartnerRole,
 } from "@/lib/session";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
-import { isValidEmail } from "@/lib/validate";
+import { isValidEmail, isValidPhone, normalizePhone } from "@/lib/validate";
 import {
   DEFAULT_REFERRAL_RATES,
   customerPercentFor,
@@ -98,10 +98,9 @@ import {
 // entered from a brand's "Book Now" and opens straight on that stall's menu.
 const TOTAL_STEPS = 3;
 
-// Where a guest picks their stall: the Brands catalogue, lensed to the Single
-// Stall category. Every entry point into this flow that doesn't already name a
-// vendor sends them here first.
-const BRANDS_HREF = "/vendors?category=single-stall";
+// Default Brands catalogue lens for single stalls vs live counters
+const SINGLE_BRANDS_HREF = "/vendors?category=single-stall";
+const LIVE_BRANDS_HREF = "/vendors?category=live-counters";
 
 // The order is stored under the platform's "custom" plan — the same id the
 // tiered wizard used for its single-stall path, so every downstream consumer
@@ -194,10 +193,16 @@ function coursePrice(course: StallCourse, picks: string[]): number {
 }
 
 /* ─── Component ──────────────────────────────────────────────────────── */
-export default function StallBookingWizard() {
+export default function StallBookingWizard({
+  mode = "single",
+}: {
+  mode?: "single" | "live";
+} = {}) {
   const { lang, t } = useLang();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
+
+  const brandsHref = mode === "live" ? LIVE_BRANDS_HREF : SINGLE_BRANDS_HREF;
 
   const [step, setStep] = useState<number>(1);
 
@@ -502,9 +507,9 @@ export default function StallBookingWizard() {
   // Best-effort lead capture for an abandoned booking.
   const capturedPhones = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const phone = customerPhone.replace(/[\s-]/g, "");
-    if (!/^[6-9]\d{9}$/.test(phone)) return;
-    if (phone === lastBookingPhone.replace(/[\s-]/g, "")) return;
+    const phone = normalizePhone(customerPhone);
+    if (!isValidPhone(phone)) return;
+    if (phone === normalizePhone(lastBookingPhone)) return;
     if (capturedPhones.current.has(phone)) return;
     capturedPhones.current.add(phone);
     void fetch("/api/leads", {
@@ -652,23 +657,27 @@ export default function StallBookingWizard() {
     setPendingVendorId("");
   }, [stalls, pendingVendorId, menuSettled]);
 
-  // Nobody books a stall they haven't seen. Landing here without one — a bare
-  // /book/stall, a cleared draft — means the guest hasn't chosen yet, so send
-  // them to the Brands page, which lists every stall with its photos, filters
-  // and full menu. They come back through a brand's "Book Now" with `?vendor=`,
-  // and the draft (event brief and all) is still in session storage. A hand-off
-  // we couldn't resolve keeps them here instead, so the notice is read first.
-  useEffect(() => {
-    if (!menuSettled || stallId || pendingVendorId || missingBrand) return;
-    if (typeof window === "undefined") return;
-    window.location.replace(BRANDS_HREF);
-  }, [menuSettled, stallId, pendingVendorId, missingBrand]);
+
 
   // Keep the active course tab in range when the stall (and its course list)
   // changes.
   useEffect(() => {
     if (stall && activeCat > stall.courses.length - 1) setActiveCat(0);
   }, [stall, activeCat]);
+
+  // For Single Stall with a single fixed course or single option, pre-select it
+  // so the guest sees the confirmed offering directly without needing to check boxes.
+  useEffect(() => {
+    if (mode === "single" && stall && stall.courses.length === 1) {
+      const c = stall.courses[0];
+      if (c && c.fixed && (!categoryItems[c.id] || categoryItems[c.id].length === 0)) {
+        setCategoryItems((prev) => ({
+          ...prev,
+          [c.id]: c.items.map((it) => it.id),
+        }));
+      }
+    }
+  }, [mode, stall, categoryItems]);
 
   /* ─── Menu selection ───────────────────────────────────────────────── */
   // No quotas here. A tier hands you "N dishes from this course"; a Single
@@ -932,7 +941,7 @@ export default function StallBookingWizard() {
   // the flow begins: the Brands page.
   const startOver = () => {
     clearStallDraft();
-    if (typeof window !== "undefined") window.location.assign(BRANDS_HREF);
+    if (typeof window !== "undefined") window.location.assign(brandsHref);
   };
 
   const applyCouponCode = (raw: string) => {
@@ -982,6 +991,7 @@ export default function StallBookingWizard() {
   const buildReceipt = (): string => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
+    const planName = mode === "live" ? "Live Stall" : "Single Stall";
     const menuLines = menuGroups
       .map((g) => `  • ${g.heading}: ${g.items.join(", ")}`)
       .join("\n");
@@ -998,7 +1008,7 @@ export default function StallBookingWizard() {
       `Booking ID: ${bookingId}`,
       "",
       `Occasion: ${occ ? occ.name : "-"}`,
-      `Plan:     Single Stall`,
+      `Plan:     ${planName}`,
       `Stall:    ${stall?.name ?? "-"}`,
       `Date:     ${eventDate || "-"}`,
       `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
@@ -1041,11 +1051,12 @@ export default function StallBookingWizard() {
   const buildInvoice = (paid: number = paidAmount): InvoiceData => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
+    const planName = mode === "live" ? "Live Stall" : "Single Stall";
 
     const lines: InvoiceData["lines"] = [];
     if (perPlate > 0) {
       lines.push({
-        label: `${stall?.name ?? "Single Stall"} menu (${money(perPlate)}/plate × ${guests})`,
+        label: `${stall?.name ?? planName} menu (${money(perPlate)}/plate × ${guests})`,
         amount: subtotal,
       });
     }
@@ -1093,7 +1104,7 @@ export default function StallBookingWizard() {
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
-      packageName: stall ? `Single Stall — ${stall.name}` : "Single Stall",
+      packageName: stall ? `${planName} — ${stall.name}` : planName,
       lines,
       menu: menuGroups.map((g) => ({
         heading: g.heading,
@@ -1175,9 +1186,9 @@ export default function StallBookingWizard() {
       setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
     }
-    if (customerPhone.replace(/\D/g, "").length < 10) {
+    if (!isValidPhone(customerPhone)) {
       setConfirmError(
-        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+        t("Please enter a valid 10-digit mobile number.", "कृपया सही 10-अंकीय मोबाइल नंबर दर्ज करें।"),
       );
       return;
     }
@@ -1371,17 +1382,36 @@ export default function StallBookingWizard() {
           plan reads as a first-class plan rather than a stripped-down one.
           Phones drop it for a minimal, low-scroll flow. */}
       <WizardHero
-        eyebrow={t("SINGLE STALL", "सिंगल स्टॉल")}
-        title={t("One Stall, One Great Menu", "एक स्टॉल, एक बढ़िया मेन्यू")}
-        sub={t(
-          "One verified stall runs your whole order — their menu, their price, and nothing you didn't ask for.",
-          "एक वेरिफाइड स्टॉल आपका पूरा ऑर्डर संभालता है — उनका मेन्यू, उनकी कीमत, और कुछ भी फ़ालतू नहीं।",
-        )}
-        chips={[
-          t("3 guided steps", "3 आसान चरण"),
-          t("One verified vendor", "एक वेरिफाइड वेंडर"),
-          t("Pay for what you pick", "जो चुनें उसी का भुगतान"),
-        ]}
+        eyebrow={mode === "live" ? t("LIVE STALL", "लाइव स्टॉल") : t("SINGLE STALL", "सिंगल स्टॉल")}
+        title={
+          mode === "live"
+            ? t("Interactive Live Cooking Stations", "इंटरएक्टिव लाइव कुकिंग स्टेशन")
+            : t("One Stall, One Great Menu", "एक स्टॉल, एक बढ़िया मेन्यू")
+        }
+        sub={
+          mode === "live"
+            ? t(
+                "Book on-site live food counters — Chaat, Dosa, Chinese, Pasta, and specialist stations cooked fresh in front of your guests.",
+                "अपने आयोजन के लिए लाइव कुकिंग काउंटर बुक करें — आपके मेहमानों के सामने ताज़ा तैयार।",
+              )
+            : t(
+                "One verified stall runs your whole order — their menu, their price, and nothing you didn't ask for.",
+                "एक वेरिफाइड स्टॉल आपका पूरा ऑर्डर संभालता है — उनका मेन्यू, उनकी कीमत, और कुछ भी फ़ालतू नहीं।",
+              )
+        }
+        chips={
+          mode === "live"
+            ? [
+                t("Interactive counters", "इंटरएक्टिव काउंटर"),
+                t("Multiple stations", "कई स्टेशन"),
+                t("Cooked on-site", "मौके पर ताज़ा तैयार"),
+              ]
+            : [
+                t("3 guided steps", "3 आसान चरण"),
+                t("One verified vendor", "एक वेरिफाइड वेंडर"),
+                t("Pay for what you pick", "जो चुनें उसी का भुगतान"),
+              ]
+        }
         aside={
           <a
             href="/book"
@@ -1419,6 +1449,7 @@ export default function StallBookingWizard() {
               <StepStallMenu
                 t={t}
                 lang={lang}
+                mode={mode}
                 stall={stall}
                 activeCat={activeCat}
                 setActiveCat={setActiveCat}
@@ -1428,13 +1459,21 @@ export default function StallBookingWizard() {
                 perPlate={perPlate}
                 pickedCount={pickedCount}
                 guests={guests}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
               />
             ) : (
               <StallHandoff
                 t={t}
+                mode={mode}
                 missingBrand={missingBrand}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
+                stalls={stalls}
+                onSelectStall={(id) => {
+                  setMissingBrand("");
+                  setCategoryItems({});
+                  setStallId(id);
+                  setActiveCat(0);
+                }}
               />
             ))}
 
@@ -1516,7 +1555,7 @@ export default function StallBookingWizard() {
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
                 onEditExtras={() => setStep(2)}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
               />
             ))}
@@ -1574,10 +1613,10 @@ export default function StallBookingWizard() {
               </Button>
             ) : (
               <a
-                href={BRANDS_HREF}
+                href={brandsHref}
                 className="text-sm font-semibold text-ink-soft underline underline-offset-4 transition hover:text-maroon"
               >
-                ← {t("Back to all stalls", "सभी स्टॉल पर वापस")}
+                ← {mode === "live" ? t("Back to live counters", "लाइव काउंटर पर वापस") : t("Back to all stalls", "सभी स्टॉल पर वापस")}
               </a>
             )}
             <Button onClick={goNext} disabled={!canNext}>
@@ -1654,22 +1693,49 @@ export default function StallBookingWizard() {
  */
 function StallHandoff({
   t,
+  mode,
   missingBrand,
   brandsHref,
+  stalls = [],
+  onSelectStall,
 }: {
   t: (en: string, hi: string) => string;
+  mode: "single" | "live";
   missingBrand: string;
   brandsHref: string;
+  stalls?: StallOption[];
+  onSelectStall?: (id: string) => void;
 }) {
+  const isLive = mode === "live";
+  const displayedStalls = useMemo(() => {
+    if (!stalls.length) return [];
+    if (isLive) {
+      const liveOnly = stalls.filter((s) => s.live || s.courses.some((c) => c.live));
+      return liveOnly.length ? liveOnly : stalls;
+    }
+    return stalls;
+  }, [stalls, isLive]);
+
   return (
     <div>
       <SectionHead
-        eyebrow={t("Single Stall", "सिंगल स्टॉल")}
-        title={t("Choose your stall", "अपना स्टॉल चुनें")}
-        sub={t(
-          "Every verified stall lives on the Brands page — browse their photos, menus and ratings there, then hit Book Now on the one you want.",
-          "हर वेरिफाइड स्टॉल ब्रांड्स पेज पर है — वहाँ उनकी तस्वीरें, मेन्यू और रेटिंग देखें, फिर जो पसंद आए उस पर बुक नाउ दबाएँ।",
-        )}
+        eyebrow={isLive ? t("Live Stall", "लाइव स्टॉल") : t("Single Stall", "सिंगल स्टॉल")}
+        title={
+          isLive
+            ? t("Choose your live counter specialist", "अपना लाइव काउंटर स्पेशलिस्ट चुनें")
+            : t("Choose your stall", "अपना स्टॉल चुनें")
+        }
+        sub={
+          isLive
+            ? t(
+                "Browse verified live counter specialists — Chaat, Dosa, Chinese, Pasta and live stations, then tap Select to choose your interactive counters.",
+                "वेरिफाइड लाइव काउंटर स्पेशलिस्ट देखें — चाट, डोसा, चाइनीज़, पास्ता और लाइव स्टेशन, फिर अपने काउंटर चुनने के लिए सेलेक्ट दबाएँ।",
+              )
+            : t(
+                "Pick a verified vendor to start building your single stall menu.",
+                "अपना सिंगल स्टॉल मेन्यू बनाना शुरू करने के लिए एक वेरिफाइड वेंडर चुनें।",
+              )
+        }
       />
 
       {missingBrand && (
@@ -1678,26 +1744,116 @@ function StallHandoff({
             ★
           </span>
           {t(
-            `We couldn't find "${missingBrand}" in the booking roster right now — pick another stall from the Brands page.`,
-            `हमें अभी "${missingBrand}" बुकिंग सूची में नहीं मिला — ब्रांड्स पेज से दूसरा स्टॉल चुनें।`,
+            `We couldn't find "${missingBrand}" in the booking roster right now — pick another specialist below.`,
+            `हमें अभी "${missingBrand}" बुकिंग सूची में नहीं मिला — नीचे से दूसरा स्पेशलिस्ट चुनें।`,
           )}
         </p>
       )}
 
-      <div className="rounded-[1.5rem] border border-cream bg-white p-6 text-center shadow-card sm:p-10">
-        <p className="text-sm leading-relaxed text-ink-soft">
-          {t(
-            "Pick a stall to start building your menu.",
-            "मेन्यू बनाना शुरू करने के लिए एक स्टॉल चुनें।",
-          )}
-        </p>
-        <a
-          href={brandsHref}
-          className="btn-sheen mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-maroon px-6 text-sm font-bold text-cream shadow-card transition hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
-        >
-          {t("Browse all stalls", "सभी स्टॉल देखें")} →
-        </a>
-      </div>
+      {displayedStalls.length > 0 ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {displayedStalls.map((s) => {
+              const liveCourseCount = s.courses.filter((c) => c.live).length;
+              return (
+                <div
+                  key={s.id}
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-cream bg-white p-4 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-maroon/20 hover:shadow-pop"
+                >
+                  <div>
+                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-cream/40">
+                      {s.image ? (
+                        <Image
+                          src={s.image}
+                          alt={s.name}
+                          fill
+                          sizes="(min-width: 1024px) 300px, (min-width: 640px) 50vw, 100vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-3xl">
+                          {isLive ? "🍳" : "🍱"}
+                        </div>
+                      )}
+                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-bold text-ink shadow-sm backdrop-blur-sm">
+                        <span className="text-maroon">★</span>
+                        <span>{s.rating.toFixed(1)}</span>
+                      </span>
+                    </div>
+
+                    <div className="mt-3">
+                      <h3 className="font-display text-base font-bold text-ink transition-colors group-hover:text-maroon">
+                        {s.name}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-ink-soft">
+                        {s.city ? `${s.city} · ` : ""}
+                        {isLive
+                          ? `${liveCourseCount || s.courses.length} ${t("Live Stations", "लाइव स्टेशन")}`
+                          : `${s.courses.length} ${t("Courses", "कोर्स")}`}
+                      </p>
+                      {s.fromPrice > 0 && (
+                        <p className="mt-2 text-xs font-medium text-ink">
+                          <span className="text-ink-soft">{t("From", "शुरुआती")}:</span>{" "}
+                          <span className="font-bold text-maroon">₹{s.fromPrice}</span>{" "}
+                          <span className="text-[11px] text-ink-soft">/ {t("plate", "प्लेट")}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-cream/60 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => onSelectStall?.(s.id)}
+                      className="btn-sheen inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full bg-maroon px-4 text-xs font-bold text-cream shadow-card transition hover:shadow-pop active:scale-95"
+                    >
+                      <span>
+                        {isLive
+                          ? t("Select Live Counters →", "लाइव काउंटर चुनें →")
+                          : t("Select Stall →", "स्टॉल चुनें →")}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-center pt-2">
+            <a
+              href={brandsHref}
+              className="text-xs font-semibold text-maroon underline underline-offset-4 transition hover:text-ink"
+            >
+              {isLive
+                ? t("Browse all live counters on Brands page →", "ब्रांड्स पेज पर सभी लाइव काउंटर देखें →")
+                : t("Browse all stalls on Brands page →", "ब्रांड्स पेज पर सभी स्टॉल देखें →")}
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[1.5rem] border border-cream bg-white p-6 text-center shadow-card sm:p-10">
+          <p className="text-sm leading-relaxed text-ink-soft">
+            {isLive
+              ? t(
+                  "Pick a live stall specialist to start selecting interactive counters.",
+                  "लाइव काउंटर चुनना शुरू करने के लिए स्पेशलिस्ट चुनें।",
+                )
+              : t(
+                  "Pick a stall to start building your menu.",
+                  "मेन्यू बनाना शुरू करने के लिए एक स्टॉल चुनें।",
+                )}
+          </p>
+          <a
+            href={brandsHref}
+            className="btn-sheen mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-maroon px-6 text-sm font-bold text-cream shadow-card transition hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
+          >
+            {isLive
+              ? t("Browse live counters", "लाइव काउंटर देखें")
+              : t("Browse all stalls", "सभी स्टॉल देखें")}{" "}
+            →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -1707,6 +1863,7 @@ function StallHandoff({
 function StepStallMenu({
   t,
   lang,
+  mode,
   stall,
   activeCat,
   setActiveCat,
@@ -1720,6 +1877,7 @@ function StepStallMenu({
 }: {
   t: (en: string, hi: string) => string;
   lang: Lang;
+  mode: "single" | "live";
   stall: StallOption;
   activeCat: number;
   setActiveCat: (n: number) => void;
@@ -1735,6 +1893,8 @@ function StepStallMenu({
   /** Where a different stall is picked — the Brands page, not a step in here. */
   brandsHref: string;
 }) {
+  const isSingleOption = mode === "single" && stall.courses.length === 1;
+  const isLive = mode === "live";
   const course = stall.courses[activeCat] ?? stall.courses[0];
   if (!course) return null;
   const picks = itemsFor(course.id);
@@ -1745,22 +1905,36 @@ function StepStallMenu({
   return (
     <div>
       <SectionHead
-        eyebrow={t("Single Stall", "सिंगल स्टॉल")}
+        eyebrow={isLive ? t("Live Stall", "लाइव स्टॉल") : t("Single Stall", "सिंगल स्टॉल")}
         title={
-          stall.allFixed
-            ? t("Choose Your Courses", "अपने कोर्स चुनें")
-            : t("Build Your Menu", "अपना मेन्यू बनाएं")
+          isLive
+            ? t("Choose Live Stations", "लाइव स्टेशन चुनें")
+            : isSingleOption
+              ? t("Vendor Set Menu", "वेंडर सेट मेन्यू")
+              : stall.allFixed
+                ? t("Choose Your Courses", "अपने कोर्स चुनें")
+                : t("Build Your Menu", "अपना मेन्यू बनाएं")
         }
         sub={
-          stall.allFixed
+          isLive
             ? t(
-                `${stall.name} serves set menus — each course comes exactly as listed, at one rate per plate. Pick the courses you want; the dishes within them aren't changed.`,
-                `${stall.name} तय मेन्यू परोसते हैं — हर कोर्स ठीक वैसा ही आता है जैसा लिखा है, एक ही प्रति-प्लेट दर पर। जो कोर्स चाहिए वे चुनें; उनके अंदर के व्यंजन बदले नहीं जाते।`,
+                "Select interactive live cooking counters and stations for your event. You can choose multiple stations.",
+                "अपने आयोजन के लिए लाइव कुकिंग काउंटर और स्टेशन चुनें। आप कई स्टेशन चुन सकते हैं।",
               )
-            : t(
-                `Every dish ${stall.name} offers. Take as many or as few as you like — there are no package limits here.`,
-                `${stall.name} के सारे व्यंजन। जितने चाहें उतने लें — यहाँ कोई पैकेज सीमा नहीं है।`,
-              )
+            : isSingleOption
+              ? t(
+                  `${stall.name}'s signature menu — every dish listed is prepared and served at one flat per-plate rate.`,
+                  `${stall.name} का खास मेन्यू — सभी व्यंजन एक फ्लैट प्रति-प्लेट दर पर तैयार और परोसे जाते हैं।`,
+                )
+              : stall.allFixed
+                ? t(
+                    `${stall.name} serves set menus — each course comes exactly as listed, at one rate per plate. Pick the courses you want; the dishes within them aren't changed.`,
+                    `${stall.name} तय मेन्यू परोसते हैं — हर कोर्स ठीक वैसा ही आता है जैसा लिखा है, एक ही प्रति-प्लेट दर पर। जो कोर्स चाहिए वे चुनें; उनके अंदर के व्यंजन बदले नहीं जाते।`,
+                  )
+                : t(
+                    `Every dish ${stall.name} offers. Take as many or as few as you like — there are no package limits here.`,
+                    `${stall.name} के सारे व्यंजन। जितने चाहें उतने लें — यहाँ कोई पैकेज सीमा नहीं है।`,
+                  )
         }
       />
 
@@ -1779,7 +1953,7 @@ function StepStallMenu({
         </span>
         <div className="min-w-0 flex-1">
           <p className="eyebrow text-[10px] font-bold text-maroon">
-            {t("YOUR STALL", "आपका स्टॉल")}
+            {isLive ? t("YOUR LIVE SPECIALIST", "आपका लाइव स्पेशलिस्ट") : t("YOUR STALL", "आपका स्टॉल")}
           </p>
           <p className="truncate font-sans text-base font-semibold text-ink sm:text-lg">
             {stall.name}
@@ -1794,43 +1968,45 @@ function StepStallMenu({
           href={brandsHref}
           className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:text-xs"
         >
-          {t("Change stall", "स्टॉल बदलें")}
+          {isLive ? t("Change specialist", "स्पेशलिस्ट बदलें") : t("Change stall", "स्टॉल बदलें")}
         </a>
       </div>
 
-      {/* Course tabs — only the courses this stall actually publishes. */}
-      <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap">
-        {stall.courses.map((c, i) => {
-          const active = i === activeCat;
-          const n = itemsFor(c.id).length;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setActiveCat(i)}
-              className={
-                "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition " +
-                (active
-                  ? "border-maroon bg-maroon text-cream"
-                  : "border-cream-3 bg-white text-ink hover:bg-cream-2")
-              }
-            >
-              {c.icon} {lang === "hi" ? c.nameHi : c.name}
-              {n > 0 && (
-                <span
-                  className={
-                    "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] " +
-                    (active ? "bg-cream text-maroon" : "bg-maroon text-cream")
-                  }
-                >
-                  {n}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* Course tabs — only shown when there are multiple courses to choose from. Single-option vendors render directly without tabs. */}
+      {!isSingleOption && (
+        <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap">
+          {stall.courses.map((c, i) => {
+            const active = i === activeCat;
+            const n = itemsFor(c.id).length;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setActiveCat(i)}
+                className={
+                  "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                  (active
+                    ? "border-maroon bg-maroon text-cream"
+                    : "border-cream-3 bg-white text-ink hover:bg-cream-2")
+                }
+              >
+                {c.icon} {lang === "hi" ? c.nameHi : c.name}
+                {n > 0 && (
+                  <span
+                    className={
+                      "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] " +
+                      (active ? "bg-cream text-maroon" : "bg-maroon text-cream")
+                    }
+                  >
+                    {n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {course.live && (
         <p className="mt-4 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-xs text-ink-soft">
@@ -1841,36 +2017,40 @@ function StepStallMenu({
         </p>
       )}
 
-      {/* A set-menu course: one control for the whole spread, and the dishes
-          below listed rather than offered. Taking it adds every dish at the
-          course's own per-plate rate. */}
+      {/* A set-menu course or single-vendor offering */}
       {course.fixed && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream bg-cream/35 px-4 py-3">
           <span className="min-w-0 text-sm text-ink">
             <span className="font-semibold">
-              {t("Set menu", "तय मेन्यू")}
+              {isSingleOption ? t("Single Vendor Offering", "सिंगल वेंडर ऑफरिंग") : t("Set menu", "तय मेन्यू")}
             </span>
             {" — "}
             {t(
-              `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
-              `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
+              `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate.`,
+              `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट।`,
             )}
           </span>
-          <button
-            type="button"
-            aria-pressed={courseTaken}
-            onClick={() => toggleCourse(course.id)}
-            className={
-              "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition " +
-              (courseTaken
-                ? "border-maroon bg-cream text-maroon shadow-soft"
-                : "border-maroon bg-white text-maroon hover:bg-cream")
-            }
-          >
-            {courseTaken
-              ? `✓ ${t("In your order", "आपके ऑर्डर में")}`
-              : t("Add this course", "यह कोर्स जोड़ें")}
-          </button>
+          {isSingleOption ? (
+            <span className="shrink-0 rounded-full border border-maroon bg-cream px-3 py-1.5 text-xs font-semibold text-maroon shadow-soft">
+              ✓ {t("Included in order", "ऑर्डर में शामिल")}
+            </span>
+          ) : (
+            <button
+              type="button"
+              aria-pressed={courseTaken}
+              onClick={() => toggleCourse(course.id)}
+              className={
+                "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                (courseTaken
+                  ? "border-maroon bg-cream text-maroon shadow-soft"
+                  : "border-maroon bg-white text-maroon hover:bg-cream")
+              }
+            >
+              {courseTaken
+                ? `✓ ${t("In your order", "आपके ऑर्डर में")}`
+                : t("Add this course", "यह कोर्स जोड़ें")}
+            </button>
+          )}
         </div>
       )}
 
@@ -2261,6 +2441,65 @@ function StepStallConfirm({
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
         title={t("Review & Confirm", "समीक्षा और पुष्टि")}
       />
+
+      {/* ── Post-selection confirmation & quick navigation card (Row 45) ── */}
+      <div className="mb-6 overflow-hidden rounded-2xl border border-maroon/20 bg-gradient-to-br from-cream/40 via-white to-cream/20 p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-maroon/10 pb-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-base font-bold text-cream shadow-sm">
+              ✓
+            </span>
+            <div>
+              <h3 className="font-display text-lg font-bold text-maroon sm:text-xl">
+                {t("Stall & Menu Confirmed", "स्टॉल और मेन्यू की पुष्टि")}
+              </h3>
+              <p className="text-xs text-ink-soft sm:text-sm">
+                {t(
+                  "Your stall specialist and custom items are selected. Click any section below to modify.",
+                  "आपका स्टॉल विशेषज्ञ और मेन्यू चुना गया है। बदलने के लिए नीचे किसी भी भाग पर क्लिक करें।",
+                )}
+              </p>
+            </div>
+          </div>
+          <a
+            href={brandsHref}
+            className="btn-sheen inline-flex items-center gap-1.5 rounded-full bg-cream/80 px-3.5 py-1.5 text-xs font-semibold text-maroon ring-1 ring-maroon/25 transition hover:bg-cream"
+          >
+            <span>{t("Change Stall Specialist", "स्टॉल विशेषज्ञ बदलें")}</span>
+            <span>→</span>
+          </a>
+        </div>
+
+        {/* Quick jump navigation chips */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-ink-soft">
+            {t("Jump to edit:", "सीधे बदलने जाएं:")}
+          </span>
+          <a
+            href={brandsHref}
+            className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+          >
+            <span>🏪 {stall?.name ?? t("Stall", "स्टॉल")}</span>
+            <span className="text-maroon">✎</span>
+          </a>
+          <button
+            type="button"
+            onClick={onEditMenu}
+            className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+          >
+            <span>🍲 {t(`${menuGroups.reduce((acc, g) => acc + g.items.length, 0)} Items Selected`, `${menuGroups.reduce((acc, g) => acc + g.items.length, 0)} आइटम चुने गए`)}</span>
+            <span className="text-maroon">✎</span>
+          </button>
+          <button
+            type="button"
+            onClick={onEditExtras}
+            className="inline-flex items-center gap-1.5 rounded-full border border-maroon/20 bg-white px-3 py-1 text-xs font-medium text-ink shadow-xs transition hover:border-maroon hover:bg-cream/40"
+          >
+            <span>✨ {t(`${selectedAddOns.length} Add-ons & Service`, `${selectedAddOns.length} एक्स्ट्रा व सर्विस`)}</span>
+            <span className="text-maroon">✎</span>
+          </button>
+        </div>
+      </div>
 
       {/* The order at a glance */}
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
