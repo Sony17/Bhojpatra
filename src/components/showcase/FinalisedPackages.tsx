@@ -21,6 +21,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { packages, packageCategoryItems, type PackageTier, type PackageFeature } from "@/lib/data";
+import { usePackagesConfig } from "@/lib/packages";
 import Reveal from "@/components/Reveal";
 import SectionIntro from "@/components/SectionIntro";
 import TierDifferentiator from "@/components/packages/TierDifferentiator";
@@ -309,7 +310,22 @@ function TierCard({ tier, cta }: { tier: PackageTier; cta: React.ReactNode }) {
 
 export default function FinalisedPackages() {
   const { lang, t } = useLang();
-  const tiers = packages.filter((p) => p.id !== "custom") as PackageTier[];
+  const packageConfigs = usePackagesConfig();
+  const tiers = packages
+    .filter((p) => p.id !== "custom")
+    .map((p) => {
+      const cfg = packageConfigs.find(
+        (c) => c.id.toLowerCase() === p.id.toLowerCase(),
+      );
+      if (!cfg) return p;
+      return {
+        ...p,
+        name: cfg.name,
+        nameHi: cfg.nameHi,
+        tagline: cfg.tagline ?? p.tagline,
+        taglineHi: cfg.taglineHi ?? p.taglineHi,
+      };
+    }) as PackageTier[];
   const custom = packages.find((p) => p.id === "custom");
 
   return (

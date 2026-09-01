@@ -23,6 +23,7 @@ import {
 import { useCompare } from "@/lib/compare";
 import { useAllVendors } from "@/lib/useAllVendors";
 import { useLang } from "@/lib/i18n";
+import { usePackagesConfig, resolvePackageName } from "@/lib/packages";
 import { useLocations } from "@/lib/locations";
 import {
   LOCATION_CHANGED_EVENT,
@@ -175,19 +176,13 @@ export default function VendorCatalog() {
   const { t, lang } = useLang();
   const locations = useLocations();
 
+  const packageConfigs = usePackagesConfig();
+
   // Display-only translations for small fixed vocabularies. Underlying values
   // stay English (used for filtering/keys); only the label shown is localized.
   const tierLabel = (tier: TierFilter): string => {
-    switch (tier) {
-      case "Silver":
-        return t("Silver", "सिल्वर");
-      case "Gold":
-        return t("Gold", "गोल्ड");
-      case "Platinum":
-        return t("Platinum", "प्लैटिनम");
-      default:
-        return t("All", "सभी");
-    }
+    if (tier === "all") return t("All", "सभी");
+    return resolvePackageName(tier, packageConfigs, lang, tier);
   };
 
   const dietLabel = (value: DietFilter): string => {

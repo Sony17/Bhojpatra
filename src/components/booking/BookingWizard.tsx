@@ -85,6 +85,7 @@ import {
   OTHER_OCCASION_ID,
   type OccasionOption,
 } from "@/lib/occasions";
+import { usePackagesConfig, resolvePackageName } from "@/lib/packages";
 import { useServices } from "@/lib/services";
 import ServicePackages from "@/components/sections/ServicePackages";
 import { Button } from "@/components/ui";
@@ -1338,9 +1339,27 @@ export default function BookingWizard() {
   };
 
   /* ─── Derived pricing ──────────────────────────────────────────────── */
-  const selectedPackage: PackageTier | undefined = packages.find(
+  const packageConfigs = usePackagesConfig();
+  const rawSelectedPackage: PackageTier | undefined = packages.find(
     (p) => p.id === packageId,
   );
+  const selectedPackage: PackageTier | undefined = rawSelectedPackage
+    ? {
+        ...rawSelectedPackage,
+        name: resolvePackageName(
+          rawSelectedPackage.id,
+          packageConfigs,
+          "en",
+          rawSelectedPackage.name,
+        ),
+        nameHi: resolvePackageName(
+          rawSelectedPackage.id,
+          packageConfigs,
+          "hi",
+          rawSelectedPackage.nameHi,
+        ),
+      }
+    : undefined;
   const basePerPlate = packageBasePerPlate[packageId] ?? 0;
 
   // Guest bounds are per-package (Silver 50–300, Gold 150–10k, Platinum 50–50k);
@@ -2438,8 +2457,8 @@ export default function BookingWizard() {
                     </span>{" "}
                     —{" "}
                     {t(
-                      `We couldn't find "${missingBrand}". It may no longer be listed. Pick a vendor below to carry on.`,
-                      `"${missingBrand}" नहीं मिला। हो सकता है यह अब सूचीबद्ध न हो। आगे बढ़ने के लिए नीचे से वेंडर चुनें।`,
+                      `We couldn't find "${missingBrand}". It may no longer be listed. Choose a caterer below to carry on.`,
+                      `"${missingBrand}" नहीं मिला। आगे बढ़ने के लिए कृपया नीचे से कैटरर चुनें।`,
                     )}
                   </p>
                   <button
@@ -2527,18 +2546,18 @@ export default function BookingWizard() {
                 subtitle={
                   counterMultiVendor && multiDishIn(liveStallCategories)
                     ? t(
-                        "Mix multiple counter vendors and dishes, cooked fresh in front of your guests — add-ons come next.",
-                        "कई काउंटर वेंडर और व्यंजन चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                        "Mix multiple live counter specialists and delicacies, prepared fresh in front of your guests — extras at next step.",
+                        "कई लाइव काउंटर स्पेशलिस्ट और व्यंजन चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
                       )
                     : counterMultiVendor
                       ? t(
-                          "Mix multiple counter vendors, cooked fresh in front of your guests — add-ons come next.",
-                          "कई काउंटर वेंडर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                          "Choose live counter specialists, prepared fresh in front of your guests — extras at next step.",
+                          "लाइव काउंटर के लिए स्पेशलिस्ट चुनें, जो आपके मेहमानों के सामने ताज़ा तैयार करेंगे — एक्स्ट्रा अगले चरण में।",
                         )
                       : multiDishIn(liveStallCategories)
                         ? t(
-                            "Pick multiple counters, cooked fresh in front of your guests — add-ons come next.",
-                            "कई काउंटर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                            "Choose multiple counters, prepared fresh in front of your guests — extras at next step.",
+                            "कई काउंटर चुनें, जो आपके मेहमानों के सामने ताज़ा बनेंगे — एक्स्ट्रा अगले चरण में।",
                           )
                         : t(
                             "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
@@ -2962,7 +2981,7 @@ export default function BookingWizard() {
           {[
             {
               icon: "🛡️",
-              title: t("Trusted Vendors", "भरोसेमंद वेंडर"),
+              title: t("Trusted Caterers & Chefs", "भरोसेमंद कैटरर व शेफ़"),
               sub: t("Quality you can rely on", "जिस पर आप भरोसा कर सकें"),
             },
             {
@@ -3346,16 +3365,22 @@ function StepPackage({
   // inert) with the date it unlocks, rather than silently vanishing. That way a
   // guest never wonders where e.g. Platinum (30-day lead) went for an event a
   // fortnight out: they see it, greyed, with "available from …".
+  const packageConfigs = usePackagesConfig();
   const tiers = packages.map((tier) => {
     const meta = homePackages.tiers.find((x) => x.id === tier.id);
-    const display = meta
-      ? {
-          ...tier,
-          name: tier.id === "custom" ? "Single Stall" : meta.name,
-          nameHi: tier.id === "custom" ? "सिंगल स्टॉल" : meta.nameHi,
-          price: meta.price,
-        }
-      : tier;
+    const cfg = packageConfigs.find(
+      (c) => c.id.toLowerCase() === tier.id.toLowerCase(),
+    );
+    const display = {
+      ...tier,
+      name:
+        cfg?.name ??
+        (meta?.name || (tier.id === "custom" ? "Single Stall" : tier.name)),
+      nameHi:
+        cfg?.nameHi ??
+        (meta?.nameHi || (tier.id === "custom" ? "सिंगल स्टॉल" : tier.nameHi)),
+      price: meta?.price ?? tier.price,
+    };
     const lead = packageLeadDays[tier.id] ?? 0;
     return {
       tier: display,
@@ -3951,8 +3976,8 @@ function StepMenu({
             </span>
             <span>
               {t(
-                "You've skipped this stall — it won't be in your order or price. Pick a vendor below to add it back.",
-                "आपने यह स्टॉल छोड़ दिया है — यह आपके ऑर्डर या कीमत में नहीं होगा। इसे वापस जोड़ने के लिए नीचे वेंडर चुनें।",
+                "You've skipped this counter — it won't be in your order or bill. Choose a caterer below to add it back.",
+                "आपने यह काउंटर छोड़ दिया है — यह आपके ऑर्डर में नहीं जुड़ेगा। वापस जोड़ने के लिए नीचे कैटरर चुनें।",
               )}
             </span>
           </span>
@@ -4276,12 +4301,12 @@ function StepMenu({
 
       {othersOpen && (
         <>
-      {/* Pick a vendor (multiple allowed on Platinum) */}
+      {/* Choose a caterer (multiple allowed on Platinum) */}
       <div className="mt-7 flex items-center justify-between gap-3">
         <h3 className="font-sans text-2xl font-semibold text-maroon">
           {multiVendor
-            ? t("Pick vendors (select multiple)", "वेंडर चुनें (कई चुनें)")
-            : t("Pick a vendor", "वेंडर चुनें")}
+            ? t("Choose your caterers (select multiple)", "कैटरर चुनें (एक से अधिक चुन सकते हैं)")
+            : t("Choose your caterer", "अपना कैटरर चुनें")}
         </h3>
         {/* Filter is offered only when the roster is long enough to be worth
             typing over — a short shortlist stays clutter-free. */}
@@ -4569,7 +4594,7 @@ function StepMenu({
             />
             <button
               type="button"
-              aria-label={t("Show more vendors", "और वेंडर दिखाएं")}
+              aria-label={t("Show more caterers", "और कैटरर देखें")}
               onClick={() =>
                 vendorScrollRef.current?.scrollBy({
                   left: 240,
@@ -4595,10 +4620,10 @@ function StepMenu({
             className="inline-flex items-center gap-2 rounded-full border border-maroon/40 bg-white px-5 py-2.5 text-sm font-semibold text-maroon shadow-sm transition hover:bg-maroon hover:text-cream"
           >
             {showAllVendors
-              ? t("Show fewer vendors", "कम वेंडर दिखाएं")
+              ? t("Show fewer caterers", "कम कैटरर देखें")
               : t(
-                  `Explore ${hiddenVendorCount} more vendors`,
-                  `${hiddenVendorCount} और वेंडर देखें`,
+                  `Explore ${hiddenVendorCount} more caterers`,
+                  `${hiddenVendorCount} और कैटरर देखें`,
                 )}
             <span aria-hidden="true" className="text-base leading-none">
               {showAllVendors ? "↑" : "↓"}
@@ -4615,12 +4640,12 @@ function StepMenu({
         <p className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 text-sm text-ink-soft shadow-sm">
           {multiVendor
             ? t(
-                "Pick one or more vendors above — each one's menu opens right below it.",
-                "ऊपर एक या अधिक वेंडर चुनें — हर वेंडर का मेन्यू उसी के नीचे खुलेगा।",
+                "Choose one or more caterers above — their menus will open right below.",
+                "ऊपर एक या अधिक कैटरर चुनें — हर कैटरर का मेन्यू नीचे खुल जाएगा।",
               )
             : t(
-                "Pick a vendor above — their menu opens right below it.",
-                "ऊपर वेंडर चुनें — उनका मेन्यू उसी के नीचे खुलेगा।",
+                "Choose a caterer above — their menu will open right below.",
+                "ऊपर अपना कैटरर चुनें — उनका मेन्यू नीचे खुल जाएगा।",
               )}
         </p>
       )}

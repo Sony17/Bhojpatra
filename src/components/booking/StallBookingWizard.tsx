@@ -1405,7 +1405,7 @@ export default function StallBookingWizard({
               ]
             : [
                 t("3 guided steps", "3 आसान चरण"),
-                t("One verified vendor", "एक वेरिफाइड वेंडर"),
+                t("One verified caterer", "एक वेरिफाइड कैटरर"),
                 t("Pay for what you pick", "जो चुनें उसी का भुगतान"),
               ]
         }
@@ -1630,7 +1630,7 @@ export default function StallBookingWizard({
                 <div className="mb-2 flex items-end justify-between gap-3">
                   <span className="min-w-0">
                     <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                      {t("Per plate", "प्रति प्लेट")}
+                      {t("Per plate price", "प्रति प्लेट कीमत")}
                     </span>
                     <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
                       {money(perPlate)}
@@ -1729,8 +1729,8 @@ function StallHandoff({
                 "वेरिफाइड लाइव काउंटर स्पेशलिस्ट देखें — चाट, डोसा, चाइनीज़, पास्ता और लाइव स्टेशन, फिर अपने काउंटर चुनने के लिए सेलेक्ट दबाएँ।",
               )
             : t(
-                "Pick a verified vendor to start building your single stall menu.",
-                "अपना सिंगल स्टॉल मेन्यू बनाना शुरू करने के लिए एक वेरिफाइड वेंडर चुनें।",
+                "Choose a verified caterer to start building your stall menu.",
+                "अपना स्टॉल मेन्यू बनाना शुरू करने के लिए वेरिफाइड कैटरर चुनें।",
               )
         }
       />

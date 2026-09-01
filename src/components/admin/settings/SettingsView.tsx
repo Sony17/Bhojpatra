@@ -14,6 +14,7 @@ const MAX_QR_FILE_BYTES = 400 * 1024;
 
 const TABS: TabItem[] = [
   { id: "password", label: "Change Password" },
+  { id: "packages", label: "Packages & Tiers" },
   { id: "occasions", label: "Occasions" },
   { id: "locations", label: "Locations" },
   { id: "payments", label: "Payments (UPI)" },
@@ -26,6 +27,18 @@ export default function SettingsView() {
       <PageHeader eyebrow="Admin Panel" title="Settings" subtitle="Platform configuration." />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "password" && <ChangePasswordTab />}
+      {tab === "packages" && (
+        <NameListTab
+          dataKey="packages"
+          title="Packages & Tier Naming"
+          description="Customer-facing names for Silver, Gold, Platinum and other tier packages. English and Hindi names configured here are reflected consistently across the website and booking flows."
+          endpoint="/api/admin/packages"
+          addLabel="+ Add package tier"
+          namePlaceholder="e.g. Silver"
+          nameHiPlaceholder="e.g. सिल्वर"
+          emptyError="Add at least one package configuration."
+        />
+      )}
       {tab === "occasions" && (
         <NameListTab
           dataKey="occasions"
@@ -179,7 +192,7 @@ function NameListTab({
   withLead = false,
   leadPlaceholder = "e.g. 7",
 }: {
-  dataKey: "occasions" | "locations";
+  dataKey: "occasions" | "locations" | "packages";
   title: string;
   description: string;
   endpoint: string;
