@@ -72,7 +72,6 @@ import {
 } from "@/lib/detectedLocation";
 import {
   useOccasions,
-  occasionLeadFor,
   OTHER_OCCASION_ID,
   type OccasionOption,
 } from "@/lib/occasions";
@@ -160,6 +159,7 @@ interface StallOption {
   /** Every course this stall runs is a set menu, so the card can say so and
    *  price per plate rather than per dish. */
   allFixed: boolean;
+  leadDays?: number;
 }
 
 /** The price of one dish on a VARIED course: the vendor's own per-delicacy
@@ -596,6 +596,7 @@ export default function StallBookingWizard({
           fromPrice: 0,
           dishCount: 0,
           allFixed: false,
+          leadDays: v.leadDays,
         });
       }
     }
@@ -856,19 +857,25 @@ export default function StallBookingWizard({
   const vendorLead = customOrderLeadDays(
     orderVendorIds,
     DEFAULT_SINGLE_STALL_LEAD_DAYS,
+    stalls,
   );
-  // Single Stall orders support next-day booking (1 day notice, or 0 for same-day stalls)
+  // Single Stall and Live Stall orders support next-day booking (1 day notice, or 0 for same-day stalls)
   const effectiveLeadDays = Math.max(0, vendorLead);
 
   const daysToEvent = daysUntil(eventDate);
   const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
   const earliestDate = isoAfterDays(effectiveLeadDays);
+  const stallLabel =
+    stall?.name ??
+    (mode === "live"
+      ? t("This live counter", "यह लाइव काउंटर")
+      : t("This stall", "यह स्टॉल"));
   const leadWarning =
     eventDate === "" || dateMeetsLead
       ? ""
       : t(
-          `${stall?.name ?? "This stall"} needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a same-day stall.`,
-          `${stall?.name ?? "इस स्टॉल"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे स्टॉल चुनें।`,
+          `${stallLabel} needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a same-day stall.`,
+          `${stallLabel} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे स्टॉल चुनें।`,
         );
 
   /* ─── Validation per step ──────────────────────────────────────────── */

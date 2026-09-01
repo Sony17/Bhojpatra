@@ -162,7 +162,7 @@ export default function DatePicker({
   // before this are disabled in the grid (defaults to tomorrow).
   const minDate = useMemo(() => {
     const d = startOfDay(new Date());
-    d.setDate(d.getDate() + Math.max(1, minDaysAhead));
+    d.setDate(d.getDate() + Math.max(0, minDaysAhead));
     return d;
   }, [minDaysAhead]);
 

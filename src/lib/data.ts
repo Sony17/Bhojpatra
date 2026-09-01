@@ -2096,12 +2096,14 @@ export const vendorListings: VendorListing[] = [
 export function customOrderLeadDays(
   vendorIds: readonly string[],
   defaultLead: number = DEFAULT_VENDOR_LEAD_DAYS,
+  extraVendors?: readonly { id: string; leadDays?: number }[],
 ): number {
   let lead = 0;
   let matched = false;
   for (const id of vendorIds) {
     if (!id) continue;
     const v =
+      extraVendors?.find((x) => x.id === id) ??
       menuCategories
         .flatMap((c) => c.vendors)
         .find((x) => x.id === id) ??

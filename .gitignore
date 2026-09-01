@@ -66,3 +66,6 @@ next-env.d.ts
 # Uploaded vendor card photos + their metadata index (runtime data store)
 /data/vendor-photos/
 /data/vendor-photos.json
+
+# Agent skills
+.agents/skills/
