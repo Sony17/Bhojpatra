@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import Link from "next/link";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { inr, money, perPlateCost } from "@/lib/money";
 import { cities } from "@/lib/data";
@@ -10,8 +8,8 @@ type City = (typeof cities)[number];
 
 /* ─── Confirmation view ───────────────────────────────────────────────────
  * The success screen both booking flows land on once the order is persisted —
- * booking id, the event at a glance, what's paid vs outstanding, and the two
- * follow-up actions (invoice download + WhatsApp share).
+ * booking id, the event at a glance, what's paid vs outstanding, and the
+ * follow-up actions (invoice download, WhatsApp share, and My Bookings).
  */
 export default function StepDone({
   t,
@@ -47,23 +45,6 @@ export default function StepDone({
   const total = Math.round(grandTotal);
   const balance = Math.max(0, total - paidAmount);
   const fullyPaid = paidAmount >= total;
-
-  // After the success screen has been seen, return the guest to the Bhojpatra
-  // home page — a visible countdown they can cancel (to download the menu,
-  // share, or just linger). `null` means the redirect was called off.
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(15);
-  useEffect(() => {
-    if (secondsLeft === null) return;
-    if (secondsLeft <= 0) {
-      window.location.assign("/");
-      return;
-    }
-    const timer = setTimeout(
-      () => setSecondsLeft((s) => (s === null ? null : s - 1)),
-      1000,
-    );
-    return () => clearTimeout(timer);
-  }, [secondsLeft]);
 
   return (
     <div className="mx-auto max-w-2xl text-center">
@@ -193,23 +174,22 @@ export default function StepDone({
         >
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>
+        <Link
+          href="/bookings"
+          className="rounded-full border border-maroon/30 bg-cream-2 px-4 py-3 text-sm font-semibold text-maroon transition hover:bg-cream-3 sm:px-6"
+        >
+          {t("View My Bookings", "मेरी बुकिंग्स देखें")} →
+        </Link>
       </div>
 
-      {secondsLeft !== null && (
-        <p className="mt-4 text-sm text-ink-soft">
-          {t(
-            `Taking you back to Bhojpatra in ${secondsLeft}s…`,
-            `${secondsLeft} सेकंड में आपको भोजपत्र होम पेज पर ले जा रहे हैं…`,
-          )}{" "}
-          <button
-            type="button"
-            onClick={() => setSecondsLeft(null)}
-            className="font-semibold text-maroon underline underline-offset-2"
-          >
-            {t("Stay on this page", "इसी पेज पर रहें")}
-          </button>
-        </p>
-      )}
+      <div className="mt-4">
+        <Link
+          href="/"
+          className="inline-block text-xs font-semibold text-ink-soft underline-offset-2 hover:text-maroon hover:underline"
+        >
+          ← {t("Back to Home", "होम पेज पर जाएं")}
+        </Link>
+      </div>
 
       {/* Turn a happy booking into word-of-mouth — promote Bhojpatra to friends. */}
       <p className="mt-8 text-sm text-ink-soft">
