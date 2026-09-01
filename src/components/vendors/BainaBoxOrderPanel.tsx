@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DatePicker from "@/components/DatePicker";
@@ -79,7 +79,26 @@ export default function BainaBoxOrderPanel({
   // login gate from flashing for an already signed-in customer.
   const session = useSessionStatus();
 
-  const [qty, setQty] = useState<Record<string, number>>({});
+  // Signature product (matching vendor fixedPrice or first product)
+  const signatureProduct = useMemo(() => {
+    if (!data.products.length) return null;
+    const fp = (data as { fixedPrice?: number }).fixedPrice;
+    return (
+      data.products.find((p) => fp !== undefined && p.price === fp) ??
+      data.products[0]
+    );
+  }, [data]);
+
+  const [qty, setQty] = useState<Record<string, number>>(() => {
+    if (data.products.length > 0) {
+      const fp = (data as { fixedPrice?: number }).fixedPrice;
+      const signature =
+        data.products.find((p) => fp !== undefined && p.price === fp) ??
+        data.products[0];
+      return { [signature.id]: 1 };
+    }
+    return {};
+  });
   const [dateIso, setDateIso] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -107,8 +126,53 @@ export default function BainaBoxOrderPanel({
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
 
+  // Whenever the active vendor changes, reset the cart to this vendor's signature product
+  useEffect(() => {
+    if (signatureProduct) {
+      setQty({ [signatureProduct.id]: 1 });
+    } else {
+      setQty({});
+    }
+    setError("");
+    setPlaced(null);
+  }, [data.vendorId, signatureProduct]);
+
+  // When arriving via "Book Now" / "Order Boxes", ensure at least 1 signature
+  // box is in the cart and scroll to the order panel.
+  useEffect(() => {
+    const handleAdd = () => {
+      setQty((prev) => {
+        const hasCurrentVendorProduct = data.products.some((p) => (prev[p.id] ?? 0) > 0);
+        if (!hasCurrentVendorProduct && signatureProduct) {
+          const cleaned: Record<string, number> = {};
+          for (const p of data.products) {
+            if (prev[p.id]) cleaned[p.id] = prev[p.id];
+          }
+          return { ...cleaned, [signatureProduct.id]: 1 };
+        }
+        return prev;
+      });
+      const el = document.getElementById("baina-order");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    };
+
+    window.addEventListener("baina:add-signature", handleAdd);
+    window.addEventListener("hashchange", handleAdd);
+    return () => {
+      window.removeEventListener("baina:add-signature", handleAdd);
+      window.removeEventListener("hashchange", handleAdd);
+    };
+  }, [data.products, signatureProduct]);
+
   const setCount = (id: string, next: number) =>
-    setQty((m) => ({ ...m, [id]: next }));
+    setQty((m) => {
+      if (next <= 0) {
+        const nextMap = { ...m };
+        delete nextMap[id];
+        return nextMap;
+      }
+      return { ...m, [id]: next };
+    });
 
   const handleConfirm = async () => {
     setError("");
@@ -138,7 +202,7 @@ export default function BainaBoxOrderPanel({
     }
 
     const id = orderRef(
-      [data.vendorId, dateIso, ...lines.map((l) => `${l.id}x${l.qty}`)].join("|"),
+      [data.vendorId, effEmail.trim(), phone.trim(), dateIso, ...lines.map((l) => `${l.id}x${l.qty}`)].join("|"),
     );
     const receipt = [
       "BHOJPATRA — BAINA BOX ORDER",
@@ -255,7 +319,7 @@ export default function BainaBoxOrderPanel({
   return (
     <>
       {/* ── Boxes & sweets grid — pick quantities ─────────────────────── */}
-      <div className="mt-12 border-t border-cream-3 pt-8">
+      <div className="mt-12 scroll-mt-20 border-t border-cream-3 pt-8" id="baina-order">
         {/* Positioning banner: Smaller Parties & Festive Gifting */}
         <div className="mb-6 flex items-center gap-2.5 rounded-xl border border-maroon/20 bg-cream/40 px-4 py-2.5 text-xs text-ink">
           <span className="text-base" aria-hidden="true">🎁</span>
@@ -332,26 +396,14 @@ export default function BainaBoxOrderPanel({
                       </span>
                     </p>
                   </div>
-                  {count === 0 ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setCount(prod.id, 1)}
-                      className="mt-3 w-full border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
-                    >
-                      {t("Add Box", "डिब्बा जोड़ें")}
-                    </Button>
-                  ) : (
-                    <QuantitySelector
-                      value={count}
-                      onChange={(n) => setCount(prod.id, n)}
-                      min={0}
-                      max={200}
-                      size="sm"
-                      label={prod.name}
-                      className="mt-3 self-center"
-                    />
-                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCount(prod.id, count > 0 ? count + 1 : 1)}
+                    className="mt-3 w-full border-maroon/20 text-maroon hover:bg-maroon hover:text-white"
+                  >
+                    + {t("Add Box", "डिब्बा जोड़ें")}
+                  </Button>
                 </div>
               </div>
             );
@@ -360,14 +412,27 @@ export default function BainaBoxOrderPanel({
       </div>
 
       {/* ── Order summary & confirm ───────────────────────────────────── */}
-      <div className="mt-8" id="baina-order">
+      <div className="mt-8">
         {totalBoxes === 0 ? (
-          <p className="rounded-card border border-cream-3 bg-cream/30 px-4 py-3 text-center text-sm text-ink-soft">
-            {t(
-              "Add boxes above to start your order.",
-              "ऑर्डर शुरू करने के लिए ऊपर डिब्बे जोड़ें।",
+          <div className="rounded-card border border-dashed border-maroon/30 bg-cream/30 p-5 text-center">
+            <p className="font-semibold text-ink">
+              {t(
+                "Select your boxes above to start your order",
+                "ऑर्डर शुरू करने के लिए ऊपर डिब्बे चुनें",
+              )}
+            </p>
+            {data.products[0] && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => setCount(data.products[0].id, 1)}
+                >
+                  + {t("Add", "जोड़ें")} {data.products[0].name} (₹{data.products[0].price.toLocaleString("en-IN")})
+                </Button>
+              </div>
             )}
-          </p>
+          </div>
         ) : (
           <div className="overflow-hidden rounded-card border border-maroon/15 bg-white shadow-card">
             <div className="border-b border-cream-3 bg-cream/40 px-5 py-4">
@@ -379,14 +444,35 @@ export default function BainaBoxOrderPanel({
             <div className="px-5 py-4">
               <ul className="divide-y divide-cream-2 text-sm">
                 {lines.map((l) => (
-                  <li key={l.id} className="flex items-center justify-between gap-3 py-2">
-                    <span className="min-w-0 truncate text-ink">
-                      {lineLabel(l)}{" "}
-                      <span className="text-ink-soft">× {l.qty}</span>
-                    </span>
-                    <span className="shrink-0 font-semibold text-ink">
-                      ₹{(l.qty * l.price).toLocaleString("en-IN")}
-                    </span>
+                  <li key={l.id} className="py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-ink">
+                          {lineLabel(l)}
+                        </p>
+                        <p className="text-xs text-ink-soft">
+                          ₹{l.price.toLocaleString("en-IN")} / {l.unit}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-base font-bold text-maroon">
+                          ₹{(l.qty * l.price).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-cream-2/60 pt-2">
+                      <span className="text-xs font-medium text-ink-soft">
+                        {t("Quantity", "मात्रा")}:
+                      </span>
+                      <QuantitySelector
+                        value={l.qty}
+                        onChange={(n) => setCount(l.id, n)}
+                        min={0}
+                        max={200}
+                        size="sm"
+                        label={`${l.name} quantity`}
+                      />
+                    </div>
                   </li>
                 ))}
                 <li className="flex items-center justify-between gap-3 py-3">
@@ -402,7 +488,10 @@ export default function BainaBoxOrderPanel({
                 </li>
               </ul>
 
-              {session === null ? (
+              {session === undefined ? (
+                // Loading state — clean placeholder while session resolves to avoid flash
+                <div className="mt-4 min-h-[14rem] animate-pulse rounded-2xl bg-cream-2/40" />
+              ) : session === null ? (
                 // Signed out — the same inline gate the booking wizard uses;
                 // once the login lands, `useSessionStatus` re-renders and the
                 // order form (with the boxes untouched) appears in its place.

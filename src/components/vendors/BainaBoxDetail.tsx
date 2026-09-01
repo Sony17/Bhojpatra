@@ -26,6 +26,12 @@ export default function BainaBoxDetail({
 
   const bookHref = "#baina-order";
 
+  const handleBookNow = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("baina:add-signature"));
+    }
+  };
+
   const photos = useMemo(
     () => [data.heroImage, ...(data.gallery ?? []).filter((g) => g !== data.heroImage)],
     [data.heroImage, data.gallery],
@@ -53,7 +59,7 @@ export default function BainaBoxDetail({
         <AppBar
           title={data.name}
           subtitle={data.location}
-          backHref="/"
+          backHref="/baina-box"
           className="mb-2 sm:rounded-b-hero"
         />
 
@@ -243,6 +249,7 @@ export default function BainaBoxDetail({
             <div className="mt-6">
               <VendorActionRow
                 bookHref={bookHref}
+                onBook={handleBookNow}
                 vendorName={data.name}
                 vendorCity={data.location}
                 priceFrom={data.fixedPrice}
@@ -271,7 +278,7 @@ export default function BainaBoxDetail({
         {/* ── Order Sweets & Boxes — per-box ordering (qty → date → confirm).
             The feast wizard hand-off above stays for full catering; this panel
             is how a box order actually completes. ── */}
-        <BainaBoxOrderPanel data={data} allHref="/baina-box" />
+        <BainaBoxOrderPanel key={data.vendorId} data={data} allHref="/baina-box" />
 
         <CompareTray />
 
@@ -282,6 +289,7 @@ export default function BainaBoxDetail({
           priceNote={t("per Box", "प्रति डिब्बा")}
           cta={t("Order Boxes", "डिब्बे ऑर्डर करें")}
           href="#baina-order"
+          onClick={handleBookNow}
         />
       </section>
     </PublicShell>
