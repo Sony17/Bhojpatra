@@ -7,6 +7,7 @@ import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { useLang } from "@/lib/i18n";
 import { Button, Badge } from "@/components/ui";
+import BainaStickyCart from "@/components/vendors/BainaStickyCart";
 import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
 
 export default function BainaBoxOverview() {
@@ -159,6 +160,7 @@ export default function BainaBoxOverview() {
           ))}
         </div>
 
+        <BainaStickyCart />
         <CompareTray />
       </section>
     </PublicShell>

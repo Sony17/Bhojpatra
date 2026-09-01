@@ -10,6 +10,8 @@ import CompareTray from "@/components/vendors/CompareTray";
 import { useCompare } from "@/lib/compare";
 import { openCompareTable } from "@/lib/compareTray";
 import { useLang } from "@/lib/i18n";
+import BainaStickyCart from "@/components/vendors/BainaStickyCart";
+import { useBainaCart, resolveBainaCartSummary } from "@/lib/bainaCart";
 import { AppBar } from "@/components/ui";
 import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
 
@@ -19,6 +21,8 @@ export default function BainaBoxDetail({
   data: BainaBoxVendorData;
 }) {
   const { t } = useLang();
+  const cart = useBainaCart();
+  const { totalBoxes } = resolveBainaCartSummary(cart);
   const { has, toggle, isFull, count: compareCount } = useCompare();
 
   const inCompare = has(data.vendorId);
@@ -280,17 +284,19 @@ export default function BainaBoxDetail({
             is how a box order actually completes. ── */}
         <BainaBoxOrderPanel key={data.vendorId} data={data} allHref="/baina-box" />
 
+        <BainaStickyCart />
         <CompareTray />
 
-        {/* Mobile sticky booking bar — jumps to the on-page box order panel
-            (the catering wizard stays reachable via the action row's Book Now). */}
-        <StickyBookingBar
-          price={`₹${data.fixedPrice.toLocaleString("en-IN")}`}
-          priceNote={t("per Box", "प्रति डिब्बा")}
-          cta={t("Order Boxes", "डिब्बे ऑर्डर करें")}
-          href="#baina-order"
-          onClick={handleBookNow}
-        />
+        {/* Mobile sticky booking bar — shown when order has 0 boxes to invite ordering */}
+        {totalBoxes === 0 && (
+          <StickyBookingBar
+            price={`₹${data.fixedPrice.toLocaleString("en-IN")}`}
+            priceNote={t("per Box", "प्रति डिब्बा")}
+            cta={t("Order Boxes", "डिब्बे ऑर्डर करें")}
+            href="#baina-order"
+            onClick={handleBookNow}
+          />
+        )}
       </section>
     </PublicShell>
   );

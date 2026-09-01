@@ -10,7 +10,8 @@ import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
-import type { BainaOrderVendor } from "@/lib/bainaBoxData";
+import { getBainaBoxVendorByVendorId, type BainaOrderVendor } from "@/lib/bainaBoxData";
+import { saveBainaCart, clearBainaCart } from "@/lib/bainaCart";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -79,6 +80,11 @@ export default function BainaBoxOrderPanel({
   // login gate from flashing for an already signed-in customer.
   const session = useSessionStatus();
 
+  const vendorSlug = useMemo(
+    () => (data as { slug?: string }).slug || getBainaBoxVendorByVendorId(data.vendorId)?.slug || data.vendorId,
+    [data],
+  );
+
   // Signature product (matching vendor fixedPrice or first product)
   const signatureProduct = useMemo(() => {
     if (!data.products.length) return null;
@@ -90,6 +96,23 @@ export default function BainaBoxOrderPanel({
   }, [data]);
 
   const [qty, setQty] = useState<Record<string, number>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem("bhojpatra:baina-cart");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.vendorId === data.vendorId && parsed?.qty && Object.keys(parsed.qty).length > 0) {
+            const validQty: Record<string, number> = {};
+            for (const p of data.products) {
+              if (parsed.qty[p.id]) validQty[p.id] = parsed.qty[p.id];
+            }
+            if (Object.keys(validQty).length > 0) {
+              return validQty;
+            }
+          }
+        }
+      } catch {}
+    }
     if (data.products.length > 0) {
       const fp = (data as { fixedPrice?: number }).fixedPrice;
       const signature =
@@ -99,6 +122,17 @@ export default function BainaBoxOrderPanel({
     }
     return {};
   });
+
+  // Sync qty state with persistent cart
+  useEffect(() => {
+    saveBainaCart({
+      vendorId: data.vendorId,
+      vendorSlug,
+      vendorName: data.name,
+      qty,
+    });
+  }, [data.vendorId, vendorSlug, data.name, qty]);
+
   const [dateIso, setDateIso] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -126,16 +160,37 @@ export default function BainaBoxOrderPanel({
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
 
-  // Whenever the active vendor changes, reset the cart to this vendor's signature product
+  // Whenever the active vendor changes, restore its saved cart or default to signature product
   useEffect(() => {
-    if (signatureProduct) {
-      setQty({ [signatureProduct.id]: 1 });
-    } else {
-      setQty({});
+    let hasSavedForVendor = false;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem("bhojpatra:baina-cart");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.vendorId === data.vendorId && parsed?.qty && Object.keys(parsed.qty).length > 0) {
+            const validQty: Record<string, number> = {};
+            for (const p of data.products) {
+              if (parsed.qty[p.id]) validQty[p.id] = parsed.qty[p.id];
+            }
+            if (Object.keys(validQty).length > 0) {
+              setQty(validQty);
+              hasSavedForVendor = true;
+            }
+          }
+        }
+      } catch {}
+    }
+    if (!hasSavedForVendor) {
+      if (signatureProduct) {
+        setQty({ [signatureProduct.id]: 1 });
+      } else {
+        setQty({});
+      }
     }
     setError("");
     setPlaced(null);
-  }, [data.vendorId, signatureProduct]);
+  }, [data.vendorId, data.products, signatureProduct]);
 
   // When arriving via "Book Now" / "Order Boxes", ensure at least 1 signature
   // box is in the cart and scroll to the order panel.
@@ -264,6 +319,7 @@ export default function BainaBoxOrderPanel({
         return;
       }
       setPlaced({ id, amount: totalAmount });
+      clearBainaCart();
     } catch {
       setError(
         t(
@@ -306,6 +362,7 @@ export default function BainaBoxOrderPanel({
               onClick={() => {
                 setPlaced(null);
                 setQty({});
+                clearBainaCart();
               }}
             >
               {t("Order more boxes", "और डिब्बे ऑर्डर करें")}
