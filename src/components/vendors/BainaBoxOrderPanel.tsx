@@ -8,10 +8,21 @@ import LoginGate from "@/components/auth/LoginGate";
 import { useLang } from "@/lib/i18n";
 import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
-import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
+import { DEFAULT_VENDOR_LEAD_DAYS, coupons, type Coupon } from "@/lib/data";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
 import { getBainaBoxVendorByVendorId, type BainaOrderVendor } from "@/lib/bainaBoxData";
 import { saveBainaCart, clearBainaCart } from "@/lib/bainaCart";
+import { ADVANCE_RATE } from "@/lib/bookingPricing";
+import { type OrderPaymentMethod } from "@/lib/orderPayment";
+import {
+  DEFAULT_REFERRAL_RATES,
+  customerPercentFor,
+  type ReferralRates,
+} from "@/lib/referralRates";
+import {
+  startRazorpayCheckout,
+  RazorpayCheckoutError,
+} from "@/lib/razorpayCheckout";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -41,8 +52,6 @@ function orderRef(seed: string): string {
   return `BHJ-B${(Math.abs(h) % 90000) + 10000}`;
 }
 
-
-
 /** How an ordered line reads in the summary and on the receipt. A vendor sells
  *  the same box in several sizes, so the size has to ride along with the name —
  *  except when it adds nothing ("Kaju Katli (Box)"). */
@@ -51,17 +60,9 @@ function lineLabel(l: { name: string; unit: string }): string {
 }
 
 /**
- * The Baina Box order flow — pick boxes with a quantity stepper, choose a
- * delivery date and confirm. Unlike the feast wizard (per-plate catering with a
- * guest minimum), boxes are ordered per box at the card price, so a gifting
- * order of a few boxes is finally possible. Confirmed orders post to
- * /api/bookings ("Bhojpatra connects you" — nothing collected online; our team
- * calls to arrange payment & delivery), so they land in My Bookings, the admin
- * console and the confirmation emails like any other booking.
- *
- * Both box sellers use this one panel: the curated Baina Box storefronts
- * (/baina-box/<slug>) and any live vendor who published a box menu in their
- * dashboard, whose boxes render on their own profile page.
+ * Per-box order panel for sweet houses & gifting specialists. Used on curated
+ * detail pages (/baina-box/<slug>) and any live vendor who published a box menu
+ * in their dashboard (/vendors/<id>).
  */
 export default function BainaBoxOrderPanel({
   data,
@@ -69,15 +70,10 @@ export default function BainaBoxOrderPanel({
   allHref,
 }: {
   data: BainaOrderVendor;
-  /** Section heading over the box grid. Defaults to "Order Sweets & Boxes". */
   heading?: string;
-  /** When set, a "View All →" link beside the heading (the curated storefronts
-   *  point it at the Baina Box marketplace; a live vendor has nowhere to go). */
   allHref?: string;
 }) {
   const { t } = useLang();
-  // null = signed out, undefined = still resolving — the tri-state keeps the
-  // login gate from flashing for an already signed-in customer.
   const session = useSessionStatus();
 
   const vendorSlug = useMemo(
@@ -85,7 +81,6 @@ export default function BainaBoxOrderPanel({
     [data],
   );
 
-  // Signature product (matching vendor fixedPrice or first product)
   const signatureProduct = useMemo(() => {
     if (!data.products.length) return null;
     const fp = (data as { fixedPrice?: number }).fixedPrice;
@@ -123,7 +118,6 @@ export default function BainaBoxOrderPanel({
     return {};
   });
 
-  // Sync qty state with persistent cart
   useEffect(() => {
     saveBainaCart({
       vendorId: data.vendorId,
@@ -138,17 +132,103 @@ export default function BainaBoxOrderPanel({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
-  // Contact fields start blank and adopt the session's details unless the
-  // customer already typed something (edits always win over prefill).
   const [touched, setTouched] = useState<{ name?: boolean; email?: boolean }>({});
   const effName = touched.name ? name : name || session?.name || "";
   const effEmail = touched.email ? email : email || session?.email || "";
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState("");
+
+  const applyCouponCode = (raw: string) => {
+    const code = raw.trim().toUpperCase();
+    const found = coupons.find((c) => c.code.toUpperCase() === code);
+    if (found) {
+      setAppliedCoupon(found);
+      setCouponInput(found.code);
+      setCouponError("");
+    } else {
+      setAppliedCoupon(null);
+      setCouponError(t("Invalid coupon code.", "अमान्य कूपन कोड।"));
+    }
+  };
+  const applyCoupon = () => applyCouponCode(couponInput);
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+  };
+
+  // Referral state
+  const [referralCode, setReferralCode] = useState("");
+  const [referrerName, setReferrerName] = useState("");
+  const [referrerType, setReferrerType] = useState("");
+  const [referralRates] = useState<ReferralRates>(DEFAULT_REFERRAL_RATES);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const ref = sp.get("ref");
+    if (ref) setReferralCode(ref.trim().toUpperCase());
+  }, []);
+
+  useEffect(() => {
+    const trimmed = referralCode.trim().toUpperCase();
+    if (!trimmed) {
+      setReferrerName("");
+      setReferrerType("");
+      return;
+    }
+    let active = true;
+    fetch(`/api/partners/${encodeURIComponent(trimmed)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((resData) => {
+        if (!active) return;
+        if (resData?.partner) {
+          setReferrerName(resData.partner.name);
+          setReferrerType(resData.partner.type);
+        } else {
+          setReferrerName("");
+          setReferrerType("");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [referralCode]);
+
+  // Payment gateway configuration
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string>("");
+  const [payMethod, setPayMethod] = useState<OrderPaymentMethod>("Connect");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/payment-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (!active || !cfg) return;
+        if (typeof cfg.razorpayKeyId === "string" && cfg.razorpayKeyId) {
+          setRazorpayKeyId(cfg.razorpayKeyId);
+          setPayMethod("Razorpay");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [placed, setPlaced] = useState<{ id: string; amount: number } | null>(
-    null,
-  );
+  const [placed, setPlaced] = useState<{
+    id: string;
+    amount: number;
+    paid: number;
+    paymentMethod: OrderPaymentMethod;
+    paymentRef?: string;
+  } | null>(null);
 
   const lines = useMemo(
     () =>
@@ -160,7 +240,22 @@ export default function BainaBoxOrderPanel({
   const totalBoxes = lines.reduce((n, l) => n + l.qty, 0);
   const totalAmount = lines.reduce((n, l) => n + l.qty * l.price, 0);
 
-  // Whenever the active vendor changes, restore its saved cart or default to signature product
+  const couponDiscount = appliedCoupon
+    ? Math.min((totalAmount * appliedCoupon.percent) / 100, appliedCoupon.cap)
+    : 0;
+  const referralCustomerPercent = referrerName
+    ? customerPercentFor(referralRates, referrerType)
+    : 0;
+  const referralDiscount = Math.max(
+    0,
+    Math.min(
+      Math.round((totalAmount * referralCustomerPercent) / 100),
+      totalAmount - couponDiscount,
+    ),
+  );
+  const grandTotal = Math.max(0, totalAmount - couponDiscount - referralDiscount);
+  const advanceAmount = Math.max(1, Math.round(grandTotal * ADVANCE_RATE));
+
   useEffect(() => {
     let hasSavedForVendor = false;
     if (typeof window !== "undefined") {
@@ -192,8 +287,6 @@ export default function BainaBoxOrderPanel({
     setPlaced(null);
   }, [data.vendorId, data.products, signatureProduct]);
 
-  // When arriving via "Book Now" / "Order Boxes", ensure at least 1 signature
-  // box is in the cart and scroll to the order panel.
   useEffect(() => {
     const handleAdd = () => {
       setQty((prev) => {
@@ -259,6 +352,54 @@ export default function BainaBoxOrderPanel({
     const id = orderRef(
       [data.vendorId, effEmail.trim(), phone.trim(), dateIso, ...lines.map((l) => `${l.id}x${l.qty}`)].join("|"),
     );
+
+    let paidAmount = 0;
+    let paymentRefId: string | undefined = undefined;
+
+    if (payMethod === "Razorpay") {
+      setSubmitting(true);
+      try {
+        const checkoutRes = await startRazorpayCheckout({
+          bookingId: id,
+          amount: advanceAmount,
+          note: `Bhojpatra — ${data.name} Baina Box`,
+          customerName: effName.trim(),
+          customerEmail: effEmail.trim(),
+          customerPhone: phone.trim(),
+        });
+        paidAmount = checkoutRes.amountPaid;
+        paymentRefId = checkoutRes.paymentId;
+      } catch (err) {
+        setSubmitting(false);
+        if (err instanceof RazorpayCheckoutError) {
+          if (err.code === "dismissed") {
+            setError(
+              t(
+                "Payment was cancelled. You can try again or choose Pay on Delivery.",
+                "भुगतान रद्द कर दिया गया। आप पुनः प्रयास कर सकते हैं या डिलीवरी पर भुगतान चुन सकते हैं।",
+              ),
+            );
+            return;
+          }
+          setError(
+            err.message ||
+              t(
+                "Payment failed. Please try again or choose Pay on Delivery.",
+                "भुगतान विफल रहा। कृपया पुनः प्रयास करें या डिलीवरी पर भुगतान चुनें।",
+              ),
+          );
+          return;
+        }
+        setError(
+          t(
+            "Could not initiate payment window. Please try again.",
+            "भुगतान विंडो शुरू नहीं हो सकी। कृपया पुनः प्रयास करें।",
+          ),
+        );
+        return;
+      }
+    }
+
     const receipt = [
       "BHOJPATRA — BAINA BOX ORDER",
       `Booking ID: ${id}`,
@@ -273,8 +414,13 @@ export default function BainaBoxOrderPanel({
           ).toLocaleString("en-IN")}`,
       ),
       "",
-      `Total (${totalBoxes} ${totalBoxes === 1 ? "box" : "boxes"}): ₹${totalAmount.toLocaleString("en-IN")}`,
-      "Payment: Bhojpatra connects you — our team calls to arrange payment & delivery.",
+      `Items Total (${totalBoxes} ${totalBoxes === 1 ? "box" : "boxes"}): ₹${totalAmount.toLocaleString("en-IN")}`,
+      ...(couponDiscount > 0 ? [`Coupon Discount (${appliedCoupon?.code}): -₹${couponDiscount.toLocaleString("en-IN")}`] : []),
+      ...(referralDiscount > 0 ? [`Referral Discount: -₹${referralDiscount.toLocaleString("en-IN")}`] : []),
+      `Grand Total: ₹${grandTotal.toLocaleString("en-IN")}`,
+      payMethod === "Razorpay"
+        ? `Payment: ₹${paidAmount.toLocaleString("en-IN")} paid online via Razorpay (Ref: ${paymentRefId ?? "verified"}). Balance ₹${(grandTotal - paidAmount).toLocaleString("en-IN")} on delivery.`
+        : "Payment: Connect / Pay on delivery — our team calls to arrange payment & delivery.",
     ].join("\n");
 
     setSubmitting(true);
@@ -291,15 +437,17 @@ export default function BainaBoxOrderPanel({
           date: formatEventDate(dateIso),
           eventDateISO: dateIso,
           packageId: "custom",
-          // Box count stands in for guests on a per-box order — the receipt
-          // and amount carry the real story.
           guests: totalBoxes,
           vendor: data.name,
           city: cityOf(data.location),
           venue: address.trim() || undefined,
-          amount: totalAmount,
-          paid: 0,
-          paymentMethod: "Connect",
+          amount: grandTotal,
+          paid: paidAmount,
+          paymentMethod: payMethod,
+          paymentRef: paymentRefId,
+          referralCode: referralCode.trim() || undefined,
+          referrerName: referrerName || undefined,
+          referrerType: referrerType || undefined,
           status: "Confirmed",
           vendors: [{ id: data.vendorId, name: data.name }],
           receipt,
@@ -318,7 +466,13 @@ export default function BainaBoxOrderPanel({
         );
         return;
       }
-      setPlaced({ id, amount: totalAmount });
+      setPlaced({
+        id,
+        amount: grandTotal,
+        paid: paidAmount,
+        paymentMethod: payMethod,
+        paymentRef: paymentRefId,
+      });
       clearBainaCart();
     } catch {
       setError(
@@ -334,6 +488,7 @@ export default function BainaBoxOrderPanel({
 
   /* ── Confirmed — replace the panel with the order summary ─────────── */
   if (placed) {
+    const balance = Math.max(0, placed.amount - placed.paid);
     return (
       <div className="mt-12 border-t border-cream-3 pt-8" id="baina-order">
         <div className="mx-auto max-w-lg rounded-card border border-maroon/15 bg-cream/40 p-6 text-center sm:p-8">
@@ -345,16 +500,45 @@ export default function BainaBoxOrderPanel({
           </h2>
           <p className="mt-2 text-sm text-ink-soft">
             {t(
-              `Your Baina Box order with ${data.name} is confirmed. Our team will call you to arrange payment & delivery.`,
-              `${data.name} के साथ आपका बैना बॉक्स ऑर्डर कन्फर्म है। भुगतान और डिलीवरी के लिए हमारी टीम आपको कॉल करेगी।`,
+              `Your Baina Box order with ${data.name} is confirmed. Our team will contact you to coordinate delivery.`,
+              `${data.name} के साथ आपका बैना बॉक्स ऑर्डर कन्फर्म है। डिलीवरी समन्वय के लिए हमारी टीम आपसे संपर्क करेगी।`,
             )}
           </p>
-          <p className="mt-4 text-sm text-ink">
-            <span className="font-semibold">{t("Booking ID", "बुकिंग आईडी")}:</span>{" "}
-            {placed.id}
-            <span className="mx-2 text-ink-soft">·</span>
-            <span className="font-semibold">₹{placed.amount.toLocaleString("en-IN")}</span>
-          </p>
+          <div className="mt-4 rounded-xl border border-cream-3 bg-white p-4 text-left text-xs space-y-1.5 text-ink-soft">
+            <div className="flex justify-between font-semibold text-ink">
+              <span>{t("Booking ID", "बुकिंग आईडी")}:</span>
+              <span className="font-mono text-maroon">{placed.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{t("Total Amount", "कुल राशि")}:</span>
+              <span className="font-bold text-ink">₹{placed.amount.toLocaleString("en-IN")}</span>
+            </div>
+            {placed.paid > 0 ? (
+              <>
+                <div className="flex justify-between text-green-700 font-medium">
+                  <span>{t("Paid Online (Advance)", "ऑनलाइन भुगतान (एडवांस)")}:</span>
+                  <span>₹{placed.paid.toLocaleString("en-IN")}</span>
+                </div>
+                {placed.paymentRef && (
+                  <div className="flex justify-between text-[11px] text-ink-soft">
+                    <span>{t("Payment Ref", "भुगतान संदर्भ")}:</span>
+                    <span className="font-mono">{placed.paymentRef}</span>
+                  </div>
+                )}
+                {balance > 0 && (
+                  <div className="flex justify-between font-semibold text-ink border-t border-cream-2 pt-1.5 mt-1.5">
+                    <span>{t("Balance on Delivery", "डिलीवरी पर बकाया")}:</span>
+                    <span className="text-maroon">₹{balance.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex justify-between text-ink font-medium">
+                <span>{t("Payment Mode", "भुगतान मोड")}:</span>
+                <span>{t("Connect / Pay on Delivery", "डिलीवरी पर भुगतान / कनेक्ट")}</span>
+              </div>
+            )}
+          </div>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Button href="/bookings">{t("View My Bookings", "मेरी बुकिंग देखें")}</Button>
             <Button
@@ -382,7 +566,7 @@ export default function BainaBoxOrderPanel({
           <span className="text-base" aria-hidden="true">🎁</span>
           <span>
             <strong className="font-semibold text-maroon">
-              {t("Tailored for Intimate Gatherings & Festive Gifting", "छोटे आयोजनों और उपहारों के लिए उपयुक्त")}
+              {t("Smaller Parties & Festive Gifting", "छोटी पार्टियाँ और त्यौहार उपहार")}
             </strong>
             {" — "}
             {t(
@@ -426,13 +610,16 @@ export default function BainaBoxOrderPanel({
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    // A vendor-published box with no photo — keep the tile's
-                    // shape rather than collapsing the grid row.
                     <span
                       aria-hidden="true"
                       className="flex h-full w-full items-center justify-center text-2xl text-maroon/40"
                     >
                       🎁
+                    </span>
+                  )}
+                  {count > 0 && (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                      <span aria-hidden="true">✓</span> {count} {t("in order", "ऑर्डर में")}
                     </span>
                   )}
                 </div>
@@ -532,17 +719,6 @@ export default function BainaBoxOrderPanel({
                     </div>
                   </li>
                 ))}
-                <li className="flex items-center justify-between gap-3 py-3">
-                  <span className="font-semibold text-ink">
-                    {t("Total", "कुल")}{" "}
-                    <span className="font-normal text-ink-soft">
-                      · {totalBoxes} {totalBoxes === 1 ? t("box", "डिब्बा") : t("boxes", "डिब्बे")}
-                    </span>
-                  </span>
-                  <span className="font-display text-xl font-bold text-maroon">
-                    ₹{totalAmount.toLocaleString("en-IN")}
-                  </span>
-                </li>
               </ul>
 
               {session === undefined ? (
@@ -556,7 +732,7 @@ export default function BainaBoxOrderPanel({
                   <LoginGate />
                 </div>
               ) : (
-                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center justify-between text-sm text-ink-soft" htmlFor="baina-date">
                       <span>{t("Delivery date", "डिलीवरी की तारीख़")}</span>
@@ -645,6 +821,184 @@ export default function BainaBoxOrderPanel({
                     />
                   </div>
 
+                  {/* ── Coupons / Promo code ───────────────────────────── */}
+                  <div className="sm:col-span-2 rounded-xl border border-cream-2 bg-cream/30 p-3.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-maroon">
+                        🎟️ {t("Have a coupon?", "कूपन कोड है?")}
+                      </span>
+                      {appliedCoupon && (
+                        <button
+                          type="button"
+                          onClick={removeCoupon}
+                          className="text-xs font-semibold text-maroon hover:underline"
+                        >
+                          {t("Remove", "हटाएं")}
+                        </button>
+                      )}
+                    </div>
+                    {appliedCoupon ? (
+                      <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 border border-emerald-200">
+                        <span>
+                          <strong>{appliedCoupon.code}</strong> applied — {appliedCoupon.percent}% off (saved ₹{couponDiscount.toLocaleString("en-IN")})
+                        </span>
+                        <span className="font-bold text-emerald-700">✓</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mt-2 flex gap-2">
+                          <Input
+                            value={couponInput}
+                            onChange={(e) => {
+                              setCouponInput(e.target.value);
+                              setCouponError("");
+                            }}
+                            placeholder={t("Enter coupon code", "कूपन कोड दर्ज करें")}
+                            className="h-9 uppercase text-xs"
+                          />
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={applyCoupon}
+                            disabled={!couponInput.trim()}
+                            className="shrink-0 h-9 px-4 text-xs font-semibold"
+                          >
+                            {t("Apply", "लागू करें")}
+                          </Button>
+                        </div>
+                        {couponError && (
+                          <p className="mt-1.5 text-xs text-maroon">{couponError}</p>
+                        )}
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {coupons.slice(0, 3).map((c) => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => applyCouponCode(c.code)}
+                              className="rounded-full border border-maroon/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-white"
+                            >
+                              🏷️ {c.code} · {c.percent}% {t("off", "छूट")}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── Referral code (Optional) ───────────────────────── */}
+                  <div className="sm:col-span-2 rounded-xl border border-cream-2 bg-cream/30 p-3.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-maroon">
+                        🤝 {t("Partner / Referral Code (Optional)", "पार्टनर / रेफरल कोड (वैकल्पिक)")}
+                      </span>
+                      {referrerName && (
+                        <span className="text-xs font-medium text-emerald-700">
+                          ✓ {referrerName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Input
+                        value={referralCode}
+                        onChange={(e) => {
+                          setReferralCode(e.target.value.toUpperCase());
+                        }}
+                        placeholder={t("e.g. BHJ123", "जैसे BHJ123")}
+                        className="h-9 uppercase text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ── Price breakdown summary ────────────────────────── */}
+                  <div className="sm:col-span-2 rounded-xl border border-maroon/10 bg-cream/20 p-4">
+                    <div className="space-y-1.5 text-xs text-ink-soft">
+                      <div className="flex justify-between">
+                        <span>
+                          {t("Items Total", "सामग्री कुल")} ({totalBoxes} {totalBoxes === 1 ? t("box", "डिब्बा") : t("boxes", "डिब्बे")}):
+                        </span>
+                        <span className="font-semibold text-ink">₹{totalAmount.toLocaleString("en-IN")}</span>
+                      </div>
+                      {couponDiscount > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-medium">
+                          <span>{t("Coupon Discount", "कूपन छूट")} ({appliedCoupon?.code}):</span>
+                          <span>-₹{couponDiscount.toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                      {referralDiscount > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-medium">
+                          <span>{t("Referral Discount", "रेफरल छूट")}:</span>
+                          <span>-₹{referralDiscount.toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-cream-3 pt-2 mt-2 flex items-center justify-between text-sm">
+                        <span className="font-bold text-ink">{t("Grand Total", "कुल राशि")}:</span>
+                        <span className="font-display text-lg font-bold text-maroon">
+                          ₹{grandTotal.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Choose Payment Method ──────────────────────────── */}
+                  <div className="sm:col-span-2 flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-maroon">
+                      💳 {t("Choose Payment Method", "भुगतान का तरीका चुनें")}
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {razorpayKeyId && (
+                        <button
+                          type="button"
+                          onClick={() => setPayMethod("Razorpay")}
+                          className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition ${
+                            payMethod === "Razorpay"
+                              ? "border-maroon bg-maroon/5 ring-1 ring-maroon shadow-sm"
+                              : "border-cream-3 bg-white hover:border-maroon/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-bold text-sm text-ink">
+                              💳 {t("Pay Online", "ऑनलाइन भुगतान")}
+                            </span>
+                            <span className="text-xs font-bold text-maroon">
+                              ₹{advanceAmount.toLocaleString("en-IN")} {t("Advance", "एडवांस")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-ink-soft">
+                            {t(
+                              "10% advance via UPI / Cards / Netbanking with Razorpay. Balance on delivery.",
+                              "10% एडवांस UPI/कार्ड से। बाकी डिलीवरी पर।",
+                            )}
+                          </p>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setPayMethod("Connect")}
+                        className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition ${
+                          payMethod === "Connect"
+                            ? "border-maroon bg-maroon/5 ring-1 ring-maroon shadow-sm"
+                            : "border-cream-3 bg-white hover:border-maroon/30"
+                        } ${!razorpayKeyId ? "sm:col-span-2" : ""}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-bold text-sm text-ink">
+                            🤝 {t("Pay on Delivery", "डिलीवरी पर भुगतान")}
+                          </span>
+                          <span className="text-xs font-semibold text-ink-soft">
+                            {t("Connect", "कनेक्ट")}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-ink-soft">
+                          {t(
+                            "Our team will call to confirm order details and arrange payment.",
+                            "हमारी टीम विवरण की पुष्टि और भुगतान के लिए कॉल करेगी।",
+                          )}
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
                   {error && (
                     <p className="rounded-control border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon sm:col-span-2">
                       {error}
@@ -659,14 +1013,21 @@ export default function BainaBoxOrderPanel({
                       onClick={handleConfirm}
                     >
                       {submitting
-                        ? t("Placing order…", "ऑर्डर हो रहा है…")
-                        : `${t("Confirm Order", "ऑर्डर कन्फर्म करें")} · ₹${totalAmount.toLocaleString("en-IN")}`}
+                        ? t("Processing…", "प्रक्रिया जारी है…")
+                        : payMethod === "Razorpay"
+                          ? `${t("Pay Advance & Confirm", "एडवांस दें और ऑर्डर करें")} · ₹${advanceAmount.toLocaleString("en-IN")}`
+                          : `${t("Confirm Order", "ऑर्डर कन्फर्म करें")} · ₹${grandTotal.toLocaleString("en-IN")}`}
                     </Button>
                     <p className="mt-2 text-center text-xs text-ink-soft">
-                      {t(
-                        "Nothing to pay online — our team calls to arrange payment & delivery.",
-                        "अभी कोई ऑनलाइन भुगतान नहीं — भुगतान और डिलीवरी के लिए हमारी टीम कॉल करेगी।",
-                      )}
+                      {payMethod === "Razorpay"
+                        ? t(
+                            `₹${advanceAmount.toLocaleString("en-IN")} online advance via secure Razorpay gateway. Balance ₹${Math.max(0, grandTotal - advanceAmount).toLocaleString("en-IN")} on delivery.`,
+                            `सुरक्षित रेज़रपे गेटवे से ₹${advanceAmount.toLocaleString("en-IN")} ऑनलाइन एडवांस। बाकी ₹${Math.max(0, grandTotal - advanceAmount).toLocaleString("en-IN")} डिलीवरी पर।`,
+                          )
+                        : t(
+                            "Nothing to pay online now — our team calls to arrange payment & delivery.",
+                            "अभी कोई ऑनलाइन भुगतान नहीं — भुगतान और डिलीवरी के लिए हमारी टीम कॉल करेगी।",
+                          )}
                     </p>
                   </div>
                 </div>

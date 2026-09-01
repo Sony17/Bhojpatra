@@ -79,7 +79,7 @@ import { useServices } from "@/lib/services";
 import { Button } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
-  MIN_GUESTS,
+  STALL_MIN_GUESTS,
   MAX_GUESTS,
   ADVANCE_RATE,
   computeOrderTotals,
@@ -340,7 +340,7 @@ export default function StallBookingWizard({
     const venueParam = sp.get("venue");
     if (venueParam) setVenue(venueParam);
     const g = Number(sp.get("guests"));
-    if (g >= MIN_GUESTS && g <= MAX_GUESTS) setGuests(Math.round(g));
+    if (g >= STALL_MIN_GUESTS && g <= MAX_GUESTS) setGuests(Math.round(g));
     // A brand page hands off its vendor — resolve it once the roster loads and
     // drop the guest straight onto the menu builder for that stall.
     const vendorParam = sp.get("vendor")?.trim();
@@ -887,7 +887,7 @@ export default function StallBookingWizard({
         return (
           occasionId !== "" &&
           (occasionId !== OTHER_OCCASION_ID || customOccasion.trim() !== "") &&
-          guests >= MIN_GUESTS &&
+          guests >= STALL_MIN_GUESTS &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
           dateMeetsLead
@@ -925,11 +925,11 @@ export default function StallBookingWizard({
       if (eventDate === "")
         out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
-      if (guests < MIN_GUESTS || guests > MAX_GUESTS)
+      if (guests < STALL_MIN_GUESTS || guests > MAX_GUESTS)
         out.push(
           t(
-            `Set guests between ${inr.format(MIN_GUESTS)} and ${inr.format(MAX_GUESTS)}`,
-            `मेहमानों की संख्या ${inr.format(MIN_GUESTS)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
+            `Set guests between ${inr.format(STALL_MIN_GUESTS)} and ${inr.format(MAX_GUESTS)}`,
+            `मेहमानों की संख्या ${inr.format(STALL_MIN_GUESTS)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
           ),
         );
       return out;
@@ -1343,7 +1343,7 @@ export default function StallBookingWizard({
       locations={locations}
       guests={guests}
       setGuests={setGuests}
-      paxMin={MIN_GUESTS}
+      paxMin={STALL_MIN_GUESTS}
       paxMax={MAX_GUESTS}
       leadWarning={leadWarning}
       // Review locks the headcount and echoes it in the order summary, so the

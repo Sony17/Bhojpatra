@@ -12,6 +12,7 @@
  */
 
 export const MIN_GUESTS = 50;
+export const STALL_MIN_GUESTS = 20;
 export const MAX_GUESTS = 50_000;
 
 export const GST_RATE = 0.18;
