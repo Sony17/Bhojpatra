@@ -87,6 +87,8 @@ import {
 } from "@/lib/occasions";
 import { usePackagesConfig, resolvePackageName } from "@/lib/packages";
 import { useServices } from "@/lib/services";
+import { resolveVendorFlow } from "@/lib/vendorLinks";
+import { BAINA_BOX_VENDOR_DATA } from "@/lib/bainaBoxData";
 import ServicePackages from "@/components/sections/ServicePackages";
 import { Button } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
@@ -448,13 +450,38 @@ export default function BookingWizard() {
     const stepParam = sp.get("step");
     const guestsParam = sp.get("guests");
 
-    // Single Stall has its own wizard at /book/stall — this one only sells the
-    // fixed Silver/Gold/Platinum feasts. Links minted before the split (a brand
-    // page's "book this stall", the old ?package=custom cards, the Mehndi
-    // occasion card) still land here, so forward them with their context intact
-    // rather than dead-ending on a package chooser that no longer offers it.
+    // Single Stall, Live Stall, and Baina Box have their own flows — this one only
+    // sells the fixed Silver/Gold/Platinum feasts. Links minted before the split or
+    // direct links (?vendor=..., old ?package=custom, Mehndi occasion) are forwarded
+    // to their appropriate flow with context intact.
     const vendorParam = sp.get("vendor")?.trim();
-    if (vendorParam || pkg === "custom" || occ === "mehndi") {
+    if (vendorParam) {
+      const flow = resolveVendorFlow(vendorParam);
+      const fwd = new URLSearchParams(sp);
+      fwd.delete("package");
+      fwd.delete("step");
+      const qs = fwd.toString();
+      if (flow === "baina") {
+        const baina = Object.values(BAINA_BOX_VENDOR_DATA).find(
+          (b) =>
+            b.vendorId.toLowerCase() === vendorParam.toLowerCase() ||
+            b.slug.toLowerCase() === vendorParam.toLowerCase(),
+        );
+        window.location.replace(
+          baina
+            ? `/baina-box/${baina.slug}#baina-order`
+            : `/vendors/${encodeURIComponent(vendorParam)}#baina-order`,
+        );
+        return;
+      }
+      if (flow === "live") {
+        window.location.replace(`/book/live-stall${qs ? `?${qs}` : ""}`);
+        return;
+      }
+      window.location.replace(`/book/stall${qs ? `?${qs}` : ""}`);
+      return;
+    }
+    if (pkg === "custom" || occ === "mehndi") {
       const fwd = new URLSearchParams(sp);
       fwd.delete("package");
       fwd.delete("step");

@@ -12,6 +12,7 @@ import {
   type VendorRatings,
 } from "@/lib/vendorRatings";
 import { Button, EmptyState } from "@/components/ui";
+import { vendorBookingHref } from "@/lib/vendorLinks";
 
 /** Localise the small fixed vocabularies (diet / tier / meal) for display. */
 function useLocalize() {
@@ -52,10 +53,10 @@ function useLocalize() {
   };
 }
 
-/** Deep-link into the booking wizard's vendor step, pre-filtered to the city. */
+/** Deep-link into the vendor's dedicated booking flow, preserving vendor ID and city. */
 function bookHref(vendor: VendorListing): string {
   const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  return `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
+  return vendorBookingHref(vendor, cityId);
 }
 
 export default function CompareView({

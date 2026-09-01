@@ -3,7 +3,6 @@ import CampaignPopup from "@/components/CampaignPopup";
 import Hero from "@/components/sections/Hero";
 import PromoBanner from "@/components/sections/PromoBanner";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
-import TopCategories from "@/components/sections/TopCategories";
 import BainaBoxes from "@/components/sections/BainaBoxes";
 import Gallery from "@/components/sections/Gallery";
 import BrandRibbon from "@/components/sections/BrandRibbon";
@@ -15,11 +14,10 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  * 1. Hero — location + book / find caterers
  * 2. Promo offer banner (art) — below the hero
  * 3. Occasions → /book
- * 4. Categories → /vendors
- * 5. Packages → book
- * 6. Baina → order path
- * 7. Social proof
- * 8. Promo lead capture — post-testimonials
+ * 4. Baina → order path
+ * 5. Gallery — real event snapshots
+ * 6. Social proof
+ * 7. Promo lead capture — post-testimonials
  */
 export default function Home() {
   return (
@@ -27,9 +25,6 @@ export default function Home() {
       <Hero />
       <PromoBanner />
       <ChooseOccasion />
-      <div className="home-band-cream">
-        <TopCategories />
-      </div>
       <BainaBoxes />
       <div className="home-band-cream">
         <Gallery />
