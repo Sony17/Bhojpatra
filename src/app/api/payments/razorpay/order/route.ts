@@ -1,5 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { upiTxnRef } from "@/lib/upi";
+import { createStore } from "@/lib/store";
+import type { StoredOrder } from "@/app/api/bookings/route";
 import {
   createRazorpayOrder,
   isRazorpayConfigured,
@@ -9,15 +11,19 @@ import {
 // Talks to the live Razorpay API per request — never prerender or cache.
 export const dynamic = "force-dynamic";
 
-// Sanity ceiling on a single advance (₹1 crore) — anything above is a bug or
-// abuse, not a booking.
+const bookingStore = createStore<StoredOrder>({
+  table: "bookings",
+  idField: "id",
+});
+
+// Sanity ceiling on a single advance/balance payment (₹1 crore) — anything above
+// is a bug or abuse, not a booking.
 const MAX_AMOUNT = 10_000_000;
 
-// Create a Razorpay Order for the booking advance. The client then opens
-// Razorpay Checkout against the returned order id; the amount is bound to the
-// order, so checkout cannot settle a different figure. The booking record
-// itself is only created after payment (the wizard derives the id up front),
-// so the booking ref travels on the order's notes for the webhook to read.
+// Create a Razorpay Order for a booking advance or remaining balance.
+// For initial bookings (not in DB yet), the amount is verified against MAX_AMOUNT.
+// For existing bookings (Pay Balance flow), the amount is strictly derived from
+// the stored booking's real remaining balance on the server.
 export async function POST(request: Request) {
   // Same gate as recording a payment — checkout sits behind login.
   const guard = await requireRole();
@@ -49,20 +55,54 @@ export async function POST(request: Request) {
     );
   }
 
-  const amt = typeof amount === "number" ? amount : Number(amount);
-  if (!Number.isFinite(amt) || amt <= 0 || amt > MAX_AMOUNT) {
-    return Response.json({ error: "Invalid amount." }, { status: 400 });
+  // Check if this is an existing booking (Pay Balance flow)
+  const existingBooking = await bookingStore.get(bookingId);
+  let amt: number;
+  let receiptType: "ADVANCE" | "BALANCE" = "ADVANCE";
+
+  if (existingBooking) {
+    const isAdmin = guard.role === "admin";
+    // Non-admins can only pay balance for their own bookings
+    if (!isAdmin && existingBooking.userId && existingBooking.userId !== guard.id) {
+      return Response.json({ error: "Not allowed." }, { status: 403 });
+    }
+    if (existingBooking.status === "Cancelled" || existingBooking.status === "Completed") {
+      return Response.json(
+        { error: `Cannot pay balance for a ${existingBooking.status.toLowerCase()} booking.` },
+        { status: 400 },
+      );
+    }
+    const currentPaid = existingBooking.paid ?? 0;
+    const remainingBalance = Math.max(0, existingBooking.amount - currentPaid);
+    if (remainingBalance <= 0) {
+      return Response.json(
+        { error: "This booking is already fully paid." },
+        { status: 400 },
+      );
+    }
+    // Authoritative amount is the server-calculated remaining balance
+    amt = remainingBalance;
+    receiptType = "BALANCE";
+  } else {
+    // Initial booking checkout flow (booking not in database yet)
+    const rawAmt = typeof amount === "number" ? amount : Number(amount);
+    if (!Number.isFinite(rawAmt) || rawAmt <= 0 || rawAmt > MAX_AMOUNT) {
+      return Response.json({ error: "Invalid amount." }, { status: 400 });
+    }
+    amt = rawAmt;
   }
 
   try {
     const order = await createRazorpayOrder({
       amountRupees: amt,
-      receipt: upiTxnRef(bookingId, "ADVANCE"),
+      receipt: upiTxnRef(bookingId, receiptType),
       notes: {
         bookingId,
         ...(typeof customer === "string" && customer.trim()
           ? { customer: customer.trim().slice(0, 100) }
-          : {}),
+          : existingBooking?.customer
+            ? { customer: existingBooking.customer.slice(0, 100) }
+            : {}),
       },
     });
     return Response.json(

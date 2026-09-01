@@ -16,6 +16,12 @@ import type { EmiPlan } from "@/lib/emi";
 
 /** A booked order, plus the receipt text used by the per-order download. */
 export interface StoredBooking extends Booking {
+  /** Customer name captured at booking time. */
+  customer?: string;
+  /** Customer phone number. */
+  phone?: string;
+  /** Customer email address. */
+  email?: string;
   /** Plain-text order summary — what "Download" saves for this booking alone. */
   receipt: string;
   /** Itemised invoice data so the order can be re-downloaded as a PDF invoice.

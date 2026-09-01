@@ -22,14 +22,12 @@ const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   Cancelled: ["Cancelled"],
 };
 
-// What a booking's own customer may do to it from My Bookings: pay off a
-// pending EMI order's balance to confirm it, cancel a pending or confirmed
-// order, mark a confirmed event complete, or reopen a completed one. They still
-// can't set the paid amount directly — settling the balance is recorded
-// server-side on Pending → Confirmed (see below) — and a cancelled order is
-// terminal.
+// What a booking's own customer may do to it from My Bookings: cancel a pending
+// or confirmed order, mark a confirmed event complete, or reopen a completed one.
+// Status cannot be moved to Confirmed via raw PATCH — confirming an order or
+// settling its balance requires server-verified Razorpay payment or admin action.
 const CUSTOMER_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  Pending: ["Confirmed", "Cancelled"],
+  Pending: ["Cancelled"],
   Confirmed: ["Completed", "Cancelled"],
   Completed: ["Confirmed"],
   Cancelled: [],
@@ -56,7 +54,7 @@ export async function GET(
 
 // PATCH /api/bookings/[id] → { status?, paid? } — validated status transition.
 // Admins may run any transition and adjust `paid`; a booking's own customer may
-// only complete/reopen their event (see CUSTOMER_TRANSITIONS) and never touch
+// only complete/reopen/cancel their event (see CUSTOMER_TRANSITIONS) and never touch
 // the money.
 export async function PATCH(
   request: Request,
@@ -100,13 +98,6 @@ export async function PATCH(
       );
     }
     next.status = body.status;
-
-    // A pending order is an EMI booking (advance paid, balance financed). When a
-    // customer confirms it they're settling that outstanding balance in full, so
-    // record it here — the client never sends `paid`, keeping money server-side.
-    if (!isAdmin && order.status === "Pending" && next.status === "Confirmed") {
-      next.paid = order.amount;
-    }
   }
 
   if (body.paid !== undefined) {

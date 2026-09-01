@@ -13,6 +13,7 @@ import {
   fetchMyBookings,
   onStoredBookingsChange,
   patchMyBooking,
+  emitBookingsChanged,
   downloadReceipt,
   bookingInvoice,
   bookingVendors,
@@ -24,6 +25,11 @@ import {
 import type { EmiPlan } from "@/lib/emi";
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
+import { useSessionStatus } from "@/lib/session";
+import {
+  startRazorpayCheckout,
+  RazorpayCheckoutError,
+} from "@/lib/razorpayCheckout";
 import {
   Button,
   type ButtonVariant,
@@ -533,28 +539,74 @@ function ConfirmAction({
 }
 
 /**
- * "Pay Balance" — settles a Pending EMI order's outstanding balance in one go,
- * which confirms it (Pending → Confirmed). The server records the full payment
- * against `paid` on that transition (the client never sends money), so the
- * balance clears on refetch.
+ * "Pay Balance" — initiates Razorpay Checkout for the booking's exact
+ * outstanding balance (Math.max(0, booking.amount - booking.paid)).
+ * On server-side signature verification, the payment is recorded in the
+ * ledger and the booking's paid amount & status are securely updated.
  */
 function PayBalanceButton({ booking }: { booking: StoredBooking }) {
   const { t } = useLang();
+  const session = useSessionStatus();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const balance = Math.max(0, booking.amount - booking.paid);
+
+  if (balance <= 0) return null;
+
+  const handlePay = async () => {
+    if (busy) return;
+    setError("");
+    setBusy(true);
+    try {
+      await startRazorpayCheckout({
+        bookingId: booking.id,
+        amount: balance,
+        note: `Bhojpatra — Pay Balance for ${booking.occasion} (${booking.id})`,
+        customerName: booking.customer || session?.name || "Customer",
+        customerEmail: booking.email || session?.email || "",
+        customerPhone: booking.phone || "",
+      });
+      emitBookingsChanged();
+    } catch (err) {
+      if (err instanceof RazorpayCheckoutError) {
+        if (err.code === "dismissed") {
+          // Closed by user without paying — not an error to display
+          return;
+        }
+        setError(
+          err.message ||
+            t(
+              "Payment failed. Please try again.",
+              "भुगतान विफल रहा। कृपया पुनः प्रयास करें।",
+            ),
+        );
+        return;
+      }
+      setError(
+        t(
+          "Could not start payment. Please try again.",
+          "भुगतान शुरू नहीं हो सका। कृपया पुनः प्रयास करें।",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <ConfirmAction
-      tone="solid"
-      triggerLabel={t(
-        `Pay Balance · ${money(balance)}`,
-        `शेष भुगतान · ${money(balance)}`,
-      )}
-      prompt={t(
-        `Settle the ${money(balance)} balance now to confirm this booking?`,
-        `इस बुकिंग की पुष्टि के लिए अभी ${money(balance)} शेष राशि चुकाएँ?`,
-      )}
-      confirmLabel={t("Yes, pay balance", "हाँ, भुगतान करें")}
-      run={() => patchMyBooking(booking.id, { status: "Confirmed" })}
-    />
+    <div className="flex shrink-0 flex-col items-start gap-1">
+      <Button
+        variant="primary"
+        onClick={handlePay}
+        loading={busy}
+        className="shrink-0"
+      >
+        {busy
+          ? t("Processing…", "प्रक्रिया जारी है…")
+          : `${t("Pay Balance", "शेष भुगतान")} · ${money(balance)}`}
+      </Button>
+      {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+    </div>
   );
 }
 
@@ -1041,7 +1093,8 @@ function BookingCard({
 
       {/* Actions */}
       <div className="mt-5 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar border-t border-cream-3 pt-4 md:flex-wrap md:overflow-visible">
-        {booking.status === "Pending" && <PayBalanceButton booking={booking} />}
+        {(booking.status === "Pending" || booking.status === "Confirmed") &&
+          balance > 0 && <PayBalanceButton booking={booking} />}
         <Button variant="secondary" onClick={onView} className="shrink-0">
           {t("View Details", "विवरण देखें")}
         </Button>
@@ -1350,9 +1403,11 @@ function BookingDetailsModal({
                   {t("Edit Booking", "बुकिंग संपादित करें")}
                 </Button>
               )}
-              {booking.status === "Pending" && (
-                <PayBalanceButton booking={booking} />
-              )}
+              {(booking.status === "Pending" ||
+                booking.status === "Confirmed") &&
+                Math.max(0, booking.amount - booking.paid) > 0 && (
+                  <PayBalanceButton booking={booking} />
+                )}
               {(booking.status === "Pending" ||
                 booking.status === "Confirmed") && (
                 <CancelBookingButton booking={booking} />
