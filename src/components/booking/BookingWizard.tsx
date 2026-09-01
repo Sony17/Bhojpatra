@@ -1229,7 +1229,11 @@ export default function BookingWizard() {
   // skip-every-stall add-ons-only order — is enough.
   const orderHasItems =
     selectedAddOns.length > 0 ||
-    (singleStall ? pickedItemCount > 0 : builtCount > 0);
+    (singleStall
+      ? pickedItemCount > 0
+      : builtCount > 0 ||
+        hasStepAnySelection(activeCategories) ||
+        (packageId !== "" && packageId !== "custom"));
   // "Step done" = every stall on that step resolved (built or skipped). Skipping
   // is allowed on Custom — the guest just moves on. On the fixed tiers nothing is
   // skippable, so these reduce to "every course complete". `menuComplete` gates
@@ -1642,8 +1646,8 @@ export default function BookingWizard() {
         // Menu step — can proceed if at least one selection has been made (or no categories)
         return menuStepCategories.length === 0 || hasStepAnySelection(menuStepCategories);
       case 3:
-        // Live Stall step — can proceed if no live stalls, or at least one selection has been made
-        return !hasLiveStalls || liveStallCategories.length === 0 || hasStepAnySelection(liveStallCategories);
+        // Live Stall step is optional — customers can select live stalls or continue without them
+        return true;
       case 4:
         return (
           occasionId !== "" &&
@@ -2066,7 +2070,7 @@ export default function BookingWizard() {
   };
   const liveNext = () => {
     if (liveCat < liveStallCategories.length - 1) setLiveCat((c) => c + 1);
-    else if (!hasLiveStalls || hasStepAnySelection(liveStallCategories)) goNext();
+    else goNext();
   };
   // Single Stall: skip the current stall and slide on to the next one. On the
   // last stall there's nowhere to advance — skipping just resolves it so the
@@ -2584,6 +2588,16 @@ export default function BookingWizard() {
                 categoryComplete={categoryComplete}
                 isSkipped={isSkipped}
                 unskipCat={unskipCat}
+                onSkipMenu={() => {
+                  liveStallCategories.forEach((c) => skipCat(c.id));
+                  setLiveCat(0);
+                  setStep(4);
+                }}
+                skipMenuText={t(
+                  "Don't want live stalls? Skip straight to event details & extras.",
+                  "लाइव स्टॉल नहीं चाहिए? सीधे इवेंट विवरण और एक्स्ट्रा पर जाएं।",
+                )}
+                skipMenuLabel={t("Skip Live Stalls", "लाइव स्टॉल छोड़ें")}
                 // Single Stall marks a live station fixed just like a plated
                 // course, so this step must render (and count) it the same way.
                 fixedStall={isFixedStall}
@@ -2842,7 +2856,7 @@ export default function BookingWizard() {
             t={t}
             categories={liveStallCategories}
             activeCat={liveCat}
-            canAdvance={hasStepAnySelection(liveStallCategories)}
+            canAdvance={true}
             isPartial={isStepPartial(liveStallCategories)}
             missingSummaries={getMissingCategorySummaries(liveStallCategories)}
             singleStall={singleStall}
@@ -2851,6 +2865,12 @@ export default function BookingWizard() {
             onPrev={livePrev}
             onNext={liveNext}
             onSkipCurrent={skipCurrentLiveStall}
+            onSkipAll={() => {
+              liveStallCategories.forEach((c) => skipCat(c.id));
+              setLiveCat(0);
+              goNext();
+            }}
+            skipAllLabel={t("Skip Live Stalls", "लाइव स्टॉल छोड़ें")}
             estTotal={orderHasItems ? grandTotal : 0}
             guestCount={guests}
           />
@@ -3153,6 +3173,8 @@ function MenuStepNav({
   onPrev,
   onNext,
   onSkipCurrent,
+  onSkipAll,
+  skipAllLabel,
   extraBanner,
   estTotal,
   guestCount,
@@ -3169,6 +3191,8 @@ function MenuStepNav({
   onPrev: () => void;
   onNext: () => void;
   onSkipCurrent: () => void;
+  onSkipAll?: () => void;
+  skipAllLabel?: string;
   extraBanner?: ReactNode;
   /** Running order estimate + headcount — surfaced on mobile as a compact
    *  summary strip above the nav, echoing the app mockup's persistent bar. */
@@ -3248,6 +3272,15 @@ function MenuStepNav({
         </Button>
 
         <div className="flex flex-1 items-center justify-end gap-2.5 sm:flex-initial">
+          {onSkipAll && (
+            <Button
+              variant="secondary"
+              onClick={onSkipAll}
+              className="flex-1 sm:flex-initial"
+            >
+              {skipAllLabel ?? t("Skip section", "सेक्शन छोड़ें")}
+            </Button>
+          )}
           {/* Single Stall lets a guest opt out of a course entirely — skip it and
               slide to the next stall, or undo if they skipped by mistake. */}
           {singleStall &&
@@ -3639,6 +3672,8 @@ function StepMenu({
   isSkipped,
   unskipCat,
   onSkipMenu,
+  skipMenuText,
+  skipMenuLabel,
   showItemPrice = false,
   fixedStall = () => false,
   vendorRatings,
@@ -3671,8 +3706,10 @@ function StepMenu({
   categoryComplete: (cat: MenuCategory) => boolean;
   isSkipped: (catId: string) => boolean;
   unskipCat: (catId: string) => void;
-  /** Single Stall only — skip the whole menu and go straight to add-ons. */
+  /** Skip the whole section and jump to the next step. */
   onSkipMenu?: () => void;
+  skipMenuText?: string;
+  skipMenuLabel?: string;
   /** Single Stall — surface each delicacy's own per-plate price (vendors who
    *  sell Single Stall price dishes individually). Display only; the checkout
    *  total still runs on the course per-plate. */
@@ -3856,22 +3893,23 @@ function StepMenu({
         sub={subtitle}
       />
 
-      {/* Single Stall only — a guest who just wants live counters & extras can
-          bypass the courses entirely and jump to the add-ons step. */}
+      {/* Skip banner for optional sections or single stall menu bypass */}
       {onSkipMenu && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-cream-2/40 px-4 py-3 text-sm text-ink-soft">
           <span>
-            {t(
-              "Not building a menu? Skip straight to live counters & extras.",
-              "मेन्यू नहीं बना रहे? सीधे लाइव काउंटर और एक्स्ट्रा पर जाएं।",
-            )}
+            {skipMenuText ??
+              t(
+                "Not building a menu? Skip straight to live counters & extras.",
+                "मेन्यू नहीं बना रहे? सीधे लाइव काउंटर और एक्स्ट्रा पर जाएं।",
+              )}
           </span>
           <button
             type="button"
             onClick={onSkipMenu}
             className="shrink-0 rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
           >
-            {t("Skip menu · Add extras only", "मेन्यू छोड़ें · सिर्फ़ एक्स्ट्रा")} →
+            {skipMenuLabel ??
+              `${t("Skip menu · Add extras only", "मेन्यू छोड़ें · सिर्फ़ एक्स्ट्रा")} →`}
           </button>
         </div>
       )}
