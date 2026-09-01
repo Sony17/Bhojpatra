@@ -7,6 +7,7 @@ import {
   customOrderLeadDays,
   occasions as seedOccasions,
   DEFAULT_OCCASION_LEAD_DAYS,
+  DEFAULT_SINGLE_STALL_LEAD_DAYS,
   type BookingStatus,
 } from "@/lib/data";
 import type { EmiPlan } from "@/lib/emi";
@@ -224,16 +225,26 @@ export async function POST(request: Request) {
           .map((v) => (v && typeof v.id === "string" ? v.id : ""))
           .filter(Boolean)
       : [];
+    const isSingleStallOrBaina =
+      packageId === "custom" || occasion === "Baina Box";
     const packageOrVendorLead =
       fixedLead !== undefined && packageId !== "custom"
         ? fixedLead
-        : customOrderLeadDays(vendorIds);
-    // The stricter of the package/vendor lead and the occasion's own notice —
-    // mirrors the wizard's `max(packageLead, occasionLead)`.
-    const requiredLead = Math.max(
-      packageOrVendorLead,
-      await occasionLeadFromName(typeof occasion === "string" ? occasion : ""),
-    );
+        : customOrderLeadDays(
+            vendorIds,
+            isSingleStallOrBaina
+              ? DEFAULT_SINGLE_STALL_LEAD_DAYS
+              : undefined,
+          );
+    // For Single Stall and Baina Box, the vendor lead (1 day for next-day availability,
+    // or 0 for same-day) applies directly. Fixed-tier full feast packages continue to
+    // enforce max(packageLead, occasionLead).
+    const requiredLead = isSingleStallOrBaina
+      ? packageOrVendorLead
+      : Math.max(
+          packageOrVendorLead,
+          await occasionLeadFromName(typeof occasion === "string" ? occasion : ""),
+        );
     const days = daysUntilISO(iso);
     if (days !== null && days < requiredLead) {
       return Response.json(

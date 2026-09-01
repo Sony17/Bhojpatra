@@ -412,8 +412,11 @@ export default function BainaBoxOrderPanel({
               ) : (
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm text-ink-soft" htmlFor="baina-date">
-                      {t("Delivery date", "डिलीवरी की तारीख़")}
+                    <label className="flex items-center justify-between text-sm text-ink-soft" htmlFor="baina-date">
+                      <span>{t("Delivery date", "डिलीवरी की तारीख़")}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
+                        ⚡ {t("Next-day available", "अगले दिन उपलब्ध")}
+                      </span>
                     </label>
                     <div
                       id="baina-date"
@@ -422,7 +425,7 @@ export default function BainaBoxOrderPanel({
                       <DatePicker
                         placeholder={t("Select date", "तारीख़ चुनें")}
                         ariaLabel={t("Delivery date", "डिलीवरी की तारीख़")}
-                        minDaysAhead={DEFAULT_VENDOR_LEAD_DAYS}
+                        minDaysAhead={1}
                         valueIso={dateIso}
                         onChange={(d) =>
                           setDateIso(

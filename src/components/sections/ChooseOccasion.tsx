@@ -18,7 +18,7 @@ export default function ChooseOccasion() {
   return (
     <section
       id="occasions"
-      className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16"
+      className="relative mx-auto max-w-7xl scroll-mt-24 px-5 py-12 sm:scroll-mt-28 sm:px-8 sm:py-16"
     >
       <SectionIntro
         eyebrow={t("Occasions", "अवसर")}
@@ -34,11 +34,12 @@ export default function ChooseOccasion() {
               return (
                 <Link
                   key={`${occasion.id}-${copy}`}
+                  id={copy === 0 ? `occasion-${occasion.id}` : undefined}
                   href={`/book?occasion=${occasion.id}`}
                   aria-label={copy === 0 ? `Book — ${name}` : undefined}
                   aria-hidden={copy === 1 || undefined}
                   tabIndex={copy === 1 ? -1 : undefined}
-                  className="group relative w-[9.5rem] shrink-0 overflow-hidden border border-cream shadow-pop transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-[11rem]"
+                  className="group relative w-[9.5rem] shrink-0 scroll-mt-24 overflow-hidden border border-cream shadow-pop transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:scroll-mt-28 sm:w-[11rem]"
                 >
                   <span className="relative block aspect-[3/4] w-full">
                     <Image

@@ -930,6 +930,7 @@ export const navLinks: {
   hasDropdown?: boolean;
   items?: DropdownItem[];
 }[] = [
+  { label: "Occasions", labelHi: "अवसर", href: "/#occasions" },
   { label: "Brands", labelHi: "ब्रांड", href: "/vendors" },
   { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
   { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
@@ -1876,10 +1877,19 @@ export const packageLeadDays: Record<string, number> = {
  */
 export const DEFAULT_VENDOR_LEAD_DAYS = 2;
 
+/**
+ * Baseline advance-booking notice (in days) for Single Stalls and Baina Boxes
+ * to support next-day availability (1 day notice).
+ */
+export const DEFAULT_SINGLE_STALL_LEAD_DAYS = 1;
+
 /** A vendor's effective advance-booking notice in days (its own `leadDays`, or
  *  the shared default). Works for both catalogue and course-level vendors. */
-export function vendorLeadDays(v: { leadDays?: number }): number {
-  return v.leadDays ?? DEFAULT_VENDOR_LEAD_DAYS;
+export function vendorLeadDays(
+  v: { leadDays?: number },
+  defaultLead: number = DEFAULT_VENDOR_LEAD_DAYS,
+): number {
+  return v.leadDays ?? defaultLead;
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -2083,7 +2093,10 @@ export const vendorListings: VendorListing[] = [
  * baseline notice so an order can never be slipped in for same-day by omitting
  * or faking its vendors.
  */
-export function customOrderLeadDays(vendorIds: readonly string[]): number {
+export function customOrderLeadDays(
+  vendorIds: readonly string[],
+  defaultLead: number = DEFAULT_VENDOR_LEAD_DAYS,
+): number {
   let lead = 0;
   let matched = false;
   for (const id of vendorIds) {
@@ -2095,10 +2108,10 @@ export function customOrderLeadDays(vendorIds: readonly string[]): number {
       vendorListings.find((x) => x.id === id);
     if (v) {
       matched = true;
-      lead = Math.max(lead, vendorLeadDays(v));
+      lead = Math.max(lead, vendorLeadDays(v, defaultLead));
     }
   }
-  return matched ? lead : DEFAULT_VENDOR_LEAD_DAYS;
+  return matched ? lead : defaultLead;
 }
 
 /* ───────────────────────────────────────────────────────────────────────

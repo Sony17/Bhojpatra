@@ -47,6 +47,7 @@ import {
   servingTimeLabel,
   isLiveStallCategory,
   customOrderLeadDays,
+  DEFAULT_SINGLE_STALL_LEAD_DAYS,
   vendorListings,
   dummyDishPhoto,
   type MenuCategory,
@@ -852,27 +853,23 @@ export default function StallBookingWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stallId, selectedAddOns, addOnVendor],
   );
-  const vendorLead = customOrderLeadDays(orderVendorIds);
-  const occasionLead = occasionLeadFor(occasionId, occasionList);
-  const effectiveLeadDays = Math.max(vendorLead, occasionLead);
+  const vendorLead = customOrderLeadDays(
+    orderVendorIds,
+    DEFAULT_SINGLE_STALL_LEAD_DAYS,
+  );
+  // Single Stall orders support next-day booking (1 day notice, or 0 for same-day stalls)
+  const effectiveLeadDays = Math.max(0, vendorLead);
 
   const daysToEvent = daysUntil(eventDate);
   const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
   const earliestDate = isoAfterDays(effectiveLeadDays);
-  const leadOccasion =
-    occasionLead > vendorLead ? resolveOccasion(occasionId) : undefined;
   const leadWarning =
     eventDate === "" || dateMeetsLead
       ? ""
-      : leadOccasion
-        ? t(
-            `A ${leadOccasion.name} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}.`,
-            `${leadOccasion.nameHi} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें।`,
-          )
-        : t(
-            `${stall?.name ?? "This stall"} needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a same-day stall.`,
-            `${stall?.name ?? "इस स्टॉल"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे स्टॉल चुनें।`,
-          );
+      : t(
+          `${stall?.name ?? "This stall"} needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a same-day stall.`,
+          `${stall?.name ?? "इस स्टॉल"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे स्टॉल चुनें।`,
+        );
 
   /* ─── Validation per step ──────────────────────────────────────────── */
   const stepValid = (s: number): boolean => {
