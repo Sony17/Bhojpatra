@@ -7,6 +7,7 @@
 import { createStore } from "@/lib/store";
 import { sendPaymentAlert } from "@/lib/email";
 import { refundRazorpayPayment } from "@/lib/razorpay";
+import { syncBookingWithLedger } from "@/lib/bookingPaymentSync";
 import type { StoredPayment } from "@/app/api/payments/route";
 
 const store = createStore<StoredPayment>({
@@ -24,7 +25,13 @@ export async function recordRazorpayPayment(opts: {
   const payments = await store.list();
 
   const existing = payments.find((p) => p.txnRef === opts.orderId);
-  if (existing) return existing;
+  if (existing) {
+    // Already recorded (verify and webhook race, or a webhook redelivery) —
+    // still re-sync the booking: the first record may have landed before the
+    // booking row existed, and this replay is the chance to heal it.
+    await syncBooking(opts.bookingId, existing.razorpayPaymentId);
+    return existing;
+  }
 
   const payment: StoredPayment = {
     // The id IS the order id, so even when verify and the webhook race past
@@ -47,10 +54,29 @@ export async function recordRazorpayPayment(opts: {
 
   await store.upsert(payment);
 
+  // The money is in the ledger — now mirror it onto the booking row itself
+  // (paid / method / ref, Pending → Confirmed when settled) so an order that
+  // already exists never shows unpaid after a real gateway payment.
+  await syncBooking(opts.bookingId, opts.paymentId);
+
   // New payment recorded — alert the owners (best-effort; never blocks).
   await sendPaymentAlert(payment);
 
   return payment;
+}
+
+/** Best-effort booking sync: the ledger row is already safe, so a sync failure
+ *  must never fail the verify/webhook response (the customer would be told
+ *  their captured payment didn't go through). */
+async function syncBooking(
+  bookingId: string,
+  paymentRef: string | undefined,
+): Promise<void> {
+  try {
+    await syncBookingWithLedger(bookingId, { method: "Razorpay", paymentRef });
+  } catch (err) {
+    console.error(`Failed to sync booking ${bookingId} after payment`, err);
+  }
 }
 
 /** Execute a gateway refund for a booking's Razorpay advance and mark the

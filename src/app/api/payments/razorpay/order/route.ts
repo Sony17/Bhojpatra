@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { upiTxnRef } from "@/lib/upi";
+import { receivedPayments } from "@/lib/bookingPaymentSync";
 import {
   createRazorpayOrder,
   isRazorpayConfigured,
@@ -52,6 +53,35 @@ export async function POST(request: Request) {
   const amt = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(amt) || amt <= 0 || amt > MAX_AMOUNT) {
     return Response.json({ error: "Invalid amount." }, { status: 400 });
+  }
+
+  // Double-charge guard: when the ledger already holds enough received money
+  // for this booking to cover the requested charge, refuse to open another
+  // checkout — a retry after "nothing updated" was how customers paid the same
+  // advance four times over. The recorded total travels back so the client can
+  // treat this as a payment that already succeeded and go straight to confirm.
+  try {
+    const rows = await receivedPayments(bookingId);
+    const recorded = rows.reduce((sum, p) => sum + p.amount, 0);
+    if (recorded >= Math.round(amt)) {
+      const last = rows[rows.length - 1];
+      return Response.json(
+        {
+          error:
+            "This payment is already recorded against your booking — you don't need to pay again.",
+          alreadyPaid: {
+            amount: recorded,
+            paymentId:
+              last?.razorpayPaymentId ?? last?.customerTxnId ?? last?.txnRef ?? "",
+          },
+        },
+        { status: 409 },
+      );
+    }
+  } catch (err) {
+    // The guard is protective, not load-bearing — if the ledger read fails,
+    // fall through and let the payment proceed rather than blocking checkout.
+    console.error("Failed to check recorded payments before order", err);
   }
 
   try {

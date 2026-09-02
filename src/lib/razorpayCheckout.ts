@@ -131,8 +131,23 @@ export async function startRazorpayCheckout(opts: {
     currency?: string;
     keyId?: string;
     error?: string;
+    alreadyPaid?: { amount?: number; paymentId?: string };
   } | null;
   if (!orderRes.ok || !order?.orderId || !order.keyId) {
+    // The server found this booking's payment already in the ledger (a retry
+    // after an earlier attempt that did charge). Don't open checkout again —
+    // report the recorded payment as the success it was, so the caller
+    // proceeds to confirm the booking instead of taking money twice.
+    if (
+      orderRes.status === 409 &&
+      typeof order?.alreadyPaid?.amount === "number" &&
+      order.alreadyPaid.amount > 0
+    ) {
+      return {
+        amountPaid: order.alreadyPaid.amount,
+        paymentId: order.alreadyPaid.paymentId ?? "",
+      };
+    }
     throw new RazorpayCheckoutError(
       "failed",
       order?.error ?? "Couldn't start the payment.",
