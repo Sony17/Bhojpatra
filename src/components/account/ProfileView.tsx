@@ -1,14 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
-import {
-  useSession,
-  refreshSession,
-  hasAccount,
-  ACCOUNT_LABEL,
-} from "@/lib/session";
+import { useSession, refreshSession, ACCOUNT_LABEL } from "@/lib/session";
 import { Button, Card, Field, Input, Badge } from "@/components/ui";
 
 /**
@@ -112,7 +106,7 @@ export default function ProfileView() {
 
       <div>
         <p className="text-caption font-semibold text-ink">
-          {t("Accounts you hold", "आपके अकाउंट")}
+          {t("Account type", "अकाउंट प्रकार")}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {session?.accounts.map((a) => (
@@ -120,14 +114,6 @@ export default function ProfileView() {
               {t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi)}
             </Badge>
           ))}
-          {hasAccount(session, "vendor") && (
-            <Link
-              href="/account/roles"
-              className="text-caption font-semibold text-maroon underline-offset-2 hover:underline"
-            >
-              {t("Manage", "प्रबंधित करें")}
-            </Link>
-          )}
         </div>
       </div>
 

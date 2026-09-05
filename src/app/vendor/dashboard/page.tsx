@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PublicShell from "@/components/app/PublicShell";
+import RequireSession from "@/components/auth/RequireSession";
 import VendorDashboard from "@/components/vendor/VendorDashboard";
 
 export const metadata: Metadata = {
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 export default function VendorDashboardPage() {
   return (
     <PublicShell>
-      <VendorDashboard />
+      <RequireSession role="vendor">
+        <VendorDashboard />
+      </RequireSession>
     </PublicShell>
   );
 }

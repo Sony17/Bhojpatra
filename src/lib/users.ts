@@ -19,24 +19,22 @@ export interface UserRecord {
   email: string;
   name?: string;
   /**
-   * The account's *primary* type — the one it first signed up as, kept for the
-   * session record and post-login default. Access is no longer gated on this
-   * single value; the full set of account types the person holds lives in
-   * `accounts` (see `accountsFor`). Admins are the exception: `role === "admin"`
-   * is a separate console and never a booking account.
+   * The account's single role. One email holds exactly one role — customer,
+   * vendor OR referral partner — and gets that role's one dashboard; roles are
+   * never combined on a login. Admins are the exception: `role === "admin"` is
+   * a separate console and never a booking account.
    */
   role: UserRole;
   /**
-   * Every account type this one person holds — customer (universal), vendor
-   * and/or referral partner. One human can be all three; the merged dashboard
-   * and the route guards read this, not `role`. Persisted so it survives a
-   * device change. Absent on legacy records → derived from `role`/`partnerRoles`
-   * by `accountsFor`.
+   * LEGACY — the old multi-account model let one login hold several account
+   * types at once. Kept only so pre-existing records still parse; new code
+   * never writes it, and `accountsFor` collapses it to the one effective role.
    */
   accounts?: AccountType[];
   /** scrypt hash, format `scrypt$N$r$p$salt$key`. Never exposed. */
   passwordHash: string;
-  /** Partner roles + referral codes, when the account holds the partner type. */
+  /** The partner role + referral code, when this account is a partner. One
+   *  membership per account; extra legacy entries are ignored on read. */
   partnerRoles?: PartnerMembership[];
   /** The user's saved UI language preference (follows them across devices). */
   lang?: "en" | "hi";
@@ -51,47 +49,42 @@ export interface PublicUser {
   id: string;
   email: string;
   name?: string;
+  /** The single effective role (see `effectiveRole`). */
   role: UserRole;
-  /** Every account type this person holds (see `UserRecord.accounts`). */
+  /** Exactly one entry — the effective role. Kept as an array only because the
+   *  client session and guards already consume this shape. Empty for admins. */
   accounts: AccountType[];
   partnerRoles?: PartnerMembership[];
   lang?: "en" | "hi";
 }
 
-/** Stable display/order for account types: customer, then vendor, then partner. */
-const ACCOUNT_ORDER: AccountType[] = ["customer", "vendor", "partner"];
-
-function orderAccounts(set: Set<AccountType>): AccountType[] {
-  return ACCOUNT_ORDER.filter((a) => set.has(a));
+/**
+ * The ONE account type this record resolves to. One email ↔ one role.
+ *
+ * Legacy records from the old multi-account model may carry extra types in
+ * `accounts`/`partnerRoles`; they collapse deterministically:
+ *   - a record whose `role` is vendor or partner keeps that role (it's what
+ *     the account was built around);
+ *   - a "customer" record that was later granted a business account keeps the
+ *     business role — vendor first, then partner — since that was a deliberate
+ *     upgrade and carries listings/referral codes;
+ *   - everyone else is a customer. Admins resolve to null (separate console).
+ */
+export function effectiveRole(u: UserRecord): AccountType | null {
+  if (u.role === "admin") return null;
+  if (u.role === "vendor" || u.role === "partner") return u.role;
+  const legacy = u.accounts ?? [];
+  if (legacy.includes("vendor")) return "vendor";
+  if (legacy.includes("partner") || (u.partnerRoles?.length ?? 0) > 0)
+    return "partner";
+  return "customer";
 }
 
-/**
- * The full set of account types a person holds, in stable order. Customer is
- * universal — every non-admin user can always book — so it's always present;
- * vendor and referral partner are add-ons. Reads the explicit `accounts` array
- * when present and unions it with the types implied by `role`/`partnerRoles`, so
- * both new multi-account records and legacy single-role records resolve
- * correctly. Admins aren't a booking account, so they get an empty set.
- */
+/** The account set a person holds — always exactly one type now (one email ↔
+ *  one role), or empty for admins. Kept array-shaped for the existing guards. */
 export function accountsFor(u: UserRecord): AccountType[] {
-  if (u.role === "admin") return [];
-  const set = new Set<AccountType>(["customer"]);
-  for (const a of u.accounts ?? []) set.add(a);
-  if (u.role === "vendor") set.add("vendor");
-  if (u.role === "partner" || (u.partnerRoles?.length ?? 0) > 0) set.add("partner");
-  return orderAccounts(set);
-}
-
-/**
- * Grant an additional account type to a user record (mutates in place). Unions
- * the new type with everything the person already holds and re-materialises the
- * explicit `accounts` array so it stays complete. No-op for admins.
- */
-export function grantAccount(u: UserRecord, type: AccountType): void {
-  if (u.role === "admin") return;
-  const set = new Set<AccountType>(accountsFor(u));
-  set.add(type);
-  u.accounts = orderAccounts(set);
+  const role = effectiveRole(u);
+  return role ? [role] : [];
 }
 
 
@@ -122,15 +115,20 @@ export function saveUser(user: UserRecord): Promise<void> {
   return store.upsert(user);
 }
 
-/** Strip everything the client must never see (password + reset material). */
+/** Strip everything the client must never see (password + reset material).
+ *  Reports the collapsed single role, and a partner's one membership — never
+ *  the legacy multi-role extras. */
 export function toPublicUser(u: UserRecord): PublicUser {
+  const accounts = accountsFor(u);
+  const role: UserRole = u.role === "admin" ? "admin" : (accounts[0] ?? "customer");
+  const membership = role === "partner" ? u.partnerRoles?.[0] : undefined;
   return {
     id: u.id,
     email: u.email,
     name: u.name,
-    role: u.role,
-    accounts: accountsFor(u),
-    ...(u.partnerRoles ? { partnerRoles: u.partnerRoles } : {}),
+    role,
+    accounts,
+    ...(membership ? { partnerRoles: [membership] } : {}),
     ...(u.lang ? { lang: u.lang } : {}),
   };
 }
