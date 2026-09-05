@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // Standalone output is opt-in via NEXT_OUTPUT=standalone so the Docker/AWS
+  // image can self-host with `node server.js`; Vercel builds (env unset)
+  // behave exactly as before.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   // Pin the workspace root to this app so Next.js doesn't pick up a
   // parent lockfile higher up the filesystem.
   turbopack: {
