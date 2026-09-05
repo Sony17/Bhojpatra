@@ -173,6 +173,10 @@ export interface AdminBooking {
   /** Food (diet) preference — "Pure Veg" / "Non-veg" / "Both" — when declared. */
   foodPreference?: string;
   guests: number;
+  /** Craft-my-plate split — veg / non-veg head-counts summing to `guests`,
+   *  when the customer declared one. */
+  vegGuests?: number;
+  nonVegGuests?: number;
   vendor: string;
   city: string;
   /** The event venue the guest chose, when one was set. */

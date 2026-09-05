@@ -12,6 +12,7 @@ import {
   type VendorListing,
 } from "@/lib/data";
 import { money } from "@/lib/money";
+import { dishAllowed, type NonVegCount } from "@/lib/dietSplit";
 
 type Lang = "en" | "hi";
 
@@ -33,6 +34,7 @@ export default function StepExtras({
   vendorIdsFor,
   onVendorToggle,
   fullFilter,
+  nonVegGuests = null,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -47,6 +49,11 @@ export default function StepExtras({
   /** Gold/Platinum unlock the richer category filter; the lower tiers get just
    *  the free-text search. */
   fullFilter: boolean;
+  /** Craft-my-plate split from the event brief. On a pure-veg plate a
+   *  counter's non-veg lines are left off its shown spread (with a note) —
+   *  the vendor cooks the veg spread only. The vendor roster itself is
+   *  narrowed by the caller (`kitchenFitsSplit`), not here. */
+  nonVegGuests?: NonVegCount;
 }) {
   // Free-text filter over the add-on roster. Matches the English/Hindi names,
   // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
@@ -131,8 +138,8 @@ export default function StepExtras({
         <SectionHead
           title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
           sub={t(
-            "Optional live counters and add-ons to round out your menu.",
-            "अपने मेन्यू को पूरा करने के लिए वैकल्पिक लाइव काउंटर और ऐड-ऑन।",
+            "Little extras and live counters to round out your menu — add them only if you fancy.",
+            "अपने मेन्यू को पूरा करने के लिए छोटे-छोटे एक्स्ट्रा और लाइव काउंटर — मन हो तभी जोड़ें।",
           )}
         />
         {selectedAddOns.length > 0 && (
@@ -157,10 +164,10 @@ export default function StepExtras({
           value={addOnQuery}
           onChange={(e) => setAddOnQuery(e.target.value)}
           placeholder={t(
-            "Search add-ons like pizza or gol gappe",
-            "पिज़्ज़ा या गोल गप्पे जैसे ऐड-ऑन खोजें",
+            "Search extras like pizza or gol gappe",
+            "पिज़्ज़ा या गोल गप्पे जैसे एक्स्ट्रा खोजें",
           )}
-          aria-label={t("Search add-ons", "ऐड-ऑन खोजें")}
+          aria-label={t("Search extras", "एक्स्ट्रा खोजें")}
           className="w-full rounded-lg border border-cream-3 bg-white py-2 pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-maroon"
         />
       </div>
@@ -171,7 +178,7 @@ export default function StepExtras({
       {fullFilter && (
         <div
           role="group"
-          aria-label={t("Filter add-ons", "ऐड-ऑन फ़िल्टर करें")}
+          aria-label={t("Filter extras", "एक्स्ट्रा फ़िल्टर करें")}
           className="mt-3 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible"
         >
           {catChips.map((c) => {
@@ -312,12 +319,12 @@ export default function StepExtras({
                   {eligibleVendors.length === 0 ? (
                     <>
                       <span className="block text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                        {t("Vendor for this counter", "इस काउंटर के लिए वेंडर")}
+                        {t("Caterer for this counter", "इस काउंटर के लिए कैटरर")}
                       </span>
                       <p className="mt-1 text-sm text-ink-soft">
                         {t(
-                          "No vendors available for this package.",
-                          "इस पैकेज के लिए कोई वेंडर उपलब्ध नहीं।",
+                          "No caterers are available for this package just yet.",
+                          "इस पैकेज के लिए अभी कोई कैटरर उपलब्ध नहीं।",
                         )}
                       </p>
                     </>
@@ -326,7 +333,15 @@ export default function StepExtras({
                       {/* Your brand for this counter, with its set menu below. */}
                       <div className="flex flex-col gap-3">
                         {pickedVendors.map((v) => {
-                          const vendorMenu = setMenuFor(v);
+                          const fullMenu = setMenuFor(v);
+                          // STRICT plate filter: a pure-veg event never sees a
+                          // counter's non-veg lines — the vendor serves the
+                          // veg spread only, and the note below says so.
+                          const vendorMenu = fullMenu.filter((item) =>
+                            dishAllowed(item.diet, nonVegGuests),
+                          );
+                          const trimmedCount =
+                            fullMenu.length - vendorMenu.length;
                           return (
                           <div
                             key={v.id}
@@ -348,7 +363,7 @@ export default function StepExtras({
                                     {v.name}
                                   </span>
                                   <span className="shrink-0 rounded-full bg-maroon px-2 py-0.5 text-[10px] font-semibold text-cream">
-                                    {t("Selected", "चयनित")}
+                                    {t("Your pick", "आपकी पसंद")}
                                   </span>
                                 </span>
                                 <span className="mt-0.5 block text-xs text-ink-soft">
@@ -451,14 +466,22 @@ export default function StepExtras({
                                 <p className="mt-2 text-[11px] text-ink-soft">
                                   {isService
                                     ? t(
-                                        "All of it is covered by this add-on's price.",
-                                        "यह सब इस ऐड-ऑन की क़ीमत में शामिल है।",
+                                        "It's all covered in this one price.",
+                                        "यह सब इसी एक क़ीमत में शामिल है।",
                                       )
                                     : t(
                                         "The whole counter is included — nothing to pick.",
                                         "पूरा काउंटर शामिल है — कुछ चुनने की ज़रूरत नहीं।",
                                       )}
                                 </p>
+                                {trimmedCount > 0 && (
+                                  <p className="mt-1 text-[11px] font-semibold text-maroon">
+                                    {t(
+                                      `Pure veg plate — ${trimmedCount} non-veg ${trimmedCount === 1 ? "item" : "items"} left off this spread.`,
+                                      `शुद्ध शाकाहारी थाली — इस काउंटर से ${trimmedCount} नॉन-वेज आइटम हटाए गए।`,
+                                    )}
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -497,12 +520,12 @@ export default function StepExtras({
                           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
                             {multiVendor
                               ? t(
-                                  `Add another vendor · ${rosterVendors.length} more`,
-                                  `और वेंडर जोड़ें · ${rosterVendors.length} और`,
+                                  `Add another caterer · ${rosterVendors.length} more`,
+                                  `और कैटरर जोड़ें · ${rosterVendors.length} और`,
                                 )
                               : t(
-                                  `Change vendor · ${rosterVendors.length} more`,
-                                  `वेंडर बदलें · ${rosterVendors.length} और`,
+                                  `Change caterer · ${rosterVendors.length} more`,
+                                  `कैटरर बदलें · ${rosterVendors.length} और`,
                                 )}
                           </span>
                           <span
@@ -522,19 +545,19 @@ export default function StepExtras({
                           >
                             {multiVendor
                               ? t(
-                                  "Vendors for this counter",
-                                  "इस काउंटर के लिए वेंडर",
+                                  "Caterers for this counter",
+                                  "इस काउंटर के लिए कैटरर",
                                 )
                               : t(
-                                  "Vendor for this counter",
-                                  "इस काउंटर के लिए वेंडर",
+                                  "Caterer for this counter",
+                                  "इस काउंटर के लिए कैटरर",
                                 )}
                           </span>
                           {multiVendor && (
                             <p className="mt-1 text-xs text-ink-soft">
                               {t(
-                                `Split this counter across multiple vendors — ${pickedVendorIds.length} selected.`,
-                                `इस काउंटर को कई वेंडरों में बाँटें — ${pickedVendorIds.length} चुने गए।`,
+                                `Share this counter between caterers — ${pickedVendorIds.length} picked.`,
+                                `इस काउंटर को कई कैटरर में बाँटें — ${pickedVendorIds.length} चुने गए।`,
                               )}
                             </p>
                           )}
@@ -583,8 +606,8 @@ export default function StepExtras({
                       )}
                       <p className="mt-2 text-xs text-ink-soft">
                         {t(
-                          `${packageName || "Selected package"} vendors`,
-                          `${packageName || "चयनित पैकेज"} वेंडर`,
+                          `Caterers for your ${packageName || "chosen"} package`,
+                          `आपके ${packageName || "चुने"} पैकेज के कैटरर`,
                         )}
                       </p>
                     </>
@@ -599,12 +622,12 @@ export default function StepExtras({
         <p className="mt-5 rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-4 py-6 text-center text-sm text-ink-soft">
           {query
             ? t(
-                `No add-ons match "${addOnQuery.trim()}".`,
-                `"${addOnQuery.trim()}" से मिलता कोई ऐड-ऑन नहीं।`,
+                `We couldn't find "${addOnQuery.trim()}" — try another dish.`,
+                `"${addOnQuery.trim()}" नहीं मिला — कोई और डिश आज़माएँ।`,
               )
             : t(
-                "No add-ons in this category.",
-                "इस श्रेणी में कोई ऐड-ऑन नहीं।",
+                "Nothing here just yet.",
+                "यहाँ अभी कुछ नहीं है।",
               )}
         </p>
       )}

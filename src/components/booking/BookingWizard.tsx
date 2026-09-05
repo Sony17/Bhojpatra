@@ -93,6 +93,15 @@ import StepDone from "@/components/booking/shared/StepDone";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
+import {
+  PREF_BOTH,
+  dishAllowed,
+  fixedSpreadFits,
+  kitchenFitsSplit,
+  resolveNonVeg,
+  splitSummary,
+  type NonVegCount,
+} from "@/lib/dietSplit";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
 import {
   WizardHero,
@@ -174,6 +183,10 @@ type BookingDraft = {
   mealTime: string;
   eventTime: string;
   foodPreference: string;
+  /** Craft-my-plate — the non-veg count dialled in for a "Both" event. The
+   *  split itself is derived from this plus `foodPreference` (`resolveNonVeg`),
+   *  so a legacy draft without the key simply resumes with no mix set. */
+  nonVegMix: number | null;
   venue: string;
   venueFee: number;
   selectedAddOns: string[];
@@ -299,6 +312,16 @@ export default function BookingWizard() {
   // Food (diet) preference — Pure Veg / Non-veg / Both. Optional; travels onto the
   // order, invoice ("Food preference") and admin / My-Bookings alongside the meal.
   const [foodPreference, setFoodPreference] = useState<string>("");
+  // Craft-my-plate: the guest's dialled-in non-veg count for a "Both" event.
+  // Only ever read through `nonVegGuests` below — `foodPreference` is what
+  // decides a pure-veg / all-non-veg plate, so the two can't contradict.
+  const [nonVegMix, setNonVegMix] = useState<NonVegCount>(null);
+  // THE split every diet filter below reads — derived, so it re-clamps for
+  // free when the head-count moves and can never disagree with the label.
+  const nonVegGuests = useMemo<NonVegCount>(
+    () => resolveNonVeg(foodPreference, nonVegMix, guests),
+    [foodPreference, nonVegMix, guests],
+  );
   const [cityId, setCityId] = useState<string>("");
   // Free-text location typed when the customer picks "Other" (their city/state
   // isn't in the admin-managed list).
@@ -412,6 +435,7 @@ export default function BookingWizard() {
       if (d.mealTime) setMealTime(d.mealTime);
       if (d.eventTime) setEventTime(d.eventTime);
       if (d.foodPreference) setFoodPreference(d.foodPreference);
+      if (typeof d.nonVegMix === "number") setNonVegMix(d.nonVegMix);
       if (d.venue) setVenue(d.venue);
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
@@ -533,6 +557,7 @@ export default function BookingWizard() {
       mealTime,
       eventTime,
       foodPreference,
+      nonVegMix,
       venue,
       venueFee,
       selectedAddOns,
@@ -554,6 +579,7 @@ export default function BookingWizard() {
     mealTime,
     eventTime,
     foodPreference,
+    nonVegMix,
     venue,
     venueFee,
     selectedAddOns,
@@ -946,6 +972,26 @@ export default function BookingWizard() {
         // guest would actually get, not of the vendor's whole published menu.
         vendors: c.vendors
           .map((v) => onBand(v, effectiveTier))
+          // Craft-my-plate gate, asked of the band-narrowed dishes. STRICT: a
+          // declared split with no non-veg eaters hides every non-veg dish; a
+          // fixed Single-Stall spread that can't fit the plate whole (a set
+          // menu with meat on a pure-veg event) is emptied so the course gate
+          // below drops the stall — a set spread is served whole or not at
+          // all. Stale picks die on their own: `itemsFor` / `vendorsFor` only
+          // count what's on this roster right now.
+          .map((v) => {
+            if (nonVegGuests === null) return v;
+            if (packageId === "custom" && v.menuType !== "varied")
+              return fixedSpreadFits(v.items, nonVegGuests)
+                ? v
+                : { ...v, items: [] };
+            return {
+              ...v,
+              items: v.items.filter((it) =>
+                dishAllowed(it.diet, nonVegGuests),
+              ),
+            };
+          })
           .filter((v) => {
           // Tier gate: Platinum surfaces every band; Silver/Gold only vendors
           // mapped to that tier (a vendor's course↔tier mapping). Vendors with
@@ -976,7 +1022,7 @@ export default function BookingWizard() {
           return tierOk && cityOk && courseOk;
         }),
       }));
-  }, [packageId, effectiveTier, liveMenuCategories, cityId]);
+  }, [packageId, effectiveTier, liveMenuCategories, cityId, nonVegGuests]);
 
   // The package's segments split across two wizard steps: plated courses build
   // in "Menu" (Step 2), live-station courses in "Live Stall" (Step 3). Both are
@@ -1422,13 +1468,15 @@ export default function BookingWizard() {
     : 0;
 
   // Vendors a guest may assign to an add-on — the existing catalogue narrowed to
-  // the tier(s) the chosen package unlocks (Custom / short-notice: everyone).
+  // the tier(s) the chosen package unlocks (Custom / short-notice: everyone),
+  // STRICTLY minus meat-only kitchens when the craft-my-plate split is pure veg.
   const eligibleAddOnVendors = useMemo<VendorListing[]>(() => {
     const tiers = PACKAGE_VENDOR_TIERS[packageId];
-    return tiers
+    const pool = tiers
       ? vendorListings.filter((v) => v.tiers.some((t) => tiers.includes(t)))
       : vendorListings;
-  }, [packageId]);
+    return pool.filter((v) => kitchenFitsSplit(v.diet, nonVegGuests));
+  }, [packageId, nonVegGuests]);
 
   // The vendor(s) effectively assigned to an add-on. We honour the guest's
   // explicit picks that are still valid for the current package tier; when none
@@ -1558,8 +1606,8 @@ export default function BookingWizard() {
           )
         : packageId === "custom"
           ? t(
-              `Your single-stall order needs ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"}' notice for the vendors you picked. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in same-day vendors.`,
-              `आपके चुने वेंडरों के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे वेंडर चुनें।`,
+              `The caterers you've picked need ${effectiveLeadDays} ${effectiveLeadDays === 1 ? "day" : "days"} to prepare. Choose a date on or after ${formatEventDate(earliestDate)}, or swap in caterers who can cook same-day.`,
+              `आपके चुने कैटरर को तैयारी के लिए ${effectiveLeadDays} दिन चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या उसी दिन बना सकने वाले कैटरर चुनें।`,
             )
           : t(
               `${selectedPackage?.name ?? "This package"} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}, or choose a package with a shorter lead time.`,
@@ -1654,7 +1702,7 @@ export default function BookingWizard() {
             "आपका मेन्यू खाली है — नीचे कम से कम एक लाइव काउंटर या एक्स्ट्रा जोड़ें।",
           ),
         );
-      if (occasionId === "") out.push(t("Select an occasion", "अवसर चुनें"));
+      if (occasionId === "") out.push(t("Choose an occasion", "अवसर चुनें"));
       if (eventDate === "") out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
       if (guests < paxMin || guests > paxMax) {
@@ -1686,7 +1734,12 @@ export default function BookingWizard() {
       setCouponError("");
     } else {
       setAppliedCoupon(null);
-      setCouponError(t("Invalid coupon code.", "अमान्य कूपन कोड।"));
+      setCouponError(
+        t(
+          "That coupon code doesn't look right — give it another try.",
+          "यह कूपन कोड सही नहीं लग रहा — एक बार फिर से देख लें।",
+        ),
+      );
     }
   };
 
@@ -1713,6 +1766,14 @@ export default function BookingWizard() {
     if (!emiOptionsForEvent(eventDate).includes(emiCount)) return undefined;
     return buildEmiPlan(balance, emiCount, eventDate);
   };
+
+  // The food line every order artifact prints — the canonical preference,
+  // with the actual plate mix spelled out when it's mixed.
+  const splitText = splitSummary(nonVegGuests, guests);
+  const foodLabel =
+    foodPreference === PREF_BOTH && splitText
+      ? `${foodPreference} (${splitText})`
+      : foodPreference;
 
   const buildReceipt = (): string => {
     const occ = resolveOccasion(occasionId);
@@ -1752,7 +1813,7 @@ export default function BookingWizard() {
       `Package:  ${pkg ? pkg.name : "-"}`,
       `Date:     ${eventDate || "-"}`,
       `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
-      `Food:     ${foodPreference || "-"}`,
+      `Food:     ${foodLabel || "-"}`,
       `City:     ${cityObj ? cityObj.name : "-"}`,
       `Venue:    ${venue || "-"}`,
       `Guests:   ${guests}`,
@@ -1761,10 +1822,10 @@ export default function BookingWizard() {
       menuLines || "  -",
       "",
     ];
-    if (addOnLines) lines.push("Add-ons:", addOnLines, "");
+    if (addOnLines) lines.push("Extras:", addOnLines, "");
     lines.push(
       `Subtotal:    ${money(subtotal)}`,
-      `Add-ons:     ${money(addOnsTotal)}`,
+      `Extras:      ${money(addOnsTotal)}`,
     );
     if (selectedService)
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
@@ -1822,7 +1883,7 @@ export default function BookingWizard() {
       lines.push({
         label: singleStall
           ? `Single Stall menu (${money(menuAddTotal)}/plate × ${guests})`
-          : `Premium vendor add-ons (${money(menuAddTotal)}/plate × ${guests})`,
+          : `Premium caterer extras (${money(menuAddTotal)}/plate × ${guests})`,
         amount: menuAddTotal * guests,
       });
     }
@@ -1871,7 +1932,7 @@ export default function BookingWizard() {
       // Meal period + clock time (e.g. "Dinner · 7:30 PM"); omitted when unset so
       // the invoice's "Serving time" line only shows for orders that carry one.
       servingTime: servingTimeLabel(mealTime, eventTime) || undefined,
-      foodPreference: foodPreference || undefined,
+      foodPreference: foodLabel || undefined,
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
@@ -1946,12 +2007,12 @@ export default function BookingWizard() {
       (servingTimeLabel(mealTime, eventTime)
         ? `Serving: ${servingTimeLabel(mealTime, eventTime)}\n`
         : "") +
-      (foodPreference ? `Food: ${foodPreference}\n` : "") +
+      (foodLabel ? `Food: ${foodLabel}\n` : "") +
       `City: ${city ? city.name : "-"}\n` +
       `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
       (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
-      (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
+      (addOnLines ? `\nExtras: ${addOnLines}\n` : "") +
       (selectedService
         ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
         : "") +
@@ -1983,6 +2044,7 @@ export default function BookingWizard() {
       mealTime,
       eventTime,
       foodPreference,
+      nonVegMix,
       guests,
       venue: venue.trim(),
       venueFee,
@@ -2183,6 +2245,11 @@ export default function BookingWizard() {
           packageId,
           leadDays: effectiveLeadDays,
           guests,
+          // Craft-my-plate split — structured, so admin / vendors see exactly
+          // how many veg vs non-veg plates to cook.
+          ...(nonVegGuests !== null
+            ? { vegGuests: guests - nonVegGuests, nonVegGuests }
+            : {}),
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
           venue: venue.trim() || undefined,
@@ -2271,7 +2338,7 @@ export default function BookingWizard() {
     t("Package", "पैकेज"),
     t("Menu", "मेन्यू"),
     t("Live Stall", "लाइव स्टॉल"),
-    t("Add-ons", "एक्स्ट्रा"),
+    t("Extras", "एक्स्ट्रा"),
     t("Essentials", "ज़रूरी सेवाएँ"),
     t("Review", "समीक्षा"),
   ];
@@ -2306,6 +2373,8 @@ export default function BookingWizard() {
       setEventTime={setEventTime}
       foodPreference={foodPreference}
       setFoodPreference={setFoodPreference}
+      nonVegGuests={nonVegGuests}
+      setNonVegMix={setNonVegMix}
       cityId={cityId}
       setCityId={setCityId}
       customCity={customCity}
@@ -2430,8 +2499,8 @@ export default function BookingWizard() {
                     </span>{" "}
                     —{" "}
                     {t(
-                      `We couldn't find "${missingBrand}". It may no longer be listed. Pick a vendor below to carry on.`,
-                      `"${missingBrand}" नहीं मिला। हो सकता है यह अब सूचीबद्ध न हो। आगे बढ़ने के लिए नीचे से वेंडर चुनें।`,
+                      `We couldn't find "${missingBrand}" — they may not be with us any more. Choose another caterer below and carry on.`,
+                      `"${missingBrand}" नहीं मिला — हो सकता है वे अब हमारे साथ न हों। नीचे से कोई और कैटरर चुनें और आगे बढ़ें।`,
                     )}
                   </p>
                   <button
@@ -2465,13 +2534,13 @@ export default function BookingWizard() {
                       )
                     : multiVendor && multiDishIn(menuStepCategories)
                     ? t(
-                        "Mix multiple vendors and pick multiple dishes across your plated courses — live counters come next.",
-                        "अपने कोर्सेज़ में कई वेंडर मिलाएं और कई व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                        "Mix and match caterers and dishes across your courses — live counters come next.",
+                        "अपने कोर्सेज़ में कई कैटरर मिलाएं और कई व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
                       )
                     : multiVendor
                       ? t(
-                          "Mix multiple vendors across your plated courses — live counters come next.",
-                          "अपने कोर्सेज़ में कई वेंडर मिलाएं — लाइव काउंटर अगले चरण में।",
+                          "Mix and match caterers across your courses — live counters come next.",
+                          "अपने कोर्सेज़ में कई कैटरर मिलाएं — लाइव काउंटर अगले चरण में।",
                         )
                       : multiDishIn(menuStepCategories)
                         ? t(
@@ -2479,8 +2548,8 @@ export default function BookingWizard() {
                             "अपने कोर्सेज़ में कई व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
                           )
                         : t(
-                            "Pick vendors and dishes for your plated courses — live counters come next.",
-                            "अपने कोर्सेज़ के लिए वेंडर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
+                            "Pick a caterer and dishes for each course — live counters come next.",
+                            "हर कोर्स के लिए कैटरर और व्यंजन चुनें — लाइव काउंटर अगले चरण में।",
                           )
                 }
                 multiVendor={multiVendor}
@@ -2519,21 +2588,21 @@ export default function BookingWizard() {
                 subtitle={
                   counterMultiVendor && multiDishIn(liveStallCategories)
                     ? t(
-                        "Mix multiple counter vendors and dishes, cooked fresh in front of your guests — add-ons come next.",
-                        "कई काउंटर वेंडर और व्यंजन चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                        "Mix and match live-counter caterers and dishes, cooked fresh in front of your guests — extras come next.",
+                        "कई काउंटर कैटरर और व्यंजन चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
                       )
                     : counterMultiVendor
                       ? t(
-                          "Mix multiple counter vendors, cooked fresh in front of your guests — add-ons come next.",
-                          "कई काउंटर वेंडर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
+                          "Mix and match live-counter caterers, cooked fresh in front of your guests — extras come next.",
+                          "कई काउंटर कैटरर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
                         )
                       : multiDishIn(liveStallCategories)
                         ? t(
-                            "Pick multiple counters, cooked fresh in front of your guests — add-ons come next.",
+                            "Pick as many counters as you like, cooked fresh in front of your guests — extras come next.",
                             "कई काउंटर चुनें, मेहमानों के सामने ताज़ा बनते हुए — एक्स्ट्रा अगले चरण में।",
                           )
                         : t(
-                            "Cook-to-order counters made fresh in front of your guests — add-ons come next.",
+                            "Counters cooked fresh in front of your guests — extras come next.",
                             "मेहमानों के सामने ताज़ा बनने वाले लाइव काउंटर — एक्स्ट्रा अगले चरण में।",
                           )
                 }
@@ -2618,6 +2687,7 @@ export default function BookingWizard() {
               // counters vs whole-event services); Single Stall & Silver keep
               // just the free-text search.
               fullFilter={packageId === "gold" || packageId === "platinum"}
+              nonVegGuests={nonVegGuests}
             />
           )}
           {/* Essentials step (5) — the mandatory "Choose Your Service Package"
@@ -2818,7 +2888,7 @@ export default function BookingWizard() {
               ←
             </Button>
             <Button onClick={goNext}>
-              {t("Continue to Add-ons", "एक्स्ट्रा तक जारी रखें")} →
+              {t("Continue to Extras", "एक्स्ट्रा तक जारी रखें")} →
             </Button>
           </div>
         )
@@ -2933,7 +3003,7 @@ export default function BookingWizard() {
           {[
             {
               icon: "🛡️",
-              title: t("Trusted Vendors", "भरोसेमंद वेंडर"),
+              title: t("Trusted Caterers", "भरोसेमंद कैटरर"),
               sub: t("Quality you can rely on", "जिस पर आप भरोसा कर सकें"),
             },
             {
@@ -3279,7 +3349,7 @@ function LiveStallEmpty({
           </p>
           <p className="mt-1">
             {t(
-              "No problem — you can add live counters (chaat, chinese, dosa, pizza & more) as add-ons on the next step, or go back and pick a higher package.",
+              "No problem — you can add live counters (chaat, chinese, dosa, pizza & more) as extras on the next step, or go back and pick a bigger package.",
               "कोई बात नहीं — अगले चरण में आप लाइव काउंटर (चाट, चाइनीज़, डोसा, पिज़्ज़ा वग़ैरह) एक्स्ट्रा के रूप में जोड़ सकते हैं, या पीछे जाकर बड़ा पैकेज चुनें।",
             )}
           </p>
@@ -3356,8 +3426,8 @@ function StepPackage({
           </span>
           <span>
             {t(
-              "This date is short-notice, so our full packages can't be arranged in time. You can still book a Single Stall — one verified vendor, their own menu, plus any add-ons & live counters.",
-              "यह तारीख़ बहुत नज़दीक है, इसलिए हमारे पूरे पैकेज समय पर तैयार नहीं हो पाएंगे। फिर भी आप सिंगल स्टॉल बुक कर सकते हैं — एक वेरिफाइड वेंडर, उनका अपना मेन्यू, साथ में ऐड-ऑन और लाइव काउंटर।",
+              "This date is coming up fast, so our full packages can't be arranged in time. You can still book a Single Stall — one trusted caterer, their own menu, plus any extras & live counters.",
+              "यह तारीख़ बहुत नज़दीक है, इसलिए हमारे पूरे पैकेज समय पर तैयार नहीं हो पाएंगे। फिर भी आप सिंगल स्टॉल बुक कर सकते हैं — एक भरोसेमंद कैटरर, उनका अपना मेन्यू, साथ में एक्स्ट्रा और लाइव काउंटर।",
             )}
           </span>
         </p>
@@ -3475,8 +3545,8 @@ function StepPackage({
                     {isStall
                       ? `${t("Book a Single Stall", "सिंगल स्टॉल बुक करें")} →`
                       : selected
-                        ? `✓ ${t("Selected", "चयनित")}`
-                        : `${t("Select", "चुनें")} ${tierName}`}
+                        ? `✓ ${t("Your pick", "आपकी पसंद")}`
+                        : `${t("Choose", "चुनें")} ${tierName}`}
                   </span>
                 </button>
               }
@@ -3861,8 +3931,8 @@ function StepMenu({
             </span>
             <span>
               {t(
-                "You've skipped this stall — it won't be in your order or price. Pick a vendor below to add it back.",
-                "आपने यह स्टॉल छोड़ दिया है — यह आपके ऑर्डर या कीमत में नहीं होगा। इसे वापस जोड़ने के लिए नीचे वेंडर चुनें।",
+                "You've set this stall aside — it won't be part of your booking or price. Choose a caterer below to bring it back.",
+                "आपने यह स्टॉल अभी के लिए हटा दिया है — यह आपकी बुकिंग या कीमत में नहीं होगा। वापस जोड़ने के लिए नीचे कोई कैटरर चुनें।",
               )}
             </span>
           </span>
@@ -3871,7 +3941,7 @@ function StepMenu({
             onClick={() => unskipCat(cat.id)}
             className="shrink-0 rounded-full border border-maroon px-4 py-1.5 text-xs font-semibold text-maroon transition hover:bg-maroon hover:text-cream"
           >
-            {t("Undo skip", "छोड़ना पूर्ववत करें")}
+            {t("Bring it back", "वापस जोड़ें")}
           </button>
         </div>
       )}
@@ -3927,17 +3997,17 @@ function StepMenu({
             <p className="-mt-2 text-xs text-ink-soft">
               {uniformBase === null
                 ? t(
-                    "Each vendor opens up its own number of dishes for this course — the count is on their card.",
-                    "इस कोर्स के लिए हर वेंडर अपनी अलग संख्या में व्यंजन देता है — गिनती उनके कार्ड पर है।",
+                    "Each caterer brings its own number of dishes for this course — you'll see the count on their card.",
+                    "इस कोर्स के लिए हर कैटरर अपनी अलग संख्या में व्यंजन लाता है — गिनती उनके कार्ड पर है।",
                   )
                 : uniformBase === 1
                   ? t(
-                      "You can pick one dish from each vendor for this course.",
-                      "इस कोर्स के लिए आप हर वेंडर से एक व्यंजन चुन सकते हैं।",
+                      "You can pick one dish from each caterer for this course.",
+                      "इस कोर्स के लिए आप हर कैटरर से एक व्यंजन चुन सकते हैं।",
                     )
                   : t(
-                      `You can pick up to ${uniformBase} dishes from each vendor for this course.`,
-                      `इस कोर्स के लिए आप हर वेंडर से ${uniformBase} व्यंजन तक चुन सकते हैं।`,
+                      `You can pick up to ${uniformBase} dishes from each caterer for this course.`,
+                      `इस कोर्स के लिए आप हर कैटरर से ${uniformBase} व्यंजन तक चुन सकते हैं।`,
                     )}
             </p>
           )}
@@ -3978,7 +4048,7 @@ function StepMenu({
                         {vendor.name}
                       </span>
                       <span className="shrink-0 rounded-full border border-maroon/30 bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
-                        {t("Selected", "चयनित")}
+                        {t("Your pick", "आपकी पसंद")}
                       </span>
                       {fixed && (
                         <span className="shrink-0 rounded-full border border-maroon bg-maroon px-2 py-0.5 text-[10px] font-semibold text-cream">
@@ -4167,12 +4237,12 @@ function StepMenu({
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
             {multiVendor
               ? t(
-                  `Add another vendor · ${otherCount} more`,
-                  `और वेंडर जोड़ें · ${otherCount} और`,
+                  `Add another caterer · ${otherCount} more`,
+                  `और कैटरर जोड़ें · ${otherCount} और`,
                 )
               : t(
-                  `Change vendor · ${otherCount} more`,
-                  `वेंडर बदलें · ${otherCount} और`,
+                  `Change caterer · ${otherCount} more`,
+                  `कैटरर बदलें · ${otherCount} और`,
                 )}
           </span>
           <span
@@ -4190,8 +4260,11 @@ function StepMenu({
       <div className="mt-7 flex items-center justify-between gap-3">
         <h3 className="font-sans text-2xl font-semibold text-maroon">
           {multiVendor
-            ? t("Pick vendors (select multiple)", "वेंडर चुनें (कई चुनें)")
-            : t("Pick a vendor", "वेंडर चुनें")}
+            ? t(
+                "Choose your caterers (pick as many as you like)",
+                "अपने कैटरर चुनें (जितने चाहें उतने चुनें)",
+              )
+            : t("Choose your caterer", "अपना कैटरर चुनें")}
         </h3>
         {/* Filter is offered only when the roster is long enough to be worth
             typing over — a short shortlist stays clutter-free. */}
@@ -4221,12 +4294,12 @@ function StepMenu({
             value={vendorSearch}
             onChange={(e) => setVendorSearch(e.target.value)}
             placeholder={t(
-              "Search vendors by name or cuisine...",
-              "नाम या व्यंजन से वेंडर खोजें...",
+              "Search by name or the food you love...",
+              "नाम या अपने पसंदीदा खाने से खोजें...",
             )}
             aria-label={t(
-              "Search vendors by name or cuisine",
-              "नाम या व्यंजन से वेंडर खोजें",
+              "Search caterers by name or cuisine",
+              "नाम या व्यंजन से कैटरर खोजें",
             )}
             className="w-full rounded-2xl border border-cream-3 bg-white px-4 py-2.5 pr-10 text-sm text-ink shadow-sm transition placeholder:text-ink-soft/60 focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
           />
@@ -4249,8 +4322,8 @@ function StepMenu({
         {rosterVendors.length === 0 ? (
           <p className="py-8 text-center text-sm font-medium text-ink-soft">
             {t(
-              `No vendors matching "${vendorSearch}" in this category.`,
-              `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
+              `We couldn't find "${vendorSearch}" here — try another name or dish.`,
+              `"${vendorSearch}" यहाँ नहीं मिला — कोई और नाम या डिश आज़माएँ।`,
             )}
           </p>
         ) : (
@@ -4379,8 +4452,8 @@ function StepMenu({
       {rosterVendors.length === 0 ? (
         <p className="py-8 text-center text-sm font-medium text-ink-soft">
           {t(
-            `No vendors matching "${vendorSearch}" in this category.`,
-            `इस श्रेणी में "${vendorSearch}" से मेल खाता कोई वेंडर नहीं मिला।`,
+            `We couldn't find "${vendorSearch}" here — try another name or dish.`,
+            `"${vendorSearch}" यहाँ नहीं मिला — कोई और नाम या डिश आज़माएँ।`,
           )}
         </p>
       ) : (
@@ -4462,7 +4535,9 @@ function StepMenu({
                     : "bg-cream-2 text-ink-soft group-hover:bg-cream-3")
                 }
               >
-                {selected ? `✓ ${t("Selected", "चयनित")}` : t("Select", "चुनें")}
+                {selected
+                  ? `✓ ${t("Your pick", "आपकी पसंद")}`
+                  : t("Choose", "चुनें")}
               </span>
             </button>
           );
@@ -4479,7 +4554,7 @@ function StepMenu({
             />
             <button
               type="button"
-              aria-label={t("Show more vendors", "और वेंडर दिखाएं")}
+              aria-label={t("See more caterers", "और कैटरर देखें")}
               onClick={() =>
                 vendorScrollRef.current?.scrollBy({
                   left: 240,
@@ -4505,10 +4580,10 @@ function StepMenu({
             className="inline-flex items-center gap-2 rounded-full border border-maroon/40 bg-white px-5 py-2.5 text-sm font-semibold text-maroon shadow-sm transition hover:bg-maroon hover:text-cream"
           >
             {showAllVendors
-              ? t("Show fewer vendors", "कम वेंडर दिखाएं")
+              ? t("Show fewer caterers", "कम कैटरर दिखाएं")
               : t(
-                  `Explore ${hiddenVendorCount} more vendors`,
-                  `${hiddenVendorCount} और वेंडर देखें`,
+                  `See ${hiddenVendorCount} more caterers`,
+                  `${hiddenVendorCount} और कैटरर देखें`,
                 )}
             <span aria-hidden="true" className="text-base leading-none">
               {showAllVendors ? "↑" : "↓"}
@@ -4525,12 +4600,12 @@ function StepMenu({
         <p className="mt-6 rounded-2xl border border-cream-3 bg-cream-2/30 p-5 text-sm text-ink-soft shadow-sm">
           {multiVendor
             ? t(
-                "Pick one or more vendors above — each one's menu opens right below it.",
-                "ऊपर एक या अधिक वेंडर चुनें — हर वेंडर का मेन्यू उसी के नीचे खुलेगा।",
+                "Choose one or more caterers above — each one's menu opens up right below it.",
+                "ऊपर एक या अधिक कैटरर चुनें — हर कैटरर का मेन्यू उसी के नीचे खुलेगा।",
               )
             : t(
-                "Pick a vendor above — their menu opens right below it.",
-                "ऊपर वेंडर चुनें — उनका मेन्यू उसी के नीचे खुलेगा।",
+                "Choose a caterer above — their menu opens up right below it.",
+                "ऊपर कैटरर चुनें — उनका मेन्यू उसी के नीचे खुलेगा।",
               )}
         </p>
       )}
@@ -4666,7 +4741,7 @@ function StepConfirm({
       }}
     >
       <SectionHead
-        title={t("Review & Confirm", "समीक्षा और पुष्टि")}
+        title={t("One last look", "एक आख़िरी नज़र")}
       />
 
       {/* Snapshot */}
@@ -4872,7 +4947,7 @@ function StepConfirm({
       <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold text-ink">
-            {t("Add-ons", "एक्स्ट्रा")}
+            {t("Extras", "एक्स्ट्रा")}
           </h3>
           <button
             type="button"
@@ -5329,7 +5404,7 @@ function SummaryPanel({
               label={
                 singleStall
                   ? t("Single Stall menu / plate", "सिंगल स्टॉल मेन्यू / प्लेट")
-                  : t("Vendor add-ons / plate", "वेंडर ऐड-ऑन / प्लेट")
+                  : t("Caterer extras / plate", "कैटरर एक्स्ट्रा / प्लेट")
               }
               value={`+ ${money(categoryAddTotal)}`}
             />
@@ -5342,7 +5417,7 @@ function SummaryPanel({
             <div className="my-2 h-px bg-cream-3" />
             <SummaryRow label={t("Subtotal", "सबटोटल")} value={money(subtotal)} />
             <SummaryRow
-              label={t("Add-ons", "एक्स्ट्रा")}
+              label={t("Extras", "एक्स्ट्रा")}
               value={money(addOnsTotal)}
             />
             {serviceName && (
