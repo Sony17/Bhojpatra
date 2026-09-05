@@ -22,6 +22,9 @@ interface Enquiry {
   message: string;
   source: string;
   createdAt: string;
+  /** Menu & budget PDF attached to a home-page custom-package request. */
+  documentUrl?: string;
+  documentName?: string;
 }
 
 const PAGE_SIZE = 10;
@@ -78,7 +81,9 @@ export default function Enquiries() {
     return {
       total: all.length,
       thisMonth: all.filter((e) => isThisMonth(e.createdAt)).length,
-      contacts: new Set(all.map((e) => e.email.toLowerCase())).size,
+      contacts: new Set(
+        all.map((e) => e.email.toLowerCase() || e.phone).filter(Boolean),
+      ).size,
     };
   }, [enquiries]);
 
@@ -116,6 +121,7 @@ export default function Enquiries() {
         Phone: e.phone,
         Subject: e.subject,
         Message: e.message,
+        Attachment: e.documentUrl ?? "",
         "Received At": formatDateTime(e.createdAt),
       })),
     );
@@ -130,14 +136,17 @@ export default function Enquiries() {
     {
       key: "email",
       header: "Email",
-      cell: (e) => (
-        <a
-          href={`mailto:${e.email}`}
-          className="font-medium text-maroon hover:underline"
-        >
-          {e.email}
-        </a>
-      ),
+      cell: (e) =>
+        e.email ? (
+          <a
+            href={`mailto:${e.email}`}
+            className="font-medium text-maroon hover:underline"
+          >
+            {e.email}
+          </a>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
     },
     {
       key: "phone",
@@ -166,6 +175,24 @@ export default function Enquiries() {
       ),
     },
     {
+      key: "documentUrl",
+      header: "Attachment",
+      cell: (e) =>
+        e.documentUrl ? (
+          <a
+            href={e.documentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-maroon hover:underline"
+            title={e.documentName}
+          >
+            Menu &amp; budget PDF
+          </a>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
+    {
       key: "createdAt",
       header: "Received At",
       cell: (e) => (
@@ -183,7 +210,7 @@ export default function Enquiries() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Enquiries"
-        subtitle="Messages sent through the public Contact page. Each one also emails the owners."
+        subtitle="Messages from the public Contact page, plus curated-package requests raised on the home page."
         actions={
           <Button
             type="button"
@@ -223,14 +250,14 @@ export default function Enquiries() {
         columns={columns}
         rows={pageRows}
         getRowKey={(e) => e.id}
-        minWidthClass="min-w-[920px]"
+        minWidthClass="min-w-[1060px]"
         empty={
           <EmptyState
             title={q ? "No matching enquiries" : "No enquiries yet"}
             message={
               q
                 ? "Try a different search term."
-                : "Enquiries will appear here as visitors submit the Contact page form."
+                : "Enquiries will appear here as visitors submit the Contact page form or request a curated package."
             }
           />
         }
