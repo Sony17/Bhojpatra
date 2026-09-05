@@ -48,6 +48,10 @@ next-env.d.ts
 /data/kyc/
 /data/kyc-documents.json
 
+# Guest-uploaded menu & budget PDFs for custom-package enquiries
+# (runtime data store — contains customer files; never commit)
+/data/enquiry-docs/
+
 # Recorded UPI payments + merchant UPI config (runtime data store)
 /data/payments.json
 /data/payment-settings.json
