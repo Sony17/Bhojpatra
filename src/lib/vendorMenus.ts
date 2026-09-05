@@ -50,6 +50,14 @@ import {
   pruneTierMap,
   tiersForPrice,
 } from "@/lib/tiers";
+import {
+  MAX_COURSE_QUOTA,
+  VENDOR_ITEM_LIMITS_KEY,
+  mergeCourseQuotas,
+  normalizeVendorItemLimits,
+  type VendorCourseLimits,
+  type VendorItemLimits,
+} from "@/lib/vendorItemLimitsData";
 
 export interface VendorMenuItem {
   name: string;
@@ -449,6 +457,16 @@ export function saveVendor(record: LiveVendorRecord): Promise<void> {
   return store.upsert(record);
 }
 
+/** The admin's per-vendor dish-quota overrides (Vendor Management → vendor →
+ *  Menu tab), shape-checked. A missing or broken settings row reads as "no
+ *  overrides" — it must never take the menu (or a profile page) down. */
+export async function readVendorItemLimits(): Promise<VendorItemLimits> {
+  const stored = await readSingleton<{ limits: VendorItemLimits }>(
+    VENDOR_ITEM_LIMITS_KEY,
+  ).catch(() => null);
+  return normalizeVendorItemLimits(stored?.limits);
+}
+
 /* ── Customer-facing projections ─────────────────────────────────────────── */
 
 /** Assemble the `MenuCategory[]` consumed by the /book wizard: the static
@@ -456,10 +474,11 @@ export function saveVendor(record: LiveVendorRecord): Promise<void> {
  *  one dish in that category. Admin-pinned "Top 5" brands lead each roster
  *  they appear in (pin order); everyone else keeps the stored order. */
 export async function assembleMenuCategories(): Promise<MenuCategory[]> {
-  const [rows, storedPins] = await Promise.all([
+  const [rows, storedPins, adminLimits] = await Promise.all([
     ensureSeededVendors(),
     // A broken pin row must never take the menu down with it.
     readSingleton<TopVendors>(TOP_VENDORS_KEY).catch(() => null),
+    readVendorItemLimits(),
   ]);
   const { pins } = reconcileTopVendors(storedPins);
   const visible = rows.filter((r) => r.moderation === "Approved");
@@ -472,6 +491,14 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
         (s) => s.categoryId === cat.id && !s.hidden && s.items.length > 0,
       );
       if (!section) return [];
+      // Effective per-band dish quota for this course: the caterer's own
+      // dashboard numbers with any admin override laid on top, band by band —
+      // an admin entry wins its band, the rest keep the caterer's, and a band
+      // neither touched stays on `packageCategoryItems`.
+      const tierItems = mergeCourseQuotas(
+        section.tierItems,
+        adminLimits[r.id]?.[cat.id],
+      );
       return [
         {
           id: r.id,
@@ -488,11 +515,10 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           // identical to the catalog card (`toVendorListing`), so the wizard's
           // tier lens and the /vendors listing agree on where a vendor sits.
           tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
-          // The caterer's own per-band dish quota for this course, when they
-          // set one — the wizard prefers it over `packageCategoryItems`.
-          ...(section.tierItems && Object.keys(section.tierItems).length
-            ? { tierItems: section.tierItems }
-            : {}),
+          // The per-band dish quota for this course (caterer's own + admin
+          // override, resolved above) — the wizard prefers it over
+          // `packageCategoryItems`.
+          ...(tierItems ? { tierItems } : {}),
           // Per-band rates for this course, when the caterer prices the bands
           // apart. The wizard resolves `perPlate` from these once it knows the
           // band being browsed; they travel so the roster card can show them.
@@ -797,10 +823,14 @@ export function counterItems(c: VendorCounter): AddOnMenuItem[] {
 }
 
 /** Project a record for the public detail page, or null when the vendor
- *  shouldn't be shown (not live, taken down, or nothing published). */
+ *  shouldn't be shown (not live, taken down, or nothing published).
+ *  `adminQuotas` — this vendor's entry from `readVendorItemLimits()` — is laid
+ *  over the caterer's own `tierItems` so the page shows the numbers the /book
+ *  wizard will actually enforce. */
 export function toPublicVendorProfile(
   r: LiveVendorRecord,
   gallery: string[],
+  adminQuotas?: VendorCourseLimits,
 ): PublicVendorProfile | null {
   if (!r.ownerUserId || r.moderation !== "Approved") return null;
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
@@ -824,6 +854,14 @@ export function toPublicVendorProfile(
     menu: visible.flatMap((s) => {
       const cat = menuCategories.find((c) => c.id === s.categoryId);
       if (!cat) return [];
+      // The band breakdown travels with the course so the public menu shows
+      // the same numbers the /book wizard will enforce — a customer reading
+      // "Gold: 5 dishes · ₹260/plate" here gets exactly that in the wizard.
+      // Same merge the wizard's feed applies (`assembleMenuCategories`).
+      const tierItems = mergeCourseQuotas(
+        s.tierItems,
+        adminQuotas?.[s.categoryId],
+      );
       return [
         {
           categoryId: s.categoryId,
@@ -831,12 +869,7 @@ export function toPublicVendorProfile(
           nameHi: cat.nameHi,
           icon: cat.icon,
           perPlate: s.perPlate,
-          // The band breakdown travels with the course so the public menu shows
-          // the same numbers the /book wizard will enforce — a customer reading
-          // "Gold: 5 dishes · ₹260/plate" here gets exactly that in the wizard.
-          ...(s.tierItems && Object.keys(s.tierItems).length
-            ? { tierItems: s.tierItems }
-            : {}),
+          ...(tierItems ? { tierItems } : {}),
           ...(s.tierPerPlate && Object.keys(s.tierPerPlate).length
             ? { tierPerPlate: s.tierPerPlate }
             : {}),
@@ -855,7 +888,7 @@ export function toPublicVendorProfile(
 
 const CATEGORY_IDS = new Set(menuCategories.map((c) => c.id));
 const MAX_SECTIONS = menuCategories.length;
-const MAX_ITEMS_PER_SECTION = 24;
+const MAX_ITEMS_PER_SECTION = MAX_COURSE_QUOTA;
 /** Signature dishes are all-or-nothing: a vendor features exactly this many, or
  *  none at all (a new vendor with fewer dishes simply skips it). */
 const FEATURED_COUNT = 4;

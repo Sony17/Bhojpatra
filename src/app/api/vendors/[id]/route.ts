@@ -1,5 +1,6 @@
 import {
   findVendorById,
+  readVendorItemLimits,
   toPublicVendorProfile,
 } from "@/lib/vendorMenus";
 import { listPhotosByOwner, photoUrl } from "@/lib/vendorPhotos";
@@ -23,7 +24,8 @@ export async function GET(
     const gallery = (await listPhotosByOwner(record.ownerUserId, "gallery")).map(
       photoUrl,
     );
-    const vendor = toPublicVendorProfile(record, gallery);
+    const limits = await readVendorItemLimits();
+    const vendor = toPublicVendorProfile(record, gallery, limits[record.id]);
     if (!vendor) {
       return Response.json({ error: "Vendor not found." }, { status: 404 });
     }

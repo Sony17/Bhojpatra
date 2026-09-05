@@ -5,6 +5,7 @@ import VendorFullMenu from "@/components/vendors/VendorFullMenu";
 import { vendorListings } from "@/lib/data";
 import {
   findVendorById,
+  readVendorItemLimits,
   toPublicVendorProfile,
   type PublicVendorProfile,
 } from "@/lib/vendorMenus";
@@ -18,7 +19,8 @@ async function loadProfile(id: string): Promise<PublicVendorProfile | null> {
   const gallery = (await listPhotosByOwner(record.ownerUserId, "gallery")).map(
     photoUrl,
   );
-  return toPublicVendorProfile(record, gallery);
+  const limits = await readVendorItemLimits();
+  return toPublicVendorProfile(record, gallery, limits[record.id]);
 }
 
 export async function generateMetadata({
@@ -44,8 +46,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Vendor Full Menu — Bhojpatra",
-    description: "Browse vendor menus on Bhojpatra.",
+    title: "Caterer Full Menu — Bhojpatra",
+    description: "Browse caterer menus on Bhojpatra.",
   };
 }
 

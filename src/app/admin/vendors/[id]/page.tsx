@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import VendorDetail from "@/components/admin/vendors/VendorDetail";
-import { getAdminVendorById } from "@/lib/admin/vendors";
+import {
+  getAdminVendorById,
+  getAdminVendorItemLimits,
+} from "@/lib/admin/vendors";
 
 /** Vendor detail route. `params` is async in this Next version, so it's awaited. */
 export async function generateMetadata({
@@ -19,6 +22,9 @@ export default async function VendorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const vendor = await getAdminVendorById(id);
-  return <VendorDetail vendor={vendor} />;
+  const [vendor, itemLimits] = await Promise.all([
+    getAdminVendorById(id),
+    getAdminVendorItemLimits(id),
+  ]);
+  return <VendorDetail vendor={vendor} itemLimits={itemLimits} />;
 }

@@ -6,6 +6,7 @@ import VendorDetail from "@/components/vendors/VendorDetail";
 import { vendorListings } from "@/lib/data";
 import {
   findVendorById,
+  readVendorItemLimits,
   toPublicVendorProfile,
   type PublicVendorProfile,
 } from "@/lib/vendorMenus";
@@ -20,7 +21,8 @@ async function loadProfile(id: string): Promise<PublicVendorProfile | null> {
   const gallery = (await listPhotosByOwner(record.ownerUserId, "gallery")).map(
     photoUrl,
   );
-  return toPublicVendorProfile(record, gallery);
+  const limits = await readVendorItemLimits();
+  return toPublicVendorProfile(record, gallery, limits[record.id]);
 }
 
 /** `params` is async in this Next version. */

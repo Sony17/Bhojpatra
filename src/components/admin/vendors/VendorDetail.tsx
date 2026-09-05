@@ -13,6 +13,8 @@ import EmptyState from "@/components/admin/shared/EmptyState";
 import { money } from "@/components/admin/shared/money";
 import BookingsMiniTable from "@/components/admin/bookings/BookingsMiniTable";
 import PushToTopFiveButton from "@/components/admin/vendors/PushToTopFiveButton";
+import VendorItemLimitsEditor from "@/components/admin/vendors/VendorItemLimitsEditor";
+import type { AdminVendorItemLimits } from "@/lib/admin/vendors";
 import { Calendar, StarSolid, Users, Wallet } from "@/components/admin/shared/icons";
 import { getBookingsByVendor } from "@/lib/admin/mockData";
 import { useVendorRatings, statFor } from "@/lib/vendorRatings";
@@ -32,12 +34,19 @@ const TABS: TabItem[] = [
 /**
  * Vendor detail page. Shows the vendor's profile, tiers, KYC documents and
  * bookings as looked up by the route. Verification and status changes are made
- * in the Vendor Approvals console, which persists them — the only action here
- * is "Push to Top 5", which pins the vendor into the /book menu-builder
- * vendor ribbon through the shared top-vendors store (nothing silently
- * no-ops). Renders a friendly not-found state for bad ids.
+ * in the Vendor Approvals console, which persists them — the actions here are
+ * "Push to Top 5" (pins the vendor into the /book menu-builder vendor ribbon
+ * through the shared top-vendors store) and the Menu tab's per-course
+ * selection-limit overrides. Renders a friendly not-found state for bad ids.
  */
-export default function VendorDetail({ vendor }: { vendor: AdminVendor | null }) {
+export default function VendorDetail({
+  vendor,
+  itemLimits,
+}: {
+  vendor: AdminVendor | null;
+  /** Selection-limits editor data; null when this id has no bookable menu. */
+  itemLimits?: AdminVendorItemLimits | null;
+}) {
   if (!vendor) {
     return (
       <div className="space-y-6">
@@ -55,10 +64,16 @@ export default function VendorDetail({ vendor }: { vendor: AdminVendor | null })
     );
   }
 
-  return <VendorDetailView vendor={vendor} />;
+  return <VendorDetailView vendor={vendor} itemLimits={itemLimits ?? null} />;
 }
 
-function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
+function VendorDetailView({
+  vendor,
+  itemLimits,
+}: {
+  vendor: AdminVendor;
+  itemLimits: AdminVendorItemLimits | null;
+}) {
   const [tab, setTab] = useState("overview");
   const tiers = sortTiers(vendor.tiers);
 
@@ -91,12 +106,15 @@ function VendorDetailView({ vendor }: { vendor: AdminVendor }) {
 
       {tab === "overview" && <OverviewTab vendor={vendor} tiers={tiers} />}
       {tab === "kyc" && <KycTab docs={vendor.documents} />}
-      {tab === "menu" && (
-        <EmptyState
-          title="Menu management is coming"
-          message="Per-vendor menus, packages and pricing arrive with the Menu & Catalog phase."
-        />
-      )}
+      {tab === "menu" &&
+        (itemLimits ? (
+          <VendorItemLimitsEditor vendorId={vendor.id} limits={itemLimits} />
+        ) : (
+          <EmptyState
+            title="No bookable menu yet"
+            message="Selection limits become editable once this vendor has a published menu in the booking flow."
+          />
+        ))}
       {tab === "bookings" && (
         <BookingsMiniTable
           rows={getBookingsByVendor(vendor.business)}
