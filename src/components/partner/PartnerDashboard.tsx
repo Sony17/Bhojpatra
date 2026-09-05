@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import {
-  addPartnerRole,
   partnerMemberships,
   useSession,
   type PartnerRole,
 } from "@/lib/session";
 import {
-  makeReferralCode,
   PARTNER_ROLE_LABEL,
   referralLink,
   referralPayoutHref,
@@ -23,9 +21,6 @@ import type { BookingStatus } from "@/lib/data";
 import VenuePanel from "@/components/partner/VenuePanel";
 import { Badge, AppBar, Button, Card, EmptyState, type BadgeTone } from "@/components/ui";
 import { money } from "@/lib/money";
-
-/** All partner roles, in display order — used to offer the ones not yet held. */
-const ALL_ROLES: PartnerRole[] = ["planner", "individual", "venue"];
 
 /** Short emoji marker per role, mirroring the signup picker. */
 const ROLE_ICON: Record<PartnerRole, string> = {
@@ -81,10 +76,8 @@ export default function PartnerDashboard() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [orders, setOrders] = useState<ReferredOrder[]>([]);
   const [rates, setRates] = useState<ReferralRates>(DEFAULT_REFERRAL_RATES);
-  // Which role's dashboard is on screen (null → default to the first held).
+  // Deep-link hint for which role's view to open (null → the held role).
   const [activeType, setActiveType] = useState<PartnerRole | null>(null);
-  // The role currently being registered, while its referral code is minted.
-  const [adding, setAdding] = useState<PartnerRole | null>(null);
 
   // Deep-link support: /partner/dashboard?tab=venues (used by the venue-owner
   // onboarding CTAs) opens straight on the "My Venue" tab and auto-selects the
@@ -105,8 +98,8 @@ export default function PartnerDashboard() {
     }
   }, []);
 
-  // Every role this account holds; one person can be all three at once. Each
-  // role carries its own referral code, so each gets its own dashboard view.
+  // One email ↔ one role: a partner account holds exactly one partner lane
+  // (planner / individual / venue), so this is at most a single membership.
   const memberships = partnerMemberships(session);
   const active =
     memberships.find((m) => m.type === activeType) ?? memberships[0] ?? null;
@@ -114,36 +107,6 @@ export default function PartnerDashboard() {
   const partnerLabel = active
     ? PARTNER_ROLE_LABEL[active.type]
     : t("Partner", "पार्टनर");
-  const addable = ALL_ROLES.filter(
-    (r) => !memberships.some((m) => m.type === r),
-  );
-
-  function selectRole(type: PartnerRole) {
-    setActiveType(type);
-    setTab(null); // let the newly selected role pick its default tab
-  }
-
-  // Register an extra partner role on this account: mint a fresh code, persist
-  // the partner record (so the booking wizard + admin can resolve it), attach
-  // the role to the session, then switch the dashboard to it.
-  async function addRole(type: PartnerRole) {
-    if (adding) return;
-    setAdding(type);
-    const newCode = makeReferralCode(session?.name);
-    try {
-      await fetch("/api/partners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: newCode, name: session?.name ?? "", type }),
-      });
-    } catch {
-      /* offline — the session still records the role; team follows up */
-    }
-    await addPartnerRole({ type, referralCode: newCode });
-    setActiveType(type);
-    setTab(null); // land on the new role's default tab (venue → My Venue)
-    setAdding(null);
-  }
 
   // Pull every recorded order, then keep only the ones booked with this
   // partner's referral code. The booking wizard tags orders at confirm time.
@@ -274,16 +237,6 @@ export default function PartnerDashboard() {
         />
       )}
 
-      {/* Role switcher — one dashboard per partner role this person holds. */}
-      <RoleSwitcher
-        memberships={memberships}
-        addable={addable}
-        activeType={active?.type ?? null}
-        adding={adding}
-        onSelect={selectRole}
-        onAdd={addRole}
-      />
-
       {/* Tab bar — a Venue Owner leads with "My Venue" and only sees venue-
           relevant tabs; referrers keep the referral tabs. */}
       <div className="mt-8 flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
@@ -350,101 +303,6 @@ export default function PartnerDashboard() {
       </div>
     </section>
     </>
-  );
-}
-
-/* ── Role switcher ──────────────────────────────────────────────────────── */
-
-function RoleSwitcher({
-  memberships,
-  addable,
-  activeType,
-  adding,
-  onSelect,
-  onAdd,
-}: {
-  memberships: { type: PartnerRole; referralCode: string }[];
-  addable: PartnerRole[];
-  activeType: PartnerRole | null;
-  adding: PartnerRole | null;
-  onSelect: (type: PartnerRole) => void;
-  onAdd: (type: PartnerRole) => void;
-}) {
-  const { t } = useLang();
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // One role and nothing left to add → no switcher needed.
-  if (memberships.length <= 1 && addable.length === 0) return null;
-
-  return (
-    <div className="mt-6">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-        {t("Your partner roles", "आपकी पार्टनर भूमिकाएँ")}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2.5">
-        {memberships.map((m) => {
-          const active = m.type === activeType;
-          return (
-            <button
-              key={m.type}
-              type="button"
-              onClick={() => onSelect(m.type)}
-              aria-pressed={active}
-              className={
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors " +
-                (active
-                  ? "border-maroon bg-maroon text-cream"
-                  : "border-cream-3 bg-white text-ink-soft hover:border-maroon/40 hover:bg-cream-2")
-              }
-            >
-              <span aria-hidden="true">{ROLE_ICON[m.type]}</span>
-              {PARTNER_ROLE_LABEL[m.type]}
-            </button>
-          );
-        })}
-
-        {/* Add another role this person doesn't hold yet. */}
-        {addable.length > 0 && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              disabled={adding !== null}
-              className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-maroon px-4 py-2 text-sm font-semibold text-maroon transition-colors hover:bg-maroon/5 disabled:opacity-50"
-            >
-              <span aria-hidden="true">＋</span>
-              {adding
-                ? t("Adding…", "जोड़ रहे हैं…")
-                : t("Add role", "भूमिका जोड़ें")}
-            </button>
-            {menuOpen && (
-              <div
-                role="menu"
-                className="absolute left-0 z-10 mt-2 w-56 overflow-hidden rounded-card border border-cream-3 bg-white p-1 shadow-pop"
-              >
-                {addable.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onAdd(r);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-cream-2"
-                  >
-                    <span aria-hidden="true">{ROLE_ICON[r]}</span>
-                    {PARTNER_ROLE_LABEL[r]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

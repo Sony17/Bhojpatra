@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import {
-  MERGED_DASHBOARD_PATH,
+  DASHBOARD_PATH,
+  DASHBOARD_HOME_PATH,
   refreshSession,
   type AccountType,
   type PartnerRole,
@@ -312,7 +313,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
       await refreshSession();
-      router.push(MERGED_DASHBOARD_PATH);
+      // One email ↔ one role — land directly on that role's dashboard.
+      router.push(DASHBOARD_PATH[user.role]);
     } catch {
       setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
@@ -388,7 +390,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               {t("List your venue", "अपना वेन्यू लिस्ट करें")}
             </Button>
           ) : (
-            <Button href={MERGED_DASHBOARD_PATH} size="lg" fullWidth>
+            <Button href={DASHBOARD_HOME_PATH} size="lg" fullWidth>
               {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
             </Button>
           )}
@@ -398,7 +400,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             </Button>
           )}
           {isVenuePartner && (
-            <Button href={MERGED_DASHBOARD_PATH} variant="secondary" size="lg" fullWidth>
+            <Button href={DASHBOARD_HOME_PATH} variant="secondary" size="lg" fullWidth>
               {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
             </Button>
           )}

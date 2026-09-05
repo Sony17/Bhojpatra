@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang, type Lang } from "@/lib/i18n";
-import { useSession, hasAccount, ACCOUNT_LABEL } from "@/lib/session";
+import { useSession, ACCOUNT_LABEL } from "@/lib/session";
 import { Button, Card, SegmentedControl, Badge } from "@/components/ui";
 
 const LANG_OPTIONS: { value: Lang; label: string }[] = [
@@ -50,7 +50,7 @@ export default function SettingsView() {
         </div>
         <div>
           <p className="text-caption font-semibold text-ink">
-            {t("Accounts you hold", "आपके अकाउंट")}
+            {t("Account type", "अकाउंट प्रकार")}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {session?.accounts.map((a) => (
@@ -64,11 +64,6 @@ export default function SettingsView() {
           <Button href="/account/password" variant="secondary" size="sm">
             {t("Change Password", "पासवर्ड बदलें")}
           </Button>
-          {hasAccount(session, "vendor") && (
-            <Button href="/account/roles" variant="secondary" size="sm">
-              {t("Manage Roles", "भूमिकाएँ प्रबंधित करें")}
-            </Button>
-          )}
         </div>
       </Card>
     </div>

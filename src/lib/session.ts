@@ -23,9 +23,9 @@ export type AccountType = "customer" | "vendor" | "partner";
 export type PartnerRole = "planner" | "individual" | "venue";
 
 /**
- * A single partner role the account holds, with its own referral code. One
- * person can be all three (Event Planner + Individual Referrer + Venue Owner);
- * each role earns against its own code and gets its own dashboard view.
+ * The one partner role an account holds, with its referral code. One email ↔
+ * one role: a partner account is exactly one of Event Planner, Individual
+ * Referrer or Venue Owner.
  */
 export interface PartnerMembership {
   type: PartnerRole;
@@ -34,32 +34,24 @@ export interface PartnerMembership {
 
 export interface MockSession {
   /**
-   * The account's primary type — its post-login default. One person can hold
-   * several accounts at once (see `accounts`); this is just which one they
-   * signed up as first.
+   * The account's single role. One email holds exactly one role — customer,
+   * vendor OR partner — and gets that role's one dashboard.
    */
   type: AccountType;
   /**
-   * Every account type this one person holds — customer (always, it's
-   * universal), vendor and/or referral partner. The merged dashboard and the
-   * route guards read this so a single login can reach all of them.
+   * The account set, always exactly one entry (`type`). Kept array-shaped
+   * because the route guards and views consume it that way.
    */
   accounts: AccountType[];
   name?: string;
   /** The account's login email — lets authenticated flows (e.g. the vendor
    *  registration wizard) bind to the signed-in account instead of re-asking. */
   email?: string;
-  /**
-   * Set for partner accounts — the primary/first referrer type. Kept for
-   * backward compatibility; prefer `partnerRoles` (this is derivable from it).
-   */
+  /** Set for partner accounts — the partner lane (planner/individual/venue). */
   partnerType?: PartnerRole;
-  /** Set for partner accounts — the primary/first referral code. */
+  /** Set for partner accounts — the referral code. */
   referralCode?: string;
-  /**
-   * Every partner role this account holds, each with its own referral code.
-   * Lets one person hold all three roles and switch between their dashboards.
-   */
+  /** The partner membership, as a one-entry array (legacy shape). */
   partnerRoles?: PartnerMembership[];
 }
 
@@ -73,8 +65,9 @@ interface SessionUser {
   partnerRoles?: PartnerMembership[];
 }
 
-/** The merged dashboard that surfaces every account a person holds. */
-export const MERGED_DASHBOARD_PATH = "/dashboard";
+/** The dashboard router — forwards each signed-in user to the one dashboard
+ *  their role owns (see `/dashboard/page.tsx`). */
+export const DASHBOARD_HOME_PATH = "/dashboard";
 
 /** Where each account type's *dedicated* dashboard lives. */
 export const DASHBOARD_PATH: Record<AccountType, string> = {
@@ -98,22 +91,17 @@ function toSession(user: SessionUser | null): MockSession | null {
   if (user.role !== "customer" && user.role !== "vendor" && user.role !== "partner") {
     return null;
   }
-  const roles = user.partnerRoles ?? [];
-  // The server computes the full account set; fall back to the primary type for
-  // any legacy response that predates the `accounts` field. Customer is
-  // universal, so it's always present.
-  const accounts =
-    user.accounts && user.accounts.length
-      ? user.accounts
-      : ([user.role].filter((a) => a === "vendor" || a === "partner") as AccountType[]);
+  // One email ↔ one role: the server reports the single effective role. The
+  // account set is always exactly that one type.
+  const membership = user.partnerRoles?.[0];
   return {
     type: user.role,
-    accounts: accounts.includes("customer") ? accounts : ["customer", ...accounts],
+    accounts: [user.role],
     name: user.name,
     email: user.email,
-    partnerType: roles[0]?.type,
-    referralCode: roles[0]?.referralCode,
-    partnerRoles: roles.length ? roles : undefined,
+    partnerType: membership?.type,
+    referralCode: membership?.referralCode,
+    partnerRoles: membership ? [membership] : undefined,
   };
 }
 
@@ -179,9 +167,9 @@ export function dashboardPath(type?: AccountType): string {
 }
 
 /**
- * All partner roles the account holds. Reads the `partnerRoles` array when
- * present, otherwise derives a single membership from the legacy
- * `partnerType`/`referralCode` fields so older sessions keep working.
+ * The partner membership the account holds (empty for non-partners). Reads the
+ * `partnerRoles` array when present, otherwise derives the membership from the
+ * legacy `partnerType`/`referralCode` fields so older sessions keep working.
  */
 export function partnerMemberships(
   session: MockSession | null,
@@ -192,23 +180,6 @@ export function partnerMemberships(
     return [{ type: session.partnerType, referralCode: session.referralCode }];
   }
   return [];
-}
-
-/**
- * Attach an additional partner role (with its freshly minted referral code) to
- * the current account. Persists it to the user's record server-side, then
- * refreshes the session so the new role's dashboard is available. No-ops on a
- * duplicate role (the server dedupes by type).
- */
-export async function addPartnerRole(
-  membership: PartnerMembership,
-): Promise<void> {
-  await fetch("/api/auth/partner-roles", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(membership),
-  }).catch(() => {});
-  await refreshSession();
 }
 
 /**

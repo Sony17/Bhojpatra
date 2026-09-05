@@ -4,17 +4,12 @@ import {
   toPublicUser,
   newUserId,
   accountsFor,
-  grantAccount,
+  effectiveRole,
   type UserRecord,
   type UserRole,
 } from "@/lib/users";
-import {
-  hashPassword,
-  verifyPassword,
-  createSession,
-  getSessionUser,
-} from "@/lib/auth";
-import type { AccountType, PartnerMembership } from "@/lib/session";
+import { hashPassword, createSession } from "@/lib/auth";
+import type { AccountType, PartnerMembership, PartnerRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -53,55 +48,44 @@ export async function POST(request: Request) {
   }
   const accountType = role as AccountType;
 
+  // A partner signs up into exactly ONE lane (planner / individual / venue).
+  // Take the first well-formed membership and ignore any extras.
+  const sentRoles = Array.isArray(body.partnerRoles) ? body.partnerRoles : [];
+  const firstMembership = sentRoles.find(
+    (m): m is PartnerMembership =>
+      !!m &&
+      typeof m === "object" &&
+      ["planner", "individual", "venue"].includes(
+        (m as { type?: unknown }).type as PartnerRole,
+      ) &&
+      typeof (m as { referralCode?: unknown }).referralCode === "string",
+  );
   const partnerRoles =
-    accountType === "partner" && Array.isArray(body.partnerRoles)
-      ? (body.partnerRoles as PartnerMembership[])
-      : undefined;
+    accountType === "partner" && firstMembership ? [firstMembership] : undefined;
   const name =
     typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined;
 
-  // ── Existing email → attach this account type to the same person ──────────
-  // One human can be a customer, a vendor AND a referral partner. Rather than
-  // rejecting a repeat signup, we add the new account to their record — but only
-  // after proving they own it (a matching session cookie, or the right
-  // password). Otherwise this would be an account-takeover vector.
+  // ── One email ↔ one role ──────────────────────────────────────────────────
+  // An email that already has an account keeps the role it signed up with —
+  // account types are never combined on one login. Signing up again with the
+  // same email is always rejected, whatever role was asked for.
   const existing = await findUserByEmail(email);
   if (existing) {
-    const sessionUser = await getSessionUser();
-    const authorized =
-      sessionUser?.email === email ||
-      (await verifyPassword(password, existing.passwordHash));
-    if (!authorized) {
-      return Response.json(
-        {
-          error:
-            "An account with this email already exists. Log in with your password to add this account type.",
-        },
-        { status: 409 },
-      );
-    }
-
-    grantAccount(existing, accountType);
-    if (name && !existing.name) existing.name = name;
-    if (partnerRoles?.length) {
-      const held = existing.partnerRoles ?? [];
-      for (const m of partnerRoles) {
-        if (!held.some((r) => r.type === m.type)) held.push(m);
-      }
-      existing.partnerRoles = held;
-    }
-
-    try {
-      await saveUser(existing);
-      await createSession(existing);
-    } catch (err) {
-      console.error("Account attach failed", err);
-      return Response.json(
-        { error: "Something went wrong. Please try again." },
-        { status: 500 },
-      );
-    }
-    return Response.json({ user: toPublicUser(existing) });
+    const held = effectiveRole(existing);
+    const label =
+      held === "vendor"
+        ? "a vendor"
+        : held === "partner"
+          ? "a partner"
+          : held === "customer"
+            ? "a customer"
+            : "an admin";
+    return Response.json(
+      {
+        error: `This email is already registered as ${label}. Each email can hold only one role — log in to that account, or sign up with a different email.`,
+      },
+      { status: 409 },
+    );
   }
 
   // ── New person → fresh record ─────────────────────────────────────────────
@@ -114,8 +98,7 @@ export async function POST(request: Request) {
     ...(partnerRoles ? { partnerRoles } : {}),
     createdAt: new Date().toISOString(),
   };
-  // Persist the explicit account set (customer is universal + whatever they
-  // signed up as) so later attaches have a complete list to union against.
+  // Persist the single-role account set explicitly.
   user.accounts = accountsFor(user);
 
   try {
