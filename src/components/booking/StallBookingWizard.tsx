@@ -54,6 +54,7 @@ import {
   type DietType,
   type Coupon,
   type BookingStatus,
+  type VendorListing,
 } from "@/lib/data";
 import { slugifyName } from "@/lib/bookings";
 import {
@@ -88,6 +89,15 @@ import {
   formatEventDate,
   isoAfterDays,
 } from "@/lib/bookingPricing";
+import {
+  PREF_BOTH,
+  dishAllowed,
+  fixedSpreadFits,
+  kitchenFitsSplit,
+  resolveNonVeg,
+  splitSummary,
+  type NonVegCount,
+} from "@/lib/dietSplit";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 // Menu (1) · Details (2) · Confirm (3). Deliberately shorter than the tiered
@@ -219,6 +229,16 @@ export default function StallBookingWizard() {
   const [mealTime, setMealTime] = useState<string>("");
   const [eventTime, setEventTime] = useState<string>("");
   const [foodPreference, setFoodPreference] = useState<string>("");
+  // Craft-my-plate: the guest's dialled-in non-veg count for a "Both" event.
+  // Only ever read through `nonVegGuests` below — `foodPreference` is what
+  // decides a pure-veg / all-non-veg plate, so the two can't contradict.
+  const [nonVegMix, setNonVegMix] = useState<NonVegCount>(null);
+  // THE split every diet filter below reads — derived, so it re-clamps for
+  // free when the head-count moves and can never disagree with the label.
+  const nonVegGuests = useMemo<NonVegCount>(
+    () => resolveNonVeg(foodPreference, nonVegMix, guests),
+    [foodPreference, nonVegMix, guests],
+  );
   const [cityId, setCityId] = useState<string>("");
   const [customCity, setCustomCity] = useState<string>("");
   const [venue, setVenue] = useState<string>("");
@@ -300,6 +320,7 @@ export default function StallBookingWizard() {
       if (d.mealTime) setMealTime(d.mealTime);
       if (d.eventTime) setEventTime(d.eventTime);
       if (d.foodPreference) setFoodPreference(d.foodPreference);
+      if (typeof d.nonVegMix === "number") setNonVegMix(d.nonVegMix);
       if (d.venue) setVenue(d.venue);
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
@@ -358,6 +379,7 @@ export default function StallBookingWizard() {
       mealTime,
       eventTime,
       foodPreference,
+      nonVegMix,
       venue,
       venueFee,
       selectedAddOns,
@@ -376,6 +398,7 @@ export default function StallBookingWizard() {
     mealTime,
     eventTime,
     foodPreference,
+    nonVegMix,
     venue,
     venueFee,
     selectedAddOns,
@@ -611,9 +634,48 @@ export default function StallBookingWizard() {
     );
   }, [liveMenuCategories, cityName, stallId]);
 
-  const stall = useMemo<StallOption | undefined>(
+  const rawStall = useMemo<StallOption | undefined>(
     () => stalls.find((s) => s.id === stallId),
     [stalls, stallId],
+  );
+
+  // STRICT craft-my-plate view of the chosen stall. With a pure-veg plate a
+  // varied course loses its non-veg dishes and a fixed (set-menu) course that
+  // carries any non-veg dish drops out whole — a set spread can't be trimmed,
+  // the vendor serves all of it or none. Courses left with nothing to serve
+  // disappear. Everything downstream (pricing, receipt, validation) reads the
+  // filtered view, so a conflicting dish can never reach the order; the raw
+  // picks stay in the draft and revive if the guest relaxes the split.
+  const dietView = useMemo(() => {
+    if (!rawStall || nonVegGuests === null) {
+      return { courses: rawStall?.courses ?? [], hiddenDishes: 0, blockedCourses: [] as StallCourse[] };
+    }
+    const courses: StallCourse[] = [];
+    const blockedCourses: StallCourse[] = [];
+    let hiddenDishes = 0;
+    for (const c of rawStall.courses) {
+      if (c.fixed) {
+        if (fixedSpreadFits(c.items, nonVegGuests)) courses.push(c);
+        else blockedCourses.push(c);
+        continue;
+      }
+      const items = c.items.filter((it) => dishAllowed(it.diet, nonVegGuests));
+      hiddenDishes += c.items.length - items.length;
+      if (items.length > 0) courses.push({ ...c, items });
+    }
+    return { courses, hiddenDishes, blockedCourses };
+  }, [rawStall, nonVegGuests]);
+
+  const stall = useMemo<StallOption | undefined>(
+    () =>
+      rawStall && {
+        ...rawStall,
+        courses: dietView.courses,
+        allFixed:
+          dietView.courses.length > 0 &&
+          dietView.courses.every((c) => c.fixed),
+      },
+    [rawStall, dietView],
   );
 
   // Resolve a `?vendor=` hand-off once the roster arrives. A catalogue id with
@@ -682,11 +744,17 @@ export default function StallBookingWizard() {
   const itemsFor = (catId: string): string[] => {
     const stored = categoryItems[catId] ?? [];
     const course = courseById(catId);
+    // A course the craft-my-plate filter dropped counts for nothing, however
+    // many picks the draft still holds for it.
+    if (!course) return [];
     // A taken fixed course always carries its FULL dish list, so a draft saved
     // while the vendor still sold this course dish-by-dish can't resume as a
     // half-picked set menu.
-    if (course?.fixed) return stored.length ? course.items.map((it) => it.id) : [];
-    return stored;
+    if (course.fixed) return stored.length ? course.items.map((it) => it.id) : [];
+    // Varied picks count only while the dish is actually on offer — a non-veg
+    // pick goes quiet (not billed, not counted) the moment the plate turns
+    // pure veg, and comes back if the split relaxes again.
+    return stored.filter((id) => course.items.some((it) => it.id === id));
   };
 
   const toggleItem = (catId: string, itemId: string) => {
@@ -754,16 +822,23 @@ export default function StallBookingWizard() {
       : selectedService.priceMin
     : 0;
 
-  // A counter's vendor: the guest's pick when it's still valid, else the first
-  // eligible one so a selected counter is never vendorless. Single Stall opens
-  // the whole catalogue — no tier narrowing.
+  // Counter vendors: the whole catalogue (no tier narrowing on Single Stall),
+  // STRICTLY minus meat-only kitchens when the plate is pure veg.
+  const counterVendors = useMemo(
+    () => vendorListings.filter((v) => kitchenFitsSplit(v.diet, nonVegGuests)),
+    [nonVegGuests],
+  );
+
+  // A counter's vendor: the guest's pick when it's still valid (and still
+  // serves the plate), else the first eligible one so a selected counter is
+  // never vendorless.
   const addOnVendorId = (addOnId: string): string => {
     const chosen = addOnVendor[addOnId];
-    if (chosen && vendorListings.some((v) => v.id === chosen)) return chosen;
-    return vendorListings[0]?.id ?? "";
+    if (chosen && counterVendors.some((v) => v.id === chosen)) return chosen;
+    return counterVendors[0]?.id ?? "";
   };
   const addOnVendorName = (addOnId: string): string =>
-    vendorListings.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
+    counterVendors.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
 
   const toggleAddOn = (id: string) => {
     if (selectedAddOns.includes(id)) {
@@ -889,6 +964,13 @@ export default function StallBookingWizard() {
     if (canNext) return [];
     if (step === 1) {
       if (!stall) return [t("Choose a stall", "एक स्टॉल चुनें")];
+      if (stall.courses.length === 0)
+        return [
+          t(
+            "This stall has nothing your pure-veg plate can take — pick another brand, or adjust the plate in your event brief.",
+            "इस स्टॉल में आपकी शुद्ध शाकाहारी थाली के लिए कुछ नहीं है — कोई और ब्रांड चुनें, या इवेंट ब्रीफ़ में थाली बदलें।",
+          ),
+        ];
       return [
         stall.allFixed
           ? t(
@@ -979,6 +1061,14 @@ export default function StallBookingWizard() {
     [stall, categoryItems],
   );
 
+  // The food line every order artifact prints — the canonical preference,
+  // with the actual plate mix spelled out when it's mixed.
+  const splitText = splitSummary(nonVegGuests, guests);
+  const foodLabel =
+    foodPreference === PREF_BOTH && splitText
+      ? `${foodPreference} (${splitText})`
+      : foodPreference;
+
   const buildReceipt = (): string => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
@@ -1002,7 +1092,7 @@ export default function StallBookingWizard() {
       `Stall:    ${stall?.name ?? "-"}`,
       `Date:     ${eventDate || "-"}`,
       `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
-      `Food:     ${foodPreference || "-"}`,
+      `Food:     ${foodLabel || "-"}`,
       `City:     ${cityObj ? cityObj.name : "-"}`,
       `Venue:    ${venue || "-"}`,
       `Guests:   ${guests}`,
@@ -1089,7 +1179,7 @@ export default function StallBookingWizard() {
       occasion: occ?.name ?? "Feast",
       eventDate: eventDate ? formatEventDate(eventDate) : "-",
       servingTime: servingTimeLabel(mealTime, eventTime) || undefined,
-      foodPreference: foodPreference || undefined,
+      foodPreference: foodLabel || undefined,
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
@@ -1148,12 +1238,12 @@ export default function StallBookingWizard() {
       (servingTimeLabel(mealTime, eventTime)
         ? `Serving: ${servingTimeLabel(mealTime, eventTime)}\n`
         : "") +
-      (foodPreference ? `Food: ${foodPreference}\n` : "") +
+      (foodLabel ? `Food: ${foodLabel}\n` : "") +
       `City: ${cityObj ? cityObj.name : "-"}\n` +
       `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
       (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
-      (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
+      (addOnLines ? `\nExtras: ${addOnLines}\n` : "") +
       (selectedService
         ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
         : "") +
@@ -1232,6 +1322,11 @@ export default function StallBookingWizard() {
           packageId: STALL_PACKAGE_ID,
           leadDays: effectiveLeadDays,
           guests,
+          // Craft-my-plate split — structured, so admin / vendors see exactly
+          // how many veg vs non-veg plates to cook.
+          ...(nonVegGuests !== null
+            ? { vegGuests: guests - nonVegGuests, nonVegGuests }
+            : {}),
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
           venue: venue.trim() || undefined,
@@ -1321,6 +1416,8 @@ export default function StallBookingWizard() {
       setEventTime={setEventTime}
       foodPreference={foodPreference}
       setFoodPreference={setFoodPreference}
+      nonVegGuests={nonVegGuests}
+      setNonVegMix={setNonVegMix}
       cityId={cityId}
       setCityId={setCityId}
       customCity={customCity}
@@ -1429,6 +1526,9 @@ export default function StallBookingWizard() {
                 pickedCount={pickedCount}
                 guests={guests}
                 brandsHref={BRANDS_HREF}
+                nonVegGuests={nonVegGuests}
+                hiddenDishes={dietView.hiddenDishes}
+                blockedCourses={dietView.blockedCourses}
               />
             ) : (
               <StallHandoff
@@ -1450,6 +1550,8 @@ export default function StallBookingWizard() {
               services={services}
               serviceId={serviceId}
               setServiceId={setServiceId}
+              counterVendors={counterVendors}
+              nonVegGuests={nonVegGuests}
             />
           )}
 
@@ -1468,7 +1570,7 @@ export default function StallBookingWizard() {
                 occasion={resolveOccasion(occasionId)}
                 eventDate={eventDate}
                 servingLabel={servingTimeLabel(mealTime, eventTime)}
-                foodPreference={foodPreference}
+                foodPreference={foodLabel}
                 city={resolveCity(cityId)}
                 venue={venue}
                 setVenue={setVenue}
@@ -1717,6 +1819,9 @@ function StepStallMenu({
   pickedCount,
   guests,
   brandsHref,
+  nonVegGuests,
+  hiddenDishes,
+  blockedCourses,
 }: {
   t: (en: string, hi: string) => string;
   lang: Lang;
@@ -1734,9 +1839,58 @@ function StepStallMenu({
   guests: number;
   /** Where a different stall is picked — the Brands page, not a step in here. */
   brandsHref: string;
+  /** The craft-my-plate split, plus what its strict filter took off this
+   *  stall's menu — surfaced so the guest knows WHY dishes are missing. */
+  nonVegGuests: NonVegCount;
+  hiddenDishes: number;
+  blockedCourses: StallCourse[];
 }) {
+  const pureVeg = nonVegGuests === 0;
+  // What the strict filter removed, told plainly. Only a pure-veg plate ever
+  // hides anything (veg dishes always pass), so the copy can say so.
+  const filterNote =
+    pureVeg && (hiddenDishes > 0 || blockedCourses.length > 0)
+      ? [
+          hiddenDishes > 0
+            ? t(
+                `${hiddenDishes} non-veg ${hiddenDishes === 1 ? "dish" : "dishes"} hidden`,
+                `${hiddenDishes} नॉन-वेज व्यंजन छुपाए गए`,
+              )
+            : "",
+          blockedCourses.length > 0
+            ? t(
+                `${blockedCourses.length} set-menu ${blockedCourses.length === 1 ? "course" : "courses"} unavailable (spread includes non-veg): ${blockedCourses.map((c) => c.name).join(", ")}`,
+                `${blockedCourses.length} तय-मेन्यू कोर्स उपलब्ध नहीं (इनमें नॉन-वेज है): ${blockedCourses.map((c) => c.nameHi).join(", ")}`,
+              )
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
   const course = stall.courses[activeCat] ?? stall.courses[0];
-  if (!course) return null;
+
+  // Nothing on this stall survives a pure-veg plate (an all-non-veg kitchen).
+  // Say so and route to veg-friendly brands rather than rendering a bare menu.
+  if (!course) {
+    return (
+      <div>
+        <SectionHead
+          eyebrow={t("Single Stall", "सिंगल स्टॉल")}
+          title={t("This stall can't serve your plate", "यह स्टॉल आपकी थाली नहीं परोस सकता")}
+          sub={t(
+            `Your event is pure veg, but everything ${stall.name} serves includes non-veg. Pick another brand, or allow non-veg guests in your event brief above.`,
+            `आपका इवेंट शुद्ध शाकाहारी है, पर ${stall.name} का पूरा मेन्यू नॉन-वेज के साथ आता है। कोई और ब्रांड चुनें, या ऊपर इवेंट ब्रीफ़ में नॉन-वेज मेहमान जोड़ें।`,
+          )}
+        />
+        <a
+          href={`${brandsHref}&diet=Veg`}
+          className="inline-flex items-center gap-2 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-soft transition hover:opacity-90"
+        >
+          {t("Browse veg-friendly brands", "वेज-फ्रेंडली ब्रांड देखें")}
+        </a>
+      </div>
+    );
+  }
   const picks = itemsFor(course.id);
   // A set-menu course is in the order whole or not at all, so "picked" is one
   // yes/no rather than a running tally of dishes.
@@ -1831,6 +1985,18 @@ function StepStallMenu({
           );
         })}
       </div>
+
+      {/* What the craft-my-plate filter is doing here, so a shorter menu never
+          reads as the stall having lost dishes. */}
+      {filterNote && (
+        <p className="mt-4 rounded-xl border border-maroon/30 bg-cream/35 px-4 py-2.5 text-xs text-ink">
+          <span className="font-bold uppercase tracking-[0.06em] text-maroon">
+            {t("Pure veg plate", "शुद्ध शाकाहारी थाली")}
+          </span>
+          {" — "}
+          {filterNote}
+        </p>
+      )}
 
       {course.live && (
         <p className="mt-4 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-xs text-ink-soft">
@@ -1999,6 +2165,12 @@ function StepStallMenu({
             <span className="block text-xs text-ink-soft">
               {money(perPlate * guests)} ·{" "}
               {t(`${inr.format(guests)} guests`, `${inr.format(guests)} मेहमान`)}
+              {nonVegGuests !== null && (
+                <span className="whitespace-nowrap">
+                  {" "}
+                  ({splitSummary(nonVegGuests, guests, t)})
+                </span>
+              )}
             </span>
           )}
         </span>
@@ -2023,6 +2195,8 @@ function StepStallDetails({
   services,
   serviceId,
   setServiceId,
+  counterVendors,
+  nonVegGuests,
 }: {
   t: (en: string, hi: string) => string;
   lang: Lang;
@@ -2036,6 +2210,9 @@ function StepStallDetails({
   services: ReturnType<typeof useServices>;
   serviceId: string;
   setServiceId: (v: string) => void;
+  /** Catalogue vendors already narrowed to kitchens that fit the plate. */
+  counterVendors: VendorListing[];
+  nonVegGuests: NonVegCount;
 }) {
   return (
     <div>
@@ -2054,12 +2231,13 @@ function StepStallDetails({
         toggleAddOn={toggleAddOn}
         packageName={t("Single Stall", "सिंगल स्टॉल")}
         multiVendor={false}
-        eligibleVendors={vendorListings}
+        eligibleVendors={counterVendors}
         vendorIdsFor={(id) => [addOnVendorId(id)].filter(Boolean)}
         onVendorToggle={(addOnId, vendorId) =>
           setAddOnVendor((m) => ({ ...m, [addOnId]: vendorId }))
         }
         fullFilter
+        nonVegGuests={nonVegGuests}
       />
 
 

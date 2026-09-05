@@ -12,6 +12,7 @@ import {
   type VendorListing,
 } from "@/lib/data";
 import { money } from "@/lib/money";
+import { dishAllowed, type NonVegCount } from "@/lib/dietSplit";
 
 type Lang = "en" | "hi";
 
@@ -33,6 +34,7 @@ export default function StepExtras({
   vendorIdsFor,
   onVendorToggle,
   fullFilter,
+  nonVegGuests = null,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -47,6 +49,11 @@ export default function StepExtras({
   /** Gold/Platinum unlock the richer category filter; the lower tiers get just
    *  the free-text search. */
   fullFilter: boolean;
+  /** Craft-my-plate split from the event brief. On a pure-veg plate a
+   *  counter's non-veg lines are left off its shown spread (with a note) —
+   *  the vendor cooks the veg spread only. The vendor roster itself is
+   *  narrowed by the caller (`kitchenFitsSplit`), not here. */
+  nonVegGuests?: NonVegCount;
 }) {
   // Free-text filter over the add-on roster. Matches the English/Hindi names,
   // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
@@ -326,7 +333,15 @@ export default function StepExtras({
                       {/* Your brand for this counter, with its set menu below. */}
                       <div className="flex flex-col gap-3">
                         {pickedVendors.map((v) => {
-                          const vendorMenu = setMenuFor(v);
+                          const fullMenu = setMenuFor(v);
+                          // STRICT plate filter: a pure-veg event never sees a
+                          // counter's non-veg lines — the vendor serves the
+                          // veg spread only, and the note below says so.
+                          const vendorMenu = fullMenu.filter((item) =>
+                            dishAllowed(item.diet, nonVegGuests),
+                          );
+                          const trimmedCount =
+                            fullMenu.length - vendorMenu.length;
                           return (
                           <div
                             key={v.id}
@@ -459,6 +474,14 @@ export default function StepExtras({
                                         "पूरा काउंटर शामिल है — कुछ चुनने की ज़रूरत नहीं।",
                                       )}
                                 </p>
+                                {trimmedCount > 0 && (
+                                  <p className="mt-1 text-[11px] font-semibold text-maroon">
+                                    {t(
+                                      `Pure veg plate — ${trimmedCount} non-veg ${trimmedCount === 1 ? "item" : "items"} left off this spread.`,
+                                      `शुद्ध शाकाहारी थाली — इस काउंटर से ${trimmedCount} नॉन-वेज आइटम हटाए गए।`,
+                                    )}
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>

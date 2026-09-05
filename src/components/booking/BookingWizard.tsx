@@ -93,6 +93,15 @@ import StepDone from "@/components/booking/shared/StepDone";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
+import {
+  PREF_BOTH,
+  dishAllowed,
+  fixedSpreadFits,
+  kitchenFitsSplit,
+  resolveNonVeg,
+  splitSummary,
+  type NonVegCount,
+} from "@/lib/dietSplit";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
 import {
   WizardHero,
@@ -174,6 +183,10 @@ type BookingDraft = {
   mealTime: string;
   eventTime: string;
   foodPreference: string;
+  /** Craft-my-plate — the non-veg count dialled in for a "Both" event. The
+   *  split itself is derived from this plus `foodPreference` (`resolveNonVeg`),
+   *  so a legacy draft without the key simply resumes with no mix set. */
+  nonVegMix: number | null;
   venue: string;
   venueFee: number;
   selectedAddOns: string[];
@@ -299,6 +312,16 @@ export default function BookingWizard() {
   // Food (diet) preference — Pure Veg / Non-veg / Both. Optional; travels onto the
   // order, invoice ("Food preference") and admin / My-Bookings alongside the meal.
   const [foodPreference, setFoodPreference] = useState<string>("");
+  // Craft-my-plate: the guest's dialled-in non-veg count for a "Both" event.
+  // Only ever read through `nonVegGuests` below — `foodPreference` is what
+  // decides a pure-veg / all-non-veg plate, so the two can't contradict.
+  const [nonVegMix, setNonVegMix] = useState<NonVegCount>(null);
+  // THE split every diet filter below reads — derived, so it re-clamps for
+  // free when the head-count moves and can never disagree with the label.
+  const nonVegGuests = useMemo<NonVegCount>(
+    () => resolveNonVeg(foodPreference, nonVegMix, guests),
+    [foodPreference, nonVegMix, guests],
+  );
   const [cityId, setCityId] = useState<string>("");
   // Free-text location typed when the customer picks "Other" (their city/state
   // isn't in the admin-managed list).
@@ -412,6 +435,7 @@ export default function BookingWizard() {
       if (d.mealTime) setMealTime(d.mealTime);
       if (d.eventTime) setEventTime(d.eventTime);
       if (d.foodPreference) setFoodPreference(d.foodPreference);
+      if (typeof d.nonVegMix === "number") setNonVegMix(d.nonVegMix);
       if (d.venue) setVenue(d.venue);
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
@@ -533,6 +557,7 @@ export default function BookingWizard() {
       mealTime,
       eventTime,
       foodPreference,
+      nonVegMix,
       venue,
       venueFee,
       selectedAddOns,
@@ -554,6 +579,7 @@ export default function BookingWizard() {
     mealTime,
     eventTime,
     foodPreference,
+    nonVegMix,
     venue,
     venueFee,
     selectedAddOns,
@@ -946,6 +972,26 @@ export default function BookingWizard() {
         // guest would actually get, not of the vendor's whole published menu.
         vendors: c.vendors
           .map((v) => onBand(v, effectiveTier))
+          // Craft-my-plate gate, asked of the band-narrowed dishes. STRICT: a
+          // declared split with no non-veg eaters hides every non-veg dish; a
+          // fixed Single-Stall spread that can't fit the plate whole (a set
+          // menu with meat on a pure-veg event) is emptied so the course gate
+          // below drops the stall — a set spread is served whole or not at
+          // all. Stale picks die on their own: `itemsFor` / `vendorsFor` only
+          // count what's on this roster right now.
+          .map((v) => {
+            if (nonVegGuests === null) return v;
+            if (packageId === "custom" && v.menuType !== "varied")
+              return fixedSpreadFits(v.items, nonVegGuests)
+                ? v
+                : { ...v, items: [] };
+            return {
+              ...v,
+              items: v.items.filter((it) =>
+                dishAllowed(it.diet, nonVegGuests),
+              ),
+            };
+          })
           .filter((v) => {
           // Tier gate: Platinum surfaces every band; Silver/Gold only vendors
           // mapped to that tier (a vendor's course↔tier mapping). Vendors with
@@ -976,7 +1022,7 @@ export default function BookingWizard() {
           return tierOk && cityOk && courseOk;
         }),
       }));
-  }, [packageId, effectiveTier, liveMenuCategories, cityId]);
+  }, [packageId, effectiveTier, liveMenuCategories, cityId, nonVegGuests]);
 
   // The package's segments split across two wizard steps: plated courses build
   // in "Menu" (Step 2), live-station courses in "Live Stall" (Step 3). Both are
@@ -1422,13 +1468,15 @@ export default function BookingWizard() {
     : 0;
 
   // Vendors a guest may assign to an add-on — the existing catalogue narrowed to
-  // the tier(s) the chosen package unlocks (Custom / short-notice: everyone).
+  // the tier(s) the chosen package unlocks (Custom / short-notice: everyone),
+  // STRICTLY minus meat-only kitchens when the craft-my-plate split is pure veg.
   const eligibleAddOnVendors = useMemo<VendorListing[]>(() => {
     const tiers = PACKAGE_VENDOR_TIERS[packageId];
-    return tiers
+    const pool = tiers
       ? vendorListings.filter((v) => v.tiers.some((t) => tiers.includes(t)))
       : vendorListings;
-  }, [packageId]);
+    return pool.filter((v) => kitchenFitsSplit(v.diet, nonVegGuests));
+  }, [packageId, nonVegGuests]);
 
   // The vendor(s) effectively assigned to an add-on. We honour the guest's
   // explicit picks that are still valid for the current package tier; when none
@@ -1714,6 +1762,14 @@ export default function BookingWizard() {
     return buildEmiPlan(balance, emiCount, eventDate);
   };
 
+  // The food line every order artifact prints — the canonical preference,
+  // with the actual plate mix spelled out when it's mixed.
+  const splitText = splitSummary(nonVegGuests, guests);
+  const foodLabel =
+    foodPreference === PREF_BOTH && splitText
+      ? `${foodPreference} (${splitText})`
+      : foodPreference;
+
   const buildReceipt = (): string => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
@@ -1752,7 +1808,7 @@ export default function BookingWizard() {
       `Package:  ${pkg ? pkg.name : "-"}`,
       `Date:     ${eventDate || "-"}`,
       `Serving:  ${servingTimeLabel(mealTime, eventTime) || "-"}`,
-      `Food:     ${foodPreference || "-"}`,
+      `Food:     ${foodLabel || "-"}`,
       `City:     ${cityObj ? cityObj.name : "-"}`,
       `Venue:    ${venue || "-"}`,
       `Guests:   ${guests}`,
@@ -1871,7 +1927,7 @@ export default function BookingWizard() {
       // Meal period + clock time (e.g. "Dinner · 7:30 PM"); omitted when unset so
       // the invoice's "Serving time" line only shows for orders that carry one.
       servingTime: servingTimeLabel(mealTime, eventTime) || undefined,
-      foodPreference: foodPreference || undefined,
+      foodPreference: foodLabel || undefined,
       city: cityObj?.name ?? "-",
       venue: venue || "-",
       guests,
@@ -1946,12 +2002,12 @@ export default function BookingWizard() {
       (servingTimeLabel(mealTime, eventTime)
         ? `Serving: ${servingTimeLabel(mealTime, eventTime)}\n`
         : "") +
-      (foodPreference ? `Food: ${foodPreference}\n` : "") +
+      (foodLabel ? `Food: ${foodLabel}\n` : "") +
       `City: ${city ? city.name : "-"}\n` +
       `Venue: ${venue || "-"}\n` +
       `Guests: ${guests}\n` +
       (menuLines ? `\nMenu:\n${menuLines}\n` : "") +
-      (addOnLines ? `\nAdd-ons: ${addOnLines}\n` : "") +
+      (addOnLines ? `\nExtras: ${addOnLines}\n` : "") +
       (selectedService
         ? `\nService: ${selectedService.name} (${money(serviceTotal)})\n`
         : "") +
@@ -1983,6 +2039,7 @@ export default function BookingWizard() {
       mealTime,
       eventTime,
       foodPreference,
+      nonVegMix,
       guests,
       venue: venue.trim(),
       venueFee,
@@ -2183,6 +2240,11 @@ export default function BookingWizard() {
           packageId,
           leadDays: effectiveLeadDays,
           guests,
+          // Craft-my-plate split — structured, so admin / vendors see exactly
+          // how many veg vs non-veg plates to cook.
+          ...(nonVegGuests !== null
+            ? { vegGuests: guests - nonVegGuests, nonVegGuests }
+            : {}),
           vendor: vendorLabel,
           city: cityObj?.name ?? "—",
           venue: venue.trim() || undefined,
@@ -2306,6 +2368,8 @@ export default function BookingWizard() {
       setEventTime={setEventTime}
       foodPreference={foodPreference}
       setFoodPreference={setFoodPreference}
+      nonVegGuests={nonVegGuests}
+      setNonVegMix={setNonVegMix}
       cityId={cityId}
       setCityId={setCityId}
       customCity={customCity}
@@ -2618,6 +2682,7 @@ export default function BookingWizard() {
               // counters vs whole-event services); Single Stall & Silver keep
               // just the free-text search.
               fullFilter={packageId === "gold" || packageId === "platinum"}
+              nonVegGuests={nonVegGuests}
             />
           )}
           {/* Essentials step (5) — the mandatory "Choose Your Service Package"

@@ -44,6 +44,13 @@ function toAdminBooking(o: Record<string, unknown>): AdminBooking {
       ? { foodPreference: o.foodPreference }
       : {}),
     guests: Number(o.guests) || 0,
+    ...(Number.isFinite(Number(o.vegGuests)) &&
+    Number.isFinite(Number(o.nonVegGuests))
+      ? {
+          vegGuests: Number(o.vegGuests),
+          nonVegGuests: Number(o.nonVegGuests),
+        }
+      : {}),
     vendor: typeof o.vendor === "string" ? o.vendor : "Bhojpatra",
     city: typeof o.city === "string" ? o.city : "—",
     ...(typeof o.venue === "string" && o.venue ? { venue: o.venue } : {}),
@@ -222,7 +229,14 @@ export default function BookingManagement() {
               {selected.foodPreference && (
                 <Field label="Food"><p className="text-sm text-ink">{selected.foodPreference}</p></Field>
               )}
-              <Field label="Guests"><p className="text-sm text-ink">{selected.guests}</p></Field>
+              <Field label="Guests">
+                <p className="text-sm text-ink">
+                  {selected.guests}
+                  {selected.vegGuests !== undefined &&
+                    selected.nonVegGuests !== undefined &&
+                    ` (${selected.vegGuests} Veg · ${selected.nonVegGuests} Non-veg)`}
+                </p>
+              </Field>
               <Field label="City"><p className="text-sm text-ink">{selected.city}</p></Field>
               {selected.venue && (
                 <Field label="Venue"><p className="text-sm text-ink">{selected.venue}</p></Field>

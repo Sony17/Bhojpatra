@@ -20,8 +20,60 @@ import {
 } from "@/lib/occasions";
 import { inr } from "@/lib/money";
 import { formatEventDate } from "@/lib/bookingPricing";
+import {
+  PREF_BOTH,
+  foodPreferenceForSplit,
+  splitSummary,
+  vegCount,
+  type NonVegCount,
+} from "@/lib/dietSplit";
 
 type Lang = "en" | "hi";
+
+/* ─── Craft-my-plate count box ────────────────────────────────────────────
+ * Buffered numeric input for one side of the veg / non-veg split, so a guest
+ * can clear the box and type freely (same pattern as the head-count field);
+ * the committed value is clamped into 0..guests on blur.
+ */
+function SplitCountInput({
+  value,
+  max,
+  onCommit,
+  ariaLabel,
+}: {
+  value: number;
+  max: number;
+  onCommit: (n: number) => void;
+  ariaLabel: string;
+}) {
+  // Buffer the keystrokes, but re-sync when the committed value changes
+  // underneath us (slider, the other box, a head-count change). Adjusting
+  // state during render — rather than in an effect — is React's own pattern
+  // for this and avoids a second render pass.
+  const [text, setText] = useState(String(value));
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setText(String(value));
+  }
+  const commit = (raw: string) => {
+    const n = Math.round(Number(raw.replace(/[^0-9]/g, "")));
+    onCommit(Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : value);
+  };
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      value={text}
+      min={0}
+      max={max}
+      onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ""))}
+      onBlur={() => commit(text)}
+      aria-label={ariaLabel}
+      className="h-7 w-12 shrink-0 rounded-full border border-cream bg-white text-center text-xs font-bold tabular-nums text-ink shadow-soft outline-none transition focus:border-maroon [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+    />
+  );
+}
 
 /* ─── "Other" free-text field ─────────────────────────────────────────────
  * Replaces a select once the guest picks "Other" — a text box with a Change
@@ -83,6 +135,8 @@ export default function EventBar({
   setEventTime,
   foodPreference,
   setFoodPreference,
+  nonVegGuests,
+  setNonVegMix,
   cityId,
   setCityId,
   customCity,
@@ -114,6 +168,15 @@ export default function EventBar({
   setEventTime: (v: string) => void;
   foodPreference: string;
   setFoodPreference: (v: string) => void;
+  /** Veg / non-veg guest split ("Craft my plate") — how many of `guests` eat
+   *  non-veg, ALREADY DERIVED by the parent via `resolveNonVeg` from the food
+   *  preference plus the dialled-in mix. `null` = not declared, and nothing
+   *  downstream gets diet-filtered. Read-only here. */
+  nonVegGuests: NonVegCount;
+  /** Writes the guest's dialled-in non-veg count (the "Both" mix). Editing the
+   *  split always writes this AND `setFoodPreference` together, so the label
+   *  and the counts are one decision rather than two states to reconcile. */
+  setNonVegMix: (v: NonVegCount) => void;
   cityId: string;
   setCityId: (v: string) => void;
   customCity: string;
@@ -196,6 +259,19 @@ export default function EventBar({
   };
   const stepGuests = (delta: number) => setGuests(clampGuests(guests + delta));
 
+  // `nonVegGuests` arrives already derived from the preference + the guest's
+  // dialled-in mix (see `resolveNonVeg`), so there is nothing to sync here —
+  // a split edit just writes both halves of the source state at once: the
+  // mix itself, and the preference label that count now derives to.
+  const commitNonVeg = (nv: number) => {
+    const clamped = Math.max(0, Math.min(guests, Math.round(nv)));
+    setNonVegMix(clamped);
+    setFoodPreference(foodPreferenceForSplit(clamped, guests));
+  };
+  const vegGuests = vegCount(nonVegGuests, guests);
+  const splitSet = nonVegGuests !== null;
+  const vegPct = guests > 0 ? Math.round((vegGuests / guests) * 100) : 0;
+
   // Collapsed one-line summary (mobile only) — every set value is shown inline
   // so the guest sees their whole event brief without expanding the card.
   const [open, setOpen] = useState(false);
@@ -224,7 +300,13 @@ export default function EventBar({
   // Food preference for the collapsed summary — the stored value is the English
   // label, so map it to the Hindi one for the HI locale.
   const foodObj = bookingFoodPreferences.find((f) => f.value === foodPreference);
-  const foodName = foodObj ? (lang === "hi" ? foodObj.nameHi : foodObj.value) : "";
+  // "Both" alone says little — carry the actual plate mix into the summary.
+  const splitText =
+    foodPreference === PREF_BOTH ? splitSummary(nonVegGuests, guests, t) : "";
+  const foodName = foodObj
+    ? (lang === "hi" ? foodObj.nameHi : foodObj.value) +
+      (splitText ? ` (${splitText})` : "")
+    : "";
   const summaryParts = [
     occasionName,
     dateName,
@@ -335,12 +417,17 @@ export default function EventBar({
       </div>
       <div
         className={
-          "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 " +
-          // Web view keeps the whole brief on one row (serving-time + food-pref
-          // selects folded in below). Guests gets the widest share so its stepper +
-          // slider bar have room, while Meal / Time / Food are trimmed narrower.
+          "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
+          // Web view keeps the whole brief on one row. Guests and the plate
+          // split get the widest share (their steppers, count boxes and slider
+          // bars have real minimum widths), while Meal / Time / Food are
+          // trimmed narrower. With the plate field there are eight of them, so
+          // the single row starts at xl (each column minmax(0,…) so the selects
+          // truncate instead of holding the row open); lg lays them out
+          // four-up on two rows rather than squeezing Food off the end. The Review step drops
+          // Guests + plate and keeps its six on one row from lg, as before.
           (showGuests
-            ? "lg:grid-cols-[1fr_1fr_1fr_1.5fr_0.85fr_0.85fr_0.85fr] "
+            ? "lg:grid-cols-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.85fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,0.9fr)_minmax(0,0.72fr)] "
             : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
           (embedded
             ? open
@@ -484,16 +571,19 @@ export default function EventBar({
 
         {showGuests && (
           <div className="flex flex-col justify-center gap-3 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
+            {/* Label above the stepper rather than beside it: side by side the
+                card's minimum width grew past its share of the eight-field
+                row and squeezed the last field off the end. */}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
+                {t("Guests", "मेहमान")}
+              </p>
+              <p className="shrink-0 text-caption text-ink/50">
+                {inr.format(paxMin)}–{inr.format(paxMax)}
+              </p>
+            </div>
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
-                  {t("Guests", "मेहमान")}
-                </p>
-                <p className="mt-0.5 text-caption text-ink/50">
-                  {inr.format(paxMin)}–{inr.format(paxMax)}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex w-full items-center justify-between gap-1.5">
                 <button
                   type="button"
                   onClick={() => stepGuests(-10)}
@@ -535,6 +625,108 @@ export default function EventBar({
               aria-label={t("Number of guests", "मेहमानों की संख्या")}
               className="h-2 w-full cursor-pointer appearance-none rounded-full bg-cream outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-maroon [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-maroon [&::-webkit-slider-thumb]:shadow-soft"
             />
+
+          </div>
+        )}
+
+        {/* Craft my plate — the veg / non-veg split of the head-count, its own
+            field in the brief rather than a shelf inside Guests: it is a
+            decision in its own right (menus and stall rosters filter STRICTLY
+            off it), and the two cards read as a pair — how many are coming,
+            and who eats what. Undeclared, three chips set the preference;
+            once set, a cream(veg) / red(non-veg) slider and two count boxes
+            tune the exact mix. */}
+        {showGuests && (
+          <div className="flex flex-col justify-center gap-2.5 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
+                {t("Craft my plate", "अपनी थाली बनाएं")}
+              </p>
+              {splitSet && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFoodPreference("");
+                    setNonVegMix(null);
+                  }}
+                  className="shrink-0 text-[10px] font-bold uppercase tracking-[0.06em] text-ink/50 transition hover:text-maroon hover:underline"
+                >
+                  {t("Clear", "हटाएं")}
+                </button>
+              )}
+            </div>
+            {!splitSet ? (
+              <>
+                <p className="-mt-1 text-caption text-ink/50">
+                  {t("Who eats what?", "कौन क्या खाएगा?")}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {bookingFoodPreferences.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setFoodPreference(f.value)}
+                      className="rounded-full border border-cream bg-white px-2.5 py-1 text-[11px] font-bold text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95"
+                    >
+                      {lang === "hi" ? f.nameHi : f.value}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* The two halves as stacked rows — swatch, who they are, how
+                    many. Side by side they'd never fit this column. */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm border border-maroon/40 bg-cream"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase text-ink/60">
+                      {t("Veg", "वेज")}
+                    </span>
+                    <SplitCountInput
+                      value={vegGuests}
+                      max={guests}
+                      onCommit={(n) => commitNonVeg(guests - n)}
+                      ariaLabel={t("Vegetarian guests", "शाकाहारी मेहमान")}
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm bg-maroon"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase text-ink/60">
+                      {t("Non-veg", "नॉन-वेज")}
+                    </span>
+                    <SplitCountInput
+                      value={guests - vegGuests}
+                      max={guests}
+                      onCommit={commitNonVeg}
+                      ariaLabel={t("Non-veg guests", "मांसाहारी मेहमान")}
+                    />
+                  </label>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={guests}
+                  step={1}
+                  value={vegGuests}
+                  onChange={(e) => commitNonVeg(guests - Number(e.target.value))}
+                  aria-label={t("Vegetarian guests", "शाकाहारी मेहमान")}
+                  aria-valuetext={`${vegGuests} ${t("veg", "वेज")}, ${guests - vegGuests} ${t("non-veg", "नॉन-वेज")}`}
+                  style={{
+                    // Track = the plate itself: cream share eats veg, red
+                    // share eats non-veg. Both stops are brand hexes.
+                    background: `linear-gradient(to right, #f0d09e 0%, #f0d09e ${vegPct}%, #b92025 ${vegPct}%, #b92025 100%)`,
+                  }}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-maroon [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-maroon [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-soft"
+                />
+              </>
+            )}
           </div>
         )}
 

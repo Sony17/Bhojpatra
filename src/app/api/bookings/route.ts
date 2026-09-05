@@ -55,6 +55,11 @@ export interface StoredOrder {
   /** Food (diet) preference — "Pure Veg" / "Non-veg" / "Both" — when declared. */
   foodPreference?: string;
   guests: number;
+  /** Craft-my-plate split — how many of `guests` eat veg vs non-veg, when the
+   *  guest declared one. Always stored as a consistent pair summing to
+   *  `guests`; both absent on orders without a declared split. */
+  vegGuests?: number;
+  nonVegGuests?: number;
   vendor: string;
   city: string;
   /** The event venue the guest chose in the wizard, when one was set. */
@@ -179,6 +184,8 @@ export async function POST(request: Request) {
     eventDateISO,
     packageId,
     guests,
+    vegGuests,
+    nonVegGuests,
     vendor,
     city,
     venue,
@@ -301,6 +308,24 @@ export async function POST(request: Request) {
 
   const selfReferral = sameAccountSelfReferral || phoneSelfReferral;
 
+  // Craft-my-plate split — stored only as a consistent pair: both counts
+  // finite, non-negative, and summing to the stored head-count. Anything else
+  // (a tampered payload, a legacy client sending one half) is dropped whole
+  // rather than half-stored.
+  const guestCount = Number.isFinite(Number(guests))
+    ? Math.round(Number(guests))
+    : 0;
+  const vegN = Math.round(Number(vegGuests));
+  const nonVegN = Math.round(Number(nonVegGuests));
+  const dietSplit =
+    Number.isFinite(vegN) &&
+    Number.isFinite(nonVegN) &&
+    vegN >= 0 &&
+    nonVegN >= 0 &&
+    vegN + nonVegN === guestCount
+      ? { vegGuests: vegN, nonVegGuests: nonVegN }
+      : null;
+
   const order: StoredOrder = {
     id,
     // Owner is taken from the session, not the request body, so it can't be
@@ -328,7 +353,9 @@ export async function POST(request: Request) {
     ...(typeof foodPreference === "string" && foodPreference.trim()
       ? { foodPreference: foodPreference.trim() }
       : {}),
-    guests: Number.isFinite(Number(guests)) ? Math.round(Number(guests)) : 0,
+    guests: guestCount,
+    // Craft-my-plate split — kept only as a consistent pair (see above).
+    ...(dietSplit ?? {}),
     vendor: typeof vendor === "string" ? vendor : "Bhojpatra",
     city: typeof city === "string" ? city : "—",
     ...(typeof venue === "string" && venue.trim()

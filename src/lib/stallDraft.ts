@@ -28,6 +28,10 @@ export type StallDraft = {
   mealTime: string;
   eventTime: string;
   foodPreference: string;
+  /** Craft-my-plate — the non-veg count dialled in for a "Both" event. The
+   *  split itself is derived from this plus `foodPreference` (`resolveNonVeg`),
+   *  so a legacy draft without the key simply resumes with no mix set. */
+  nonVegMix: number | null;
   venue: string;
   venueFee: number;
   selectedAddOns: string[];
