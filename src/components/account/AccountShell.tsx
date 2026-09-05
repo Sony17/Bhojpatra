@@ -4,16 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useLang } from "@/lib/i18n";
-import { useSession, hasAccount } from "@/lib/session";
 import { cn } from "@/components/ui";
 
-/** The account sub-sections, in the order the profile menu lists them.
- *  `vendorOnly` (Roles) shows only for accounts that hold the vendor type. */
-const NAV: { href: string; en: string; hi: string; vendorOnly?: boolean }[] = [
+/** The account sub-sections, in the order the profile menu lists them. */
+const NAV: { href: string; en: string; hi: string }[] = [
   { href: "/account/profile", en: "My Profile", hi: "मेरी प्रोफ़ाइल" },
   { href: "/account/settings", en: "Settings", hi: "सेटिंग्स" },
   { href: "/account/password", en: "Change Password", hi: "पासवर्ड बदलें" },
-  { href: "/account/roles", en: "Roles", hi: "भूमिकाएँ", vendorOnly: true },
 ];
 
 /**
@@ -24,10 +21,7 @@ const NAV: { href: string; en: string; hi: string; vendorOnly?: boolean }[] = [
 export default function AccountShell({ children }: { children: ReactNode }) {
   const { t } = useLang();
   const pathname = usePathname();
-  const session = useSession();
-  const items = NAV.filter(
-    (item) => !item.vendorOnly || hasAccount(session, "vendor"),
-  );
+  const items = NAV;
 
   return (
     <div className="mx-auto w-full max-w-3xl">

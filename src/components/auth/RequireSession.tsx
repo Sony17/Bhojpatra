@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  MERGED_DASHBOARD_PATH,
+  DASHBOARD_PATH,
   useSessionStatus,
   type AccountType,
 } from "@/lib/session";
@@ -13,10 +13,9 @@ import {
  * Client-side guard for the customer/vendor/partner dashboards. Mirrors the
  * admin gate in `AdminShell`: while the session is still loading (`undefined`)
  * we render a neutral placeholder; a signed-out visitor (`null`) is bounced to
- * /login; a signed-in user who doesn't hold this account type is sent to the
- * merged dashboard. Only when the account set *includes* `role` is the
- * dashboard rendered — so one person holding customer + vendor + partner can
- * reach every one of these pages from the same login.
+ * /login. One email holds exactly one role, so a signed-in user who isn't the
+ * required `role` is sent to their own role's dashboard instead. Omit `role`
+ * to allow any signed-in account (e.g. the shared /account pages).
  *
  * The session is read from the real signed-cookie backend (via
  * `/api/auth/session`), so this reflects the authoritative server session; it's
@@ -26,12 +25,13 @@ export default function RequireSession({
   role,
   children,
 }: {
-  role: AccountType;
+  role?: AccountType;
   children: ReactNode;
 }) {
   const router = useRouter();
   const session = useSessionStatus();
-  const allowed = session != null && session.accounts.includes(role);
+  const allowed =
+    session != null && (role === undefined || session.type === role);
 
   useEffect(() => {
     if (session === undefined) return; // still loading — wait
@@ -39,9 +39,10 @@ export default function RequireSession({
       router.replace("/login"); // signed out
       return;
     }
-    if (!session.accounts.includes(role)) {
-      // Signed in but doesn't hold this account — send them to their hub.
-      router.replace(MERGED_DASHBOARD_PATH);
+    if (role !== undefined && session.type !== role) {
+      // Signed in, but this page belongs to a different role — send them to
+      // the one dashboard their role owns.
+      router.replace(DASHBOARD_PATH[session.type]);
     }
   }, [session, role, router]);
 

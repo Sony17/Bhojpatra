@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLang, type Lang } from "@/lib/i18n";
 import {
   logout,
-  MERGED_DASHBOARD_PATH,
+  DASHBOARD_HOME_PATH,
   ACCOUNT_LABEL,
   useSession,
   hasAccount,
@@ -18,19 +18,18 @@ const LANG_OPTIONS: { id: Lang; full: string }[] = [
 ];
 
 /** Signed-in account actions, in the order the profile menu lists them.
- *  `vendorOnly` items (Roles) show only for accounts that hold the
- *  vendor/caterer type. */
+ *  `customerOnly` items (My Bookings) show only for customer accounts — one
+ *  email holds one role, and the bookings dashboard belongs to customers. */
 const ACCOUNT_LINKS: {
   href: string;
   en: string;
   hi: string;
-  vendorOnly?: boolean;
+  customerOnly?: boolean;
 }[] = [
-  { href: "/bookings", en: "My Bookings", hi: "मेरी बुकिंग" },
+  { href: "/bookings", en: "My Bookings", hi: "मेरी बुकिंग", customerOnly: true },
   { href: "/account/profile", en: "My Profile", hi: "मेरी प्रोफ़ाइल" },
   { href: "/account/settings", en: "Settings", hi: "सेटिंग्स" },
   { href: "/account/password", en: "Change Password", hi: "पासवर्ड बदलें" },
-  { href: "/account/roles", en: "Roles", hi: "भूमिकाएँ", vendorOnly: true },
 ];
 
 /**
@@ -49,11 +48,9 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
   const session = useSession();
 
   const name = session?.name?.trim();
-  // One person can hold several accounts — list them all (Customer · Vendor · …).
+  // One email ↔ one role — show the single account type.
   const typeLabel = session
-    ? session.accounts
-        .map((a) => t(ACCOUNT_LABEL[a].en, ACCOUNT_LABEL[a].hi))
-        .join(" · ")
+    ? t(ACCOUNT_LABEL[session.type].en, ACCOUNT_LABEL[session.type].hi)
     : "";
   const displayName = name || typeLabel || t("Account", "अकाउंट");
   const initial = displayName.charAt(0).toUpperCase();
@@ -69,7 +66,7 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
       {session ? (
         <li className="border-b border-maroon/10">
           <Link
-            href={MERGED_DASHBOARD_PATH}
+            href={DASHBOARD_HOME_PATH}
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-maroon/5"
           >
@@ -98,7 +95,7 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
       {session ? (
         <>
           {ACCOUNT_LINKS.filter(
-            (item) => !item.vendorOnly || hasAccount(session, "vendor"),
+            (item) => !item.customerOnly || hasAccount(session, "customer"),
           ).map((item) => (
             <li key={item.href} className="border-b border-maroon/10">
               <Link
