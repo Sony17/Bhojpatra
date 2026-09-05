@@ -40,9 +40,9 @@ const KNOWLEDGE: Knowledge[] = [
   {
     keywords: ["city", "cities", "location", "where", "area", "serve", "available", "near", "शहर", "लोकेशन", "कहाँ", "कहां"],
     answer:
-      "We cover 500+ cities across India — including Lucknow, Delhi, Mumbai, Bengaluru, Kolkata, Hyderabad, Jaipur and Pune. Tell us your city and we'll match you with local specialists.",
+      "We cover 500+ cities across India — including Lucknow, Delhi, Mumbai, Bengaluru, Kolkata, Hyderabad, Jaipur and Pune. Tell us your city and we'll match you with trusted local caterers.",
     answerHi:
-      "हम पूरे भारत में 500+ शहरों में सेवा देते हैं — लखनऊ, दिल्ली, मुंबई, बेंगलुरु, कोलकाता, हैदराबाद, जयपुर और पुणे सहित। अपना शहर बताएं और हम आपको स्थानीय स्पेशलिस्ट से जोड़ देंगे।",
+      "हम पूरे भारत में 500+ शहरों में सेवा देते हैं — लखनऊ, दिल्ली, मुंबई, बेंगलुरु, कोलकाता, हैदराबाद, जयपुर और पुणे सहित। अपना शहर बताएं और हम आपको भरोसेमंद स्थानीय कैटरर से जोड़ देंगे।",
   },
   {
     keywords: ["occasion", "wedding", "haldi", "mehndi", "tilak", "engagement", "reception", "birthday", "corporate", "event", "party", "अवसर", "शादी", "हल्दी", "मेहंदी", "बर्थडे", "पार्टी"],
@@ -54,16 +54,16 @@ const KNOWLEDGE: Knowledge[] = [
   {
     keywords: ["book", "booking", "process", "step", "how", "start", "begin", "बुक", "बुकिंग", "प्रोसेस", "कैसे", "शुरू"],
     answer:
-      "Booking takes 4 easy steps:\n1. Choose your occasion\n2. Select a package\n3. Pick your specialists\n4. Review & confirm\n\nYou'll get instant confirmation — we assist end-to-end.",
+      "Booking takes 4 easy steps:\n1. Choose your occasion\n2. Pick a package\n3. Choose your caterers\n4. Take one last look & confirm\n\nYou'll hear from us right away — we're with you the whole way.",
     answerHi:
-      "बुकिंग सिर्फ़ 4 आसान चरणों में:\n1. अपना अवसर चुनें\n2. पैकेज चुनें\n3. अपने स्पेशलिस्ट चुनें\n4. समीक्षा करें और कन्फ़र्म करें\n\nआपको तुरंत पुष्टि मिलेगी — हम शुरू से अंत तक मदद करते हैं।",
+      "बुकिंग सिर्फ़ 4 आसान चरणों में:\n1. अपना अवसर चुनें\n2. पैकेज चुनें\n3. अपने कैटरर चुनें\n4. एक आख़िरी नज़र डालें और कन्फ़र्म करें\n\nआपको तुरंत पुष्टि मिलेगी — हम शुरू से अंत तक साथ हैं।",
   },
   {
     keywords: ["vendor", "specialist", "caterer", "verified", "trust", "safe", "quality", "review", "वेंडर", "स्पेशलिस्ट", "वेरिफाइड", "समीक्षा", "भरोसा"],
     answer:
-      "Every one of our 10,000+ specialists is verified and rated by real customers (we average 4.8/5 across 1 Lakh+ happy customers). You can compare menus and reviews before you choose.",
+      "Every one of our 10,000+ caterers is verified and rated by real customers (we average 4.8/5 across 1 Lakh+ happy customers). You can compare menus and reviews before you choose.",
     answerHi:
-      "हमारे 10,000+ स्पेशलिस्ट में से हर एक वेरिफाइड है और असली ग्राहकों द्वारा रेट किया गया है (1 लाख+ खुश ग्राहकों में औसत 4.8/5)। चुनने से पहले आप मेन्यू और समीक्षाओं की तुलना कर सकते हैं।",
+      "हमारे 10,000+ कैटरर में से हर एक वेरिफाइड है और असली ग्राहकों द्वारा रेट किया गया है (1 लाख+ खुश ग्राहकों में औसत 4.8/5)। चुनने से पहले आप मेन्यू और समीक्षाओं की तुलना कर सकते हैं।",
   },
   {
     keywords: ["contact", "call", "phone", "human", "talk", "agent", "support", "whatsapp", "help", "संपर्क", "कॉल", "बात", "मदद", "सहायता"],
@@ -89,7 +89,7 @@ const FAQS: { q: string; qHi: string; kb: number }[] = [
   { q: "What does it cost?", qHi: "इसकी कीमत क्या है?", kb: 0 },
   { q: "Which cities do you serve?", qHi: "आप किन शहरों में सेवा देते हैं?", kb: 1 },
   { q: "How does booking work?", qHi: "बुकिंग कैसे होती है?", kb: 3 },
-  { q: "Are your vendors verified?", qHi: "क्या आपके वेंडर वेरिफाइड हैं?", kb: 4 },
+  { q: "Are your caterers verified?", qHi: "क्या आपके कैटरर वेरिफाइड हैं?", kb: 4 },
 ];
 
 interface Message {
@@ -409,7 +409,7 @@ export default function FloatingChat() {
                 }`}
               >
                 <PhoneIcon className="h-3.5 w-3.5" />
-                {t("Request a callback", "कॉलबैक चाहिए")}
+                {t("Ask us to call you", "कॉलबैक चाहिए")}
               </button>
             </div>
           </div>
@@ -523,7 +523,7 @@ export default function FloatingChat() {
                     </svg>
                   </span>
                   <p className="mt-4 font-display text-lg text-ink">
-                    {t("Callback requested", "कॉलबैक का अनुरोध हो गया")}
+                    {t("We're on it!", "हो गया!")}
                   </p>
                   <p className="mt-1.5 max-w-[15rem] text-sm text-ink-soft">
                     {t(
@@ -536,7 +536,7 @@ export default function FloatingChat() {
                     onClick={resetCallback}
                     className="mt-5"
                   >
-                    {t("Request another", "एक और अनुरोध करें")}
+                    {t("Ask for another call", "एक और कॉल माँगें")}
                   </Button>
                 </div>
               ) : (
@@ -608,7 +608,7 @@ export default function FloatingChat() {
                       onChange={(e) => setNote(e.target.value)}
                       rows={3}
                       maxLength={500}
-                      placeholder={t("Add a description (optional)", "विवरण जोड़ें (वैकल्पिक)")}
+                      placeholder={t("Tell us a little more (optional)", "थोड़ा और बताएं (वैकल्पिक)")}
                       aria-label={t("Description", "विवरण")}
                       className="w-full resize-none rounded-control border border-cream-3 bg-white px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-maroon focus:ring-2 focus:ring-maroon/25"
                     />
@@ -619,7 +619,7 @@ export default function FloatingChat() {
                       className="flex items-center gap-1.5 text-sm font-semibold text-maroon transition-colors hover:text-maroon-dark"
                     >
                       <span className="text-base leading-none">+</span>
-                      {t("Add description", "विवरण जोड़ें")}
+                      {t("Add a note", "नोट जोड़ें")}
                     </button>
                   )}
 
@@ -641,7 +641,7 @@ export default function FloatingChat() {
                   >
                     {cbSubmitting
                       ? t("Sending…", "भेजा जा रहा है…")
-                      : t("Request callback", "कॉलबैक का अनुरोध करें")}
+                      : t("Call me back", "मुझे कॉल करें")}
                   </Button>
                 </form>
               )}

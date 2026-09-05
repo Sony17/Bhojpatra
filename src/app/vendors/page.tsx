@@ -5,9 +5,9 @@ import VendorCatalog from "@/components/vendors/VendorCatalog";
 import { SkeletonList } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Vendors — Bhojpatra",
+  title: "Caterers — Bhojpatra",
   description:
-    "Browse and compare verified caterers across India. Search by cuisine or name and filter by city, state, diet and tier to find the perfect vendor for your feast.",
+    "Browse and compare trusted caterers across India. Search by cuisine or name, filter by city and budget, and find the perfect caterer for your feast.",
 };
 
 export default function VendorsPage() {

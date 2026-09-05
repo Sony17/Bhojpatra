@@ -311,8 +311,8 @@ const VARIANTS: Variant[] = [
 const TRUST_ITEMS = [
   {
     icon: "🛡",
-    en: "Verified Vendors",
-    hi: "सत्यापित वेंडर",
+    en: "Trusted Caterers",
+    hi: "भरोसेमंद कैटरर",
     subEn: "100% verified & trusted partners",
     subHi: "100% सत्यापित और भरोसेमंद पार्टनर",
   },
@@ -574,8 +574,8 @@ function ServiceCard({
             }`}
           >
             {selected
-              ? `✓ ${t("Selected", "चुना गया")}`
-              : t("Select this package", "यह पैकेज चुनें")}
+              ? `✓ ${t("Your pick", "आपकी पसंद")}`
+              : t("Choose this package", "यह पैकेज चुनें")}
           </span>
         )}
       </div>

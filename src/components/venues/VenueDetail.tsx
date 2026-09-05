@@ -366,8 +366,8 @@ function VenueBooking({
     if (!isValidTxnId(txnId)) {
       setPayError(
         t(
-          "Enter the transaction ID from your UPI app to confirm the payment.",
-          "भुगतान की पुष्टि के लिए अपने UPI ऐप से लेनदेन आईडी दर्ज करें।",
+          "Add the payment ID from your UPI app so we can match your payment.",
+          "अपने UPI ऐप से पेमेंट आईडी डालें ताकि हम आपका भुगतान मिला सकें।",
         ),
       );
       return;
@@ -393,7 +393,7 @@ function VenueBooking({
       if (!res.ok) {
         setPayError(
           data?.error ??
-            t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+            t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
         );
         return;
       }
@@ -401,7 +401,7 @@ function VenueBooking({
       setPaidRef(customerTxnId);
     } catch {
       setPayError(
-        t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+        t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
       );
     } finally {
       setPaying(false);
@@ -490,7 +490,12 @@ function VenueBooking({
       return false;
     }
     if (customerPhone.replace(/\D/g, "").length < 10) {
-      setDetailsError(t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"));
+      setDetailsError(
+        t(
+          "That phone number doesn't look quite right — please check it.",
+          "यह फ़ोन नंबर सही नहीं लग रहा — कृपया जाँच लें।",
+        ),
+      );
       return false;
     }
     return true;
@@ -756,7 +761,7 @@ function VenueBooking({
                         ariaLabel={t("Occasion", "अवसर")}
                         buttonClassName="mt-1.5"
                         options={[
-                          { value: "", label: t("Select", "चुनें") },
+                          { value: "", label: t("Choose", "चुनें") },
                           ...occasions.map((o) => ({
                             value: o.id,
                             label: lang === "hi" ? o.nameHi : o.name,
@@ -1034,7 +1039,7 @@ function VenueBooking({
                           htmlFor="venue-upi-txn-id"
                           className="text-sm font-semibold text-ink"
                         >
-                          {t("UPI Transaction ID", "UPI लेनदेन आईडी")}
+                          {t("UPI payment ID", "UPI पेमेंट आईडी")}
                         </label>
                         <Input
                           id="venue-upi-txn-id"
@@ -1070,7 +1075,7 @@ function VenueBooking({
                         className="mt-4"
                       >
                         {paying
-                          ? t("Recording…", "दर्ज हो रहा है…")
+                          ? t("Saving…", "सेव हो रहा है…")
                           : `${t("I've paid", "मैंने भुगतान कर दिया")} ${money(amount)}`}
                       </Button>
                       <p className="mt-2 text-xs text-ink-soft">

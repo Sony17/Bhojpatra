@@ -75,8 +75,8 @@ export default function ContactPage() {
     } catch {
       setError(
         t(
-          "Couldn't send your enquiry. Please check your connection.",
-          "आपकी पूछताछ नहीं भेजी जा सकी। कृपया अपना कनेक्शन जांचें।",
+          "Your message didn't go through — please check your connection and try again.",
+          "आपका संदेश नहीं जा पाया — कृपया अपना कनेक्शन देखकर फिर कोशिश करें।",
         ),
       );
     } finally {
@@ -102,7 +102,7 @@ export default function ContactPage() {
         {/* LEFT — enquiry form */}
         <Card padding="lg" className="sm:p-8">
           <h2 className="font-display text-xl font-semibold text-ink">
-            {t("Send us an enquiry", "हमें पूछताछ भेजें")}
+            {t("Send us a message", "हमें संदेश भेजें")}
           </h2>
 
           {submitted && (
@@ -161,7 +161,7 @@ export default function ContactPage() {
                 required
                 value={subject}
                 onChange={setSubject}
-                placeholder={t("Select an occasion", "अवसर चुनें")}
+                placeholder={t("Choose an occasion", "अवसर चुनें")}
                 ariaLabel={t("Subject / Occasion", "विषय / अवसर")}
                 options={SUBJECTS.map((s) => ({
                   value: s.value,
@@ -192,7 +192,7 @@ export default function ContactPage() {
             >
               {submitting
                 ? t("Sending…", "भेज रहे हैं…")
-                : t("Send Enquiry", "पूछताछ भेजें")}
+                : t("Send message", "संदेश भेजें")}
             </Button>
           </form>
 

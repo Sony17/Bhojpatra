@@ -5,7 +5,7 @@ import PackageSectionSwitcher from "@/components/showcase/PackageSectionSwitcher
 export const metadata: Metadata = {
   title: "Choose Your Package — Bhojpatra",
   description:
-    "Silver, Gold and Platinum as one clear value ladder — stat strips, an upgrade path, a full comparison and famous-vendor perks, all in the Bhojpatra theme.",
+    "Compare our Silver, Gold and Platinum feast packages side by side, see exactly what each includes, and pick the one made for your celebration.",
 };
 
 export default function FinalisePage() {

@@ -200,14 +200,14 @@ export default function PaymentBox({
       if (!res.ok) {
         setError(
           data?.error ??
-            t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+            t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
         );
         return;
       }
       onPaid(amount, customerTxnId);
     } catch {
       setError(
-        t("Couldn't record payment. Try again.", "भुगतान दर्ज नहीं हुआ। फिर कोशिश करें।"),
+        t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
       );
     } finally {
       setSubmitting(false);
@@ -299,8 +299,8 @@ export default function PaymentBox({
         </p>
         <p className="mt-1 text-sm text-ink-soft">
           {fullyPaid
-            ? t("Full payment recorded:", "पूरा भुगतान दर्ज:")
-            : t("Advance recorded:", "एडवांस दर्ज:")}{" "}
+            ? t("Paid in full:", "पूरा भुगतान मिल गया:")
+            : t("Advance received:", "एडवांस मिल गया:")}{" "}
           <span className="font-semibold text-ink">{money(paidAmount)}</span>
         </p>
         {!fullyPaid && (

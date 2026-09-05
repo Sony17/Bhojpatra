@@ -234,7 +234,7 @@ export default function Packages() {
                 {/* Identity · price · CTA */}
                 <div className="text-center lg:max-w-xs lg:shrink-0 lg:text-left">
                   <p className="eyebrow text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-soft">
-                    {t("One Verified Vendor", "एक वेरिफाइड वेंडर")}
+                    {t("One Trusted Caterer", "एक भरोसेमंद कैटरर")}
                   </p>
                   <h3 className="mt-2 font-display text-3xl leading-none tracking-wide text-maroon sm:text-4xl">
                     {lang === "hi" ? singleStall.nameHi : singleStall.name}
@@ -439,8 +439,8 @@ export default function Packages() {
               given brand. Said here rather than left for the guest to discover. */}
           <p className="mt-3 px-2 text-center text-xs text-ink-soft">
             {t(
-              "Prices are approximate. Final price may vary as per menu & vendor selection. Dish counts shown are our standard for each tier — some brands serve more (or fewer) from a course, shown on their card while booking.",
-              "कीमतें अनुमानित हैं। अंतिम कीमत मेन्यू और वेंडर के चयन के अनुसार बदल सकती है। दिखाई गई डिश संख्या हर टियर के लिए हमारा मानक है — कुछ ब्रांड किसी कोर्स से इससे ज़्यादा (या कम) परोसते हैं, जो बुकिंग के समय उनके कार्ड पर दिखेगा।",
+              "Prices are approximate. The final price depends on the menu and caterers you choose. Dish counts shown are our standard for each package — some caterers serve more (or fewer) from a course, shown on their card while booking.",
+              "कीमतें अनुमानित हैं। अंतिम कीमत आपके चुने मेन्यू और कैटरर पर निर्भर करती है। दिखाई गई डिश संख्या हर पैकेज के लिए हमारा मानक है — कुछ कैटरर किसी कोर्स से इससे ज़्यादा (या कम) परोसते हैं, जो बुकिंग के समय उनके कार्ड पर दिखेगा।",
             )}
           </p>
         </Reveal>

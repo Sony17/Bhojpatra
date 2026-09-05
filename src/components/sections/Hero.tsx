@@ -127,18 +127,18 @@ export default function Hero() {
   bookParams.set("guests", guests);
   const bookHref = `/book?${bookParams.toString()}`;
 
-  // Browse path — same location, into the catalog (Zomato-style discover → convert).
+  // Browse path — same location, straight into the Single Stall brands
+  // (Zomato-style discover → convert). The category chip stays clearable, so a
+  // visitor can widen back out to the full catalog from there.
   const cityDisplayName = isOtherCity
     ? customCity.trim()
     : (locations.find((l) => l.id === cityId)?.name ?? "");
-  const vendorsParams = new URLSearchParams();
+  const vendorsParams = new URLSearchParams({ category: "single-stall" });
   if (cityDisplayName) vendorsParams.set("city", cityDisplayName);
-  const vendorsHref = vendorsParams.size
-    ? `/vendors?${vendorsParams.toString()}`
-    : "/vendors";
+  const vendorsHref = `/vendors?${vendorsParams.toString()}`;
 
   const ctaLabel = lang === "hi" ? hero.ctaHi : hero.cta;
-  const browseLabel = t("Explore more", "और देखें");
+  const browseLabel = t("Explore stalls", "स्टॉल देखें");
 
   const fieldLabel =
     "block truncate text-[8px] font-bold uppercase tracking-[0.12em] text-ink/65 sm:text-[10px] sm:tracking-[0.16em]";
@@ -190,8 +190,8 @@ export default function Hero() {
           <BrandSelect
             className="mt-1"
             options={occasionOptions}
-            placeholder={t("Select Occasion", "अवसर चुनें")}
-            ariaLabel={t("Select Occasion", "अवसर चुनें")}
+            placeholder={t("Choose your occasion", "अवसर चुनें")}
+            ariaLabel={t("Choose your occasion", "अवसर चुनें")}
             icon="chevron"
             buttonClassName={slotButtonClass}
             iconClassName="right-1"
@@ -213,8 +213,8 @@ export default function Hero() {
         <span className={fieldLabel}>{t("Date", "तारीख")}</span>
         <DatePicker
           className="mt-1"
-          placeholder={t("Select Date", "तारीख चुनें")}
-          ariaLabel={t("Select Date", "तारीख चुनें")}
+          placeholder={t("Pick a date", "तारीख चुनें")}
+          ariaLabel={t("Pick a date", "तारीख चुनें")}
           buttonClassName={slotButtonClass}
           iconClassName="right-1"
           direction="up"
@@ -237,8 +237,8 @@ export default function Hero() {
         <BrandSelect
           className="mt-1"
           options={guestOptions}
-          placeholder={t("Select Guests", "मेहमान चुनें")}
-          ariaLabel={t("Select Guests", "मेहमान चुनें")}
+          placeholder={t("How many guests?", "कितने मेहमान?")}
+          ariaLabel={t("How many guests?", "कितने मेहमान?")}
           icon="chevron"
           buttonClassName={slotButtonClass}
           iconClassName="right-1"

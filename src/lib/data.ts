@@ -823,9 +823,9 @@ export const testimonials: Testimonial[] = [
     role: "Corporate Gala · Delhi",
     roleHi: "कॉर्पोरेट गाला · दिल्ली",
     quote:
-      "Transparent pricing and zero surprises. I compared three specialists in minutes and booked the best one for our annual gala without a single call.",
+      "Transparent pricing and zero surprises. I compared three caterers in minutes and booked the best one for our annual gala without a single call.",
     quoteHi:
-      "पारदर्शी कीमत और कोई छिपी बात नहीं। मैंने मिनटों में तीन स्पेशलिस्ट की तुलना की और बिना एक भी कॉल किए हमारे सालाना गाला के लिए सबसे अच्छा बुक किया।",
+      "पारदर्शी कीमत और कोई छिपी बात नहीं। मैंने मिनटों में तीन कैटरर की तुलना की और बिना एक भी कॉल किए हमारे सालाना गाला के लिए सबसे अच्छा बुक किया।",
     rating: 5,
     avatar: "/avatars/t-2.jpg",
   },
@@ -859,9 +859,9 @@ export const testimonials: Testimonial[] = [
     role: "Birthday · Hyderabad",
     roleHi: "बर्थडे · हैदराबाद",
     quote:
-      "Loved being able to read real reviews before choosing. Our specialist nailed the South Indian spread and the kids' dessert counter was a hit.",
+      "Loved being able to read real reviews before choosing. Our caterer nailed the South Indian spread and the kids' dessert counter was a hit.",
     quoteHi:
-      "चुनने से पहले असली समीक्षाएं पढ़ पाना बहुत अच्छा लगा। हमारे स्पेशलिस्ट ने साउथ इंडियन स्प्रेड शानदार बनाया और बच्चों का डेज़र्ट काउंटर हिट रहा।",
+      "चुनने से पहले असली समीक्षाएं पढ़ पाना बहुत अच्छा लगा। हमारे कैटरर ने साउथ इंडियन स्प्रेड शानदार बनाया और बच्चों का डेज़र्ट काउंटर हिट रहा।",
     rating: 5,
     avatar: "/avatars/t-5.jpg",
   },
@@ -871,9 +871,9 @@ export const testimonials: Testimonial[] = [
     role: "Engagement · Pune",
     roleHi: "सगाई · पुणे",
     quote:
-      "End-to-end assistance is real here. They handled vendor coordination so we could actually enjoy our own engagement. Highly recommend.",
+      "End-to-end help is real here. They took care of all the caterers for us, so we could actually enjoy our own engagement. Highly recommend.",
     quoteHi:
-      "यहाँ शुरू से अंत तक की मदद असली है। उन्होंने वेंडर का सारा समन्वय संभाला ताकि हम अपनी सगाई का असल में आनंद ले सकें। ज़रूर सुझाऊंगा।",
+      "यहाँ शुरू से अंत तक की मदद असली है। उन्होंने कैटरर का सारा तालमेल संभाला ताकि हम अपनी सगाई का असल में आनंद ले सकें। ज़रूर सुझाऊंगा।",
     rating: 5,
     avatar: "/avatars/t-6.jpg",
   },
@@ -930,7 +930,7 @@ export const navLinks: {
   hasDropdown?: boolean;
   items?: DropdownItem[];
 }[] = [
-  { label: "Brands", labelHi: "ब्रांड", href: "/vendors" },
+  { label: "Caterers", labelHi: "कैटरर", href: "/vendors" },
   { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
   { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
 ];

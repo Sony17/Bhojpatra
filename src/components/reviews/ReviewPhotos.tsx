@@ -73,7 +73,7 @@ export function ReviewPhotoEditor({
       setError(
         err instanceof Error
           ? err.message
-          : t("Upload failed. Try again.", "अपलोड विफल। पुनः प्रयास करें।"),
+          : t("The photo didn't upload — please try again.", "फ़ोटो अपलोड नहीं हो पाई — कृपया फिर कोशिश करें।"),
       );
     } finally {
       setBusy(false);

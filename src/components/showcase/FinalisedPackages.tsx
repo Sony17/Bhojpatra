@@ -193,7 +193,7 @@ function tierHighlights(id: TierId, s: ReturnType<typeof spec>, t: (en: string, 
       t(`${s.starters} starters`, `${s.starters} स्टार्टर`),
       t("Fixed main-course thali", "फिक्स्ड मेन कोर्स थाली"),
       t(`${s.sweets} sweet`, `${s.sweets} मिठाई`),
-      t("One verified vendor from your city", "आपके शहर का एक वेरिफाइड वेंडर"),
+      t("One trusted caterer from your city", "आपके शहर का एक भरोसेमंद कैटरर"),
     ];
   if (id === "gold")
     return [
@@ -207,7 +207,7 @@ function tierHighlights(id: TierId, s: ReturnType<typeof spec>, t: (en: string, 
     t(`${s.starters} premium starters`, `${s.starters} प्रीमियम स्टार्टर`),
     t(`${s.live} live counters`, `${s.live} लाइव काउंटर`),
     t("Bigger chaat & sweet spread", "बड़ा चाट और मिठाई स्प्रेड"),
-    t("Iconic vendors from across India", "पूरे भारत के आइकॉनिक वेंडर"),
+    t("Iconic caterers from across India", "पूरे भारत के मशहूर कैटरर"),
   ];
 }
 

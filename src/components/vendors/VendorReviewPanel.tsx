@@ -222,8 +222,8 @@ export default function VendorReviewPanel({
           disabled={status === "submitting"}
         >
           {status === "submitting"
-            ? t("Submitting…", "सबमिट हो रहा है…")
-            : t("Submit review", "समीक्षा सबमिट करें")}
+            ? t("Sending…", "भेजी जा रही है…")
+            : t("Share your review", "अपनी समीक्षा भेजें")}
         </Button>
       </div>
     </div>

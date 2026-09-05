@@ -18,8 +18,8 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
     icon: <path d="M4 11.5 12 4l8 7.5M6 10v9h12v-9M9.5 19v-5h5v5" />,
   },
   {
-    label: "Brands",
-    labelHi: "ब्रांड",
+    label: "Caterers",
+    labelHi: "कैटरर",
     href: "/vendors",
     icon: (
       <>

@@ -127,13 +127,13 @@ export default function BainaBoxOrderPanel({
     }
     if (phone.replace(/\D/g, "").length < 10) {
       setError(
-        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
+        t("That phone number doesn't look quite right — please check it.", "यह फ़ोन नंबर सही नहीं लग रहा — कृपया जाँच लें।"),
       );
       return;
     }
     if (!isValidEmail(effEmail)) {
       setError(
-        t("Please enter a valid email address.", "कृपया सही ईमेल पता दर्ज करें।"),
+        t("That email doesn't look quite right — please check it.", "यह ईमेल सही नहीं लग रहा — कृपया जाँच लें।"),
       );
       return;
     }
@@ -406,7 +406,7 @@ export default function BainaBoxOrderPanel({
                       className="rounded-2xl border border-cream bg-white shadow-soft"
                     >
                       <DatePicker
-                        placeholder={t("Select date", "तारीख़ चुनें")}
+                        placeholder={t("Pick a date", "तारीख़ चुनें")}
                         ariaLabel={t("Delivery date", "डिलीवरी की तारीख़")}
                         minDaysAhead={DEFAULT_VENDOR_LEAD_DAYS}
                         valueIso={dateIso}

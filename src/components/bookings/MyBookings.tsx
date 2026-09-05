@@ -223,7 +223,7 @@ export default function MyBookings() {
             value={String(counts.confirmed)}
           />
           <StatCard
-            label={t("Amount Due", "बकाया राशि")}
+            label={t("Left to pay", "देना बाकी")}
             value={money(counts.dueAmount)}
           />
           <StatCard
@@ -654,7 +654,7 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
         leftIcon={<span aria-hidden="true">↺</span>}
         className="shrink-0"
       >
-        {t("Request refund", "रिफ़ंड का अनुरोध करें")}
+        {t("Ask for a refund", "रिफ़ंड माँगें")}
       </Button>
     );
   }
@@ -723,7 +723,7 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
         <Button variant="primary" onClick={submit} disabled={busy} className="shrink-0">
           {busy
             ? t("Sending…", "भेज रहे हैं…")
-            : t("Send request", "अनुरोध भेजें")}
+            : t("Send", "भेजें")}
         </Button>
         <Button
           variant="ghost"
@@ -742,17 +742,17 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
   );
 }
 
-/* "Get help" ticket categories — the `en` label is the canonical value sent to
-   /api/support (it must match the server's TICKET_CATEGORIES whitelist); `hi`
-   is display-only. */
-const HELP_CATEGORIES: { en: string; hi: string }[] = [
-  { en: "Booking", hi: "बुकिंग" },
-  { en: "Payment", hi: "भुगतान" },
-  { en: "Refund", hi: "रिफ़ंड" },
-  { en: "Vendor", hi: "वेंडर" },
-  { en: "Billing", hi: "बिलिंग" },
-  { en: "Technical", hi: "तकनीकी" },
-  { en: "General", hi: "सामान्य" },
+/* "Get help" ticket categories — `en` is the canonical value sent to
+   /api/support (it must match the server's TICKET_CATEGORIES whitelist), so it
+   never changes; `label`/`hi` are what the guest actually reads. */
+const HELP_CATEGORIES: { en: string; label: string; hi: string }[] = [
+  { en: "Booking", label: "My booking", hi: "मेरी बुकिंग" },
+  { en: "Payment", label: "Paying", hi: "भुगतान" },
+  { en: "Refund", label: "Refund", hi: "रिफ़ंड" },
+  { en: "Vendor", label: "The caterer", hi: "कैटरर" },
+  { en: "Billing", label: "Bill or invoice", hi: "बिल या इनवॉइस" },
+  { en: "Technical", label: "Trouble with the app", hi: "ऐप में दिक़्क़त" },
+  { en: "General", label: "Something else", hi: "कुछ और" },
 ];
 
 /**
@@ -856,7 +856,7 @@ function GetHelpButton({ booking }: { booking: StoredBooking }) {
             onClick={() => setCategory(c.en)}
             className="shrink-0 whitespace-nowrap"
           >
-            {lang === "hi" ? c.hi : c.en}
+            {lang === "hi" ? c.hi : c.label}
           </Chip>
         ))}
       </div>
@@ -881,7 +881,7 @@ function GetHelpButton({ booking }: { booking: StoredBooking }) {
         <Button variant="primary" onClick={submit} disabled={busy} className="shrink-0">
           {busy
             ? t("Sending…", "भेज रहे हैं…")
-            : t("Raise ticket", "टिकट बनाएं")}
+            : t("Ask for help", "मदद माँगें")}
         </Button>
         <Button
           variant="ghost"
@@ -942,7 +942,7 @@ function BookingCard({
           </p>
           {booking.paymentRef && (
             <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
-              {t("Transaction Ref", "ट्रांज़ैक्शन रेफ़")}: {booking.paymentRef}
+              {t("Payment ref", "पेमेंट रेफ़")}: {booking.paymentRef}
             </p>
           )}
 
@@ -1146,7 +1146,7 @@ function DownloadMenu({
           {booking.paymentRef && (
             <div className="border-b border-cream-3 px-4 py-2.5">
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
-                {t("Transaction ID", "लेनदेन आईडी")}
+                {t("Payment ID", "पेमेंट आईडी")}
               </span>
               <span className="mt-0.5 block select-all break-all text-xs font-medium text-ink">
                 {booking.paymentRef}
@@ -1182,7 +1182,7 @@ function DownloadMenu({
                   {t("Order Receipt (PDF)", "ऑर्डर रसीद (PDF)")}
                 </span>
                 <span className="block text-xs text-ink-soft">
-                  {t("Plain-text summary", "सादा-पाठ सारांश")}
+                  {t("A simple text summary", "सीधा-सादा सारांश")}
                 </span>
               </span>
             </button>
@@ -1274,7 +1274,7 @@ function BookingDetailsModal({
             </p>
             {booking.paymentRef && (
               <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-ink-soft">
-                {t("Transaction Ref", "ट्रांज़ैक्शन रेफ़")}: {booking.paymentRef}
+                {t("Payment ref", "पेमेंट रेफ़")}: {booking.paymentRef}
               </p>
             )}
           </div>
@@ -1396,7 +1396,7 @@ function EditBookingForm({
       return;
     }
     if (!Number.isFinite(guestCount) || guestCount <= 0) {
-      setError(t("Please enter a valid guest count.", "कृपया मान्य मेहमान संख्या दर्ज करें।"));
+      setError(t("Please check the number of guests.", "कृपया मेहमानों की संख्या जाँच लें।"));
       return;
     }
     const dateLabel = dateISO ? isoToLabel(dateISO) : booking.date;
@@ -1594,8 +1594,8 @@ function ReviewModal({
     if (rated.length === 0) {
       setError(
         t(
-          "Please give at least one vendor a star rating.",
-          "कृपया कम से कम एक वेंडर को स्टार रेटिंग दें।",
+          "Please give at least one caterer a star rating.",
+          "कृपया कम से कम एक कैटरर को स्टार रेटिंग दें।",
         ),
       );
       return;
@@ -1659,7 +1659,7 @@ function ReviewModal({
     } catch {
       setStatus("idle");
       setError(
-        t("Network error. Please try again.", "नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।"),
+        t("We couldn't connect — please try again.", "कनेक्ट नहीं हो पाया — कृपया फिर कोशिश करें।"),
       );
     }
   };
@@ -1688,8 +1688,8 @@ function ReviewModal({
             <p className="mt-0.5 truncate text-sm text-ink-soft">
               {vendors.length > 1
                 ? t(
-                    `Rate each of your ${vendors.length} vendors`,
-                    `अपने ${vendors.length} वेंडर को रेट करें`,
+                    `Rate each of your ${vendors.length} caterers`,
+                    `अपने ${vendors.length} कैटरर को रेट करें`,
                   )
                 : `${booking.vendor} · ${booking.occasion}`}
             </p>
@@ -1760,8 +1760,8 @@ function ReviewModal({
 
           <p className="mt-2 text-xs text-ink-soft">
             {t(
-              "Your reviews may appear publicly on our home page and on vendor profiles.",
-              "आपकी समीक्षाएँ हमारे होम पेज और वेंडर प्रोफ़ाइल पर सार्वजनिक रूप से दिख सकती हैं।",
+              "Your reviews may appear publicly on our home page and on caterer pages.",
+              "आपकी समीक्षाएँ हमारे होम पेज और कैटरर पेजों पर सार्वजनिक रूप से दिख सकती हैं।",
             )}
           </p>
 
@@ -1777,8 +1777,8 @@ function ReviewModal({
               className="shrink-0"
             >
               {status === "submitting"
-                ? t("Submitting…", "सबमिट हो रहा है…")
-                : t("Submit review", "समीक्षा सबमिट करें")}
+                ? t("Sending…", "भेजी जा रही है…")
+                : t("Share your review", "अपनी समीक्षा भेजें")}
             </Button>
             <Button variant="secondary" onClick={onClose} className="shrink-0">
               {t("Cancel", "रद्द करें")}

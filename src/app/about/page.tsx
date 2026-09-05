@@ -6,7 +6,7 @@ import AboutHighlights from "@/components/about/AboutHighlights";
 export const metadata: Metadata = {
   title: "About Us — Bhojpatra",
   description:
-    "Learn about Bhojpatra — India's Feast Booking Platform connecting you with verified catering specialists.",
+    "Learn about Bhojpatra — India's Feast Booking Platform bringing trusted caterers to your celebration.",
 };
 
 export default function AboutPage() {

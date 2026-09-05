@@ -37,8 +37,8 @@ export default function PromoLeadCapture() {
 
     if (!isValidEmail(email) && !isValidPhone(phone)) {
       const msg = t(
-        "Please enter a valid email address or mobile number.",
-        "कृपया एक मान्य ईमेल पता या मोबाइल नंबर दर्ज करें।",
+        "That doesn't look like an email or mobile number — please check it.",
+        "यह ईमेल या मोबाइल नंबर सही नहीं लग रहा — कृपया जाँच लें।",
       );
       setStatus("error");
       setMessage(msg);
@@ -76,8 +76,8 @@ export default function PromoLeadCapture() {
       setPhone("");
     } catch {
       const msg = t(
-        "Network error. Please try again.",
-        "नेटवर्क त्रुटि। कृपया फिर से कोशिश करें।",
+        "We couldn't connect — please try again.",
+        "कनेक्ट नहीं हो पाया — कृपया फिर कोशिश करें।",
       );
       setStatus("error");
       setMessage(msg);

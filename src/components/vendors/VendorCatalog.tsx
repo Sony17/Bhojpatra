@@ -165,7 +165,7 @@ const LENSES: Lens[] = [
   { id: "Silver", label: "Silver", labelHi: "सिल्वर", match: (v) => v.tiers.includes("Silver") },
   { id: "Gold", label: "Gold", labelHi: "गोल्ड", match: (v) => v.tiers.includes("Gold") },
   { id: "Platinum", label: "Platinum", labelHi: "प्लैटिनम", match: (v) => v.tiers.includes("Platinum") },
-  { id: "addons", label: "Add-ons", labelHi: "ऐड-ऑन", icon: "➕", match: (v) => listingOfferings(v).length > 0 },
+  { id: "addons", label: "Extras", labelHi: "एक्स्ट्रा", icon: "➕", match: (v) => listingOfferings(v).length > 0 },
   { id: "essential", label: "Service Package", labelHi: "सर्विस पैकेज", icon: "🍽️", match: inCategory("essential") },
 ];
 
@@ -667,12 +667,12 @@ export default function VendorCatalog() {
         ) : (
           <>
             <h1 className="mt-2 text-app-title text-ink">
-              {t("Choose your favourite Brand", "अपना पसंदीदा ब्रांड चुनें")}
+              {t("Choose your favourite caterer", "अपना पसंदीदा कैटरर चुनें")}
             </h1>
             <p className="mt-2 text-body text-ink/55">
               {t(
-                "Search, filter, book — verified caterers near you.",
-                "खोजें, फ़िल्टर करें, बुक करें — आपके पास वेरिफाइड कैटरर।",
+                "Search, compare and book trusted caterers near you.",
+                "अपने आस-पास के भरोसेमंद कैटरर खोजें, तुलना करें और बुक करें।",
               )}
             </p>
           </>
@@ -709,10 +709,10 @@ export default function VendorCatalog() {
               id="vendor-search"
               value={query}
               onChange={setQuery}
-              aria-label={t("Search brands", "ब्रांड खोजें")}
+              aria-label={t("Search caterers", "कैटरर खोजें")}
               placeholder={t(
-                "Search brands, stalls or cuisines",
-                "ब्रांड, स्टॉल या व्यंजन खोजें",
+                "Search caterers, stalls or cuisines",
+                "कैटरर, स्टॉल या व्यंजन खोजें",
               )}
               className="lg:w-96 lg:shrink-0"
             />
@@ -853,12 +853,12 @@ export default function VendorCatalog() {
             {showFilter("tier") && (
               <FilterSelect
                 id="vendor-tier"
-                label={t("Tier", "टियर")}
+                label={t("Package", "पैकेज")}
                 value={tier}
                 onChange={(v) => setTier(v as TierFilter)}
                 options={TIER_OPTIONS.map((tv) => ({
                   value: tv,
-                  label: tv === ALL ? t("All Tiers", "सभी टियर") : tierLabel(tv),
+                  label: tv === ALL ? t("All packages", "सभी पैकेज") : tierLabel(tv),
                 }))}
               />
             )}
@@ -924,12 +924,12 @@ export default function VendorCatalog() {
           {showFilter("tier") && (
             <FilterSelect
               id="sheet-tier"
-              label={t("Tier", "टियर")}
+              label={t("Package", "पैकेज")}
               value={tier}
               onChange={(v) => setTier(v as TierFilter)}
               options={TIER_OPTIONS.map((tv) => ({
                 value: tv,
-                label: tv === ALL ? t("All Tiers", "सभी टियर") : tierLabel(tv),
+                label: tv === ALL ? t("All packages", "सभी पैकेज") : tierLabel(tv),
               }))}
             />
           )}
@@ -953,7 +953,7 @@ export default function VendorCatalog() {
           {showFilter("diet") && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
-                {t("Diet", "डाइट")}
+                {t("Veg or non-veg", "वेज या नॉन-वेज")}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {DIET_OPTIONS.map((dietValue) => (
@@ -1080,10 +1080,10 @@ export default function VendorCatalog() {
       ) : (
         <EmptyState
           className="mt-4"
-          title={t("No vendors found", "कोई वेंडर नहीं मिला")}
+          title={t("No caterers found", "कोई कैटरर नहीं मिला")}
           message={t(
-            "Try a different search or relax your filters.",
-            "अलग खोज आज़माएं या अपने फ़िल्टर हटाएं।",
+            "Try a different search, or clear a filter or two.",
+            "कोई और खोज आज़माएँ, या एक-दो फ़िल्टर हटा दें।",
           )}
           action={
             hasActiveFilters ? (

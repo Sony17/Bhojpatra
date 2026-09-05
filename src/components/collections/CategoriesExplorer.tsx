@@ -47,8 +47,8 @@ export default function CategoriesExplorer() {
         "हर स्वाद, एक भोजपत्र अनुभव",
       )}
       subtitle={t(
-        "Curated menus. Verified vendors. Seamless booking.",
-        "क्यूरेटेड मेन्यू। वेरिफाइड वेंडर। आसान बुकिंग।",
+        "Handpicked menus. Trusted caterers. Easy booking.",
+        "चुने हुए मेन्यू। भरोसेमंद कैटरर। आसान बुकिंग।",
       )}
       tiles={tiles}
     />

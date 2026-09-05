@@ -6,7 +6,7 @@ import { useLang } from "@/lib/i18n";
 
 /** Trust stats shown as a band beneath the About intro. */
 const STATS: { value: string; label: string; labelHi: string }[] = [
-  { value: "500+", label: "Verified specialists", labelHi: "सत्यापित विशेषज्ञ" },
+  { value: "500+", label: "Trusted caterers", labelHi: "भरोसेमंद कैटरर" },
   { value: "20+", label: "Cities served", labelHi: "सेवित शहर" },
   { value: "10,000+", label: "Happy celebrations", labelHi: "खुशहाल आयोजन" },
 ];
@@ -19,8 +19,8 @@ const REASONS: {
   bodyHi: string;
 }[] = [
   {
-    title: "Specialist-first",
-    titleHi: "विशेषज्ञ-पहले",
+    title: "The right cook for every dish",
+    titleHi: "हर डिश के लिए सही कारीगर",
     body: "We curate the best chaat-walas, halwais and live counters instead of one-size catering.",
     bodyHi:
       "हम एक जैसी कैटरिंग के बजाय बेहतरीन चाट-वालों, हलवाइयों और लाइव काउंटरों को चुनते हैं।",
@@ -39,8 +39,8 @@ const REASONS: {
     bodyHi: "एक असली इंसान आपको मेन्यू से लेकर आख़िरी परोसने तक मार्गदर्शन देता है।",
   },
   {
-    title: "Trusted vendors",
-    titleHi: "भरोसेमंद विक्रेता",
+    title: "Trusted kitchens",
+    titleHi: "भरोसेमंद रसोई",
     body: "Every kitchen is vetted on hygiene, taste, and celebration experience.",
     bodyHi:
       "हर रसोई को स्वच्छता, स्वाद और आयोजन के अनुभव पर परखा जाता है।",
