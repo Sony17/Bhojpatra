@@ -1,0 +1,2243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bhojpatra Vendor Dashboard — High-Fidelity Visual Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Self-hosted Ananda Neptouch 2 + Open Sans Fallback ── */
+    @font-face {
+      font-family: 'Ananda Neptouch 2';
+      src: url('../public/ananda-neptouch-2.regular.ttf') format('truetype'),
+           url('/ananda-neptouch-2.regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    :root {
+      /* Bhojpatra 4-Color Palette STRICTLY */
+      --color-red: #B92025;       /* rgb(185, 32, 37) */
+      --color-cream: #F0D09E;     /* rgb(240, 208, 158) */
+      --color-black: #000000;     /* rgb(0, 0, 0) */
+      --color-white: #FFFFFF;     /* rgb(255, 255, 255) */
+
+      /* Derived Alpha Tokens for Opacity/Shadows */
+      --color-red-10: rgba(185, 32, 37, 0.10);
+      --color-red-15: rgba(185, 32, 37, 0.15);
+      --color-red-25: rgba(185, 32, 37, 0.25);
+      --color-cream-15: rgba(240, 208, 158, 0.15);
+      --color-cream-30: rgba(240, 208, 158, 0.30);
+      --color-cream-50: rgba(240, 208, 158, 0.50);
+      --color-black-05: rgba(0, 0, 0, 0.05);
+      --color-black-10: rgba(0, 0, 0, 0.10);
+      --color-black-15: rgba(0, 0, 0, 0.15);
+      --color-black-40: rgba(0, 0, 0, 0.40);
+
+      /* Typography */
+      --font-display: 'Ananda Neptouch 2', 'Open Sans', Georgia, serif;
+      --font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+      /* Radii */
+      --radius-control: 12px;
+      --radius-card: 16px;
+      --radius-sheet: 20px;
+      --radius-hero: 24px;
+      --radius-pill: 9999px;
+
+      /* Shadows */
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.10);
+      --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.05), 0 16px 40px -16px rgba(0, 0, 0, 0.18);
+      --shadow-brand: 0 10px 28px -12px rgba(185, 32, 37, 0.40);
+      --shadow-modal: 0 24px 60px -20px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #1a1a1a;
+      color: var(--color-black);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Prototyping Control Bar (Sticky at Top of Browser) ── */
+    .prototype-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: var(--color-black);
+      color: var(--color-white);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 2px solid var(--color-red);
+      font-size: 13px;
+    }
+    .prototype-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .prototype-badge {
+      background: var(--color-red);
+      color: var(--color-cream);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .prototype-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 2px;
+      border: 1px solid #444;
+    }
+    .control-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--color-cream);
+      padding: 0 8px;
+    }
+    .btn-toggle {
+      background: transparent;
+      border: none;
+      color: #aaa;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .btn-toggle:hover {
+      color: var(--color-white);
+      background: #333;
+    }
+    .btn-toggle.active {
+      background: var(--color-red);
+      color: var(--color-cream);
+    }
+
+    /* ── Canvas Viewport Container ── */
+    .viewport-canvas {
+      flex: 1;
+      padding: 30px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 40px;
+      overflow-x: auto;
+    }
+
+    /* ── Device Frames ── */
+    .frame-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .frame-label {
+      color: var(--color-cream);
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Desktop Frame (1440px) */
+    .desktop-frame {
+      width: 1440px;
+      height: 980px;
+      background: #FAFAF8;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1);
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Mobile Frame (390px iPhone standard) */
+    .mobile-frame {
+      width: 390px;
+      height: 844px;
+      background: #FAFAF8;
+      border-radius: 44px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.7), 0 0 0 8px #2b2b2b, 0 0 0 10px #444;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .mobile-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 130px;
+      height: 28px;
+      background: #2b2b2b;
+      border-bottom-left-radius: 18px;
+      border-bottom-right-radius: 18px;
+      z-index: 100;
+    }
+
+    /* ==========================================================================
+       BHOJPATRA VENDOR SHELL STYLING (DESKTOP)
+       ========================================================================== */
+    .vendor-sidebar {
+      width: 260px;
+      background: var(--color-red);
+      color: var(--color-cream);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(240, 208, 158, 0.2);
+    }
+    .sidebar-brand-block {
+      padding: 24px 20px;
+      border-bottom: 1px solid rgba(240, 208, 158, 0.15);
+    }
+    .brand-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .brand-icon-pot {
+      width: 32px;
+      height: 32px;
+      background: var(--color-cream);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-red);
+      font-weight: 900;
+      font-size: 18px;
+      font-family: var(--font-display);
+    }
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--color-cream);
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+    .portal-tag {
+      display: inline-block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--color-white);
+      background: rgba(0,0,0,0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .sidebar-vendor-card {
+      margin-top: 14px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(240, 208, 158, 0.2);
+    }
+    .vendor-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--color-white);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .vendor-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--color-cream);
+    }
+    .status-dot-pulse {
+      width: 7px;
+      height: 7px;
+      background: var(--color-cream);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(240, 208, 158, 0.4);
+    }
+    .tier-pill-small {
+      background: var(--color-cream);
+      color: var(--color-red);
+      font-weight: 800;
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-control);
+      color: rgba(240, 208, 158, 0.9);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--color-white);
+    }
+    .nav-link.active {
+      background: var(--color-cream);
+      color: var(--color-red);
+      font-weight: 700;
+      box-shadow: var(--shadow-card);
+    }
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    .nav-badge-count {
+      margin-left: auto;
+      background: var(--color-white);
+      color: var(--color-red);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 1px 7px;
+      border-radius: var(--radius-pill);
+    }
+    .nav-link.active .nav-badge-count {
+      background: var(--color-red);
+      color: var(--color-cream);
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+      padding: 16px 14px;
+      border-top: 1px solid rgba(240, 208, 158, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .footer-action-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--color-cream);
+      text-decoration: none;
+      font-weight: 600;
+      padding: 6px 8px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .footer-action-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--color-white);
+    }
+
+    /* Desktop Main Canvas */
+    .desktop-canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: #FAFAF8;
+    }
+
+    /* Sticky Topbar */
+    .vendor-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--color-cream-30);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+    .breadcrumb-trail {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--color-black);
+    }
+    .breadcrumb-root {
+      color: #666;
+    }
+    .breadcrumb-sep {
+      color: var(--color-cream);
+    }
+    .breadcrumb-current {
+      font-weight: 700;
+      color: var(--color-black);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .btn-preview-store {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius-control);
+      border: 1.5px solid var(--color-red);
+      background: transparent;
+      color: var(--color-red);
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-preview-store:hover {
+      background: var(--color-red);
+      color: var(--color-cream);
+    }
+    .topbar-icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-control);
+      border: 1px solid var(--color-cream-30);
+      background: var(--color-white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      color: var(--color-black);
+      transition: background 0.15s ease;
+    }
+    .topbar-icon-btn:hover {
+      background: var(--color-cream-15);
+    }
+    .notification-dot {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      background: var(--color-red);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px var(--color-white);
+    }
+    .user-profile-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 10px 4px 6px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--color-cream-30);
+      background: var(--color-white);
+      cursor: pointer;
+    }
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--color-red);
+      color: var(--color-cream);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .user-info-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-black);
+    }
+
+    /* Content Area */
+    .dashboard-content-body {
+      padding: 28px 32px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1180px;
+      width: 100%;
+    }
+
+    /* ── Operational Status Banner (LEVEL 2 HIERARCHY) ── */
+    .status-banner {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-card);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-card);
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .status-badge-cluster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-solid-maroon {
+      background: var(--color-red);
+      color: var(--color-cream);
+    }
+    .badge-outline-maroon {
+      border: 1.5px solid var(--color-red);
+      color: var(--color-red);
+      background: rgba(185, 32, 37, 0.04);
+    }
+    .badge-soft-cream {
+      background: var(--color-cream-30);
+      color: var(--color-black);
+      border: 1px solid var(--color-cream);
+    }
+    .status-text-explanation {
+      font-size: 13px;
+      color: #555;
+      margin-left: 4px;
+    }
+
+    /* ── Action Required Alert Card (LEVEL 2 HIERARCHY) ── */
+    .urgent-alert-card {
+      background: var(--color-white);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--color-cream-30);
+      border-left: 5px solid var(--color-red);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-pop);
+      gap: 16px;
+      animation: alertPulse 3s infinite ease-in-out;
+    }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: var(--shadow-card); }
+      50% { box-shadow: 0 4px 20px rgba(185, 32, 37, 0.15); }
+    }
+    .alert-left-content {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .alert-icon-wrap {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--color-red-10);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-red);
+      flex-shrink: 0;
+    }
+    .alert-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-black);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-time-tag {
+      font-size: 11px;
+      background: var(--color-red-10);
+      color: var(--color-red);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .alert-description {
+      font-size: 13px;
+      color: #444;
+      margin-top: 3px;
+    }
+    .alert-actions-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .btn-primary-action {
+      background: var(--color-red);
+      color: var(--color-cream);
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--radius-control);
+      font-weight: 700;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      box-shadow: var(--shadow-brand);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px -8px rgba(185, 32, 37, 0.5);
+    }
+    .btn-secondary-ghost {
+      background: transparent;
+      border: 1px solid var(--color-cream-30);
+      color: var(--color-black);
+      padding: 9px 14px;
+      border-radius: var(--radius-control);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn-secondary-ghost:hover {
+      background: var(--color-cream-15);
+    }
+
+    /* ── Next Upcoming Event (LEVEL 1 VISUAL FOCAL POINT) ── */
+    .spotlight-hero-card {
+      background: var(--color-white);
+      border-radius: var(--radius-hero);
+      border: 2px solid var(--color-cream);
+      box-shadow: var(--shadow-pop);
+      padding: 26px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .spotlight-hero-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--color-red) 0%, var(--color-cream) 100%);
+    }
+    .spotlight-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .spotlight-eyebrow {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--color-red);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .spotlight-event-name {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--color-black);
+      line-height: 1.15;
+    }
+    .countdown-pill {
+      background: var(--color-red);
+      color: var(--color-cream);
+      font-size: 13px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-card);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .spotlight-logistics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      background: rgba(240, 208, 158, 0.12);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-card);
+      padding: 16px 20px;
+    }
+    .logistic-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .logistic-icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--color-white);
+      border: 1px solid var(--color-cream);
+      color: var(--color-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logistic-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      font-weight: 700;
+    }
+    .logistic-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-black);
+      margin-top: 1px;
+    }
+    .logistic-sub {
+      font-size: 12px;
+      color: #555;
+    }
+
+    /* Course Breakdown Chips inside Spotlight */
+    .course-chips-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chips-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #444;
+    }
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dish-chip {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--color-black);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .diet-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .diet-veg {
+      border: 1.5px solid var(--color-red);
+    }
+    .diet-veg::after {
+      content: "";
+      width: 4px;
+      height: 4px;
+      background: var(--color-red);
+      border-radius: 50%;
+    }
+    .diet-non-veg {
+      border: 1.5px solid var(--color-black);
+    }
+    .diet-non-veg::after {
+      content: "";
+      width: 4px;
+      height: 4px;
+      background: var(--color-black);
+      border-radius: 50%;
+    }
+
+    .spotlight-special-note {
+      background: #FFFDF9;
+      border: 1px dashed var(--color-cream);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #333;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .note-icon {
+      color: var(--color-red);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .spotlight-footer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-top: 1px solid var(--color-cream-30);
+      padding-top: 18px;
+      flex-wrap: wrap;
+    }
+    .host-contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-black);
+      text-decoration: none;
+    }
+    .btn-prep-sheet-primary {
+      background: var(--color-red);
+      color: var(--color-cream);
+      border: none;
+      padding: 12px 24px;
+      border-radius: var(--radius-control);
+      font-weight: 800;
+      font-size: 14px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-brand);
+      transition: all 0.2s ease;
+    }
+    .btn-prep-sheet-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 32px -8px rgba(185, 32, 37, 0.55);
+    }
+
+    /* ── Operational Metrics Grid (LEVEL 3 HIERARCHY) ── */
+    .metrics-row-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+    .metric-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-card);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: transform 0.15s ease;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-pop);
+    }
+    .metric-top-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .metric-icon-small {
+      color: var(--color-red);
+    }
+    .metric-big-num {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--color-black);
+      letter-spacing: -0.5px;
+      margin-top: 4px;
+    }
+    .metric-sub-detail {
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* ── Two-Column Bottom Grid (LEVEL 4 HIERARCHY) ── */
+    .bottom-split-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 24px;
+    }
+
+    /* Left: Upcoming Bookings Feed */
+    .feed-panel {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-card);
+      padding: 22px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--color-black);
+    }
+    .panel-view-all-link {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-red);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .panel-view-all-link:hover {
+      text-decoration: underline;
+    }
+
+    .booking-feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .booking-row-card {
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-control);
+      padding: 14px 16px;
+      background: #FAF9F6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .booking-row-card:hover {
+      background: var(--color-white);
+      border-color: var(--color-cream);
+      box-shadow: var(--shadow-card);
+    }
+    .booking-date-badge {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream);
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+      min-width: 52px;
+    }
+    .date-badge-day {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--color-red);
+      line-height: 1;
+    }
+    .date-badge-month {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--color-black);
+    }
+    .booking-info-middle {
+      flex: 1;
+    }
+    .booking-name-bold {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-black);
+    }
+    .booking-meta-line {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* Right: Menu & Profile Health */
+    .health-sidebar-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .health-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .health-stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(240, 208, 158, 0.2);
+    }
+    .health-stat-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: var(--color-cream-30);
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--color-red);
+      border-radius: var(--radius-pill);
+    }
+    .checklist-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 12px;
+      color: #444;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .check-icon-done {
+      color: var(--color-red);
+      font-weight: bold;
+    }
+
+    /* ==========================================================================
+       BHOJPATRA VENDOR SHELL STYLING (MOBILE 390px)
+       ========================================================================== */
+    .mobile-screen-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #FAFAF8;
+      position: relative;
+    }
+
+    /* Mobile Header (AppBar) */
+    .mobile-appbar {
+      height: 60px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--color-cream-30);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      margin-top: 14px; /* below notch */
+    }
+    .mobile-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mobile-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--color-black);
+    }
+
+    /* Mobile Scroll Content */
+    .mobile-scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px 84px; /* padding for bottom nav */
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Mobile Compact Status Pill */
+    .mobile-status-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-control);
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* Mobile Alert Card */
+    .mobile-alert-card {
+      background: var(--color-white);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--color-cream-30);
+      border-left: 4px solid var(--color-red);
+      padding: 14px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mobile-alert-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--color-black);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mobile-alert-desc {
+      font-size: 12px;
+      color: #555;
+    }
+
+    /* Mobile Spotlight Hero */
+    .mobile-spotlight-card {
+      background: var(--color-white);
+      border-radius: var(--radius-card);
+      border: 1.5px solid var(--color-cream);
+      box-shadow: var(--shadow-pop);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mobile-spotlight-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--color-red);
+    }
+    .mobile-event-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--color-black);
+      line-height: 1.2;
+    }
+
+    /* Mobile Metrics 2x2 */
+    .mobile-metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mobile-metric-tile {
+      background: var(--color-white);
+      border: 1px solid var(--color-cream-30);
+      border-radius: var(--radius-control);
+      padding: 12px;
+      box-shadow: var(--shadow-card);
+    }
+    .mobile-metric-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #666;
+    }
+    .mobile-metric-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--color-black);
+      margin-top: 2px;
+    }
+
+    /* Mobile Fixed Bottom Navigation */
+    .mobile-bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--color-white);
+      border-top: 1px solid var(--color-cream-30);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+      z-index: 50;
+    }
+    .bottom-tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: #777;
+      text-decoration: none;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      padding: 6px 12px;
+    }
+    .bottom-tab-item.active {
+      color: var(--color-red);
+    }
+    .tab-badge-pill {
+      position: absolute;
+      top: 2px;
+      right: 10px;
+      background: var(--color-red);
+      color: var(--color-cream);
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: var(--radius-pill);
+    }
+
+    /* ==========================================================================
+       INTERACTIVE MODALS & DRAWERS (FOR PREVIEW)
+       ========================================================================== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(3px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-sheet {
+      background: var(--color-white);
+      border-radius: var(--radius-sheet);
+      width: 100%;
+      max-width: 720px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-modal);
+      border: 1px solid var(--color-cream);
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--color-cream-30);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: var(--color-white);
+      z-index: 10;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--color-black);
+    }
+    .btn-close-modal {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--color-cream-30);
+      background: var(--color-white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .prep-sheet-header-box {
+      background: rgba(240, 208, 158, 0.15);
+      border: 1px solid var(--color-cream);
+      border-radius: var(--radius-card);
+      padding: 16px;
+    }
+    .prep-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .prep-table th {
+      text-align: left;
+      padding: 8px 10px;
+      background: #F4F2EB;
+      color: var(--color-black);
+      font-weight: 700;
+      border-bottom: 1px solid var(--color-cream);
+    }
+    .prep-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--color-cream-30);
+      color: #333;
+    }
+    .prep-checkbox {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--color-red);
+      cursor: pointer;
+    }
+
+    /* Notification Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: var(--color-black);
+      color: var(--color-cream);
+      padding: 14px 20px;
+      border-radius: var(--radius-control);
+      border-left: 4px solid var(--color-red);
+      box-shadow: var(--shadow-modal);
+      z-index: 3000;
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast-popup.show {
+      display: flex;
+      animation: toastIn 0.3s ease-out;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Top Prototyping Controls Bar ── -->
+  <header class="prototype-bar">
+    <div class="prototype-brand">
+      <span>BHOJPATRA VENDOR DASHBOARD</span>
+      <span class="prototype-badge">Hi-Fi Visual Mockup</span>
+    </div>
+
+    <div class="prototype-controls">
+      <div class="control-group">
+        <span class="control-label">View Canvas:</span>
+        <button class="btn-toggle active" id="btn-show-sidebyside" onclick="setViewMode('sidebyside')">Side-by-Side (Desktop + Mobile)</button>
+        <button class="btn-toggle" id="btn-show-desktop" onclick="setViewMode('desktop')">Desktop 1440px</button>
+        <button class="btn-toggle" id="btn-show-mobile" onclick="setViewMode('mobile')">Mobile 390px</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Caterer State:</span>
+        <button class="btn-toggle active" id="state-active" onclick="setCatererState('active')">Active (Royal Awadh)</button>
+        <button class="btn-toggle" id="state-zero" onclick="setCatererState('zero')">Zero Bookings</button>
+        <button class="btn-toggle" id="state-kyc-rejected" onclick="setCatererState('kyc')">KYC Rejected</button>
+        <button class="btn-toggle" id="state-hidden" onclick="setCatererState('hidden')">Listing Hidden</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Viewport Canvas Container ── -->
+  <main class="viewport-canvas">
+
+    <!-- ====================================================================
+         DESKTOP FRAME (1440px)
+         ==================================================================== -->
+    <div class="frame-wrapper" id="wrapper-desktop">
+      <div class="frame-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Desktop Viewport (1440px Canvas)
+      </div>
+
+      <div class="desktop-frame">
+        <!-- Sidebar Navigation -->
+        <aside class="vendor-sidebar">
+          <div class="sidebar-brand-block">
+            <div class="brand-logo-row">
+              <div class="brand-icon-pot">भ</div>
+              <div>
+                <div class="brand-title">Bhojpatra</div>
+                <div class="portal-tag">Vendor Portal</div>
+              </div>
+            </div>
+
+            <!-- Caterer Identity Card -->
+            <div class="sidebar-vendor-card">
+              <div class="vendor-name" id="desktop-vendor-name">Royal Awadh Caterers</div>
+              <div class="vendor-meta-row">
+                <span class="status-dot-pulse"></span>
+                <span id="desktop-vendor-status">Verified Partner</span>
+                <span class="tier-pill-small" id="desktop-vendor-tier">Platinum</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Links -->
+          <nav class="sidebar-nav">
+            <a class="nav-link active">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+              <span>Dashboard</span>
+            </a>
+
+            <a class="nav-link" onclick="openBookingModal()">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+              <span>Orders</span>
+              <span class="nav-badge-count" id="desktop-orders-badge">1</span>
+            </a>
+
+            <a class="nav-link">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+              <span>Calendar</span>
+            </a>
+
+            <a class="nav-link">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+              <span>Menu & Food</span>
+            </a>
+
+            <a class="nav-link">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+              <span>Finances</span>
+            </a>
+
+            <a class="nav-link">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+              <span>Reviews</span>
+            </a>
+
+            <a class="nav-link">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+              <span>Profile & KYC</span>
+            </a>
+          </nav>
+
+          <!-- Sidebar Footer Utilities -->
+          <div class="sidebar-footer">
+            <a class="footer-action-btn" onclick="showToast('Connecting to Bhojpatra Partner Concierge...')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+              <span>Partner Helpdesk</span>
+            </a>
+            <a class="footer-action-btn" onclick="showToast('Signed out of Vendor Portal')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+              <span>Sign Out</span>
+            </a>
+          </div>
+        </aside>
+
+        <!-- Desktop Canvas -->
+        <div class="desktop-canvas">
+          <!-- Topbar -->
+          <header class="vendor-topbar">
+            <div class="breadcrumb-trail">
+              <span class="breadcrumb-root">Vendor Portal</span>
+              <span class="breadcrumb-sep">/</span>
+              <span class="breadcrumb-current">Dashboard Home</span>
+            </div>
+
+            <div class="topbar-actions">
+              <button class="btn-preview-store" onclick="showToast('Opening public storefront preview for Royal Awadh...')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                Preview Storefront
+              </button>
+
+              <button class="topbar-icon-btn" onclick="openBookingModal()" title="1 unread notification">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                <span class="notification-dot" id="desktop-notif-dot"></span>
+              </button>
+
+              <div class="user-profile-pill">
+                <div class="user-avatar">RA</div>
+                <span class="user-info-text">Royal Awadh</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+              </div>
+            </div>
+          </header>
+
+          <!-- Main Content Body -->
+          <div class="dashboard-content-body">
+
+            <!-- 1. Operational Status Banner -->
+            <section class="status-banner" id="banner-status-container">
+              <div class="status-badge-cluster">
+                <span class="badge-pill badge-solid-maroon" id="badge-verification">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  Verified Caterer
+                </span>
+                <span class="badge-pill badge-outline-maroon" id="badge-marketplace">
+                  <span class="status-dot-pulse" style="background: var(--color-red);"></span>
+                  Live on Marketplace
+                </span>
+                <span class="badge-pill badge-solid-maroon" id="badge-tier">Platinum Tier</span>
+                <span class="status-text-explanation" id="banner-status-text">Your kitchen profile is active and discoverable for feast & stall bookings in Lucknow.</span>
+              </div>
+              <a class="panel-view-all-link" onclick="showToast('Profile & Compliance settings opened')">Compliance Settings →</a>
+            </section>
+
+            <!-- 2. Action Required (Urgent Alert Card) -->
+            <section class="urgent-alert-card" id="card-urgent-alert">
+              <div class="alert-left-content">
+                <div class="alert-icon-wrap">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                </div>
+                <div>
+                  <div class="alert-title">
+                    <span id="urgent-alert-heading">1 new booking request requires kitchen confirmation</span>
+                    <span class="alert-time-tag">Action Needed in 24h</span>
+                  </div>
+                  <div class="alert-description" id="urgent-alert-desc">
+                    Gupta Engagement Party · 18 Dec 2026 · 180 Guests · Gomti Nagar, Lucknow · Awadhi Feast Spread
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert-actions-group">
+                <button class="btn-primary-action" onclick="openBookingModal()">Review Booking</button>
+                <button class="btn-secondary-ghost" onclick="showToast('Decline dialogue triggered for BHOJ-9412')">Decline</button>
+              </div>
+            </section>
+
+            <!-- 3. Next Upcoming Event (LEVEL 1 VISUAL FOCAL POINT) -->
+            <section class="spotlight-hero-card" id="card-next-event-spotlight">
+              <div class="spotlight-header-row">
+                <div>
+                  <div class="spotlight-eyebrow">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    Next Upcoming Event Commitment
+                  </div>
+                  <h1 class="spotlight-event-name" id="spotlight-event-title">Sharma Wedding Reception</h1>
+                </div>
+
+                <div class="countdown-pill" id="spotlight-countdown">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                  Next Event in 3 Days
+                </div>
+              </div>
+
+              <!-- Logistics Grid -->
+              <div class="spotlight-logistics-grid">
+                <div class="logistic-item">
+                  <div class="logistic-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+                  </div>
+                  <div>
+                    <div class="logistic-label">Event Date & Time</div>
+                    <div class="logistic-value">Sat, 12 Dec 2026</div>
+                    <div class="logistic-sub">Dinner Service · 7:30 PM Buffet</div>
+                  </div>
+                </div>
+
+                <div class="logistic-item">
+                  <div class="logistic-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  </div>
+                  <div>
+                    <div class="logistic-label">Serving Venue</div>
+                    <div class="logistic-value">Grand Heritage Lawn</div>
+                    <div class="logistic-sub">Sector B, Gomti Nagar, Lucknow</div>
+                  </div>
+                </div>
+
+                <div class="logistic-item">
+                  <div class="logistic-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 3s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                  </div>
+                  <div>
+                    <div class="logistic-label">Headcount & Format</div>
+                    <div class="logistic-value">250 Guests Confirmed</div>
+                    <div class="logistic-sub">Royal Awadhi Feast Spread</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Course Summary Chips -->
+              <div class="course-chips-container">
+                <div class="chips-section-title">Itemized Menu Spread Assigned to Your Kitchen:</div>
+                <div class="chips-row">
+                  <span class="dish-chip"><span class="diet-indicator diet-non-veg"></span>Galouti Kebab (500 pcs)</span>
+                  <span class="dish-chip"><span class="diet-indicator diet-veg"></span>Paneer Tikka Shashlik (350 pcs)</span>
+                  <span class="dish-chip"><span class="diet-indicator diet-non-veg"></span>Awadhi Dum Gosht Biryani (45 kg)</span>
+                  <span class="dish-chip"><span class="diet-indicator diet-veg"></span>Dal Makhani (35 kg)</span>
+                  <span class="dish-chip"><span class="diet-indicator diet-veg"></span>Shahi Tukda with Rabri (300 cups)</span>
+                  <span class="dish-chip" style="background: var(--color-cream-30); font-weight:700;">+6 More Dishes</span>
+                  <span class="dish-chip" style="border-color: var(--color-red); color: var(--color-red); font-weight:700;">+ Live Paan Counter</span>
+                </div>
+              </div>
+
+              <!-- Special Host Note -->
+              <div class="spotlight-special-note">
+                <svg class="note-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
+                <div>
+                  <strong>Host Special Instructions:</strong> "Please ensure Dal Makhani has less oil. There are 30 strict Jain guests requiring separate Satvik dal and paneer preparation."
+                </div>
+              </div>
+
+              <!-- Footer Actions -->
+              <div class="spotlight-footer-actions">
+                <a class="host-contact-link" onclick="showToast('Initiating WhatsApp connection to host: Vikram Sharma (+91 98765 43210)')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.43-3.9-6.63-6.49l1.97-1.57c.27-.27.35-.66.24-1.01-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+                  <span>Host: Vikram Sharma (+91 98765 43210)</span>
+                </a>
+
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn-secondary-ghost" onclick="showToast('Opening complete booking overview for BHOJ-8492')">View Order Details</button>
+                  <button class="btn-prep-sheet-primary" onclick="openPrepSheetModal()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+                    View Kitchen Prep Sheet
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- 4. Operational Metrics (LEVEL 3 HIERARCHY) -->
+            <section class="metrics-row-grid" id="grid-metrics">
+              <div class="metric-card">
+                <div class="metric-top-label">
+                  <span>Upcoming Bookings</span>
+                  <svg class="metric-icon-small" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+                </div>
+                <div class="metric-big-num" id="metric-upcoming-val">5 Events</div>
+                <div class="metric-sub-detail" id="metric-upcoming-sub">Next: 12 Dec 2026</div>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-top-label">
+                  <span>Completed Events</span>
+                  <svg class="metric-icon-small" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                </div>
+                <div class="metric-big-num" id="metric-completed-val">42 Events</div>
+                <div class="metric-sub-detail" id="metric-completed-sub">100% On-Time Serving</div>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-top-label">
+                  <span>Average Rating</span>
+                  <svg class="metric-icon-small" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                </div>
+                <div class="metric-big-num" id="metric-rating-val">★ 4.8</div>
+                <div class="metric-sub-detail" id="metric-rating-sub">Based on 38 reviews</div>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-top-label">
+                  <span>Pending Payout</span>
+                  <svg class="metric-icon-small" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8z"/></svg>
+                </div>
+                <div class="metric-big-num" id="metric-payout-val">₹48,500</div>
+                <div class="metric-sub-detail" id="metric-payout-sub">Due on event completion</div>
+              </div>
+            </section>
+
+            <!-- 5. Two-Column Bottom Grid (LEVEL 4 HIERARCHY) -->
+            <section class="bottom-split-grid" id="grid-bottom-split">
+              <!-- Left: Upcoming Bookings Feed -->
+              <div class="feed-panel">
+                <div class="panel-header-row">
+                  <h2 class="panel-title">Active Booking Pipeline</h2>
+                  <a class="panel-view-all-link" onclick="showToast('Opening full bookings schedule')">View All Bookings & Archives →</a>
+                </div>
+
+                <div class="booking-feed-list" id="desktop-feed-container">
+                  <div class="booking-row-card" onclick="openPrepSheetModal()">
+                    <div class="booking-date-badge">
+                      <div class="date-badge-day">12</div>
+                      <div class="date-badge-month">DEC</div>
+                    </div>
+                    <div class="booking-info-middle">
+                      <div class="booking-name-bold">Sharma Wedding Reception</div>
+                      <div class="booking-meta-line">Grand Heritage Lawn, Lucknow · 250 Guests · Royal Feast</div>
+                    </div>
+                    <span class="badge-pill badge-solid-maroon">Confirmed</span>
+                  </div>
+
+                  <div class="booking-row-card" onclick="showToast('Opening BHOJ-8821 booking sheet')">
+                    <div class="booking-date-badge">
+                      <div class="date-badge-day">24</div>
+                      <div class="date-badge-month">DEC</div>
+                    </div>
+                    <div class="booking-info-middle">
+                      <div class="booking-name-bold">Veritas Tech Annual Gala Dinner</div>
+                      <div class="booking-meta-line">Clarks Avadh, Lucknow · 400 Guests · Multi-Cuisine Feast</div>
+                    </div>
+                    <span class="badge-pill badge-solid-maroon">Confirmed</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Menu Health & Profile Completeness -->
+              <div class="health-sidebar-stack">
+                <!-- Menu Health Card -->
+                <div class="health-card">
+                  <div class="panel-header-row">
+                    <h2 class="panel-title">Menu & Catalog Health</h2>
+                    <a class="panel-view-all-link" onclick="showToast('Navigating to MenuBuilder workspace')">Manage →</a>
+                  </div>
+
+                  <div class="health-stat-row">
+                    <span>Active Published Dishes</span>
+                    <strong style="color: var(--color-black);">32 Items</strong>
+                  </div>
+                  <div class="health-stat-row">
+                    <span>Signature Dishes Featured</span>
+                    <strong style="color: var(--color-red);">4 / 4 Selected</strong>
+                  </div>
+                  <div class="health-stat-row">
+                    <span>Live Counters Enabled</span>
+                    <strong style="color: var(--color-black);">3 Counters Active</strong>
+                  </div>
+                  <div class="health-stat-row">
+                    <span>Baina Gift Boxes</span>
+                    <strong style="color: var(--color-black);">2 Box Sizes</strong>
+                  </div>
+                </div>
+
+                <!-- Profile Completeness Card -->
+                <div class="health-card">
+                  <div class="panel-header-row">
+                    <h2 class="panel-title">Profile Completeness</h2>
+                    <strong style="color: var(--color-red); font-size: 14px;">80%</strong>
+                  </div>
+
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 80%;"></div>
+                  </div>
+
+                  <div class="checklist-list">
+                    <div class="check-item"><span class="check-icon-done">✓</span> Business bio & contact phone verified</div>
+                    <div class="check-item"><span class="check-icon-done">✓</span> GST & FSSAI License documents approved</div>
+                    <div class="check-item"><span class="check-icon-done">✓</span> 12-course feast packages published</div>
+                    <div class="check-item" style="color: #777;">○ Upload 3 kitchen gallery photos (+20%)</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         MOBILE FRAME (390px)
+         ==================================================================== -->
+    <div class="frame-wrapper" id="wrapper-mobile">
+      <div class="frame-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+        Mobile Viewport (390px On-Site Ergonomics)
+      </div>
+
+      <div class="mobile-frame">
+        <div class="mobile-notch"></div>
+
+        <div class="mobile-screen-container">
+          <!-- Mobile AppBar -->
+          <header class="mobile-appbar">
+            <button class="topbar-icon-btn" style="border:none; width:34px; height:34px;" onclick="showToast('Menu drawer toggled')">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
+
+            <div class="mobile-title-group">
+              <div class="brand-icon-pot" style="width:24px; height:24px; font-size:14px;">भ</div>
+              <span class="mobile-title">Royal Awadh Caterers</span>
+            </div>
+
+            <button class="topbar-icon-btn" style="border:none; width:34px; height:34px; position:relative;" onclick="openBookingModal()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              <span class="notification-dot" style="top:4px; right:4px;"></span>
+            </button>
+          </header>
+
+          <!-- Mobile Scroll Body -->
+          <div class="mobile-scroll-body">
+            <!-- Mobile Compact Status Strip -->
+            <div class="mobile-status-strip">
+              <span style="display:flex; align-items:center; gap:4px; color:var(--color-red);">
+                <span class="status-dot-pulse" style="background:var(--color-red);"></span>
+                Verified Partner
+              </span>
+              <span>Live on Bhojpatra</span>
+              <span class="tier-pill-small">Platinum</span>
+            </div>
+
+            <!-- Mobile Urgent Alert -->
+            <div class="mobile-alert-card" id="mobile-card-urgent">
+              <div class="mobile-alert-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--color-red)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                <span>1 Booking Request Pending</span>
+              </div>
+              <div class="mobile-alert-desc">
+                Gupta Engagement · 18 Dec · 180 Guests · Lucknow
+              </div>
+              <button class="btn-primary-action" style="width:100%; justify-content:center; padding:10px;" onclick="openBookingModal()">Review Booking (Action Needed)</button>
+            </div>
+
+            <!-- Mobile Next Event Spotlight -->
+            <div class="mobile-spotlight-card" id="mobile-card-spotlight">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="spotlight-eyebrow" style="margin-bottom:0;">NEXT COMMITMENT</span>
+                <span class="countdown-pill" style="font-size:11px; padding:3px 8px;">In 3 Days</span>
+              </div>
+
+              <div class="mobile-event-title">Sharma Wedding Reception</div>
+
+              <div style="font-size:13px; color:#333; display:flex; flex-direction:column; gap:6px;">
+                <div>📅 <strong>Sat, 12 Dec 2026</strong> (7:30 PM)</div>
+                <div>📍 <strong>Grand Heritage Lawn</strong>, Lucknow</div>
+                <div>👥 <strong>250 Guests</strong> (Royal Feast)</div>
+              </div>
+
+              <div style="font-size:12px; background:rgba(240,208,158,0.2); padding:8px 10px; border-radius:6px;">
+                <strong>Special:</strong> Less oil in Dal Makhani. 30 Jain guests.
+              </div>
+
+              <button class="btn-prep-sheet-primary" style="width:100%; justify-content:center; padding:12px;" onclick="openPrepSheetModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+                View Kitchen Prep Sheet
+              </button>
+            </div>
+
+            <!-- Mobile Metrics 2x2 -->
+            <div class="mobile-metrics-grid">
+              <div class="mobile-metric-tile">
+                <div class="mobile-metric-label">Active Orders</div>
+                <div class="mobile-metric-val">5</div>
+                <div style="font-size:10px; color:#777;">Next 12 Dec</div>
+              </div>
+
+              <div class="mobile-metric-tile">
+                <div class="mobile-metric-label">Pending Payout</div>
+                <div class="mobile-metric-val" style="color:var(--color-red);">₹48.5k</div>
+                <div style="font-size:10px; color:#777;">Due upon serving</div>
+              </div>
+
+              <div class="mobile-metric-tile">
+                <div class="mobile-metric-label">Rating</div>
+                <div class="mobile-metric-val">★ 4.8</div>
+                <div style="font-size:10px; color:#777;">38 reviews</div>
+              </div>
+
+              <div class="mobile-metric-tile">
+                <div class="mobile-metric-label">Completed</div>
+                <div class="mobile-metric-val">42</div>
+                <div style="font-size:10px; color:#777;">Lifetime events</div>
+              </div>
+            </div>
+
+            <!-- Mobile Upcoming List -->
+            <div style="background:var(--color-white); border:1px solid var(--color-cream-30); border-radius:var(--radius-card); padding:14px;">
+              <div style="font-size:14px; font-weight:800; margin-bottom:10px;">Upcoming Schedule</div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; border-bottom:1px solid rgba(240,208,158,0.2); padding-bottom:6px;">
+                  <div>
+                    <strong>12 Dec</strong> · Sharma Reception (250p)
+                  </div>
+                  <span class="tier-pill-small" style="background:var(--color-red); color:var(--color-cream);">Confirmed</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                  <div>
+                    <strong>24 Dec</strong> · Veritas Gala (400p)
+                  </div>
+                  <span class="tier-pill-small" style="background:var(--color-red); color:var(--color-cream);">Confirmed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile Fixed Bottom Navigation (4 Pillars) -->
+          <nav class="mobile-bottom-nav">
+            <a class="bottom-tab-item active">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+              <span>Dashboard</span>
+            </a>
+
+            <a class="bottom-tab-item" onclick="openBookingModal()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+              <span>Orders</span>
+              <span class="tab-badge-pill">1</span>
+            </a>
+
+            <a class="bottom-tab-item" onclick="showToast('Menu workspace active')">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
+              <span>Menu</span>
+            </a>
+
+            <a class="bottom-tab-item" onclick="showToast('More tab opened: Finances, Reviews, Profile')">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+              <span>More</span>
+            </a>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ====================================================================
+       INTERACTIVE MODAL 1: KITCHEN PREP SHEET (CHEF PRODUCTION SHEET)
+       ==================================================================== -->
+  <div class="modal-overlay" id="modal-prep-sheet">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:var(--color-red); letter-spacing:1px; text-transform:uppercase;">Kitchen Production Brief</span>
+          <h2 class="modal-title">Chef Prep Sheet: Sharma Wedding Reception</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-prep-sheet')">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="prep-sheet-header-box">
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; font-size:13px;">
+            <div><strong>Order ID:</strong> BHOJ-8492</div>
+            <div><strong>Event Date:</strong> 12 Dec 2026 (Dinner)</div>
+            <div><strong>Plating Deadline:</strong> 7:30 PM</div>
+            <div><strong>Total Headcount:</strong> <span style="font-size:16px; font-weight:800; color:var(--color-red);">250 Guests</span></div>
+          </div>
+          <div style="margin-top:8px; font-size:12px; color:#555;">
+            <strong>Venue:</strong> Grand Heritage Lawn, Sector B, Gomti Nagar, Lucknow
+          </div>
+        </div>
+
+        <div>
+          <h3 style="font-size:14px; font-weight:800; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-red);">1. Starters & Appetizers (Service: 6:30 PM - 8:00 PM)</h3>
+          <table class="prep-table">
+            <thead>
+              <tr>
+                <th style="width:40px;">Done</th>
+                <th>Dish Name</th>
+                <th>Diet</th>
+                <th>Production Batch Quantity</th>
+                <th>Plating / Serving Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Galouti Kebab</strong></td>
+                <td><span class="diet-indicator diet-non-veg"></span> Non-Veg</td>
+                <td><strong>500 pcs</strong> (Mutton mince)</td>
+                <td>Serve on mini ulte tawe ke parathe with mint dip</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Paneer Tikka Shashlik</strong></td>
+                <td><span class="diet-indicator diet-veg"></span> Veg</td>
+                <td><strong>350 pcs</strong> (Malai Paneer)</td>
+                <td>Skewered with capsicum and charred tomatoes</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Dahi ke Kebab</strong></td>
+                <td><span class="diet-indicator diet-veg"></span> Veg</td>
+                <td><strong>300 pcs</strong> (Hung curd)</td>
+                <td>Crisp golden crust, cardamom powder garnish</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Murg Malai Tikka</strong></td>
+                <td><span class="diet-indicator diet-non-veg"></span> Non-Veg</td>
+                <td><strong>450 pcs</strong> (Boneless thigh)</td>
+                <td>Cream & cheese marination, mild spice</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 style="font-size:14px; font-weight:800; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-red);">2. Main Course & Dum Rice (Buffet: 7:30 PM onwards)</h3>
+          <table class="prep-table">
+            <thead>
+              <tr>
+                <th style="width:40px;">Done</th>
+                <th>Dish Name</th>
+                <th>Diet</th>
+                <th>Batch Estimate</th>
+                <th>Special Kitchen Instructions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Awadhi Dum Gosht Biryani</strong></td>
+                <td><span class="diet-indicator diet-non-veg"></span> Non-Veg</td>
+                <td><strong>45 kg</strong> finished handi</td>
+                <td>Sealed handi for live dum cracking at buffet</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Dal Makhani (Bhojpatra Signature)</strong></td>
+                <td><span class="diet-indicator diet-veg"></span> Veg</td>
+                <td><strong>35 kg</strong></td>
+                <td><strong style="color:var(--color-red);">HOST NOTE: Low oil preparation.</strong></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Paneer Lababdar (Jain Batch Separated)</strong></td>
+                <td><span class="diet-indicator diet-veg"></span> Veg</td>
+                <td><strong>30 kg</strong> (incl. 30 Jain portions)</td>
+                <td>30 Jain portions prepared with zero onion/garlic</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="prep-checkbox" /></td>
+                <td><strong>Assorted Tandoori Breads</strong></td>
+                <td><span class="diet-indicator diet-veg"></span> Veg</td>
+                <td><strong>750 pcs</strong> (Naan, Roomali, Kulcha)</td>
+                <td>Live tandoor station at buffet corner</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--color-cream-30); padding-top:16px;">
+          <button class="btn-secondary-ghost" onclick="window.print()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right:6px;"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+            Print A4 Kitchen Sheet
+          </button>
+          <button class="btn-primary-action" onclick="closeModal('modal-prep-sheet'); showToast('Prep sheet progress saved for kitchen team');">Mark Cooking Underway</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       INTERACTIVE MODAL 2: BOOKING CONFIRMATION REVIEW
+       ==================================================================== -->
+  <div class="modal-overlay" id="modal-booking-review">
+    <div class="modal-sheet" style="max-width: 600px;">
+      <div class="modal-header">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:var(--color-red); letter-spacing:1px; text-transform:uppercase;">Incoming Booking Request</span>
+          <h2 class="modal-title">Review Order: BHOJ-9412</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modal-booking-review')">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background:#FFFDF9; border:1px solid var(--color-cream); border-radius:12px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <strong style="font-size:16px;">Gupta Engagement Party</strong>
+            <span class="badge-pill badge-outline-maroon">Awaiting Acceptance</span>
+          </div>
+          <div style="font-size:13px; color:#444; line-height:1.6;">
+            <div>📅 <strong>Date:</strong> 18 Dec 2026 (Dinner Service)</div>
+            <div>👥 <strong>Guest Count:</strong> 180 Guests</div>
+            <div>📍 <strong>Venue:</strong> Gomti Nagar, Lucknow</div>
+            <div>💰 <strong>Package:</strong> Awadhi Classic Feast (₹650/plate)</div>
+            <div>💵 <strong>Estimated Catering Total:</strong> ₹1,17,000</div>
+          </div>
+        </div>
+
+        <div style="font-size:13px; color:#555;">
+          <strong>Action Required:</strong> Acknowledging confirms that your kitchen has adequate capacity, ingredients, and staff to cater this event on 18 Dec. Once accepted, the customer will be notified immediately.
+        </div>
+
+        <div style="display:flex; gap:12px; justify-content:flex-end; border-top:1px solid var(--color-cream-30); padding-top:16px;">
+          <button class="btn-secondary-ghost" onclick="declineBooking()">Decline (Busy / Unavailable)</button>
+          <button class="btn-primary-action" onclick="acceptBooking()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Accept & Confirm Capacity
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Element -->
+  <div class="toast-popup" id="toast-el">
+    <span id="toast-msg">Action processed successfully</span>
+  </div>
+
+  <!-- ── Interactive Simulation Scripts ── -->
+  <script>
+    // Viewport switcher
+    function setViewMode(mode) {
+      document.getElementById('btn-show-sidebyside').classList.remove('active');
+      document.getElementById('btn-show-desktop').classList.remove('active');
+      document.getElementById('btn-show-mobile').classList.remove('active');
+
+      const desktopWrapper = document.getElementById('wrapper-desktop');
+      const mobileWrapper = document.getElementById('wrapper-mobile');
+
+      if (mode === 'sidebyside') {
+        document.getElementById('btn-show-sidebyside').classList.add('active');
+        desktopWrapper.style.display = 'flex';
+        mobileWrapper.style.display = 'flex';
+      } else if (mode === 'desktop') {
+        document.getElementById('btn-show-desktop').classList.add('active');
+        desktopWrapper.style.display = 'flex';
+        mobileWrapper.style.display = 'none';
+      } else if (mode === 'mobile') {
+        document.getElementById('btn-show-mobile').classList.add('active');
+        desktopWrapper.style.display = 'none';
+        mobileWrapper.style.display = 'flex';
+      }
+    }
+
+    // Caterer State Simulator
+    function setCatererState(state) {
+      document.getElementById('state-active').classList.remove('active');
+      document.getElementById('state-zero').classList.remove('active');
+      document.getElementById('state-kyc-rejected').classList.remove('active');
+      document.getElementById('state-hidden').classList.remove('active');
+
+      const alertCard = document.getElementById('card-urgent-alert');
+      const spotlightCard = document.getElementById('card-next-event-spotlight');
+      const mobileAlert = document.getElementById('mobile-card-urgent');
+      const mobileSpotlight = document.getElementById('mobile-card-spotlight');
+      const badgeMarketplace = document.getElementById('badge-marketplace');
+      const badgeVerification = document.getElementById('badge-verification');
+      const statusText = document.getElementById('banner-status-text');
+
+      if (state === 'active') {
+        document.getElementById('state-active').classList.add('active');
+        alertCard.style.display = 'flex';
+        spotlightCard.style.display = 'flex';
+        mobileAlert.style.display = 'flex';
+        mobileSpotlight.style.display = 'flex';
+        badgeMarketplace.innerHTML = '<span class="status-dot-pulse" style="background:var(--color-red);"></span> Live on Marketplace';
+        badgeVerification.innerHTML = '✓ Verified Caterer';
+        statusText.innerText = 'Your kitchen profile is active and discoverable for feast & stall bookings in Lucknow.';
+        showToast('Switched to Active Caterer state (Royal Awadh Caterers)');
+      } else if (state === 'zero') {
+        document.getElementById('state-zero').classList.add('active');
+        alertCard.style.display = 'none';
+        spotlightCard.innerHTML = `
+          <div style="text-align:center; padding: 40px 20px;">
+            <div style="font-size:36px; margin-bottom:12px;">🏪</div>
+            <h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">Your Kitchen is Open for Bookings!</h2>
+            <p style="color:#666; max-width:500px; margin:0 auto 20px; font-size:14px;">Your dishes and feast packages are live on the marketplace. As soon as an event host books your catering, your prep brief will appear right here.</p>
+            <button class="btn-preview-store" onclick="showToast('Opening public preview')">Preview Public Storefront</button>
+          </div>
+        `;
+        mobileAlert.style.display = 'none';
+        showToast('Switched to Zero Bookings state (Empty state demonstration)');
+      } else if (state === 'kyc') {
+        document.getElementById('state-kyc-rejected').classList.add('active');
+        alertCard.style.display = 'flex';
+        alertCard.style.borderLeftColor = 'var(--color-red)';
+        document.getElementById('urgent-alert-heading').innerText = 'Action Required: FSSAI License Document Rejected';
+        document.getElementById('urgent-alert-desc').innerText = 'Admin review found the submitted FSSAI certificate expired. Upload a valid renewal certificate to maintain live marketplace visibility.';
+        badgeVerification.innerHTML = '⚠️ KYC Action Required';
+        badgeVerification.style.background = 'var(--color-red)';
+        statusText.innerText = 'KYC compliance issue detected. Please resubmit the requested document.';
+        showToast('Switched to KYC Rejected state');
+      } else if (state === 'hidden') {
+        document.getElementById('state-hidden').classList.add('active');
+        badgeMarketplace.innerHTML = '⛔ Storefront Hidden by Admin';
+        badgeMarketplace.style.background = 'var(--color-red)';
+        badgeMarketplace.style.color = 'var(--color-cream)';
+        statusText.innerText = 'Your caterer storefront is temporarily hidden from search results. Contact partner support.';
+        alertCard.style.display = 'flex';
+        document.getElementById('urgent-alert-heading').innerText = 'Notice: Listing Temporarily Delisted';
+        document.getElementById('urgent-alert-desc').innerText = 'Your account has been placed on temporary hold. Please contact Bhojpatra Admin to reactivate customer discovery.';
+        showToast('Switched to Listing Hidden state');
+      }
+    }
+
+    // Modal helpers
+    function openPrepSheetModal() {
+      document.getElementById('modal-prep-sheet').classList.add('open');
+    }
+    function openBookingModal() {
+      document.getElementById('modal-booking-review').classList.add('open');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    // Interactive booking actions
+    function acceptBooking() {
+      closeModal('modal-booking-review');
+      document.getElementById('card-urgent-alert').style.display = 'none';
+      document.getElementById('mobile-card-urgent').style.display = 'none';
+      document.getElementById('desktop-orders-badge').style.display = 'none';
+      document.getElementById('desktop-notif-dot').style.display = 'none';
+      showToast('✓ Booking BHOJ-9412 Accepted! Added to Active Pipeline.');
+    }
+    function declineBooking() {
+      closeModal('modal-booking-review');
+      document.getElementById('card-urgent-alert').style.display = 'none';
+      document.getElementById('mobile-card-urgent').style.display = 'none';
+      showToast('Booking request BHOJ-9412 declined.');
+    }
+
+    // Toast message helper
+    function showToast(msg) {
+      const toast = document.getElementById('toast-el');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

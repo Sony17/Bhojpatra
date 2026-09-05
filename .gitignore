@@ -69,3 +69,6 @@ next-env.d.ts
 
 # Agent skills
 .agents/skills/
+
+# Local scratch and test scripts
+/scratch/
