@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bhojpatra — Vendor Registration & Onboarding Experience Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="mode-desktop">
+
+  <!-- ── Top Prototyping Control Bar (Sticky at Top) ── -->
+  <header class="prototype-bar">
+    <div class="prototype-brand">
+      <span class="prototype-logo-badge">BHOJPATRA</span>
+      <span>Vendor Experience Prototype</span>
+    </div>
+
+    <div class="prototype-controls">
+      <!-- Viewport Canvas Switcher -->
+      <div class="control-group">
+        <span class="control-label">Canvas:</span>
+        <button class="btn-toggle active" data-mode="desktop" onclick="setViewMode('desktop')">Desktop (1440px)</button>
+        <button class="btn-toggle" data-mode="mobile" onclick="setViewMode('mobile')">Mobile (390px)</button>
+        <button class="btn-toggle" data-mode="sidebyside" onclick="setViewMode('sidebyside')">Side-by-Side</button>
+      </div>
+
+      <!-- Jump Directly to Any Step or Sub-Step -->
+      <div class="control-group">
+        <span class="control-label">Jump to View:</span>
+        <select class="control-select" id="prototype-step-jump" onchange="goToStep(this.value)">
+          <optgroup label="General Onboarding">
+            <option value="view-details">01. Vendor Details</option>
+            <option value="view-basic">02. Basic Info & Coverage</option>
+            <option value="view-kyc">03. Statutory KYC</option>
+            <option value="view-offerings">04. Service Offerings</option>
+          </optgroup>
+          <optgroup label="5. Catering Menu Builder">
+            <option value="view-cat-basics">5A. Feast Basics</option>
+            <option value="view-cat-courses">5B. Course Hierarchy</option>
+            <option value="view-cat-dishes">5C. Dish Builder</option>
+            <option value="view-cat-tiers">5D. Tier Configuration</option>
+            <option value="view-cat-extras">5E. Live Counters & Services</option>
+            <option value="view-cat-review">5F. Catering Review</option>
+          </optgroup>
+          <optgroup label="6. Single Stall Builder">
+            <option value="view-stall-basics">6A. Stall Basics</option>
+            <option value="view-stall-format">6B. Menu Style & Format</option>
+            <option value="view-stall-items">6C. Delicacies Catalog</option>
+            <option value="view-stall-pricing">6D. Pricing & Capacity</option>
+            <option value="view-stall-review">6E. Stall Review</option>
+          </optgroup>
+          <optgroup label="7. Baina Gifting Builder">
+            <option value="view-baina-basics">7A. Gifting Basics</option>
+            <option value="view-baina-boxes">7B. Box Catalog</option>
+            <option value="view-baina-packaging">7C. Packaging Styles</option>
+            <option value="view-baina-review">7D. Baina Review</option>
+          </optgroup>
+          <optgroup label="Final Review & Go-Live">
+            <option value="view-review">08. Final Registration Review</option>
+            <option value="view-complete">09. Registration Complete</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Quick Scenario Preset -->
+      <div class="control-group">
+        <span class="control-label">Demo Preset:</span>
+        <select class="control-select" onchange="applyScenarioPreset(this.value)">
+          <option value="catering">Full Feast Caterer</option>
+          <option value="stall">Specialty Food Stall</option>
+          <option value="baina">Mithai & Baina Artisan</option>
+          <option value="all">Multi-Service Partner (All 3)</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main Viewport Canvas (Desktop & Mobile Frames) ── -->
+  <main class="viewport-canvas">
+
+    <!-- ====================================================================
+         DESKTOP FRAME (1440px Canvas)
+         ==================================================================== -->
+    <section class="frame-wrapper" id="wrapper-desktop">
+      <div class="frame-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Desktop Canvas (1440px)
+      </div>
+
+      <div class="desktop-frame">
+        <!-- Top App Bar -->
+        <header class="wizard-header">
+          <div class="wizard-brand">
+            <div class="brand-icon">भ</div>
+            <div>
+              <div class="brand-name">Bhojpatra</div>
+              <div class="brand-tagline">Vendor Partner Onboarding</div>
+            </div>
+          </div>
+
+          <div class="wizard-header-help">
+            <a class="help-link" onclick="showToast('Connecting to Bhojpatra Onboarding Support on WhatsApp...')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+              <span>Need help? Chat with Concierge</span>
+            </a>
+          </div>
+        </header>
+
+        <!-- Stepper Progress Bar (Consolidated 6 Main Phases) -->
+        <nav class="wizard-stepper-bar" aria-label="Onboarding Steps">
+          <div class="stepper-track" id="desktop-stepper-track"></div>
+        </nav>
+
+        <!-- Subnav Breadcrumbs for Catering Builder (5A to 5F) -->
+        <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
+          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">5A. Feast Basics</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">5B. Courses</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">5C. Dishes</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">5D. Tiers</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-extras" onclick="goToStep('view-cat-extras')">5E. Live Counters</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-review" onclick="goToStep('view-cat-review')">5F. Catering Review</button>
+        </nav>
+
+        <!-- Subnav Breadcrumbs for Stall Builder (6A to 6E) -->
+        <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
+          <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">6A. Stall Basics</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-format" onclick="goToStep('view-stall-format')">6B. Menu Format</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-items" onclick="goToStep('view-stall-items')">6C. Delicacies</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">6D. Pricing & Capacity</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-review" onclick="goToStep('view-stall-review')">6E. Stall Review</button>
+        </nav>
+
+        <!-- Subnav Breadcrumbs for Baina Builder (7A to 7D) -->
+        <nav class="builder-subnav-bar" data-subnav-group="baina" style="display: none;">
+          <button type="button" class="subnav-pill" data-target-step="view-baina-basics" onclick="goToStep('view-baina-basics')">7A. Gifting Basics</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-boxes" onclick="goToStep('view-baina-boxes')">7B. Box Catalog</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-packaging" onclick="goToStep('view-baina-packaging')">7C. Packaging Styles</button>
+          <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-review" onclick="goToStep('view-baina-review')">7D. Baina Review</button>
+        </nav>
+
+        <!-- Body Scroll Area (Hosting All Step & Sub-Step Views) -->
+        <div class="wizard-body">
+
+          <!-- ── VIEW 01: VENDOR DETAILS ── -->
+          <article class="step-container active" data-step-id="view-details">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 1 · Business Identity</div>
+              <h1 class="step-heading">Tell us about your catering business</h1>
+              <p class="step-subtext">Let's start with your official trading name, registered owner details, and primary culinary specialities.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="d-biz-name">Business / Catering Brand Name *</label>
+                  <input type="text" id="d-biz-name" class="form-input" data-bind="details.businessName" value="Awadhi Royal Caterers" placeholder="e.g. Awadhi Royal Caterers" />
+                  <span class="field-hint">This name will be prominently displayed to customers in the catalog.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-owner-name">Owner / Primary Contact Name *</label>
+                  <input type="text" id="d-owner-name" class="form-input" data-bind="details.ownerName" value="Mohammad Zeeshaan" placeholder="Full legal name" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-phone">Contact Mobile Number *</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">+91</span>
+                    <input type="tel" id="d-phone" class="form-input" data-bind="details.phone" value="9876543210" placeholder="10-digit mobile number" />
+                  </div>
+                  <span class="field-hint">We send booking alerts and verification updates to this WhatsApp number.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-email">Account Email Address *</label>
+                  <input type="email" id="d-email" class="form-input" data-bind="details.email" value="contact@awadhiroyal.com" placeholder="business@example.com" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-city">Primary Kitchen City *</label>
+                  <select id="d-city" class="form-select" data-bind="details.city">
+                    <option value="Lucknow" selected>Lucknow</option>
+                    <option value="Kanpur">Kanpur</option>
+                    <option value="Varanasi">Varanasi</option>
+                    <option value="Ayodhya">Ayodhya</option>
+                    <option value="Prayagraj">Prayagraj</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-state">State *</label>
+                  <select id="d-state" class="form-select" data-bind="details.state">
+                    <option value="Uttar Pradesh" selected>Uttar Pradesh</option>
+                    <option value="Delhi">Delhi</option>
+                    <option value="Bihar">Bihar</option>
+                    <option value="Madhya Pradesh">Madhya Pradesh</option>
+                  </select>
+                </div>
+
+                <!-- Cuisines -->
+                <div class="form-group full-width">
+                  <label class="form-label">Cuisine Specialities * <span class="form-label-sub">Pick all that apply</span></label>
+                  <div class="chip-group">
+                    <button type="button" class="chip selected" data-cuisine="Awadhi">Awadhi</button>
+                    <button type="button" class="chip selected" data-cuisine="Mughlai">Mughlai</button>
+                    <button type="button" class="chip selected" data-cuisine="North Indian">North Indian</button>
+                    <button type="button" class="chip" data-cuisine="Punjabi">Punjabi</button>
+                    <button type="button" class="chip" data-cuisine="South Indian">South Indian</button>
+                    <button type="button" class="chip" data-cuisine="Chinese">Chinese</button>
+                    <button type="button" class="chip" data-cuisine="Continental">Continental</button>
+                    <button type="button" class="chip" data-cuisine="Sweets">Sweets & Mithai</button>
+                    <button type="button" class="chip" data-cuisine="Chaat">Street Chaat</button>
+                    <div class="chip-custom-adder">
+                      <input type="text" class="input-chip-add" placeholder="+ Custom cuisine" />
+                      <button type="button" class="btn-chip-add btn-add-custom-cuisine" title="Add cuisine">+</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Google Reputation Import -->
+                <div class="form-group full-width" style="background: rgba(240,208,158,0.15); border: 1px solid var(--color-cream); border-radius: var(--radius-control); padding: 16px;">
+                  <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <span>⭐ Google Business Reputation (Optional)</span>
+                    <span class="feature-pill">Instant Trust Badge</span>
+                  </div>
+                  <p style="font-size: 12px; color: #555; margin-bottom: 12px;">Already established on Google Maps? Import your rating so your Bhojpatra card displays a verified star badge from Day 1.</p>
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label class="form-label" for="d-google-rating">Google Rating (0 to 5.0)</label>
+                      <input type="number" id="d-google-rating" class="form-input" min="0" max="5" step="0.1" value="4.8" placeholder="e.g. 4.8" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="d-google-reviews">Number of Google Reviews</label>
+                      <input type="number" id="d-google-reviews" class="form-input" min="0" value="142" placeholder="e.g. 142" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 02: BASIC INFO & OPERATIONS ── -->
+          <article class="step-container" data-step-id="view-basic">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 2 · Operations & Capacity</div>
+              <h1 class="step-heading">Operating capacity & service cities</h1>
+              <p class="step-subtext">Define your guest volume bandwidth and serviceable coverage areas so customers receive accurate availability.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label class="form-label" for="d-min-guests">Min Guests per Booking *</label>
+                  <input type="number" id="d-min-guests" class="form-input" data-bind="basic.minGuests" value="50" min="10" />
+                  <span class="field-hint">Smallest event you accept.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-max-guests">Max Guests per Event *</label>
+                  <input type="number" id="d-max-guests" class="form-input" data-bind="basic.maxGuests" value="1500" min="50" />
+                  <span class="field-hint">Peak kitchen handling capacity.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-max-events">Max Events per Day *</label>
+                  <input type="number" id="d-max-events" class="form-input" data-bind="basic.maxEventsPerDay" value="3" min="1" max="10" />
+                  <span class="field-hint">Prevents overbooking calendar.</span>
+                </div>
+
+                <!-- Serviceable Cities -->
+                <div class="form-group full-width">
+                  <label class="form-label">Serviceable Coverage Cities * <span class="form-label-sub">Where can your team travel to cater?</span></label>
+                  <div class="chip-group">
+                    <button type="button" class="chip selected" data-city="Lucknow">Lucknow</button>
+                    <button type="button" class="chip selected" data-city="Kanpur">Kanpur</button>
+                    <button type="button" class="chip selected" data-city="Ayodhya">Ayodhya</button>
+                    <button type="button" class="chip" data-city="Prayagraj">Prayagraj</button>
+                    <button type="button" class="chip" data-city="Varanasi">Varanasi</button>
+                    <button type="button" class="chip" data-city="Gorakhpur">Gorakhpur</button>
+                    <div class="chip-custom-adder">
+                      <input type="text" class="input-chip-add" placeholder="+ Other city" />
+                      <button type="button" class="btn-chip-add btn-add-custom-city" title="Add city">+</button>
+                    </div>
+                  </div>
+                  <span class="field-hint">Customers in these cities will see your listing in their regional marketplace search.</span>
+                </div>
+
+                <!-- Lead Time Notice -->
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-lead-hours">Minimum Preparation Notice</label>
+                  <select id="d-lead-hours" class="form-select">
+                    <option value="24">24 hours notice</option>
+                    <option value="48" selected>48 hours notice (Standard for feasts)</option>
+                    <option value="72">72 hours notice (3 days)</option>
+                    <option value="168">7 days notice (Large weddings only)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 03: KYC & COMPLIANCE ── -->
+          <article class="step-container" data-step-id="view-kyc">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 3 · Compliance & Verification</div>
+              <h1 class="step-heading">Statutory KYC & licence documents</h1>
+              <p class="step-subtext">Bhojpatra is a verified-only marketplace. Enter your regulatory tax numbers and upload verification proofs.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="d-gst-num">GSTIN Number * <span class="form-label-sub">15 alphanumeric chars</span></label>
+                  <input type="text" id="d-gst-num" class="form-input" data-bind="kyc.gstNumber" value="09AAACA1234A1Z5" placeholder="e.g. 09AAACA1234A1Z5" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-fssai-num">FSSAI Licence Number * <span class="form-label-sub">14-digit food safety ID</span></label>
+                  <input type="text" id="d-fssai-num" class="form-input" data-bind="kyc.fssaiNumber" value="12723055000123" placeholder="e.g. 12723055000123" />
+                </div>
+              </div>
+
+              <!-- Upload Document Tiles -->
+              <div>
+                <label class="form-label" style="margin-bottom: 12px;">Upload Statutory Verification Documents</label>
+                <div class="kyc-docs-grid">
+                  <div class="doc-upload-card uploaded" data-doc-key="gst">
+                    <div class="doc-icon-glyph">✓</div>
+                    <div class="doc-title-text">GST Certificate</div>
+                    <div class="doc-hint-text"><span class="doc-uploaded-badge">✓ gst_certificate_2026.pdf</span></div>
+                  </div>
+
+                  <div class="doc-upload-card uploaded" data-doc-key="fssai">
+                    <div class="doc-icon-glyph">✓</div>
+                    <div class="doc-title-text">FSSAI Licence</div>
+                    <div class="doc-hint-text"><span class="doc-uploaded-badge">✓ fssai_licence_awadh.pdf</span></div>
+                  </div>
+
+                  <div class="doc-upload-card uploaded" data-doc-key="ownerId">
+                    <div class="doc-icon-glyph">✓</div>
+                    <div class="doc-title-text">Owner Government ID</div>
+                    <div class="doc-hint-text"><span class="doc-uploaded-badge">✓ owner_pan_card.jpg</span></div>
+                  </div>
+
+                  <div class="doc-upload-card uploaded" data-doc-key="businessProof">
+                    <div class="doc-icon-glyph">✓</div>
+                    <div class="doc-title-text">Business Proof / Shop Act</div>
+                    <div class="doc-hint-text"><span class="doc-uploaded-badge">✓ shop_act_licence.pdf</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background: rgba(240,208,158,0.15); border-left: 4px solid var(--color-red); padding: 14px; border-radius: 8px; font-size: 13px; color: #444; line-height: 1.5;">
+                <strong style="color: var(--color-black);">Bhojpatra Trust Guarantee:</strong> Your uploaded documents are reviewed exclusively by Bhojpatra's compliance managers. Your documents are never shared publicly with customers.
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 04: SERVICE OFFERING SELECTION (WHAT DO YOU OFFER?) ── -->
+          <article class="step-container" data-step-id="view-offerings">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 4 · Primary Service Selection</div>
+              <h1 class="step-heading">What services do you provide?</h1>
+              <p class="step-subtext">Select everything your enterprise offers. We will guide you through dedicated menu builders for each selection.</p>
+            </header>
+
+            <div class="service-cards-grid">
+              <!-- Offering 1: Catering -->
+              <div class="service-card-select selected" data-offering="catering">
+                <div class="service-card-icon">🍲</div>
+                <div class="service-card-body">
+                  <div class="service-card-tag">Full Event Feasts</div>
+                  <h3 class="service-card-title">Full Catering Services</h3>
+                  <p class="service-card-desc">Complete multi-course feasts for weddings, receptions, and corporate banquets. Tiered packages (Silver, Gold, Platinum) with starters, main dishes, and buffet styling.</p>
+                  <div class="service-features-list">
+                    <span class="feature-pill">Per-Plate Pricing</span>
+                    <span class="feature-pill">Silver · Gold · Platinum</span>
+                    <span class="feature-pill">Course Dish Quotas</span>
+                  </div>
+                </div>
+                <div class="service-checkbox-indicator">✓</div>
+              </div>
+
+              <!-- Offering 2: Stall -->
+              <div class="service-card-select" data-offering="stall">
+                <div class="service-card-icon">🍢</div>
+                <div class="service-card-body">
+                  <div class="service-card-tag">Single Brand Food Station</div>
+                  <h3 class="service-card-title">Single Food Stall</h3>
+                  <p class="service-card-desc">Specialized single food counters serving an occasion (e.g. iconic Biryani corner, live Chaat counter, Dosa station, Kebab grill) with a set spread or delicacy menu.</p>
+                  <div class="service-features-list">
+                    <span class="feature-pill">Fixed Spread or Build-Your-Own</span>
+                    <span class="feature-pill">Individual Stall Pricing</span>
+                    <span class="feature-pill">Occasion Bookings</span>
+                  </div>
+                </div>
+                <div class="service-checkbox-indicator"></div>
+              </div>
+
+              <!-- Offering 3: Baina -->
+              <div class="service-card-select" data-offering="baina">
+                <div class="service-card-icon">🎁</div>
+                <div class="service-card-body">
+                  <div class="service-card-tag">Sweet & Gifting Packaging</div>
+                  <h3 class="service-card-title">Baina Box Gifting</h3>
+                  <p class="service-card-desc">Custom wedding and festival gifting boxes, traditional mithai hampers, and dry fruit packages delivered directly to event hosts or guests.</p>
+                  <div class="service-features-list">
+                    <span class="feature-pill">½ kg & 1 kg Base Prices</span>
+                    <span class="feature-pill">Custom Hamper Sizes</span>
+                    <span class="feature-pill">Direct Gifting Orders</span>
+                  </div>
+                </div>
+                <div class="service-checkbox-indicator"></div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ================================================================
+               CATERING MENU BUILDER (5A TO 5F)
+               ================================================================ -->
+
+          <!-- ── VIEW 5A: FEAST BASICS ── -->
+          <article class="step-container" data-step-id="view-cat-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5A of 5F</div>
+              <h1 class="step-heading">Feast package identity</h1>
+              <p class="step-subtext">Name and describe the foundational catering package your team brings to celebrations.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-cat-feast-name">Feast / Package Display Name *</label>
+                  <input type="text" id="d-cat-feast-name" class="form-input" data-bind="catering.feastName" value="Royal Awadhi Dastarkhwan" placeholder="e.g. Royal Awadhi Dastarkhwan" />
+                  <span class="field-hint">The headline name displayed to event hosts browsing your catering catalog.</span>
+                </div>
+
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-cat-feast-desc">Feast Culinary Description</label>
+                  <textarea id="d-cat-feast-desc" class="form-textarea" data-bind="catering.description" placeholder="Describe the royal heritage, specialty cooking techniques, or dining experience...">Heritage royal multi-course feast inspired by Nawabi culinary traditions.</textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-cat-cuisine-ctx">Cuisine Experience Focus</label>
+                  <input type="text" id="d-cat-cuisine-ctx" class="form-input" data-bind="catering.cuisineContext" value="Awadhi & Mughlai" />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Starting Tier Reference Rate</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">₹</span>
+                    <input type="number" class="form-input" value="799" readonly style="background: rgba(240,208,158,0.15); cursor: not-allowed;" />
+                  </div>
+                  <span class="field-hint">You will configure Silver, Gold, and Platinum rates in Step 5D.</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 5B: COURSES HIERARCHY ── -->
+          <article class="step-container" data-step-id="view-cat-courses">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5B of 5F</div>
+              <h1 class="step-heading">Configure catering courses</h1>
+              <p class="step-subtext">These courses structure how dishes are organized and served during the dining experience.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="course-manage-list course-manage-list-container">
+                <!-- Populated dynamically via renderCourseManageList() -->
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                <button type="button" class="btn-secondary" onclick="addNewCoursePrompt()">+ Add Custom Course</button>
+                <button type="button" class="btn-dish-action" onclick="goToStep('view-cat-dishes')">Continue to Dish Builder →</button>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 5C: DISH BUILDER ── -->
+          <article class="step-container" data-step-id="view-cat-dishes">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5C of 5F</div>
+              <h1 class="step-heading">Build your dish catalog</h1>
+              <p class="step-subtext">Add dishes into each course, specify Veg/Non-Veg, and select which feast tiers include each delicacy.</p>
+            </header>
+
+            <div class="content-card">
+              <!-- Course Tabs -->
+              <div class="course-tabs-nav course-tabs-nav-container">
+                <!-- Populated dynamically via renderCourseTabs() -->
+              </div>
+
+              <!-- Dish Cards List -->
+              <div class="dish-list-container">
+                <!-- Populated dynamically via renderCateringDishes() -->
+              </div>
+
+              <!-- Add Dish CTA -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                <button type="button" class="btn-primary" onclick="openDishModal()" style="min-height: 44px; padding: 0 20px;">
+                  <span>+ Add Dish to this Course</span>
+                </button>
+                <button type="button" class="btn-secondary" onclick="goToStep('view-cat-tiers')">
+                  <span>Next: Configure Tiers →</span>
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 5D: TIER CONFIGURATION ── -->
+          <article class="step-container" data-step-id="view-cat-tiers">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5D of 5F</div>
+              <h1 class="step-heading">Tier pricing & course quotas</h1>
+              <p class="step-subtext">Define the per-plate price and allowed dish counts for Silver, Gold, and Platinum feast packages.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="tier-matrix-grid">
+                <!-- 1. Silver Tier -->
+                <div class="tier-column-card">
+                  <span class="tier-badge-pill tier-silver">SILVER TIER</span>
+                  <div>
+                    <label class="form-label">Price per Plate *</label>
+                    <div class="input-with-prefix">
+                      <span class="input-prefix">₹</span>
+                      <input type="number" id="tier-price-silver" class="form-input" value="799" onchange="updateTierPrice('silver', this.value)" />
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #777; margin-top: 6px;">Course Inclusions</div>
+                  <div id="quotas-silver">
+                    <!-- Populated dynamically via renderTierMatrix() -->
+                  </div>
+                </div>
+
+                <!-- 2. Gold Tier -->
+                <div class="tier-column-card gold-card">
+                  <span class="tier-badge-pill tier-gold">GOLD TIER (POPULAR)</span>
+                  <div>
+                    <label class="form-label">Price per Plate *</label>
+                    <div class="input-with-prefix">
+                      <span class="input-prefix">₹</span>
+                      <input type="number" id="tier-price-gold" class="form-input" value="1199" onchange="updateTierPrice('gold', this.value)" />
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #777; margin-top: 6px;">Course Inclusions</div>
+                  <div id="quotas-gold">
+                    <!-- Populated dynamically via renderTierMatrix() -->
+                  </div>
+                </div>
+
+                <!-- 3. Platinum Tier -->
+                <div class="tier-column-card platinum-card">
+                  <span class="tier-badge-pill tier-platinum">PLATINUM ROYAL</span>
+                  <div>
+                    <label class="form-label">Price per Plate *</label>
+                    <div class="input-with-prefix">
+                      <span class="input-prefix">₹</span>
+                      <input type="number" id="tier-price-platinum" class="form-input" value="1699" onchange="updateTierPrice('platinum', this.value)" />
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #777; margin-top: 6px;">Course Inclusions</div>
+                  <div id="quotas-platinum">
+                    <!-- Populated dynamically via renderTierMatrix() -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 5E: LIVE COUNTERS & ESSENTIAL SERVICES ── -->
+          <article class="step-container" data-step-id="view-cat-extras">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5E of 5F</div>
+              <h1 class="step-heading">Live counters & essential services</h1>
+              <p class="step-subtext">Highlight experiential live food counters and on-site event staff hospitality inclusions.</p>
+            </header>
+
+            <div class="content-card">
+              <div>
+                <label class="form-label" style="margin-bottom: 8px;">Select Available Live Food Stations <span class="form-label-sub">With per-guest add-on pricing</span></label>
+                <div class="chip-group">
+                  <button type="button" class="chip selected" data-live-counter="Pan Counter">Pan Counter (+₹40/p)</button>
+                  <button type="button" class="chip selected" data-live-counter="Chaat Station">Chaat Station (+₹60/p)</button>
+                  <button type="button" class="chip selected" data-live-counter="Live Tandoor">Live Tandoor (+₹90/p)</button>
+                  <button type="button" class="chip" data-live-counter="Pizza Counter">Pizza Counter (+₹120/p)</button>
+                  <button type="button" class="chip" data-live-counter="Chinese Wok">Chinese Wok (+₹85/p)</button>
+                  <button type="button" class="chip" data-live-counter="Dessert Studio">Dessert Studio (+₹70/p)</button>
+                </div>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <label class="form-label" style="margin-bottom: 12px;">Essential Hospitality & Service Inclusions</label>
+                <div class="form-grid-3">
+                  <div class="stall-format-card selected" style="padding: 14px;">
+                    <div style="font-weight: 700; font-size: 14px; color: var(--color-black);">Uniformed Service Staff</div>
+                    <div style="font-size: 12px; color: #555;">Trained stewards and banquet captains included in quotation.</div>
+                  </div>
+                  <div class="stall-format-card selected" style="padding: 14px;">
+                    <div style="font-weight: 700; font-size: 14px; color: var(--color-black);">Cleaning & Hygiene Crew</div>
+                    <div style="font-size: 12px; color: #555;">Continuous table clearing and buffet sanitation.</div>
+                  </div>
+                  <div class="stall-format-card selected" style="padding: 14px;">
+                    <div style="font-weight: 700; font-size: 14px; color: var(--color-black);">Waste Management</div>
+                    <div style="font-size: 12px; color: #555;">Eco-friendly segregation and end-of-event disposal.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 5F: CATERING REVIEW ── -->
+          <article class="step-container" data-step-id="view-cat-review">
+            <header class="step-header">
+              <div class="step-eyebrow">Catering Builder · 5F of 5F</div>
+              <h1 class="step-heading">Catering offering summary</h1>
+              <p class="step-subtext">Review your feast packages and dish offerings before continuing your onboarding setup.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🍲 Feast Basics</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-cat-basics')">Edit Basics</button>
+                </div>
+                <div style="font-size: 16px; font-weight: 700; color: var(--color-black);" id="cat-rev-feast-name">Royal Awadhi Dastarkhwan</div>
+                <div style="font-size: 13px; color: #555; margin-top: 4px;" id="cat-rev-feast-desc">Heritage royal multi-course feast inspired by Nawabi culinary traditions.</div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🏷️ Tier Pricing Rates</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-cat-tiers')">Edit Tiers</button>
+                </div>
+                <div style="font-size: 14px; font-weight: 600;" id="cat-rev-tiers">Silver: ₹799/p · Gold: ₹1199/p · Platinum: ₹1699/p</div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🍽️ Courses & Dishes</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-cat-dishes')">Edit Dishes</button>
+                </div>
+                <div style="font-size: 13px; color: #555; margin-bottom: 8px;" id="cat-rev-courses">6 courses configured</div>
+                <div style="font-size: 13px; color: #555; margin-bottom: 8px;" id="cat-rev-dishes">13 individual delicacies configured across courses.</div>
+                <div id="cat-rev-dishes-sample-list" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🔥 Live Food Stations</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-cat-extras')">Edit Extras</button>
+                </div>
+                <div style="font-size: 14px;" id="cat-rev-counters">Pan Counter, Chaat Station, Live Tandoor</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ================================================================
+               SINGLE STALL BUILDER (6A TO 6E)
+               ================================================================ -->
+
+          <!-- ── VIEW 6A: STALL BASICS ── -->
+          <article class="step-container" data-step-id="view-stall-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Builder · 6A of 6E</div>
+              <h1 class="step-heading">Single Stall brand & category</h1>
+              <p class="step-subtext">Set up your single brand food station display identity and culinary category specialty.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-stall-name-input">Stall Brand / Display Name *</label>
+                  <input type="text" id="d-stall-name-input" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" />
+                  <span class="field-hint">Publicly displayed banner name on the Bhojpatra Stall marketplace.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-stall-spec-sel">Category Speciality</label>
+                  <select id="d-stall-spec-sel" class="form-select" data-bind="stall.specialty">
+                    <option value="Mughlai & Tandoor Station" selected>Mughlai & Tandoor Station</option>
+                    <option value="Street Food & Chaat Corner">Street Food & Chaat Corner</option>
+                    <option value="South Indian Dosa Bar">South Indian Dosa Bar</option>
+                    <option value="Dessert & Jalebi Studio">Dessert & Jalebi Studio</option>
+                    <option value="Woodfired Pizza Corner">Woodfired Pizza Corner</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-stall-desc">Stall Experience Description</label>
+                  <input type="text" id="d-stall-desc" class="form-input" data-bind="stall.description" value="Authentic charcoal-dum service station catering live kebabs and dum biryani." />
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 6B: STALL MENU FORMAT ── -->
+          <article class="step-container" data-step-id="view-stall-format">
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Builder · 6B of 6E</div>
+              <h1 class="step-heading">Stall menu operating format</h1>
+              <p class="step-subtext">Choose how event hosts book and pay for your stall spread.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="stall-format-grid">
+                <!-- Option 1: Fixed Spread -->
+                <div class="stall-format-card selected" onclick="state.stall.menuType='fixed'; bindStallMenuType();">
+                  <div class="stall-format-title">
+                    <span>Fixed Set Spread</span>
+                    <span class="feature-pill">Host Favorite</span>
+                  </div>
+                  <p class="stall-format-desc">Host pays a flat per-plate rate. All published delicacies in your stall spread are prepared and served to every guest.</p>
+                </div>
+
+                <!-- Option 2: Varied Build-Your-Own -->
+                <div class="stall-format-card" onclick="state.stall.menuType='varied'; bindStallMenuType();">
+                  <div class="stall-format-title">
+                    <span>Varied / Build-Your-Own</span>
+                    <span class="feature-pill">Custom Menus</span>
+                  </div>
+                  <p class="stall-format-desc">Host curates individual delicacies from your stall menu. Pricing is calculated dynamically per selected item.</p>
+                </div>
+              </div>
+
+              <!-- Segmented format button toggler -->
+              <div class="segmented-control" style="margin-top: 10px;">
+                <button type="button" class="segmented-btn active" data-stall-type="fixed">Fixed Set Spread Format</button>
+                <button type="button" class="segmented-btn" data-stall-type="varied">Varied (Delicacy Pricing)</button>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 6C: STALL DELICACIES ── -->
+          <article class="step-container" data-step-id="view-stall-items">
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Builder · 6C of 6E</div>
+              <h1 class="step-heading">Stall delicacies & specialties</h1>
+              <p class="step-subtext">List the signature items, portion descriptions, and prices prepared at your station.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="delicacy-list-container">
+                <!-- Populated dynamically via renderStallDelicacies() -->
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                <button type="button" class="btn-primary" onclick="openDelicacyModal()" style="min-height: 44px; padding: 0 20px;">
+                  <span>+ Add Delicacy Item</span>
+                </button>
+                <button type="button" class="btn-secondary" onclick="goToStep('view-stall-pricing')">
+                  <span>Next: Pricing & Pax Guarantee →</span>
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 6D: STALL PRICING & CAPACITY ── -->
+          <article class="step-container" data-step-id="view-stall-pricing">
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Builder · 6D of 6E</div>
+              <h1 class="step-heading">Pricing & booking commitments</h1>
+              <p class="step-subtext">Set your rates, minimum guest guarantees, and station booking constraints.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="d-stall-fixed-rate">Fixed Per-Plate Rate (₹) *</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">₹</span>
+                    <input type="number" id="d-stall-fixed-rate" class="form-input" data-bind="stall.fixedPerPlate" value="280" />
+                  </div>
+                  <span class="field-hint">Applies when booked as an all-inclusive set spread.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-stall-min-pax">Minimum Guest Guarantee *</label>
+                  <input type="number" id="d-stall-min-pax" class="form-input" data-bind="stall.minPaxGuarantee" value="50" min="20" />
+                  <span class="field-hint">Minimum pax billable to book this stall for an event.</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 6E: STALL REVIEW ── -->
+          <article class="step-container" data-step-id="view-stall-review">
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Builder · 6E of 6E</div>
+              <h1 class="step-heading">Food Stall offering summary</h1>
+              <p class="step-subtext">Verify your stall configurations before proceeding.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🍢 Stall Identity</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-stall-basics')">Edit</button>
+                </div>
+                <div style="font-size: 16px; font-weight: 700;" id="stall-rev-name">Awadhi Dum Biryani Corner (Mughlai & Tandoor)</div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">📋 Menu Format & Terms</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-stall-format')">Edit</button>
+                </div>
+                <div style="font-size: 14px;" id="stall-rev-format">Fixed Set Spread (₹280/plate) · Min Guarantee: 50 pax</div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🍛 Delicacies Catalog</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-stall-items')">Edit</button>
+                </div>
+                <div style="font-size: 13px; color: #444;" id="stall-rev-items">4 delicacies configured</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ================================================================
+               BAINA BOX BUILDER (7A TO 7D)
+               ================================================================ -->
+
+          <!-- ── VIEW 7A: BAINA BASICS ── -->
+          <article class="step-container" data-step-id="view-baina-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">Baina Builder · 7A of 7D</div>
+              <h1 class="step-heading">Gifting studio identity</h1>
+              <p class="step-subtext">Set up your celebratory gifting studio name and fulfillment constraints.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="form-grid-2">
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-baina-studio-name">Gifting Studio / Mithai Brand Name *</label>
+                  <input type="text" id="d-baina-studio-name" class="form-input" data-bind="baina.studioName" value="Ram Asrey Royal Baina & Mithai Studio" />
+                  <span class="field-hint">Publicly displayed name in the Bhojpatra Baina Box gifting catalog.</span>
+                </div>
+
+                <div class="form-group full-width">
+                  <label class="form-label" for="d-baina-studio-desc">Confectionery Story & Craft</label>
+                  <textarea id="d-baina-studio-desc" class="form-textarea" data-bind="baina.description">Generations-old confectionery crafting artisanal sweet hampers and custom wedding invitation boxes.</textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-baina-min-order">Minimum Order Quantity (Boxes) *</label>
+                  <input type="number" id="d-baina-min-order" class="form-input" data-bind="baina.minOrderBoxes" value="25" min="5" />
+                  <span class="field-hint">Smallest bulk order accepted for wedding hampers.</span>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="d-baina-lead-days">Production Lead Time (Days) *</label>
+                  <input type="number" id="d-baina-lead-days" class="form-input" data-bind="baina.leadDays" value="3" min="1" />
+                  <span class="field-hint">Days required to handcraft and pack fresh batches.</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 7B: BAINA BOX CATALOG ── -->
+          <article class="step-container" data-step-id="view-baina-boxes">
+            <header class="step-header">
+              <div class="step-eyebrow">Baina Builder · 7B of 7D</div>
+              <h1 class="step-heading">Box catalog & specifications</h1>
+              <p class="step-subtext">Configure your signature gifting boxes, contents, ½ kg and 1 kg base rates, and sizes.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="baina-box-list-container">
+                <!-- Populated dynamically via renderBainaBoxes() -->
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                <button type="button" class="btn-primary" onclick="openBoxModal()" style="min-height: 44px; padding: 0 20px;">
+                  <span>+ Add New Gifting Box</span>
+                </button>
+                <button type="button" class="btn-secondary" onclick="goToStep('view-baina-packaging')">
+                  <span>Next: Packaging Styles →</span>
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 7C: BAINA PACKAGING ── -->
+          <article class="step-container" data-step-id="view-baina-packaging">
+            <header class="step-header">
+              <div class="step-eyebrow">Baina Builder · 7C of 7D</div>
+              <h1 class="step-heading">Packaging styles & presentation</h1>
+              <p class="step-subtext">Select the packaging aesthetics available to event hosts ordering your hampers.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="packaging-grid">
+                <div class="packaging-card selected" data-packaging="velvet">
+                  <div class="pkg-icon">🎀</div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 15px;">Royal Velvet Finish</div>
+                    <div style="font-size: 12px; color: #555;">Plush velvet casing with golden embossed clasp. Traditional luxury.</div>
+                  </div>
+                </div>
+
+                <div class="packaging-card" data-packaging="gold-foil">
+                  <div class="pkg-icon">✨</div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 15px;">Golden Metallic Foil</div>
+                    <div style="font-size: 12px; color: #555;">Laser-cut floral jaali pattern with gold foil finish.</div>
+                  </div>
+                </div>
+
+                <div class="packaging-card" data-packaging="eco-kraft">
+                  <div class="pkg-icon">🌿</div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 15px;">Eco-Friendly Kraft Board</div>
+                    <div style="font-size: 12px; color: #555;">100% biodegradable artisan handmade paper with jute tie.</div>
+                  </div>
+                </div>
+
+                <div class="packaging-card" data-packaging="brocade">
+                  <div class="pkg-icon">👑</div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 15px;">Banarasi Brocade Silk</div>
+                    <div style="font-size: 12px; color: #555;">Handwoven silk fabric wrapped over sturdy keepsake boxes.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 7D: BAINA REVIEW ── -->
+          <article class="step-container" data-step-id="view-baina-review">
+            <header class="step-header">
+              <div class="step-eyebrow">Baina Builder · 7D of 7D</div>
+              <h1 class="step-heading">Baina Gifting summary</h1>
+              <p class="step-subtext">Review your gifting box catalog before proceeding to final onboarding verification.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🎁 Gifting Studio</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-baina-basics')">Edit</button>
+                </div>
+                <div style="font-size: 16px; font-weight: 700;" id="baina-rev-studio">Ram Asrey Royal Baina Studio</div>
+                <div style="font-size: 13px; color: #555; margin-top: 4px;" id="baina-rev-terms">Min Order: 25 boxes · Lead Notice: 3 days</div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">📦 Signature Box Catalog</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-baina-boxes')">Edit</button>
+                </div>
+                <div id="baina-rev-boxes-list"></div>
+              </div>
+
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🎀 Packaging & Craft</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-baina-packaging')">Edit</button>
+                </div>
+                <div style="font-size: 14px;" id="baina-rev-packaging">Primary Packaging: VELVET</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 08: FINAL REGISTRATION REVIEW ── -->
+          <article class="step-container" data-step-id="view-review">
+            <header class="step-header">
+              <div class="step-eyebrow">Final Step · Verification & Review</div>
+              <h1 class="step-heading">Review your complete registration</h1>
+              <p class="step-subtext">Please review all submitted enterprise credentials and service offerings. You can edit any section directly.</p>
+            </header>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- 1. Identity -->
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🏢 Business & Owner Identity</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-details')">Edit</button>
+                </div>
+                <dl class="review-dl">
+                  <div>
+                    <dt class="review-dt">Business Name</dt>
+                    <dd class="review-dd" id="rev-business-name">Awadhi Royal Caterers</dd>
+                  </div>
+                  <div>
+                    <dt class="review-dt">Owner & Contact</dt>
+                    <dd class="review-dd" id="rev-owner-name">Mohammad Zeeshaan (9876543210)</dd>
+                  </div>
+                  <div>
+                    <dt class="review-dt">Primary Location</dt>
+                    <dd class="review-dd" id="rev-location">Lucknow, Uttar Pradesh</dd>
+                  </div>
+                  <div>
+                    <dt class="review-dt">Cuisine Specialities</dt>
+                    <dd class="review-dd" id="rev-cuisines">Awadhi, Mughlai, North Indian</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <!-- 2. Operations & Coverage -->
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">📍 Operations & Serviceable Coverage</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-basic')">Edit</button>
+                </div>
+                <dl class="review-dl">
+                  <div>
+                    <dt class="review-dt">Guest Capacity Range</dt>
+                    <dd class="review-dd" id="rev-capacity">50 to 1,500 guests (3 events/day)</dd>
+                  </div>
+                  <div>
+                    <dt class="review-dt">Serviceable Cities</dt>
+                    <dd class="review-dd" id="rev-cities">Lucknow, Kanpur, Ayodhya</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <!-- 3. Compliance -->
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">📋 Statutory Compliance & Documents</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-kyc')">Edit</button>
+                </div>
+                <dl class="review-dl">
+                  <div>
+                    <dt class="review-dt">GSTIN Number</dt>
+                    <dd class="review-dd" id="rev-gst">09AAACA1234A1Z5 (Certificate Attached)</dd>
+                  </div>
+                  <div>
+                    <dt class="review-dt">FSSAI Licence</dt>
+                    <dd class="review-dd" id="rev-fssai">12723055000123 (Licence Attached)</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <!-- 4. Selected Offerings -->
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">🍽️ Active Service Branches</div>
+                  <button type="button" class="btn-edit-step" onclick="goToStep('view-offerings')">Edit</button>
+                </div>
+                <div id="rev-offerings" style="display: flex; gap: 8px;"></div>
+              </div>
+
+              <!-- 5. Service Configuration Summary -->
+              <div class="review-section-card">
+                <div class="review-header-row">
+                  <div class="review-title">⚙️ Built Service Catalogs</div>
+                </div>
+                <div id="rev-service-details"></div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── VIEW 09: REGISTRATION COMPLETE & DASHBOARD GATEWAY ── -->
+          <article class="step-container" data-step-id="view-complete">
+            <div class="success-card-hero">
+              <div class="success-check-bubble">✓</div>
+              <h1 class="step-heading" style="font-size: 34px;">Application Submitted Successfully!</h1>
+              <p class="step-subtext" style="max-width: 540px; margin: 0 auto;">Welcome to the Bhojpatra Partner Network. Your profile, KYC proofs, and built menus have been logged in our verification pipeline.</p>
+
+              <div class="vendor-id-pill">
+                <span>Assigned Vendor ID:</span>
+                <span class="vendor-id-bold">VND-782194</span>
+              </div>
+
+              <!-- Verification Pipeline Status Tracker -->
+              <div style="max-width: 480px; margin: 0 auto; text-align: left; background: #FAF9F6; border: 1px solid var(--color-cream-30); border-radius: var(--radius-card); padding: 18px;">
+                <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--color-red); margin-bottom: 10px;">Verification Timeline</div>
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                  <div style="display: flex; align-items: center; gap: 10px; color: #166534; font-weight: 700;">
+                    <span>✓</span> <span>Step 1: Application & Catalog Registered</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px; color: var(--color-red); font-weight: 700;">
+                    <span>⏳</span> <span>Step 2: KYC Review & FSSAI Verification (24-48h)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px; color: #888;">
+                    <span>○</span> <span>Step 3: Marketplace Go-Live & Order Reception</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dashboard Organization Teaser -->
+              <div class="dashboard-preview-teaser">
+                <div style="font-weight: 700; font-size: 16px; color: var(--color-black);">Your Vendor Dashboard is Ready!</div>
+                <p style="font-size: 13px; color: #555; margin-top: 4px;">The menus and pricing configured during onboarding are automatically ready in your operational dashboard:</p>
+                <div class="teaser-grid">
+                  <div class="teaser-tab-card">
+                    <div class="teaser-tab-title">1. Overview</div>
+                    <div class="teaser-tab-desc">Urgent alerts & upcoming event commitments.</div>
+                  </div>
+                  <div class="teaser-tab-card">
+                    <div class="teaser-tab-title">2. Orders</div>
+                    <div class="teaser-tab-desc">Incoming booking pipeline and prep sheets.</div>
+                  </div>
+                  <div class="teaser-tab-card">
+                    <div class="teaser-tab-title">3. Calendar</div>
+                    <div class="teaser-tab-desc">Blackout dates & event capacity.</div>
+                  </div>
+                  <div class="teaser-tab-card">
+                    <div class="teaser-tab-title">4. Menu & Food</div>
+                    <div class="teaser-tab-desc">Course catalog & offering pricing.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action CTAs -->
+              <div style="margin-top: 32px; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;">
+                <a href="../vendor_dashboard.html" class="btn-primary" style="text-decoration: none;">
+                  <span>Launch Vendor Dashboard (Mockup Demo) →</span>
+                </a>
+                <button type="button" class="btn-secondary" onclick="showToast('Opening Partner Concierge on WhatsApp...')">
+                  <span>Chat with Partner Concierge</span>
+                </button>
+              </div>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- Sticky Footer Navigation Bar (Desktop) -->
+        <footer class="wizard-footer">
+          <button type="button" class="btn-secondary btn-prev-step" onclick="prevStep()">← Back</button>
+          <div class="footer-btn-group">
+            <button type="button" class="btn-ghost" onclick="showToast('Draft progress saved to browser storage ✓')">Save Draft</button>
+            <button type="button" class="btn-primary btn-next-step" onclick="nextStep()">Save & Continue →</button>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         MOBILE FRAME (390px iPhone Viewport)
+         ==================================================================== -->
+    <section class="frame-wrapper" id="wrapper-mobile">
+      <div class="frame-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        Mobile Canvas (390px Viewport)
+      </div>
+
+      <div class="mobile-frame">
+        <div class="mobile-notch"><div class="notch-camera"></div></div>
+
+        <!-- Mobile Header -->
+        <header class="wizard-header">
+          <div class="wizard-brand">
+            <div class="brand-icon">भ</div>
+            <div class="brand-name">Bhojpatra</div>
+          </div>
+          <a class="help-link" onclick="showToast('Opening WhatsApp Support...')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+          </a>
+        </header>
+
+        <!-- Stepper Track Mobile -->
+        <nav class="wizard-stepper-bar">
+          <div class="stepper-track" id="mobile-stepper-track"></div>
+        </nav>
+
+        <!-- Mobile Subnav Breadcrumbs for Catering -->
+        <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
+          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">Basics</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">Courses</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">Dishes</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Tiers</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-extras" onclick="goToStep('view-cat-extras')">Extras</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-review" onclick="goToStep('view-cat-review')">Review</button>
+        </nav>
+
+        <!-- Mobile Body (Shares Active Step IDs with Desktop) -->
+        <div class="wizard-body">
+
+          <!-- View 01 Mobile -->
+          <article class="step-container active" data-step-id="view-details">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 1 · Identity</div>
+              <h1 class="step-heading">Your business details</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label" for="m-biz-name">Business Name *</label>
+                <input type="text" id="m-biz-name" class="form-input" data-bind="details.businessName" value="Awadhi Royal Caterers" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="m-owner-name">Owner Name *</label>
+                <input type="text" id="m-owner-name" class="form-input" data-bind="details.ownerName" value="Mohammad Zeeshaan" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="m-phone">Contact Mobile *</label>
+                <div class="input-with-prefix">
+                  <span class="input-prefix">+91</span>
+                  <input type="tel" id="m-phone" class="form-input" data-bind="details.phone" value="9876543210" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="m-city">Operating City *</label>
+                <select id="m-city" class="form-select" data-bind="details.city">
+                  <option value="Lucknow" selected>Lucknow</option>
+                  <option value="Kanpur">Kanpur</option>
+                  <option value="Varanasi">Varanasi</option>
+                </select>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 02 Mobile -->
+          <article class="step-container" data-step-id="view-basic">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 2 · Operations</div>
+              <h1 class="step-heading">Capacity & coverage</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">Min Guests per Event</label>
+                <input type="number" class="form-input" data-bind="basic.minGuests" value="50" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Guests per Event</label>
+                <input type="number" class="form-input" data-bind="basic.maxGuests" value="1500" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Events per Day</label>
+                <input type="number" class="form-input" data-bind="basic.maxEventsPerDay" value="3" />
+              </div>
+            </div>
+          </article>
+
+          <!-- View 03 Mobile -->
+          <article class="step-container" data-step-id="view-kyc">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 3 · Compliance</div>
+              <h1 class="step-heading">KYC documents</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">GSTIN Number</label>
+                <input type="text" class="form-input" data-bind="kyc.gstNumber" value="09AAACA1234A1Z5" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">FSSAI Licence Number</label>
+                <input type="text" class="form-input" data-bind="kyc.fssaiNumber" value="12723055000123" />
+              </div>
+              <div class="kyc-docs-grid">
+                <div class="doc-upload-card uploaded" data-doc-key="gst">
+                  <div class="doc-icon-glyph">✓</div>
+                  <div class="doc-title-text">GST Certificate</div>
+                </div>
+                <div class="doc-upload-card uploaded" data-doc-key="fssai">
+                  <div class="doc-icon-glyph">✓</div>
+                  <div class="doc-title-text">FSSAI Licence</div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 04 Mobile -->
+          <article class="step-container" data-step-id="view-offerings">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 4 · Services</div>
+              <h1 class="step-heading">What do you provide?</h1>
+            </header>
+            <div class="service-cards-grid">
+              <div class="service-card-select selected" data-offering="catering">
+                <div class="service-card-icon">🍲</div>
+                <div class="service-card-body">
+                  <h3 class="service-card-title">Full Catering</h3>
+                  <p class="service-card-desc">Tiered feast packages with full courses.</p>
+                </div>
+                <div class="service-checkbox-indicator">✓</div>
+              </div>
+              <div class="service-card-select" data-offering="stall">
+                <div class="service-card-icon">🍢</div>
+                <div class="service-card-body">
+                  <h3 class="service-card-title">Single Stall</h3>
+                  <p class="service-card-desc">Specialty food counter station.</p>
+                </div>
+                <div class="service-checkbox-indicator"></div>
+              </div>
+              <div class="service-card-select" data-offering="baina">
+                <div class="service-card-icon">🎁</div>
+                <div class="service-card-body">
+                  <h3 class="service-card-title">Baina Boxes</h3>
+                  <p class="service-card-desc">Wedding sweet gifting hampers.</p>
+                </div>
+                <div class="service-checkbox-indicator"></div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 5A Mobile -->
+          <article class="step-container" data-step-id="view-cat-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">5A · Feast Basics</div>
+              <h1 class="step-heading">Feast identity</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">Feast Name *</label>
+                <input type="text" class="form-input" data-bind="catering.feastName" value="Royal Awadhi Dastarkhwan" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-textarea" data-bind="catering.description">Heritage royal multi-course feast.</textarea>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 5B Mobile -->
+          <article class="step-container" data-step-id="view-cat-courses">
+            <header class="step-header">
+              <div class="step-eyebrow">5B · Courses</div>
+              <h1 class="step-heading">Catering courses</h1>
+            </header>
+            <div class="content-card">
+              <div class="course-manage-list course-manage-list-container"></div>
+              <button type="button" class="btn-secondary" onclick="addNewCoursePrompt()" style="width: 100%; margin-top: 8px;">+ Add Course</button>
+            </div>
+          </article>
+
+          <!-- View 5C Mobile -->
+          <article class="step-container" data-step-id="view-cat-dishes">
+            <header class="step-header">
+              <div class="step-eyebrow">5C · Dishes</div>
+              <h1 class="step-heading">Dish catalog</h1>
+            </header>
+            <div class="content-card">
+              <div class="course-tabs-nav course-tabs-nav-container"></div>
+              <div class="dish-list-container"></div>
+              <button type="button" class="btn-primary" onclick="openDishModal()" style="width: 100%; margin-top: 8px;">+ Add Dish</button>
+            </div>
+          </article>
+
+          <!-- View 5D Mobile -->
+          <article class="step-container" data-step-id="view-cat-tiers">
+            <header class="step-header">
+              <div class="step-eyebrow">5D · Tiers</div>
+              <h1 class="step-heading">Tier pricing</h1>
+            </header>
+            <div class="content-card">
+              <div class="tier-matrix-grid">
+                <div class="tier-column-card">
+                  <span class="tier-badge-pill tier-silver">SILVER</span>
+                  <div class="form-group">
+                    <label class="form-label">Price (₹/p)</label>
+                    <input type="number" class="form-input" value="799" onchange="updateTierPrice('silver', this.value)" />
+                  </div>
+                </div>
+                <div class="tier-column-card gold-card">
+                  <span class="tier-badge-pill tier-gold">GOLD</span>
+                  <div class="form-group">
+                    <label class="form-label">Price (₹/p)</label>
+                    <input type="number" class="form-input" value="1199" onchange="updateTierPrice('gold', this.value)" />
+                  </div>
+                </div>
+                <div class="tier-column-card platinum-card">
+                  <span class="tier-badge-pill tier-platinum">PLATINUM</span>
+                  <div class="form-group">
+                    <label class="form-label">Price (₹/p)</label>
+                    <input type="number" class="form-input" value="1699" onchange="updateTierPrice('platinum', this.value)" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 5E Mobile -->
+          <article class="step-container" data-step-id="view-cat-extras">
+            <header class="step-header">
+              <div class="step-eyebrow">5E · Extras</div>
+              <h1 class="step-heading">Live stations</h1>
+            </header>
+            <div class="content-card">
+              <div class="chip-group">
+                <button type="button" class="chip selected" data-live-counter="Pan Counter">Pan Counter</button>
+                <button type="button" class="chip selected" data-live-counter="Chaat Station">Chaat Station</button>
+                <button type="button" class="chip selected" data-live-counter="Live Tandoor">Live Tandoor</button>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 5F Mobile -->
+          <article class="step-container" data-step-id="view-cat-review">
+            <header class="step-header">
+              <div class="step-eyebrow">5F · Review</div>
+              <h1 class="step-heading">Catering summary</h1>
+            </header>
+            <div class="content-card">
+              <div class="review-section-card">
+                <strong>Royal Awadhi Dastarkhwan</strong>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">Silver ₹799 · Gold ₹1199 · Platinum ₹1699</div>
+                <div style="font-size: 12px; color: #444; margin-top: 4px;">6 Courses · 13 Dishes configured</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 6A to 6E Mobile (Stall) -->
+          <article class="step-container" data-step-id="view-stall-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">6A · Stall</div>
+              <h1 class="step-heading">Stall details</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">Stall Name</label>
+                <input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani Corner" />
+              </div>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-stall-format">
+            <header class="step-header">
+              <div class="step-eyebrow">6B · Format</div>
+              <h1 class="step-heading">Menu format</h1>
+            </header>
+            <div class="content-card">
+              <div class="segmented-control">
+                <button type="button" class="segmented-btn active" data-stall-type="fixed">Fixed Spread</button>
+                <button type="button" class="segmented-btn" data-stall-type="varied">Varied</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-stall-items">
+            <header class="step-header">
+              <div class="step-eyebrow">6C · Items</div>
+              <h1 class="step-heading">Stall delicacies</h1>
+            </header>
+            <div class="content-card">
+              <div class="delicacy-list-container"></div>
+              <button type="button" class="btn-primary" onclick="openDelicacyModal()" style="width: 100%; margin-top: 8px;">+ Add Item</button>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-stall-pricing">
+            <header class="step-header">
+              <div class="step-eyebrow">6D · Pricing</div>
+              <h1 class="step-heading">Stall pricing</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">Fixed Per-Plate Rate (₹)</label>
+                <input type="number" class="form-input" data-bind="stall.fixedPerPlate" value="280" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Min Guarantee (Pax)</label>
+                <input type="number" class="form-input" data-bind="stall.minPaxGuarantee" value="50" />
+              </div>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-stall-review">
+            <header class="step-header">
+              <div class="step-eyebrow">6E · Stall Review</div>
+              <h1 class="step-heading">Stall summary</h1>
+            </header>
+            <div class="content-card">
+              <div class="review-section-card">
+                <strong>Awadhi Dum Biryani Corner</strong>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">Fixed Spread (₹280/plate) · Min 50 pax</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 7A to 7D Mobile (Baina) -->
+          <article class="step-container" data-step-id="view-baina-basics">
+            <header class="step-header">
+              <div class="step-eyebrow">7A · Gifting</div>
+              <h1 class="step-heading">Studio details</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label">Studio Name</label>
+                <input type="text" class="form-input" data-bind="baina.studioName" value="Ram Asrey Royal Baina Studio" />
+              </div>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-baina-boxes">
+            <header class="step-header">
+              <div class="step-eyebrow">7B · Boxes</div>
+              <h1 class="step-heading">Gifting boxes</h1>
+            </header>
+            <div class="content-card">
+              <div class="baina-box-list-container"></div>
+              <button type="button" class="btn-primary" onclick="openBoxModal()" style="width: 100%; margin-top: 8px;">+ Add Box</button>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-baina-packaging">
+            <header class="step-header">
+              <div class="step-eyebrow">7C · Packaging</div>
+              <h1 class="step-heading">Packaging style</h1>
+            </header>
+            <div class="content-card">
+              <div class="packaging-card selected" data-packaging="velvet">
+                <div class="pkg-icon">🎀</div>
+                <div><strong>Royal Velvet Finish</strong></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="step-container" data-step-id="view-baina-review">
+            <header class="step-header">
+              <div class="step-eyebrow">7D · Baina Review</div>
+              <h1 class="step-heading">Baina summary</h1>
+            </header>
+            <div class="content-card">
+              <div class="review-section-card">
+                <strong>Ram Asrey Royal Baina Studio</strong>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">2 Custom Boxes configured</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- View 08 Mobile (Review) -->
+          <article class="step-container" data-step-id="view-review">
+            <header class="step-header">
+              <div class="step-eyebrow">Step 8 · Review</div>
+              <h1 class="step-heading">Review details</h1>
+            </header>
+            <div class="content-card">
+              <div><strong>Awadhi Royal Caterers</strong></div>
+              <div style="font-size: 12px; color: #666;">Lucknow · 9876543210</div>
+              <div style="font-size: 12px; color: #666;">GST & FSSAI Verified</div>
+              <div style="font-size: 13px; font-weight: 700; margin-top: 8px; color: var(--color-red);">Configured Service Catalogs Ready</div>
+            </div>
+          </article>
+
+          <!-- View 09 Mobile (Complete) -->
+          <article class="step-container" data-step-id="view-complete">
+            <div class="success-card-hero" style="padding: 24px;">
+              <div class="success-check-bubble" style="width: 56px; height: 56px; font-size: 26px;">✓</div>
+              <h2 class="step-heading" style="font-size: 24px;">Submitted!</h2>
+              <div class="vendor-id-pill">ID: <strong>VND-782194</strong></div>
+              <a href="../vendor_dashboard.html" class="btn-primary" style="margin-top: 14px; text-decoration: none; width: 100%;">Launch Dashboard</a>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- Sticky Footer Mobile -->
+        <footer class="wizard-footer">
+          <button type="button" class="btn-secondary btn-prev-step" onclick="prevStep()">←</button>
+          <button type="button" class="btn-primary btn-next-step" onclick="nextStep()">Continue →</button>
+        </footer>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       INTERACTIVE MODALS & DRAWERS
+       ==================================================================== -->
+
+  <!-- 1. Dish Editor Modal (Catering Step 5C) -->
+  <div class="modal-backdrop" id="modal-dish-editor">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title">Add New Catering Dish</div>
+        <button type="button" class="btn-close-modal" onclick="closeAllModals()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="modal-dish-name">Dish Name *</label>
+          <input type="text" id="modal-dish-name" class="form-input" placeholder="e.g. Kakori Kebab, Paneer Pasanda" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="modal-dish-course">Assigned Course *</label>
+            <select id="modal-dish-course" class="form-select"></select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Dietary Classification *</label>
+            <div class="segmented-control">
+              <button type="button" class="segmented-btn active" id="modal-diet-veg" onclick="setModalDiet('veg')">🟢 Veg</button>
+              <button type="button" class="segmented-btn" id="modal-diet-nonveg" onclick="setModalDiet('non-veg')">🔴 Non-Veg</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modal-dish-desc">Preparation / Dish Description</label>
+          <textarea id="modal-dish-desc" class="form-textarea" placeholder="Highlight key spices, marinade, or preparation method..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Included in Feast Tiers * <span class="form-label-sub">Pick all tiers where this dish is served</span></label>
+          <div style="display: flex; gap: 18px; margin-top: 4px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" name="dish-tiers" value="Silver" checked />
+              <span class="dish-tier-tag silver">Silver Tier</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" name="dish-tiers" value="Gold" checked />
+              <span class="dish-tier-tag gold">Gold Tier</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" name="dish-tiers" value="Platinum" checked />
+              <span class="dish-tier-tag platinum">Platinum Tier</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+        <button type="button" class="btn-primary" onclick="saveDish()">Save Dish to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Delicacy Editor Modal (Stall Step 6C) -->
+  <div class="modal-backdrop" id="modal-delicacy-editor">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title">Add Stall Delicacy</div>
+        <button type="button" class="btn-close-modal" onclick="closeAllModals()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="modal-del-name">Delicacy / Dish Name *</label>
+          <input type="text" id="modal-del-name" class="form-input" placeholder="e.g. Mutton Galouti Kebab with Mughlai Paratha" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="modal-del-price">Unit Price (₹) *</label>
+            <div class="input-with-prefix">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="modal-del-price" class="form-input" value="180" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Dietary Classification *</label>
+            <div class="segmented-control">
+              <button type="button" class="segmented-btn active" id="modal-del-diet-veg" onclick="setDelicacyDiet('veg')">🟢 Veg</button>
+              <button type="button" class="segmented-btn" id="modal-del-diet-nonveg" onclick="setDelicacyDiet('non-veg')">🔴 Non-Veg</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modal-del-desc">Serving Portion & Accompaniment Details</label>
+          <input type="text" id="modal-del-desc" class="form-input" placeholder="e.g. 2 pieces served with spicy mint chutney and sliced onions" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+        <button type="button" class="btn-primary" onclick="saveDelicacy()">Save Delicacy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Baina Box Editor Modal (Baina Step 7B) -->
+  <div class="modal-backdrop" id="modal-box-editor">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title">Add Baina Gifting Box</div>
+        <button type="button" class="btn-close-modal" onclick="closeAllModals()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="modal-box-name">Gifting Box Title *</label>
+          <input type="text" id="modal-box-name" class="form-input" placeholder="e.g. Shahi Awadhi Sweet Hamper" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modal-box-contents">Box Contents List *</label>
+          <input type="text" id="modal-box-contents" class="form-input" placeholder="e.g. Kaju Katli, Besan Ladoo, Roasted Cashews, Pista Halwa" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="modal-box-half-kg">½ kg Base Price (₹) *</label>
+            <div class="input-with-prefix">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="modal-box-half-kg" class="form-input" value="600" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="modal-box-one-kg">1 kg Standard Price (₹) *</label>
+            <div class="input-with-prefix">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="modal-box-one-kg" class="form-input" value="1100" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeAllModals()">Cancel</button>
+        <button type="button" class="btn-primary" onclick="saveBox()">Save Box to Catalog</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast-msg" id="prototype-toast">Action simulated successfully ✓</div>
+
+  <!-- JavaScript Controller -->
+  <script src="script.js"></script>
+</body>
+</html>
