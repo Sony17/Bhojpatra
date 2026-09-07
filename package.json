@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/homeContentData.test.ts"
+    "test": "npx tsx --env-file=.env.local --test src/lib/homeContentData.test.ts src/lib/enquiries.test.ts src/lib/enquiriesRoute.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -48,6 +48,9 @@ next-env.d.ts
 /data/kyc/
 /data/kyc-documents.json
 
+# Uploaded enquiry attachments (runtime data store)
+/data/enquiries/
+
 # Recorded UPI payments + merchant UPI config (runtime data store)
 /data/payments.json
 /data/payment-settings.json
