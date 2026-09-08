@@ -68,7 +68,7 @@
       <div class="control-group">
         <span class="control-label">Scenario Preset:</span>
         <select class="control-select" onchange="applyScenarioPreset(this.value)">
-          <option value="all" selected>Multi-Service Partner (All 3)</option>
+          <option value="all" selected>Multi-Service Partner (All 7)</option>
           <option value="catering">Feast Booking Partner</option>
           <option value="stall">Specialty Food Stall</option>
           <option value="baina">Mithai & Baina Artisan</option>
@@ -358,58 +358,23 @@
 
             <div class="content-card">
               <div class="offering-cards-grid">
-                <!-- Feast Booking Card -->
+                <!-- 1. Feast Booking Card -->
                 <div class="offering-card active" data-offering-key="catering" onclick="toggleOffering('catering')">
                   <div class="offering-header">
                     <span class="offering-icon">🍲</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
                   <div class="offering-title">Feast Booking</div>
-                  <div class="offering-blurb">Complete multi-course feasts (Silver & Gold) with dish quotas, live counters, and service crew.</div>
+                  <div class="offering-blurb">Complete multi-course feasts (Silver & Gold) with tiered menus, defined dish allowances, and regional culinary heritage.</div>
                   <ul class="offering-features">
                     <li>Multi-course menu builder</li>
                     <li>Tier pricing (Silver Base / Gold Featured)</li>
-                    <li>Live cooking counters & extras</li>
-                    <li>Tableware, cutlery & staff essentials</li>
+                    <li>Defined dish allowances per course</li>
+                    <li>Culinary specialization mapping</li>
                   </ul>
-
-                  <!-- Feast Inclusions & Capabilities Panel -->
-                  <div class="feast-capabilities-panel" onclick="event.stopPropagation()">
-                    <div class="caps-panel-title">Feast Inclusions & Capabilities Configurable:</div>
-                    <div class="caps-grid">
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="liveCounters" onchange="toggleCapability('liveCounters', this.checked)">
-                        <div class="cap-text">
-                          <span class="cap-name">Live Counters</span>
-                          <span class="cap-desc">Food & beverage stations</span>
-                        </div>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="extras" onchange="toggleCapability('extras', this.checked)">
-                        <div class="cap-text">
-                          <span class="cap-name">Extras</span>
-                          <span class="cap-desc">Additional rental items</span>
-                        </div>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="addOns" onchange="toggleCapability('addOns', this.checked)">
-                        <div class="cap-text">
-                          <span class="cap-name">Add-ons</span>
-                          <span class="cap-desc">Drinks & special spreads</span>
-                        </div>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="essentials" onchange="toggleCapability('essentials', this.checked)">
-                        <div class="cap-text">
-                          <span class="cap-name">Essentials</span>
-                          <span class="cap-desc">Crew, tableware & setup</span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
                 </div>
 
-                <!-- Single Stall Card -->
+                <!-- 2. Single Specialty Stall Card -->
                 <div class="offering-card active" data-offering-key="stall" onclick="toggleOffering('stall')">
                   <div class="offering-header">
                     <span class="offering-icon">🍢</span>
@@ -425,7 +390,7 @@
                   </ul>
                 </div>
 
-                <!-- Baina Box Card -->
+                <!-- 3. Baina Gifting Boxes Card -->
                 <div class="offering-card active" data-offering-key="baina" onclick="toggleOffering('baina')">
                   <div class="offering-header">
                     <span class="offering-icon">🎁</span>
@@ -438,6 +403,70 @@
                     <li>½ kg, 1 kg & custom sizes</li>
                     <li>Luxury packaging finishes</li>
                     <li>Bulk minimum order rules</li>
+                  </ul>
+                </div>
+
+                <!-- 4. Live Counters Card -->
+                <div class="offering-card active" data-offering-key="counters" onclick="toggleOffering('counters')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍳</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Live Counters</div>
+                  <div class="offering-blurb">Interactive live cooking & beverage stations (Chaat, Tandoor, Dosa, Wok, Pizza, Paan) managed on-site.</div>
+                  <ul class="offering-features">
+                    <li>Live tawa, sigdi & wok setup</li>
+                    <li>Per-plate or flat counter rates</li>
+                    <li>Curated item spreads per station</li>
+                    <li>Standalone or add-on deployment</li>
+                  </ul>
+                </div>
+
+                <!-- 5. Extras Card -->
+                <div class="offering-card active" data-offering-key="extras" onclick="toggleOffering('extras')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🪑</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Extras</div>
+                  <div class="offering-blurb">Additional event rental items, furniture, chafing warmers, bar setups, and specialty catering equipment.</div>
+                  <ul class="offering-features">
+                    <li>Buffet chafing dishes & warmers</li>
+                    <li>Live bar & mocktail glassware</li>
+                    <li>Vintage brass & copper cookware</li>
+                    <li>Per-event equipment pricing</li>
+                  </ul>
+                </div>
+
+                <!-- 6. Add-ons Card -->
+                <div class="offering-card active" data-offering-key="addons" onclick="toggleOffering('addons')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍹</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Add-ons</div>
+                  <div class="offering-blurb">Supplementary food & beverage enhancements like welcome drinks, dessert studios, and midnight refreshments.</div>
+                  <ul class="offering-features">
+                    <li>Pre-event welcome coolers</li>
+                    <li>Live dessert & halwai studio</li>
+                    <li>Midnight refreshment spreads</li>
+                    <li>Flexible guest-count scaling</li>
+                  </ul>
+                </div>
+
+                <!-- 7. Essentials Card -->
+                <div class="offering-card active" data-offering-key="essentials" onclick="toggleOffering('essentials')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍽️</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Essentials</div>
+                  <div class="offering-blurb">Professional banquet service staff, premium cutlery & tableware packages, and complete waste management.</div>
+                  <ul class="offering-features">
+                    <li>Uniformed stewards & captain</li>
+                    <li>Tableware packages (A to D)</li>
+                    <li>Designer banquet linens & labels</li>
+                    <li>On-site sanitization & disposal</li>
                   </ul>
                 </div>
               </div>
@@ -745,41 +774,49 @@
                       <option value="South Indian">South Indian (Live Dosa Bar & Traditional Thali)</option>
                       <option value="Banarasi Chaat">Banarasi Chaat (Live Kashi Street Food)</option>
                       <option value="Artisanal Sweets">Artisanal Sweets (Heritage Mithai & Halwai Studio)</option>
+                      <option value="__custom__">➕ Add New Specialization...</option>
                     </select>
+
+                    <!-- Inline Custom Specialization Input Form -->
+                    <div class="custom-spec-wrapper" style="display:none; margin-top:8px;">
+                      <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" class="form-input custom-spec-input" placeholder="e.g. Kashmiri Wazwan, Chettinad, Marwari, Bengali Feast..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSpecializationFromInput(this);}" />
+                        <button type="button" class="btn-tier-proceed" style="padding:7px 14px; font-size:12px; white-space:nowrap;" onclick="addCustomSpecializationFromInput(this)">Add Specialization</button>
+                        <button type="button" class="btn-tier-back" style="padding:7px 12px; font-size:12px;" onclick="cancelCustomSpecialization()">Cancel</button>
+                      </div>
+                      <span class="field-hint" style="margin-top:4px; display:block;">Type your kitchen's unique regional cuisine or signature culinary craft.</span>
+                    </div>
+
+                    <div class="spec-footer-action" style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                      <span class="field-hint">Don't see your regional cuisine above?</span>
+                      <button type="button" class="btn-link-spec" onclick="openCustomSpecializationInput()" style="background:none; border:none; color:var(--color-red); font-size:11.5px; font-weight:700; cursor:pointer; text-decoration:underline;">+ Add New Specialization</button>
+                    </div>
                   </div>
 
                   <div class="quota-list" style="margin-top: 14px;">
                     <div class="quota-row">
                       <span class="quota-label">Starters Allowance</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="starters">5</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="starters">5</span> dishes included
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span class="quota-label">Main Course</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="main">5</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="main">5</span> dishes included
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span class="quota-label">Breads</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="breads">2</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="breads">2</span> breads included
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span class="quota-label">Sweets & Mithai</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="sweets">3</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="sweets">3</span> sweets included
+                      </span>
                     </div>
                   </div>
 
@@ -1437,52 +1474,68 @@
             </header>
             <div class="content-card">
               <div class="offering-cards-grid">
+                <!-- 1. Feast Booking -->
                 <div class="offering-card active" data-offering-key="catering" onclick="toggleOffering('catering')">
                   <div class="offering-header">
                     <span class="offering-icon">🍲</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
                   <div class="offering-title">Feast Booking</div>
-                  <div class="offering-blurb">Multi-course feast with live counters and staff.</div>
-
-                  <!-- Mobile Feast Capabilities Panel -->
-                  <div class="feast-capabilities-panel" onclick="event.stopPropagation()" style="margin-top:10px;">
-                    <div class="caps-panel-title">Feast Capabilities:</div>
-                    <div class="caps-grid">
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="liveCounters" onchange="toggleCapability('liveCounters', this.checked)">
-                        <span class="cap-name">Live Counters</span>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="extras" onchange="toggleCapability('extras', this.checked)">
-                        <span class="cap-name">Extras</span>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="addOns" onchange="toggleCapability('addOns', this.checked)">
-                        <span class="cap-name">Add-ons</span>
-                      </label>
-                      <label class="cap-item">
-                        <input type="checkbox" checked data-cap="essentials" onchange="toggleCapability('essentials', this.checked)">
-                        <span class="cap-name">Essentials</span>
-                      </label>
-                    </div>
-                  </div>
+                  <div class="offering-blurb">Multi-course feasts (Silver & Gold) with tiered menus & allowances.</div>
                 </div>
+                <!-- 2. Single Stall -->
                 <div class="offering-card active" data-offering-key="stall" onclick="toggleOffering('stall')">
                   <div class="offering-header">
                     <span class="offering-icon">🍢</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
                   <div class="offering-title">Single Stall</div>
-                  <div class="offering-blurb">Dedicated food station for live parties.</div>
+                  <div class="offering-blurb">Dedicated food station for live parties and events.</div>
                 </div>
+                <!-- 3. Baina Boxes -->
                 <div class="offering-card active" data-offering-key="baina" onclick="toggleOffering('baina')">
                   <div class="offering-header">
                     <span class="offering-icon">🎁</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
                   <div class="offering-title">Baina Boxes</div>
-                  <div class="offering-blurb">Artisanal sweet gift hampers.</div>
+                  <div class="offering-blurb">Artisanal sweet gift hampers & invitation boxes.</div>
+                </div>
+                <!-- 4. Live Counters -->
+                <div class="offering-card active" data-offering-key="counters" onclick="toggleOffering('counters')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍳</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Live Counters</div>
+                  <div class="offering-blurb">Interactive cooking stations (Chaat, Tandoor, Dosa, Paan).</div>
+                </div>
+                <!-- 5. Extras -->
+                <div class="offering-card active" data-offering-key="extras" onclick="toggleOffering('extras')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🪑</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Extras</div>
+                  <div class="offering-blurb">Chafing warmers, buffet tables & rental event gear.</div>
+                </div>
+                <!-- 6. Add-ons -->
+                <div class="offering-card active" data-offering-key="addons" onclick="toggleOffering('addons')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍹</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Add-ons</div>
+                  <div class="offering-blurb">Welcome coolers, dessert bar & midnight refreshments.</div>
+                </div>
+                <!-- 7. Essentials -->
+                <div class="offering-card active" data-offering-key="essentials" onclick="toggleOffering('essentials')">
+                  <div class="offering-header">
+                    <span class="offering-icon">🍽️</span>
+                    <div class="offering-checkbox">✓</div>
+                  </div>
+                  <div class="offering-title">Essentials</div>
+                  <div class="offering-blurb">Uniformed stewards, tableware packages & waste disposal.</div>
                 </div>
               </div>
             </div>
@@ -1668,41 +1721,48 @@
                       <option value="South Indian">South Indian</option>
                       <option value="Banarasi Chaat">Banarasi Chaat</option>
                       <option value="Artisanal Sweets">Artisanal Sweets</option>
+                      <option value="__custom__">➕ Add New Specialization...</option>
                     </select>
+
+                    <div class="custom-spec-wrapper" style="display:none; margin-top:8px;">
+                      <div style="display:flex; gap:6px; flex-direction:column;">
+                        <input type="text" class="form-input custom-spec-input" placeholder="e.g. Kashmiri Wazwan, Chettinad..." style="width:100%;" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSpecializationFromInput(this);}" />
+                        <div style="display:flex; gap:6px; width:100%;">
+                          <button type="button" class="btn-tier-proceed" style="flex:1; padding:7px 10px; font-size:11.5px; text-align:center;" onclick="addCustomSpecializationFromInput(this)">Add</button>
+                          <button type="button" class="btn-tier-back" style="padding:7px 10px; font-size:11.5px; text-align:center;" onclick="cancelCustomSpecialization()">Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="spec-footer-action" style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                      <span class="field-hint" style="font-size:10px;">Not listed?</span>
+                      <button type="button" class="btn-link-spec" onclick="openCustomSpecializationInput()" style="background:none; border:none; color:var(--color-red); font-size:11px; font-weight:700; cursor:pointer; text-decoration:underline;">+ Add New Specialization</button>
+                    </div>
                   </div>
 
                   <div class="quota-list" style="margin-top:10px;">
                     <div class="quota-row">
                       <span>Starters</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="starters">5</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="starters">5</span> dishes
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span>Main Course</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="main">5</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="main">5</span> dishes
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span>Breads</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="breads">2</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="breads">2</span> breads
+                      </span>
                     </div>
                     <div class="quota-row">
                       <span>Sweets</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',-1)">−</button>
-                        <span class="stepper-val" data-tier="gold" data-course="sweets">3</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',1)">+</button>
-                      </div>
+                      <span class="quota-badge-readonly">
+                        <span class="stepper-val" data-tier="gold" data-course="sweets">3</span> sweets
+                      </span>
                     </div>
                   </div>
 

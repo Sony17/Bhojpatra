@@ -13,8 +13,8 @@ const state = {
   currentStepId: 'view-details',
   stepHistory: [],
 
-  // Selected Service Offerings (Step 4)
-  selectedOfferings: ['catering', 'stall', 'baina'], // Default to all 3 to demonstrate full power
+  // Selected Service Offerings (Step 3: 7 Distinct Service Offerings)
+  selectedOfferings: ['catering', 'stall', 'baina', 'counters', 'extras', 'addons', 'essentials'], // Default to all 7 to demonstrate full capabilities
 
   // Step 1: Vendor Identity & Operations (Collected Once, Never Repeated)
   details: {
@@ -421,14 +421,14 @@ function nextStep() {
     return;
   }
 
-  // Inside Catering Flow:
+  // Inside Catering (Feast Booking) Flow:
   if (cur === 'view-cat-basics') { goToStep('view-cat-courses'); return; }
   if (cur === 'view-cat-courses') { goToStep('view-cat-dishes'); return; }
   if (cur === 'view-cat-dishes') { goToStep('view-cat-tiers'); return; }
   if (cur === 'view-cat-tiers') {
-    if (state.capabilities.liveCounters) {
+    if (state.selectedOfferings.includes('counters')) {
       goToStep('view-cat-live');
-    } else if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+    } else if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
       goToStep('view-cat-extras');
     } else if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-basics');
@@ -439,8 +439,10 @@ function nextStep() {
     }
     return;
   }
+
+  // Inside Live Counters Flow:
   if (cur === 'view-cat-live') {
-    if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+    if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
       goToStep('view-cat-extras');
     } else if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-basics');
@@ -451,8 +453,9 @@ function nextStep() {
     }
     return;
   }
+
+  // Inside Extras & Essentials Flow:
   if (cur === 'view-cat-extras') {
-    // After Catering Extras, transition to Stall if selected, else Baina, else Review
     if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-basics');
     } else if (state.selectedOfferings.includes('baina')) {
@@ -469,7 +472,6 @@ function nextStep() {
   if (cur === 'view-stall-delicacies') { goToStep('view-stall-pricing'); return; }
   if (cur === 'view-stall-pricing') { goToStep('view-stall-live'); return; }
   if (cur === 'view-stall-live') {
-    // After Stall, transition to Baina if selected, else Review
     if (state.selectedOfferings.includes('baina')) {
       goToStep('view-baina-basics');
     } else {
@@ -499,30 +501,42 @@ function prevStep() {
   if (cur === 'view-kyc') { goToStep('view-details'); return; }
   if (cur === 'view-offerings') { goToStep('view-kyc'); return; }
 
-  // From first sub-steps, back goes to Offerings
+  // From Catering (Feast Booking):
   if (cur === 'view-cat-basics') { goToStep('view-offerings'); return; }
   if (cur === 'view-cat-courses') { goToStep('view-cat-basics'); return; }
   if (cur === 'view-cat-dishes') { goToStep('view-cat-courses'); return; }
   if (cur === 'view-cat-tiers') { goToStep('view-cat-dishes'); return; }
-  if (cur === 'view-cat-live') { goToStep('view-cat-tiers'); return; }
-  if (cur === 'view-cat-extras') {
-    if (state.capabilities.liveCounters) {
-      goToStep('view-cat-live');
-    } else {
+
+  // From Live Counters:
+  if (cur === 'view-cat-live') {
+    if (state.selectedOfferings.includes('catering')) {
       goToStep('view-cat-tiers');
+    } else {
+      goToStep('view-offerings');
     }
     return;
   }
 
+  // From Extras & Essentials:
+  if (cur === 'view-cat-extras') {
+    if (state.selectedOfferings.includes('counters')) {
+      goToStep('view-cat-live');
+    } else if (state.selectedOfferings.includes('catering')) {
+      goToStep('view-cat-tiers');
+    } else {
+      goToStep('view-offerings');
+    }
+    return;
+  }
+
+  // From Stall:
   if (cur === 'view-stall-basics') {
-    if (state.selectedOfferings.includes('catering')) {
-      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
-        goToStep('view-cat-extras');
-      } else if (state.capabilities.liveCounters) {
-        goToStep('view-cat-live');
-      } else {
-        goToStep('view-cat-tiers');
-      }
+    if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+      goToStep('view-cat-extras');
+    } else if (state.selectedOfferings.includes('counters')) {
+      goToStep('view-cat-live');
+    } else if (state.selectedOfferings.includes('catering')) {
+      goToStep('view-cat-tiers');
     } else {
       goToStep('view-offerings');
     }
@@ -533,17 +547,16 @@ function prevStep() {
   if (cur === 'view-stall-pricing') { goToStep('view-stall-delicacies'); return; }
   if (cur === 'view-stall-live') { goToStep('view-stall-pricing'); return; }
 
+  // From Baina:
   if (cur === 'view-baina-basics') {
     if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-live');
+    } else if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+      goToStep('view-cat-extras');
+    } else if (state.selectedOfferings.includes('counters')) {
+      goToStep('view-cat-live');
     } else if (state.selectedOfferings.includes('catering')) {
-      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
-        goToStep('view-cat-extras');
-      } else if (state.capabilities.liveCounters) {
-        goToStep('view-cat-live');
-      } else {
-        goToStep('view-cat-tiers');
-      }
+      goToStep('view-cat-tiers');
     } else {
       goToStep('view-offerings');
     }
@@ -552,19 +565,18 @@ function prevStep() {
   if (cur === 'view-baina-boxes') { goToStep('view-baina-basics'); return; }
   if (cur === 'view-baina-packaging') { goToStep('view-baina-boxes'); return; }
 
+  // From Review:
   if (cur === 'view-review') {
     if (state.selectedOfferings.includes('baina')) {
       goToStep('view-baina-packaging');
     } else if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-live');
+    } else if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+      goToStep('view-cat-extras');
+    } else if (state.selectedOfferings.includes('counters')) {
+      goToStep('view-cat-live');
     } else if (state.selectedOfferings.includes('catering')) {
-      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
-        goToStep('view-cat-extras');
-      } else if (state.capabilities.liveCounters) {
-        goToStep('view-cat-live');
-      } else {
-        goToStep('view-cat-tiers');
-      }
+      goToStep('view-cat-tiers');
     } else {
       goToStep('view-offerings');
     }
@@ -584,10 +596,16 @@ function routeAfterOfferings() {
   }
   if (state.selectedOfferings.includes('catering')) {
     goToStep('view-cat-basics');
+  } else if (state.selectedOfferings.includes('counters')) {
+    goToStep('view-cat-live');
+  } else if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+    goToStep('view-cat-extras');
   } else if (state.selectedOfferings.includes('stall')) {
     goToStep('view-stall-basics');
   } else if (state.selectedOfferings.includes('baina')) {
     goToStep('view-baina-basics');
+  } else {
+    goToStep('view-review');
   }
 }
 
@@ -612,8 +630,17 @@ function updateVendorContextHeader() {
     // Services Pills & Dietary Offering (Plain Text, Zero Badges)
     const servicesRow = h.querySelector('.vendor-context-services');
     if (servicesRow) {
+      const labelMap = {
+        'catering': 'Feast Booking',
+        'stall': 'Stall',
+        'baina': 'Baina Boxes',
+        'counters': 'Live Counters',
+        'extras': 'Extras',
+        'addons': 'Add-ons',
+        'essentials': 'Essentials'
+      };
       let pillsHtml = state.selectedOfferings.map(s => {
-        const label = s === 'catering' ? 'Feast Booking' : s === 'stall' ? 'Stall' : 'Baina';
+        const label = labelMap[s] || s;
         return `<span class="service-pill">${label}</span>`;
       }).join('');
 
@@ -628,7 +655,9 @@ function updateVendorContextHeader() {
     const tagEl = h.querySelector('.active-builder-tag');
     if (tagEl) {
       let focusText = "Onboarding";
-      if (state.currentStepId.startsWith('view-cat-')) focusText = "Feast Builder";
+      if (['view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers'].includes(state.currentStepId)) focusText = "Feast Builder";
+      else if (state.currentStepId === 'view-cat-live') focusText = "Live Counters";
+      else if (state.currentStepId === 'view-cat-extras') focusText = "Extras & Essentials";
       else if (state.currentStepId.startsWith('view-stall-')) focusText = "Stall Builder";
       else if (state.currentStepId.startsWith('view-baina-')) focusText = "Baina Builder";
       else if (state.currentStepId === 'view-review') focusText = "Final Review";
@@ -949,10 +978,80 @@ function saveGoldTier() {
 }
 
 function setGoldSpecialization(val) {
+  if (val === '__custom__') {
+    openCustomSpecializationInput();
+    return;
+  }
   state.catering.goldSpecialization = val;
   document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(el => {
     el.value = val;
   });
+}
+
+function openCustomSpecializationInput() {
+  document.querySelectorAll('.custom-spec-wrapper').forEach(w => w.style.display = 'block');
+  document.querySelectorAll('.spec-footer-action').forEach(fa => fa.style.display = 'none');
+  const inputs = document.querySelectorAll('.custom-spec-input');
+  inputs.forEach(inp => inp.value = '');
+  if (inputs.length > 0) {
+    inputs[0].focus();
+  }
+}
+
+function cancelCustomSpecialization() {
+  document.querySelectorAll('.custom-spec-wrapper').forEach(w => w.style.display = 'none');
+  document.querySelectorAll('.spec-footer-action').forEach(fa => fa.style.display = 'flex');
+  document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(el => {
+    if (el.value === '__custom__') {
+      el.value = state.catering.goldSpecialization || 'Awadhi';
+    }
+  });
+}
+
+function addCustomSpecialization(name) {
+  const cleanName = (name || '').trim();
+  if (!cleanName) {
+    showToast("Please enter a culinary specialization name.");
+    return;
+  }
+
+  document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(selectEl => {
+    let exists = false;
+    for (let opt of selectEl.options) {
+      if (opt.value.toLowerCase() === cleanName.toLowerCase()) {
+        opt.selected = true;
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = cleanName;
+      opt.textContent = `${cleanName} (Custom Specialization)`;
+      opt.selected = true;
+
+      const customOpt = selectEl.querySelector('option[value="__custom__"]');
+      if (customOpt) {
+        selectEl.insertBefore(opt, customOpt);
+      } else {
+        selectEl.appendChild(opt);
+      }
+    }
+    selectEl.value = cleanName;
+  });
+
+  state.catering.goldSpecialization = cleanName;
+  document.querySelectorAll('.custom-spec-input').forEach(inp => inp.value = '');
+  cancelCustomSpecialization();
+  showToast(`Added "${cleanName}" to culinary specializations!`);
+}
+
+function addCustomSpecializationFromInput(btnOrInput) {
+  const container = btnOrInput.closest('.custom-spec-wrapper');
+  const input = container ? container.querySelector('.custom-spec-input') : document.querySelector('.custom-spec-input');
+  if (input) {
+    addCustomSpecialization(input.value);
+  }
 }
 
 function renderTierView() {
@@ -986,7 +1085,20 @@ function renderTierView() {
 
   // Sync specialization select
   document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(el => {
-    el.value = state.catering.goldSpecialization || 'Awadhi';
+    const val = state.catering.goldSpecialization || 'Awadhi';
+    let exists = false;
+    for (let opt of el.options) {
+      if (opt.value === val) { exists = true; break; }
+    }
+    if (!exists && val && val !== '__custom__') {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = `${val} (Custom Specialization)`;
+      const customOpt = el.querySelector('option[value="__custom__"]');
+      if (customOpt) el.insertBefore(opt, customOpt);
+      else el.appendChild(opt);
+    }
+    el.value = val;
   });
 
   renderTierQuotas();
@@ -1385,33 +1497,56 @@ function renderMasterReview() {
             `;
           }).join('')}
         </div>
+      </div>
+    `;
+  }
 
-        <!-- Live Counters Spread (Separated!) -->
-        <div class="review-subitem-group" style="padding-top:10px;border-top:1px dashed var(--color-cream-30);">
-          <div class="review-subitem-title">Live Food & Beverage Counters (${activeLiveCounters.length} Counters Selected)</div>
-          <div class="review-pills-row">
-            ${activeLiveCounters.map(alc => `
-              <span class="review-pill" style="border-color:var(--color-red-40);">
-                <span>${alc.icon}</span> <strong>${alc.name}</strong> (+₹${alc.rate}/plate)
-              </span>
-            `).join('')}
+  // 3. Live Counters Review (if selected)
+  if (state.selectedOfferings.includes('counters')) {
+    const activeLiveCounters = state.catering.availableCounters.filter(ac => state.catering.liveCounters.includes(ac.id));
+    html += `
+      <div class="review-section-card">
+        <div class="review-section-header">
+          <div class="review-section-title">
+            <span>🍳</span>
+            <span>Live Counters (${activeLiveCounters.length} Counters Configured)</span>
           </div>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-live')">Edit Counters ✎</button>
         </div>
+        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Interactive on-site cooking and beverage stations.</p>
+        <div class="review-pills-row">
+          ${activeLiveCounters.map(alc => `
+            <span class="review-pill" style="border-color:var(--color-red-40);">
+              <span>${alc.icon}</span> <strong>${alc.name}</strong> (+₹${alc.rate}/plate)
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
 
-        <!-- Tableware, Cutlery & Event Essentials (Separated!) -->
-        <div class="review-subitem-group" style="padding-top:10px;border-top:1px dashed var(--color-cream-30);">
-          <div class="review-subitem-title">Tableware, Cutlery & Buffet Essentials</div>
-          <div style="font-size:12px;font-weight:700;color:var(--color-black);">
-            ${cutleryChoice?.name || "Standard Tableware"} <span style="color:var(--color-red);">(${cutleryChoice?.rate || "Included"})</span>
+  // 4. Extras, Add-ons & Essentials Review (if selected)
+  if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+    const cutleryChoice = state.catering.cutleryTiers.find(ct => ct.id === state.catering.cutleryTier);
+    html += `
+      <div class="review-section-card">
+        <div class="review-section-header">
+          <div class="review-section-title">
+            <span>🍽️</span>
+            <span>Tableware, Cutlery & Event Essentials</span>
           </div>
-          <p style="font-size:11px;color:var(--color-black-60);margin-top:2px;">${cutleryChoice?.desc}</p>
-          <div class="review-pills-row" style="margin-top:6px;">
-            <span class="service-pill">✓ Uniformed Stewards</span>
-            <span class="service-pill">✓ Designer Buffet Linens</span>
-            <span class="service-pill">✓ Food Labels</span>
-            <span class="service-pill">✓ Handwash Setup</span>
-            <span class="service-pill">✓ Waste Management</span>
-          </div>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Essentials ✎</button>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--color-black);">
+          ${cutleryChoice?.name || "Standard Tableware"} <span style="color:var(--color-red);">(${cutleryChoice?.rate || "Included"})</span>
+        </div>
+        <p style="font-size:11px;color:var(--color-black-60);margin-top:2px;">${cutleryChoice?.desc}</p>
+        <div class="review-pills-row" style="margin-top:8px;">
+          <span class="service-pill">✓ Uniformed Stewards</span>
+          <span class="service-pill">✓ Designer Buffet Linens</span>
+          <span class="service-pill">✓ Food Labels</span>
+          <span class="service-pill">✓ Handwash Setup</span>
+          <span class="service-pill">✓ Waste Management</span>
         </div>
       </div>
     `;
@@ -1541,7 +1676,7 @@ function closeStorefrontPreview() {
 // ── Scenario Presets Engine ──
 function applyScenarioPreset(presetKey) {
   if (presetKey === 'catering') {
-    state.selectedOfferings = ['catering'];
+    state.selectedOfferings = ['catering', 'counters', 'extras', 'essentials'];
     state.details.dietaryOffering = 'both';
     state.details.businessName = "Royal Awadh Caterers";
     state.catering.packageName = "Grand Wedding Dastarkhwan";
@@ -1560,11 +1695,11 @@ function applyScenarioPreset(presetKey) {
     goToStep('view-offerings');
     showToast("Loaded 'Mithai & Baina Artisan' Scenario");
   } else if (presetKey === 'all') {
-    state.selectedOfferings = ['catering', 'stall', 'baina'];
+    state.selectedOfferings = ['catering', 'stall', 'baina', 'counters', 'extras', 'addons', 'essentials'];
     state.details.dietaryOffering = 'both';
     state.details.businessName = "Royal Awadh Hospitality Group";
     goToStep('view-offerings');
-    showToast("Loaded 'Multi-Service Partner (All 3)' Scenario");
+    showToast("Loaded 'Multi-Service Partner (All 7)' Scenario");
   }
 
   // Update diet cards UI
