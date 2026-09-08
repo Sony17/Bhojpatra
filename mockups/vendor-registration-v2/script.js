@@ -14,15 +14,15 @@ const state = {
   stepHistory: [],
 
   // Selected Service Offerings (Step 3: 7 Distinct Service Offerings)
-  selectedOfferings: ['catering', 'stall', 'baina', 'counters', 'extras', 'addons', 'essentials'], // Default to all 7 to demonstrate full capabilities
+  selectedOfferings: [], // Default unselected: vendor explicitly selects offerings in normal flow
 
   // Step 1: Vendor Identity & Operations (Collected Once, Never Repeated)
   details: {
     dietaryOffering: null, // Mandatory selection at start: 'veg' | 'non-veg' | 'both' (no default)
     businessName: "Royal Awadh Caterers",
-    ownerName: "Mohammad Zeeshaan",
-    phone: "9876543210",
-    email: "contact@royalawadh.com",
+    ownerName: "Kabir Ahmad (Demo Partner)",
+    phone: "98000 00000",
+    email: "vendor@demo-bhojpatra.com",
     city: "Lucknow",
     state: "Uttar Pradesh",
     serviceCities: ["Lucknow", "Kanpur", "Ayodhya", "Varanasi"],
@@ -33,13 +33,13 @@ const state = {
 
   // Step 2: Statutory KYC & Compliance
   kyc: {
-    gstNumber: "09AAACA1234A1Z5",
-    fssaiNumber: "12723055000123",
+    gstNumber: "09ABCDE1234F1Z5",
+    fssaiNumber: "10000000000000",
     docs: {
-      gst: { uploaded: true, filename: "gst_certificate_2026.pdf" },
-      fssai: { uploaded: true, filename: "fssai_licence_awadh.pdf" },
-      ownerId: { uploaded: true, filename: "owner_pan_card.jpg" },
-      businessProof: { uploaded: true, filename: "shop_act_licence.pdf" }
+      gst: { uploaded: true, filename: "gst_certificate_sample.pdf" },
+      fssai: { uploaded: true, filename: "fssai_licence_sample.pdf" },
+      ownerId: { uploaded: true, filename: "owner_pan_sample.jpg" },
+      businessProof: { uploaded: true, filename: "shop_act_licence_sample.pdf" }
     }
   },
 
@@ -352,11 +352,17 @@ const STEP_SEQUENCE = [
 ];
 
 // ── Initial Setup on Window Load ──
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   renderAllViews();
   setupEventListeners();
   goToStep('view-details');
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 // ── Navigation Engine ──
 function goToStep(stepId) {
@@ -748,10 +754,6 @@ function updateSubnavBreadcrumbs(stepId) {
 function toggleOffering(offeringKey) {
   const idx = state.selectedOfferings.indexOf(offeringKey);
   if (idx > -1) {
-    if (state.selectedOfferings.length === 1) {
-      showToast("At least one service offering must remain selected.");
-      return;
-    }
     state.selectedOfferings.splice(idx, 1);
   } else {
     state.selectedOfferings.push(offeringKey);
@@ -1525,28 +1527,70 @@ function renderMasterReview() {
     `;
   }
 
-  // 4. Extras, Add-ons & Essentials Review (if selected)
-  if (state.selectedOfferings.includes('extras') || state.selectedOfferings.includes('addons') || state.selectedOfferings.includes('essentials')) {
+  // 4. Extras Review (if selected)
+  if (state.selectedOfferings.includes('extras')) {
+    html += `
+      <div class="review-section-card">
+        <div class="review-section-header">
+          <div class="review-section-title">
+            <span>🪑</span>
+            <span>Extras: Event Rentals & Equipment</span>
+          </div>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Extras ✎</button>
+        </div>
+        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Additional buffet equipment, chafing warmers, and event furniture rentals.</p>
+        <div class="review-pills-row">
+          <span class="service-pill">✓ Heavy-Duty Chafing Dishes & Food Warmers</span>
+          <span class="service-pill">✓ Designer Buffet Tables & Banquet Linens</span>
+          <span class="service-pill">✓ Live Mocktail & Beverage Glassware</span>
+          <span class="service-pill">✓ Traditional Brass & Copper Cookware</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // 5. Add-ons Review (if selected)
+  if (state.selectedOfferings.includes('addons')) {
+    html += `
+      <div class="review-section-card">
+        <div class="review-section-header">
+          <div class="review-section-title">
+            <span>🍹</span>
+            <span>Add-ons: Refreshments & Dessert Spreads</span>
+          </div>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Add-ons ✎</button>
+        </div>
+        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Supplementary guest experience enhancements and special food spreads.</p>
+        <div class="review-pills-row">
+          <span class="service-pill">✓ Welcome Drinks & Mocktail Coolers</span>
+          <span class="service-pill">✓ Artisanal Live Dessert & Halwai Studio</span>
+          <span class="service-pill">✓ Midnight Snack & Chai Stations</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // 6. Essentials Review (if selected)
+  if (state.selectedOfferings.includes('essentials')) {
     const cutleryChoice = state.catering.cutleryTiers.find(ct => ct.id === state.catering.cutleryTier);
     html += `
       <div class="review-section-card">
         <div class="review-section-header">
           <div class="review-section-title">
             <span>🍽️</span>
-            <span>Tableware, Cutlery & Event Essentials</span>
+            <span>Essentials: Service Crew & Tableware</span>
           </div>
           <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Essentials ✎</button>
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--color-black);">
-          ${cutleryChoice?.name || "Standard Tableware"} <span style="color:var(--color-red);">(${cutleryChoice?.rate || "Included"})</span>
+          Selected Tableware: ${cutleryChoice?.name || "Standard Tableware"} <span style="color:var(--color-red);">(${cutleryChoice?.rate || "Included"})</span>
         </div>
         <p style="font-size:11px;color:var(--color-black-60);margin-top:2px;">${cutleryChoice?.desc}</p>
         <div class="review-pills-row" style="margin-top:8px;">
-          <span class="service-pill">✓ Uniformed Stewards</span>
-          <span class="service-pill">✓ Designer Buffet Linens</span>
-          <span class="service-pill">✓ Food Labels</span>
-          <span class="service-pill">✓ Handwash Setup</span>
-          <span class="service-pill">✓ Waste Management</span>
+          <span class="service-pill">✓ Uniformed Stewards & Service Captain</span>
+          <span class="service-pill">✓ Acrylic Bilingual Food Labels</span>
+          <span class="service-pill">✓ Handwash Setup & Sanitization</span>
+          <span class="service-pill">✓ Dedicated Waste Management Crew</span>
         </div>
       </div>
     `;
@@ -1700,6 +1744,10 @@ function applyScenarioPreset(presetKey) {
     state.details.businessName = "Royal Awadh Hospitality Group";
     goToStep('view-offerings');
     showToast("Loaded 'Multi-Service Partner (All 7)' Scenario");
+  } else if (!presetKey || presetKey === 'custom') {
+    state.selectedOfferings = [];
+    goToStep('view-offerings');
+    showToast("Switched to Custom Onboarding (Manual Selection)");
   }
 
   // Update diet cards UI
@@ -1749,8 +1797,99 @@ function showToast(message) {
   }, 3200);
 }
 
+// ── Universal Choice Chip Interactive Selection Engine ──
+function getChipLabel(chip) {
+  const clone = chip.cloneNode(true);
+  const check = clone.querySelector('.chip-check');
+  if (check) check.remove();
+  return clone.textContent.replace(/[✓✔\s]+/g, ' ').trim();
+}
+
+function setChipState(chip, isActive) {
+  const label = getChipLabel(chip);
+  if (isActive) {
+    chip.classList.add('active');
+    chip.innerHTML = `<span class="chip-check">✓</span> ${label}`;
+  } else {
+    chip.classList.remove('active');
+    chip.innerHTML = label;
+  }
+}
+
+function toggleChoiceChip(chip) {
+  const isCurrentlyActive = chip.classList.contains('active');
+  const nextActive = !isCurrentlyActive;
+  const label = getChipLabel(chip);
+
+  setChipState(chip, nextActive);
+  syncChipToState(chip, label, nextActive);
+}
+
+function syncChipToState(chip, label, isNowActive) {
+  const stepContainer = chip.closest('.step-container');
+  if (!stepContainer) return;
+  const stepId = stepContainer.getAttribute('data-step-id');
+
+  if (stepId === 'view-details') {
+    // Step 1: Cuisines
+    if (!state.details.cuisines) state.details.cuisines = [];
+    if (isNowActive && !state.details.cuisines.includes(label)) {
+      state.details.cuisines.push(label);
+    } else if (!isNowActive) {
+      state.details.cuisines = state.details.cuisines.filter(c => c !== label);
+    }
+    // Mirror to matching chip in the other frame (desktop <-> mobile)
+    document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip').forEach(other => {
+      if (other !== chip && getChipLabel(other) === label && other.classList.contains('active') !== isNowActive) {
+        setChipState(other, isNowActive);
+      }
+    });
+  } else if (stepId === 'view-cat-basics') {
+    // Step 5A: Feast Best For Occasions
+    if (!state.catering.bestFor) state.catering.bestFor = [];
+    if (isNowActive && !state.catering.bestFor.includes(label)) {
+      state.catering.bestFor.push(label);
+    } else if (!isNowActive) {
+      state.catering.bestFor = state.catering.bestFor.filter(c => c !== label);
+    }
+    // Mirror to matching chip in the other frame
+    document.querySelectorAll('.step-container[data-step-id="view-cat-basics"] .choice-chip').forEach(other => {
+      if (other !== chip && getChipLabel(other) === label && other.classList.contains('active') !== isNowActive) {
+        setChipState(other, isNowActive);
+      }
+    });
+  } else if (stepId === 'view-stall-basics') {
+    // Step 6A: Stall Occasions
+    if (!state.stall.bestFor) state.stall.bestFor = [];
+    if (isNowActive && !state.stall.bestFor.includes(label)) {
+      state.stall.bestFor.push(label);
+    } else if (!isNowActive) {
+      state.stall.bestFor = state.stall.bestFor.filter(c => c !== label);
+    }
+  } else if (stepId === 'view-stall-live') {
+    // Step 6E: Stall Live Equipment
+    if (!state.stall.liveEquipment) state.stall.liveEquipment = [];
+    if (isNowActive && !state.stall.liveEquipment.includes(label)) {
+      state.stall.liveEquipment.push(label);
+    } else if (!isNowActive) {
+      state.stall.liveEquipment = state.stall.liveEquipment.filter(c => c !== label);
+    }
+  } else if (stepId === 'view-baina-basics') {
+    // Step 7A: Baina Gifting Occasions
+    if (!state.baina.bestFor) state.baina.bestFor = [];
+    if (isNowActive && !state.baina.bestFor.includes(label)) {
+      state.baina.bestFor.push(label);
+    } else if (!isNowActive) {
+      state.baina.bestFor = state.baina.bestFor.filter(c => c !== label);
+    }
+  }
+}
+
 // ── Initial Bindings & Listeners ──
 function setupEventListeners() {
+  if (window.__listenersInitialized) return;
+  window.__listenersInitialized = true;
+
   // Synchronize two-way input bindings
   document.querySelectorAll('input[data-bind], select[data-bind], textarea[data-bind]').forEach(input => {
     input.addEventListener('input', (e) => {
@@ -1768,6 +1907,14 @@ function setupEventListeners() {
 
       updateVendorContextHeader();
     });
+  });
+
+  // Universal Choice Chip Click Delegator
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('.choice-chip');
+    if (!chip) return;
+    
+    toggleChoiceChip(chip);
   });
 }
 

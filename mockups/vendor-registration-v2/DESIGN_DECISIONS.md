@@ -157,6 +157,6 @@ Following implementation of Version 2, an Impeccable UX design critique was cond
 ## 5. Remaining Product Decisions for Stakeholder Alignment
 
 Before translating this prototype into production code (`VendorRegister.tsx`, `MenuBuilder.tsx`, PostgreSQL tables), confirm the following with Sony:
-1. **Multi-Service Registration Default:** Should first-time caterers be encouraged to complete only Full Catering initially and unlock Stall/Baina from their dashboard, or is simultaneous multi-service onboarding preferred?
+1. **Multi-Service Registration Default:** Should first-time caterers be encouraged to complete only Feast Booking initially and unlock Stall/Baina from their dashboard, or is simultaneous multi-service onboarding preferred?
 2. **Tier Quota Customization Boundaries:** Should caterers have unlimited flexibility to set course dish quotas on Silver/Gold/Platinum, or should the platform enforce minimum baseline quotas (e.g. Gold must have at least 4 Starters)?
 3. **Draft Resumption:** In production, should draft registration sessions auto-save to Redis/PostgreSQL keyed to the caterer's verified mobile number so they can complete onboarding across devices?

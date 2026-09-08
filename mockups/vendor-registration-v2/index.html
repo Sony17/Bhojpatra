@@ -68,7 +68,8 @@
       <div class="control-group">
         <span class="control-label">Scenario Preset:</span>
         <select class="control-select" onchange="applyScenarioPreset(this.value)">
-          <option value="all" selected>Multi-Service Partner (All 7)</option>
+          <option value="" selected>Custom Onboarding (Manual Selection)</option>
+          <option value="all">Multi-Service Partner (All 7)</option>
           <option value="catering">Feast Booking Partner</option>
           <option value="stall">Specialty Food Stall</option>
           <option value="baina">Mithai & Baina Artisan</option>
@@ -241,21 +242,21 @@
 
                 <div class="form-group">
                   <label class="form-label" for="d-owner-name">Owner / Primary Contact Name <span class="required">*</span></label>
-                  <input type="text" id="d-owner-name" class="form-input" data-bind="details.ownerName" value="Mohammad Zeeshaan" placeholder="Full legal name" />
+                  <input type="text" id="d-owner-name" class="form-input" data-bind="details.ownerName" value="Kabir Ahmad (Demo Partner)" placeholder="Full legal name" />
                 </div>
 
                 <div class="form-group">
                   <label class="form-label" for="d-phone">WhatsApp Mobile Number <span class="required">*</span></label>
                   <div class="input-with-prefix">
                     <span class="input-prefix">+91</span>
-                    <input type="tel" id="d-phone" class="form-input" data-bind="details.phone" value="9876543210" placeholder="10-digit mobile number" />
+                    <input type="tel" id="d-phone" class="form-input" data-bind="details.phone" value="98000 00000" placeholder="10-digit mobile number" />
                   </div>
                   <span class="field-hint">Booking alerts and customer confirmations are delivered to this number.</span>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label" for="d-email">Account Email Address <span class="required">*</span></label>
-                  <input type="email" id="d-email" class="form-input" data-bind="details.email" value="contact@royalawadh.com" placeholder="business@example.com" />
+                  <input type="email" id="d-email" class="form-input" data-bind="details.email" value="vendor@demo-bhojpatra.com" placeholder="business@example.com" />
                 </div>
 
                 <div class="form-group">
@@ -296,7 +297,7 @@
                 <div class="form-group">
                   <label class="form-label">Google Rating (Imported Reputation)</label>
                   <input type="text" class="form-input" data-bind="details.googleRating" value="4.8" placeholder="e.g. 4.8" />
-                  <span class="field-hint">Surfaced as a trusted Google badge on catalog cards.</span>
+                  <span class="field-hint">Surfaced as Google rating on catalog cards.</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Total Google Reviews Count</label>
@@ -318,11 +319,11 @@
               <div class="form-grid-2">
                 <div class="form-group">
                   <label class="form-label" for="d-gst">GSTIN (Goods and Services Tax Identification) *</label>
-                  <input type="text" id="d-gst" class="form-input" data-bind="kyc.gstNumber" value="09AAACA1234A1Z5" style="text-transform: uppercase;" />
+                  <input type="text" id="d-gst" class="form-input" data-bind="kyc.gstNumber" value="09ABCDE1234F1Z5" style="text-transform: uppercase;" />
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="d-fssai">FSSAI Food Safety Licence (14 Digits) *</label>
-                  <input type="text" id="d-fssai" class="form-input" data-bind="kyc.fssaiNumber" value="12723055000123" />
+                  <input type="text" id="d-fssai" class="form-input" data-bind="kyc.fssaiNumber" value="10000000000000" />
                 </div>
               </div>
 
@@ -333,14 +334,14 @@
                     <span style="font-size: 28px;">📄</span>
                     <div class="photo-upload-meta">
                       <div class="photo-upload-title">GST Certificate</div>
-                      <div class="photo-upload-desc">gst_certificate_2026.pdf (Verified ✓)</div>
+                      <div class="photo-upload-desc">gst_certificate_sample.pdf (Uploaded ✓)</div>
                     </div>
                   </div>
                   <div class="photo-uploader-box">
                     <span style="font-size: 28px;">🥗</span>
                     <div class="photo-upload-meta">
                       <div class="photo-upload-title">FSSAI Licence</div>
-                      <div class="photo-upload-desc">fssai_licence_awadh.pdf (Verified ✓)</div>
+                      <div class="photo-upload-desc">fssai_licence_sample.pdf (Uploaded ✓)</div>
                     </div>
                   </div>
                 </div>
@@ -359,10 +360,10 @@
             <div class="content-card">
               <div class="offering-cards-grid">
                 <!-- 1. Feast Booking Card -->
-                <div class="offering-card active" data-offering-key="catering" onclick="toggleOffering('catering')">
+                <div class="offering-card" data-offering-key="catering" onclick="toggleOffering('catering')">
                   <div class="offering-header">
                     <span class="offering-icon">🍲</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Feast Booking</div>
                   <div class="offering-blurb">Complete multi-course feasts (Silver & Gold) with tiered menus, defined dish allowances, and regional culinary heritage.</div>
@@ -375,10 +376,10 @@
                 </div>
 
                 <!-- 2. Single Specialty Stall Card -->
-                <div class="offering-card active" data-offering-key="stall" onclick="toggleOffering('stall')">
+                <div class="offering-card" data-offering-key="stall" onclick="toggleOffering('stall')">
                   <div class="offering-header">
                     <span class="offering-icon">🍢</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Single Specialty Stall</div>
                   <div class="offering-blurb">One dedicated food station (Biryani, Chaat, Tandoor, Dosa, Wok) with custom delicacies for any celebration.</div>
@@ -391,10 +392,10 @@
                 </div>
 
                 <!-- 3. Baina Gifting Boxes Card -->
-                <div class="offering-card active" data-offering-key="baina" onclick="toggleOffering('baina')">
+                <div class="offering-card" data-offering-key="baina" onclick="toggleOffering('baina')">
                   <div class="offering-header">
                     <span class="offering-icon">🎁</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Baina Gifting Boxes</div>
                   <div class="offering-blurb">Artisanal sweet hampers and wedding announcement invitation boxes delivered in luxury packaging.</div>
@@ -407,10 +408,10 @@
                 </div>
 
                 <!-- 4. Live Counters Card -->
-                <div class="offering-card active" data-offering-key="counters" onclick="toggleOffering('counters')">
+                <div class="offering-card" data-offering-key="counters" onclick="toggleOffering('counters')">
                   <div class="offering-header">
                     <span class="offering-icon">🍳</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Live Counters</div>
                   <div class="offering-blurb">Interactive live cooking & beverage stations (Chaat, Tandoor, Dosa, Wok, Pizza, Paan) managed on-site.</div>
@@ -423,10 +424,10 @@
                 </div>
 
                 <!-- 5. Extras Card -->
-                <div class="offering-card active" data-offering-key="extras" onclick="toggleOffering('extras')">
+                <div class="offering-card" data-offering-key="extras" onclick="toggleOffering('extras')">
                   <div class="offering-header">
                     <span class="offering-icon">🪑</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Extras</div>
                   <div class="offering-blurb">Additional event rental items, furniture, chafing warmers, bar setups, and specialty catering equipment.</div>
@@ -439,10 +440,10 @@
                 </div>
 
                 <!-- 6. Add-ons Card -->
-                <div class="offering-card active" data-offering-key="addons" onclick="toggleOffering('addons')">
+                <div class="offering-card" data-offering-key="addons" onclick="toggleOffering('addons')">
                   <div class="offering-header">
                     <span class="offering-icon">🍹</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Add-ons</div>
                   <div class="offering-blurb">Supplementary food & beverage enhancements like welcome drinks, dessert studios, and midnight refreshments.</div>
@@ -455,10 +456,10 @@
                 </div>
 
                 <!-- 7. Essentials Card -->
-                <div class="offering-card active" data-offering-key="essentials" onclick="toggleOffering('essentials')">
+                <div class="offering-card" data-offering-key="essentials" onclick="toggleOffering('essentials')">
                   <div class="offering-header">
                     <span class="offering-icon">🍽️</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Essentials</div>
                   <div class="offering-blurb">Professional banquet service staff, premium cutlery & tableware packages, and complete waste management.</div>
@@ -512,7 +513,7 @@
                   <span class="choice-chip">Family Pujas & Gatherings</span>
                   <span class="choice-chip">Corporate Galas</span>
                 </div>
-                <span class="field-hint" style="margin-top: 4px;">Directly populates the "Best For" badge on the storefront package card.</span>
+                <span class="field-hint" style="margin-top: 4px;">Directly populates the "Best For" tag on the storefront package card.</span>
               </div>
 
               <!-- Guest Range & Capacity -->
@@ -542,10 +543,10 @@
             </div>
           </article>
 
-          <!-- ── 5B. CATERING: COURSE HIERARCHY ── -->
+          <!-- ── 5B. FEAST: COURSE HIERARCHY ── -->
           <article class="step-container" data-step-id="view-cat-courses">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5B. Course Structure</div>
+              <div class="step-eyebrow">Feast Builder · 5B. Course Hierarchy</div>
               <h1 class="step-heading">Standard platform course hierarchy</h1>
               <p class="step-subtext">Bhojpatra categorizes menus into 5 platform standard courses, creating clear navigation for guests rather than one long flat list.</p>
             </header>
@@ -613,7 +614,7 @@
           <!-- ── 5C. CATERING: GRANULAR DISH BUILDER ── -->
           <article class="step-container" data-step-id="view-cat-dishes">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5C. Dishes & Food Photos</div>
+              <div class="step-eyebrow">Feast Builder · 5C. Dishes & Photos</div>
               <h1 class="step-heading">Build your dishes with authentic photos</h1>
               <p class="step-subtext">Add dishes to each course, set dietary status, attach food photos, and assign them to marketplace tiers.</p>
             </header>
@@ -680,8 +681,7 @@
                 <button type="button" class="tier-prog-tab coming-soon" data-tier="platinum" onclick="switchTierView('platinum')">
                   <div class="tab-step-num">3</div>
                   <div class="tab-label">
-                    <span>Platinum Luxury</span>
-                    <span class="tab-tag coming-soon">₹1,599</span>
+                    <span>Platinum / Coming Soon</span>
                   </div>
                   <span class="tab-status">Coming Soon</span>
                 </button>
@@ -833,12 +833,12 @@
             </div>
           </article>
 
-          <!-- ── 5E. CATERING: LIVE COUNTERS (SEPARATED FROM EXTRAS) ── -->
+          <!-- ── 5E. LIVE COUNTERS (SEPARATED FROM FEAST) ── -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5E. Live Counters</div>
+              <div class="step-eyebrow">Service Offerings · 4. Live Counters</div>
               <h1 class="step-heading">Select live food & beverage counters</h1>
-              <p class="step-subtext">Per Sony's directive, Live Counters are strictly separated from event service extras. Select which live stations your kitchen can deploy.</p>
+              <p class="step-subtext">Live Counters are strictly separated from event service extras. Select which live stations your kitchen can deploy.</p>
             </header>
 
             <div class="content-card">
@@ -914,10 +914,10 @@
             </div>
           </article>
 
-          <!-- ── 5F. CATERING: EXTRAS, ESSENTIALS & CUTLERY ── -->
+          <!-- ── 5F. EXTRAS, ADD-ONS & ESSENTIALS (SEPARATED FROM FEAST) ── -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5F. Cutlery & Essentials</div>
+              <div class="step-eyebrow">Service Offerings · 5-7. Extras, Add-ons & Essentials</div>
               <h1 class="step-heading">Tableware, cutlery & buffet essentials</h1>
               <p class="step-subtext">Sony identified cutlery and event essentials as missing. Map your tableware tiers directly to Bhojpatra's Service Packages (A to D).</p>
             </header>
@@ -1409,18 +1409,18 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Owner Name *</label>
-                <input type="text" class="form-input" data-bind="details.ownerName" value="Mohammad Zeeshaan" />
+                <input type="text" class="form-input" data-bind="details.ownerName" value="Kabir Ahmad (Demo Partner)" />
               </div>
               <div class="form-group">
                 <label class="form-label">WhatsApp Mobile *</label>
                 <div class="input-with-prefix">
                   <span class="input-prefix">+91</span>
-                  <input type="tel" class="form-input" data-bind="details.phone" value="9876543210" />
+                  <input type="tel" class="form-input" data-bind="details.phone" value="98000 00000" />
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Email *</label>
-                <input type="email" class="form-input" data-bind="details.email" value="contact@royalawadh.com" />
+                <input type="email" class="form-input" data-bind="details.email" value="vendor@demo-bhojpatra.com" />
               </div>
               <div class="form-group">
                 <label class="form-label">City *</label>
@@ -1450,17 +1450,17 @@
             <div class="content-card">
               <div class="form-group">
                 <label class="form-label">GSTIN *</label>
-                <input type="text" class="form-input" data-bind="kyc.gstNumber" value="09AAACA1234A1Z5" />
+                <input type="text" class="form-input" data-bind="kyc.gstNumber" value="09ABCDE1234F1Z5" />
               </div>
               <div class="form-group">
                 <label class="form-label">FSSAI Licence *</label>
-                <input type="text" class="form-input" data-bind="kyc.fssaiNumber" value="12723055000123" />
+                <input type="text" class="form-input" data-bind="kyc.fssaiNumber" value="10000000000000" />
               </div>
               <div class="photo-uploader-box">
                 <span style="font-size: 24px;">📄</span>
                 <div class="photo-upload-meta">
                   <div class="photo-upload-title">GST Certificate</div>
-                  <div class="photo-upload-desc">Verified ✓</div>
+                  <div class="photo-upload-desc">Uploaded ✓</div>
                 </div>
               </div>
             </div>
@@ -1475,64 +1475,64 @@
             <div class="content-card">
               <div class="offering-cards-grid">
                 <!-- 1. Feast Booking -->
-                <div class="offering-card active" data-offering-key="catering" onclick="toggleOffering('catering')">
+                <div class="offering-card" data-offering-key="catering" onclick="toggleOffering('catering')">
                   <div class="offering-header">
                     <span class="offering-icon">🍲</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Feast Booking</div>
                   <div class="offering-blurb">Multi-course feasts (Silver & Gold) with tiered menus & allowances.</div>
                 </div>
                 <!-- 2. Single Stall -->
-                <div class="offering-card active" data-offering-key="stall" onclick="toggleOffering('stall')">
+                <div class="offering-card" data-offering-key="stall" onclick="toggleOffering('stall')">
                   <div class="offering-header">
                     <span class="offering-icon">🍢</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Single Stall</div>
                   <div class="offering-blurb">Dedicated food station for live parties and events.</div>
                 </div>
                 <!-- 3. Baina Boxes -->
-                <div class="offering-card active" data-offering-key="baina" onclick="toggleOffering('baina')">
+                <div class="offering-card" data-offering-key="baina" onclick="toggleOffering('baina')">
                   <div class="offering-header">
                     <span class="offering-icon">🎁</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Baina Boxes</div>
                   <div class="offering-blurb">Artisanal sweet gift hampers & invitation boxes.</div>
                 </div>
                 <!-- 4. Live Counters -->
-                <div class="offering-card active" data-offering-key="counters" onclick="toggleOffering('counters')">
+                <div class="offering-card" data-offering-key="counters" onclick="toggleOffering('counters')">
                   <div class="offering-header">
                     <span class="offering-icon">🍳</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Live Counters</div>
                   <div class="offering-blurb">Interactive cooking stations (Chaat, Tandoor, Dosa, Paan).</div>
                 </div>
                 <!-- 5. Extras -->
-                <div class="offering-card active" data-offering-key="extras" onclick="toggleOffering('extras')">
+                <div class="offering-card" data-offering-key="extras" onclick="toggleOffering('extras')">
                   <div class="offering-header">
                     <span class="offering-icon">🪑</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Extras</div>
                   <div class="offering-blurb">Chafing warmers, buffet tables & rental event gear.</div>
                 </div>
                 <!-- 6. Add-ons -->
-                <div class="offering-card active" data-offering-key="addons" onclick="toggleOffering('addons')">
+                <div class="offering-card" data-offering-key="addons" onclick="toggleOffering('addons')">
                   <div class="offering-header">
                     <span class="offering-icon">🍹</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Add-ons</div>
                   <div class="offering-blurb">Welcome coolers, dessert bar & midnight refreshments.</div>
                 </div>
                 <!-- 7. Essentials -->
-                <div class="offering-card active" data-offering-key="essentials" onclick="toggleOffering('essentials')">
+                <div class="offering-card" data-offering-key="essentials" onclick="toggleOffering('essentials')">
                   <div class="offering-header">
                     <span class="offering-icon">🍽️</span>
-                    <div class="offering-checkbox">✓</div>
+                    <div class="offering-checkbox"></div>
                   </div>
                   <div class="offering-title">Essentials</div>
                   <div class="offering-blurb">Uniformed stewards, tableware packages & waste disposal.</div>
@@ -1631,7 +1631,7 @@
                 <button type="button" class="tier-prog-tab coming-soon" data-tier="platinum" onclick="switchTierView('platinum')">
                   <div class="tab-step-num">3</div>
                   <div class="tab-label">
-                    <span>Platinum · ₹1,599</span>
+                    <span>Platinum / Coming Soon</span>
                   </div>
                   <span class="tab-status">Coming Soon</span>
                 </button>
@@ -2059,8 +2059,7 @@
             <img id="sf-hero-image" src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=70" alt="Hero" />
             <div class="storefront-hero-overlay">
               <div class="storefront-hero-tags">
-                <span class="storefront-hero-tag">✓ Verified Partner</span>
-                <span class="storefront-hero-tag" style="background:var(--color-cream);color:var(--color-red);">Gold & Platinum</span>
+                <span class="storefront-hero-tag" style="background:var(--color-cream);color:var(--color-red);">Feast Booking Partner</span>
               </div>
               <h2 id="sf-brand-name" style="font-size:20px;font-weight:800;color:#FFF;">Royal Awadh Caterers</h2>
               <p id="sf-cuisines" style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">Awadhi · Mughlai · North Indian</p>

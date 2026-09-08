@@ -909,6 +909,16 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   font-weight: 700;
 }
 
+.choice-chip.active:hover {
+  background: #7A1417;
+  border-color: #7A1417;
+  color: var(--color-cream);
+}
+
+.choice-chip:active {
+  transform: scale(0.96);
+}
+
 .choice-chip .chip-check {
   font-size: 11px;
 }
