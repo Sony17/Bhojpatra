@@ -371,6 +371,50 @@ function goToStep(stepId) {
   state.stepHistory.push(state.currentStepId);
   state.currentStepId = stepId;
 
+  // Handle Dashboard vs Onboarding Shell Switching
+  if (stepId.startsWith('view-dashboard')) {
+    const dShell = document.getElementById('desktop-dashboard-shell');
+    const oShell = document.getElementById('desktop-onboarding-shell');
+    const mDShell = document.getElementById('mobile-dashboard-shell');
+    const mOShell = document.getElementById('mobile-onboarding-shell');
+    if (dShell) dShell.style.display = 'flex';
+    if (oShell) oShell.style.display = 'none';
+    if (mDShell) mDShell.style.display = 'flex';
+    if (mOShell) mOShell.style.display = 'none';
+
+    renderDashboardView();
+
+    let tab = 'home';
+    if (stepId === 'view-dashboard-services') tab = 'services';
+    if (stepId === 'view-dashboard-orders') tab = 'orders';
+    setDashboardTab(tab, false);
+
+    const jumpSelect = document.getElementById('prototype-step-jump');
+    if (jumpSelect) jumpSelect.value = stepId;
+
+    const quickBtn = document.getElementById('btn-quick-dash-toggle');
+    if (quickBtn) {
+      quickBtn.classList.add('active');
+      quickBtn.innerHTML = '<span>📝</span> Back to Onboarding';
+    }
+    return;
+  } else {
+    const dShell = document.getElementById('desktop-dashboard-shell');
+    const oShell = document.getElementById('desktop-onboarding-shell');
+    const mDShell = document.getElementById('mobile-dashboard-shell');
+    const mOShell = document.getElementById('mobile-onboarding-shell');
+    if (dShell) dShell.style.display = 'none';
+    if (oShell) oShell.style.display = 'flex';
+    if (mDShell) mDShell.style.display = 'none';
+    if (mOShell) mOShell.style.display = 'flex';
+
+    const quickBtn = document.getElementById('btn-quick-dash-toggle');
+    if (quickBtn) {
+      quickBtn.classList.remove('active');
+      quickBtn.innerHTML = '<span>📊</span> Vendor Dashboard';
+    }
+  }
+
   // Toggle active containers across both Desktop and Mobile frames
   document.querySelectorAll('.step-container').forEach(el => {
     el.classList.toggle('active', el.getAttribute('data-step-id') === stepId);
@@ -1924,4 +1968,479 @@ function renderAllViews() {
   renderTierView();
   renderDelicaciesList();
   renderBainaBoxList();
+  renderDashboardView();
 }
+
+// ==========================================================================
+// BHOJPATRA VENDOR DASHBOARD CONTROLLER (V1 REPLICA & V2 7-SERVICES)
+// Preserves V1 layout, widgets, metrics, modals, and mobile ergonomics
+// ==========================================================================
+
+let activeDashboardTab = 'home';
+let currentCatererSimState = 'active';
+
+function toggleDashboardMode() {
+  if (state.currentStepId.startsWith('view-dashboard')) {
+    goToStep('view-details');
+  } else {
+    goToStep('view-dashboard');
+  }
+}
+
+function setDashboardTab(tabName, syncStep = true) {
+  activeDashboardTab = tabName;
+
+  // Desktop tab views
+  const dHome = document.getElementById('desktop-tab-home');
+  const dServices = document.getElementById('desktop-tab-services');
+  const dOrders = document.getElementById('desktop-tab-orders');
+
+  if (dHome) dHome.style.display = tabName === 'home' ? 'flex' : 'none';
+  if (dServices) dServices.style.display = tabName === 'services' ? 'flex' : 'none';
+  if (dOrders) dOrders.style.display = tabName === 'orders' ? 'flex' : 'none';
+
+  // Desktop nav links
+  const navHome = document.getElementById('nav-item-home');
+  const navServices = document.getElementById('nav-item-services');
+  const navOrders = document.getElementById('nav-item-orders');
+  if (navHome) navHome.classList.toggle('active', tabName === 'home');
+  if (navServices) navServices.classList.toggle('active', tabName === 'services');
+  if (navOrders) navOrders.classList.toggle('active', tabName === 'orders');
+
+  // Breadcrumb
+  const breadcrumb = document.getElementById('desktop-breadcrumb-current');
+  if (breadcrumb) {
+    if (tabName === 'home') breadcrumb.textContent = 'Dashboard Home';
+    else if (tabName === 'services') breadcrumb.textContent = 'My Services & Offerings (7 Services)';
+    else if (tabName === 'orders') breadcrumb.textContent = 'Orders & Capacity Pipeline';
+  }
+
+  // Mobile tab views
+  const mHome = document.getElementById('mobile-tab-home');
+  const mServices = document.getElementById('mobile-tab-services');
+  const mOrders = document.getElementById('mobile-tab-orders');
+
+  if (mHome) mHome.style.display = tabName === 'home' ? 'flex' : 'none';
+  if (mServices) mServices.style.display = tabName === 'services' ? 'flex' : 'none';
+  if (mOrders) mOrders.style.display = tabName === 'orders' ? 'flex' : 'none';
+
+  // Mobile bottom nav items
+  const mobHome = document.getElementById('mob-nav-home');
+  const mobServices = document.getElementById('mob-nav-services');
+  const mobOrders = document.getElementById('mob-nav-orders');
+  if (mobHome) mobHome.classList.toggle('active', tabName === 'home');
+  if (mobServices) mobServices.classList.toggle('active', tabName === 'services');
+  if (mobOrders) mobOrders.classList.toggle('active', tabName === 'orders');
+
+  if (syncStep) {
+    if (tabName === 'home') state.currentStepId = 'view-dashboard';
+    else if (tabName === 'services') state.currentStepId = 'view-dashboard-services';
+    else if (tabName === 'orders') state.currentStepId = 'view-dashboard-orders';
+
+    const jumpSelect = document.getElementById('prototype-step-jump');
+    if (jumpSelect) jumpSelect.value = state.currentStepId;
+  }
+}
+
+function renderDashboardView() {
+  const bizName = state.details.businessName || "Royal Awadh Caterers";
+  const dietVal = state.details.dietaryOffering || "both";
+
+  // Plain Dietary Classification String (Strictly NO Badges)
+  let dietLabel = "⚖️ Both Veg & Non-Veg";
+  let dietShort = "Both Veg & Non-Veg";
+  if (dietVal === 'veg') {
+    dietLabel = "🟢 Pure Vegetarian (100% Veg Kitchen)";
+    dietShort = "Pure Veg";
+  } else if (dietVal === 'non-veg') {
+    dietLabel = "🔴 Non-Vegetarian Kitchen";
+    dietShort = "Non-Veg";
+  }
+
+  // Active Tier (Silver Base, Gold Featured, Platinum Coming Soon)
+  const isGold = state.catering.activeTier === 'gold' || state.catering.silverCompleted;
+  const tierShort = isGold ? "Gold Tier" : "Silver Tier";
+
+  // Bind Desktop Sidebar
+  const dName = document.getElementById('desktop-vendor-name');
+  if (dName) dName.textContent = bizName;
+
+  const dDiet = document.getElementById('desktop-vendor-diet');
+  if (dDiet) dDiet.textContent = dietShort;
+
+  const dTier = document.getElementById('desktop-vendor-tier');
+  if (dTier) dTier.textContent = tierShort;
+
+  // Bind Topbar Profile
+  const dAvatar = document.getElementById('desktop-user-avatar');
+  if (dAvatar) {
+    const initials = bizName.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'RA';
+    dAvatar.textContent = initials;
+  }
+  const dUserName = document.getElementById('desktop-user-name');
+  if (dUserName) dUserName.textContent = bizName;
+
+  // Bind Status Banner
+  const bTier = document.getElementById('badge-tier');
+  if (bTier) {
+    bTier.textContent = isGold ? "Gold / Bhoj Signature" : "Silver / Bhoj City";
+    bTier.className = isGold ? "badge-pill badge-gold-tier" : "badge-pill badge-solid-maroon";
+  }
+  const bDiet = document.getElementById('badge-diet');
+  if (bDiet) bDiet.textContent = dietLabel;
+
+  // Bind Mobile Header
+  const mName = document.getElementById('mobile-dash-brand-name');
+  if (mName) mName.textContent = bizName;
+
+  const mDiet = document.getElementById('mobile-strip-diet');
+  if (mDiet) mDiet.textContent = dietShort;
+
+  const mTier = document.getElementById('mobile-strip-tier');
+  if (mTier) mTier.textContent = isGold ? "Gold" : "Silver";
+
+  // Bind Active Offerings Count
+  const countEl = document.getElementById('desktop-active-services-count');
+  if (countEl) countEl.textContent = state.selectedOfferings.length;
+
+  // Bind Health Stack Stats
+  const hFeast = document.getElementById('health-stat-feast');
+  if (hFeast) {
+    const isCat = state.selectedOfferings.includes('catering');
+    hFeast.textContent = isCat ? `${isGold ? 'Gold (₹1,199/p)' : 'Silver (₹799/p)'} · ${state.catering.dishes.length} Dishes` : 'Not Configured · Add +';
+    hFeast.style.color = isCat ? 'var(--color-red)' : '#888';
+  }
+
+  const hStall = document.getElementById('health-stat-stall');
+  if (hStall) {
+    const isStall = state.selectedOfferings.includes('stall');
+    hStall.textContent = isStall ? `Active · Fixed (₹${state.stall.fixedPerPlate}/p)` : 'Not Configured · Add +';
+    hStall.style.color = isStall ? 'var(--color-black)' : '#888';
+  }
+
+  const hBaina = document.getElementById('health-stat-baina');
+  if (hBaina) {
+    const isBaina = state.selectedOfferings.includes('baina');
+    hBaina.textContent = isBaina ? `Active · ${state.baina.boxes.length} Box Sizes` : 'Not Configured · Add +';
+    hBaina.style.color = isBaina ? 'var(--color-black)' : '#888';
+  }
+
+  const hCounters = document.getElementById('health-stat-counters');
+  if (hCounters) {
+    const isCounters = state.selectedOfferings.includes('counters');
+    hCounters.textContent = isCounters ? `${state.catering.liveCounters.length} Active Counters` : 'Not Configured · Add +';
+    hCounters.style.color = isCounters ? 'var(--color-black)' : '#888';
+  }
+
+  const hExtras = document.getElementById('health-stat-extras');
+  if (hExtras) {
+    const isExtras = state.selectedOfferings.includes('extras');
+    hExtras.textContent = isExtras ? 'Warmers & Buffets Active' : 'Not Configured · Add +';
+    hExtras.style.color = isExtras ? 'var(--color-black)' : '#888';
+  }
+
+  const hAddons = document.getElementById('health-stat-addons');
+  if (hAddons) {
+    const isAddons = state.selectedOfferings.includes('addons');
+    hAddons.textContent = isAddons ? 'Welcome Coolers Enabled' : 'Not Configured · Add +';
+    hAddons.style.color = isAddons ? 'var(--color-black)' : '#888';
+  }
+
+  const hEssentials = document.getElementById('health-stat-essentials');
+  if (hEssentials) {
+    const isEssentials = state.selectedOfferings.includes('essentials');
+    hEssentials.textContent = isEssentials ? 'Stewards & Cutlery (Pkg B)' : 'Not Configured · Add +';
+    hEssentials.style.color = isEssentials ? 'var(--color-black)' : '#888';
+  }
+
+  // Render Services Hub
+  renderServicesHub();
+}
+
+function renderServicesHub() {
+  const dContainer = document.getElementById('desktop-services-grid-container');
+  const mContainer = document.getElementById('mobile-services-list-container');
+  if (!dContainer && !mContainer) return;
+
+  const isGold = state.catering.activeTier === 'gold' || state.catering.silverCompleted;
+
+  const servicesData = [
+    {
+      key: 'catering',
+      title: '1. Feast Booking',
+      subtitle: 'Multi-course plated buffet catering for grand events',
+      icon: '🍲',
+      isActive: state.selectedOfferings.includes('catering'),
+      activeDetails: [
+        { label: 'Active Tier', value: isGold ? 'Gold / Bhoj Signature' : 'Silver / Bhoj City' },
+        { label: 'Base Pricing', value: isGold ? `₹${state.catering.tierPrices.gold}/p` : `₹${state.catering.tierPrices.silver}/p` },
+        { label: 'Specialization', value: isGold ? state.catering.goldSpecialization : 'None (Base Tier)' },
+        { label: 'Published Menu', value: `${state.catering.dishes.length} Items (5 Courses)` },
+        { label: 'Platinum Tier', value: '<span class="tier-pill-small" style="background:#E5E7EB;color:#555;">Coming Soon</span>' }
+      ],
+      unconfiguredNote: 'Offer full-service wedding and gala feast booking with Silver & Gold tiers.',
+      editStep: 'view-cat-basics',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'stall',
+      title: '2. Single Stall',
+      subtitle: 'Dynamic live station for birthdays, fairs & house parties',
+      icon: '🎪',
+      isActive: state.selectedOfferings.includes('stall'),
+      activeDetails: [
+        { label: 'Stall Name', value: state.stall.stallName },
+        { label: 'Menu Format', value: state.stall.menuType === 'fixed' ? `Fixed Set Spread (₹${state.stall.fixedPerPlate}/p)` : 'Varied À la Carte' },
+        { label: 'Min Pax Guarantee', value: `${state.stall.minPaxGuarantee} Guests` },
+        { label: 'Specialty Items', value: `${state.stall.delicacies.length} Delicacies Configured` }
+      ],
+      unconfiguredNote: 'Deploy standalone specialty stalls like Biryani handis or live Sigdi kebabs.',
+      editStep: 'view-stall-basics',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'baina',
+      title: '3. Baina Boxes',
+      subtitle: 'Artisanal sweet gift hampers & invitation boxes',
+      icon: '🎁',
+      isActive: state.selectedOfferings.includes('baina'),
+      activeDetails: [
+        { label: 'Studio Name', value: state.baina.studioName },
+        { label: 'Packaging Style', value: state.baina.packaging === 'velvet' ? 'Royal Velvet Finish' : (state.baina.packaging === 'gold-foil' ? 'Golden Metallic Foil' : (state.baina.packaging === 'eco-kraft' ? 'Eco Kraft Board' : 'Banarasi Brocade')) },
+        { label: 'Min Order Guarantee', value: `${state.baina.minOrderBoxes} Gift Boxes` },
+        { label: 'Configured Boxes', value: `${state.baina.boxes.length} Hamper Sizes (½kg & 1kg)` }
+      ],
+      unconfiguredNote: 'Craft signature mithai and dry-fruit gift boxes for wedding invitation distribution.',
+      editStep: 'view-baina-basics',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'counters',
+      title: '4. Live Counters',
+      subtitle: 'Interactive live cooking stations deployed alongside feasts',
+      icon: '🍳',
+      isActive: state.selectedOfferings.includes('counters'),
+      activeDetails: [
+        { label: 'Active Stations', value: 'Chaat Station · Tandoor & Wok · Paan Counter' },
+        { label: 'Price Range', value: '₹40 to ₹90 per guest' },
+        { label: 'Setup Requirement', value: 'Dedicated 8ft preparation zone' }
+      ],
+      unconfiguredNote: 'Add interactive Chaat, Tandoori live rolls, or Banarasi Paan live kiosks.',
+      editStep: 'view-cat-live',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'extras',
+      title: '5. Extras',
+      subtitle: 'Equipment rentals, chafing warmers & presentation ware',
+      icon: '🪑',
+      isActive: state.selectedOfferings.includes('extras'),
+      activeDetails: [
+        { label: 'Buffet Equipment', value: 'Stainless Chafers & Fuel Warmers' },
+        { label: 'Display Linens', value: 'Designer Maroon Banquet Table Skirtings' },
+        { label: 'Rental Coverage', value: 'Included for up to 500 guests' }
+      ],
+      unconfiguredNote: 'Provide buffet warmer gear, chafing dishes, and presentation table setups.',
+      editStep: 'view-cat-extras',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'addons',
+      title: '6. Add-ons',
+      subtitle: 'Welcome coolers, mocktail bar & dessert studios',
+      icon: '🍹',
+      isActive: state.selectedOfferings.includes('addons'),
+      activeDetails: [
+        { label: 'Welcome Drinks Bar', value: 'Saffron Kahwa, Aam Panna & Mojitos' },
+        { label: 'Late Night Studio', value: 'Hot Kesar Jalebi & Rabri Station' },
+        { label: 'Hourly Extension', value: 'Available upon host request' }
+      ],
+      unconfiguredNote: 'Offer botanical welcome refreshments and specialty midnight dessert stations.',
+      editStep: 'view-cat-extras',
+      addStep: 'view-offerings'
+    },
+    {
+      key: 'essentials',
+      title: '7. Essentials',
+      subtitle: 'Uniformed service crew, tableware packages & hygiene',
+      icon: '🍽️',
+      isActive: state.selectedOfferings.includes('essentials'),
+      activeDetails: [
+        { label: 'Service Staff', value: 'Uniformed Stewards, Captain & Table Helpers' },
+        { label: 'Tableware Tier', value: 'Package B · Ceramic & Stainless Steel (+₹40/p)' },
+        { label: 'Waste Management', value: 'Clean disposal team & segregated bins' }
+      ],
+      unconfiguredNote: 'Provide hospitality stewards, ceramic/fine bone cutlery, and waste clearance.',
+      editStep: 'view-cat-extras',
+      addStep: 'view-offerings'
+    }
+  ];
+
+  const html = servicesData.map(svc => `
+    <div class="service-summary-card ${svc.isActive ? '' : 'unconfigured'}">
+      <div class="card-top-header">
+        <div class="service-icon-label-group">
+          <div class="service-icon-circle">${svc.icon}</div>
+          <div>
+            <div class="service-title-text">${svc.title}</div>
+            <div class="service-sub-type">${svc.subtitle}</div>
+          </div>
+        </div>
+        <span class="service-status-pill ${svc.isActive ? 'active' : 'unconfigured'}">
+          ${svc.isActive ? 'Active Service' : 'Not Configured'}
+        </span>
+      </div>
+
+      <div class="service-body-details">
+        ${svc.isActive
+          ? svc.activeDetails.map(d => `
+              <div class="service-detail-row">
+                <span style="color:#777;font-size:11.5px;">${d.label}:</span>
+                <strong style="color:var(--color-black);font-size:12px;">${d.value}</strong>
+              </div>
+            `).join('')
+          : `<p style="font-size:12px;color:#777;line-height:1.4;">${svc.unconfiguredNote}</p>`
+        }
+      </div>
+
+      <div class="service-footer-actions">
+        ${svc.isActive
+          ? `<button type="button" class="btn-secondary-ghost" style="padding:6px 12px;font-size:11.5px;" onclick="goToStep('${svc.editStep}')">Edit Configuration ✎</button>`
+          : `<button type="button" class="btn-primary-action" style="padding:6px 12px;font-size:11.5px;" onclick="goToStep('${svc.addStep}')">+ Enable This Service</button>`
+        }
+        <span style="font-size:11px;color:#888;">${svc.isActive ? 'Live on Marketplace' : 'Inactive'}</span>
+      </div>
+    </div>
+  `).join('');
+
+  if (dContainer) dContainer.innerHTML = html;
+  if (mContainer) mContainer.innerHTML = html;
+}
+
+// ── Caterer State Simulator (V1 Feature Preserved) ──
+function setCatererDashboardState(mode) {
+  currentCatererSimState = mode;
+
+  const select = document.getElementById('caterer-state-select');
+  if (select) select.value = mode;
+
+  const urgentCard = document.getElementById('card-urgent-alert');
+  const spotlightCard = document.getElementById('card-next-event-spotlight');
+  const mobUrgent = document.getElementById('mobile-card-urgent');
+  const mobSpotlight = document.getElementById('mobile-card-spotlight');
+  const bMarketplace = document.getElementById('badge-marketplace');
+  const bStatusText = document.getElementById('banner-status-text');
+
+  if (mode === 'active') {
+    if (urgentCard) urgentCard.style.display = 'flex';
+    if (spotlightCard) spotlightCard.style.display = 'flex';
+    if (mobUrgent) mobUrgent.style.display = 'flex';
+    if (mobSpotlight) mobSpotlight.style.display = 'flex';
+    if (bMarketplace) {
+      bMarketplace.innerHTML = '<span class="status-dot-pulse" style="background:var(--color-red);"></span> Live on Marketplace';
+      bMarketplace.className = 'badge-pill badge-outline-maroon';
+    }
+    if (bStatusText) bStatusText.textContent = 'Your kitchen profile is active and discoverable for feast & stall bookings in Lucknow.';
+    showToast('Switched to Active Caterer state (Royal Awadh Caterers)');
+  } else if (mode === 'zero') {
+    if (urgentCard) urgentCard.style.display = 'none';
+    if (mobUrgent) mobUrgent.style.display = 'none';
+    if (bMarketplace) {
+      bMarketplace.innerHTML = '<span class="status-dot-pulse" style="background:var(--color-red);"></span> Live on Marketplace';
+    }
+    if (spotlightCard) {
+      spotlightCard.innerHTML = `
+        <div style="text-align:center; padding: 36px 20px;">
+          <div style="font-size:36px; margin-bottom:10px;">🏪</div>
+          <h2 style="font-size:20px; font-weight:800; margin-bottom:6px;">Your Kitchen is Open for Bookings!</h2>
+          <p style="color:#666; max-width:480px; margin:0 auto 18px; font-size:13px;">Your feast packages and services are published live on the marketplace. As soon as an event host books your services, your kitchen prep brief will appear right here.</p>
+          <button type="button" class="btn-preview-store" onclick="openStorefrontPreview()">Preview Public Storefront</button>
+        </div>
+      `;
+    }
+    showToast('Switched to Zero Bookings state (Empty state demonstration)');
+  } else if (mode === 'kyc') {
+    if (urgentCard) {
+      urgentCard.style.display = 'flex';
+      const heading = document.getElementById('urgent-alert-heading');
+      const desc = document.getElementById('urgent-alert-desc');
+      if (heading) heading.textContent = 'Action Required: Statutory FSSAI License Document Renewal';
+      if (desc) desc.textContent = 'Bhojpatra statutory compliance review found the submitted FSSAI license certificate expired. Upload a valid certificate to retain live marketplace visibility.';
+    }
+    if (bStatusText) bStatusText.textContent = 'Statutory compliance issue detected. Please re-verify requested documents.';
+    showToast('Switched to KYC Action Required state');
+  } else if (mode === 'hidden') {
+    if (bMarketplace) {
+      bMarketplace.innerHTML = '⛔ Storefront Hidden by Admin';
+      bMarketplace.className = 'badge-pill badge-solid-maroon';
+    }
+    if (urgentCard) {
+      urgentCard.style.display = 'flex';
+      const heading = document.getElementById('urgent-alert-heading');
+      const desc = document.getElementById('urgent-alert-desc');
+      if (heading) heading.textContent = 'Notice: Listing Temporarily Delisted';
+      if (desc) desc.textContent = 'Your partner storefront has been placed on temporary hold. Please contact Bhojpatra Partner Concierge to reactivate discovery.';
+    }
+    if (bStatusText) bStatusText.textContent = 'Your caterer storefront is temporarily hidden from search results. Contact partner support.';
+    showToast('Switched to Listing Hidden state');
+  }
+}
+
+// ── Modals & Booking Action Handlers ──
+function openPrepSheetModal() {
+  const modal = document.getElementById('modal-prep-sheet');
+  if (modal) modal.classList.add('open');
+}
+
+function openBookingReviewModal() {
+  const modal = document.getElementById('modal-booking-review');
+  if (modal) modal.classList.add('open');
+}
+
+function closeDashboardModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.classList.remove('open');
+}
+
+function acceptBooking() {
+  closeDashboardModal('modal-booking-review');
+
+  const card = document.getElementById('card-urgent-alert');
+  if (card) card.style.display = 'none';
+
+  const mCard = document.getElementById('mobile-card-urgent');
+  if (mCard) mCard.style.display = 'none';
+
+  const oCard = document.getElementById('orders-pending-card');
+  if (oCard) oCard.style.display = 'none';
+
+  const dot = document.getElementById('desktop-notif-dot');
+  if (dot) dot.style.display = 'none';
+
+  const mDot = document.getElementById('mobile-notif-dot');
+  if (mDot) mDot.style.display = 'none';
+
+  const badge = document.getElementById('desktop-orders-badge');
+  if (badge) badge.style.display = 'none';
+
+  const mBadge = document.getElementById('mobile-bottom-order-badge');
+  if (mBadge) mBadge.style.display = 'none';
+
+  showToast('✓ Booking BHOJ-9412 Accepted! Added to Active Pipeline.');
+}
+
+function declineBooking() {
+  closeDashboardModal('modal-booking-review');
+
+  const card = document.getElementById('card-urgent-alert');
+  if (card) card.style.display = 'none';
+
+  const mCard = document.getElementById('mobile-card-urgent');
+  if (mCard) mCard.style.display = 'none';
+
+  const oCard = document.getElementById('orders-pending-card');
+  if (oCard) oCard.style.display = 'none';
+
+  showToast('Booking request BHOJ-9412 declined.');
+}
+
