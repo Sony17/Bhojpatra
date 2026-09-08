@@ -18,6 +18,7 @@ const state = {
 
   // Step 1: Vendor Identity & Operations (Collected Once, Never Repeated)
   details: {
+    dietaryOffering: null, // Mandatory selection at start: 'veg' | 'non-veg' | 'both' (no default)
     businessName: "Royal Awadh Caterers",
     ownerName: "Mohammad Zeeshaan",
     phone: "9876543210",
@@ -188,7 +189,10 @@ const state = {
       }
     ],
 
-    // 5D. Pricing & Tiers (Base Rates and Course Quotas)
+    // 5D. Pricing & Tiers (Sequential Single-Tier Progression: Silver -> Gold -> Platinum Coming Soon)
+    activeTier: "silver",          // Only one tier active at a time: 'silver' | 'gold'
+    silverCompleted: false,        // Gold remains locked until Silver is saved
+    goldSpecialization: "Awadhi",  // Specialization category for Gold tier
     tierPrices: {
       silver: 799,
       gold: 1199,
@@ -308,6 +312,14 @@ const state = {
     ]
   },
 
+  // Feast Capabilities (Step 3 Inclusions: Live Counters, Extras, Add-ons, Essentials)
+  capabilities: {
+    liveCounters: true,
+    extras: true,
+    addOns: true,
+    essentials: true
+  },
+
   // Active Editing Target for Modals
   activeEditDishId: null,
   activeEditDelicacyId: null,
@@ -373,7 +385,7 @@ function goToStep(stepId) {
 
   // Re-render dynamic step views if necessary
   if (stepId === 'view-cat-dishes') renderDishList();
-  if (stepId === 'view-cat-tiers') renderTierQuotas();
+  if (stepId === 'view-cat-tiers') { renderTierView(); }
   if (stepId === 'view-stall-delicacies') renderDelicaciesList();
   if (stepId === 'view-baina-boxes') renderBainaBoxList();
   if (stepId === 'view-review') renderMasterReview();
@@ -385,8 +397,14 @@ function goToStep(stepId) {
 function nextStep() {
   const cur = state.currentStepId;
 
-  // Step 1: Details -> KYC
+  // Step 1: Details -> KYC (Mandatory Diet Selection Gate)
   if (cur === 'view-details') {
+    if (!state.details.dietaryOffering) {
+      document.querySelectorAll('.diet-validation-error').forEach(el => el.style.display = 'block');
+      document.querySelectorAll('.diet-selection-section').forEach(el => el.classList.add('pulse-error'));
+      showToast("Please select your kitchen's dietary offering (Veg, Non-Veg, or Both) to continue.");
+      return;
+    }
     goToStep('view-kyc');
     return;
   }
@@ -407,8 +425,32 @@ function nextStep() {
   if (cur === 'view-cat-basics') { goToStep('view-cat-courses'); return; }
   if (cur === 'view-cat-courses') { goToStep('view-cat-dishes'); return; }
   if (cur === 'view-cat-dishes') { goToStep('view-cat-tiers'); return; }
-  if (cur === 'view-cat-tiers') { goToStep('view-cat-live'); return; }
-  if (cur === 'view-cat-live') { goToStep('view-cat-extras'); return; }
+  if (cur === 'view-cat-tiers') {
+    if (state.capabilities.liveCounters) {
+      goToStep('view-cat-live');
+    } else if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+      goToStep('view-cat-extras');
+    } else if (state.selectedOfferings.includes('stall')) {
+      goToStep('view-stall-basics');
+    } else if (state.selectedOfferings.includes('baina')) {
+      goToStep('view-baina-basics');
+    } else {
+      goToStep('view-review');
+    }
+    return;
+  }
+  if (cur === 'view-cat-live') {
+    if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+      goToStep('view-cat-extras');
+    } else if (state.selectedOfferings.includes('stall')) {
+      goToStep('view-stall-basics');
+    } else if (state.selectedOfferings.includes('baina')) {
+      goToStep('view-baina-basics');
+    } else {
+      goToStep('view-review');
+    }
+    return;
+  }
   if (cur === 'view-cat-extras') {
     // After Catering Extras, transition to Stall if selected, else Baina, else Review
     if (state.selectedOfferings.includes('stall')) {
@@ -463,11 +505,24 @@ function prevStep() {
   if (cur === 'view-cat-dishes') { goToStep('view-cat-courses'); return; }
   if (cur === 'view-cat-tiers') { goToStep('view-cat-dishes'); return; }
   if (cur === 'view-cat-live') { goToStep('view-cat-tiers'); return; }
-  if (cur === 'view-cat-extras') { goToStep('view-cat-live'); return; }
+  if (cur === 'view-cat-extras') {
+    if (state.capabilities.liveCounters) {
+      goToStep('view-cat-live');
+    } else {
+      goToStep('view-cat-tiers');
+    }
+    return;
+  }
 
   if (cur === 'view-stall-basics') {
     if (state.selectedOfferings.includes('catering')) {
-      goToStep('view-cat-extras');
+      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+        goToStep('view-cat-extras');
+      } else if (state.capabilities.liveCounters) {
+        goToStep('view-cat-live');
+      } else {
+        goToStep('view-cat-tiers');
+      }
     } else {
       goToStep('view-offerings');
     }
@@ -482,7 +537,13 @@ function prevStep() {
     if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-live');
     } else if (state.selectedOfferings.includes('catering')) {
-      goToStep('view-cat-extras');
+      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+        goToStep('view-cat-extras');
+      } else if (state.capabilities.liveCounters) {
+        goToStep('view-cat-live');
+      } else {
+        goToStep('view-cat-tiers');
+      }
     } else {
       goToStep('view-offerings');
     }
@@ -497,7 +558,13 @@ function prevStep() {
     } else if (state.selectedOfferings.includes('stall')) {
       goToStep('view-stall-live');
     } else if (state.selectedOfferings.includes('catering')) {
-      goToStep('view-cat-extras');
+      if (state.capabilities.extras || state.capabilities.addOns || state.capabilities.essentials) {
+        goToStep('view-cat-extras');
+      } else if (state.capabilities.liveCounters) {
+        goToStep('view-cat-live');
+      } else {
+        goToStep('view-cat-tiers');
+      }
     } else {
       goToStep('view-offerings');
     }
@@ -542,20 +609,26 @@ function updateVendorContextHeader() {
     const ratingEl = h.querySelector('.vendor-context-rating-badge');
     if (ratingEl) ratingEl.innerHTML = `<span class="star">★</span> ${state.details.googleRating} (${state.details.googleReviews} reviews)`;
 
-    // Services Pills
+    // Services Pills & Dietary Offering (Plain Text, Zero Badges)
     const servicesRow = h.querySelector('.vendor-context-services');
     if (servicesRow) {
-      servicesRow.innerHTML = state.selectedOfferings.map(s => {
-        const label = s === 'catering' ? 'Catering' : s === 'stall' ? 'Stall' : 'Baina';
+      let pillsHtml = state.selectedOfferings.map(s => {
+        const label = s === 'catering' ? 'Feast Booking' : s === 'stall' ? 'Stall' : 'Baina';
         return `<span class="service-pill">${label}</span>`;
       }).join('');
+
+      if (state.details.dietaryOffering) {
+        const dietNames = { 'veg': 'Pure Veg', 'non-veg': 'Non-Veg Only', 'both': 'Both Veg & Non-Veg' };
+        pillsHtml += `<span class="service-pill" style="border-color:var(--color-black-40);color:var(--color-black);font-weight:700;">${dietNames[state.details.dietaryOffering] || state.details.dietaryOffering}</span>`;
+      }
+      servicesRow.innerHTML = pillsHtml;
     }
 
     // Active Focus Tag
     const tagEl = h.querySelector('.active-builder-tag');
     if (tagEl) {
       let focusText = "Onboarding";
-      if (state.currentStepId.startsWith('view-cat-')) focusText = "Catering Builder";
+      if (state.currentStepId.startsWith('view-cat-')) focusText = "Feast Builder";
       else if (state.currentStepId.startsWith('view-stall-')) focusText = "Stall Builder";
       else if (state.currentStepId.startsWith('view-baina-')) focusText = "Baina Builder";
       else if (state.currentStepId === 'view-review') focusText = "Final Review";
@@ -824,7 +897,102 @@ function deleteDish(dishId) {
   showToast("Dish removed from menu.");
 }
 
-// ── Step 5D: Quota Steppers ──
+// ── Step 1: Dietary Classification Handler (Mandatory at Start) ──
+function setDietaryOffering(val) {
+  state.details.dietaryOffering = val;
+  document.querySelectorAll('.diet-choice-card').forEach(c => {
+    c.classList.toggle('active', c.getAttribute('data-diet-value') === val);
+  });
+  document.querySelectorAll('.diet-validation-error').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.diet-selection-section').forEach(el => el.classList.remove('pulse-error'));
+  updateVendorContextHeader();
+}
+
+// ── Step 3: Feast Capabilities Inclusions Toggle ──
+function toggleCapability(capKey, isChecked) {
+  state.capabilities[capKey] = isChecked;
+  document.querySelectorAll(`input[data-cap="${capKey}"]`).forEach(cb => {
+    cb.checked = isChecked;
+  });
+}
+
+// ── Step 5D: Sequential Single-Tier Onboarding & Specialization Handlers ──
+function switchTierView(tier) {
+  if (tier === 'platinum') {
+    showToast("Platinum tier onboarding is coming soon.");
+    return;
+  }
+  if (tier === 'gold' && !state.catering.silverCompleted) {
+    showToast("Please configure and save Silver tier first.");
+    return;
+  }
+  state.catering.activeTier = tier;
+  renderTierView();
+}
+
+function saveSilverTier() {
+  state.catering.silverCompleted = true;
+  state.catering.activeTier = 'gold';
+  renderTierView();
+  showToast("Silver tier saved! Now configure Gold tier.");
+}
+
+function backToSilverTier() {
+  // Silver remains completed, Gold remains unlocked, data preserved
+  state.catering.activeTier = 'silver';
+  renderTierView();
+}
+
+function saveGoldTier() {
+  showToast("Gold tier saved!");
+  nextStep();
+}
+
+function setGoldSpecialization(val) {
+  state.catering.goldSpecialization = val;
+  document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(el => {
+    el.value = val;
+  });
+}
+
+function renderTierView() {
+  const active = state.catering.activeTier || 'silver';
+  const silverDone = state.catering.silverCompleted;
+
+  // Progression tabs update
+  document.querySelectorAll('.tier-prog-tab[data-tier="silver"]').forEach(tab => {
+    tab.classList.toggle('active', active === 'silver');
+    tab.classList.toggle('completed', silverDone);
+    const statusEl = tab.querySelector('.tab-status');
+    if (statusEl) statusEl.textContent = silverDone ? '✓ Completed' : 'In Progress';
+  });
+
+  document.querySelectorAll('.tier-prog-tab[data-tier="gold"]').forEach(tab => {
+    tab.classList.toggle('active', active === 'gold');
+    tab.classList.toggle('locked', !silverDone);
+    const statusEl = tab.querySelector('.tab-status');
+    if (statusEl) statusEl.textContent = silverDone ? (active === 'gold' ? 'In Progress' : 'Configured') : '🔒 Locked';
+  });
+
+  // Toggle single active panel across both Desktop and Mobile
+  document.querySelectorAll('.tier-panel-silver').forEach(p => {
+    p.classList.toggle('active', active === 'silver');
+    p.style.display = active === 'silver' ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tier-panel-gold').forEach(p => {
+    p.classList.toggle('active', active === 'gold');
+    p.style.display = active === 'gold' ? 'block' : 'none';
+  });
+
+  // Sync specialization select
+  document.querySelectorAll('[data-bind="catering.goldSpecialization"]').forEach(el => {
+    el.value = state.catering.goldSpecialization || 'Awadhi';
+  });
+
+  renderTierQuotas();
+}
+
+// ── Quota Steppers ──
 function adjustQuota(tier, courseKey, delta) {
   const current = state.catering.tierQuotas[tier][courseKey] || 0;
   const updated = Math.max(0, current + delta);
@@ -1097,7 +1265,7 @@ function renderMasterReview() {
   const hasBaina = state.selectedOfferings.includes('baina');
 
   let html = `
-    <!-- 1. Vendor Identity & Operations Review -->
+    <!-- 1. Vendor Identity & Operations Review (Zero Badges) -->
     <div class="review-section-card">
       <div class="review-section-header">
         <div class="review-section-title">
@@ -1124,19 +1292,22 @@ function renderMasterReview() {
           <p style="font-size:12px;font-weight:600;">${state.details.serviceCities.join(', ')}</p>
         </div>
       </div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--color-cream-30);display:flex;align-items:center;justify-content:space-between;">
+      <div class="form-grid-2" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--color-cream-30);">
         <div>
-          <span style="font-size:11px;color:var(--color-black-60);">Cuisines: </span>
-          <span style="font-size:12px;font-weight:700;color:var(--color-red);">${state.details.cuisines.join(' · ')}</span>
+          <p style="font-size:11px;color:var(--color-black-60);">Dietary Offering (Food Classification)</p>
+          <p style="font-size:13px;font-weight:800;color:var(--color-black);">
+            ${state.details.dietaryOffering === 'veg' ? 'Pure Vegetarian (100% Veg Kitchen)' : state.details.dietaryOffering === 'non-veg' ? 'Non-Vegetarian Only' : state.details.dietaryOffering === 'both' ? 'Both Veg & Non-Veg (Separated Prep)' : 'Not selected'}
+          </p>
         </div>
-        <div class="vendor-context-rating-badge">
-          <span class="star">★</span> ${state.details.googleRating} (${state.details.googleReviews} Google Reviews)
+        <div>
+          <p style="font-size:11px;color:var(--color-black-60);">Primary Cuisines</p>
+          <p style="font-size:12px;font-weight:700;color:var(--color-red);">${state.details.cuisines.join(' · ')}</p>
         </div>
       </div>
     </div>
   `;
 
-  // 2. Catering Review (if selected)
+  // 2. Feast Catering Review (if selected)
   if (hasCatering) {
     const dishesByCourse = {};
     state.catering.courses.forEach(c => {
@@ -1151,9 +1322,9 @@ function renderMasterReview() {
         <div class="review-section-header">
           <div class="review-section-title">
             <span>🍲</span>
-            <span>Catering Feast: ${state.catering.packageName}</span>
+            <span>Feast Booking: ${state.catering.packageName}</span>
           </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-dishes')">Edit Catering ✎</button>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-dishes')">Edit Feast ✎</button>
         </div>
 
         <div style="margin-bottom:14px;">
@@ -1166,8 +1337,33 @@ function renderMasterReview() {
           </div>
         </div>
 
+        <!-- Sequential Tiers Configured -->
+        <div class="review-subitem-group" style="padding-top:10px;border-top:1px dashed var(--color-cream-30);">
+          <div class="review-subitem-title">Configured Feast Tiers & Specialization</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12px;background:var(--color-cream-10);border:1px solid var(--color-cream-30);padding:8px 12px;border-radius:var(--radius-control);">
+              <strong>Silver Tier (Bhoj City Base)</strong> · ₹${state.catering.tierPrices.silver}/plate
+              <div style="color:var(--color-black-60);font-size:11px;margin-top:2px;">
+                Allowances: Starters (${state.catering.tierQuotas.silver.starters}), Main (${state.catering.tierQuotas.silver.main}), Breads (${state.catering.tierQuotas.silver.breads}), Sweets (${state.catering.tierQuotas.silver.sweets}) · <em>Standard base package (no specialization)</em>
+              </div>
+            </div>
+            <div style="font-size:12px;background:#FFFDF8;border:1px solid #F59E0B;padding:8px 12px;border-radius:var(--radius-control);">
+              <strong style="color:#B45309;">Gold Tier (Bhoj Signature Featured)</strong> · ₹${state.catering.tierPrices.gold}/plate
+              <div style="color:var(--color-black-80);font-size:11px;margin-top:2px;">
+                Specialization: <strong>${state.catering.goldSpecialization}</strong>
+              </div>
+              <div style="color:var(--color-black-60);font-size:11px;margin-top:2px;">
+                Allowances: Starters (${state.catering.tierQuotas.gold.starters}), Main (${state.catering.tierQuotas.gold.main}), Breads (${state.catering.tierQuotas.gold.breads}), Sweets (${state.catering.tierQuotas.gold.sweets})
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--color-black-40);padding:4px 8px;">
+              Platinum Luxury (₹${state.catering.tierPrices.platinum}/plate) · <em>Coming Soon</em>
+            </div>
+          </div>
+        </div>
+
         <!-- Itemized Courses & Dishes -->
-        <div class="review-subitem-group">
+        <div class="review-subitem-group" style="margin-top:12px;">
           <div class="review-subitem-title">Itemized Menu Courses (${state.catering.dishes.length} Dishes Published)</div>
           ${state.catering.courses.map(cat => {
             const items = dishesByCourse[cat.id] || [];
@@ -1346,25 +1542,34 @@ function closeStorefrontPreview() {
 function applyScenarioPreset(presetKey) {
   if (presetKey === 'catering') {
     state.selectedOfferings = ['catering'];
+    state.details.dietaryOffering = 'both';
     state.details.businessName = "Royal Awadh Caterers";
     state.catering.packageName = "Grand Wedding Dastarkhwan";
     goToStep('view-offerings');
-    showToast("Loaded 'Full Feast Caterer' Scenario");
+    showToast("Loaded 'Feast Booking Partner' Scenario");
   } else if (presetKey === 'stall') {
     state.selectedOfferings = ['stall'];
+    state.details.dietaryOffering = 'both';
     state.details.businessName = "Awadhi Dum Biryani Corner";
     goToStep('view-offerings');
     showToast("Loaded 'Specialty Food Stall' Scenario");
   } else if (presetKey === 'baina') {
     state.selectedOfferings = ['baina'];
+    state.details.dietaryOffering = 'veg';
     state.details.businessName = "Ram Asrey Royal Baina Studio";
     goToStep('view-offerings');
     showToast("Loaded 'Mithai & Baina Artisan' Scenario");
   } else if (presetKey === 'all') {
     state.selectedOfferings = ['catering', 'stall', 'baina'];
+    state.details.dietaryOffering = 'both';
     state.details.businessName = "Royal Awadh Hospitality Group";
     goToStep('view-offerings');
     showToast("Loaded 'Multi-Service Partner (All 3)' Scenario");
+  }
+
+  // Update diet cards UI
+  if (state.details.dietaryOffering) {
+    setDietaryOffering(state.details.dietaryOffering);
   }
 
   // Update UI selection cards
@@ -1434,7 +1639,7 @@ function setupEventListeners() {
 function renderAllViews() {
   updateVendorContextHeader();
   renderDishList();
-  renderTierQuotas();
+  renderTierView();
   renderDelicaciesList();
   renderBainaBoxList();
 }

@@ -37,11 +37,11 @@
             <option value="view-kyc">02. Statutory KYC & Docs</option>
             <option value="view-offerings">03. Service Offerings</option>
           </optgroup>
-          <optgroup label="5. Catering Menu Builder">
+          <optgroup label="5. Feast Menu Builder">
             <option value="view-cat-basics">5A. Package Basics & Best For</option>
             <option value="view-cat-courses">5B. Course Hierarchy</option>
             <option value="view-cat-dishes">5C. Dish Builder & Photos</option>
-            <option value="view-cat-tiers">5D. Tier Pricing & Quotas</option>
+            <option value="view-cat-tiers">5D. Silver & Gold Tiers</option>
             <option value="view-cat-live">5E. Live Counters (Separated)</option>
             <option value="view-cat-extras">5F. Extras, Essentials & Cutlery</option>
           </optgroup>
@@ -69,7 +69,7 @@
         <span class="control-label">Scenario Preset:</span>
         <select class="control-select" onchange="applyScenarioPreset(this.value)">
           <option value="all" selected>Multi-Service Partner (All 3)</option>
-          <option value="catering">Full Feast Caterer</option>
+          <option value="catering">Feast Booking Partner</option>
           <option value="stall">Specialty Food Stall</option>
           <option value="baina">Mithai & Baina Artisan</option>
         </select>
@@ -135,20 +135,20 @@
             </div>
           </div>
           <div class="vendor-context-actions">
-            <span class="active-builder-tag">Catering Builder</span>
+            <span class="active-builder-tag">Feast Builder</span>
             <button type="button" class="btn-edit-vendor-context" onclick="goToStep('view-details')">Edit Details ✎</button>
           </div>
         </aside>
 
-        <!-- Subnav Breadcrumbs for Catering Builder (5A to 5F) -->
+        <!-- Subnav Breadcrumbs for Feast Builder (5A to 5F) -->
         <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
-          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">5A. Package & Best For</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">5A. Feast Details</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">5B. Course Hierarchy</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">5C. Dishes & Photos</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">5D. Pricing & Quotas</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">5D. Silver & Gold Tiers</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-cat-live" onclick="goToStep('view-cat-live')">5E. Live Counters</button>
           <span class="subnav-divider">›</span>
@@ -189,6 +189,44 @@
             </header>
 
             <div class="content-card">
+              <!-- Mandatory Dietary Offering at Start (Zero Badges) -->
+              <div class="diet-selection-section" id="desktop-diet-section" style="margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--color-cream-30);">
+                <div class="card-title-row" style="margin-bottom: 6px;">
+                  <span class="card-title">Kitchen Dietary Offering <span class="required">*</span></span>
+                  <span class="badge" style="background:var(--color-cream-30);color:var(--color-black-80);">Mandatory Initial Gate</span>
+                </div>
+                <p class="field-hint" style="margin-bottom: 12px;">Choose your kitchen's core dietary classification. This determines your catalog classification across all services.</p>
+                <div class="diet-choice-grid">
+                  <div class="diet-choice-card" data-diet-value="veg" onclick="setDietaryOffering('veg')">
+                    <div class="diet-card-top">
+                      <span style="font-size:24px;">🟢</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label">Pure Vegetarian</div>
+                    <div class="diet-choice-sub">100% vegetarian kitchen with strictly no meat or egg handling.</div>
+                  </div>
+                  <div class="diet-choice-card" data-diet-value="non-veg" onclick="setDietaryOffering('non-veg')">
+                    <div class="diet-card-top">
+                      <span style="font-size:24px;">🔴</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label">Non-Vegetarian Only</div>
+                    <div class="diet-choice-sub">Specialized non-vegetarian kitchen focusing on authentic meat preparations.</div>
+                  </div>
+                  <div class="diet-choice-card" data-diet-value="both" onclick="setDietaryOffering('both')">
+                    <div class="diet-card-top">
+                      <span style="font-size:24px;">⚖️</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label">Both Veg & Non-Veg</div>
+                    <div class="diet-choice-sub">Strictly separate preparation areas, dedicated fryers, and color-coded utensils.</div>
+                  </div>
+                </div>
+                <div class="diet-validation-error" id="desktop-diet-error" style="display:none;margin-top:10px;font-size:12px;color:var(--color-red);font-weight:700;">
+                  ⚠️ Please select your kitchen's dietary offering before proceeding.
+                </div>
+              </div>
+
               <div class="card-title-row">
                 <span class="card-title">Business & Owner Credentials</span>
                 <span class="card-title badge">Taken Only Once</span>
@@ -273,7 +311,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Step 2 · Compliance & Legal</div>
               <h1 class="step-heading">Statutory KYC verification</h1>
-              <p class="step-subtext">Verified partners earn the official Bhojpatra Verified badge on all catalog cards and search rankings.</p>
+              <p class="step-subtext">Submit your statutory business credentials to complete onboarding and activate commercial listings on Bhojpatra.</p>
             </header>
 
             <div class="content-card">
@@ -320,20 +358,55 @@
 
             <div class="content-card">
               <div class="offering-cards-grid">
-                <!-- Catering Card -->
+                <!-- Feast Booking Card -->
                 <div class="offering-card active" data-offering-key="catering" onclick="toggleOffering('catering')">
                   <div class="offering-header">
                     <span class="offering-icon">🍲</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
-                  <div class="offering-title">Full Catering Feast</div>
-                  <div class="offering-blurb">Complete multi-course feasts (Silver, Gold, Platinum) with dish quotas, live counters, and service crew.</div>
+                  <div class="offering-title">Feast Booking</div>
+                  <div class="offering-blurb">Complete multi-course feasts (Silver & Gold) with dish quotas, live counters, and service crew.</div>
                   <ul class="offering-features">
                     <li>Multi-course menu builder</li>
-                    <li>Tier pricing (Silver/Gold/Platinum)</li>
-                    <li>Live cooking counters</li>
-                    <li>Tableware, cutlery & staff</li>
+                    <li>Tier pricing (Silver Base / Gold Featured)</li>
+                    <li>Live cooking counters & extras</li>
+                    <li>Tableware, cutlery & staff essentials</li>
                   </ul>
+
+                  <!-- Feast Inclusions & Capabilities Panel -->
+                  <div class="feast-capabilities-panel" onclick="event.stopPropagation()">
+                    <div class="caps-panel-title">Feast Inclusions & Capabilities Configurable:</div>
+                    <div class="caps-grid">
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="liveCounters" onchange="toggleCapability('liveCounters', this.checked)">
+                        <div class="cap-text">
+                          <span class="cap-name">Live Counters</span>
+                          <span class="cap-desc">Food & beverage stations</span>
+                        </div>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="extras" onchange="toggleCapability('extras', this.checked)">
+                        <div class="cap-text">
+                          <span class="cap-name">Extras</span>
+                          <span class="cap-desc">Additional rental items</span>
+                        </div>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="addOns" onchange="toggleCapability('addOns', this.checked)">
+                        <div class="cap-text">
+                          <span class="cap-name">Add-ons</span>
+                          <span class="cap-desc">Drinks & special spreads</span>
+                        </div>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="essentials" onchange="toggleCapability('essentials', this.checked)">
+                        <div class="cap-text">
+                          <span class="cap-name">Essentials</span>
+                          <span class="cap-desc">Crew, tableware & setup</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Single Stall Card -->
@@ -371,12 +444,12 @@
             </div>
           </article>
 
-          <!-- ── 5A. CATERING: PACKAGE BASICS & STOREFRONT METADATA ── -->
+          <!-- ── 5A. FEAST: PACKAGE BASICS & STOREFRONT METADATA ── -->
           <article class="step-container" data-step-id="view-cat-basics">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5A. Package Details</div>
-              <h1 class="step-heading">Configure your signature catering package</h1>
-              <p class="step-subtext">Vendor identity is already locked at the top. Here, define the storefront package details customers see when browsing your feast.</p>
+              <div class="step-eyebrow">Feast Builder · 5A. Feast Details</div>
+              <h1 class="step-heading">Configure your signature feast booking</h1>
+              <p class="step-subtext">Vendor identity is already locked at the top. Here, define the storefront feast details customers see when browsing your offering.</p>
             </header>
 
             <div class="content-card">
@@ -549,23 +622,57 @@
           <!-- ── 5D. CATERING: PRICING & TIER QUOTA STEPPERS ── -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
-              <div class="step-eyebrow">Catering Builder · 5D. Tiers & Allowances</div>
-              <h1 class="step-heading">Set per-plate rates & course dish quotas</h1>
-              <p class="step-subtext">Use Bhojpatra's tier allowance model. Specify base price and adjust how many dishes guests pick on Silver, Gold, and Platinum.</p>
+              <div class="step-eyebrow">Feast Builder · 5D. Tiers & Allowances</div>
+              <h1 class="step-heading">Configure tier allowances & pricing</h1>
+              <p class="step-subtext">Sequential single-tier onboarding. Silver / Bhoj City is the base tier. Complete and save Silver to unlock Gold / Bhoj Signature.</p>
             </header>
 
             <div class="content-card">
-              <div class="tier-matrix-grid">
-                <!-- Silver Tier -->
+              <!-- Tier Progression Nav Bar (Only 1 active at a time) -->
+              <div class="tier-progression-bar">
+                <button type="button" class="tier-prog-tab active" data-tier="silver" onclick="switchTierView('silver')">
+                  <div class="tab-step-num">1</div>
+                  <div class="tab-label">
+                    <span>Silver Tier</span>
+                    <span class="tab-tag base">Bhoj City (Base) · ₹799</span>
+                  </div>
+                  <span class="tab-status">In Progress</span>
+                </button>
+                <span class="prog-arrow">→</span>
+                <button type="button" class="tier-prog-tab locked" data-tier="gold" onclick="switchTierView('gold')">
+                  <div class="tab-step-num">2</div>
+                  <div class="tab-label">
+                    <span>Gold Tier</span>
+                    <span class="tab-tag featured">Bhoj Signature · ₹1,199</span>
+                  </div>
+                  <span class="tab-status">🔒 Locked</span>
+                </button>
+                <span class="prog-arrow">→</span>
+                <button type="button" class="tier-prog-tab coming-soon" data-tier="platinum" onclick="switchTierView('platinum')">
+                  <div class="tab-step-num">3</div>
+                  <div class="tab-label">
+                    <span>Platinum Luxury</span>
+                    <span class="tab-tag coming-soon">₹1,599</span>
+                  </div>
+                  <span class="tab-status">Coming Soon</span>
+                </button>
+              </div>
+
+              <!-- PANEL 1: SILVER TIER (BASE TIER) -->
+              <div class="tier-panel tier-panel-silver active">
                 <div class="tier-card">
                   <div class="tier-header">
-                    <span class="tier-badge-label" style="color:#4B5563;">Silver Tier</span>
+                    <div>
+                      <span class="tier-badge-label" style="color:#4B5563;font-size:14px;">Silver / Bhoj City (Base Tier)</span>
+                      <div style="font-size:11px;color:var(--color-black-60);margin-top:2px;">Standard base platform package. Silver has no specialization.</div>
+                    </div>
                     <div class="tier-price-row">
                       <span class="tier-price">₹799</span>
                       <span class="tier-unit">/ plate</span>
                     </div>
                   </div>
-                  <div class="quota-list">
+
+                  <div class="quota-list" style="margin-top: 14px;">
                     <div class="quota-row">
                       <span class="quota-label">Starters Allowance</span>
                       <div class="quota-stepper">
@@ -599,18 +706,49 @@
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Gold Tier (Featured) -->
-                <div class="tier-card featured">
+                  <div class="tier-action-bar">
+                    <div class="tier-notice-box" style="margin-top:0;flex:1;font-size:11px;">
+                      ℹ️ Base tier covering essential multi-course offerings. Saving unlocks Gold tier.
+                    </div>
+                    <button type="button" class="btn-tier-proceed" onclick="saveSilverTier()">
+                      Save & Proceed to Gold Tier →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANEL 2: GOLD TIER (FEATURED WITH SPECIALIZATION) -->
+              <div class="tier-panel tier-panel-gold" style="display:none;">
+                <div class="tier-card featured featured-gold">
                   <div class="tier-header">
-                    <span class="tier-badge-label" style="color:var(--color-red);">Gold Tier (Most Popular)</span>
+                    <div>
+                      <span class="tier-badge-label" style="color:#B45309;font-size:14px;">Gold / Bhoj Signature (Featured Tier)</span>
+                      <div style="font-size:11px;color:var(--color-black-60);margin-top:2px;">Expanded allowances with your kitchen's certified culinary specialization.</div>
+                    </div>
                     <div class="tier-price-row">
-                      <span class="tier-price">₹1,199</span>
+                      <span class="tier-price" style="color:var(--color-red);">₹1,199</span>
                       <span class="tier-unit">/ plate</span>
                     </div>
                   </div>
-                  <div class="quota-list">
+
+                  <!-- Specialization Selector for Gold Tier -->
+                  <div class="specialization-box">
+                    <div class="specialization-title">Culinary Specialization Category <span class="required">*</span></div>
+                    <div class="specialization-subtext">Select your specialization category and fill your menu accordingly:</div>
+                    <select class="form-select" data-bind="catering.goldSpecialization" onchange="setGoldSpecialization(this.value)">
+                      <option value="Awadhi" selected>Awadhi Cuisine (Lucknowi Dum & Kebabs)</option>
+                      <option value="Mughlai">Mughlai Cuisine (Rich Gravies & Royal Dastarkhwan)</option>
+                      <option value="North Indian">North Indian (Paneer, Dal Makhani & Tandoor)</option>
+                      <option value="Tandoori & Grills">Tandoori & Grills (Live Sigdi & Charcoal Skewers)</option>
+                      <option value="Indo-Chinese">Indo-Chinese (Live Wok Tosses & Dimsums)</option>
+                      <option value="South Indian">South Indian (Live Dosa Bar & Traditional Thali)</option>
+                      <option value="Banarasi Chaat">Banarasi Chaat (Live Kashi Street Food)</option>
+                      <option value="Artisanal Sweets">Artisanal Sweets (Heritage Mithai & Halwai Studio)</option>
+                    </select>
+                  </div>
+
+                  <div class="quota-list" style="margin-top: 14px;">
                     <div class="quota-row">
                       <span class="quota-label">Starters Allowance</span>
                       <div class="quota-stepper">
@@ -644,50 +782,14 @@
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Platinum Tier -->
-                <div class="tier-card">
-                  <div class="tier-header">
-                    <span class="tier-badge-label" style="color:var(--color-red);">Platinum Luxury</span>
-                    <div class="tier-price-row">
-                      <span class="tier-price">₹1,599</span>
-                      <span class="tier-unit">/ plate</span>
-                    </div>
-                  </div>
-                  <div class="quota-list">
-                    <div class="quota-row">
-                      <span class="quota-label">Starters Allowance</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','starters',-1)">−</button>
-                        <span class="stepper-val" data-tier="platinum" data-course="starters">6</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','starters',1)">+</button>
-                      </div>
-                    </div>
-                    <div class="quota-row">
-                      <span class="quota-label">Main Course</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','main',-1)">−</button>
-                        <span class="stepper-val" data-tier="platinum" data-course="main">6</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','main',1)">+</button>
-                      </div>
-                    </div>
-                    <div class="quota-row">
-                      <span class="quota-label">Breads</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','breads',-1)">−</button>
-                        <span class="stepper-val" data-tier="platinum" data-course="breads">2</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','breads',1)">+</button>
-                      </div>
-                    </div>
-                    <div class="quota-row">
-                      <span class="quota-label">Sweets & Mithai</span>
-                      <div class="quota-stepper">
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','sweets',-1)">−</button>
-                        <span class="stepper-val" data-tier="platinum" data-course="sweets">4</span>
-                        <button type="button" class="stepper-btn" onclick="adjustQuota('platinum','sweets',1)">+</button>
-                      </div>
-                    </div>
+                  <div class="tier-action-bar">
+                    <button type="button" class="btn-tier-back" onclick="backToSilverTier()">
+                      ← Back to Silver (Review/Edit)
+                    </button>
+                    <button type="button" class="btn-tier-proceed" onclick="saveGoldTier()">
+                      Save & Continue →
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1230,6 +1332,40 @@
               <p class="step-subtext">Collected once and reflected everywhere.</p>
             </header>
             <div class="content-card">
+              <!-- Mandatory Dietary Offering at Start Mobile -->
+              <div class="diet-selection-section" id="mobile-diet-section" style="margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-cream-30);">
+                <label class="form-label" style="margin-bottom: 6px;">Kitchen Dietary Offering <span class="required">*</span></label>
+                <div class="diet-choice-grid">
+                  <div class="diet-choice-card" data-diet-value="veg" onclick="setDietaryOffering('veg')">
+                    <div class="diet-card-top">
+                      <span style="font-size:20px;">🟢</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label" style="font-size:13px;">Pure Vegetarian</div>
+                    <div class="diet-choice-sub">100% vegetarian kitchen</div>
+                  </div>
+                  <div class="diet-choice-card" data-diet-value="non-veg" onclick="setDietaryOffering('non-veg')">
+                    <div class="diet-card-top">
+                      <span style="font-size:20px;">🔴</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label" style="font-size:13px;">Non-Vegetarian Only</div>
+                    <div class="diet-choice-sub">Specialized non-veg kitchen</div>
+                  </div>
+                  <div class="diet-choice-card" data-diet-value="both" onclick="setDietaryOffering('both')">
+                    <div class="diet-card-top">
+                      <span style="font-size:20px;">⚖️</span>
+                      <div class="diet-choice-radio"></div>
+                    </div>
+                    <div class="diet-choice-label" style="font-size:13px;">Both Veg & Non-Veg</div>
+                    <div class="diet-choice-sub">Separated prep zones</div>
+                  </div>
+                </div>
+                <div class="diet-validation-error" id="mobile-diet-error" style="display:none;margin-top:8px;font-size:11px;color:var(--color-red);font-weight:700;">
+                  ⚠️ Please select dietary offering before proceeding.
+                </div>
+              </div>
+
               <div class="form-group">
                 <label class="form-label">Brand Name *</label>
                 <input type="text" class="form-input" data-bind="details.businessName" value="Royal Awadh Caterers" />
@@ -1306,8 +1442,31 @@
                     <span class="offering-icon">🍲</span>
                     <div class="offering-checkbox">✓</div>
                   </div>
-                  <div class="offering-title">Catering Feast</div>
+                  <div class="offering-title">Feast Booking</div>
                   <div class="offering-blurb">Multi-course feast with live counters and staff.</div>
+
+                  <!-- Mobile Feast Capabilities Panel -->
+                  <div class="feast-capabilities-panel" onclick="event.stopPropagation()" style="margin-top:10px;">
+                    <div class="caps-panel-title">Feast Capabilities:</div>
+                    <div class="caps-grid">
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="liveCounters" onchange="toggleCapability('liveCounters', this.checked)">
+                        <span class="cap-name">Live Counters</span>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="extras" onchange="toggleCapability('extras', this.checked)">
+                        <span class="cap-name">Extras</span>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="addOns" onchange="toggleCapability('addOns', this.checked)">
+                        <span class="cap-name">Add-ons</span>
+                      </label>
+                      <label class="cap-item">
+                        <input type="checkbox" checked data-cap="essentials" onchange="toggleCapability('essentials', this.checked)">
+                        <span class="cap-name">Essentials</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div class="offering-card active" data-offering-key="stall" onclick="toggleOffering('stall')">
                   <div class="offering-header">
@@ -1392,23 +1551,168 @@
             </div>
           </article>
 
-          <!-- Mobile View 5D: Cat Tiers -->
+          <!-- Mobile View 5D: Cat Tiers (Sequential Single-Tier Progression) -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
-              <div class="step-eyebrow">5D. Tiers</div>
+              <div class="step-eyebrow">5D. Tiers & Allowances</div>
               <h1 class="step-heading">Pricing & allowances</h1>
+              <p class="step-subtext">Sequential progression: Silver base first, then Gold featured with specialization.</p>
             </header>
             <div class="content-card">
-              <div class="tier-matrix-grid">
-                <div class="tier-card featured">
-                  <div class="tier-badge-label" style="color:var(--color-red);">Gold: ₹1,199/plate</div>
-                  <div class="quota-row" style="margin-top:8px;">
-                    <span>Starters Quota</span>
-                    <div class="quota-stepper">
-                      <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',-1)">−</button>
-                      <span class="stepper-val" data-tier="gold" data-course="starters">5</span>
-                      <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',1)">+</button>
+              <!-- Tier Progression Nav Bar Mobile -->
+              <div class="tier-progression-bar">
+                <button type="button" class="tier-prog-tab active" data-tier="silver" onclick="switchTierView('silver')">
+                  <div class="tab-step-num">1</div>
+                  <div class="tab-label">
+                    <span>Silver (Base) · ₹799</span>
+                  </div>
+                  <span class="tab-status">In Progress</span>
+                </button>
+                <button type="button" class="tier-prog-tab locked" data-tier="gold" onclick="switchTierView('gold')">
+                  <div class="tab-step-num">2</div>
+                  <div class="tab-label">
+                    <span>Gold (Featured) · ₹1,199</span>
+                  </div>
+                  <span class="tab-status">🔒 Locked</span>
+                </button>
+                <button type="button" class="tier-prog-tab coming-soon" data-tier="platinum" onclick="switchTierView('platinum')">
+                  <div class="tab-step-num">3</div>
+                  <div class="tab-label">
+                    <span>Platinum · ₹1,599</span>
+                  </div>
+                  <span class="tab-status">Coming Soon</span>
+                </button>
+              </div>
+
+              <!-- Mobile Silver Panel -->
+              <div class="tier-panel tier-panel-silver active">
+                <div class="tier-card">
+                  <div class="tier-header">
+                    <div>
+                      <span class="tier-badge-label" style="color:#4B5563;">Silver / Bhoj City</span>
+                      <div style="font-size:10.5px;color:var(--color-black-60);">Base tier (no specialization)</div>
                     </div>
+                    <div class="tier-price-row">
+                      <span class="tier-price">₹799</span>
+                      <span class="tier-unit">/ p</span>
+                    </div>
+                  </div>
+
+                  <div class="quota-list" style="margin-top:10px;">
+                    <div class="quota-row">
+                      <span>Starters</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','starters',-1)">−</button>
+                        <span class="stepper-val" data-tier="silver" data-course="starters">2</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','starters',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Main Course</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','main',-1)">−</button>
+                        <span class="stepper-val" data-tier="silver" data-course="main">3</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','main',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Breads</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','breads',-1)">−</button>
+                        <span class="stepper-val" data-tier="silver" data-course="breads">1</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','breads',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Sweets</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','sweets',-1)">−</button>
+                        <span class="stepper-val" data-tier="silver" data-course="sweets">1</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('silver','sweets',1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tier-action-bar" style="flex-direction:column;gap:8px;">
+                    <button type="button" class="btn-tier-proceed" style="width:100%;text-align:center;" onclick="saveSilverTier()">
+                      Save & Proceed to Gold →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mobile Gold Panel -->
+              <div class="tier-panel tier-panel-gold" style="display:none;">
+                <div class="tier-card featured featured-gold">
+                  <div class="tier-header">
+                    <div>
+                      <span class="tier-badge-label" style="color:#B45309;">Gold / Bhoj Signature</span>
+                      <div style="font-size:10.5px;color:var(--color-black-60);">With culinary specialization</div>
+                    </div>
+                    <div class="tier-price-row">
+                      <span class="tier-price" style="color:var(--color-red);">₹1,199</span>
+                      <span class="tier-unit">/ p</span>
+                    </div>
+                  </div>
+
+                  <!-- Specialization Selector for Gold Tier -->
+                  <div class="specialization-box">
+                    <div class="specialization-title">Specialization Category <span class="required">*</span></div>
+                    <div class="specialization-subtext">Select specialization to fill menu:</div>
+                    <select class="form-select" data-bind="catering.goldSpecialization" onchange="setGoldSpecialization(this.value)">
+                      <option value="Awadhi" selected>Awadhi Cuisine</option>
+                      <option value="Mughlai">Mughlai Cuisine</option>
+                      <option value="North Indian">North Indian</option>
+                      <option value="Tandoori & Grills">Tandoori & Grills</option>
+                      <option value="Indo-Chinese">Indo-Chinese</option>
+                      <option value="South Indian">South Indian</option>
+                      <option value="Banarasi Chaat">Banarasi Chaat</option>
+                      <option value="Artisanal Sweets">Artisanal Sweets</option>
+                    </select>
+                  </div>
+
+                  <div class="quota-list" style="margin-top:10px;">
+                    <div class="quota-row">
+                      <span>Starters</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',-1)">−</button>
+                        <span class="stepper-val" data-tier="gold" data-course="starters">5</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','starters',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Main Course</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',-1)">−</button>
+                        <span class="stepper-val" data-tier="gold" data-course="main">5</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','main',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Breads</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',-1)">−</button>
+                        <span class="stepper-val" data-tier="gold" data-course="breads">2</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','breads',1)">+</button>
+                      </div>
+                    </div>
+                    <div class="quota-row">
+                      <span>Sweets</span>
+                      <div class="quota-stepper">
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',-1)">−</button>
+                        <span class="stepper-val" data-tier="gold" data-course="sweets">3</span>
+                        <button type="button" class="stepper-btn" onclick="adjustQuota('gold','sweets',1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tier-action-bar" style="flex-direction:column;gap:8px;">
+                    <button type="button" class="btn-tier-back" style="width:100%;text-align:center;" onclick="backToSilverTier()">
+                      ← Back to Silver
+                    </button>
+                    <button type="button" class="btn-tier-proceed" style="width:100%;text-align:center;" onclick="saveGoldTier()">
+                      Save & Continue →
+                    </button>
                   </div>
                 </div>
               </div>

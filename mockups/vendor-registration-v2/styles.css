@@ -1942,3 +1942,390 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   border-bottom-right-radius: 0;
   margin-top: auto;
 }
+
+/* ==========================================================================
+   DIETARY CLASSIFICATION AT START (Step 1)
+   ========================================================================== */
+.diet-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.diet-choice-card {
+  background: var(--color-white);
+  border: 2px solid var(--color-cream-30);
+  border-radius: var(--radius-control);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.diet-choice-card:hover {
+  border-color: var(--color-red-40);
+  background: #FFFDFB;
+}
+
+.diet-choice-card.active {
+  border-color: var(--color-red);
+  background: var(--color-red-05);
+  box-shadow: 0 2px 8px var(--color-red-10);
+}
+
+.diet-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.diet-choice-radio {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-cream);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast) ease;
+  background: #FFF;
+}
+
+.diet-choice-card.active .diet-choice-radio {
+  border-color: var(--color-red);
+}
+
+.diet-choice-card.active .diet-choice-radio::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--color-red);
+  border-radius: 50%;
+}
+
+.diet-choice-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-black);
+}
+
+.diet-choice-sub {
+  font-size: 11px;
+  color: var(--color-black-60);
+  line-height: 1.3;
+}
+
+.diet-choice-wrapper.pulse-error {
+  animation: pulseRed 0.6s ease-in-out;
+}
+
+@keyframes pulseRed {
+  0%, 100% { border-color: var(--color-red); }
+  50% { border-color: var(--color-red); box-shadow: 0 0 12px rgba(185, 32, 37, 0.4); }
+}
+
+/* ==========================================================================
+   FEAST CAPABILITIES CHECKLIST (Step 3)
+   ========================================================================== */
+.feast-capabilities-panel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #FFF;
+  border: 1px solid var(--color-cream-30);
+  border-radius: var(--radius-control);
+}
+
+.caps-panel-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-black);
+  margin-bottom: 8px;
+}
+
+.caps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+
+.cap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cap-item input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--color-red);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.cap-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.cap-name {
+  font-weight: 700;
+  color: var(--color-black);
+}
+
+.cap-desc {
+  font-size: 10.5px;
+  color: var(--color-black-60);
+  line-height: 1.25;
+}
+
+/* ==========================================================================
+   SEQUENTIAL SINGLE-TIER ONBOARDING & SPECIALIZATION (Step 5D)
+   ========================================================================== */
+.tier-progression-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-control);
+  flex-wrap: wrap;
+}
+
+.tier-prog-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--dur-fast) ease;
+  color: var(--color-black-60);
+}
+
+.tier-prog-tab:hover:not(.locked):not(.coming-soon) {
+  background: var(--color-cream-10);
+  color: var(--color-black);
+}
+
+.tier-prog-tab.active {
+  background: var(--color-red-05);
+  border-color: var(--color-red);
+  color: var(--color-red);
+  font-weight: 800;
+}
+
+.tier-prog-tab.completed {
+  border-color: var(--color-cream);
+  color: var(--color-black);
+  font-weight: 700;
+}
+
+.tier-prog-tab.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tier-prog-tab.coming-soon {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: var(--color-cream-10);
+  border: 1px dashed var(--color-cream);
+}
+
+.tab-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-cream-30);
+  color: var(--color-black-80);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tier-prog-tab.active .tab-step-num {
+  background: var(--color-red);
+  color: #FFF;
+}
+
+.tier-prog-tab.completed .tab-step-num {
+  background: #059669;
+  color: #FFF;
+}
+
+.tab-label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.tab-tag.base {
+  background: var(--color-cream-30);
+  color: var(--color-black-80);
+}
+
+.tab-tag.featured {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.tab-tag.coming-soon {
+  background: var(--color-cream-20);
+  color: var(--color-black-60);
+}
+
+.tab-status {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-black-60);
+}
+
+.prog-arrow {
+  color: var(--color-black-40);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Single Active Tier Panel */
+.tier-panel {
+  display: none;
+}
+
+.tier-panel.active {
+  display: block;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tier-card.featured-gold {
+  border-color: #F59E0B;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.15);
+  background: linear-gradient(180deg, #FFFDF8 0%, #FFFFFF 100%);
+}
+
+.specialization-box {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-cream);
+}
+
+.specialization-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-black);
+  margin-bottom: 4px;
+}
+
+.specialization-subtext {
+  font-size: 11px;
+  color: var(--color-black-60);
+  margin-bottom: 10px;
+}
+
+.tier-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-cream-20);
+  gap: 12px;
+}
+
+.btn-tier-proceed {
+  background: var(--color-red);
+  color: #FFF;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 22px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+  margin-left: auto;
+}
+
+.btn-tier-proceed:hover {
+  background: #98191D;
+  box-shadow: 0 2px 8px rgba(185, 32, 37, 0.25);
+}
+
+.btn-tier-back {
+  background: #FFF;
+  color: var(--color-black-80);
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-pill);
+  padding: 9px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+}
+
+.btn-tier-back:hover {
+  border-color: var(--color-black-60);
+  background: var(--color-cream-10);
+}
+
+.tier-notice-box {
+  background: var(--color-cream-10);
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-control);
+  padding: 10px 14px;
+  font-size: 11.5px;
+  color: var(--color-black-80);
+  line-height: 1.4;
+  margin-top: 12px;
+}
+
+/* Mobile Canvas adaptations for new components */
+.mobile-frame .diet-choice-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mobile-frame .caps-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mobile-frame .tier-progression-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.mobile-frame .prog-arrow {
+  display: none;
+}
+
+.mobile-frame .tier-prog-tab {
+  width: 100%;
+  justify-content: space-between;
+}
+
