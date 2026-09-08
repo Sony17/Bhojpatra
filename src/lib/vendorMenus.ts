@@ -565,6 +565,14 @@ const tiersFor = tiersForPrice;
 export function toVendorListing(r: LiveVendorRecord): VendorListing {
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
   const diets = new Set(visible.flatMap((s) => s.items.map((i) => i.diet)));
+  // Include genuine active food counter extras that carry a declared diet
+  for (const c of r.counters ?? []) {
+    if (!c.hidden && c.extras?.length) {
+      for (const e of c.extras) {
+        if (e.diet) diets.add(e.diet);
+      }
+    }
+  }
   const diet: VendorListing["diet"] = diets.has("non-veg")
     ? diets.has("veg")
       ? "Veg & Non-Veg"

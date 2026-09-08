@@ -52,4 +52,6 @@ export { default as StickyActionBar } from "./StickyActionBar";
 export { default as PullToRefresh } from "./PullToRefresh";
 export { default as FloatingCart } from "./FloatingCart";
 
+export { default as FoodDietBadge } from "./FoodDietBadge";
+
 export { FadeIn, Pressable, motion, AnimatePresence } from "./Motion";

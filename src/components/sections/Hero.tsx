@@ -44,11 +44,7 @@ function toYmd(d: Date) {
   ).padStart(2, "0")}`;
 }
 
-export default function Hero({
-  onOpenCustomEnquiry,
-}: {
-  onOpenCustomEnquiry?: () => void;
-} = {}) {
+export default function Hero() {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();
 
@@ -87,10 +83,12 @@ export default function Hero({
       return;
     }
     seededFromDetection.current = true;
-    setCityId(detectedMatch.locationId);
-    if (detectedMatch.customCity) {
-      setCustomCity(detectedMatch.customCity);
-    }
+    queueMicrotask(() => {
+      setCityId(detectedMatch.locationId);
+      if (detectedMatch.customCity) {
+        setCustomCity(detectedMatch.customCity);
+      }
+    });
   }, [detectedMatch]);
 
   // Keep the hero location in sync when the header picker changes city.
@@ -339,20 +337,6 @@ export default function Hero({
 
         <div className="animate-rise delay-4 mt-5 max-w-5xl sm:mt-9">
           {bookingBar}
-          {onOpenCustomEnquiry && (
-            <div className="mt-2.5 flex items-center justify-center sm:justify-start px-2">
-              <button
-                type="button"
-                onClick={onOpenCustomEnquiry}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink/80 transition-colors hover:text-maroon sm:text-[13px]"
-              >
-                <span>{t("Have your own menu or budget?", "अपना मेनू या बजट है?")}</span>
-                <span className="font-bold text-maroon underline underline-offset-2">
-                  {t("Custom Catering Enquiry →", "कस्टम कैटरिंग पूछताछ →")}
-                </span>
-              </button>
-            </div>
-          )}
         </div>
 
         <ul className="animate-rise delay-5 mt-6 grid grid-cols-4 gap-0 divide-x divide-maroon/10 border-t border-maroon/10 pt-4 sm:mt-12 sm:pt-7">

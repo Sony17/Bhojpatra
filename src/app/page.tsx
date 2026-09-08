@@ -30,7 +30,7 @@ export default function Home() {
 
   return (
     <PublicShell hero>
-      <Hero onOpenCustomEnquiry={() => setCustomEnquiryOpen(true)} />
+      <Hero />
       <PromoBanner />
       <CustomCateringBanner onOpenModal={() => setCustomEnquiryOpen(true)} />
       <ChooseOccasion />

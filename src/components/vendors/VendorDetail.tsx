@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { vendorListings, cities, listingCateringCategories, type VendorListing } from "@/lib/data";
+import { isFoodVendor } from "@/lib/craftMyPlate";
 import {
   slugifyName,
   fetchMyBookings,
@@ -660,9 +661,11 @@ function VendorProfile({
                   {c}
                 </span>
               ))}
-              <span className="rounded-full border border-cream-3 bg-white px-2.5 py-0.5 text-xs font-medium text-ink sm:px-3.5 sm:py-1.5 sm:text-sm">
-                {localize(vendor.diet)}
-              </span>
+              {isFoodVendor(vendor) && (
+                <span className="rounded-full border border-cream-3 bg-white px-2.5 py-0.5 text-xs font-medium text-ink sm:px-3.5 sm:py-1.5 sm:text-sm">
+                  {localize(vendor.diet)}
+                </span>
+              )}
             </div>
 
             {vendor.mealTypes.length > 0 && (

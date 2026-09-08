@@ -35,6 +35,7 @@ import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
+import { isFoodVendor } from "@/lib/craftMyPlate";
 import {
   AppSearchBar,
   Button,
@@ -43,6 +44,7 @@ import {
   CategoryChips,
   Drawer,
   EmptyState,
+  FoodDietBadge,
   PullToRefresh,
 } from "@/components/ui";
 
@@ -196,19 +198,6 @@ export default function VendorCatalog() {
     }
   };
 
-  // Diet value as stored on a vendor (includes the combined option).
-  const vendorDietLabel = (value: VendorListing["diet"]): string => {
-    switch (value) {
-      case "Veg":
-        return t("Veg", "वेज");
-      case "Non-Veg":
-        return t("Non-Veg", "नॉन-वेज");
-      case "Veg & Non-Veg":
-        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
-      default:
-        return value;
-    }
-  };
 
   const priceLabel = (value: PriceRange): string => {
     switch (value) {
@@ -269,6 +258,7 @@ export default function VendorCatalog() {
     const d = searchParams.get("diet");
     return DIET_OPTIONS.includes(d as DietFilter) ? (d as DietFilter) : ALL;
   });
+
   const [tier, setTier] = useState<TierFilter>(() => {
     const tv = searchParams.get("tier");
     return TIER_OPTIONS.includes(tv as TierFilter) ? (tv as TierFilter) : ALL;
@@ -491,6 +481,9 @@ export default function VendorCatalog() {
         servingTime === "" ||
         v.mealTypes.includes(mealPeriodForTime(servingTime));
 
+      const matchesDietRequirement =
+        !visibleFilters.has("diet") || matchesDiet(v, diet);
+
       return (
         matchesQuery &&
         matchesCategory &&
@@ -498,7 +491,7 @@ export default function VendorCatalog() {
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
         (!visibleFilters.has("cuisine") || cuisine === ALL || v.cuisines.includes(cuisine)) &&
-        (!visibleFilters.has("diet") || matchesDiet(v, diet)) &&
+        matchesDietRequirement &&
         (!visibleFilters.has("tier") || tier === ALL || v.tiers.includes(tier)) &&
         (!visibleFilters.has("price") || matchesPrice(v, price)) &&
         matchesMeals &&
@@ -877,6 +870,7 @@ export default function VendorCatalog() {
         </div>
       </div>
 
+
       {/* Mobile filter sheet */}
       <Drawer
         open={filtersOpen}
@@ -1164,7 +1158,7 @@ function VendorCard({
    *  search and would only muddy the result. */
   lens: LensId;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
@@ -1228,19 +1222,6 @@ function VendorCard({
         }
       : undefined;
 
-  const dietBadgeLabel = (value: VendorListing["diet"]): string => {
-    switch (value) {
-      case "Veg":
-        return t("Veg", "वेज");
-      case "Non-Veg":
-        return t("Non-Veg", "नॉन-वेज");
-      case "Veg & Non-Veg":
-        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
-      default:
-        return value;
-    }
-  };
-
   const mealBadgeLabel = (value: string): string => {
     switch (value) {
       case "Breakfast":
@@ -1292,32 +1273,38 @@ function VendorCard({
           </span>
         )}
 
-        <button
-          type="button"
-          onClick={() => toggle(vendor.id)}
-          disabled={compareDisabled}
-          aria-pressed={inCompare}
-          aria-label={
-            inCompare
-              ? t("Remove from compare", "तुलना से हटाएँ")
-              : t("Add to compare", "तुलना में जोड़ें")
-          }
-          title={
-            compareDisabled
-              ? t("Compare list is full", "तुलना सूची भर गई है")
-              : undefined
-          }
-          className={
-            "absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
-            (inCompare
-              ? "bg-maroon text-cream"
-              : "bg-white/95 text-ink hover:text-maroon")
-          }
-        >
-          <span aria-hidden="true" className="text-sm font-bold leading-none">
-            {inCompare ? "✓" : "+"}
-          </span>
-        </button>
+        <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1.5">
+          {isFoodVendor(vendor) && (
+            <FoodDietBadge diet={vendor.diet} lang={lang} />
+          )}
+
+          <button
+            type="button"
+            onClick={() => toggle(vendor.id)}
+            disabled={compareDisabled}
+            aria-pressed={inCompare}
+            aria-label={
+              inCompare
+                ? t("Remove from compare", "तुलना से हटाएँ")
+                : t("Add to compare", "तुलना में जोड़ें")
+            }
+            title={
+              compareDisabled
+                ? t("Compare list is full", "तुलना सूची भर गई है")
+                : undefined
+            }
+            className={
+              "flex h-8 w-8 items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
+              (inCompare
+                ? "bg-maroon text-cream"
+                : "bg-white/95 text-ink hover:text-maroon")
+            }
+          >
+            <span aria-hidden="true" className="text-sm font-bold leading-none">
+              {inCompare ? "✓" : "+"}
+            </span>
+          </button>
+        </div>
 
         {/* Rating on image — Swiggy/Zomato signature chip */}
         <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1.5">
@@ -1363,19 +1350,6 @@ function VendorCard({
       {/* Dense info block — app card body */}
       <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
         <div className="flex items-start gap-2">
-          {/* Diet mark — brand-only semantic square */}
-          <span
-            aria-label={dietBadgeLabel(vendor.diet)}
-            title={dietBadgeLabel(vendor.diet)}
-            className={
-              "mt-1 h-3.5 w-3.5 shrink-0 rounded-[2px] border-2 " +
-              (vendor.diet === "Non-Veg"
-                ? "border-maroon bg-maroon"
-                : vendor.diet === "Veg"
-                  ? "border-maroon bg-cream"
-                  : "border-maroon bg-white")
-            }
-          />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-sans text-[15px] font-bold leading-snug tracking-tight text-ink">
               {vendor.name}
