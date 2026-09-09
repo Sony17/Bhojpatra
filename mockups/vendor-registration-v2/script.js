@@ -17,6 +17,7 @@ const state = {
   account: {
     id: "VND-884291",
     name: "Kabir Ahmad",
+    businessName: "Royal Awadh Caterers",
     email: "vendor@demo-bhojpatra.com",
     phone: "98000 00000",
     role: "vendor",
@@ -29,19 +30,20 @@ const state = {
   // Custom Offerings (Task 8: Make Vendor Offerings Customizable)
   customOfferings: [],
 
-  // Commercial Kitchen Identity & Operations (Details not collected at signup)
+  // Commercial Kitchen Operations & Setup (Details NOT collected at signup)
   details: {
     dietaryOffering: null, // Mandatory selection at start: 'veg' | 'non-veg' | 'both' (no default)
-    businessName: "Royal Awadh Caterers",
-    ownerName: "Kabir Ahmad",
-    phone: "98000 00000",
-    email: "vendor@demo-bhojpatra.com",
     city: "Lucknow",
     state: "Uttar Pradesh",
     serviceCities: ["Lucknow", "Kanpur", "Ayodhya", "Varanasi"],
     cuisines: ["Awadhi", "Mughlai", "North Indian"],
     googleRating: "4.8",
     googleReviews: "142",
+    // Derived display getters from canonical state.account (DO NOT STORE SEPARATE TRUTH)
+    get businessName() { return state.account ? state.account.businessName : "Royal Awadh Caterers"; },
+    get ownerName() { return state.account ? state.account.name : "Kabir Ahmad"; },
+    get email() { return state.account ? state.account.email : "vendor@demo-bhojpatra.com"; },
+    get phone() { return state.account ? state.account.phone : "98000 00000"; }
   },
 
   // Step 2: Statutory KYC & Compliance
@@ -1657,8 +1659,8 @@ function renderMasterReview() {
       </div>
       <div class="form-grid-2">
         <div>
-          <p style="font-size:11px;color:var(--color-black-60);">Trading Brand Name</p>
-          <p style="font-size:14px;font-weight:800;color:var(--color-black);">${state.details.businessName}</p>
+          <p style="font-size:11px;color:var(--color-black-60);">Registered Business / Brand Name</p>
+          <p style="font-size:14px;font-weight:800;color:var(--color-black);">${state.account.businessName}</p>
         </div>
         <div>
           <p style="font-size:11px;color:var(--color-black-60);">Account Holder (From Signup)</p>
@@ -2074,26 +2076,27 @@ function applyScenarioPreset(presetKey) {
   if (presetKey === 'catering') {
     state.selectedOfferings = ['catering', 'counters', 'extras', 'essentials'];
     state.details.dietaryOffering = 'both';
-    state.details.businessName = "Royal Awadh Caterers";
+    state.account.businessName = "Royal Awadh Caterers";
     state.catering.packageName = "Grand Wedding Dastarkhwan";
     goToStep('view-offerings');
     showToast("Loaded 'Feast Booking Partner' Scenario");
   } else if (presetKey === 'stall') {
     state.selectedOfferings = ['stall'];
     state.details.dietaryOffering = 'both';
-    state.details.businessName = "Awadhi Dum Biryani Corner";
+    state.account.businessName = "Awadhi Dum Biryani Corner";
+    state.catering.packageName = "Grand Wedding Dastarkhwan";
     goToStep('view-offerings');
     showToast("Loaded 'Specialty Food Stall' Scenario");
   } else if (presetKey === 'baina') {
     state.selectedOfferings = ['baina'];
     state.details.dietaryOffering = 'veg';
-    state.details.businessName = "Ram Asrey Royal Baina Studio";
+    state.account.businessName = "Ram Asrey Royal Baina Studio";
     goToStep('view-offerings');
     showToast("Loaded 'Mithai & Baina Artisan' Scenario");
   } else if (presetKey === 'all') {
     state.selectedOfferings = ['catering', 'stall', 'baina', 'counters', 'extras', 'addons', 'essentials'];
     state.details.dietaryOffering = 'both';
-    state.details.businessName = "Royal Awadh Hospitality Group";
+    state.account.businessName = "Royal Awadh Hospitality Group";
     goToStep('view-offerings');
     showToast("Loaded 'Multi-Service Partner (All 7)' Scenario");
   } else if (!presetKey || presetKey === 'custom') {
@@ -2919,54 +2922,122 @@ function closeVendorSignInModal() {
   }
 }
 
+// Known / registered vendor accounts store (representing authenticated database)
+const REGISTERED_VENDOR_ACCOUNTS = [
+  {
+    id: "VND-884291",
+    name: "Kabir Ahmad",
+    businessName: "Royal Awadh Caterers",
+    email: "vendor@demo-bhojpatra.com",
+    phone: "98000 00000",
+    role: "vendor",
+    verified: true,
+    city: "Lucknow",
+    state: "Uttar Pradesh",
+    hasCompletedOnboarding: true
+  },
+  {
+    id: "VND-551920",
+    name: "Mohit Rastogi",
+    businessName: "Banarasi Zaika Catering",
+    email: "mohit@banarasizaika.com",
+    phone: "98765 43210",
+    role: "vendor",
+    verified: true,
+    city: "Varanasi",
+    state: "Uttar Pradesh",
+    hasCompletedOnboarding: false
+  }
+];
+
 function handleVendorSignIn(e) {
   if (e) e.preventDefault();
-  closeVendorSignInModal();
 
   const credInput = document.getElementById('signin-credential');
-  if (credInput && credInput.value) {
-    const val = credInput.value.trim();
-    if (val.includes('@')) {
-      state.account.email = val;
-    } else {
-      const digits = val.replace(/[^0-9]/g, '').slice(-10);
-      if (digits) state.account.phone = digits;
-    }
-    syncAccountDetailsToUI();
+  const passInput = document.getElementById('signin-password');
+  const credVal = credInput ? credInput.value.trim() : '';
+  const passVal = passInput ? passInput.value.trim() : '';
+
+  if (!credVal || !passVal) {
+    showToast('⚠️ Please enter your registered email or mobile and password');
+    return;
   }
 
-  showToast('✓ Signed in successfully as Royal Awadh Caterers');
-  goToStep('view-dashboard');
+  // Pure authentication: retrieve existing account record without collecting profile data
+  const normalizedCred = credVal.toLowerCase();
+  const digits = credVal.replace(/[^0-9]/g, '').slice(-10);
+  
+  const matched = REGISTERED_VENDOR_ACCOUNTS.find(acc => 
+    acc.email.toLowerCase() === normalizedCred || (digits && acc.phone.includes(digits))
+  ) || {
+    // Dynamic match for demo credentials using existing vendor structure
+    id: state.account.id || "VND-884291",
+    name: state.account.name || "Kabir Ahmad",
+    businessName: state.account.businessName || "Royal Awadh Caterers",
+    email: normalizedCred.includes('@') ? normalizedCred : state.account.email,
+    phone: digits.length === 10 ? digits : state.account.phone,
+    role: "vendor",
+    verified: true,
+    hasCompletedOnboarding: true
+  };
+
+  // Load existing account into session state — NO duplicate profile creation, NO re-entry
+  state.account = {
+    id: matched.id,
+    name: matched.name,
+    businessName: matched.businessName,
+    email: matched.email,
+    phone: matched.phone,
+    role: matched.role,
+    verified: matched.verified
+  };
+
+  if (matched.city) state.details.city = matched.city;
+  if (matched.state) state.details.state = matched.state;
+
+  closeVendorSignInModal();
+  syncAccountDetailsToUI();
+
+  showToast(`✓ Signed in as ${state.account.businessName} (${state.account.email})`);
+  
+  // Route to dashboard if already completed onboarding, or to onboarding step if resuming
+  if (matched.hasCompletedOnboarding) {
+    goToStep('view-dashboard');
+  } else {
+    goToStep('view-details');
+  }
 }
 
 // ── Phase 2 Task 7: Reuse Existing Vendor Signup Details ──
 function syncAccountDetailsToUI() {
   if (!state.account) return;
 
-  // Sync to state.details for unified single source of truth
-  state.details.ownerName = state.account.name;
-  state.details.phone = state.account.phone;
-  state.details.email = state.account.email;
-
-  // Desktop verified credentials block
+  // Desktop verified credentials block (Display-only)
   const dOwner = document.getElementById('d-display-owner');
+  const dBiz = document.getElementById('d-display-biz-name');
   const dPhone = document.getElementById('d-display-phone');
   const dEmail = document.getElementById('d-display-email');
   const dAccId = document.getElementById('d-account-id');
 
   if (dOwner) dOwner.textContent = state.account.name;
+  if (dBiz) dBiz.textContent = state.account.businessName;
   if (dPhone) dPhone.textContent = `+91 ${state.account.phone}`;
   if (dEmail) dEmail.textContent = state.account.email;
   if (dAccId) dAccId.textContent = state.account.id || 'VND-884291';
 
-  // Mobile verified credentials block
+  // Mobile verified credentials block (Display-only)
   const mOwner = document.getElementById('mob-display-owner');
+  const mBiz = document.getElementById('mob-display-biz-name');
   const mPhone = document.getElementById('mob-display-phone');
   const mEmail = document.getElementById('mob-display-email');
 
   if (mOwner) mOwner.textContent = state.account.name;
+  if (mBiz) mBiz.textContent = state.account.businessName;
   if (mPhone) mPhone.textContent = `+91 ${state.account.phone}`;
   if (mEmail) mEmail.textContent = state.account.email;
+
+  // Update persistent context headers and review displays
+  updateVendorContextHeader();
 }
 
 // ── Phase 2 Task 8: Make Vendor Offerings Customizable ──
