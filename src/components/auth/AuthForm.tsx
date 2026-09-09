@@ -81,6 +81,223 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   // Venue Owners onboard with in-house catering, so we collect their GST number.
   const isVenuePartner = isPartner && partnerRole === "venue";
 
+  // Vendor Commercial Offerings (pre-selected for quick registration)
+  const [selectedOfferings, setSelectedOfferings] = useState<string[]>([
+    "catering",
+  ]);
+
+  // Vendor Recognition Badges (Task 17: Badges & Recognition)
+  const [badgeApplications, setBadgeApplications] = useState<string[]>([]);
+  const [expandedBadge, setExpandedBadge] = useState<string | null>(null);
+
+  function toggleOffering(id: string) {
+    setSelectedOfferings((prev) =>
+      prev.includes(id)
+        ? prev.length > 1
+          ? prev.filter((k) => k !== id)
+          : prev
+        : [...prev, id]
+    );
+  }
+
+  function toggleBadgeApplication(id: string) {
+    setBadgeApplications((prev) =>
+      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
+    );
+  }
+
+  function toggleExpandBadge(id: string) {
+    setExpandedBadge((prev) => (prev === id ? null : id));
+  }
+
+  const OFFERING_OPTIONS = [
+    {
+      id: "catering",
+      icon: "🍲",
+      title: t("Feast Booking", "दावत बुकिंग"),
+      blurb: t("Multi-course feasts with silver & gold tiers", "मल्टी-कोर्स दावतें"),
+    },
+    {
+      id: "stall",
+      icon: "🍢",
+      title: t("Specialty Stall", "स्पेशल्टी स्टॉल"),
+      blurb: t("Dedicated food stations and event stalls", "फूड स्टेशन और स्टॉल"),
+    },
+    {
+      id: "baina",
+      icon: "🎁",
+      title: t("Baina Boxes", "बायना बॉक्स"),
+      blurb: t("Artisanal sweet gift hampers & boxes", "मिठाई उपहार हैम्पर्स"),
+    },
+    {
+      id: "counters",
+      icon: "🍳",
+      title: t("Live Counters", "लाइव काउंटर"),
+      blurb: t("Interactive live cooking & chat stations", "लाइव कुकिंग काउंटर"),
+    },
+  ];
+
+  const BADGE_OPTIONS = [
+    {
+      id: "verified-caterer",
+      name: "Verified Caterer",
+      nameHi: "वेरीफाइड कैटरर",
+      tagline: "Entry-Level Recognition",
+      taglineHi: "प्रवेश-स्तरीय मान्यता",
+      description:
+        "Entry-level recognition for vendors meeting Bhojpatra's core quality and operational standards.",
+      descriptionHi:
+        "Bhojpatra के मुख्य गुणवत्ता और परिचालन मानकों को पूरा करने वाले वेंडरों के लिए प्रवेश-स्तरीय मान्यता।",
+      icon: "🛡️",
+      requirements: [
+        {
+          title: "Valid FSSAI",
+          desc: t(
+            "Active Food Safety and Standards Authority of India licence.",
+            "सक्रिय भारतीय खाद्य संरक्षा एवं मानक प्राधिकरण लाइसेंस।"
+          ),
+        },
+        {
+          title: "GST where applicable",
+          desc: t(
+            "Valid GSTIN registration based on statutory turnover thresholds.",
+            "वैधानिक टर्नओवर सीमा के अनुसार मान्य GSTIN पंजीकरण।"
+          ),
+        },
+        {
+          title: "PAN + business/bank details",
+          desc: t(
+            "Verified commercial PAN and active business bank account for payouts.",
+            "सत्यापित व्यावसायिक पैन और भुगतान के लिए सक्रिय बैंक खाता।"
+          ),
+        },
+        {
+          title: "Minimum 2 years operating experience",
+          exception: t(
+            "Exception allowed for a strong established brand/new entity",
+            "मजबूत स्थापित ब्रांड या नई इकाई के लिए अपवाद की अनुमति"
+          ),
+          desc: t(
+            "Demonstrated commercial track record in food service or catering.",
+            "खाद्य सेवा या कैटरिंग में प्रमाणित व्यावसायिक ट्रैक रिकॉर्ड।"
+          ),
+        },
+        {
+          title: "Proper kitchen / food preparation setup",
+          desc: t(
+            "Dedicated commercial kitchen facility with adequate storage and clean prep stations.",
+            "पर्याप्त भंडारण और स्वच्छ तैयारी स्टेशनों के साथ समर्पित व्यावसायिक रसोई सुविधा।"
+          ),
+        },
+        {
+          title: "Hygiene & food-safety standards pass",
+          desc: t(
+            "Sanitized cooking areas, food-grade vessels, pest control, and staff hygiene.",
+            "स्वच्छ खाना पकाने के क्षेत्र, खाद्य-ग्रेड बर्तन, कीट नियंत्रण और कर्मचारियों की स्वच्छता।"
+          ),
+        },
+        {
+          title: "Menu, pricing and service area clearly defined",
+          desc: t(
+            "Transparent per-plate menus, package inclusions, and designated delivery radii.",
+            "पारदर्शी प्रति-प्लेट मेनू, पैकेज समावेशन और निर्धारित सेवा क्षेत्र।"
+          ),
+        },
+        {
+          title: "At least 3–5 genuine event references/orders",
+          desc: t(
+            "Verifiable client contacts or completed catering event orders.",
+            "सत्यापन योग्य ग्राहक संपर्क या पूर्ण किए गए कैटरिंग ऑर्डर।"
+          ),
+        },
+        {
+          title: "No serious unresolved customer complaints",
+          desc: t(
+            "Clean service record without unresolved food quality, safety, or fulfillment escalations.",
+            "खाद्य गुणवत्ता, सुरक्षा या सेवा विफलता की किसी अनसुलझी शिकायत के बिना स्वच्छ रिकॉर्ड।"
+          ),
+        },
+        {
+          title: "Bhojpatra quality inspection / tasting pass",
+          desc: t(
+            "Successful kitchen inspection and food tasting evaluation by the Bhojpatra team.",
+            "Bhojpatra टीम द्वारा सफल रसोई निरीक्षण और भोजन चखने (tasting) का मूल्यांकन।"
+          ),
+        },
+      ],
+    },
+    {
+      id: "city-icon-caterer",
+      name: "City Icon Caterer",
+      nameHi: "सिटी आइकन कैटरर",
+      tagline: "Premier Regional Recognition",
+      taglineHi: "प्रमुख क्षेत्रीय मान्यता",
+      description:
+        "Prestigious badge celebrating premier banquet and feast caterers recognized for outstanding city-wide reputation and culinary grandeur.",
+      descriptionHi:
+        "शहर भर में उत्कृष्ट प्रतिष्ठा और पाक भव्यता के लिए मान्यता प्राप्त प्रमुख बैंक्वेट और दावत कैटरर्स के लिए प्रतिष्ठित बैज।",
+      icon: "👑",
+      requirements: [
+        {
+          title: t("Established Market Presence", "स्थापित बाजार प्रतिष्ठा"),
+          desc: t(
+            "Minimum 5+ years of active catering operations with prominent event references.",
+            "प्रमुख कार्यक्रम संदर्भों के साथ न्यूनतम 5+ वर्षों का सक्रिय कैटरिंग संचालन।"
+          ),
+        },
+        {
+          title: t("Large-Scale Execution", "बड़े पैमाने पर आयोजन क्षमता"),
+          desc: t(
+            "Demonstrated capability to serve gatherings exceeding 500+ guests with full service crew.",
+            "पूर्ण सेवा दल के साथ 500+ से अधिक मेहमानों की सेवा करने की सिद्ध क्षमता।"
+          ),
+        },
+        {
+          title: t("Customer Excellence Rating", "ग्राहक उत्कृष्टता रेटिंग"),
+          desc: t(
+            "Consistent 4.5+ star verified reputation across regional celebration reviews.",
+            "क्षेत्रीय समारोह समीक्षाओं में लगातार 4.5+ स्टार सत्यापित प्रतिष्ठा।"
+          ),
+        },
+      ],
+    },
+    {
+      id: "heritage-caterer",
+      name: "Heritage Caterer",
+      nameHi: "हेरिटेज कैटरर",
+      tagline: "Custodians of Culinary Legacy",
+      taglineHi: "पाक विरासत के संरक्षक",
+      description:
+        "Distinguished recognition honoring master custodians preserving authentic multi-generational Awadhi, Mughlai, or regional culinary traditions.",
+      descriptionHi:
+        "प्रामाणिक बहु-पीढ़ी अवधी, मुग़लई या क्षेत्रीय पाक परंपराओं को संरक्षित करने वाले मास्टर संरक्षकों के लिए विशिष्ट सम्मान।",
+      icon: "🏛️",
+      requirements: [
+        {
+          title: t("Culinary Lineage & Legacy", "पाक वंश और विरासत"),
+          desc: t(
+            "Generational master khansama roots or legacy recipes preserved for 15+ years.",
+            "15+ वर्षों से संरक्षित पीढ़ीगत मास्टर खानसामा जड़ें या पारंपरिक व्यंजन विधियां।"
+          ),
+        },
+        {
+          title: t("Authentic Preparation Methods", "पारंपरिक तैयारी विधियां"),
+          desc: t(
+            "Traditional slow-cooking techniques (dum pukht, wood-fired sigri, copper handis).",
+            "पारंपरिक धीमी आंच पर पकाने की तकनीक (दम पुख्त, सिगड़ी, तांबे की हांडी)।"
+          ),
+        },
+        {
+          title: t("Signature Regional Dishes", "सिग्नेचर क्षेत्रीय व्यंजन"),
+          desc: t(
+            "Artisanal heritage menu items unique to Uttar Pradesh's royal culinary heritage.",
+            "उत्तर प्रदेश की शाही पाक विरासत के लिए अनूठे कारीगर विरासत मेनू आइटम।"
+          ),
+        },
+      ],
+    },
+  ];
+
   // Preselect the registration type when arriving from a "Become a Partner" /
   // "List as a Vendor" CTA (e.g. /signup?type=vendor). Read in an effect so the
   // server and first client render match — no Suspense boundary needed.
@@ -370,6 +587,35 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                 : t("Customer", "ग्राहक")}
           </span>
         </span>
+
+        {isVendor && badgeApplications.length > 0 && (
+          <div className="mt-4 rounded-card border border-maroon/20 bg-cream/30 p-3 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wider text-maroon">
+              {t("Badges Applied with Signup", "साइनअप के साथ आवेदन किए गए बैज")}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {badgeApplications.map((bId) => {
+                const b = BADGE_OPTIONS.find((item) => item.id === bId);
+                return (
+                  <span
+                    key={bId}
+                    className="inline-flex items-center gap-1 rounded-full bg-maroon text-cream px-2.5 py-1 text-xs font-medium"
+                  >
+                    <span>{b?.icon}</span>
+                    <span>{b?.name}</span>
+                    <span className="text-[10px] text-cream/70">✓</span>
+                  </span>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-soft">
+              {t(
+                "Your badge application has been recorded and will be evaluated during your onboarding verification.",
+                "आपका बैज आवेदन रिकॉर्ड कर लिया गया है और ऑनबोर्डिंग सत्यापन के दौरान इसका मूल्यांकन किया जाएगा।"
+              )}
+            </p>
+          </div>
+        )}
 
         {isPartner && referralCode && (
           <div className="mt-5 rounded-card border border-maroon/30 bg-cream px-4 py-4">
@@ -799,6 +1045,223 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               className={inputClass}
             />
           </div>
+        )}
+
+        {isSignup && isVendor && (
+          <>
+            {/* ── Vendor Offerings Section (Anchored before Badges) ── */}
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-ink">
+                  {t("Commercial Offerings", "वाणिज्यिक सेवाएं")}
+                </label>
+                <span className="text-xs text-ink-soft">
+                  {t("Select what you provide", "जो सेवाएं आप देते हैं")}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {OFFERING_OPTIONS.map((offering) => {
+                  const isSelected = selectedOfferings.includes(offering.id);
+                  return (
+                    <button
+                      key={offering.id}
+                      type="button"
+                      onClick={() => toggleOffering(offering.id)}
+                      className={`focus-ring flex flex-col items-start gap-1 rounded-control border p-2.5 text-left transition-all ${
+                        isSelected
+                          ? "border-maroon bg-cream/40 ring-1 ring-maroon/30 shadow-xs"
+                          : "border-cream-3 bg-white/70 hover:border-maroon/30 hover:bg-cream/20"
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="text-lg">{offering.icon}</span>
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] font-bold ${
+                            isSelected
+                              ? "border-maroon bg-maroon text-cream"
+                              : "border-cream-3 bg-white text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-ink leading-tight">
+                        {offering.title}
+                      </span>
+                      <span className="text-[11px] text-ink-soft line-clamp-2 leading-tight">
+                        {offering.blurb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Task 17: Badges & Recognition Section (Directly after Offerings) ── */}
+            <div
+              id="vendor-badges-section"
+              className="flex flex-col gap-3 rounded-card border border-maroon/25 bg-cream/30 p-4"
+            >
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-maroon">
+                    {t("Recognition Program", "मान्यता कार्यक्रम")}
+                  </span>
+                  <span className="rounded-full bg-maroon/10 px-2.5 py-0.5 text-xs font-bold text-maroon">
+                    {badgeApplications.length > 0
+                      ? t(
+                          `${badgeApplications.length} Applied`,
+                          `${badgeApplications.length} आवेदन किए गए`
+                        )
+                      : t("Optional", "वैकल्पिक")}
+                  </span>
+                </div>
+                <h3 className="font-display text-lg font-bold text-ink">
+                  {t("Badges & Recognition", "बैज और पहचान")}
+                </h3>
+                <p className="text-xs text-ink-soft leading-relaxed">
+                  {t(
+                    "Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust to customers from day one.",
+                    "पहले दिन से ही ग्राहकों के सामने अपनी रसोई के मानकों, विरासत और सत्यापित विश्वसनीयता को उजागर करने के लिए Bhojpatra मान्यता बैज के लिए आवेदन करें।"
+                  )}
+                </p>
+              </div>
+
+              {/* 3 Badge Cards */}
+              <div className="flex flex-col gap-2.5">
+                {BADGE_OPTIONS.map((badge) => {
+                  const isApplied = badgeApplications.includes(badge.id);
+                  const isExpanded = expandedBadge === badge.id;
+
+                  return (
+                    <div
+                      key={badge.id}
+                      data-badge-card={badge.id}
+                      className={`rounded-control border transition-all ${
+                        isApplied
+                          ? "border-maroon bg-white shadow-sm ring-1 ring-maroon/20"
+                          : "border-cream-3 bg-white/80 hover:border-maroon/40 hover:bg-white"
+                      } p-3.5`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-maroon/15 bg-cream/40 text-lg">
+                            {badge.icon}
+                          </span>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-ink">
+                                {badge.name}
+                              </h4>
+                              {isApplied && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-maroon/10 px-2 py-0.5 text-[11px] font-semibold text-maroon">
+                                  ✓ {t("Applied", "लागू")}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium text-maroon/90">
+                              {badge.tagline}
+                            </span>
+                            <p className="mt-1 text-xs text-ink-soft leading-relaxed">
+                              {badge.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <button
+                            type="button"
+                            data-badge-apply={badge.id}
+                            onClick={() => toggleBadgeApplication(badge.id)}
+                            className={`focus-ring tap inline-flex min-h-[36px] items-center justify-center rounded-control px-3 text-xs font-semibold transition-all ${
+                              isApplied
+                                ? "bg-maroon text-cream hover:bg-maroon/90"
+                                : "border border-maroon/40 bg-cream/20 text-maroon hover:border-maroon hover:bg-cream"
+                            }`}
+                          >
+                            {isApplied
+                              ? t("✓ Applied", "✓ लागू किया")
+                              : t("Apply", "आवेदन करें")}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Requirements Toggle & Area */}
+                      <div className="mt-2.5 border-t border-cream-3/60 pt-2">
+                        <button
+                          type="button"
+                          data-badge-toggle={badge.id}
+                          onClick={() => toggleExpandBadge(badge.id)}
+                          className="focus-ring inline-flex items-center gap-1 text-xs font-medium text-maroon hover:underline"
+                        >
+                          <span>
+                            {isExpanded
+                              ? t("Hide Requirements", "आवश्यकताएं छिपाएं")
+                              : t("View Requirements", "आवश्यकताएं देखें")}
+                          </span>
+                          <span className="text-[10px]">
+                            {isExpanded ? "▲" : "▼"}
+                          </span>
+                        </button>
+
+                        {isExpanded && (
+                          <div
+                            data-badge-requirements={badge.id}
+                            className="mt-2.5 rounded-control bg-cream/30 p-3 text-xs text-ink"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="font-semibold text-ink-soft uppercase tracking-wider text-[10.5px]">
+                                {t("Requirements", "आवश्यकताएं")}
+                              </p>
+                              <span className="text-[10.5px] text-ink-soft/80">
+                                {badge.requirements.length} {t("criteria", "मानदंड")}
+                              </span>
+                            </div>
+                            <ul className="flex flex-col gap-2">
+                              {badge.requirements.map((req, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start gap-2"
+                                >
+                                  <span
+                                    className="text-maroon/80 font-mono text-xs leading-5 select-none shrink-0"
+                                    aria-hidden="true"
+                                  >
+                                    □
+                                  </span>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-ink leading-5">
+                                      {req.title}
+                                    </span>
+                                    {req.exception && (
+                                      <div className="text-[11px] text-maroon/90 font-medium mt-0.5 flex flex-wrap items-center gap-1">
+                                        <span className="inline-flex items-center rounded bg-cream-2 px-1.5 py-0.5 border border-maroon/20 text-[11px]">
+                                          {t("Exception: strong established brand/new entity", "अपवाद: मजबूत स्थापित ब्रांड या नई इकाई")}
+                                        </span>
+                                        <span className="text-[10.5px] text-ink-soft">
+                                          ({t("Exception allowed for a strong established brand/new entity", "मजबूत स्थापित ब्रांड या नई इकाई के लिए अपवाद की अनुमति")})
+                                        </span>
+                                      </div>
+                                    )}
+                                    {req.desc && (
+                                      <span className="text-[11px] text-ink-soft leading-tight mt-0.5">
+                                        {req.desc}
+                                      </span>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {!isForgot && (
