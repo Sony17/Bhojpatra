@@ -1759,7 +1759,8 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   animation: fadeIn var(--dur-fast) ease forwards;
 }
 
-.modal-backdrop.open {
+.modal-backdrop.open,
+.modal-backdrop.active {
   display: flex;
 }
 
@@ -3685,5 +3686,95 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   accent-color: var(--color-red);
   cursor: pointer;
 }
+
+/* ── Phase 1 Enhancements: Vendor Direct Sign In ── */
+.btn-vendor-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-red);
+  background: var(--color-white);
+  color: var(--color-red);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+}
+
+.btn-vendor-signin:hover {
+  background: var(--color-red);
+  color: var(--color-cream);
+}
+
+.existing-vendor-signin-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--color-cream-30);
+  border: 1px solid var(--color-cream-60);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.signin-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.signin-banner-text strong {
+  font-size: 13px;
+  color: var(--color-black);
+  font-weight: 700;
+}
+
+.signin-banner-text span {
+  font-size: 11.5px;
+  color: var(--color-black-60);
+}
+
+.btn-banner-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-red);
+  color: var(--color-cream);
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) ease;
+}
+
+.btn-banner-signin:hover {
+  background: var(--color-black);
+}
+
+.field-optional {
+  font-size: 11px;
+  color: var(--color-black-60);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.mobile-frame .existing-vendor-signin-banner {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.mobile-frame .btn-banner-signin {
+  width: 100%;
+  justify-content: center;
+}
+
 
 

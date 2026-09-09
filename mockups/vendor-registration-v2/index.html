@@ -38,33 +38,33 @@
             <option value="view-dashboard-orders">📋 Orders & Active Pipeline</option>
           </optgroup>
           <optgroup label="General Onboarding">
-            <option value="view-details" selected>01. Vendor Identity & Ops</option>
-            <option value="view-kyc">02. Statutory KYC & Docs</option>
-            <option value="view-offerings">03. Service Offerings</option>
+            <option value="view-details" selected>Vendor Identity & Operations</option>
+            <option value="view-kyc">Statutory KYC & Compliance</option>
+            <option value="view-offerings">Service Offerings Selection</option>
           </optgroup>
-          <optgroup label="5. Feast Menu Builder">
-            <option value="view-cat-basics">5A. Package Basics & Best For</option>
-            <option value="view-cat-courses">5B. Course Hierarchy</option>
-            <option value="view-cat-dishes">5C. Dish Builder & Photos</option>
-            <option value="view-cat-tiers">5D. Silver & Gold Tiers</option>
-            <option value="view-cat-live">5E. Live Counters (Separated)</option>
-            <option value="view-cat-extras">5F. Extras, Essentials & Cutlery</option>
+          <optgroup label="Feast Menu Builder">
+            <option value="view-cat-basics">Feast Basics & Best For</option>
+            <option value="view-cat-courses">Course Hierarchy</option>
+            <option value="view-cat-dishes">Dishes & Food Photos</option>
+            <option value="view-cat-tiers">Silver & Gold Tiers</option>
+            <option value="view-cat-live">Live Food Counters</option>
+            <option value="view-cat-extras">Extras, Essentials & Cutlery</option>
           </optgroup>
-          <optgroup label="6. Dynamic Stall Builder">
-            <option value="view-stall-basics">6A. Stall Identity & Specialty</option>
-            <option value="view-stall-format">6B. Menu Format (Fixed/Varied)</option>
-            <option value="view-stall-delicacies">6C. Delicacies Catalog</option>
-            <option value="view-stall-pricing">6D. Pricing & Capacity</option>
-            <option value="view-stall-live">6E. Stall Live & Cutlery</option>
+          <optgroup label="Specialty Stall Builder">
+            <option value="view-stall-basics">Stall Identity & Specialty</option>
+            <option value="view-stall-format">Stall Menu Format (Fixed)</option>
+            <option value="view-stall-delicacies">Delicacies Catalog</option>
+            <option value="view-stall-pricing">Stall Pricing & Capacity</option>
+            <option value="view-stall-live">Stall Setup & Cutlery</option>
           </optgroup>
-          <optgroup label="7. Baina Gifting Builder">
-            <option value="view-baina-basics">7A. Studio Story & Best For</option>
-            <option value="view-baina-boxes">7B. Box Catalog & Sizes</option>
-            <option value="view-baina-packaging">7C. Packaging Styles</option>
+          <optgroup label="Baina Gifting Hamper Builder">
+            <option value="view-baina-basics">Baina Studio & Best For</option>
+            <option value="view-baina-boxes">Box Catalog & Sizes</option>
+            <option value="view-baina-packaging">Packaging Styles</option>
           </optgroup>
           <optgroup label="Consolidated Review & Go-Live">
-            <option value="view-review">08. Master Review & Submit</option>
-            <option value="view-complete">09. Registration Complete</option>
+            <option value="view-review">Master Review & Submit</option>
+            <option value="view-complete">Registration Complete</option>
           </optgroup>
         </select>
       </div>
@@ -130,6 +130,10 @@
           </div>
 
           <div class="wizard-header-help">
+            <button type="button" class="btn-vendor-signin" onclick="openVendorSignInModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+              <span>Sign In</span>
+            </button>
             <a class="help-link" onclick="showToast('Connecting to Bhojpatra Onboarding Concierge on WhatsApp...')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
               <span>Need help? Chat with Concierge</span>
@@ -164,55 +168,63 @@
           </div>
         </aside>
 
-        <!-- Subnav Breadcrumbs for Feast Builder (5A to 5F) -->
+        <!-- Subnav Breadcrumbs for Feast Builder -->
         <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
-          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">5A. Feast Details</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">Feast Details</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">5B. Course Hierarchy</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">Course Hierarchy</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">5C. Dishes & Photos</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">Dishes & Photos</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">5D. Silver & Gold Tiers</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Silver & Gold Tiers</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-live" onclick="goToStep('view-cat-live')">5E. Live Counters</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-live" onclick="goToStep('view-cat-live')">Live Counters</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-extras" onclick="goToStep('view-cat-extras')">5F. Extras & Cutlery</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-extras" onclick="goToStep('view-cat-extras')">Extras & Cutlery</button>
         </nav>
 
-        <!-- Subnav Breadcrumbs for Stall Builder (6A to 6E) -->
+        <!-- Subnav Breadcrumbs for Stall Builder -->
         <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
-          <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">6A. Stall Identity</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">Stall Identity</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-format" onclick="goToStep('view-stall-format')">6B. Menu Format</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-format" onclick="goToStep('view-stall-format')">Menu Format</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">6C. Delicacies Catalog</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">Delicacies Catalog</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">6D. Pricing & Pax</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">Pricing & Pax</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-live" onclick="goToStep('view-stall-live')">6E. Live & Cutlery</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-live" onclick="goToStep('view-stall-live')">Live & Cutlery</button>
         </nav>
 
-        <!-- Subnav Breadcrumbs for Baina Builder (7A to 7C) -->
+        <!-- Subnav Breadcrumbs for Baina Builder -->
         <nav class="builder-subnav-bar" data-subnav-group="baina" style="display: none;">
-          <button type="button" class="subnav-pill" data-target-step="view-baina-basics" onclick="goToStep('view-baina-basics')">7A. Studio Story</button>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-basics" onclick="goToStep('view-baina-basics')">Studio Story</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-baina-boxes" onclick="goToStep('view-baina-boxes')">7B. Box Catalog</button>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-boxes" onclick="goToStep('view-baina-boxes')">Box Catalog</button>
           <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-baina-packaging" onclick="goToStep('view-baina-packaging')">7C. Packaging Styles</button>
+          <button type="button" class="subnav-pill" data-target-step="view-baina-packaging" onclick="goToStep('view-baina-packaging')">Packaging Styles</button>
         </nav>
 
         <!-- Body Scroll Area (Hosting All Step & Sub-Step Views) -->
         <div class="wizard-body">
 
-          <!-- ── VIEW 01: VENDOR DETAILS & OPERATIONS (Taken ONCE) ── -->
+          <!-- ── VIEW: VENDOR DETAILS & OPERATIONS ── -->
           <article class="step-container active" data-step-id="view-details">
             <header class="step-header">
-              <div class="step-eyebrow">Step 1 · Single Source of Vendor Identity</div>
+              <div class="step-eyebrow">Vendor Identity & Operations</div>
               <h1 class="step-heading">Your catering business identity</h1>
               <p class="step-subtext">Enter your business identity once. It will be reused across all your feast packages, stalls, and gifting storefronts.</p>
             </header>
 
             <div class="content-card">
+              <!-- Existing Vendor Direct Sign In Banner (Task 1: Add Sign In to Cutleries/Vendor flow) -->
+              <div class="existing-vendor-signin-banner">
+                <div class="signin-banner-text">
+                  <strong>Already registered as a Bhojpatra Vendor?</strong>
+                  <span>Directly sign in to access your vendor dashboard, active pipeline, and kitchen orders.</span>
+                </div>
+                <button type="button" class="btn-banner-signin" onclick="openVendorSignInModal()">Sign In to Dashboard →</button>
+              </div>
               <!-- Mandatory Dietary Offering at Start (Zero Badges) -->
               <div class="diet-selection-section" id="desktop-diet-section" style="margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--color-cream-30);">
                 <div class="card-title-row" style="margin-bottom: 6px;">
@@ -330,10 +342,10 @@
             </div>
           </article>
 
-          <!-- ── VIEW 02: STATUTORY KYC & COMPLIANCE ── -->
+          <!-- ── VIEW: STATUTORY KYC & COMPLIANCE ── -->
           <article class="step-container" data-step-id="view-kyc">
             <header class="step-header">
-              <div class="step-eyebrow">Step 2 · Compliance & Legal</div>
+              <div class="step-eyebrow">Compliance & Statutory KYC</div>
               <h1 class="step-heading">Statutory KYC verification</h1>
               <p class="step-subtext">Submit your statutory business credentials to complete onboarding and activate commercial listings on Bhojpatra.</p>
             </header>
@@ -372,10 +384,10 @@
             </div>
           </article>
 
-          <!-- ── VIEW 03: SERVICE OFFERING SELECTION (Step 4) ── -->
+          <!-- ── VIEW: SERVICE OFFERING SELECTION ── -->
           <article class="step-container" data-step-id="view-offerings">
             <header class="step-header">
-              <div class="step-eyebrow">Step 3 · Commercial Offerings</div>
+              <div class="step-eyebrow">Commercial Service Offerings</div>
               <h1 class="step-heading">What services do you offer?</h1>
               <p class="step-subtext">Select all offerings your business provides. The onboarding flow will adapt and open dedicated builders for each selection.</p>
             </header>
@@ -497,10 +509,10 @@
             </div>
           </article>
 
-          <!-- ── 5A. FEAST: PACKAGE BASICS & STOREFRONT METADATA ── -->
+          <!-- ── FEAST: PACKAGE BASICS & STOREFRONT METADATA ── -->
           <article class="step-container" data-step-id="view-cat-basics">
             <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · 5A. Feast Details</div>
+              <div class="step-eyebrow">Feast Builder · Feast Details</div>
               <h1 class="step-heading">Configure your signature feast booking</h1>
               <p class="step-subtext">Vendor identity is already locked at the top. Here, define the storefront feast details customers see when browsing your offering.</p>
             </header>
@@ -566,10 +578,10 @@
             </div>
           </article>
 
-          <!-- ── 5B. FEAST: COURSE HIERARCHY ── -->
+          <!-- ── FEAST: COURSE HIERARCHY ── -->
           <article class="step-container" data-step-id="view-cat-courses">
             <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · 5B. Course Hierarchy</div>
+              <div class="step-eyebrow">Feast Builder · Course Hierarchy</div>
               <h1 class="step-heading">Standard platform course hierarchy</h1>
               <p class="step-subtext">Bhojpatra categorizes menus into 5 platform standard courses, creating clear navigation for guests rather than one long flat list.</p>
             </header>
@@ -634,10 +646,10 @@
             </div>
           </article>
 
-          <!-- ── 5C. CATERING: GRANULAR DISH BUILDER ── -->
+          <!-- ── FEAST: GRANULAR DISH BUILDER ── -->
           <article class="step-container" data-step-id="view-cat-dishes">
             <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · 5C. Dishes & Photos</div>
+              <div class="step-eyebrow">Feast Builder · Dishes & Photos</div>
               <h1 class="step-heading">Build your dishes with authentic photos</h1>
               <p class="step-subtext">Add dishes to each course, set dietary status, attach food photos, and assign them to marketplace tiers.</p>
             </header>
@@ -672,10 +684,10 @@
             </div>
           </article>
 
-          <!-- ── 5D. CATERING: PRICING & TIER QUOTA STEPPERS ── -->
+          <!-- ── FEAST: PRICING & TIER QUOTA STEPPERS ── -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · 5D. Tiers & Allowances</div>
+              <div class="step-eyebrow">Feast Builder · Tiers & Allowances</div>
               <h1 class="step-heading">Configure tier allowances & pricing</h1>
               <p class="step-subtext">Sequential single-tier onboarding. Silver / Bhoj City is the base tier. Complete and save Silver to unlock Gold / Bhoj Signature.</p>
             </header>
@@ -856,10 +868,10 @@
             </div>
           </article>
 
-          <!-- ── 5E. LIVE COUNTERS (SEPARATED FROM FEAST) ── -->
+          <!-- ── LIVE COUNTERS (SEPARATED FROM FEAST) ── -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
-              <div class="step-eyebrow">Service Offerings · 4. Live Counters</div>
+              <div class="step-eyebrow">Service Offerings · Live Food Counters</div>
               <h1 class="step-heading">Select live food & beverage counters</h1>
               <p class="step-subtext">Live Counters are strictly separated from event service extras. Select which live stations your kitchen can deploy.</p>
             </header>
@@ -937,10 +949,10 @@
             </div>
           </article>
 
-          <!-- ── 5F. EXTRAS, ADD-ONS & ESSENTIALS (SEPARATED FROM FEAST) ── -->
+          <!-- ── EXTRAS, ADD-ONS & ESSENTIALS (SEPARATED FROM FEAST) ── -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
-              <div class="step-eyebrow">Service Offerings · 5-7. Extras, Add-ons & Essentials</div>
+              <div class="step-eyebrow">Service Offerings · Extras, Add-ons & Essentials</div>
               <h1 class="step-heading">Tableware, cutlery & buffet essentials</h1>
               <p class="step-subtext">Sony identified cutlery and event essentials as missing. Map your tableware tiers directly to Bhojpatra's Service Packages (A to D).</p>
             </header>
@@ -1013,10 +1025,10 @@
             </div>
           </article>
 
-          <!-- ── 6A. STALL: IDENTITY & SPECIALTY ── -->
+          <!-- ── STALL: IDENTITY & SPECIALTY ── -->
           <article class="step-container" data-step-id="view-stall-basics">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · 6A. Stall Identity</div>
+              <div class="step-eyebrow">Stall Builder · Stall Identity</div>
               <h1 class="step-heading">Dynamic specialty food stall builder</h1>
               <p class="step-subtext">Sony emphasized: Stall must be as dynamic as menu building! Configure your station specialty, description, and photo.</p>
             </header>
@@ -1024,8 +1036,8 @@
             <div class="content-card">
               <div class="form-grid-2">
                 <div class="form-group">
-                  <label class="form-label">Stall Display Brand Name <span class="required">*</span></label>
-                  <input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" />
+                  <label class="form-label">Stall Display Brand Name <span class="field-optional">(Optional)</span></label>
+                  <input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="e.g. Awadhi Dum Biryani Corner (optional)" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Category Specialty <span class="required">*</span></label>
@@ -1069,41 +1081,32 @@
             </div>
           </article>
 
-          <!-- ── 6B. STALL: MENU FORMAT (FIXED VS VARIED) ── -->
+          <!-- ── STALL: MENU FORMAT (FIXED SET SPREAD) ── -->
           <article class="step-container" data-step-id="view-stall-format">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · 6B. Menu Format</div>
+              <div class="step-eyebrow">Stall Builder · Menu Format</div>
               <h1 class="step-heading">How do customers order from this stall?</h1>
-              <p class="step-subtext">Source of Truth: SingleStallMenuType ('fixed' set spread vs 'varied' build-your-own delicacies).</p>
+              <p class="step-subtext">All Bhojpatra single stall bookings use the Fixed Set Spread format with a flat per-plate rate.</p>
             </header>
 
             <div class="content-card">
-              <div class="form-grid-2">
+              <div class="form-grid-1" style="max-width: 560px;">
                 <div class="offering-card stall-format-card active" data-format="fixed" onclick="setStallMenuType('fixed')">
                   <div class="offering-header">
                     <span style="font-size:28px;">🍱</span>
-                    <span class="badge" style="background:var(--color-red-10);color:var(--color-red);">Recommended</span>
+                    <span class="badge" style="background:var(--color-red-10);color:var(--color-red);">Fixed Format</span>
                   </div>
                   <div class="offering-title">Fixed Set Spread</div>
-                  <div class="offering-blurb">Flat per-plate rate covering all published delicacies. Every guest gets the entire spread served fresh.</div>
-                </div>
-
-                <div class="offering-card stall-format-card" data-format="varied" onclick="setStallMenuType('varied')">
-                  <div class="offering-header">
-                    <span style="font-size:28px;">📋</span>
-                    <span class="badge" style="background:var(--color-cream-30);color:var(--color-black);">Build-Your-Own</span>
-                  </div>
-                  <div class="offering-title">Varied Delicacies</div>
-                  <div class="offering-blurb">Guests select individual delicacies priced separately. Bills dynamically based on items chosen.</div>
+                  <div class="offering-blurb">Flat per-plate rate covering all published delicacies. Every guest gets the entire spread served fresh on-site.</div>
                 </div>
               </div>
             </div>
           </article>
 
-          <!-- ── 6C. STALL: DELICACIES CATALOG ── -->
+          <!-- ── STALL: DELICACIES CATALOG ── -->
           <article class="step-container" data-step-id="view-stall-delicacies">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · 6C. Delicacies Catalog</div>
+              <div class="step-eyebrow">Stall Builder · Delicacies Catalog</div>
               <h1 class="step-heading">Manage stall delicacies & item pricing</h1>
               <p class="step-subtext">Add each food item prepared at your station with its dietary marker, unit price, and appetizing photo.</p>
             </header>
@@ -1117,10 +1120,10 @@
             </div>
           </article>
 
-          <!-- ── 6D. STALL: PRICING & CAPACITY ── -->
+          <!-- ── STALL: PRICING & CAPACITY ── -->
           <article class="step-container" data-step-id="view-stall-pricing">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · 6D. Rates & Minimums</div>
+              <div class="step-eyebrow">Stall Builder · Rates & Minimums</div>
               <h1 class="step-heading">Pricing & guest guarantee</h1>
               <p class="step-subtext">Set your fixed per-plate rate (for Fixed format) and minimum guest guarantee required to deploy the stall.</p>
             </header>
@@ -1141,10 +1144,10 @@
             </div>
           </article>
 
-          <!-- ── 6E. STALL: LIVE EQUIPMENT & CUTLERY ── -->
+          <!-- ── STALL: LIVE EQUIPMENT & CUTLERY ── -->
           <article class="step-container" data-step-id="view-stall-live">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · 6E. Setup & Cutlery</div>
+              <div class="step-eyebrow">Stall Builder · Setup & Cutlery</div>
               <h1 class="step-heading">On-site equipment & stall cutlery</h1>
               <p class="step-subtext">Sony emphasized including cutlery and essentials. Define what cooking gear and eco-disposables accompany the stall.</p>
             </header>
@@ -1167,10 +1170,10 @@
             </div>
           </article>
 
-          <!-- ── 7A. BAINA: STUDIO STORY & BEST FOR ── -->
+          <!-- ── BAINA: STUDIO STORY & BEST FOR ── -->
           <article class="step-container" data-step-id="view-baina-basics">
             <header class="step-header">
-              <div class="step-eyebrow">Baina Builder · 7A. Studio Story</div>
+              <div class="step-eyebrow">Baina Builder · Studio Story</div>
               <h1 class="step-heading">Artisanal gifting studio & traditions</h1>
               <p class="step-subtext">Define your gifting brand, pure ghee commitment, bulk minimums, and occasion specialties.</p>
             </header>
@@ -1204,10 +1207,10 @@
             </div>
           </article>
 
-          <!-- ── 7B. BAINA: BOX CATALOG & SIZES ── -->
+          <!-- ── BAINA: BOX CATALOG & SIZES ── -->
           <article class="step-container" data-step-id="view-baina-boxes">
             <header class="step-header">
-              <div class="step-eyebrow">Baina Builder · 7B. Box Catalog</div>
+              <div class="step-eyebrow">Baina Builder · Box Catalog</div>
               <h1 class="step-heading">Artisanal gifting box hampers</h1>
               <p class="step-subtext">Manage signature gift boxes with itemized sweet contents, ½ kg base rates, 1 kg rates, and hamper photography.</p>
             </header>
@@ -1221,10 +1224,10 @@
             </div>
           </article>
 
-          <!-- ── 7C. BAINA: PACKAGING STYLES ── -->
+          <!-- ── BAINA: PACKAGING STYLES ── -->
           <article class="step-container" data-step-id="view-baina-packaging">
             <header class="step-header">
-              <div class="step-eyebrow">Baina Builder · 7C. Packaging Presentation</div>
+              <div class="step-eyebrow">Baina Builder · Packaging Presentation</div>
               <h1 class="step-heading">Select luxury packaging presentation</h1>
               <p class="step-subtext">Choose the signature packaging finish delivered to the wedding invitation hosts.</p>
             </header>
@@ -1402,11 +1405,6 @@
               </div>
 
               <div class="topbar-actions">
-                <button type="button" class="btn-preview-store" onclick="openStorefrontPreview()">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-                  Preview Storefront
-                </button>
-
                 <button type="button" class="topbar-icon-btn" onclick="openBookingReviewModal()" title="1 unread booking notification">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
                   <span class="notification-dot" id="desktop-notif-dot"></span>
@@ -1535,11 +1533,6 @@
 
                 <!-- Footer Actions -->
                 <div class="spotlight-footer-actions">
-                  <a class="host-contact-link" onclick="showToast('Connecting to Host: Vikram Sharma (Demo Host) · +91 98000 00000')">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.43-3.9-6.63-6.49l1.97-1.57c.27-.27.35-.66.24-1.01-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
-                    <span>Host: Vikram Sharma (Demo Host) · +91 98000 00000</span>
-                  </a>
-
                   <div style="display: flex; gap: 10px;">
                     <button type="button" class="btn-secondary-ghost" onclick="setDashboardTab('orders')">View All Orders</button>
                     <button type="button" class="btn-prep-sheet-primary" onclick="openPrepSheetModal()">
@@ -1804,9 +1797,14 @@
             <div class="brand-icon" style="width:30px;height:30px;font-size:18px;">भ</div>
             <div class="brand-name" style="font-size:18px;">Bhojpatra</div>
           </div>
-          <a class="help-link" onclick="showToast('Opening WhatsApp Support...')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
-          </a>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="btn-vendor-signin" onclick="openVendorSignInModal()" style="padding:4px 10px; font-size:11px;">
+              <span>Sign In</span>
+            </button>
+            <a class="help-link" onclick="showToast('Opening WhatsApp Support...')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+            </a>
+          </div>
         </header>
 
         <!-- Stepper Track Mobile -->
@@ -1860,14 +1858,22 @@
         <!-- Mobile Body (Shares Active Step IDs with Desktop) -->
         <div class="wizard-body">
 
-          <!-- Mobile View 01: Details -->
+          <!-- Mobile View: Details -->
           <article class="step-container active" data-step-id="view-details">
             <header class="step-header">
-              <div class="step-eyebrow">Step 1 · Identity</div>
+              <div class="step-eyebrow">Vendor Identity</div>
               <h1 class="step-heading">Business details</h1>
               <p class="step-subtext">Collected once and reflected everywhere.</p>
             </header>
             <div class="content-card">
+              <!-- Mobile Existing Vendor Direct Sign In Banner (Task 1: Add Sign In to Cutleries/Vendor flow) -->
+              <div class="existing-vendor-signin-banner">
+                <div class="signin-banner-text">
+                  <strong>Registered Vendor?</strong>
+                  <span>Sign in directly to your vendor dashboard.</span>
+                </div>
+                <button type="button" class="btn-banner-signin" onclick="openVendorSignInModal()">Sign In →</button>
+              </div>
               <!-- Mandatory Dietary Offering at Start Mobile -->
               <div class="diet-selection-section" id="mobile-diet-section" style="margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-cream-30);">
                 <label class="form-label" style="margin-bottom: 6px;">Kitchen Dietary Offering <span class="required">*</span></label>
@@ -1943,7 +1949,7 @@
           <!-- Mobile View 02: KYC -->
           <article class="step-container" data-step-id="view-kyc">
             <header class="step-header">
-              <div class="step-eyebrow">Step 2 · KYC</div>
+              <div class="step-eyebrow">Statutory KYC</div>
               <h1 class="step-heading">Compliance</h1>
             </header>
             <div class="content-card">
@@ -1965,10 +1971,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 03: Offerings -->
+          <!-- Mobile View: Offerings -->
           <article class="step-container" data-step-id="view-offerings">
             <header class="step-header">
-              <div class="step-eyebrow">Step 3 · Services</div>
+              <div class="step-eyebrow">Commercial Offerings</div>
               <h1 class="step-heading">What do you offer?</h1>
             </header>
             <div class="content-card">
@@ -2040,10 +2046,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5A: Cat Basics -->
+          <!-- Mobile View: Cat Basics -->
           <article class="step-container" data-step-id="view-cat-basics">
             <header class="step-header">
-              <div class="step-eyebrow">5A. Feast Details</div>
+              <div class="step-eyebrow">Feast Details</div>
               <h1 class="step-heading">Package info</h1>
             </header>
             <div class="content-card">
@@ -2069,10 +2075,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5B: Cat Courses -->
+          <!-- Mobile View: Cat Courses -->
           <article class="step-container" data-step-id="view-cat-courses">
             <header class="step-header">
-              <div class="step-eyebrow">5B. Courses</div>
+              <div class="step-eyebrow">Course Hierarchy</div>
               <h1 class="step-heading">Course hierarchy</h1>
             </header>
             <div class="content-card">
@@ -2086,10 +2092,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5C: Cat Dishes -->
+          <!-- Mobile View: Cat Dishes -->
           <article class="step-container" data-step-id="view-cat-dishes">
             <header class="step-header">
-              <div class="step-eyebrow">5C. Dishes</div>
+              <div class="step-eyebrow">Dishes & Photos</div>
               <h1 class="step-heading">Dish builder</h1>
             </header>
             <div class="content-card">
@@ -2103,10 +2109,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5D: Cat Tiers (Sequential Single-Tier Progression) -->
+          <!-- Mobile View: Cat Tiers (Sequential Single-Tier Progression) -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
-              <div class="step-eyebrow">5D. Tiers & Allowances</div>
+              <div class="step-eyebrow">Tiers & Allowances</div>
               <h1 class="step-heading">Pricing & allowances</h1>
               <p class="step-subtext">Sequential progression: Silver base first, then Gold featured with specialization.</p>
             </header>
@@ -2278,10 +2284,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5E: Cat Live -->
+          <!-- Mobile View: Cat Live -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
-              <div class="step-eyebrow">5E. Live Counters</div>
+              <div class="step-eyebrow">Live Counters</div>
               <h1 class="step-heading">Live stations</h1>
             </header>
             <div class="content-card">
@@ -2302,10 +2308,10 @@
             </div>
           </article>
 
-          <!-- Mobile View 5F: Cat Extras -->
+          <!-- Mobile View: Cat Extras -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
-              <div class="step-eyebrow">5F. Cutlery & Extras</div>
+              <div class="step-eyebrow">Cutlery & Extras</div>
               <h1 class="step-heading">Tableware</h1>
             </header>
             <div class="content-card">
@@ -2320,50 +2326,50 @@
 
           <!-- Mobile Stall Views -->
           <article class="step-container" data-step-id="view-stall-basics">
-            <header class="step-header"><div class="step-eyebrow">6A. Stall</div><h1 class="step-heading">Stall details</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Stall Details</div><h1 class="step-heading">Stall details</h1></header>
             <div class="content-card">
-              <div class="form-group"><label class="form-label">Stall Name</label><input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" /></div>
+              <div class="form-group"><label class="form-label">Stall Name <span class="field-optional">(Optional)</span></label><input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="Stall Brand Name (optional)" /></div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-format">
-            <header class="step-header"><div class="step-eyebrow">6B. Format</div><h1 class="step-heading">Ordering format</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Ordering Format</div><h1 class="step-heading">Ordering format</h1></header>
             <div class="content-card">
               <div class="offering-card stall-format-card active" data-format="fixed" onclick="setStallMenuType('fixed')"><div class="offering-title">Fixed Set Spread (₹280/p)</div></div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-delicacies">
-            <header class="step-header"><div class="step-eyebrow">6C. Items</div><h1 class="step-heading">Stall delicacies</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Stall Delicacies</div><h1 class="step-heading">Stall delicacies</h1></header>
             <div class="content-card">
               <div class="delicacies-catalog-container items-catalog-grid"></div>
               <button type="button" class="btn-add-item-dashed" onclick="openDelicacyEditor()">＋ Add Item</button>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-pricing">
-            <header class="step-header"><div class="step-eyebrow">6D. Pricing</div><h1 class="step-heading">Capacity</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Pricing & Capacity</div><h1 class="step-heading">Capacity</h1></header>
             <div class="content-card">
               <div class="form-group"><label class="form-label">Rate (₹)</label><input type="number" class="form-input" data-bind="stall.fixedPerPlate" value="280" /></div>
               <div class="form-group"><label class="form-label">Min Pax</label><input type="number" class="form-input" data-bind="stall.minPaxGuarantee" value="50" /></div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-live">
-            <header class="step-header"><div class="step-eyebrow">6E. Equipment</div><h1 class="step-heading">Stall setup</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Stall Setup</div><h1 class="step-heading">Stall setup</h1></header>
             <div class="content-card"><div class="review-pill">✓ Sigdi & Ulta Tawa Included</div></div>
           </article>
 
           <!-- Mobile Baina Views -->
           <article class="step-container" data-step-id="view-baina-basics">
-            <header class="step-header"><div class="step-eyebrow">7A. Studio</div><h1 class="step-heading">Gifting story</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Gifting Story</div><h1 class="step-heading">Gifting story</h1></header>
             <div class="content-card"><div class="form-group"><label class="form-label">Studio Name</label><input type="text" class="form-input" data-bind="baina.studioName" value="Ram Asrey Royal Baina Studio" /></div></div>
           </article>
           <article class="step-container" data-step-id="view-baina-boxes">
-            <header class="step-header"><div class="step-eyebrow">7B. Boxes</div><h1 class="step-heading">Gift boxes</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Gift Boxes</div><h1 class="step-heading">Gift boxes</h1></header>
             <div class="content-card">
               <div class="baina-box-catalog-container items-catalog-grid"></div>
               <button type="button" class="btn-add-item-dashed" onclick="openBoxEditor()">＋ Add Box</button>
             </div>
           </article>
           <article class="step-container" data-step-id="view-baina-packaging">
-            <header class="step-header"><div class="step-eyebrow">7C. Packaging</div><h1 class="step-heading">Box styles</h1></header>
+            <header class="step-header"><div class="step-eyebrow">Box Styles</div><h1 class="step-heading">Box styles</h1></header>
             <div class="content-card"><div class="review-pill active">👑 Royal Velvet Finish</div></div>
           </article>
 
@@ -2699,6 +2705,39 @@
         <button type="button" class="btn-back" onclick="closeBoxEditor()">Cancel</button>
         <button type="button" class="btn-next" onclick="saveBoxEditor()">Save Box</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Vendor Sign In Modal (Task 1: Add Sign In to Cutleries/Vendor flow) -->
+  <div class="modal-backdrop" id="modal-vendor-signin">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:var(--color-red); letter-spacing:1px; text-transform:uppercase;">Vendor Portal Access</span>
+          <h2 class="modal-title" style="margin-top:2px;">Existing Vendor Sign In</h2>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeVendorSignInModal()">✕</button>
+      </div>
+      <form onsubmit="handleVendorSignIn(event)">
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+          <p style="font-size:13px; color:var(--color-black-60); line-height:1.5; margin:0;">
+            Already have an active caterer or kitchen account? Sign in to jump directly into your Bhojpatra Kitchen Dashboard.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="signin-credential">Registered Mobile Number or Email *</label>
+            <input type="text" id="signin-credential" class="form-input" value="+91 98765 43210" placeholder="+91 98765 43210 or chef@domain.com" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="signin-otp">Passcode or Verification Code *</label>
+            <input type="password" id="signin-otp" class="form-input" value="8492" placeholder="4-digit PIN or OTP" required />
+            <span style="font-size:11px; color:var(--color-black-60); margin-top:4px; display:inline-block;">Demo mode: Pre-filled credentials jump directly into the active dashboard.</span>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn-back" onclick="closeVendorSignInModal()">Cancel</button>
+          <button type="submit" class="btn-next">Sign In to Dashboard →</button>
+        </div>
+      </form>
     </div>
   </div>
 

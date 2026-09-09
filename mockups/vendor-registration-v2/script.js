@@ -716,19 +716,19 @@ function updateVendorContextHeader() {
   });
 }
 
-// ── Stepper Bar Progress Engine ──
+// ── Stepper Bar Progress Engine (Phase 1: Without Step Numbers) ──
 function updateStepperProgress(stepId) {
   const phases = [
-    { id: 'phase-identity', label: '1. Identity', steps: ['view-details'] },
-    { id: 'phase-kyc', label: '2. KYC', steps: ['view-kyc'] },
-    { id: 'phase-offerings', label: '3. Offerings', steps: ['view-offerings'] },
-    { id: 'phase-builder', label: '4. Service Setup', steps: [
+    { id: 'phase-identity', label: 'Identity', steps: ['view-details'] },
+    { id: 'phase-kyc', label: 'KYC', steps: ['view-kyc'] },
+    { id: 'phase-offerings', label: 'Offerings', steps: ['view-offerings'] },
+    { id: 'phase-builder', label: 'Service Setup', steps: [
       'view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers', 'view-cat-live', 'view-cat-extras',
       'view-stall-basics', 'view-stall-format', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live',
       'view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'
     ]},
-    { id: 'phase-review', label: '5. Review & Submit', steps: ['view-review'] },
-    { id: 'phase-complete', label: '6. Go Live', steps: ['view-complete'] }
+    { id: 'phase-review', label: 'Review & Submit', steps: ['view-review'] },
+    { id: 'phase-complete', label: 'Go Live', steps: ['view-complete'] }
   ];
 
   let currentPhaseIndex = 0;
@@ -751,7 +751,7 @@ function updateStepperProgress(stepId) {
 
       html += `
         <div class="step-node ${statusClass}" onclick="jumpToPhase(${idx})">
-          <div class="step-bullet">${isCompleted ? '✓' : (idx + 1)}</div>
+          <div class="step-bullet">${isCompleted ? '✓' : '•'}</div>
           <span>${p.label}</span>
         </div>
       `;
@@ -1194,11 +1194,11 @@ function setCutleryTier(tierId) {
   });
 }
 
-// ── Step 6: Stall Delicacies Engine ──
-function setStallMenuType(type) {
-  state.stall.menuType = type;
+// ── Stall Delicacies Engine (Fixed Set Spread format) ──
+function setStallMenuType(type = 'fixed') {
+  state.stall.menuType = 'fixed';
   document.querySelectorAll('.stall-format-card').forEach(c => {
-    c.classList.toggle('active', c.getAttribute('data-format') === type);
+    c.classList.toggle('active', c.getAttribute('data-format') === 'fixed');
   });
 }
 
@@ -1647,7 +1647,7 @@ function renderMasterReview() {
         <div class="review-section-header">
           <div class="review-section-title">
             <span>🍢</span>
-            <span>Single Stall: ${state.stall.stallName}</span>
+            <span>Single Stall: ${state.stall.stallName || state.details.businessName || 'Specialty Food Stall'}</span>
           </div>
           <button type="button" class="btn-review-edit" onclick="goToStep('view-stall-delicacies')">Edit Stall ✎</button>
         </div>
@@ -2189,8 +2189,8 @@ function renderServicesHub() {
       icon: '🎪',
       isActive: state.selectedOfferings.includes('stall'),
       activeDetails: [
-        { label: 'Stall Name', value: state.stall.stallName },
-        { label: 'Menu Format', value: state.stall.menuType === 'fixed' ? `Fixed Set Spread (₹${state.stall.fixedPerPlate}/p)` : 'Varied À la Carte' },
+        { label: 'Stall Name', value: state.stall.stallName || 'Not Specified (Optional)' },
+        { label: 'Menu Format', value: `Fixed Set Spread (₹${state.stall.fixedPerPlate}/p)` },
         { label: 'Min Pax Guarantee', value: `${state.stall.minPaxGuarantee} Guests` },
         { label: 'Specialty Items', value: `${state.stall.delicacies.length} Delicacies Configured` }
       ],
@@ -2353,8 +2353,7 @@ function setCatererDashboardState(mode) {
         <div style="text-align:center; padding: 36px 20px;">
           <div style="font-size:36px; margin-bottom:10px;">🏪</div>
           <h2 style="font-size:20px; font-weight:800; margin-bottom:6px;">Your Kitchen is Open for Bookings!</h2>
-          <p style="color:#666; max-width:480px; margin:0 auto 18px; font-size:13px;">Your feast packages and services are published live on the marketplace. As soon as an event host books your services, your kitchen prep brief will appear right here.</p>
-          <button type="button" class="btn-preview-store" onclick="openStorefrontPreview()">Preview Public Storefront</button>
+          <p style="color:#666; max-width:480px; margin:0 auto; font-size:13px;">Your feast packages and services are published live on the marketplace. As soon as an event host books your services, your kitchen prep brief will appear right here.</p>
         </div>
       `;
     }
@@ -2443,4 +2442,29 @@ function declineBooking() {
 
   showToast('Booking request BHOJ-9412 declined.');
 }
+
+// ── Vendor Direct Sign In Modal (Task 1: Add Sign In to Cutleries/Vendor flow) ──
+function openVendorSignInModal() {
+  const modal = document.getElementById('modal-vendor-signin');
+  if (modal) {
+    modal.classList.add('open');
+    modal.classList.add('active');
+  }
+}
+
+function closeVendorSignInModal() {
+  const modal = document.getElementById('modal-vendor-signin');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.classList.remove('active');
+  }
+}
+
+function handleVendorSignIn(e) {
+  if (e) e.preventDefault();
+  closeVendorSignInModal();
+  showToast('✓ Signed in successfully as Royal Awadh Caterers');
+  goToStep('view-dashboard');
+}
+
 
