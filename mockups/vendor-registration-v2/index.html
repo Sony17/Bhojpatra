@@ -263,35 +263,45 @@
                 </div>
               </div>
 
+              <!-- Verified Vendor Account Details (Reused from Signup - Task 7) -->
+              <div class="vendor-account-reused-card">
+                <div class="account-reused-header">
+                  <div class="account-reused-title">
+                    <span class="account-verified-icon">✓</span>
+                    <span>Verified Vendor Account Details</span>
+                    <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-weight:700;">Reused from Signup</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--color-black-60);">Account ID: <strong id="d-account-id">VND-884291</strong></span>
+                </div>
+                <div class="account-reused-grid">
+                  <div class="account-field-item">
+                    <span class="account-field-label">Primary Account Holder</span>
+                    <span class="account-field-val" id="d-display-owner">Kabir Ahmad</span>
+                  </div>
+                  <div class="account-field-item">
+                    <span class="account-field-label">Registered WhatsApp Mobile</span>
+                    <span class="account-field-val" id="d-display-phone">+91 98000 00000</span>
+                  </div>
+                  <div class="account-field-item">
+                    <span class="account-field-label">Registered Account Email</span>
+                    <span class="account-field-val" id="d-display-email">vendor@demo-bhojpatra.com</span>
+                  </div>
+                </div>
+                <div class="account-reused-hint">
+                  ℹ️ Linked directly to your active Bhojpatra vendor login. These credentials are automatically preserved and never requested again.
+                </div>
+              </div>
+
               <div class="card-title-row">
-                <span class="card-title">Business & Owner Credentials</span>
-                <span class="card-title badge">Taken Only Once</span>
+                <span class="card-title">Commercial Kitchen Identity</span>
+                <span class="card-title badge">Marketplace Profile</span>
               </div>
 
               <div class="form-grid-2">
-                <div class="form-group">
+                <div class="form-group" style="grid-column: span 2;">
                   <label class="form-label" for="d-biz-name">Business / Catering Brand Name <span class="required">*</span></label>
                   <input type="text" id="d-biz-name" class="form-input" data-bind="details.businessName" value="Royal Awadh Caterers" placeholder="e.g. Royal Awadh Caterers" />
                   <span class="field-hint">Displayed on all your storefront catalog listings and booking pages.</span>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="d-owner-name">Owner / Primary Contact Name <span class="required">*</span></label>
-                  <input type="text" id="d-owner-name" class="form-input" data-bind="details.ownerName" value="Kabir Ahmad (Demo Partner)" placeholder="Full legal name" />
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="d-phone">WhatsApp Mobile Number <span class="required">*</span></label>
-                  <div class="input-with-prefix">
-                    <span class="input-prefix">+91</span>
-                    <input type="tel" id="d-phone" class="form-input" data-bind="details.phone" value="98000 00000" placeholder="10-digit mobile number" />
-                  </div>
-                  <span class="field-hint">Booking alerts and customer confirmations are delivered to this number.</span>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="d-email">Account Email Address <span class="required">*</span></label>
-                  <input type="email" id="d-email" class="form-input" data-bind="details.email" value="vendor@demo-bhojpatra.com" placeholder="business@example.com" />
                 </div>
 
                 <div class="form-group">
@@ -504,6 +514,33 @@
                     <li>Designer banquet linens & labels</li>
                     <li>On-site sanitization & disposal</li>
                   </ul>
+                </div>
+              </div>
+
+              <!-- Custom Offerings Dynamic Cards Grid (Task 8) -->
+              <div class="custom-offerings-grid" id="desktop-custom-offerings-container"></div>
+
+              <!-- Custom Offering Adder Card (Task 8) -->
+              <div class="custom-offering-adder-card">
+                <div class="card-title-row" style="margin-bottom: 8px;">
+                  <span class="card-title" style="font-size: 14px;">
+                    <span>✨</span> Add Custom Commercial Offering
+                  </span>
+                  <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-weight:700;">Customizable</span>
+                </div>
+                <p class="field-hint" style="margin-bottom: 12px;">
+                  Provide a specialized service not listed above? Add your own custom commercial offering to your vendor profile.
+                </p>
+                <div class="custom-offering-form-row">
+                  <div class="form-group" style="margin-bottom:0; flex: 2; min-width: 220px;">
+                    <input type="text" id="custom-offering-title" class="form-input" placeholder="Offering Title (e.g. Live Dessert Bar, Paan Studio, Bartending)" />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0; flex: 3; min-width: 260px;">
+                    <input type="text" id="custom-offering-blurb" class="form-input" placeholder="Short description of this service (optional)" />
+                  </div>
+                  <button type="button" class="btn-add-custom-offering" onclick="addCustomOffering('desktop')">
+                    <span>＋</span> Add Offering
+                  </button>
                 </div>
               </div>
             </div>
@@ -1908,24 +1945,37 @@
                 </div>
               </div>
 
+              <!-- Mobile Verified Vendor Account Details (Reused from Signup - Task 7) -->
+              <div class="vendor-account-reused-card mobile-reused-card">
+                <div class="account-reused-header">
+                  <div class="account-reused-title">
+                    <span class="account-verified-icon">✓</span>
+                    <span style="font-size:12px;font-weight:800;">Signup Details Linked</span>
+                  </div>
+                  <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-size:10px;font-weight:700;">Reused</span>
+                </div>
+                <div class="mobile-account-list">
+                  <div class="mobile-account-row">
+                    <span class="account-field-label">Owner:</span>
+                    <strong class="account-field-val" id="mob-display-owner">Kabir Ahmad</strong>
+                  </div>
+                  <div class="mobile-account-row">
+                    <span class="account-field-label">Mobile:</span>
+                    <strong class="account-field-val" id="mob-display-phone">+91 98000 00000</strong>
+                  </div>
+                  <div class="mobile-account-row">
+                    <span class="account-field-label">Email:</span>
+                    <strong class="account-field-val" id="mob-display-email">vendor@demo-bhojpatra.com</strong>
+                  </div>
+                </div>
+                <div class="account-reused-hint" style="font-size:11px;">
+                  ℹ️ Reused from active signup account. No re-entry required.
+                </div>
+              </div>
+
               <div class="form-group">
                 <label class="form-label">Brand Name *</label>
                 <input type="text" class="form-input" data-bind="details.businessName" value="Royal Awadh Caterers" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Owner Name *</label>
-                <input type="text" class="form-input" data-bind="details.ownerName" value="Kabir Ahmad (Demo Partner)" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">WhatsApp Mobile *</label>
-                <div class="input-with-prefix">
-                  <span class="input-prefix">+91</span>
-                  <input type="tel" class="form-input" data-bind="details.phone" value="98000 00000" />
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Email *</label>
-                <input type="email" class="form-input" data-bind="details.email" value="vendor@demo-bhojpatra.com" />
               </div>
               <div class="form-group">
                 <label class="form-label">City *</label>
@@ -2042,6 +2092,29 @@
                   <div class="offering-title">Essentials</div>
                   <div class="offering-blurb">Uniformed stewards, tableware packages & waste disposal.</div>
                 </div>
+              </div>
+
+              <!-- Mobile Custom Offerings Dynamic Cards Grid (Task 8) -->
+              <div class="custom-offerings-grid" id="mobile-custom-offerings-container" style="margin-top:12px;"></div>
+
+              <!-- Mobile Custom Offering Adder Card (Task 8) -->
+              <div class="custom-offering-adder-card mobile-adder-card" style="margin-top:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-size:12.5px; font-weight:800; color:var(--color-black);">✨ Custom Offering</span>
+                  <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-size:10px;font-weight:700;">Customizable</span>
+                </div>
+                <p class="field-hint" style="margin-bottom:8px; font-size:11px;">
+                  Add your own specialized commercial service offering.
+                </p>
+                <div class="form-group" style="margin-bottom:6px;">
+                  <input type="text" id="mobile-custom-offering-title" class="form-input" placeholder="Offering Name (e.g. Live Dessert Bar)" />
+                </div>
+                <div class="form-group" style="margin-bottom:8px;">
+                  <input type="text" id="mobile-custom-offering-blurb" class="form-input" placeholder="Short description (optional)" />
+                </div>
+                <button type="button" class="btn-add-custom-offering" style="width:100%; justify-content:center;" onclick="addCustomOffering('mobile')">
+                  <span>＋</span> Add Custom Offering
+                </button>
               </div>
             </div>
           </article>

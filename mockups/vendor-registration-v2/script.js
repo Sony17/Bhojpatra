@@ -13,14 +13,27 @@ const state = {
   currentStepId: 'view-details',
   stepHistory: [],
 
-  // Selected Service Offerings (Step 3: 7 Distinct Service Offerings)
+  // Existing Vendor Account Identity (Reused from Signup / Auth Session - Task 7)
+  account: {
+    id: "VND-884291",
+    name: "Kabir Ahmad",
+    email: "vendor@demo-bhojpatra.com",
+    phone: "98000 00000",
+    role: "vendor",
+    verified: true,
+  },
+
+  // Selected Service Offerings (Predefined & Custom)
   selectedOfferings: [], // Default unselected: vendor explicitly selects offerings in normal flow
 
-  // Step 1: Vendor Identity & Operations (Collected Once, Never Repeated)
+  // Custom Offerings (Task 8: Make Vendor Offerings Customizable)
+  customOfferings: [],
+
+  // Commercial Kitchen Identity & Operations (Details not collected at signup)
   details: {
     dietaryOffering: null, // Mandatory selection at start: 'veg' | 'non-veg' | 'both' (no default)
     businessName: "Royal Awadh Caterers",
-    ownerName: "Kabir Ahmad (Demo Partner)",
+    ownerName: "Kabir Ahmad",
     phone: "98000 00000",
     email: "vendor@demo-bhojpatra.com",
     city: "Lucknow",
@@ -690,8 +703,12 @@ function updateVendorContextHeader() {
         'essentials': 'Essentials'
       };
       let pillsHtml = state.selectedOfferings.map(s => {
-        const label = labelMap[s] || s;
-        return `<span class="service-pill">${label}</span>`;
+        let label = labelMap[s];
+        if (!label && state.customOfferings) {
+          const custom = state.customOfferings.find(c => c.id === s);
+          if (custom) label = custom.title;
+        }
+        return `<span class="service-pill">${label || s}</span>`;
       }).join('');
 
       if (state.details.dietaryOffering) {
@@ -1438,8 +1455,9 @@ function renderMasterReview() {
           <p style="font-size:14px;font-weight:800;color:var(--color-black);">${state.details.businessName}</p>
         </div>
         <div>
-          <p style="font-size:11px;color:var(--color-black-60);">Primary Owner / Mobile</p>
-          <p style="font-size:13px;font-weight:700;">${state.details.ownerName} · +91 ${state.details.phone}</p>
+          <p style="font-size:11px;color:var(--color-black-60);">Account Holder (From Signup)</p>
+          <p style="font-size:13px;font-weight:700;">${state.account.name} · +91 ${state.account.phone} <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-size:10px;padding:2px 6px;border-radius:9999px;">✓ Linked</span></p>
+          <p style="font-size:11px;color:var(--color-black-60);margin-top:2px;">${state.account.email}</p>
         </div>
         <div>
           <p style="font-size:11px;color:var(--color-black-60);">City & State</p>
@@ -1720,6 +1738,33 @@ function renderMasterReview() {
     `;
   }
 
+  // 5. Custom Commercial Offerings Review (Task 8)
+  if (state.customOfferings && state.customOfferings.length > 0) {
+    const selectedCustoms = state.customOfferings.filter(c => state.selectedOfferings.includes(c.id));
+    if (selectedCustoms.length > 0) {
+      html += `
+        <div class="review-section-card">
+          <div class="review-section-header">
+            <div class="review-section-title">
+              <span>✨</span>
+              <span>Custom Service Offerings (${selectedCustoms.length})</span>
+            </div>
+            <button type="button" class="btn-review-edit" onclick="goToStep('view-offerings')">Edit Offerings ✎</button>
+          </div>
+          <div class="review-grid">
+            ${selectedCustoms.map(c => `
+              <div class="review-stat-box">
+                <div class="review-stat-label">Custom Service Offering</div>
+                <div class="review-stat-val" style="font-size:14px;font-weight:800;">${escapeHtml(c.title)}</div>
+                <div style="font-size:11.5px;color:var(--color-black-60);margin-top:2px;">${escapeHtml(c.blurb)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+  }
+
   container.innerHTML = html;
 }
 
@@ -1963,6 +2008,8 @@ function setupEventListeners() {
 }
 
 function renderAllViews() {
+  syncAccountDetailsToUI();
+  renderCustomOfferings();
   updateVendorContextHeader();
   renderDishList();
   renderTierView();
@@ -2276,6 +2323,27 @@ function renderServicesHub() {
     }
   ];
 
+  // Append Custom Offerings (Task 8: Make Vendor Offerings Customizable)
+  if (state.customOfferings && state.customOfferings.length > 0) {
+    state.customOfferings.forEach((c, idx) => {
+      const isSel = state.selectedOfferings.includes(c.id);
+      servicesData.push({
+        key: c.id,
+        title: `${8 + idx}. ${c.title}`,
+        subtitle: c.blurb || 'Vendor-defined custom commercial offering',
+        icon: c.icon || '✨',
+        isActive: isSel,
+        activeDetails: [
+          { label: 'Offering Scope', value: 'Custom Vendor-Defined Service' },
+          { label: 'Listing Status', value: isSel ? 'Active on Catalog' : 'Disabled' }
+        ],
+        unconfiguredNote: 'Activate this custom service offering for event bookings.',
+        editStep: 'view-offerings',
+        addStep: 'view-offerings'
+      });
+    });
+  }
+
   const html = servicesData.map(svc => `
     <div class="service-summary-card ${svc.isActive ? '' : 'unconfigured'}">
       <div class="card-top-header">
@@ -2443,6 +2511,17 @@ function declineBooking() {
   showToast('Booking request BHOJ-9412 declined.');
 }
 
+// ── HTML Escaper Helper ──
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Vendor Direct Sign In Modal (Task 1: Add Sign In to Cutleries/Vendor flow) ──
 function openVendorSignInModal() {
   const modal = document.getElementById('modal-vendor-signin');
@@ -2463,8 +2542,169 @@ function closeVendorSignInModal() {
 function handleVendorSignIn(e) {
   if (e) e.preventDefault();
   closeVendorSignInModal();
+
+  const credInput = document.getElementById('signin-credential');
+  if (credInput && credInput.value) {
+    const val = credInput.value.trim();
+    if (val.includes('@')) {
+      state.account.email = val;
+    } else {
+      const digits = val.replace(/[^0-9]/g, '').slice(-10);
+      if (digits) state.account.phone = digits;
+    }
+    syncAccountDetailsToUI();
+  }
+
   showToast('✓ Signed in successfully as Royal Awadh Caterers');
   goToStep('view-dashboard');
+}
+
+// ── Phase 2 Task 7: Reuse Existing Vendor Signup Details ──
+function syncAccountDetailsToUI() {
+  if (!state.account) return;
+
+  // Sync to state.details for unified single source of truth
+  state.details.ownerName = state.account.name;
+  state.details.phone = state.account.phone;
+  state.details.email = state.account.email;
+
+  // Desktop verified credentials block
+  const dOwner = document.getElementById('d-display-owner');
+  const dPhone = document.getElementById('d-display-phone');
+  const dEmail = document.getElementById('d-display-email');
+  const dAccId = document.getElementById('d-account-id');
+
+  if (dOwner) dOwner.textContent = state.account.name;
+  if (dPhone) dPhone.textContent = `+91 ${state.account.phone}`;
+  if (dEmail) dEmail.textContent = state.account.email;
+  if (dAccId) dAccId.textContent = state.account.id || 'VND-884291';
+
+  // Mobile verified credentials block
+  const mOwner = document.getElementById('mob-display-owner');
+  const mPhone = document.getElementById('mob-display-phone');
+  const mEmail = document.getElementById('mob-display-email');
+
+  if (mOwner) mOwner.textContent = state.account.name;
+  if (mPhone) mPhone.textContent = `+91 ${state.account.phone}`;
+  if (mEmail) mEmail.textContent = state.account.email;
+}
+
+// ── Phase 2 Task 8: Make Vendor Offerings Customizable ──
+function addCustomOffering(source = 'desktop') {
+  const titleInput = document.getElementById(source === 'mobile' ? 'mobile-custom-offering-title' : 'custom-offering-title');
+  const blurbInput = document.getElementById(source === 'mobile' ? 'mobile-custom-offering-blurb' : 'custom-offering-blurb');
+
+  const title = (titleInput ? titleInput.value : '').trim();
+  const blurb = (blurbInput ? blurbInput.value : '').trim();
+
+  if (!title) {
+    showToast('Please enter an offering name.');
+    if (titleInput) titleInput.focus();
+    return;
+  }
+
+  // Predefined offerings comparison
+  const predefinedNames = [
+    'feast booking', 'catering', 'single specialty stall', 'stall',
+    'baina gifting boxes', 'baina boxes', 'baina', 'live counters', 'counters',
+    'extras', 'add-ons', 'addons', 'essentials'
+  ];
+
+  if (predefinedNames.includes(title.toLowerCase())) {
+    showToast(`"${title}" is already an available standard offering above.`);
+    return;
+  }
+
+  // Check against existing custom offerings (case-insensitive duplicate check)
+  if (!state.customOfferings) state.customOfferings = [];
+  const exists = state.customOfferings.some(c => c.title.toLowerCase() === title.toLowerCase());
+  if (exists) {
+    showToast(`"${title}" has already been added.`);
+    return;
+  }
+
+  const customId = `custom-${Date.now()}`;
+  const newOffering = {
+    id: customId,
+    title: title,
+    blurb: blurb || 'Vendor-defined commercial service offering',
+    icon: '✨',
+    isCustom: true
+  };
+
+  state.customOfferings.push(newOffering);
+  if (!state.selectedOfferings.includes(customId)) {
+    state.selectedOfferings.push(customId);
+  }
+
+  // Clear inputs across both desktop and mobile
+  const dTitle = document.getElementById('custom-offering-title');
+  const dBlurb = document.getElementById('custom-offering-blurb');
+  const mTitle = document.getElementById('mobile-custom-offering-title');
+  const mBlurb = document.getElementById('mobile-custom-offering-blurb');
+
+  if (dTitle) dTitle.value = '';
+  if (dBlurb) dBlurb.value = '';
+  if (mTitle) mTitle.value = '';
+  if (mBlurb) mBlurb.value = '';
+
+  renderCustomOfferings();
+  updateVendorContextHeader();
+  renderServicesHub();
+  showToast(`✓ Added custom offering: "${title}"`);
+}
+
+function removeCustomOffering(offeringId) {
+  if (!state.customOfferings) return;
+  const idx = state.customOfferings.findIndex(c => c.id === offeringId);
+  if (idx === -1) return;
+
+  const title = state.customOfferings[idx].title;
+  state.customOfferings.splice(idx, 1);
+
+  const selIdx = state.selectedOfferings.indexOf(offeringId);
+  if (selIdx > -1) {
+    state.selectedOfferings.splice(selIdx, 1);
+  }
+
+  renderCustomOfferings();
+  updateVendorContextHeader();
+  renderServicesHub();
+  showToast(`Removed custom offering: "${title}"`);
+}
+
+function renderCustomOfferings() {
+  const dContainer = document.getElementById('desktop-custom-offerings-container');
+  const mContainer = document.getElementById('mobile-custom-offerings-container');
+
+  if (!state.customOfferings || state.customOfferings.length === 0) {
+    if (dContainer) dContainer.innerHTML = '';
+    if (mContainer) mContainer.innerHTML = '';
+    return;
+  }
+
+  const generateHtml = () => {
+    return state.customOfferings.map(c => {
+      const isSelected = state.selectedOfferings.includes(c.id);
+      return `
+        <div class="offering-card custom-offering-card ${isSelected ? 'active' : ''}" data-offering-key="${c.id}" onclick="toggleOffering('${c.id}')">
+          <div class="offering-header">
+            <span class="offering-icon">${c.icon || '✨'}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn-remove-custom-offering" onclick="event.stopPropagation(); removeCustomOffering('${c.id}')" title="Remove custom offering">✕</button>
+              <div class="offering-checkbox">${isSelected ? '✓' : ''}</div>
+            </div>
+          </div>
+          <div class="offering-title">${escapeHtml(c.title)}</div>
+          <div class="offering-blurb">${escapeHtml(c.blurb)}</div>
+          <span class="badge" style="background:var(--color-cream-30);color:var(--color-black-80);font-size:11px;align-self:flex-start;">Custom Offering</span>
+        </div>
+      `;
+    }).join('');
+  };
+
+  if (dContainer) dContainer.innerHTML = generateHtml();
+  if (mContainer) mContainer.innerHTML = generateHtml();
 }
 
 
