@@ -230,33 +230,112 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       id: "city-icon-caterer",
       name: "City Icon Caterer",
       nameHi: "सिटी आइकन कैटरर",
-      tagline: "Premier Regional Recognition",
-      taglineHi: "प्रमुख क्षेत्रीय मान्यता",
+      tagline: "City-Level Recognition",
+      taglineHi: "शहर-स्तरीय मान्यता",
       description:
-        "Prestigious badge celebrating premier banquet and feast caterers recognized for outstanding city-wide reputation and culinary grandeur.",
+        "City-level recognition for established caterers with a strong local reputation and consistently professional event execution.",
       descriptionHi:
-        "शहर भर में उत्कृष्ट प्रतिष्ठा और पाक भव्यता के लिए मान्यता प्राप्त प्रमुख बैंक्वेट और दावत कैटरर्स के लिए प्रतिष्ठित बैज।",
+        "मजबूत स्थानीय प्रतिष्ठा और लगातार पेशेवर कार्यक्रम निष्पादन वाले स्थापित कैटरर्स के लिए शहर-स्तरीय मान्यता।",
       icon: "👑",
       requirements: [
         {
-          title: t("Established Market Presence", "स्थापित बाजार प्रतिष्ठा"),
+          title: "Minimum 5 years of operating history",
           desc: t(
-            "Minimum 5+ years of active catering operations with prominent event references.",
-            "प्रमुख कार्यक्रम संदर्भों के साथ न्यूनतम 5+ वर्षों का सक्रिय कैटरिंग संचालन।"
+            "Demonstrated commercial catering presence and established operational track record for at least 5 years.",
+            "कम से कम 5 वर्षों का प्रमाणित व्यावसायिक कैटरिंग संचालन और स्थापित ट्रैक रिकॉर्ड।"
           ),
         },
         {
-          title: t("Large-Scale Execution", "बड़े पैमाने पर आयोजन क्षमता"),
+          title: "Recognised reputation in the city/region",
           desc: t(
-            "Demonstrated capability to serve gatherings exceeding 500+ guests with full service crew.",
-            "पूर्ण सेवा दल के साथ 500+ से अधिक मेहमानों की सेवा करने की सिद्ध क्षमता।"
+            "Well-known regional catering standing and strong community trust across the city.",
+            "शहर और क्षेत्र में सुस्थापित कैटरिंग प्रतिष्ठा और मजबूत सामुदायिक विश्वास।"
           ),
         },
         {
-          title: t("Customer Excellence Rating", "ग्राहक उत्कृष्टता रेटिंग"),
+          title: "Strong customer reviews/references",
           desc: t(
-            "Consistent 4.5+ star verified reputation across regional celebration reviews.",
-            "क्षेत्रीय समारोह समीक्षाओं में लगातार 4.5+ स्टार सत्यापित प्रतिष्ठा।"
+            "Consistently positive ratings and verifiable host testimonials from past grand celebrations.",
+            "पिछले बड़े समारोहों से लगातार सकारात्मक रेटिंग और सत्यापन योग्य ग्राहक प्रशंसापत्र।"
+          ),
+        },
+        {
+          title: "Consistent food quality",
+          desc: t(
+            "High taste consistency, authentic culinary mastery, and impeccable food standards.",
+            "लगातार उच्च स्वाद गुणवत्ता, प्रामाणिक पाक कला और त्रुटिहीन खाद्य मानक।"
+          ),
+        },
+        {
+          title: "Professional event execution",
+          desc: t(
+            "Punctual buffet deployment, polished presentation, and disciplined on-ground coordination.",
+            "समय पर बुफे व्यवस्था, सुरुचिपूर्ण प्रस्तुति और अनुशासित ऑन-ग्राउंड समन्वय।"
+          ),
+        },
+        {
+          title: "Good menu depth & presentation",
+          desc: t(
+            "Rich repertoire of multi-course spreads, seasonal specialties, and elegant food staging.",
+            "मल्टी-कोर्स व्यंजनों की विस्तृत श्रृंखला और सुरुचिपूर्ण भोजन प्रस्तुति।"
+          ),
+        },
+        {
+          title: "Reliable manpower/logistics",
+          desc: t(
+            "Experienced banquet captains, uniformed servers, and dependable logistics fleet.",
+            "अनुभवी बैंक्वेट कैप्टन, वर्दीधारी सर्वर और विश्वसनीय लॉजिस्टिक्स बेड़ा।"
+          ),
+        },
+        {
+          title: "Bhojpatra tasting + operational audit pass",
+          desc: t(
+            "Comprehensive kitchen hygiene inspection, live banquet audit, and tasting evaluation clearance.",
+            "विस्तृत रसोई स्वच्छता निरीक्षण, लाइव बैंक्वेट ऑडिट और टेस्टिंग मूल्यांकन पास।"
+          ),
+        },
+      ],
+      plusPoints: [
+        {
+          title: "Known for a signature cuisine/menu",
+          desc: t(
+            "Celebrated flagship dishes, heritage specialties, or trademark recipes that draw distinct regional demand.",
+            "प्रसिद्ध सिग्नेचर व्यंजन या पारंपरिक रेसिपी जो विशिष्ट मांग आकर्षित करती हैं।"
+          ),
+        },
+        {
+          title: "Regularly caters weddings/large celebrations",
+          desc: t(
+            "Proven track record serving large banquets and grand wedding gatherings exceeding 300+ guests.",
+            "300+ मेहमानों वाले बड़े विवाह समारोहों और उत्सवों के आयोजन का नियमित अनुभव।"
+          ),
+        },
+        {
+          title: "Strong local brand recall",
+          desc: t(
+            "Widely recognized brand name trusted by event hosts, wedding planners, and families.",
+            "इवेंट आयोजकों, वेडिंग प्लानर्स और परिवारों द्वारा व्यापक रूप से पहचाना जाने वाला नाम।"
+          ),
+        },
+        {
+          title: "Notable venues/clients/events served",
+          desc: t(
+            "Experience operating at prominent lawns, heritage banquets, civic gatherings, or notable client events.",
+            "शहर के प्रमुख लॉन, हेरिटेज बैंक्वेट और प्रतिष्ठित कार्यक्रमों में सेवा देने का अनुभव।"
+          ),
+        },
+        {
+          title: "Social presence and customer reputation",
+          desc: t(
+            "Active digital footprint, word-of-mouth acclaim, and positive social media community presence.",
+            "सक्रिय डिजिटल उपस्थिति, वर्ड-ऑफ-माउथ प्रतिष्ठा और सकारात्मक सोशल मीडिया समुदाय।"
+          ),
+        },
+        {
+          title: "Repeat customers",
+          desc: t(
+            "High loyalty rate with families and organizations repeatedly booking for consecutive celebrations.",
+            "लगातार आयोजनों के लिए परिवारों और संगठनों द्वारा बार-बार बुकिंग का उच्च रिकॉर्ड।"
           ),
         },
       ],
@@ -1215,7 +1294,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                                 {t("Requirements", "आवश्यकताएं")}
                               </p>
                               <span className="text-[10.5px] text-ink-soft/80">
-                                {badge.requirements.length} {t("criteria", "मानदंड")}
+                                {badge.requirements.length} {t("mandatory criteria", "अनिवार्य मानदंड")}
                               </span>
                             </div>
                             <ul className="flex flex-col gap-2">
@@ -1253,6 +1332,58 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                                 </li>
                               ))}
                             </ul>
+
+                            {/* Separate Plus Points Section for badges that define it (Task 19) */}
+                            {"plusPoints" in badge &&
+                              Array.isArray((badge as any).plusPoints) &&
+                              (badge as any).plusPoints.length > 0 && (
+                                <div
+                                  data-badge-plus-points={badge.id}
+                                  className="mt-3.5 border-t border-maroon/15 pt-3"
+                                >
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <p className="font-semibold text-ink uppercase tracking-wider text-[10.5px]">
+                                      {t("Plus Points", "प्लस पॉइंट्स")}
+                                    </p>
+                                    <span className="text-[10px] font-medium text-maroon bg-maroon/10 rounded-full px-2 py-0.5">
+                                      {t("Non-mandatory", "गैर-अनिवार्य")}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-ink-soft mb-2 leading-relaxed">
+                                    {t(
+                                      "Additional strengths that improve candidacy (not mandatory to qualify):",
+                                      "अतिरिक्त खूबियां जो उम्मीदवारी को मजबूत बनाती हैं (पात्रता के लिए अनिवार्य नहीं):"
+                                    )}
+                                  </p>
+                                  <ul className="flex flex-col gap-2">
+                                    {(badge as any).plusPoints.map(
+                                      (point: { title: string; desc?: string }, pIdx: number) => (
+                                        <li
+                                          key={pIdx}
+                                          className="flex items-start gap-2"
+                                        >
+                                          <span
+                                            className="text-maroon/80 font-bold text-xs leading-5 select-none shrink-0"
+                                            aria-hidden="true"
+                                          >
+                                            +
+                                          </span>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium text-ink leading-5">
+                                              {point.title}
+                                            </span>
+                                            {point.desc && (
+                                              <span className="text-[11px] text-ink-soft leading-tight mt-0.5">
+                                                {point.desc}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
                           </div>
                         )}
                       </div>
