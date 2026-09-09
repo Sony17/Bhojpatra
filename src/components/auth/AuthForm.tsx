@@ -344,33 +344,75 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       id: "heritage-caterer",
       name: "Heritage Caterer",
       nameHi: "हेरिटेज कैटरर",
-      tagline: "Custodians of Culinary Legacy",
-      taglineHi: "पाक विरासत के संरक्षक",
+      tagline: "Most Exclusive Recognition",
+      taglineHi: "सर्वाधिक विशिष्ट मान्यता",
       description:
-        "Distinguished recognition honoring master custodians preserving authentic multi-generational Awadhi, Mughlai, or regional culinary traditions.",
+        "Our most exclusive recognition for caterers with a long-standing culinary legacy.",
       descriptionHi:
-        "प्रामाणिक बहु-पीढ़ी अवधी, मुग़लई या क्षेत्रीय पाक परंपराओं को संरक्षित करने वाले मास्टर संरक्षकों के लिए विशिष्ट सम्मान।",
+        "लंबे समय से चली आ रही पाक विरासत वाले कैटरर्स के लिए हमारी सबसे विशिष्ट मान्यता।",
       icon: "🏛️",
       requirements: [
         {
-          title: t("Culinary Lineage & Legacy", "पाक वंश और विरासत"),
+          title: "Minimum 15 years continuous legacy",
           desc: t(
-            "Generational master khansama roots or legacy recipes preserved for 15+ years.",
-            "15+ वर्षों से संरक्षित पीढ़ीगत मास्टर खानसामा जड़ें या पारंपरिक व्यंजन विधियां।"
+            "Established commercial presence and continuous culinary operations for at least 15 years.",
+            "कम से कम 15 वर्षों से निरंतर पाक संचालन और स्थापित व्यावसायिक उपस्थिति।"
           ),
         },
         {
-          title: t("Authentic Preparation Methods", "पारंपरिक तैयारी विधियां"),
+          title: "Preferably family-run/legacy food business",
           desc: t(
-            "Traditional slow-cooking techniques (dum pukht, wood-fired sigri, copper handis).",
-            "पारंपरिक धीमी आंच पर पकाने की तकनीक (दम पुख्त, सिगड़ी, तांबे की हांडी)।"
+            "Custodianship rooted in artisanal family enterprise, heritage khansamas, or generational lineage.",
+            "पारिवारिक उद्यम, पारंपरिक खानसामा या पीढ़ीगत विरासत में निहित संरक्षण।"
           ),
         },
         {
-          title: t("Signature Regional Dishes", "सिग्नेचर क्षेत्रीय व्यंजन"),
+          title: "Strong connection with local culinary tradition",
           desc: t(
-            "Artisanal heritage menu items unique to Uttar Pradesh's royal culinary heritage.",
-            "उत्तर प्रदेश की शाही पाक विरासत के लिए अनूठे कारीगर विरासत मेनू आइटम।"
+            "Deep grounding in authentic Awadhi, Purvanchali, Bhojpuri, or regional festive gastronomy.",
+            "अवधी, पूर्वांचली, भोजपुरी या क्षेत्रीय पारंपरिक भोजन में गहरी जड़ें।"
+          ),
+        },
+        {
+          title: "Multiple generations involved OR demonstrable long-standing legacy",
+          desc: t(
+            "Multi-generational master chefs active in kitchen leadership or documented institutional heritage.",
+            "रसोई में सक्रिय बहु-पीढ़ी के मास्टर शेफ या दस्तावेजी ऐतिहासिक विरासत।"
+          ),
+        },
+        {
+          title: "Recognised local reputation",
+          desc: t(
+            "Iconic standing as a culinary institution trusted across communities and generations.",
+            "समुदायों और पीढ़ियों में एक प्रतिष्ठित पाक संस्थान के रूप में स्थापित पहचान।"
+          ),
+        },
+        {
+          title: "Signature/traditional dishes",
+          desc: t(
+            "Time-honored recipes, artisanal slow-cooking mastery (dum pukht, sigri), and hallmark preparations.",
+            "पारंपरिक व्यंजन विधियां, धीमी आंच पर पकाने की कला और ऐतिहासिक सिग्नेचर व्यंजन।"
+          ),
+        },
+        {
+          title: "Consistent quality over the years",
+          desc: t(
+            "Uncompromising taste benchmarks, authentic spices, and enduring culinary excellence.",
+            "वर्षों से लगातार बेजोड़ स्वाद मानक, प्रामाणिक मसाले और स्थायी पाक उत्कृष्टता।"
+          ),
+        },
+        {
+          title: "Strong historical/customer references",
+          desc: t(
+            "Rich archive of landmark civic celebrations, family weddings, and historic host testimonials.",
+            "ऐतिहासिक पारिवारिक विवाहों, बड़े समारोहों और ग्राहकों के पुख्ता प्रशंसापत्र।"
+          ),
+        },
+        {
+          title: "Bhojpatra tasting + verification process pass",
+          desc: t(
+            "Exhaustive verification of lineage, on-site legacy kitchen review, and curated tasting audit.",
+            "पाक वंश का गहन सत्यापन, पारंपरिक रसोई का प्रत्यक्ष निरीक्षण और टेस्टिंग ऑडिट पास।"
           ),
         },
       ],
