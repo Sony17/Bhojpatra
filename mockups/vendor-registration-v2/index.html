@@ -322,19 +322,41 @@
                 </div>
               </div>
 
-              <!-- Cuisines Multi-Select -->
+              <!-- Cuisines Multi-Select (Task 9: Add Custom Cuisine) -->
               <div class="form-group" style="margin-top: 10px;">
                 <label class="form-label">Primary Culinary Specialties & Cuisines (Shown as tags on catalog)</label>
-                <div class="chip-grid">
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Awadhi</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Mughlai</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> North Indian</span>
-                  <span class="choice-chip">Tandoori & Grills</span>
-                  <span class="choice-chip">Indo-Chinese</span>
-                  <span class="choice-chip">South Indian</span>
-                  <span class="choice-chip">Artisanal Sweets</span>
-                  <span class="choice-chip">Banarasi Chaat</span>
+                <div class="chip-grid" id="desktop-cuisine-chips" data-chip-type="cuisine">
+                  <span class="choice-chip active" data-cuisine="Awadhi"><span class="chip-check">✓</span> Awadhi</span>
+                  <span class="choice-chip active" data-cuisine="Mughlai"><span class="chip-check">✓</span> Mughlai</span>
+                  <span class="choice-chip active" data-cuisine="North Indian"><span class="chip-check">✓</span> North Indian</span>
+                  <span class="choice-chip" data-cuisine="Tandoori & Grills">Tandoori & Grills</span>
+                  <span class="choice-chip" data-cuisine="Indo-Chinese">Indo-Chinese</span>
+                  <span class="choice-chip" data-cuisine="South Indian">South Indian</span>
+                  <span class="choice-chip" data-cuisine="Artisanal Sweets">Artisanal Sweets</span>
+                  <span class="choice-chip" data-cuisine="Banarasi Chaat">Banarasi Chaat</span>
+                  <div class="chip-custom-adder">
+                    <input type="text" class="input-chip-add" id="desktop-input-custom-cuisine" placeholder="+ Custom cuisine" />
+                    <button type="button" class="btn-chip-add btn-add-custom-cuisine" onclick="addCustomCuisine('desktop')" title="Add custom cuisine">+</button>
+                  </div>
                 </div>
+              </div>
+
+              <!-- Serviceable Cities Multi-Select (Task 10: Add Serviceable Cities) -->
+              <div class="form-group full-width" style="margin-top: 10px;">
+                <label class="form-label">Serviceable Coverage Cities <span class="required">*</span> <span class="form-label-sub">Where can your team travel to cater?</span></label>
+                <div class="chip-grid" id="desktop-service-cities-grid" data-chip-type="city">
+                  <span class="choice-chip active" data-city="Lucknow"><span class="chip-check">✓</span> Lucknow</span>
+                  <span class="choice-chip active" data-city="Kanpur"><span class="chip-check">✓</span> Kanpur</span>
+                  <span class="choice-chip active" data-city="Ayodhya"><span class="chip-check">✓</span> Ayodhya</span>
+                  <span class="choice-chip active" data-city="Varanasi"><span class="chip-check">✓</span> Varanasi</span>
+                  <span class="choice-chip" data-city="Prayagraj">Prayagraj</span>
+                  <span class="choice-chip" data-city="Gorakhpur">Gorakhpur</span>
+                  <div class="chip-custom-adder">
+                    <input type="text" class="input-chip-add" id="desktop-input-custom-city" placeholder="+ Other city" />
+                    <button type="button" class="btn-chip-add btn-add-custom-city" onclick="addCustomCity('desktop')" title="Add city">+</button>
+                  </div>
+                </div>
+                <span class="field-hint">Customers in these regional cities will see your kitchen listing in search results.</span>
               </div>
 
               <!-- Google Reviews & Reputation -->
@@ -563,9 +585,14 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="cat-lead-hours">Advance Booking Notice (Hours) <span class="required">*</span></label>
-                  <input type="number" id="cat-lead-hours" class="form-input" data-bind="catering.leadHours" value="48" />
-                  <span class="field-hint">Minimum lead time you require to procure ingredients and prep.</span>
+                  <label class="form-label" for="cat-lead-hours">Minimum Preparation Notice <span class="required">*</span></label>
+                  <select id="cat-lead-hours" class="form-select" data-bind="catering.leadHours">
+                    <option value="24">24 hours notice</option>
+                    <option value="48" selected>48 hours notice (Standard for feasts)</option>
+                    <option value="72">72 hours notice (3 days)</option>
+                    <option value="168">7 days notice (Large weddings only)</option>
+                  </select>
+                  <span class="field-hint">Minimum advance notice you require before accepting a booking.</span>
                 </div>
               </div>
 
@@ -908,9 +935,9 @@
           <!-- ── LIVE COUNTERS (SEPARATED FROM FEAST) ── -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
-              <div class="step-eyebrow">Service Offerings · Live Food Counters</div>
-              <h1 class="step-heading">Select live food & beverage counters</h1>
-              <p class="step-subtext">Live Counters are strictly separated from event service extras. Select which live stations your kitchen can deploy.</p>
+              <div class="step-eyebrow">Feast Menu Builder · Live Food Counters</div>
+              <h1 class="step-heading">Select live food & beverage counters for feast</h1>
+              <p class="step-subtext">Select which experiential live cooking stations accompany this feast booking quotation.</p>
             </header>
 
             <div class="content-card">
@@ -982,21 +1009,57 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- Chinese Live Wok -->
+                <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
+                  <img src="https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Chinese Wok" />
+                  <div class="counter-info">
+                    <div class="counter-name-row">
+                      <span class="counter-name">🍜 Chinese Live Wok</span>
+                      <span class="counter-price-tag">+₹85/p</span>
+                    </div>
+                    <p class="counter-desc">Wok-tossed Hakka noodles, Manchurian & spicy Schezwan.</p>
+                    <div class="counter-spread-chips">
+                      <span class="spread-chip">Hakka Noodles</span>
+                      <span class="spread-chip">Veg Manchurian</span>
+                      <span class="spread-chip">Chilli Paneer</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dessert Studio -->
+                <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
+                  <img src="https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Dessert Studio" />
+                  <div class="counter-info">
+                    <div class="counter-name-row">
+                      <span class="counter-name">🍨 Dessert Studio</span>
+                      <span class="counter-price-tag">+₹70/p</span>
+                    </div>
+                    <p class="counter-desc">Live hot jalebi with rabri, malpua & seasonal halwas.</p>
+                    <div class="counter-spread-chips">
+                      <span class="spread-chip">Live Jalebi</span>
+                      <span class="spread-chip">Kesar Rabri</span>
+                      <span class="spread-chip">Moong Dal Halwa</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </article>
 
-          <!-- ── EXTRAS, ADD-ONS & ESSENTIALS (SEPARATED FROM FEAST) ── -->
+          <!-- ── EXTRAS, ADD-ONS & ESSENTIALS (FEAST OFFERINGS) ── -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
-              <div class="step-eyebrow">Service Offerings · Extras, Add-ons & Essentials</div>
-              <h1 class="step-heading">Tableware, cutlery & buffet essentials</h1>
-              <p class="step-subtext">Sony identified cutlery and event essentials as missing. Map your tableware tiers directly to Bhojpatra's Service Packages (A to D).</p>
+              <div class="step-eyebrow">Feast Menu Builder · Extras, Essentials & Add-ons</div>
+              <h1 class="step-heading">Configure feast extras, tableware & essentials</h1>
+              <p class="step-subtext">Configure optional hospitality extras, service staff essentials, and tableware package add-ons for this feast.</p>
             </header>
 
             <div class="content-card">
+              <!-- Task 16: Feast Add-ons / Tableware Presentation Tiers -->
               <div class="card-title-row">
-                <span class="card-title">Tableware & Cutlery Presentation Tiers</span>
+                <span class="card-title">🍽️ Tableware & Cutlery Presentation Add-ons</span>
+                <span class="badge">Bhojpatra Packages A–D</span>
               </div>
               <div class="cutlery-tier-grid">
                 <!-- Package A -->
@@ -1048,15 +1111,72 @@
                 </div>
               </div>
 
-              <!-- Buffet Essentials Checklist -->
-              <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--color-cream-30);">
-                <label class="form-label" style="margin-bottom: 8px; display: block;">Included Service Crew & Buffet Amenities</label>
-                <div class="review-pills-row">
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Uniformed Stewards & Service Captain</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Designer Buffet Tables & Linens</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Acrylic Bilingual Food Labels</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Handwash Station & Sanitizers</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Dustbins & Waste Management Crew</span>
+              <!-- Task 14: Feast Hospitality Extras -->
+              <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title">✨ Feast Hospitality Extras</span>
+                  <span class="badge">Selectable Upgrades</span>
+                </div>
+                <div class="feast-extras-grid">
+                  <div class="feast-extra-card active" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
+                    <span class="feast-extra-icon">🍹</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row">
+                        <span class="feast-extra-name">Welcome Drinks & Mocktails</span>
+                        <span class="feast-extra-rate">+₹65/p</span>
+                      </div>
+                      <div class="feast-extra-desc">Live botanical coolers, fresh fruit punches, and spiced mojitos.</div>
+                    </div>
+                  </div>
+
+                  <div class="feast-extra-card" data-extra-id="hi-tea" onclick="toggleFeastExtra('hi-tea')">
+                    <span class="feast-extra-icon">🫖</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row">
+                        <span class="feast-extra-name">Hi-Tea & Evening Snacks</span>
+                        <span class="feast-extra-rate">+₹75/p</span>
+                      </div>
+                      <div class="feast-extra-desc">Barista tea/coffee bar with hot cocktail samosas and artisanal cookies.</div>
+                    </div>
+                  </div>
+
+                  <div class="feast-extra-card" data-extra-id="decor" onclick="toggleFeastExtra('decor')">
+                    <span class="feast-extra-icon">🎉</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row">
+                        <span class="feast-extra-name">Buffet Floral & Theme Decor</span>
+                        <span class="feast-extra-rate">Flat ₹35,000</span>
+                      </div>
+                      <div class="feast-extra-desc">Marigold garlands, warm spotlighting, and brass decor props.</div>
+                    </div>
+                  </div>
+
+                  <div class="feast-extra-card" data-extra-id="sound" onclick="toggleFeastExtra('sound')">
+                    <span class="feast-extra-icon">🔊</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row">
+                        <span class="feast-extra-name">Banquet Sound & Announcements</span>
+                        <span class="feast-extra-rate">Flat ₹15,000</span>
+                      </div>
+                      <div class="feast-extra-desc">Professional wireless PA system, ambient instrumental music, and microphones.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Task 15: Essential Hospitality & Service Inclusions -->
+              <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title">🧑‍🍳 Essential Hospitality & Service Inclusions</span>
+                  <span class="badge">Included Service Crew</span>
+                </div>
+                <div class="review-pills-row" id="desktop-feast-essentials-row">
+                  <span class="choice-chip active" data-essential-key="staff" onclick="toggleFeastEssential('staff')"><span class="chip-check">✓</span> Uniformed Stewards & Service Captain</span>
+                  <span class="choice-chip active" data-essential-key="buffetTables" onclick="toggleFeastEssential('buffetTables')"><span class="chip-check">✓</span> Designer Buffet Tables & Linens</span>
+                  <span class="choice-chip active" data-essential-key="foodLabels" onclick="toggleFeastEssential('foodLabels')"><span class="chip-check">✓</span> Acrylic Bilingual Food Labels</span>
+                  <span class="choice-chip active" data-essential-key="handwashStation" onclick="toggleFeastEssential('handwashStation')"><span class="chip-check">✓</span> Handwash Station & Sanitizers</span>
+                  <span class="choice-chip active" data-essential-key="wasteBins" onclick="toggleFeastEssential('wasteBins')"><span class="chip-check">✓</span> Dustbins & Waste Management Crew</span>
+                  <span class="choice-chip active" data-essential-key="hygieneCrew" onclick="toggleFeastEssential('hygieneCrew')"><span class="chip-check">✓</span> Continuous Cleaning & Hygiene Crew</span>
                 </div>
               </div>
             </div>
@@ -1077,8 +1197,11 @@
                   <input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="e.g. Awadhi Dum Biryani Corner (optional)" />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Category Specialty <span class="required">*</span></label>
-                  <select class="form-select" data-bind="stall.specialty">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <label class="form-label" style="margin-bottom:0;">Category Specialty <span class="required">*</span></label>
+                    <button type="button" class="btn-new-category" id="btn-desktop-new-cat" onclick="toggleNewCategoryBox('desktop')">＋ NEW CATEGORY</button>
+                  </div>
+                  <select class="form-select stall-specialty-select" id="desktop-stall-specialty" data-bind="stall.specialty">
                     <option value="Biryani & Tandoor Station" selected>Biryani & Dum Handi Station</option>
                     <option value="Chaat & Street Food">Banarasi Chaat & Street Food</option>
                     <option value="Tandoor & Kebab Grills">Live Tandoor & Kebab Grills</option>
@@ -1086,6 +1209,12 @@
                     <option value="Artisanal Pizza & Pasta">Artisanal Pizza & Pasta Station</option>
                     <option value="Chinese Wok & Dimsums">Chinese Live Wok & Dimsums</option>
                   </select>
+                  <div class="new-category-inline-box" id="desktop-new-cat-box" style="display:none;">
+                    <input type="text" class="form-input" id="desktop-new-cat-input" placeholder="Enter custom category (e.g. Amritsari Kulcha Station)" />
+                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red);color:#FFF;border:none;padding:6px 14px;border-radius:4px;font-weight:700;cursor:pointer;" onclick="submitNewStallCategory('desktop')">Add</button>
+                    <button type="button" class="btn-sm btn-secondary" style="background:#FFF;border:1px solid #CCC;padding:6px 10px;border-radius:4px;cursor:pointer;" onclick="toggleNewCategoryBox('desktop')">Cancel</button>
+                  </div>
+                  <span class="field-hint">Defines your stall's culinary niche on the /book/stall marketplace.</span>
                 </div>
               </div>
 
@@ -1987,10 +2116,31 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Cuisines</label>
-                <div class="chip-grid">
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Awadhi</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Mughlai</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> North Indian</span>
+                <div class="chip-grid" id="mobile-cuisine-chips" data-chip-type="cuisine">
+                  <span class="choice-chip active" data-cuisine="Awadhi"><span class="chip-check">✓</span> Awadhi</span>
+                  <span class="choice-chip active" data-cuisine="Mughlai"><span class="chip-check">✓</span> Mughlai</span>
+                  <span class="choice-chip active" data-cuisine="North Indian"><span class="chip-check">✓</span> North Indian</span>
+                  <div class="chip-custom-adder">
+                    <input type="text" class="input-chip-add" id="mobile-input-custom-cuisine" placeholder="+ Custom" style="width:90px;" />
+                    <button type="button" class="btn-chip-add btn-add-custom-cuisine" onclick="addCustomCuisine('mobile')" title="Add cuisine">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mobile Serviceable Cities (Task 10) -->
+              <div class="form-group">
+                <label class="form-label">Coverage Cities *</label>
+                <div class="chip-grid" id="mobile-service-cities-grid" data-chip-type="city">
+                  <span class="choice-chip active" data-city="Lucknow"><span class="chip-check">✓</span> Lucknow</span>
+                  <span class="choice-chip active" data-city="Kanpur"><span class="chip-check">✓</span> Kanpur</span>
+                  <span class="choice-chip active" data-city="Ayodhya"><span class="chip-check">✓</span> Ayodhya</span>
+                  <span class="choice-chip active" data-city="Varanasi"><span class="chip-check">✓</span> Varanasi</span>
+                  <span class="choice-chip" data-city="Prayagraj">Prayagraj</span>
+                  <span class="choice-chip" data-city="Gorakhpur">Gorakhpur</span>
+                  <div class="chip-custom-adder">
+                    <input type="text" class="input-chip-add" id="mobile-input-custom-city" placeholder="+ City" style="width:80px;" />
+                    <button type="button" class="btn-chip-add btn-add-custom-city" onclick="addCustomCity('mobile')" title="Add city">+</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2129,6 +2279,15 @@
               <div class="form-group">
                 <label class="form-label">Package Name *</label>
                 <input type="text" class="form-input" data-bind="catering.packageName" value="Royal Awadh Wedding Feast" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="mob-cat-lead-hours">Minimum Preparation Notice *</label>
+                <select id="mob-cat-lead-hours" class="form-select" data-bind="catering.leadHours">
+                  <option value="24">24 hours notice</option>
+                  <option value="48" selected>48 hours notice (Standard for feasts)</option>
+                  <option value="72">72 hours notice (3 days)</option>
+                  <option value="168">7 days notice (Large weddings only)</option>
+                </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Best For</label>
@@ -2357,7 +2516,7 @@
             </div>
           </article>
 
-          <!-- Mobile View: Cat Live -->
+          <!-- Mobile View: Cat Live (Task 13: Live Counters) -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
               <div class="step-eyebrow">Live Counters</div>
@@ -2373,35 +2532,146 @@
                 </div>
                 <div class="counter-item-card active" data-counter-id="live" onclick="toggleLiveCounter('live')">
                   <div class="counter-info">
-                    <div class="counter-name">🍳 Live Tandoor (+₹90/p)</div>
-                    <div class="counter-desc">Fresh tikkas and hot breads</div>
+                    <div class="counter-name">🍳 Live Tandoor & Wok (+₹90/p)</div>
+                    <div class="counter-desc">Fresh tikkas, hot tawa breads</div>
+                  </div>
+                </div>
+                <div class="counter-item-card active" data-counter-id="pan" onclick="toggleLiveCounter('pan')">
+                  <div class="counter-info">
+                    <div class="counter-name">🍃 Banarasi Paan Bar (+₹40/p)</div>
+                    <div class="counter-desc">Meetha paan, chocolate paan, mukhwas</div>
+                  </div>
+                </div>
+                <div class="counter-item-card" data-counter-id="pizza" onclick="toggleLiveCounter('pizza')">
+                  <div class="counter-info">
+                    <div class="counter-name">🍕 Wood-Fired Pizza (+₹120/p)</div>
+                    <div class="counter-desc">Artisanal pizzas baked in live oven</div>
+                  </div>
+                </div>
+                <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
+                  <div class="counter-info">
+                    <div class="counter-name">🍜 Chinese Live Wok (+₹85/p)</div>
+                    <div class="counter-desc">Hakka noodles, Manchurian, Chilli Paneer</div>
+                  </div>
+                </div>
+                <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
+                  <div class="counter-info">
+                    <div class="counter-name">🍨 Dessert Studio (+₹70/p)</div>
+                    <div class="counter-desc">Hot jalebi with rabri, malpua, halwa</div>
                   </div>
                 </div>
               </div>
             </div>
           </article>
 
-          <!-- Mobile View: Cat Extras -->
+          <!-- Mobile View: Cat Extras (Tasks 14, 15, 16) -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
-              <div class="step-eyebrow">Cutlery & Extras</div>
-              <h1 class="step-heading">Tableware</h1>
+              <div class="step-eyebrow">Feast Extras & Tableware</div>
+              <h1 class="step-heading">Inclusions</h1>
             </header>
             <div class="content-card">
+              <!-- Task 16: Tableware Add-ons -->
+              <div class="card-title-row">
+                <span class="card-title" style="font-size:13px;">🍽️ Tableware Add-on</span>
+              </div>
               <div class="cutlery-tier-grid">
+                <div class="cutlery-tier-card" data-cutlery-id="essential" onclick="setCutleryTier('essential')">
+                  <div class="cutlery-pkg-badge">Package A</div>
+                  <div class="cutlery-tier-name">Eco Disposables (₹0)</div>
+                </div>
                 <div class="cutlery-tier-card active" data-cutlery-id="standard" onclick="setCutleryTier('standard')">
                   <div class="cutlery-pkg-badge">Package B</div>
                   <div class="cutlery-tier-name">Ceramic & Steel (+₹40/p)</div>
+                </div>
+                <div class="cutlery-tier-card" data-cutlery-id="premium" onclick="setCutleryTier('premium')">
+                  <div class="cutlery-pkg-badge">Package C</div>
+                  <div class="cutlery-tier-name">Bone China (+₹90/p)</div>
+                </div>
+                <div class="cutlery-tier-card" data-cutlery-id="ultra" onclick="setCutleryTier('ultra')">
+                  <div class="cutlery-pkg-badge">Package D</div>
+                  <div class="cutlery-tier-name">Luxury Gold/Silver (+₹180/p)</div>
+                </div>
+              </div>
+
+              <!-- Task 14: Feast Extras -->
+              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title" style="font-size:13px;">✨ Feast Extras</span>
+                </div>
+                <div class="feast-extras-grid" style="grid-template-columns:1fr;">
+                  <div class="feast-extra-card active" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
+                    <span class="feast-extra-icon">🍹</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row"><span class="feast-extra-name">Mocktails</span><span class="feast-extra-rate">+₹65/p</span></div>
+                      <div class="feast-extra-desc">Live botanical coolers & juices</div>
+                    </div>
+                  </div>
+                  <div class="feast-extra-card" data-extra-id="hi-tea" onclick="toggleFeastExtra('hi-tea')">
+                    <span class="feast-extra-icon">🫖</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row"><span class="feast-extra-name">Hi-Tea</span><span class="feast-extra-rate">+₹75/p</span></div>
+                      <div class="feast-extra-desc">Barista tea/coffee & snacks</div>
+                    </div>
+                  </div>
+                  <div class="feast-extra-card" data-extra-id="decor" onclick="toggleFeastExtra('decor')">
+                    <span class="feast-extra-icon">🎉</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row"><span class="feast-extra-name">Floral Decor</span><span class="feast-extra-rate">₹35,000</span></div>
+                      <div class="feast-extra-desc">Marigold & brass props</div>
+                    </div>
+                  </div>
+                  <div class="feast-extra-card" data-extra-id="sound" onclick="toggleFeastExtra('sound')">
+                    <span class="feast-extra-icon">🔊</span>
+                    <div class="feast-extra-info">
+                      <div class="feast-extra-title-row"><span class="feast-extra-name">Sound & DJ</span><span class="feast-extra-rate">₹15,000</span></div>
+                      <div class="feast-extra-desc">Wireless PA & ambient sound</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Task 15: Feast Essentials -->
+              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title" style="font-size:13px;">🧑‍🍳 Service Crew</span>
+                </div>
+                <div class="review-pills-row" id="mobile-feast-essentials-row">
+                  <span class="choice-chip active" data-essential-key="staff" onclick="toggleFeastEssential('staff')"><span class="chip-check">✓</span> Stewards</span>
+                  <span class="choice-chip active" data-essential-key="buffetTables" onclick="toggleFeastEssential('buffetTables')"><span class="chip-check">✓</span> Tables</span>
+                  <span class="choice-chip active" data-essential-key="foodLabels" onclick="toggleFeastEssential('foodLabels')"><span class="chip-check">✓</span> Labels</span>
+                  <span class="choice-chip active" data-essential-key="handwashStation" onclick="toggleFeastEssential('handwashStation')"><span class="chip-check">✓</span> Handwash</span>
+                  <span class="choice-chip active" data-essential-key="wasteBins" onclick="toggleFeastEssential('wasteBins')"><span class="chip-check">✓</span> Dustbins</span>
+                  <span class="choice-chip active" data-essential-key="hygieneCrew" onclick="toggleFeastEssential('hygieneCrew')"><span class="chip-check">✓</span> Cleaners</span>
                 </div>
               </div>
             </div>
           </article>
 
-          <!-- Mobile Stall Views -->
+          <!-- Mobile Stall Views (Task 12: Add New Category) -->
           <article class="step-container" data-step-id="view-stall-basics">
             <header class="step-header"><div class="step-eyebrow">Stall Details</div><h1 class="step-heading">Stall details</h1></header>
             <div class="content-card">
               <div class="form-group"><label class="form-label">Stall Name <span class="field-optional">(Optional)</span></label><input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="Stall Brand Name (optional)" /></div>
+              <div class="form-group">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                  <label class="form-label" style="margin-bottom:0;">Category *</label>
+                  <button type="button" class="btn-new-category" style="padding:4px 8px;font-size:11px;" id="btn-mobile-new-cat" onclick="toggleNewCategoryBox('mobile')">＋ NEW</button>
+                </div>
+                <select class="form-select stall-specialty-select" id="mobile-stall-specialty" data-bind="stall.specialty">
+                  <option value="Biryani & Tandoor Station" selected>Biryani & Dum Handi Station</option>
+                  <option value="Chaat & Street Food">Banarasi Chaat & Street Food</option>
+                  <option value="Tandoor & Kebab Grills">Live Tandoor & Kebab Grills</option>
+                  <option value="South Indian Dosa Bar">South Indian Dosa & Tiffin Bar</option>
+                  <option value="Artisanal Pizza & Pasta">Artisanal Pizza & Pasta Station</option>
+                  <option value="Chinese Wok & Dimsums">Chinese Live Wok & Dimsums</option>
+                </select>
+                <div class="new-category-inline-box" id="mobile-new-cat-box" style="display:none;">
+                  <input type="text" class="form-input" id="mobile-new-cat-input" placeholder="Custom category..." style="height:32px;font-size:12px;" />
+                  <button type="button" class="btn-sm btn-primary" style="background:var(--color-red);color:#FFF;border:none;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;" onclick="submitNewStallCategory('mobile')">Add</button>
+                  <button type="button" class="btn-sm btn-secondary" style="background:#FFF;border:1px solid #CCC;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;" onclick="toggleNewCategoryBox('mobile')">✕</button>
+                </div>
+              </div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-format">

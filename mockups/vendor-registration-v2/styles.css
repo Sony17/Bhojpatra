@@ -3957,5 +3957,206 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   padding: 14px;
 }
 
+/* ==========================================================================
+   PHASE 3: FIELD & SECTION ADDITIONS
+   - Custom Cuisine & Serviceable Cities chip adders
+   - Stall Identity New Category control
+   - Feast Inclusions: Live Counters, Extras, Essentials, Add-ons
+   ========================================================================== */
 
+.chip-custom-adder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 2px;
+}
 
+.input-chip-add {
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1.5px dashed var(--color-cream-60);
+  padding: 0 12px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--color-black);
+  outline: none;
+  width: 130px;
+  background: transparent;
+  transition: all var(--dur-fast) ease;
+}
+
+.input-chip-add:focus {
+  border-color: var(--color-red);
+  border-style: solid;
+  width: 170px;
+  background: var(--color-white);
+  box-shadow: 0 0 0 2px rgba(185, 32, 37, 0.12);
+}
+
+.btn-chip-add {
+  height: 32px;
+  width: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--color-cream);
+  background: var(--color-white);
+  color: var(--color-red);
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--dur-fast) ease;
+}
+
+.btn-chip-add:hover {
+  background: var(--color-red);
+  color: var(--color-white);
+  border-color: var(--color-red);
+  transform: scale(1.05);
+}
+
+/* Stall Identity New Category Button & Inline Adder */
+.stall-category-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-new-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFF;
+  border: 1.5px dashed var(--color-red);
+  color: var(--color-red);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--dur-fast) ease;
+  font-family: inherit;
+}
+
+.btn-new-category:hover {
+  background: var(--color-red-05);
+  border-style: solid;
+  transform: translateY(-1px);
+}
+
+.new-category-inline-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  background: var(--color-cream-10);
+  border: 1px solid var(--color-cream-40);
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+}
+
+/* Feast Extras & Essentials Cards */
+.feast-extras-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.feast-extra-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--color-white);
+  border: 1.5px solid var(--color-cream-30);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+  user-select: none;
+}
+
+.feast-extra-card:hover {
+  border-color: var(--color-cream);
+  background: var(--color-cream-05);
+}
+
+.feast-extra-card.active {
+  border-color: var(--color-red);
+  background: rgba(185, 32, 37, 0.03);
+  box-shadow: 0 2px 8px rgba(185, 32, 37, 0.08);
+}
+
+.feast-extra-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.feast-extra-info {
+  flex: 1;
+}
+
+.feast-extra-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.feast-extra-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-black);
+}
+
+.feast-extra-rate {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-red);
+}
+
+.feast-extra-desc {
+  font-size: 11.5px;
+  color: var(--color-black-60);
+  line-height: 1.35;
+}
+
+.feast-essential-card {
+  background: var(--color-white);
+  border: 1.5px solid var(--color-cream-30);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+  user-select: none;
+}
+
+.feast-essential-card:hover {
+  border-color: var(--color-cream);
+}
+
+.feast-essential-card.active {
+  border-color: var(--color-red);
+  background: rgba(185, 32, 37, 0.03);
+}
+
+.feast-essential-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-black);
+  margin-bottom: 4px;
+}
+
+.feast-essential-desc {
+  font-size: 11.5px;
+  color: var(--color-black-60);
+  line-height: 1.35;
+}

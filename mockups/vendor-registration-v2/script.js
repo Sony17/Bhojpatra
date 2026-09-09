@@ -230,7 +230,7 @@ const state = {
       { id: "mocktail", name: "Mocktail & Juice Bar", rate: 65, icon: "🍹", desc: "Live fruit punches, mojitos, and fresh botanical coolers" }
     ],
 
-    // 5F. Extras, Essentials & Cutlery (Distinct from Live!)
+    // 5F. Extras, Essentials & Cutlery (Feast Inclusions)
     cutleryTier: "standard", // 'essential' | 'standard' | 'premium' | 'ultra'
     cutleryTiers: [
       { id: "essential", name: "Package A · Essential Disposables", rate: "Included (₹0)", desc: "Heavy-duty biodegradable areca leaf plates, wooden cutlery & paper cups" },
@@ -238,12 +238,20 @@ const state = {
       { id: "premium", name: "Package C · Premium Bone China", rate: "+₹90/plate", desc: "Fine bone china crockery, polished stainless cutlery & crystal stemware" },
       { id: "ultra", name: "Package D · Ultra Luxury Gold/Silver", rate: "+₹180/plate", desc: "Imported luxury designer crockery, gold/silver finish cutlery & royal banquet linens" }
     ],
+    extras: ["mocktail"],
+    availableExtras: [
+      { id: "mocktail", name: "Welcome Drinks & Mocktails", rate: "+₹65/p", icon: "🍹", desc: "Live botanical coolers, fresh fruit punches, and spiced mojitos" },
+      { id: "hi-tea", name: "Hi-Tea & Evening Snacks", rate: "+₹75/p", icon: "🫖", desc: "Barista tea/coffee bar with hot cocktail samosas and artisanal cookies" },
+      { id: "decor", name: "Buffet Floral & Theme Decor", rate: "Flat ₹35,000", icon: "🎉", desc: "Marigold garlands, warm spotlighting, and brass decor props" },
+      { id: "sound", name: "Banquet Sound & Announcements", rate: "Flat ₹15,000", icon: "🔊", desc: "Professional wireless PA system, ambient instrumental music, and microphones" }
+    ],
     serviceInclusions: {
       staff: true,           // Uniformed stewards & captain
       buffetTables: true,    // Buffet tables & designer linens
       foodLabels: true,      // Acrylic bilingual food labels
       handwashStation: true, // Handwash & sanitization setup
-      wasteBins: true        // Dustbins & clean disposal team
+      wasteBins: true,       // Dustbins & clean disposal team
+      hygieneCrew: true      // Cleaning & hygiene crew
     }
   },
 
@@ -251,6 +259,7 @@ const state = {
   stall: {
     stallName: "Awadhi Dum Biryani & Galouti Corner",
     specialty: "Biryani & Tandoor Station",
+    customCategories: [],
     tagline: "Authentic slow-dum Awadhi degchis and live sigdi kebab station cooked on-site.",
     bestFor: ["Weddings", "House Parties", "Corporate Lunches", "Cultural Fairs"],
     menuType: "fixed", // 'fixed' | 'varied'
@@ -452,6 +461,7 @@ function goToStep(stepId) {
   if (stepId === 'view-stall-delicacies') renderDelicaciesList();
   if (stepId === 'view-baina-boxes') renderBainaBoxList();
   if (stepId === 'view-review') renderMasterReview();
+  renderPhase3StateToUI();
 
   // Scroll active frame body to top
   document.querySelectorAll('.wizard-body').forEach(b => b.scrollTop = 0);
@@ -1203,13 +1213,209 @@ function toggleLiveCounter(counterId) {
   });
 }
 
-// ── Step 5F: Cutlery & Tableware Tiers (Separated from Food) ──
+// ── Step 5F: Cutlery & Tableware Tiers (Add-ons - Task 16) ──
 function setCutleryTier(tierId) {
   state.catering.cutleryTier = tierId;
   document.querySelectorAll('.cutlery-tier-card').forEach(c => {
     c.classList.toggle('active', c.getAttribute('data-cutlery-id') === tierId);
   });
 }
+
+// ── Step 5F: Feast Hospitality Extras (Task 14) ──
+function toggleFeastExtra(extraId) {
+  if (!state.catering.extras) state.catering.extras = [];
+  const idx = state.catering.extras.indexOf(extraId);
+  if (idx > -1) {
+    state.catering.extras.splice(idx, 1);
+  } else {
+    state.catering.extras.push(extraId);
+  }
+  document.querySelectorAll(`.feast-extra-card[data-extra-id="${extraId}"]`).forEach(card => {
+    card.classList.toggle('active', state.catering.extras.includes(extraId));
+  });
+}
+
+// ── Step 5F: Essential Service Inclusions (Task 15) ──
+function toggleFeastEssential(key) {
+  if (!state.catering.serviceInclusions) state.catering.serviceInclusions = {};
+  const nextVal = !state.catering.serviceInclusions[key];
+  state.catering.serviceInclusions[key] = nextVal;
+  document.querySelectorAll(`.choice-chip[data-essential-key="${key}"]`).forEach(chip => {
+    setChipState(chip, nextVal);
+  });
+}
+
+// ── Step 6A: Stall Identity - New Category Creation (Task 12) ──
+function toggleNewCategoryBox(source = 'desktop') {
+  const boxId = source === 'mobile' ? 'mobile-new-cat-box' : 'desktop-new-cat-box';
+  const inputId = source === 'mobile' ? 'mobile-new-cat-input' : 'desktop-new-cat-input';
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const isHidden = box.style.display === 'none' || !box.style.display;
+  box.style.display = isHidden ? 'flex' : 'none';
+  if (isHidden) {
+    const input = document.getElementById(inputId);
+    if (input) input.focus();
+  }
+}
+
+function submitNewStallCategory(source = 'desktop') {
+  const inputId = source === 'mobile' ? 'mobile-new-cat-input' : 'desktop-new-cat-input';
+  const input = document.getElementById(inputId);
+  if (!input || !input.value.trim()) {
+    showToast('Please enter a category name');
+    return;
+  }
+
+  const catName = input.value.trim();
+  if (!state.stall.customCategories) state.stall.customCategories = [];
+
+  // Prevent accidental duplicates (case-insensitive check against options)
+  const existingOption = Array.from(document.querySelectorAll('.stall-specialty-select option'))
+    .find(opt => opt.value.toLowerCase() === catName.toLowerCase() || opt.textContent.toLowerCase() === catName.toLowerCase());
+
+  if (existingOption) {
+    state.stall.specialty = existingOption.value;
+    document.querySelectorAll('.stall-specialty-select').forEach(sel => {
+      sel.value = existingOption.value;
+    });
+    toggleNewCategoryBox(source);
+    input.value = '';
+    showToast(`Selected existing category "${existingOption.value}"`);
+    return;
+  }
+
+  // Register and set custom category (strictly isolated from commercial offerings)
+  if (!state.stall.customCategories.includes(catName)) {
+    state.stall.customCategories.push(catName);
+  }
+  state.stall.specialty = catName;
+
+  document.querySelectorAll('.stall-specialty-select').forEach(sel => {
+    const opt = document.createElement('option');
+    opt.value = catName;
+    opt.textContent = catName;
+    sel.appendChild(opt);
+    sel.value = catName;
+  });
+
+  input.value = '';
+  toggleNewCategoryBox(source);
+  showToast(`Created & selected stall category "${catName}"`);
+}
+
+// ── Step 1: Custom Cuisine Adder (Task 9) ──
+function addCustomCuisine(source = 'desktop') {
+  const inputId = source === 'mobile' ? 'mobile-input-custom-cuisine' : 'desktop-input-custom-cuisine';
+  const input = document.getElementById(inputId);
+  if (!input || !input.value.trim()) return;
+
+  const val = input.value.trim();
+  if (!state.details.cuisines) state.details.cuisines = [];
+
+  // Check if chip already exists
+  const existingChip = Array.from(document.querySelectorAll('#desktop-cuisine-chips .choice-chip, #mobile-cuisine-chips .choice-chip'))
+    .find(c => getChipLabel(c).toLowerCase() === val.toLowerCase());
+
+  if (existingChip) {
+    const canonicalName = getChipLabel(existingChip);
+    if (!state.details.cuisines.includes(canonicalName)) {
+      state.details.cuisines.push(canonicalName);
+    }
+    document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip:not([data-city])').forEach(c => {
+      if (getChipLabel(c).toLowerCase() === canonicalName.toLowerCase()) {
+        setChipState(c, true);
+      }
+    });
+    input.value = '';
+    showToast(`Selected "${canonicalName}"`);
+    return;
+  }
+
+  if (!state.details.cuisines.includes(val)) {
+    state.details.cuisines.push(val);
+  }
+
+  ['desktop-cuisine-chips', 'mobile-cuisine-chips'].forEach(containerId => {
+    const container = document.getElementById(containerId);
+    if (container) {
+      const chip = document.createElement('span');
+      chip.className = 'choice-chip active';
+      chip.setAttribute('data-cuisine', val);
+      chip.innerHTML = `<span class="chip-check">✓</span> ${val}`;
+      const adder = container.querySelector('.chip-custom-adder');
+      if (adder) {
+        container.insertBefore(chip, adder);
+      } else {
+        container.appendChild(chip);
+      }
+    }
+  });
+
+  input.value = '';
+  const otherInputId = source === 'mobile' ? 'desktop-input-custom-cuisine' : 'mobile-input-custom-cuisine';
+  const otherInput = document.getElementById(otherInputId);
+  if (otherInput) otherInput.value = '';
+
+  showToast(`Added custom cuisine "${val}"`);
+}
+
+// ── Step 1: Custom Serviceable City Adder (Task 10) ──
+function addCustomCity(source = 'desktop') {
+  const inputId = source === 'mobile' ? 'mobile-input-custom-city' : 'desktop-input-custom-city';
+  const input = document.getElementById(inputId);
+  if (!input || !input.value.trim()) return;
+
+  const val = input.value.trim();
+  if (!state.details.serviceCities) state.details.serviceCities = [];
+
+  // Check if chip already exists
+  const existingChip = Array.from(document.querySelectorAll('#desktop-service-cities-grid .choice-chip, #mobile-service-cities-grid .choice-chip'))
+    .find(c => (c.getAttribute('data-city') || getChipLabel(c)).toLowerCase() === val.toLowerCase());
+
+  if (existingChip) {
+    const canonicalName = existingChip.getAttribute('data-city') || getChipLabel(existingChip);
+    if (!state.details.serviceCities.includes(canonicalName)) {
+      state.details.serviceCities.push(canonicalName);
+    }
+    document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip[data-city]').forEach(c => {
+      if ((c.getAttribute('data-city') || getChipLabel(c)).toLowerCase() === canonicalName.toLowerCase()) {
+        setChipState(c, true);
+      }
+    });
+    input.value = '';
+    showToast(`Selected "${canonicalName}"`);
+    return;
+  }
+
+  if (!state.details.serviceCities.includes(val)) {
+    state.details.serviceCities.push(val);
+  }
+
+  ['desktop-service-cities-grid', 'mobile-service-cities-grid'].forEach(containerId => {
+    const container = document.getElementById(containerId);
+    if (container) {
+      const chip = document.createElement('span');
+      chip.className = 'choice-chip active';
+      chip.setAttribute('data-city', val);
+      chip.innerHTML = `<span class="chip-check">✓</span> ${val}`;
+      const adder = container.querySelector('.chip-custom-adder');
+      if (adder) {
+        container.insertBefore(chip, adder);
+      } else {
+        container.appendChild(chip);
+      }
+    }
+  });
+
+  input.value = '';
+  const otherInputId = source === 'mobile' ? 'desktop-input-custom-city' : 'mobile-input-custom-city';
+  const otherInput = document.getElementById(otherInputId);
+  if (otherInput) otherInput.value = '';
+
+  showToast(`Added serviceable city "${val}"`);
+}
+
 
 // ── Stall Delicacies Engine (Fixed Set Spread format) ──
 function setStallMenuType(type = 'fixed') {
@@ -1560,6 +1766,63 @@ function renderMasterReview() {
               </div>
             `;
           }).join('')}
+        </div>
+
+        <!-- Feast Inclusions: Live Counters, Extras, Essentials, Add-ons (Tasks 13–16) -->
+        <div class="review-subitem-group" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
+          <div class="review-subitem-title">Configured Feast Offering Inclusions</div>
+          
+          <!-- 13. Feast Live Counters -->
+          <div style="margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
+              <span>🍳</span> <span>Live Counters (${activeLiveCounters.length}):</span>
+            </div>
+            <div class="review-pills-row" style="margin-top:4px;">
+              ${activeLiveCounters.length > 0 
+                ? activeLiveCounters.map(alc => `<span class="review-pill" style="border-color:var(--color-red-40);">${alc.icon} <strong>${alc.name}</strong> (+₹${alc.rate}/p)</span>`).join('')
+                : '<span class="review-pill" style="color:var(--color-black-40);">None configured</span>'}
+            </div>
+          </div>
+
+          <!-- 14. Feast Extras -->
+          <div style="margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
+              <span>✨</span> <span>Feast Hospitality Extras (${(state.catering.extras || []).length}):</span>
+            </div>
+            <div class="review-pills-row" style="margin-top:4px;">
+              ${(state.catering.extras && state.catering.extras.length > 0)
+                ? (state.catering.availableExtras || []).filter(ae => state.catering.extras.includes(ae.id)).map(ae => `<span class="service-pill">${ae.icon} ${ae.name} (${ae.rate})</span>`).join('')
+                : '<span class="review-pill" style="color:var(--color-black-40);">None configured</span>'}
+            </div>
+          </div>
+
+          <!-- 15. Feast Essentials -->
+          <div style="margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
+              <span>🧑‍🍳</span> <span>Service Crew & Hygiene Essentials:</span>
+            </div>
+            <div class="review-pills-row" style="margin-top:4px;">
+              ${state.catering.serviceInclusions.staff ? '<span class="service-pill">✓ Uniformed Stewards & Captain</span>' : ''}
+              ${state.catering.serviceInclusions.buffetTables ? '<span class="service-pill">✓ Designer Buffet Tables & Linens</span>' : ''}
+              ${state.catering.serviceInclusions.foodLabels ? '<span class="service-pill">✓ Acrylic Bilingual Food Labels</span>' : ''}
+              ${state.catering.serviceInclusions.handwashStation ? '<span class="service-pill">✓ Handwash & Sanitizers</span>' : ''}
+              ${state.catering.serviceInclusions.wasteBins ? '<span class="service-pill">✓ Dustbins & Waste Crew</span>' : ''}
+              ${state.catering.serviceInclusions.hygieneCrew ? '<span class="service-pill">✓ Continuous Cleaning Crew</span>' : ''}
+            </div>
+          </div>
+
+          <!-- 16. Feast Add-ons / Tableware Presentation Tiers -->
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
+              <span>🍽️</span> <span>Tableware Presentation Add-on:</span>
+            </div>
+            <div style="margin-top:4px;font-size:12px;">
+              <span class="review-pill" style="border-color:var(--color-cream-60);font-weight:700;">
+                ${cutleryChoice ? `${cutleryChoice.name} (${cutleryChoice.rate})` : 'Standard Tableware'}
+              </span>
+              <span style="font-size:11px;color:var(--color-black-60);margin-left:6px;">${cutleryChoice ? cutleryChoice.desc : ''}</span>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -1920,19 +2183,38 @@ function syncChipToState(chip, label, isNowActive) {
   const stepId = stepContainer.getAttribute('data-step-id');
 
   if (stepId === 'view-details') {
-    // Step 1: Cuisines
-    if (!state.details.cuisines) state.details.cuisines = [];
-    if (isNowActive && !state.details.cuisines.includes(label)) {
-      state.details.cuisines.push(label);
-    } else if (!isNowActive) {
-      state.details.cuisines = state.details.cuisines.filter(c => c !== label);
-    }
-    // Mirror to matching chip in the other frame (desktop <-> mobile)
-    document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip').forEach(other => {
-      if (other !== chip && getChipLabel(other) === label && other.classList.contains('active') !== isNowActive) {
-        setChipState(other, isNowActive);
+    const isCity = chip.hasAttribute('data-city') || chip.closest('[data-chip-type="city"]');
+    if (isCity) {
+      // Step 1: Serviceable Coverage Cities (Task 10)
+      const cityVal = chip.getAttribute('data-city') || label;
+      if (!state.details.serviceCities) state.details.serviceCities = [];
+      if (isNowActive && !state.details.serviceCities.includes(cityVal)) {
+        state.details.serviceCities.push(cityVal);
+      } else if (!isNowActive) {
+        state.details.serviceCities = state.details.serviceCities.filter(c => c !== cityVal);
       }
-    });
+      // Mirror to matching city chip in the other frame
+      document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip[data-city]').forEach(other => {
+        if (other !== chip && (other.getAttribute('data-city') === cityVal || getChipLabel(other) === cityVal) && other.classList.contains('active') !== isNowActive) {
+          setChipState(other, isNowActive);
+        }
+      });
+    } else {
+      // Step 1: Primary Cuisines (Task 9)
+      const cuisineVal = chip.getAttribute('data-cuisine') || label;
+      if (!state.details.cuisines) state.details.cuisines = [];
+      if (isNowActive && !state.details.cuisines.includes(cuisineVal)) {
+        state.details.cuisines.push(cuisineVal);
+      } else if (!isNowActive) {
+        state.details.cuisines = state.details.cuisines.filter(c => c !== cuisineVal);
+      }
+      // Mirror to matching cuisine chip in the other frame
+      document.querySelectorAll('.step-container[data-step-id="view-details"] .choice-chip:not([data-city])').forEach(other => {
+        if (other !== chip && (other.getAttribute('data-cuisine') === cuisineVal || getChipLabel(other) === cuisineVal) && other.classList.contains('active') !== isNowActive) {
+          setChipState(other, isNowActive);
+        }
+      });
+    }
   } else if (stepId === 'view-cat-basics') {
     // Step 5A: Feast Best For Occasions
     if (!state.catering.bestFor) state.catering.bestFor = [];
@@ -1947,6 +2229,18 @@ function syncChipToState(chip, label, isNowActive) {
         setChipState(other, isNowActive);
       }
     });
+  } else if (stepId === 'view-cat-extras') {
+    // Step 5F: Essential Service Inclusions (Task 15)
+    const essentialKey = chip.getAttribute('data-essential-key');
+    if (essentialKey) {
+      if (!state.catering.serviceInclusions) state.catering.serviceInclusions = {};
+      state.catering.serviceInclusions[essentialKey] = isNowActive;
+      document.querySelectorAll(`.choice-chip[data-essential-key="${essentialKey}"]`).forEach(other => {
+        if (other !== chip && other.classList.contains('active') !== isNowActive) {
+          setChipState(other, isNowActive);
+        }
+      });
+    }
   } else if (stepId === 'view-stall-basics') {
     // Step 6A: Stall Occasions
     if (!state.stall.bestFor) state.stall.bestFor = [];
@@ -1974,42 +2268,128 @@ function syncChipToState(chip, label, isNowActive) {
   }
 }
 
-// ── Initial Bindings & Listeners ──
-function setupEventListeners() {
-  if (window.__listenersInitialized) return;
-  window.__listenersInitialized = true;
-
-  // Synchronize two-way input bindings
-  document.querySelectorAll('input[data-bind], select[data-bind], textarea[data-bind]').forEach(input => {
-    input.addEventListener('input', (e) => {
-      const path = e.target.getAttribute('data-bind').split('.');
-      let obj = state;
-      for (let i = 0; i < path.length - 1; i++) {
-        obj = obj[path[i]];
-      }
-      obj[path[path.length - 1]] = e.target.value;
-
-      // Also mirror value to identical inputs on other canvas (desktop <-> mobile)
-      document.querySelectorAll(`[data-bind="${e.target.getAttribute('data-bind')}"]`).forEach(mirror => {
-        if (mirror !== e.target) mirror.value = e.target.value;
+// ── Synchronize Phase 3 State to UI Elements ──
+function renderPhase3StateToUI() {
+  // 1. Sync Cuisines (Task 9)
+  if (state.details.cuisines) {
+    state.details.cuisines.forEach(c => {
+      let found = false;
+      document.querySelectorAll('#desktop-cuisine-chips .choice-chip, #mobile-cuisine-chips .choice-chip').forEach(chip => {
+        if ((chip.getAttribute('data-cuisine') || getChipLabel(chip)).toLowerCase() === c.toLowerCase()) {
+          setChipState(chip, true);
+          found = true;
+        }
       });
-
-      updateVendorContextHeader();
+      if (!found) {
+        // Render custom chip
+        ['desktop-cuisine-chips', 'mobile-cuisine-chips'].forEach(containerId => {
+          const container = document.getElementById(containerId);
+          if (container) {
+            const chip = document.createElement('span');
+            chip.className = 'choice-chip active';
+            chip.setAttribute('data-cuisine', c);
+            chip.innerHTML = `<span class="chip-check">✓</span> ${c}`;
+            const adder = container.querySelector('.chip-custom-adder');
+            if (adder) container.insertBefore(chip, adder);
+            else container.appendChild(chip);
+          }
+        });
+      }
     });
-  });
+  }
 
-  // Universal Choice Chip Click Delegator
-  document.addEventListener('click', (e) => {
-    const chip = e.target.closest('.choice-chip');
-    if (!chip) return;
-    
-    toggleChoiceChip(chip);
-  });
+  // 2. Sync Serviceable Cities (Task 10)
+  if (state.details.serviceCities) {
+    state.details.serviceCities.forEach(city => {
+      let found = false;
+      document.querySelectorAll('#desktop-service-cities-grid .choice-chip, #mobile-service-cities-grid .choice-chip').forEach(chip => {
+        if ((chip.getAttribute('data-city') || getChipLabel(chip)).toLowerCase() === city.toLowerCase()) {
+          setChipState(chip, true);
+          found = true;
+        }
+      });
+      if (!found) {
+        // Render custom city chip
+        ['desktop-service-cities-grid', 'mobile-service-cities-grid'].forEach(containerId => {
+          const container = document.getElementById(containerId);
+          if (container) {
+            const chip = document.createElement('span');
+            chip.className = 'choice-chip active';
+            chip.setAttribute('data-city', city);
+            chip.innerHTML = `<span class="chip-check">✓</span> ${city}`;
+            const adder = container.querySelector('.chip-custom-adder');
+            if (adder) container.insertBefore(chip, adder);
+            else container.appendChild(chip);
+          }
+        });
+      }
+    });
+  }
+
+  // 3. Sync Minimum Preparation Notice (Task 11)
+  if (state.catering.leadHours) {
+    document.querySelectorAll('#cat-lead-hours, #mob-cat-lead-hours').forEach(sel => {
+      sel.value = String(state.catering.leadHours);
+    });
+  }
+
+  // 4. Sync Stall Categories & Specialty (Task 12)
+  if (state.stall.customCategories && state.stall.customCategories.length > 0) {
+    state.stall.customCategories.forEach(cat => {
+      document.querySelectorAll('.stall-specialty-select').forEach(sel => {
+        if (!Array.from(sel.options).some(o => o.value.toLowerCase() === cat.toLowerCase())) {
+          const opt = document.createElement('option');
+          opt.value = cat;
+          opt.textContent = cat;
+          sel.appendChild(opt);
+        }
+      });
+    });
+  }
+  if (state.stall.specialty) {
+    document.querySelectorAll('.stall-specialty-select').forEach(sel => {
+      sel.value = state.stall.specialty;
+    });
+  }
+
+  // 5. Sync Live Counters (Task 13)
+  if (state.catering.liveCounters) {
+    document.querySelectorAll('.counter-item-card[data-counter-id]').forEach(card => {
+      const id = card.getAttribute('data-counter-id');
+      card.classList.toggle('active', state.catering.liveCounters.includes(id));
+    });
+  }
+
+  // 6. Sync Feast Extras (Task 14)
+  if (state.catering.extras) {
+    document.querySelectorAll('.feast-extra-card[data-extra-id]').forEach(card => {
+      const id = card.getAttribute('data-extra-id');
+      card.classList.toggle('active', state.catering.extras.includes(id));
+    });
+  }
+
+  // 7. Sync Feast Essentials (Task 15)
+  if (state.catering.serviceInclusions) {
+    document.querySelectorAll('.choice-chip[data-essential-key]').forEach(chip => {
+      const key = chip.getAttribute('data-essential-key');
+      const isActive = !!state.catering.serviceInclusions[key];
+      setChipState(chip, isActive);
+    });
+  }
+
+  // 8. Sync Tableware Add-ons (Task 16)
+  if (state.catering.cutleryTier) {
+    document.querySelectorAll('.cutlery-tier-card[data-cutlery-id]').forEach(card => {
+      const id = card.getAttribute('data-cutlery-id');
+      card.classList.toggle('active', id === state.catering.cutleryTier);
+    });
+  }
 }
 
 function renderAllViews() {
   syncAccountDetailsToUI();
   renderCustomOfferings();
+  renderPhase3StateToUI();
   updateVendorContextHeader();
   renderDishList();
   renderTierView();
