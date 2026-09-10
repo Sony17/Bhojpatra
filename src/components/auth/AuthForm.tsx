@@ -14,6 +14,9 @@ import { setAdminSession } from "@/lib/adminAuth";
 import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
 import { isValidGst, isValidEmail, isValidPhone } from "@/lib/validate";
 import { Button, controlClass } from "@/components/ui";
+import BadgeApplicationModal, {
+  type BadgeApplicationRecord,
+} from "./BadgeApplicationModal";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
 
@@ -66,6 +69,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fullName, setFullName] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [referralCode, setReferralCode] = useState("");
   // Reset flow: the emailed link carries the one-time token + the account email
@@ -89,6 +94,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   // Vendor Recognition Badges (Task 17: Badges & Recognition)
   const [badgeApplications, setBadgeApplications] = useState<string[]>([]);
   const [expandedBadge, setExpandedBadge] = useState<string | null>(null);
+  const [activeBadgeModal, setActiveBadgeModal] = useState<string | null>(null);
+  const [badgeDetails, setBadgeDetails] = useState<Record<string, BadgeApplicationRecord>>({});
 
   function toggleOffering(id: string) {
     setSelectedOfferings((prev) =>
@@ -101,9 +108,42 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   }
 
   function toggleBadgeApplication(id: string) {
-    setBadgeApplications((prev) =>
-      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
-    );
+    setActiveBadgeModal(id);
+  }
+
+  function handleBadgeSubmit(badgeId: string) {
+    setBadgeApplications((prev) => (prev.includes(badgeId) ? prev : [...prev, badgeId]));
+    setBadgeDetails((prev) => ({
+      ...prev,
+      [badgeId]: {
+        ...(prev[badgeId] || { badgeId, currentStep: 6 }),
+        status: "submitted",
+        submittedAt: new Date().toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      },
+    }));
+  }
+
+  function handleUpdateBadgeData(badgeId: string, data: Partial<BadgeApplicationRecord>) {
+    setBadgeDetails((prev) => {
+      const existing = prev[badgeId] || {
+        badgeId,
+        status: "in_progress",
+        currentStep: 1,
+      };
+      return {
+        ...prev,
+        [badgeId]: {
+          ...existing,
+          ...data,
+        },
+      };
+    });
   }
 
   function toggleExpandBadge(id: string) {
@@ -137,7 +177,26 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     },
   ];
 
-  const BADGE_OPTIONS = [
+  interface BadgeRequirementItem {
+    title: string;
+    desc?: string;
+    exception?: string;
+  }
+
+  interface BadgeOptionItem {
+    id: string;
+    name: string;
+    nameHi: string;
+    tagline: string;
+    taglineHi: string;
+    description: string;
+    descriptionHi: string;
+    icon: string;
+    requirements: BadgeRequirementItem[];
+    plusPoints?: { title: string; desc?: string }[];
+  }
+
+  const BADGE_OPTIONS: BadgeOptionItem[] = [
     {
       id: "verified-caterer",
       name: "Verified Caterer",
@@ -1092,6 +1151,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               name="businessName"
               type="text"
               required
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
               placeholder={t("e.g. Awadhi Royal Caterers", "उदा. अवधी रॉयल कैटरर्स")}
               className={inputClass}
             />
@@ -1141,6 +1202,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               type="email"
               required
               autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className={inputClass}
             />
@@ -1253,15 +1316,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                 {BADGE_OPTIONS.map((badge) => {
                   const isApplied = badgeApplications.includes(badge.id);
                   const isExpanded = expandedBadge === badge.id;
+                  const appData = badgeDetails[badge.id];
+                  const isSubmitted = isApplied || appData?.status === "submitted";
+                  const isInProgress = !isSubmitted && appData?.status === "in_progress";
 
                   return (
                     <div
                       key={badge.id}
                       data-badge-card={badge.id}
                       className={`rounded-control border transition-all ${
-                        isApplied
+                        isSubmitted
                           ? "border-maroon bg-white shadow-sm ring-1 ring-maroon/20"
-                          : "border-cream-3 bg-white/80 hover:border-maroon/40 hover:bg-white"
+                          : isInProgress
+                            ? "border-maroon/50 bg-white/95 ring-1 ring-maroon/10 shadow-xs"
+                            : "border-cream-3 bg-white/80 hover:border-maroon/40 hover:bg-white"
                       } p-3.5`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1274,11 +1342,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                               <h4 className="text-sm font-bold text-ink">
                                 {badge.name}
                               </h4>
-                              {isApplied && (
+                              {isSubmitted ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-maroon/10 px-2 py-0.5 text-[11px] font-semibold text-maroon">
-                                  ✓ {t("Applied", "लागू")}
+                                  ✓ {t("Application Submitted", "आवेदन जमा")} · {t("Applied", "लागू")}
                                 </span>
-                              )}
+                              ) : isInProgress ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-cream-2/80 px-2 py-0.5 text-[11px] font-semibold text-maroon">
+                                  ⏳ {t("In Progress", "प्रगति पर")}
+                                </span>
+                              ) : null}
                             </div>
                             <span className="text-xs font-medium text-maroon/90">
                               {badge.tagline}
@@ -1296,14 +1368,18 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                             data-badge-apply={badge.id}
                             onClick={() => toggleBadgeApplication(badge.id)}
                             className={`focus-ring tap inline-flex min-h-[36px] items-center justify-center rounded-control px-3 text-xs font-semibold transition-all ${
-                              isApplied
+                              isSubmitted
                                 ? "bg-maroon text-cream hover:bg-maroon/90"
-                                : "border border-maroon/40 bg-cream/20 text-maroon hover:border-maroon hover:bg-cream"
+                                : isInProgress
+                                  ? "border border-maroon bg-cream/40 text-maroon hover:bg-cream"
+                                  : "border border-maroon/40 bg-cream/20 text-maroon hover:border-maroon hover:bg-cream"
                             }`}
                           >
-                            {isApplied
-                              ? t("✓ Applied", "✓ लागू किया")
-                              : t("Apply", "आवेदन करें")}
+                            {isSubmitted
+                              ? t("✓ Application Submitted", "✓ आवेदन जमा किया")
+                              : isInProgress
+                                ? t("Continue Application", "आवेदन जारी रखें")
+                                : t("Apply", "आवेदन करें")}
                           </button>
                         </div>
                       </div>
@@ -1635,6 +1711,29 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             </>
           )}
         </p>
+      )}
+      {/* ── Proper Badge Application Modal (Step 1 to 6) ── */}
+      {activeBadgeModal && (
+        <BadgeApplicationModal
+          badgeId={activeBadgeModal}
+          isOpen={!!activeBadgeModal}
+          onClose={() => setActiveBadgeModal(null)}
+          badgeData={
+            badgeDetails[activeBadgeModal] || {
+              badgeId: activeBadgeModal,
+              status: badgeApplications.includes(activeBadgeModal) ? "submitted" : "not_applied",
+              currentStep: 1,
+            }
+          }
+          onUpdateData={(data) => handleUpdateBadgeData(activeBadgeModal, data)}
+          onSubmitApplication={handleBadgeSubmit}
+          vendorAccount={{
+            fullName,
+            businessName,
+            email,
+            mobile,
+          }}
+        />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -583,31 +583,20 @@
                 </div>
               </div>
 
-              <!-- Custom Offerings Dynamic Cards Grid (Task 8) -->
-              <div class="custom-offerings-grid" id="desktop-custom-offerings-container"></div>
-
-              <!-- Custom Offering Adder Card (Task 8) -->
-              <div class="custom-offering-adder-card">
-                <div class="card-title-row" style="margin-bottom: 8px;">
-                  <span class="card-title" style="font-size: 14px;">
-                    <span>✨</span> Add Custom Commercial Offering
-                  </span>
-                  <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-weight:700;">Customizable</span>
-                </div>
-                <p class="field-hint" style="margin-bottom: 12px;">
-                  Provide a specialized service not listed above? Add your own custom commercial offering to your vendor profile.
-                </p>
-                <div class="custom-offering-form-row">
-                  <div class="form-group" style="margin-bottom:0; flex: 2; min-width: 220px;">
-                    <input type="text" id="custom-offering-title" class="form-input" placeholder="Offering Title (e.g. Live Dessert Bar, Paan Studio, Bartending)" />
+              <!-- Bhojpatra Recognition Badges (Phase 4 Tasks 17-20 Mockup Integration) -->
+              <div class="mockup-badges-section" id="desktop-mockup-badges-section">
+                <div class="badges-section-header">
+                  <div class="card-title-row" style="margin-bottom: 4px;">
+                    <span class="card-title" style="font-size: 15px;">
+                      <span>🛡️</span> Badges & Recognition
+                    </span>
+                    <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-weight:700;">Optional</span>
                   </div>
-                  <div class="form-group" style="margin-bottom:0; flex: 3; min-width: 260px;">
-                    <input type="text" id="custom-offering-blurb" class="form-input" placeholder="Short description of this service (optional)" />
-                  </div>
-                  <button type="button" class="btn-add-custom-offering" onclick="addCustomOffering('desktop')">
-                    <span>＋</span> Add Offering
-                  </button>
+                  <p class="field-hint" style="margin-bottom: 14px;">
+                    Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust to customers from day one.
+                  </p>
                 </div>
+                <div class="badge-cards-list" id="desktop-badge-cards-list"></div>
               </div>
             </div>
           </article>
@@ -2408,27 +2397,20 @@
                 </div>
               </div>
 
-              <!-- Mobile Custom Offerings Dynamic Cards Grid (Task 8) -->
-              <div class="custom-offerings-grid" id="mobile-custom-offerings-container" style="margin-top:12px;"></div>
-
-              <!-- Mobile Custom Offering Adder Card (Task 8) -->
-              <div class="custom-offering-adder-card mobile-adder-card" style="margin-top:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                  <span style="font-size:12.5px; font-weight:800; color:var(--color-black);">✨ Custom Offering</span>
-                  <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-size:10px;font-weight:700;">Customizable</span>
+              <!-- Mobile Bhojpatra Recognition Badges -->
+              <div class="mockup-badges-section" id="mobile-mockup-badges-section">
+                <div class="badges-section-header">
+                  <div class="card-title-row" style="margin-bottom: 4px;">
+                    <span class="card-title" style="font-size: 14px;">
+                      <span>🛡️</span> Badges & Recognition
+                    </span>
+                    <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-weight:700;">Optional</span>
+                  </div>
+                  <p class="field-hint" style="margin-bottom: 12px; font-size:11px;">
+                    Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust.
+                  </p>
                 </div>
-                <p class="field-hint" style="margin-bottom:8px; font-size:11px;">
-                  Add your own specialized commercial service offering.
-                </p>
-                <div class="form-group" style="margin-bottom:6px;">
-                  <input type="text" id="mobile-custom-offering-title" class="form-input" placeholder="Offering Name (e.g. Live Dessert Bar)" />
-                </div>
-                <div class="form-group" style="margin-bottom:8px;">
-                  <input type="text" id="mobile-custom-offering-blurb" class="form-input" placeholder="Short description (optional)" />
-                </div>
-                <button type="button" class="btn-add-custom-offering" style="width:100%; justify-content:center;" onclick="addCustomOffering('mobile')">
-                  <span>＋</span> Add Custom Offering
-                </button>
+                <div class="badge-cards-list" id="mobile-badge-cards-list"></div>
               </div>
             </div>
           </article>
@@ -3641,6 +3623,13 @@
           Accept & Confirm Capacity
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 7. Badge Application & Registration Flow Modal (6 Stages) -->
+  <div class="modal-backdrop" id="modal-badge-application">
+    <div class="modal-sheet badge-application-sheet" style="max-width: 680px; max-height: 90vh;">
+      <div id="badge-modal-content"></div>
     </div>
   </div>
 

@@ -32,6 +32,13 @@ const state = {
   currentStepId: 'view-details',
   stepHistory: [],
 
+  // Recognition Badges Applications State (Phase 4 Tasks 17-20 Mockup Integration)
+  badges: {
+    applied: [],
+    details: {}
+  },
+  activeBadgeModalKey: null,
+
   // Existing Vendor Account Identity (Reused from Signup / Auth Session - Task 7)
   account: {
     id: "VND-884291",
@@ -2788,6 +2795,44 @@ function renderMasterReview() {
     }
   }
 
+  // 6. Bhojpatra Badges & Recognition Review
+  const appliedBadgeCount = state.badges ? (state.badges.applied || []).length : 0;
+  html += `
+    <div class="review-section-card">
+      <div class="review-section-header">
+        <div class="review-section-title">
+          <span>🛡️</span>
+          <span>Bhojpatra Recognition Badges (${appliedBadgeCount} Applied)</span>
+        </div>
+        <button type="button" class="btn-review-edit" onclick="goToStep('view-offerings')">Manage Badges ✎</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${Object.keys(BADGE_CONFIGS).map(k => {
+          const cfg = BADGE_CONFIGS[k];
+          const det = state.badges && state.badges.details && state.badges.details[k];
+          const isSub = det && det.status === 'submitted';
+          const isInP = det && det.status === 'in_progress';
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;background:var(--color-cream-10);border:1px solid var(--color-cream-30);border-radius:var(--radius-control);padding:10px 12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:20px;">${cfg.icon}</span>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:var(--color-black);">${cfg.name}</div>
+                  <div style="font-size:11.5px;color:var(--color-black-60);">${cfg.tagline}</div>
+                </div>
+              </div>
+              <div>
+                ${isSub 
+                  ? `<span class="badge-status-pill submitted">✓ Submitted (${det.referenceId || 'In Review'})</span>` 
+                  : (isInP ? `<span class="badge-status-pill in-progress">⏳ In Progress</span>` : `<span style="font-size:11.5px;color:var(--color-black-40);">Not Applied (Optional)</span>`)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
   container.innerHTML = html;
 }
 
@@ -3231,6 +3276,8 @@ function renderAllViews() {
   renderDelicaciesList();
   renderBainaBoxList();
   renderDashboardView();
+  initBadgeState();
+  renderBadgesUI();
 }
 
 // ==========================================================================
@@ -3989,5 +4036,875 @@ function renderCustomOfferings() {
   if (dContainer) dContainer.innerHTML = generateHtml();
   if (mContainer) mContainer.innerHTML = generateHtml();
 }
+
+// ==========================================================================
+// ── BHOJPATRA BADGES & RECOGNITION CONTROLLER (PHASE 4 TASK 17-20 MOCKUP) ──
+// ==========================================================================
+
+const BADGE_CONFIGS = {
+  verified_caterer: {
+    key: 'verified_caterer',
+    name: 'Verified Caterer',
+    tagline: 'Entry-Level Recognition',
+    icon: '🛡️',
+    description: "Entry-level recognition for vendors meeting Bhojpatra's core quality and operational standards.",
+    requirements: [
+      { title: "Valid FSSAI", desc: "Active Food Safety and Standards Authority of India licence." },
+      { title: "GST where applicable", desc: "Valid GSTIN registration based on statutory turnover thresholds." },
+      { title: "PAN + business/bank details", desc: "Verified commercial PAN and active business bank account for payouts." },
+      {
+        title: "Minimum 2 years operating experience",
+        desc: "Demonstrated commercial track record in food service or catering.",
+        exception: "Exception allowed for a strong established brand/new entity"
+      },
+      { title: "Proper kitchen / food preparation setup", desc: "Dedicated commercial kitchen facility with adequate storage and clean prep stations." },
+      { title: "Hygiene & food-safety standards pass", desc: "Sanitized cooking areas, food-grade vessels, pest control, and staff hygiene." },
+      { title: "Menu, pricing and service area clearly defined", desc: "Transparent per-plate menus, package inclusions, and designated delivery radii." },
+      { title: "At least 3–5 genuine event references/orders", desc: "Verifiable client contacts or completed catering event orders." },
+      { title: "No serious unresolved customer complaints", desc: "Zero open hygiene, food safety, or refund grievances." },
+      { title: "Bhojpatra quality inspection / tasting pass", desc: "Satisfactory kitchen audit and sensory evaluation by food panel." }
+    ]
+  },
+  city_icon_caterer: {
+    key: 'city_icon_caterer',
+    name: 'City Icon Caterer',
+    tagline: 'City-Level Recognition',
+    icon: '⭐',
+    description: 'Prestigious city-level recognition for established caterers with proven scale, reputation, and excellence.',
+    requirements: [
+      { title: "Minimum 5 years of operating history", desc: "Well-established commercial catering presence." },
+      { title: "Recognised reputation in the city/region", desc: "Known brand equity among local event planners and banquet venues." },
+      { title: "Strong customer reviews/references", desc: "High satisfaction scores across multiple verified celebrations." },
+      { title: "Consistent food quality", desc: "Reliable taste, temperature maintenance, and presentation across large guest volumes." },
+      { title: "Professional event execution", desc: "Punctual live stall setup, organized buffet management, and courteous stewards." },
+      { title: "Good menu depth & presentation", desc: "Versatile multi-cuisine repertoire with refined aesthetic plating." },
+      { title: "Reliable manpower/logistics", desc: "Dedicated transport, chafing equipment, uniformed crew, and backup chef teams." },
+      { title: "Bhojpatra tasting + operational audit pass", desc: "Comprehensive review of commercial kitchen and live event audit." }
+    ],
+    plusPoints: [
+      { title: "Known for a signature cuisine/menu", desc: "Famous city landmark dish or unique regional specialty." },
+      { title: "Regularly caters weddings/large celebrations", desc: "Experience handling 500+ to 2,000+ guest banquets." },
+      { title: "Strong local brand recall", desc: "Household recognition within the home city." },
+      { title: "Notable venues/clients/events served", desc: "Official vendor at premier clubs, government functions, or luxury lawns." },
+      { title: "Social presence and customer reputation", desc: "Active digital profile with authentic customer photos and press mentions." },
+      { title: "Repeat customers", desc: "Demonstrated recurring bookings for corporate or family milestone events." }
+    ]
+  },
+  heritage_caterer: {
+    key: 'heritage_caterer',
+    name: 'Heritage Caterer',
+    tagline: 'Generational & Culinary Legacy',
+    icon: '👑',
+    description: 'Our most exclusive recognition for caterers with a long-standing culinary legacy and generational heritage.',
+    requirements: [
+      { title: "Minimum 15 years continuous legacy", desc: "Demonstrable decade-and-a-half or greater operational presence." },
+      { title: "Preferably family-run/legacy food business", desc: "Traditional family ownership passed through generations." },
+      { title: "Strong connection with local culinary tradition", desc: "Rooted in authentic regional cuisine and culinary heritage." },
+      {
+        title: "Multiple generations involved OR demonstrable long-standing legacy",
+        desc: "Active leadership from multi-generational family or established legacy culinary masters.",
+        orCondition: "Preserved requirement: Multiple generations involved OR demonstrable long-standing legacy"
+      },
+      { title: "Recognised local reputation", desc: "Revered culinary standing within the community." },
+      { title: "Signature/traditional dishes", desc: "Celebrated recipes preserved through traditional preparation methods." },
+      { title: "Consistent quality over the years", desc: "Uncompromising taste standards maintained across decades." },
+      { title: "Strong historical/customer references", desc: "Generations of patron families and archival proof of legacy." },
+      { title: "Bhojpatra tasting + verification process pass", desc: "Curated historical evaluation and signature dish tasting clearance." }
+    ]
+  }
+};
+
+function initBadgeState() {
+  if (!state.badges) {
+    state.badges = { applied: [], details: {} };
+  }
+  Object.keys(BADGE_CONFIGS).forEach(key => {
+    if (!state.badges.details[key]) {
+      state.badges.details[key] = {
+        badgeKey: key,
+        status: 'not_applied',
+        currentStep: 1,
+        submittedAt: null,
+        referenceId: null,
+        expanded: false,
+        data: {
+          experienceYears: key === 'heritage_caterer' ? '15+ years' : (key === 'city_icon_caterer' ? '5-10 years' : '2-5 years'),
+          fssaiNumber: (state.kyc && state.kyc.fssaiNumber) || '10000000000000',
+          gstNumber: (state.kyc && state.kyc.gstNumber) || '09ABCDE1234F1Z5',
+          kitchenDescription: 'Dedicated commercial catering kitchen with separate veg prep line, cold room, and 45kg handi dum capacity.',
+          hygieneConfirmed: true,
+          tastingConsent: true,
+          signatureSpecialties: (state.details && state.details.cuisines ? state.details.cuisines.join(', ') : 'Awadhi, Mughlai, Dum Biryani'),
+          maxCapacity: '1500 guests',
+          notableEvents: 'UP State Annual Gala (800 guests), Taj Lucknow Lawn Reception (1200 guests).',
+          reputationLinks: 'https://instagram.com/royalawadh · 4.8★ Google Rating',
+          plusPointsChecked: [0, 1, 2, 5],
+          foundingYear: '1978 (48 continuous years)',
+          generationsInvolved: '3rd Generation',
+          generationalDetails: 'Founded by Haji Ahmad Ali in 1978. Now managed by 3rd-generation family chefs preserving traditional wood-fire dum pukht recipes.',
+          traditionalDishes: 'Awadhi Shahi Dum Biryani, Galouti Kebab with Ulte Tawe ka Paratha, Sheermal, Shahi Tukda.',
+          heritageProof: 'Regional heritage food award, historical wedding registers from 1980s, featured in Awadh culinary archives.',
+          heritageConsent: true
+        }
+      };
+    }
+  });
+}
+
+function renderBadgesUI() {
+  initBadgeState();
+  const dList = document.getElementById('desktop-badge-cards-list');
+  const mList = document.getElementById('mobile-badge-cards-list');
+
+  const generateBadgeCardsHtml = () => {
+    return Object.keys(BADGE_CONFIGS).map(key => {
+      const cfg = BADGE_CONFIGS[key];
+      const det = state.badges.details[key] || {};
+      const isSubmitted = det.status === 'submitted';
+      const isInProgress = det.status === 'in_progress';
+
+      let statusPillHtml = '';
+      if (isSubmitted) {
+        statusPillHtml = `<span class="badge-status-pill submitted">✓ Application Submitted · Applied</span>`;
+      } else if (isInProgress) {
+        statusPillHtml = `<span class="badge-status-pill in-progress">⏳ In Progress</span>`;
+      }
+
+      let actionBtnHtml = '';
+      if (isSubmitted) {
+        actionBtnHtml = `<button type="button" class="btn-badge-action submitted" onclick="openBadgeModal('${key}')">✓ Application Submitted (View)</button>`;
+      } else if (isInProgress) {
+        actionBtnHtml = `<button type="button" class="btn-badge-action in-progress" onclick="openBadgeModal('${key}')">Continue Application →</button>`;
+      } else {
+        actionBtnHtml = `<button type="button" class="btn-badge-action unapplied" onclick="openBadgeModal('${key}')">Apply for Badge</button>`;
+      }
+
+      const isExpanded = Boolean(det.expanded);
+      const reqCountText = key === 'verified_caterer' 
+        ? '10 mandatory criteria' 
+        : (key === 'city_icon_caterer' ? '8 mandatory criteria + 6 Plus Points' : 'Exactly 9 legacy criteria');
+
+      return `
+        <div class="mockup-badge-card ${isSubmitted ? 'is-submitted' : (isInProgress ? 'is-in-progress' : '')}" id="badge-card-${key}">
+          <div class="badge-card-main">
+            <div class="badge-card-identity">
+              <div class="badge-avatar-icon">${cfg.icon}</div>
+              <div class="badge-card-info">
+                <div class="badge-card-title-row">
+                  <h4 class="badge-card-title">${cfg.name}</h4>
+                  ${statusPillHtml}
+                </div>
+                <div class="badge-tagline">${cfg.tagline}</div>
+                <div class="badge-description">${cfg.description}</div>
+              </div>
+            </div>
+            <div class="badge-card-actions">
+              ${actionBtnHtml}
+            </div>
+          </div>
+
+          <div class="badge-requirements-accordion">
+            <button type="button" class="btn-badge-toggle-req" onclick="toggleBadgeRequirements('${key}', event)">
+              <span>${isExpanded ? 'Hide Requirements ▲' : 'View Requirements ▼'}</span>
+            </button>
+            <div class="badge-req-dropdown" style="display: ${isExpanded ? 'block' : 'none'};">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <strong style="font-size:11.5px; color:var(--color-black-80); text-transform:uppercase; letter-spacing:0.5px;">Requirements</strong>
+                <span style="font-size:11px; color:var(--color-black-60);">${reqCountText}</span>
+              </div>
+              <ul class="badge-req-list">
+                ${cfg.requirements.map(r => `
+                  <li class="badge-req-item">
+                    <span class="badge-req-check">✓</span>
+                    <div>
+                      <strong>${r.title}:</strong>
+                      <span style="color:var(--color-black-70);">${r.desc}</span>
+                      ${r.exception ? `<div class="badge-exception-callout">ℹ️ Exception: ${r.exception}</div>` : ''}
+                      ${r.orCondition ? `<div class="badge-exception-callout">ℹ️ ${r.orCondition}</div>` : ''}
+                    </div>
+                  </li>
+                `).join('')}
+              </ul>
+
+              ${cfg.plusPoints ? `
+                <div class="badge-plus-points-header">
+                  <strong style="font-size:11.5px; color:var(--color-black-80); text-transform:uppercase; letter-spacing:0.5px;">Optional Plus Points (6 Criteria)</strong>
+                  <span class="badge" style="background:#DCFCE7; color:#16A34A; font-size:10px; font-weight:700;">Non-Mandatory</span>
+                </div>
+                <ul class="badge-req-list" style="margin-top:6px;">
+                  ${cfg.plusPoints.map(p => `
+                    <li class="badge-req-item">
+                      <span style="color:#16A34A; font-weight:800;">+</span>
+                      <div>
+                        <strong>${p.title}:</strong>
+                        <span style="color:var(--color-black-70);">${p.desc}</span>
+                      </div>
+                    </li>
+                  `).join('')}
+                </ul>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  if (dList) dList.innerHTML = generateBadgeCardsHtml();
+  if (mList) mList.innerHTML = generateBadgeCardsHtml();
+}
+
+function toggleBadgeRequirements(badgeKey, e) {
+  if (e) e.stopPropagation();
+  initBadgeState();
+  if (state.badges.details[badgeKey]) {
+    state.badges.details[badgeKey].expanded = !state.badges.details[badgeKey].expanded;
+    renderBadgesUI();
+  }
+}
+
+function openBadgeModal(badgeKey) {
+  initBadgeState();
+  state.activeBadgeModalKey = badgeKey;
+  const det = state.badges.details[badgeKey];
+  if (det.status === 'submitted') {
+    det.currentStep = 6;
+  }
+  renderBadgeModalContent();
+  const modal = document.getElementById('modal-badge-application');
+  if (modal) {
+    modal.classList.add('open');
+    modal.classList.add('active');
+  }
+}
+
+function closeBadgeModal() {
+  const modal = document.getElementById('modal-badge-application');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.classList.remove('active');
+  }
+  state.activeBadgeModalKey = null;
+  renderBadgesUI();
+}
+
+function setModalStep(stepNumber) {
+  saveBadgeStepData();
+  const badgeKey = state.activeBadgeModalKey;
+  if (!badgeKey) return;
+  const det = state.badges.details[badgeKey];
+  det.currentStep = stepNumber;
+  if (det.status === 'not_applied' && stepNumber > 1) {
+    det.status = 'in_progress';
+  }
+  renderBadgeModalContent();
+  renderBadgesUI();
+}
+
+function saveBadgeStepData() {
+  const badgeKey = state.activeBadgeModalKey;
+  if (!badgeKey || !state.badges.details[badgeKey]) return;
+  const data = state.badges.details[badgeKey].data;
+
+  const getVal = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value : null;
+  };
+  const getChecked = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.checked : false;
+  };
+
+  if (badgeKey === 'verified_caterer') {
+    if (getVal('b-inp-v-exp') !== null) data.experienceYears = getVal('b-inp-v-exp');
+    if (getVal('b-inp-v-fssai') !== null) data.fssaiNumber = getVal('b-inp-v-fssai');
+    if (getVal('b-inp-v-gst') !== null) data.gstNumber = getVal('b-inp-v-gst');
+    if (getVal('b-inp-v-kitchen') !== null) data.kitchenDescription = getVal('b-inp-v-kitchen');
+    data.hygieneConfirmed = getChecked('b-chk-v-hygiene');
+    data.tastingConsent = getChecked('b-chk-v-tasting');
+  } else if (badgeKey === 'city_icon_caterer') {
+    if (getVal('b-inp-c-exp') !== null) data.experienceYears = getVal('b-inp-c-exp');
+    if (getVal('b-inp-c-spec') !== null) data.signatureSpecialties = getVal('b-inp-c-spec');
+    if (getVal('b-inp-c-cap') !== null) data.maxCapacity = getVal('b-inp-c-cap');
+    if (getVal('b-inp-c-notable') !== null) data.notableEvents = getVal('b-inp-c-notable');
+    if (getVal('b-inp-c-links') !== null) data.reputationLinks = getVal('b-inp-c-links');
+    const checkedPlus = [];
+    document.querySelectorAll('.chk-city-plus').forEach((el, idx) => {
+      if (el.checked) checkedPlus.push(idx);
+    });
+    data.plusPointsChecked = checkedPlus;
+  } else if (badgeKey === 'heritage_caterer') {
+    if (getVal('b-inp-h-year') !== null) data.foundingYear = getVal('b-inp-h-year');
+    if (getVal('b-inp-h-gen') !== null) data.generationsInvolved = getVal('b-inp-h-gen');
+    if (getVal('b-inp-h-gendetail') !== null) data.generationalDetails = getVal('b-inp-h-gendetail');
+    if (getVal('b-inp-h-dishes') !== null) data.traditionalDishes = getVal('b-inp-h-dishes');
+    if (getVal('b-inp-h-proof') !== null) data.heritageProof = getVal('b-inp-h-proof');
+    data.heritageConsent = getChecked('b-chk-h-consent');
+  }
+}
+
+function handleBadgeDeclarationCheck(checkbox) {
+  const btn = document.getElementById('btn-badge-final-submit');
+  if (btn) {
+    btn.disabled = !checkbox.checked;
+    if (checkbox.checked) {
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    } else {
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
+  }
+}
+
+function submitBadgeApplication(badgeKey) {
+  initBadgeState();
+  const det = state.badges.details[badgeKey];
+  const cfg = BADGE_CONFIGS[badgeKey];
+  if (!det) return;
+
+  const randomRef = 'BHOJ-BADGE-' + Math.floor(100000 + Math.random() * 900000);
+  det.referenceId = randomRef;
+  det.status = 'submitted';
+  det.currentStep = 6;
+  det.submittedAt = new Date().toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  if (!state.badges.applied.includes(badgeKey)) {
+    state.badges.applied.push(badgeKey);
+  }
+
+  renderBadgesUI();
+  renderBadgeModalContent();
+  showToast(`Badge application for ${cfg.name} successfully submitted!`);
+}
+
+function renderBadgeModalContent() {
+  const container = document.getElementById('badge-modal-content');
+  if (!container) return;
+
+  const badgeKey = state.activeBadgeModalKey;
+  if (!badgeKey || !BADGE_CONFIGS[badgeKey]) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const cfg = BADGE_CONFIGS[badgeKey];
+  const det = state.badges.details[badgeKey];
+  const step = det.currentStep || 1;
+
+  const stepNames = [
+    'Introduction',
+    'Eligibility & Requirements',
+    'Application Details',
+    'Review Application',
+    'Declaration & Submit',
+    'Application Submitted'
+  ];
+
+  // Header HTML
+  let headerHtml = `
+    <div class="badge-modal-header">
+      <div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">${cfg.icon}</span>
+          <span class="modal-title" style="font-size:17px;">${cfg.name}</span>
+          <span class="badge" style="background:var(--color-cream);color:var(--color-red);font-size:11px;font-weight:700;">${cfg.tagline}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+          <span style="font-size:11.5px; color:var(--color-black-60);">
+            Step ${step} of 6: <strong>${stepNames[step - 1]}</strong>
+          </span>
+          <div class="badge-step-stepper" aria-hidden="true">
+            ${[1,2,3,4,5,6].map(s => `
+              <div class="badge-step-dot ${s === step ? 'active' : (s < step ? 'completed' : '')}"></div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeBadgeModal()" title="Close">✕</button>
+    </div>
+  `;
+
+  // Step Body HTML
+  let bodyHtml = '';
+  let footerHtml = '';
+
+  if (step === 1) {
+    // ── STEP 1: INTRODUCTION ──
+    bodyHtml = `
+      <div class="modal-body">
+        <div class="badge-hero-intro">
+          <div style="font-size:12px; font-weight:800; color:var(--color-red); text-transform:uppercase; letter-spacing:0.5px;">Bhojpatra Recognition Program</div>
+          <h3 style="font-size:18px; margin:4px 0 6px 0; color:var(--color-black);">${cfg.name}</h3>
+          <p style="font-size:13px; color:var(--color-black-80); line-height:1.5; margin:0;">
+            ${cfg.description}
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size:13px; font-weight:700; margin-bottom:6px; color:var(--color-black);">Key Caterer Benefits</h4>
+          <div class="badge-benefit-grid">
+            <div class="badge-benefit-card">
+              <strong style="color:var(--color-red);">🛡️ Verified Storefront Trust Badge</strong>
+              <div style="font-size:11.5px; color:var(--color-black-60); margin-top:2px;">Displayed prominently on your feast packages, stalls, and regional city search listings.</div>
+            </div>
+            <div class="badge-benefit-card">
+              <strong style="color:var(--color-red);">🚀 Priority Regional Placement</strong>
+              <div style="font-size:11.5px; color:var(--color-black-60); margin-top:2px;">Higher search ranking and recommendation placement for wedding and large banquet hosts.</div>
+            </div>
+            <div class="badge-benefit-card">
+              <strong style="color:var(--color-red);">👨‍🍳 Executive Tasting Clearance</strong>
+              <div style="font-size:11.5px; color:var(--color-black-60); margin-top:2px;">Official sensory evaluation and hygiene certificate issued by the Bhojpatra culinary council.</div>
+            </div>
+            <div class="badge-benefit-card">
+              <strong style="color:var(--color-red);">🤝 Dedicated Onboarding Concierge</strong>
+              <div style="font-size:11.5px; color:var(--color-black-60); margin-top:2px;">Direct WhatsApp concierge routing and expedited menu and package publishing.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; background:#FFFDF9; border:1px dashed var(--color-cream-30); border-radius:var(--radius-control); padding:12px; font-size:12px; line-height:1.5; color:var(--color-black-80);">
+          <strong>Application Process Overview:</strong>
+          <div style="margin-top:4px;">
+            1. Review eligibility requirements → 2. Provide commercial kitchen details → 3. Summary review → 4. Formal accuracy declaration → 5. Application review (3–5 business days).
+          </div>
+        </div>
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="closeBadgeModal()">Cancel</button>
+        <button type="button" class="btn-next" onclick="setModalStep(2)">View Requirements →</button>
+      </div>
+    `;
+  } else if (step === 2) {
+    // ── STEP 2: ELIGIBILITY & REQUIREMENTS ──
+    const reqCountText = badgeKey === 'verified_caterer' 
+      ? '10 Mandatory Criteria' 
+      : (badgeKey === 'city_icon_caterer' ? '8 Mandatory Criteria' : 'Exactly 9 Legacy Criteria');
+
+    bodyHtml = `
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--color-black-70); margin-top:0; margin-bottom:14px; line-height:1.5;">
+          Please review the official qualification criteria for the <strong>${cfg.name}</strong> badge. You must meet all mandatory criteria to qualify for certification.
+        </p>
+
+        <div style="background:#FFFDF9; border:1px solid var(--color-cream-30); border-radius:var(--radius-control); padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="font-size:12px; text-transform:uppercase; color:var(--color-red); letter-spacing:0.5px;">Mandatory Criteria</strong>
+            <span class="badge" style="background:var(--color-cream-30); color:var(--color-red); font-size:11px; font-weight:700;">${reqCountText}</span>
+          </div>
+
+          <ul class="badge-req-list">
+            ${cfg.requirements.map((r, i) => `
+              <li class="badge-req-item">
+                <span class="badge-req-check">✓</span>
+                <div>
+                  <strong>${i+1}. ${r.title}:</strong>
+                  <div style="font-size:12px; color:var(--color-black-70);">${r.desc}</div>
+                  ${r.exception ? `<div class="badge-exception-callout">ℹ️ Exception: ${r.exception}</div>` : ''}
+                  ${r.orCondition ? `<div class="badge-exception-callout">ℹ️ ${r.orCondition}</div>` : ''}
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+
+          ${cfg.plusPoints ? `
+            <div class="badge-plus-points-header" style="margin-top:16px;">
+              <strong style="font-size:12px; text-transform:uppercase; color:#16A34A; letter-spacing:0.5px;">Optional Plus Points</strong>
+              <span class="badge" style="background:#DCFCE7; color:#16A34A; font-size:10px; font-weight:700;">6 Non-Mandatory Additional Strengths</span>
+            </div>
+            <p style="font-size:11.5px; color:var(--color-black-60); margin:4px 0 8px 0;">
+              Plus Points demonstrate exceptional regional strength and accelerate council clearance, but are not strictly mandatory.
+            </p>
+            <ul class="badge-req-list">
+              ${cfg.plusPoints.map((p, i) => `
+                <li class="badge-req-item">
+                  <span style="color:#16A34A; font-weight:800;">+</span>
+                  <div>
+                    <strong>${i+1}. ${p.title}:</strong>
+                    <div style="font-size:12px; color:var(--color-black-70);">${p.desc}</div>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="setModalStep(1)">← Back</button>
+        <button type="button" class="btn-next" onclick="setModalStep(3)">I Meet These Requirements · Continue →</button>
+      </div>
+    `;
+  } else if (step === 3) {
+    // ── STEP 3: APPLICATION DETAILS ──
+    const d = det.data;
+
+    let badgeSpecificFieldsHtml = '';
+    if (badgeKey === 'verified_caterer') {
+      badgeSpecificFieldsHtml = `
+        <div class="form-group">
+          <label class="form-label" for="b-inp-v-exp">Years in Catering Operation <span class="required">*</span></label>
+          <select id="b-inp-v-exp" class="form-select">
+            <option value="under_2" ${d.experienceYears === 'under_2' ? 'selected' : ''}>Under 2 years (Eligible via established brand / new entity exception)</option>
+            <option value="2-5 years" ${d.experienceYears === '2-5 years' ? 'selected' : ''}>2 to 5 years continuous operation</option>
+            <option value="5-10 years" ${d.experienceYears === '5-10 years' ? 'selected' : ''}>5 to 10 years commercial operation</option>
+            <option value="10+ years" ${d.experienceYears === '10+ years' ? 'selected' : ''}>10+ years established operation</option>
+          </select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="b-inp-v-fssai">FSSAI Licence Number <span class="required">*</span></label>
+            <input type="text" id="b-inp-v-fssai" class="form-input" value="${escapeHtml(d.fssaiNumber)}" />
+            <span class="field-hint">Pre-filled from KYC submission.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="b-inp-v-gst">GSTIN Registration</label>
+            <input type="text" id="b-inp-v-gst" class="form-input" value="${escapeHtml(d.gstNumber)}" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-v-kitchen">Commercial Kitchen Setup & Equipment <span class="required">*</span></label>
+          <textarea id="b-inp-v-kitchen" class="form-textarea" rows="2">${escapeHtml(d.kitchenDescription)}</textarea>
+          <span class="field-hint">Briefly summarize cooking stations, cold storage, and hygiene equipment.</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="b-chk-v-hygiene" ${d.hygieneConfirmed ? 'checked' : ''} style="margin-top:2px;" />
+            <span>I confirm our kitchen maintains active pest-control logs, food-grade storage, and sanitized prep surfaces.</span>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="b-chk-v-tasting" ${d.tastingConsent ? 'checked' : ''} style="margin-top:2px;" />
+            <span>We consent to a pre-scheduled physical kitchen inspection and food tasting clearance by Bhojpatra.</span>
+          </label>
+        </div>
+      `;
+    } else if (badgeKey === 'city_icon_caterer') {
+      badgeSpecificFieldsHtml = `
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="b-inp-c-exp">Operating Experience in This City <span class="required">*</span></label>
+            <select id="b-inp-c-exp" class="form-select">
+              <option value="5-10 years" ${d.experienceYears === '5-10 years' ? 'selected' : ''}>5 to 10 years (Standard City Icon)</option>
+              <option value="10-15 years" ${d.experienceYears === '10-15 years' ? 'selected' : ''}>10 to 15 years in regional city</option>
+              <option value="15+ years" ${d.experienceYears === '15+ years' ? 'selected' : ''}>15+ years veteran presence</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="b-inp-c-cap">Max Single Event Capacity (Guests) <span class="required">*</span></label>
+            <input type="text" id="b-inp-c-cap" class="form-input" value="${escapeHtml(d.maxCapacity)}" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-c-spec">Signature Cuisines & Renowned Dishes <span class="required">*</span></label>
+          <input type="text" id="b-inp-c-spec" class="form-input" value="${escapeHtml(d.signatureSpecialties)}" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-c-notable">Notable Venues, Celebrities & High-Profile Events Served</label>
+          <textarea id="b-inp-c-notable" class="form-textarea" rows="2">${escapeHtml(d.notableEvents)}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-c-links">Online Portfolio / Instagram / Press Mentions</label>
+          <input type="text" id="b-inp-c-links" class="form-input" value="${escapeHtml(d.reputationLinks)}" />
+        </div>
+
+        <div style="margin-top:10px;">
+          <label class="form-label" style="margin-bottom:6px;">Select Applicable City Icon Plus Points (Optional Strengths):</label>
+          <div style="display:flex; flex-direction:column; gap:6px; background:#FDFBF7; border:1px solid var(--color-cream-30); border-radius:var(--radius-control); padding:10px;">
+            ${(cfg.plusPoints || []).map((p, idx) => {
+              const isChecked = (d.plusPointsChecked || []).includes(idx);
+              return `
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="chk-city-plus" data-index="${idx}" ${isChecked ? 'checked' : ''} />
+                  <span><strong>${p.title}:</strong> <small style="color:var(--color-black-60);">${p.desc}</small></span>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else if (badgeKey === 'heritage_caterer') {
+      badgeSpecificFieldsHtml = `
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="b-inp-h-year">Founding Year / Continuous Legacy (Min 15 Years) <span class="required">*</span></label>
+            <input type="text" id="b-inp-h-year" class="form-input" value="${escapeHtml(d.foundingYear)}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="b-inp-h-gen">Generational Lineage <span class="required">*</span></label>
+            <select id="b-inp-h-gen" class="form-select">
+              <option value="1st Generation" ${d.generationsInvolved === '1st Generation' ? 'selected' : ''}>1st Generation Master Founder</option>
+              <option value="2nd Generation" ${d.generationsInvolved === '2nd Generation' ? 'selected' : ''}>2nd Generation Family Ownership</option>
+              <option value="3rd Generation" ${d.generationsInvolved === '3rd Generation' ? 'selected' : ''}>3rd Generation Family Ownership</option>
+              <option value="4th+ Generation" ${d.generationsInvolved === '4th+ Generation' ? 'selected' : ''}>4th+ Generation Historic Legacy</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-h-gendetail">
+            Generational Continuity OR Long-Standing Legacy Details <span class="required">*</span>
+          </label>
+          <textarea id="b-inp-h-gendetail" class="form-textarea" rows="2">${escapeHtml(d.generationalDetails)}</textarea>
+          <span class="field-hint">ℹ️ Explicit criterion: Multiple generations involved OR demonstrable long-standing culinary legacy.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-h-dishes">Preserved Traditional Recipes & Ancestral Dum Techniques <span class="required">*</span></label>
+          <textarea id="b-inp-h-dishes" class="form-textarea" rows="2">${escapeHtml(d.traditionalDishes)}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="b-inp-h-proof">Historical Standing & Archival Proof (Media, Awards, Old Menus)</label>
+          <textarea id="b-inp-h-proof" class="form-textarea" rows="2">${escapeHtml(d.heritageProof)}</textarea>
+        </div>
+
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer; margin-top:8px;">
+          <input type="checkbox" id="b-chk-h-consent" ${d.heritageConsent ? 'checked' : ''} style="margin-top:2px;" />
+          <span>I authorize the Bhojpatra Heritage Jury to verify our culinary standing and schedule an ancestral dish tasting.</span>
+        </label>
+      `;
+    }
+
+    bodyHtml = `
+      <div class="modal-body">
+        <!-- Reused Vendor Profile Box -->
+        <div class="badge-reused-creds-banner">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="font-size:12px; color:var(--color-red);">✓ Verified Vendor Account Details</strong>
+            <span class="badge" style="background:var(--color-cream); color:var(--color-red); font-size:10px; font-weight:700;">Reused from Profile</span>
+          </div>
+          <div style="font-size:11.5px; color:var(--color-black-80); display:flex; flex-wrap:wrap; gap:12px;">
+            <div>Brand: <strong>${state.account.businessName}</strong></div>
+            <div>Owner: <strong>${state.account.name}</strong></div>
+            <div>WhatsApp: <strong>+91 ${state.account.phone}</strong></div>
+            <div>Email: <strong>${state.account.email}</strong></div>
+          </div>
+        </div>
+
+        <p style="font-size:12.5px; color:var(--color-black-70); margin-top:0; margin-bottom:12px;">
+          Complete the specific verification parameters for your <strong>${cfg.name}</strong> application:
+        </p>
+
+        ${badgeSpecificFieldsHtml}
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="setModalStep(2)">← Back</button>
+        <button type="button" class="btn-next" onclick="setModalStep(4)">Review Application →</button>
+      </div>
+    `;
+  } else if (step === 4) {
+    // ── STEP 4: REVIEW APPLICATION ──
+    const d = det.data;
+
+    let reviewDetailsHtml = '';
+    if (badgeKey === 'verified_caterer') {
+      reviewDetailsHtml = `
+        <div class="form-grid-2" style="font-size:12px; gap:8px;">
+          <div><span style="color:var(--color-black-60);">Operating History:</span> <strong>${d.experienceYears}</strong></div>
+          <div><span style="color:var(--color-black-60);">FSSAI Licence:</span> <strong>${d.fssaiNumber}</strong></div>
+          <div><span style="color:var(--color-black-60);">GSTIN:</span> <strong>${d.gstNumber}</strong></div>
+          <div><span style="color:var(--color-black-60);">Hygiene Assessment:</span> <strong style="color:var(--color-veg);">✓ Confirmed</strong></div>
+        </div>
+        <div style="margin-top:10px; font-size:12px;">
+          <div style="color:var(--color-black-60);">Kitchen & Prep Facility:</div>
+          <div style="background:#FFF; border:1px solid var(--color-cream-30); border-radius:4px; padding:6px 10px; margin-top:4px;">${escapeHtml(d.kitchenDescription)}</div>
+        </div>
+      `;
+    } else if (badgeKey === 'city_icon_caterer') {
+      const plusCount = (d.plusPointsChecked || []).length;
+      reviewDetailsHtml = `
+        <div class="form-grid-2" style="font-size:12px; gap:8px;">
+          <div><span style="color:var(--color-black-60);">Regional History:</span> <strong>${d.experienceYears}</strong></div>
+          <div><span style="color:var(--color-black-60);">Max Event Headcount:</span> <strong>${d.maxCapacity}</strong></div>
+          <div><span style="color:var(--color-black-60);">Signature Specialties:</span> <strong>${d.signatureSpecialties}</strong></div>
+          <div><span style="color:var(--color-black-60);">Plus Points Claimed:</span> <strong>${plusCount} of 6 Criteria</strong></div>
+        </div>
+        <div style="margin-top:10px; font-size:12px;">
+          <div style="color:var(--color-black-60);">Notable Landmark Events:</div>
+          <div style="background:#FFF; border:1px solid var(--color-cream-30); border-radius:4px; padding:6px 10px; margin-top:4px;">${escapeHtml(d.notableEvents)}</div>
+        </div>
+      `;
+    } else if (badgeKey === 'heritage_caterer') {
+      reviewDetailsHtml = `
+        <div class="form-grid-2" style="font-size:12px; gap:8px;">
+          <div><span style="color:var(--color-black-60);">Founding Heritage:</span> <strong>${d.foundingYear}</strong></div>
+          <div><span style="color:var(--color-black-60);">Lineage:</span> <strong>${d.generationsInvolved}</strong></div>
+        </div>
+        <div style="margin-top:8px; font-size:12px;">
+          <div style="color:var(--color-black-60);">Generational Lineage / Long-Standing Standing:</div>
+          <div style="background:#FFF; border:1px solid var(--color-cream-30); border-radius:4px; padding:6px 10px; margin-top:4px;">${escapeHtml(d.generationalDetails)}</div>
+        </div>
+        <div style="margin-top:8px; font-size:12px;">
+          <div style="color:var(--color-black-60);">Ancestral Signature Recipes:</div>
+          <div style="background:#FFF; border:1px solid var(--color-cream-30); border-radius:4px; padding:6px 10px; margin-top:4px;">${escapeHtml(d.traditionalDishes)}</div>
+        </div>
+      `;
+    }
+
+    bodyHtml = `
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0; font-size:15px; color:var(--color-black);">Review Application Details</h3>
+            <p style="margin:2px 0 0 0; font-size:12px; color:var(--color-black-60);">Please verify your entered parameters before formal submission.</p>
+          </div>
+          <button type="button" class="btn-back" onclick="setModalStep(3)" style="padding:5px 12px; font-size:11.5px; font-weight:700;">
+            ✏️ Edit Details
+          </button>
+        </div>
+
+        <div style="background:#FFFDF9; border:1px solid var(--color-cream-30); border-radius:var(--radius-control); padding:14px; display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--color-cream-20); padding-bottom:8px;">
+            <span style="font-size:20px;">${cfg.icon}</span>
+            <div>
+              <strong style="font-size:14px;">${cfg.name}</strong>
+              <div style="font-size:11px; color:var(--color-red); font-weight:600;">${cfg.tagline}</div>
+            </div>
+          </div>
+
+          <div>
+            <strong style="font-size:11.5px; color:var(--color-black-60); text-transform:uppercase; letter-spacing:0.5px;">Applicant Vendor Profile</strong>
+            <div style="font-size:12px; margin-top:2px;">${state.account.businessName} · ${state.account.name} · +91 ${state.account.phone}</div>
+          </div>
+
+          <div>
+            <strong style="font-size:11.5px; color:var(--color-black-60); text-transform:uppercase; letter-spacing:0.5px;">Submitted Parameters</strong>
+            <div style="margin-top:6px;">
+              ${reviewDetailsHtml}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="setModalStep(3)">← Back to Details</button>
+        <button type="button" class="btn-next" onclick="setModalStep(5)">Confirm & Proceed to Declaration →</button>
+      </div>
+    `;
+  } else if (step === 5) {
+    // ── STEP 5: DECLARATION & SUBMIT ──
+    bodyHtml = `
+      <div class="modal-body">
+        <div class="badge-hero-intro" style="margin-bottom:14px;">
+          <div style="font-size:11.5px; font-weight:800; color:var(--color-red); text-transform:uppercase;">Final Submission Step</div>
+          <h3 style="font-size:16px; margin:4px 0 4px 0;">Official Accuracy Declaration</h3>
+          <p style="font-size:12.5px; color:var(--color-black-70); margin:0;">
+            Applying for <strong>${cfg.name}</strong> certification.
+          </p>
+        </div>
+
+        <div class="badge-declaration-box">
+          <strong style="color:var(--color-black); display:block; margin-bottom:6px;">Vendor Commitment & Truthfulness Undertaking:</strong>
+          <p style="margin:0 0 10px 0;">
+            "I solemnly declare and confirm that all operational history, commercial kitchen facilities, licensing details, and references provided in this application are true, accurate, and verifiable. I understand that misrepresentation or failure to meet sensory tasting standards will result in application rejection or badge revocation."
+          </p>
+          <div style="background:var(--color-cream-20); border-radius:6px; padding:10px; margin-top:8px;">
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; font-weight:700; color:var(--color-red); cursor:pointer;">
+              <input type="checkbox" id="badge-declaration-check" onchange="handleBadgeDeclarationCheck(this)" style="margin-top:2px;" />
+              <span>I accept this declaration and submit my application for council verification.</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; font-size:11.5px; color:var(--color-black-60); line-height:1.45;">
+          ℹ️ Once submitted, your application enters active review. You can monitor verification progress or update documentation through your onboarding concierge.
+        </div>
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="setModalStep(4)">← Back</button>
+        <button type="button" class="btn-next" id="btn-badge-final-submit" disabled style="opacity:0.5; cursor:not-allowed;" onclick="submitBadgeApplication('${badgeKey}')">
+          Submit Badge Application ✓
+        </button>
+      </div>
+    `;
+  } else if (step === 6) {
+    // ── STEP 6: APPLICATION SUBMITTED ──
+    bodyHtml = `
+      <div class="modal-body">
+        <div class="badge-success-card">
+          <div class="badge-success-icon">✓</div>
+          <h2 style="font-size:20px; font-weight:800; color:var(--color-black); margin:0 0 4px 0;">
+            Application Successfully Submitted!
+          </h2>
+          <p style="font-size:13px; color:var(--color-black-60); margin:0 auto 16px auto; max-width:440px;">
+            Your application for the <strong>${cfg.name}</strong> badge has been officially recorded and routed for quality council evaluation.
+          </p>
+
+          <div style="background:#FFFDF9; border:1px solid var(--color-cream); border-radius:var(--radius-card); padding:16px; max-width:460px; margin:0 auto 18px auto; text-align:left;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid var(--color-cream-20); padding-bottom:6px;">
+              <span style="font-size:12px; color:var(--color-black-60);">Application Reference ID</span>
+              <strong style="font-size:13px; color:var(--color-red); letter-spacing:0.5px;">${det.referenceId || 'BHOJ-BADGE-884291'}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid var(--color-cream-20); padding-bottom:6px;">
+              <span style="font-size:12px; color:var(--color-black-60);">Submission Timestamp</span>
+              <span style="font-size:12px; font-weight:700;">${det.submittedAt || 'Today'}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid var(--color-cream-20); padding-bottom:6px;">
+              <span style="font-size:12px; color:var(--color-black-60);">Evaluation Status</span>
+              <span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700; font-size:11px;">🟡 Under Council Review</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="font-size:12px; color:var(--color-black-60);">Assigned Caterer</span>
+              <span style="font-size:12px; font-weight:700;">${state.account.businessName}</span>
+            </div>
+          </div>
+
+          <div style="background:var(--color-cream-20); border-radius:var(--radius-control); padding:12px; max-width:460px; margin:0 auto; font-size:12px; color:var(--color-black-80); text-align:left; line-height:1.5;">
+            <strong>Next Steps:</strong>
+            <ul style="margin:4px 0 0 0; padding-left:18px;">
+              <li>Desk verification of FSSAI / operational history (24–48h).</li>
+              <li>Onboarding concierge reaches out via WhatsApp for tasting session.</li>
+              <li>Certified badge automatically published to your live customer storefront.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+
+    footerHtml = `
+      <div class="modal-footer" style="justify-content:center; gap:12px;">
+        <button type="button" class="btn-back" onclick="setModalStep(4)">View Submitted Details</button>
+        <button type="button" class="btn-next" onclick="closeBadgeModal()">Return to Onboarding →</button>
+      </div>
+    `;
+  }
+
+  container.innerHTML = headerHtml + bodyHtml + footerHtml;
+}
+
+// ESC Key closes badge application modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('modal-badge-application');
+    if (modal && (modal.classList.contains('open') || modal.classList.contains('active'))) {
+      closeBadgeModal();
+    }
+  }
+});
 
 

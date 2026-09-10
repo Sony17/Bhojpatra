@@ -4618,3 +4618,347 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   color: var(--color-black-60);
   margin-top: 4px;
 }
+
+/* ==========================================================================
+   BHOJPATRA BADGES & RECOGNITION SECTION & MODAL (PROTOTYPE V2)
+   ========================================================================== */
+.mockup-badges-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--color-cream-30);
+}
+
+.badge-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mockup-badge-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-cream-30);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  transition: all var(--dur-fast) ease;
+}
+
+.mockup-badge-card:hover {
+  border-color: rgba(185, 32, 37, 0.4);
+}
+
+.mockup-badge-card.is-submitted {
+  border-color: var(--color-red);
+  background: #FFFDF9;
+  box-shadow: 0 2px 6px rgba(185, 32, 37, 0.12);
+}
+
+.mockup-badge-card.is-in-progress {
+  border-color: rgba(185, 32, 37, 0.5);
+  background: #FFFDF9;
+}
+
+.badge-card-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.badge-card-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.badge-avatar-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-cream-20);
+  border: 1px solid rgba(185, 32, 37, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.badge-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-black);
+  margin: 0;
+}
+
+.badge-tagline {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-red);
+  margin-top: 1px;
+}
+
+.badge-description {
+  font-size: 12px;
+  color: var(--color-black-60);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.badge-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-status-pill.submitted {
+  background: rgba(185, 32, 37, 0.1);
+  color: var(--color-red);
+  border: 1px solid rgba(185, 32, 37, 0.2);
+}
+
+.badge-status-pill.in-progress {
+  background: var(--color-cream-30);
+  color: var(--color-red);
+}
+
+.badge-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-badge-action {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: all var(--dur-fast) ease;
+  white-space: nowrap;
+}
+
+.btn-badge-action.unapplied {
+  background: var(--color-cream-20);
+  border: 1px solid rgba(185, 32, 37, 0.35);
+  color: var(--color-red);
+}
+
+.btn-badge-action.unapplied:hover {
+  background: var(--color-cream);
+  border-color: var(--color-red);
+}
+
+.btn-badge-action.in-progress {
+  background: var(--color-cream-30);
+  border: 1px solid var(--color-red);
+  color: var(--color-red);
+}
+
+.btn-badge-action.submitted {
+  background: var(--color-red);
+  border: 1px solid var(--color-red);
+  color: var(--color-cream);
+}
+
+.btn-badge-action.submitted:hover {
+  background: #981b20;
+}
+
+.badge-requirements-accordion {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-cream-20);
+}
+
+.btn-badge-toggle-req {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-red);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-badge-toggle-req:hover {
+  text-decoration: underline;
+}
+
+.badge-req-dropdown {
+  margin-top: 10px;
+  background: #FDFBF7;
+  border: 1px solid var(--color-cream-30);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.badge-req-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.badge-req-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.badge-req-check {
+  color: var(--color-veg);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.badge-exception-callout {
+  background: var(--color-cream-20);
+  border-left: 3px solid var(--color-red);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  color: var(--color-red);
+  margin-top: 6px;
+  margin-left: 22px;
+}
+
+.badge-plus-points-header {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-cream-30);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Modal Specifics */
+.badge-application-sheet {
+  background: #FFF;
+  border-radius: var(--radius-sheet);
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.badge-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-cream-30);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+}
+
+.badge-step-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.badge-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-cream-30);
+  transition: all var(--dur-fast) ease;
+}
+
+.badge-step-dot.active {
+  background: var(--color-red);
+  transform: scale(1.25);
+}
+
+.badge-step-dot.completed {
+  background: var(--color-red);
+  opacity: 0.6;
+}
+
+.badge-hero-intro {
+  background: linear-gradient(135deg, rgba(185, 32, 37, 0.05) 0%, rgba(240, 208, 158, 0.25) 100%);
+  border: 1px solid var(--color-cream-30);
+  border-radius: var(--radius-control);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.badge-benefit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.badge-benefit-card {
+  background: #FFF;
+  border: 1px solid var(--color-cream-20);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+}
+
+.badge-reused-creds-banner {
+  background: var(--color-cream-20);
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.badge-declaration-box {
+  background: #FFFDF9;
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-control);
+  padding: 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-black-80);
+}
+
+.badge-success-card {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.badge-success-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-red);
+  color: var(--color-cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 12px auto;
+  box-shadow: 0 4px 12px rgba(185, 32, 37, 0.25);
+}
