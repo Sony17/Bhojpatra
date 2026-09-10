@@ -121,11 +121,8 @@
           <!-- Top App Bar -->
         <header class="wizard-header">
           <div class="wizard-brand">
-            <div class="brand-icon">भ</div>
-            <div>
-              <div class="brand-name">Bhojpatra</div>
-              <div class="brand-tagline">Vendor Partner Onboarding V2</div>
-            </div>
+            <img src="../../public/bhojpatra-logo.png" alt="Bhojpatra" class="bhojpatra-header-logo" onerror="this.src='bhojpatra-logo.png'" />
+            <div class="brand-tagline">Vendor Partner Onboarding V2</div>
           </div>
 
           <div class="wizard-header-help">
@@ -308,15 +305,69 @@
                     <option value="Lucknow" selected>Lucknow</option>
                     <option value="Kanpur">Kanpur</option>
                     <option value="Varanasi">Varanasi</option>
-                    <option value="Ayodhya">Ayodhya</option>
                     <option value="Prayagraj">Prayagraj</option>
+                    <option value="Ayodhya">Ayodhya</option>
                     <option value="Gorakhpur">Gorakhpur</option>
+                    <option value="Noida">Noida</option>
+                    <option value="Ghaziabad">Ghaziabad</option>
+                    <option value="Agra">Agra</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                    <option value="Mumbai">Mumbai</option>
+                    <option value="Bengaluru">Bengaluru</option>
+                    <option value="Hyderabad">Hyderabad</option>
+                    <option value="Kolkata">Kolkata</option>
+                    <option value="Chennai">Chennai</option>
+                    <option value="Pune">Pune</option>
+                    <option value="Ahmedabad">Ahmedabad</option>
+                    <option value="Jaipur">Jaipur</option>
+                    <option value="Chandigarh">Chandigarh</option>
+                    <option value="Indore">Indore</option>
+                    <option value="Bhopal">Bhopal</option>
+                    <option value="Patna">Patna</option>
+                    <option value="Dehradun">Dehradun</option>
                   </select>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label" for="d-state">State <span class="required">*</span></label>
-                  <input type="text" id="d-state" class="form-input" data-bind="details.state" value="Uttar Pradesh" readonly />
+                  <select id="d-state" class="form-select" data-bind="details.state">
+                    <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                    <option value="Andhra Pradesh">Andhra Pradesh</option>
+                    <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                    <option value="Assam">Assam</option>
+                    <option value="Bihar">Bihar</option>
+                    <option value="Chandigarh">Chandigarh</option>
+                    <option value="Chhattisgarh">Chhattisgarh</option>
+                    <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                    <option value="Delhi">Delhi</option>
+                    <option value="Goa">Goa</option>
+                    <option value="Gujarat">Gujarat</option>
+                    <option value="Haryana">Haryana</option>
+                    <option value="Himachal Pradesh">Himachal Pradesh</option>
+                    <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                    <option value="Jharkhand">Jharkhand</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Kerala">Kerala</option>
+                    <option value="Ladakh">Ladakh</option>
+                    <option value="Lakshadweep">Lakshadweep</option>
+                    <option value="Madhya Pradesh">Madhya Pradesh</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                    <option value="Manipur">Manipur</option>
+                    <option value="Meghalaya">Meghalaya</option>
+                    <option value="Mizoram">Mizoram</option>
+                    <option value="Nagaland">Nagaland</option>
+                    <option value="Odisha">Odisha</option>
+                    <option value="Puducherry">Puducherry</option>
+                    <option value="Punjab">Punjab</option>
+                    <option value="Rajasthan">Rajasthan</option>
+                    <option value="Sikkim">Sikkim</option>
+                    <option value="Tamil Nadu">Tamil Nadu</option>
+                    <option value="Telangana">Telangana</option>
+                    <option value="Tripura">Tripura</option>
+                    <option value="Uttar Pradesh" selected>Uttar Pradesh</option>
+                    <option value="Uttarakhand">Uttarakhand</option>
+                    <option value="West Bengal">West Bengal</option>
+                  </select>
                 </div>
               </div>
 
@@ -349,6 +400,15 @@
                   <span class="choice-chip active" data-city="Varanasi"><span class="chip-check">✓</span> Varanasi</span>
                   <span class="choice-chip" data-city="Prayagraj">Prayagraj</span>
                   <span class="choice-chip" data-city="Gorakhpur">Gorakhpur</span>
+                  <span class="choice-chip" data-city="Agra">Agra</span>
+                  <span class="choice-chip" data-city="Delhi NCR">Delhi NCR</span>
+                  <span class="choice-chip" data-city="Noida">Noida</span>
+                  <span class="choice-chip" data-city="Mumbai">Mumbai</span>
+                  <span class="choice-chip" data-city="Bengaluru">Bengaluru</span>
+                  <span class="choice-chip" data-city="Hyderabad">Hyderabad</span>
+                  <span class="choice-chip" data-city="Kolkata">Kolkata</span>
+                  <span class="choice-chip" data-city="Jaipur">Jaipur</span>
+                  <span class="choice-chip" data-city="Pune">Pune</span>
                   <div class="chip-custom-adder">
                     <input type="text" class="input-chip-add" id="desktop-input-custom-city" placeholder="+ Other city" />
                     <button type="button" class="btn-chip-add btn-add-custom-city" onclick="addCustomCity('desktop')" title="Add city">+</button>
@@ -471,69 +531,32 @@
                     <li>Bulk minimum order rules</li>
                   </ul>
                 </div>
+              </div>
 
-                <!-- 4. Live Counters Card -->
-                <div class="offering-card" data-offering-key="counters" onclick="toggleOffering('counters')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍳</span>
-                    <div class="offering-checkbox"></div>
-                  </div>
-                  <div class="offering-title">Live Counters</div>
-                  <div class="offering-blurb">Interactive live cooking & beverage stations (Chaat, Tandoor, Dosa, Wok, Pizza, Paan) managed on-site.</div>
-                  <ul class="offering-features">
-                    <li>Live tawa, sigdi & wok setup</li>
-                    <li>Per-plate or flat counter rates</li>
-                    <li>Curated item spreads per station</li>
-                    <li>Standalone or add-on deployment</li>
-                  </ul>
+              <!-- Feast Offering Sub-Configurations (Pre-Task 23 Correction: Restored Feast Hierarchy) -->
+              <div class="feast-subofferings-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:13px; font-weight:700; color:var(--color-black);">🍲 Feast Sub-Configurations (Configured in Feast Flow)</span>
+                  <span class="badge" style="background:var(--color-cream); color:var(--color-red); font-size:10px; font-weight:700;">Sub-Parts of Feast</span>
                 </div>
-
-                <!-- 5. Extras Card -->
-                <div class="offering-card" data-offering-key="extras" onclick="toggleOffering('extras')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🪑</span>
-                    <div class="offering-checkbox"></div>
+                <p class="field-hint" style="margin-bottom:10px; font-size:11.5px;">These 4 specialized capabilities are sub-parts of your Feast offering and are configured sequentially in the Feast Menu Builder:</p>
+                <div class="feast-subparts-grid">
+                  <div class="feast-subpart-card" data-offering-key="counters">
+                    <div class="subpart-title"><span>🍳</span> <span>Live Counters</span></div>
+                    <div class="subpart-desc">Interactive live cooking & beverage stations (Chaat, Tandoor, Wok, Pizza, Paan).</div>
                   </div>
-                  <div class="offering-title">Extras</div>
-                  <div class="offering-blurb">Additional event rental items, furniture, chafing warmers, bar setups, and specialty catering equipment.</div>
-                  <ul class="offering-features">
-                    <li>Buffet chafing dishes & warmers</li>
-                    <li>Live bar & mocktail glassware</li>
-                    <li>Vintage brass & copper cookware</li>
-                    <li>Per-event equipment pricing</li>
-                  </ul>
-                </div>
-
-                <!-- 6. Add-ons Card -->
-                <div class="offering-card" data-offering-key="addons" onclick="toggleOffering('addons')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍹</span>
-                    <div class="offering-checkbox"></div>
+                  <div class="feast-subpart-card" data-offering-key="extras">
+                    <div class="subpart-title"><span>✨</span> <span>Feast Extras</span></div>
+                    <div class="subpart-desc">Welcome mocktails, evening hi-tea snacks & theme floral buffet decor.</div>
                   </div>
-                  <div class="offering-title">Add-ons</div>
-                  <div class="offering-blurb">Supplementary food & beverage enhancements like welcome drinks, dessert studios, and midnight refreshments.</div>
-                  <ul class="offering-features">
-                    <li>Pre-event welcome coolers</li>
-                    <li>Live dessert & halwai studio</li>
-                    <li>Midnight refreshment spreads</li>
-                    <li>Flexible guest-count scaling</li>
-                  </ul>
-                </div>
-
-                <!-- 7. Essentials Card -->
-                <div class="offering-card" data-offering-key="essentials" onclick="toggleOffering('essentials')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍽️</span>
-                    <div class="offering-checkbox"></div>
+                  <div class="feast-subpart-card" data-offering-key="essentials">
+                    <div class="subpart-title"><span>🛡️</span> <span>Essentials</span></div>
+                    <div class="subpart-desc">Uniformed banquet stewards, bilingual food labels, handwash setup & waste crews.</div>
                   </div>
-                  <div class="offering-title">Essentials</div>
-                  <div class="offering-blurb">Professional banquet service staff, premium cutlery & tableware packages, and complete waste management.</div>
-                  <ul class="offering-features">
-                    <li>Uniformed stewards & captain</li>
-                    <li>Tableware packages (A to D)</li>
-                    <li>Designer banquet linens & labels</li>
-                    <li>On-site sanitization & disposal</li>
-                  </ul>
+                  <div class="feast-subpart-card" data-offering-key="addons">
+                    <div class="subpart-title"><span>🍽️</span> <span>Add-ons</span></div>
+                    <div class="subpart-desc">Tableware presentation packages (Base Disposables to Royal Gold/Silver).</div>
+                  </div>
                 </div>
               </div>
 
@@ -1054,63 +1077,8 @@
             </header>
 
             <div class="content-card">
-              <!-- Task 16: Feast Add-ons / Tableware Presentation Tiers -->
-              <div class="card-title-row">
-                <span class="card-title">🍽️ Tableware & Cutlery Presentation Add-ons</span>
-                <span class="badge">Bhojpatra Packages A–D</span>
-              </div>
-              <div class="cutlery-tier-grid">
-                <!-- Package A -->
-                <div class="cutlery-tier-card" data-cutlery-id="essential" onclick="setCutleryTier('essential')">
-                  <div class="cutlery-pkg-badge">Package A</div>
-                  <div class="cutlery-tier-name">Eco Disposables</div>
-                  <div class="cutlery-rate-hint">Base Included (₹0)</div>
-                  <ul class="cutlery-inclusions">
-                    <li>Areca nut leaf plates</li>
-                    <li>Birchwood spoons/forks</li>
-                    <li>Paper cups & napkins</li>
-                  </ul>
-                </div>
-
-                <!-- Package B -->
-                <div class="cutlery-tier-card active" data-cutlery-id="standard" onclick="setCutleryTier('standard')">
-                  <div class="cutlery-pkg-badge">Package B</div>
-                  <div class="cutlery-tier-name">Ceramic & Steel</div>
-                  <div class="cutlery-rate-hint">+₹40 / plate</div>
-                  <ul class="cutlery-inclusions">
-                    <li>Ceramic dinner plates</li>
-                    <li>Stainless steel cutlery</li>
-                    <li>Glassware water tumblers</li>
-                  </ul>
-                </div>
-
-                <!-- Package C -->
-                <div class="cutlery-tier-card" data-cutlery-id="premium" onclick="setCutleryTier('premium')">
-                  <div class="cutlery-pkg-badge">Package C</div>
-                  <div class="cutlery-tier-name">Bone China Crockery</div>
-                  <div class="cutlery-rate-hint">+₹90 / plate</div>
-                  <ul class="cutlery-inclusions">
-                    <li>Fine bone china plates</li>
-                    <li>Premium polished cutlery</li>
-                    <li>Crystal beverage goblets</li>
-                  </ul>
-                </div>
-
-                <!-- Package D -->
-                <div class="cutlery-tier-card" data-cutlery-id="ultra" onclick="setCutleryTier('ultra')">
-                  <div class="cutlery-pkg-badge">Package D</div>
-                  <div class="cutlery-tier-name">Royal Gold / Silver</div>
-                  <div class="cutlery-rate-hint">+₹180 / plate</div>
-                  <ul class="cutlery-inclusions">
-                    <li>Imported luxury tableware</li>
-                    <li>Gold / Silver finish cutlery</li>
-                    <li>Royal banquet styling</li>
-                  </ul>
-                </div>
-              </div>
-
               <!-- Task 14: Feast Hospitality Extras -->
-              <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--color-cream-30);">
+              <div>
                 <div class="card-title-row">
                   <span class="card-title">✨ Feast Hospitality Extras</span>
                   <span class="badge">Selectable Upgrades</span>
@@ -1175,6 +1143,63 @@
                   <span class="choice-chip active" data-essential-key="handwashStation" onclick="toggleFeastEssential('handwashStation')"><span class="chip-check">✓</span> Handwash Station & Sanitizers</span>
                   <span class="choice-chip active" data-essential-key="wasteBins" onclick="toggleFeastEssential('wasteBins')"><span class="chip-check">✓</span> Dustbins & Waste Management Crew</span>
                   <span class="choice-chip active" data-essential-key="hygieneCrew" onclick="toggleFeastEssential('hygieneCrew')"><span class="chip-check">✓</span> Continuous Cleaning & Hygiene Crew</span>
+                </div>
+              </div>
+
+              <!-- Task 16: Feast Add-ons / Tableware Presentation Tiers -->
+              <div style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title">🍽️ Tableware & Cutlery Presentation Add-ons</span>
+                  <span class="badge">Bhojpatra Packages A–D</span>
+                </div>
+                <div class="cutlery-tier-grid">
+                  <!-- Package A -->
+                  <div class="cutlery-tier-card" data-cutlery-id="essential" onclick="setCutleryTier('essential')">
+                    <div class="cutlery-pkg-badge">Package A</div>
+                    <div class="cutlery-tier-name">Eco Disposables</div>
+                    <div class="cutlery-rate-hint">Base Included (₹0)</div>
+                    <ul class="cutlery-inclusions">
+                      <li>Areca nut leaf plates</li>
+                      <li>Birchwood spoons/forks</li>
+                      <li>Paper cups & napkins</li>
+                    </ul>
+                  </div>
+
+                  <!-- Package B -->
+                  <div class="cutlery-tier-card active" data-cutlery-id="standard" onclick="setCutleryTier('standard')">
+                    <div class="cutlery-pkg-badge">Package B</div>
+                    <div class="cutlery-tier-name">Ceramic & Steel</div>
+                    <div class="cutlery-rate-hint">+₹40 / plate</div>
+                    <ul class="cutlery-inclusions">
+                      <li>Ceramic dinner plates</li>
+                      <li>Stainless steel cutlery</li>
+                      <li>Glassware water tumblers</li>
+                    </ul>
+                  </div>
+
+                  <!-- Package C -->
+                  <div class="cutlery-tier-card" data-cutlery-id="premium" onclick="setCutleryTier('premium')">
+                    <div class="cutlery-pkg-badge">Package C</div>
+                    <div class="cutlery-tier-name">Bone China Crockery</div>
+                    <div class="cutlery-rate-hint">+₹90 / plate</div>
+                    <ul class="cutlery-inclusions">
+                      <li>Fine bone china plates</li>
+                      <li>Premium polished cutlery</li>
+                      <li>Crystal beverage goblets</li>
+                    </ul>
+                  </div>
+
+                  <!-- Package D -->
+                  <div class="cutlery-tier-card" data-cutlery-id="ultra" onclick="setCutleryTier('ultra')">
+                    <div class="cutlery-pkg-badge">Package D</div>
+                    <div class="cutlery-tier-name">Royal Gold / Silver</div>
+                    <div class="cutlery-rate-hint">+₹180 / plate</div>
+                    <ul class="cutlery-inclusions">
+                      <li>Imported luxury tableware</li>
+                      <li>Gold / Silver finish cutlery</li>
+                      <li>Royal banquet styling</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1939,8 +1964,8 @@
           <!-- Mobile Header -->
         <header class="wizard-header">
           <div class="wizard-brand">
-            <div class="brand-icon" style="width:30px;height:30px;font-size:18px;">भ</div>
-            <div class="brand-name" style="font-size:18px;">Bhojpatra</div>
+            <img src="../../public/bhojpatra-logo.png" alt="Bhojpatra" class="bhojpatra-header-logo" onerror="this.src='bhojpatra-logo.png'" />
+            <div class="brand-tagline" style="font-size:10px;">Vendor Partner Onboarding V2</div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <button type="button" class="btn-vendor-signin" onclick="openVendorSignInModal()" style="padding:4px 10px; font-size:11px;">
@@ -2087,13 +2112,76 @@
                 </div>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">City *</label>
-                <select class="form-select" data-bind="details.city">
-                  <option value="Lucknow" selected>Lucknow</option>
-                  <option value="Kanpur">Kanpur</option>
-                  <option value="Varanasi">Varanasi</option>
-                </select>
+              <div class="form-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div class="form-group">
+                  <label class="form-label" for="m-city">City *</label>
+                  <select id="m-city" class="form-select" data-bind="details.city">
+                    <option value="Lucknow" selected>Lucknow</option>
+                    <option value="Kanpur">Kanpur</option>
+                    <option value="Varanasi">Varanasi</option>
+                    <option value="Prayagraj">Prayagraj</option>
+                    <option value="Ayodhya">Ayodhya</option>
+                    <option value="Gorakhpur">Gorakhpur</option>
+                    <option value="Noida">Noida</option>
+                    <option value="Ghaziabad">Ghaziabad</option>
+                    <option value="Agra">Agra</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                    <option value="Mumbai">Mumbai</option>
+                    <option value="Bengaluru">Bengaluru</option>
+                    <option value="Hyderabad">Hyderabad</option>
+                    <option value="Kolkata">Kolkata</option>
+                    <option value="Chennai">Chennai</option>
+                    <option value="Pune">Pune</option>
+                    <option value="Ahmedabad">Ahmedabad</option>
+                    <option value="Jaipur">Jaipur</option>
+                    <option value="Chandigarh">Chandigarh</option>
+                    <option value="Indore">Indore</option>
+                    <option value="Bhopal">Bhopal</option>
+                    <option value="Patna">Patna</option>
+                    <option value="Dehradun">Dehradun</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="m-state">State *</label>
+                  <select id="m-state" class="form-select" data-bind="details.state">
+                    <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                    <option value="Andhra Pradesh">Andhra Pradesh</option>
+                    <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                    <option value="Assam">Assam</option>
+                    <option value="Bihar">Bihar</option>
+                    <option value="Chandigarh">Chandigarh</option>
+                    <option value="Chhattisgarh">Chhattisgarh</option>
+                    <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                    <option value="Delhi">Delhi</option>
+                    <option value="Goa">Goa</option>
+                    <option value="Gujarat">Gujarat</option>
+                    <option value="Haryana">Haryana</option>
+                    <option value="Himachal Pradesh">Himachal Pradesh</option>
+                    <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                    <option value="Jharkhand">Jharkhand</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Kerala">Kerala</option>
+                    <option value="Ladakh">Ladakh</option>
+                    <option value="Lakshadweep">Lakshadweep</option>
+                    <option value="Madhya Pradesh">Madhya Pradesh</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                    <option value="Manipur">Manipur</option>
+                    <option value="Meghalaya">Meghalaya</option>
+                    <option value="Mizoram">Mizoram</option>
+                    <option value="Nagaland">Nagaland</option>
+                    <option value="Odisha">Odisha</option>
+                    <option value="Puducherry">Puducherry</option>
+                    <option value="Punjab">Punjab</option>
+                    <option value="Rajasthan">Rajasthan</option>
+                    <option value="Sikkim">Sikkim</option>
+                    <option value="Tamil Nadu">Tamil Nadu</option>
+                    <option value="Telangana">Telangana</option>
+                    <option value="Tripura">Tripura</option>
+                    <option value="Uttar Pradesh" selected>Uttar Pradesh</option>
+                    <option value="Uttarakhand">Uttarakhand</option>
+                    <option value="West Bengal">West Bengal</option>
+                  </select>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Cuisines</label>
@@ -2118,6 +2206,12 @@
                   <span class="choice-chip active" data-city="Varanasi"><span class="chip-check">✓</span> Varanasi</span>
                   <span class="choice-chip" data-city="Prayagraj">Prayagraj</span>
                   <span class="choice-chip" data-city="Gorakhpur">Gorakhpur</span>
+                  <span class="choice-chip" data-city="Agra">Agra</span>
+                  <span class="choice-chip" data-city="Delhi NCR">Delhi NCR</span>
+                  <span class="choice-chip" data-city="Noida">Noida</span>
+                  <span class="choice-chip" data-city="Mumbai">Mumbai</span>
+                  <span class="choice-chip" data-city="Bengaluru">Bengaluru</span>
+                  <span class="choice-chip" data-city="Hyderabad">Hyderabad</span>
                   <div class="chip-custom-adder">
                     <input type="text" class="input-chip-add" id="mobile-input-custom-city" placeholder="+ City" style="width:80px;" />
                     <button type="button" class="btn-chip-add btn-add-custom-city" onclick="addCustomCity('mobile')" title="Add city">+</button>
@@ -2187,41 +2281,27 @@
                   <div class="offering-title">Baina Boxes</div>
                   <div class="offering-blurb">Artisanal sweet gift hampers & invitation boxes.</div>
                 </div>
-                <!-- 4. Live Counters -->
-                <div class="offering-card" data-offering-key="counters" onclick="toggleOffering('counters')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍳</span>
-                    <div class="offering-checkbox"></div>
-                  </div>
-                  <div class="offering-title">Live Counters</div>
-                  <div class="offering-blurb">Interactive cooking stations (Chaat, Tandoor, Dosa, Paan).</div>
+              </div>
+
+              <!-- Mobile Feast Offering Sub-Configurations (Pre-Task 23 Correction) -->
+              <div class="feast-subofferings-panel" style="margin-top:12px; padding:10px 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-size:11.5px; font-weight:700; color:var(--color-black);">🍲 Feast Sub-Configurations</span>
+                  <span class="badge" style="background:var(--color-cream); color:var(--color-red); font-size:9px; font-weight:700;">Sub-Parts</span>
                 </div>
-                <!-- 5. Extras -->
-                <div class="offering-card" data-offering-key="extras" onclick="toggleOffering('extras')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🪑</span>
-                    <div class="offering-checkbox"></div>
+                <div class="feast-subparts-grid" style="grid-template-columns:1fr; gap:6px;">
+                  <div class="feast-subpart-card" data-offering-key="counters" style="padding:8px 10px;">
+                    <div class="subpart-title" style="font-size:11px;"><span>🍳</span> <span>Live Counters</span></div>
                   </div>
-                  <div class="offering-title">Extras</div>
-                  <div class="offering-blurb">Chafing warmers, buffet tables & rental event gear.</div>
-                </div>
-                <!-- 6. Add-ons -->
-                <div class="offering-card" data-offering-key="addons" onclick="toggleOffering('addons')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍹</span>
-                    <div class="offering-checkbox"></div>
+                  <div class="feast-subpart-card" data-offering-key="extras" style="padding:8px 10px;">
+                    <div class="subpart-title" style="font-size:11px;"><span>✨</span> <span>Feast Extras</span></div>
                   </div>
-                  <div class="offering-title">Add-ons</div>
-                  <div class="offering-blurb">Welcome coolers, dessert bar & midnight refreshments.</div>
-                </div>
-                <!-- 7. Essentials -->
-                <div class="offering-card" data-offering-key="essentials" onclick="toggleOffering('essentials')">
-                  <div class="offering-header">
-                    <span class="offering-icon">🍽️</span>
-                    <div class="offering-checkbox"></div>
+                  <div class="feast-subpart-card" data-offering-key="essentials" style="padding:8px 10px;">
+                    <div class="subpart-title" style="font-size:11px;"><span>🛡️</span> <span>Essentials</span></div>
                   </div>
-                  <div class="offering-title">Essentials</div>
-                  <div class="offering-blurb">Uniformed stewards, tableware packages & waste disposal.</div>
+                  <div class="feast-subpart-card" data-offering-key="addons" style="padding:8px 10px;">
+                    <div class="subpart-title" style="font-size:11px;"><span>🍽️</span> <span>Add-ons</span></div>
+                  </div>
                 </div>
               </div>
 
@@ -2552,31 +2632,8 @@
               <h1 class="step-heading">Inclusions</h1>
             </header>
             <div class="content-card">
-              <!-- Task 16: Tableware Add-ons -->
-              <div class="card-title-row">
-                <span class="card-title" style="font-size:13px;">🍽️ Tableware Add-on</span>
-              </div>
-              <div class="cutlery-tier-grid">
-                <div class="cutlery-tier-card" data-cutlery-id="essential" onclick="setCutleryTier('essential')">
-                  <div class="cutlery-pkg-badge">Package A</div>
-                  <div class="cutlery-tier-name">Eco Disposables (₹0)</div>
-                </div>
-                <div class="cutlery-tier-card active" data-cutlery-id="standard" onclick="setCutleryTier('standard')">
-                  <div class="cutlery-pkg-badge">Package B</div>
-                  <div class="cutlery-tier-name">Ceramic & Steel (+₹40/p)</div>
-                </div>
-                <div class="cutlery-tier-card" data-cutlery-id="premium" onclick="setCutleryTier('premium')">
-                  <div class="cutlery-pkg-badge">Package C</div>
-                  <div class="cutlery-tier-name">Bone China (+₹90/p)</div>
-                </div>
-                <div class="cutlery-tier-card" data-cutlery-id="ultra" onclick="setCutleryTier('ultra')">
-                  <div class="cutlery-pkg-badge">Package D</div>
-                  <div class="cutlery-tier-name">Luxury Gold/Silver (+₹180/p)</div>
-                </div>
-              </div>
-
               <!-- Task 14: Feast Extras -->
-              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
+              <div>
                 <div class="card-title-row">
                   <span class="card-title" style="font-size:13px;">✨ Feast Extras</span>
                 </div>
@@ -2624,6 +2681,31 @@
                   <span class="choice-chip active" data-essential-key="handwashStation" onclick="toggleFeastEssential('handwashStation')"><span class="chip-check">✓</span> Handwash</span>
                   <span class="choice-chip active" data-essential-key="wasteBins" onclick="toggleFeastEssential('wasteBins')"><span class="chip-check">✓</span> Dustbins</span>
                   <span class="choice-chip active" data-essential-key="hygieneCrew" onclick="toggleFeastEssential('hygieneCrew')"><span class="chip-check">✓</span> Cleaners</span>
+                </div>
+              </div>
+
+              <!-- Task 16: Tableware Add-ons -->
+              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
+                <div class="card-title-row">
+                  <span class="card-title" style="font-size:13px;">🍽️ Tableware Add-on</span>
+                </div>
+                <div class="cutlery-tier-grid">
+                  <div class="cutlery-tier-card" data-cutlery-id="essential" onclick="setCutleryTier('essential')">
+                    <div class="cutlery-pkg-badge">Package A</div>
+                    <div class="cutlery-tier-name">Eco Disposables (₹0)</div>
+                  </div>
+                  <div class="cutlery-tier-card active" data-cutlery-id="standard" onclick="setCutleryTier('standard')">
+                    <div class="cutlery-pkg-badge">Package B</div>
+                    <div class="cutlery-tier-name">Ceramic & Steel (+₹40/p)</div>
+                  </div>
+                  <div class="cutlery-tier-card" data-cutlery-id="premium" onclick="setCutleryTier('premium')">
+                    <div class="cutlery-pkg-badge">Package C</div>
+                    <div class="cutlery-tier-name">Bone China (+₹90/p)</div>
+                  </div>
+                  <div class="cutlery-tier-card" data-cutlery-id="ultra" onclick="setCutleryTier('ultra')">
+                    <div class="cutlery-pkg-badge">Package D</div>
+                    <div class="cutlery-tier-name">Luxury Gold/Silver (+₹180/p)</div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -4238,3 +4238,66 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   background: rgba(0, 0, 0, 0.02);
 }
 
+/* ── Bhojpatra Official Header Logo ── */
+.bhojpatra-header-logo {
+  height: 36px;
+  width: auto;
+  max-height: 36px;
+  max-width: 160px;
+  object-fit: contain;
+  display: block;
+}
+
+.mobile-frame .bhojpatra-header-logo {
+  height: 26px;
+  max-height: 26px;
+  max-width: 110px;
+}
+
+/* ── Feast Sub-Configurations Panel (Pre-Task 23 Correction) ── */
+.feast-subofferings-panel {
+  margin-top: 16px;
+  background: rgba(240, 208, 158, 0.12);
+  border: 1px dashed var(--color-cream);
+  border-radius: var(--radius-card);
+  padding: 14px 18px;
+}
+
+.feast-subparts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.feast-subpart-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-cream-30);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: var(--transition-fast);
+}
+
+.feast-subpart-card:hover {
+  border-color: var(--color-red-40);
+  background: #FFFDFB;
+}
+
+.subpart-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-black);
+}
+
+.subpart-desc {
+  font-size: 11px;
+  color: var(--color-black-60);
+  line-height: 1.35;
+}
+
+

@@ -7,6 +7,25 @@
  * ==========================================================================
  */
 
+// ── Canonical Geographic Data Sources (reused from src/lib/data.ts & V1) ──
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam",
+  "Bihar", "Chandigarh", "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat",
+  "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka",
+  "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+  "Uttarakhand", "West Bengal"
+];
+
+const CANONICAL_CITIES = [
+  "Lucknow", "Kanpur", "Varanasi", "Prayagraj", "Ayodhya", "Gorakhpur",
+  "Noida", "Ghaziabad", "Agra", "Delhi NCR", "Mumbai", "Bengaluru",
+  "Hyderabad", "Kolkata", "Chennai", "Pune", "Ahmedabad", "Jaipur",
+  "Chandigarh", "Indore", "Bhopal", "Patna", "Dehradun"
+];
+
 // ── Application Mock State (Bhojpatra Data Model) ──
 const state = {
   // Navigation & Sequence
@@ -1963,98 +1982,7 @@ function renderMasterReview() {
     `;
   }
 
-  // 3. Live Counters Review (if selected)
-  if (state.selectedOfferings.includes('counters')) {
-    const activeLiveCounters = state.catering.availableCounters.filter(ac => state.catering.liveCounters.includes(ac.id));
-    html += `
-      <div class="review-section-card">
-        <div class="review-section-header">
-          <div class="review-section-title">
-            <span>🍳</span>
-            <span>Live Counters (${activeLiveCounters.length} Counters Configured)</span>
-          </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-live')">Edit Counters ✎</button>
-        </div>
-        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Interactive on-site cooking and beverage stations.</p>
-        <div class="review-pills-row">
-          ${activeLiveCounters.map(alc => `
-            <span class="review-pill" style="border-color:var(--color-red-40);">
-              <span>${alc.icon}</span> <strong>${alc.name}</strong> (+₹${alc.rate}/plate)
-            </span>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  // 4. Extras Review (if selected)
-  if (state.selectedOfferings.includes('extras')) {
-    html += `
-      <div class="review-section-card">
-        <div class="review-section-header">
-          <div class="review-section-title">
-            <span>🪑</span>
-            <span>Extras: Event Rentals & Equipment</span>
-          </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Extras ✎</button>
-        </div>
-        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Additional buffet equipment, chafing warmers, and event furniture rentals.</p>
-        <div class="review-pills-row">
-          <span class="service-pill">✓ Heavy-Duty Chafing Dishes & Food Warmers</span>
-          <span class="service-pill">✓ Designer Buffet Tables & Banquet Linens</span>
-          <span class="service-pill">✓ Live Mocktail & Beverage Glassware</span>
-          <span class="service-pill">✓ Traditional Brass & Copper Cookware</span>
-        </div>
-      </div>
-    `;
-  }
-
-  // 5. Add-ons Review (if selected)
-  if (state.selectedOfferings.includes('addons')) {
-    html += `
-      <div class="review-section-card">
-        <div class="review-section-header">
-          <div class="review-section-title">
-            <span>🍹</span>
-            <span>Add-ons: Refreshments & Dessert Spreads</span>
-          </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Add-ons ✎</button>
-        </div>
-        <p style="font-size:12px;color:var(--color-black-80);margin-bottom:8px;">Supplementary guest experience enhancements and special food spreads.</p>
-        <div class="review-pills-row">
-          <span class="service-pill">✓ Welcome Drinks & Mocktail Coolers</span>
-          <span class="service-pill">✓ Artisanal Live Dessert & Halwai Studio</span>
-          <span class="service-pill">✓ Midnight Snack & Chai Stations</span>
-        </div>
-      </div>
-    `;
-  }
-
-  // 6. Essentials Review (if selected)
-  if (state.selectedOfferings.includes('essentials')) {
-    const cutleryChoice = state.catering.cutleryTiers.find(ct => ct.id === state.catering.cutleryTier);
-    html += `
-      <div class="review-section-card">
-        <div class="review-section-header">
-          <div class="review-section-title">
-            <span>🍽️</span>
-            <span>Essentials: Service Crew & Tableware</span>
-          </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-cat-extras')">Edit Essentials ✎</button>
-        </div>
-        <div style="font-size:12px;font-weight:700;color:var(--color-black);">
-          Selected Tableware: ${cutleryChoice?.name || "Standard Tableware"} <span style="color:var(--color-red);">(${cutleryChoice?.rate || "Included"})</span>
-        </div>
-        <p style="font-size:11px;color:var(--color-black-60);margin-top:2px;">${cutleryChoice?.desc}</p>
-        <div class="review-pills-row" style="margin-top:8px;">
-          <span class="service-pill">✓ Uniformed Stewards & Service Captain</span>
-          <span class="service-pill">✓ Acrylic Bilingual Food Labels</span>
-          <span class="service-pill">✓ Handwash Setup & Sanitization</span>
-          <span class="service-pill">✓ Dedicated Waste Management Crew</span>
-        </div>
-      </div>
-    `;
-  }
+  // 3. Feast Sub-Parts (Live Counters, Extras, Essentials, Add-ons) are integrated inside Feast Booking card above.
 
   // 3. Stall Review (if selected)
   if (hasStall) {
@@ -2465,6 +2393,18 @@ function renderPhase3StateToUI() {
     });
   }
 
+  // Sync Primary Kitchen City & State
+  if (state.details.city) {
+    document.querySelectorAll('#d-city, #m-city, select[data-bind="details.city"]').forEach(sel => {
+      sel.value = state.details.city;
+    });
+  }
+  if (state.details.state) {
+    document.querySelectorAll('#d-state, #m-state, select[data-bind="details.state"]').forEach(sel => {
+      sel.value = state.details.state;
+    });
+  }
+
   // 3. Sync Minimum Preparation Notice (Task 11)
   if (state.catering.leadHours) {
     document.querySelectorAll('#cat-lead-hours, #mob-cat-lead-hours').forEach(sel => {
@@ -2530,9 +2470,9 @@ function setupEventListeners() {
   if (window.__listenersInitialized) return;
   window.__listenersInitialized = true;
 
-  // Synchronize two-way input bindings
+  // Synchronize two-way input bindings (input & change for selects)
   document.querySelectorAll('input[data-bind], select[data-bind], textarea[data-bind]').forEach(input => {
-    input.addEventListener('input', (e) => {
+    const syncHandler = (e) => {
       const path = e.target.getAttribute('data-bind').split('.');
       let obj = state;
       for (let i = 0; i < path.length - 1; i++) {
@@ -2546,7 +2486,9 @@ function setupEventListeners() {
       });
 
       updateVendorContextHeader();
-    });
+    };
+    input.addEventListener('input', syncHandler);
+    input.addEventListener('change', syncHandler);
   });
 
   // Universal Choice Chip Click Delegator
