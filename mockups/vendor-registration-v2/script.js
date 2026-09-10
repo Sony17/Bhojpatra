@@ -376,6 +376,10 @@ const STEP_SEQUENCE = [
 
 // ── Initial Setup on Window Load ──
 function initApp() {
+  // Normalize default mock box selection to max 5 (Task 22)
+  if (state.baina && state.baina.boxes && state.baina.boxes.length > 5) {
+    state.baina.boxes = state.baina.boxes.slice(0, 5);
+  }
   renderAllViews();
   setupEventListeners();
   goToStep('view-details');
@@ -1568,36 +1572,80 @@ function setPackagingStyle(styleKey) {
   });
 }
 
+function updateBoxLimitUI() {
+  const count = state.baina && state.baina.boxes ? state.baina.boxes.length : 0;
+  const isAtLimit = count >= 5;
+
+  document.querySelectorAll('.box-selection-limit-notice').forEach(el => {
+    el.style.display = isAtLimit ? 'block' : 'none';
+    if (isAtLimit) {
+      el.textContent = 'Maximum 5 selections allowed.';
+    }
+  });
+
+  document.querySelectorAll('#desktop-btn-add-box, #mobile-btn-add-box').forEach(btn => {
+    if (isAtLimit) {
+      btn.classList.add('limit-reached');
+      btn.setAttribute('aria-disabled', 'true');
+    } else {
+      btn.classList.remove('limit-reached');
+      btn.removeAttribute('aria-disabled');
+    }
+  });
+}
+
 function renderBainaBoxList() {
   const containers = document.querySelectorAll('.baina-box-catalog-container');
+  if (!state.baina.boxes) state.baina.boxes = [];
+  const count = state.baina.boxes.length;
+
   containers.forEach(c => {
-    c.innerHTML = state.baina.boxes.map(b => `
-      <div class="dish-card" id="box-row-${b.id}">
+    if (count === 0) {
+      c.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--color-black-60); font-size: 13px;">
+          No gifting boxes added yet. Click below to add your first box hamper (up to 5).
+        </div>
+      `;
+      return;
+    }
+
+    c.innerHTML = state.baina.boxes.map((b, idx) => `
+      <div class="dish-card selected" id="box-row-${b.id}" data-box-id="${b.id}">
         <div class="dish-card-left">
-          <img src="${b.photo}" alt="${b.name}" class="dish-thumb" onerror="this.src='https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=70'" />
+          <img src="${b.photo}" alt="${escapeHtml(b.name)}" class="dish-thumb" onerror="this.src='https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=70'" />
           <div class="dish-info">
             <div class="dish-name-row">
-              <span class="dish-name">${b.name}</span>
+              <span class="dish-name">${escapeHtml(b.name)}</span>
+              <span class="service-pill" style="font-size:10px;background:var(--color-cream);color:var(--color-red);font-weight:700;">Box ${idx + 1} of 5</span>
             </div>
-            <p class="dish-desc">${b.contents}</p>
+            <p class="dish-desc">${escapeHtml(b.contents)}</p>
             <div class="dish-meta-row" style="margin-top:5px;">
               <span class="review-pill" style="font-weight:700;color:var(--color-red);">½ kg: ₹${b.priceHalfKg}</span>
               ${b.priceOneKg ? `<span class="review-pill" style="font-weight:700;">1 kg: ₹${b.priceOneKg}</span>` : ''}
-              ${b.customSizes.map(s => `<span class="service-pill">${s.label}: ₹${s.price}</span>`).join('')}
+              ${(b.customSizes || []).map(s => `<span class="service-pill">${escapeHtml(s.label)}: ₹${s.price}</span>`).join('')}
             </div>
           </div>
         </div>
         <div class="dish-card-actions">
-          <button type="button" class="btn-icon-action" onclick="openBoxEditor('${b.id}')">✎</button>
-          <button type="button" class="btn-icon-action" onclick="deleteBox('${b.id}')">✕</button>
+          <button type="button" class="btn-icon-action" title="Edit Box" aria-label="Edit ${escapeHtml(b.name)}" onclick="openBoxEditor('${b.id}')">✎</button>
+          <button type="button" class="btn-icon-action" title="Remove Box" aria-label="Remove ${escapeHtml(b.name)}" onclick="deleteBox('${b.id}')">✕</button>
         </div>
       </div>
     `).join('');
   });
+
+  updateBoxLimitUI();
 }
 
 function openBoxEditor(boxId) {
-  state.activeEditBoxId = boxId;
+  // If attempting to open editor to add a new 6th box while already at 5 boxes, reject with clear feedback
+  if (!boxId && state.baina && state.baina.boxes && state.baina.boxes.length >= 5) {
+    showToast("Maximum 5 selections allowed.");
+    updateBoxLimitUI();
+    return;
+  }
+
+  state.activeEditBoxId = boxId || null;
   const modal = document.getElementById('modal-box-editor');
   if (!modal) return;
 
@@ -1650,6 +1698,14 @@ function saveBoxEditor() {
     }
     showToast(`Updated "${name}"`);
   } else {
+    // Enforce 5-selection limit: attempting a 6th box is rejected
+    if (state.baina.boxes.length >= 5) {
+      showToast("Maximum 5 selections allowed.");
+      updateBoxLimitUI();
+      closeBoxEditor();
+      return;
+    }
+
     state.baina.boxes.push({
       id: `box-${Date.now()}`,
       name,
@@ -1659,7 +1715,7 @@ function saveBoxEditor() {
       customSizes: [{ label: "250g", price: Math.round(halfKg * 0.6) }],
       photo
     });
-    showToast(`Added "${name}" to box catalog`);
+    showToast(`Added "${name}" to box catalog (${state.baina.boxes.length}/5)`);
   }
 
   closeBoxEditor();
@@ -1667,9 +1723,52 @@ function saveBoxEditor() {
 }
 
 function deleteBox(boxId) {
+  if (!state.baina || !state.baina.boxes) return;
   state.baina.boxes = state.baina.boxes.filter(b => b.id !== boxId);
   renderBainaBoxList();
   showToast("Gifting box removed.");
+}
+
+// Alias deselectBox to deleteBox for explicit deselection API
+function deselectBox(boxId) {
+  deleteBox(boxId);
+}
+
+// Box selection helpers ensuring canonical state reuse and 5-selection limit
+function selectBox(boxObj) {
+  if (!state.baina) state.baina = { boxes: [] };
+  if (!state.baina.boxes) state.baina.boxes = [];
+
+  // Prevent duplicate additions
+  if (state.baina.boxes.some(b => b.id === boxObj.id || b.name.toLowerCase() === boxObj.name.toLowerCase())) {
+    return false;
+  }
+
+  // Enforce 5-selection limit
+  if (state.baina.boxes.length >= 5) {
+    showToast("Maximum 5 selections allowed.");
+    updateBoxLimitUI();
+    return false;
+  }
+
+  state.baina.boxes.push(boxObj);
+  renderBainaBoxList();
+  return true;
+}
+
+function toggleBox(boxId) {
+  if (!state.baina || !state.baina.boxes) return false;
+  const exists = state.baina.boxes.some(b => b.id === boxId);
+  if (exists) {
+    deselectBox(boxId);
+    return false;
+  }
+  if (state.baina.boxes.length >= 5) {
+    showToast("Maximum 5 selections allowed.");
+    updateBoxLimitUI();
+    return false;
+  }
+  return true;
 }
 
 // ── Consolidated Review & Submit (Sony's Core Requirement) ──

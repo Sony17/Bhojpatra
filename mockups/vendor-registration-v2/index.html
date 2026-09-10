@@ -1360,9 +1360,12 @@
             <div class="content-card">
               <div class="baina-box-catalog-container items-catalog-grid"></div>
 
-              <button type="button" class="btn-add-item-dashed" onclick="openBoxEditor()">
+              <button type="button" class="btn-add-item-dashed" id="desktop-btn-add-box" onclick="openBoxEditor()">
                 <span>＋</span> Add New Gifting Box Hamper
               </button>
+              <div class="box-selection-limit-notice" id="desktop-box-limit-notice" style="display:none;" role="status" aria-live="polite">
+                Maximum 5 selections allowed.
+              </div>
             </div>
           </article>
 
@@ -2680,7 +2683,10 @@
             <header class="step-header"><div class="step-eyebrow">Gift Boxes</div><h1 class="step-heading">Gift boxes</h1></header>
             <div class="content-card">
               <div class="baina-box-catalog-container items-catalog-grid"></div>
-              <button type="button" class="btn-add-item-dashed" onclick="openBoxEditor()">＋ Add Box</button>
+              <button type="button" class="btn-add-item-dashed" id="mobile-btn-add-box" onclick="openBoxEditor()">＋ Add Box</button>
+              <div class="box-selection-limit-notice" id="mobile-box-limit-notice" style="display:none;" role="status" aria-live="polite">
+                Maximum 5 selections allowed.
+              </div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-baina-packaging">
