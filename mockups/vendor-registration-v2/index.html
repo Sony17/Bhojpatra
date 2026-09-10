@@ -52,7 +52,6 @@
           </optgroup>
           <optgroup label="Specialty Stall Builder">
             <option value="view-stall-basics">Stall Identity & Specialty</option>
-            <option value="view-stall-format">Stall Menu Format (Fixed)</option>
             <option value="view-stall-delicacies">Delicacies Catalog</option>
             <option value="view-stall-pricing">Stall Pricing & Capacity</option>
             <option value="view-stall-live">Stall Setup & Cutlery</option>
@@ -141,9 +140,12 @@
           </div>
         </header>
 
-        <!-- Stepper Progress Bar (Consolidated 5 Phases) -->
+        <!-- Stepper Progress Bar (Consolidated 5 Phases with Animated Progress) -->
         <nav class="wizard-stepper-bar" aria-label="Onboarding Steps">
           <div class="stepper-track" id="desktop-stepper-track"></div>
+          <div class="stepper-overall-progress" aria-hidden="true">
+            <div class="stepper-overall-fill" id="desktop-stepper-overall-fill"></div>
+          </div>
         </nav>
 
         <!-- Persistent Vendor Context Header (Sony: reflected at top once collected) -->
@@ -186,8 +188,6 @@
         <!-- Subnav Breadcrumbs for Stall Builder -->
         <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
           <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">Stall Identity</button>
-          <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-format" onclick="goToStep('view-stall-format')">Menu Format</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">Delicacies Catalog</button>
           <span class="subnav-divider">›</span>
@@ -1245,28 +1245,6 @@
             </div>
           </article>
 
-          <!-- ── STALL: MENU FORMAT (FIXED SET SPREAD) ── -->
-          <article class="step-container" data-step-id="view-stall-format">
-            <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · Menu Format</div>
-              <h1 class="step-heading">How do customers order from this stall?</h1>
-              <p class="step-subtext">All Bhojpatra single stall bookings use the Fixed Set Spread format with a flat per-plate rate.</p>
-            </header>
-
-            <div class="content-card">
-              <div class="form-grid-1" style="max-width: 560px;">
-                <div class="offering-card stall-format-card active" data-format="fixed" onclick="setStallMenuType('fixed')">
-                  <div class="offering-header">
-                    <span style="font-size:28px;">🍱</span>
-                    <span class="badge" style="background:var(--color-red-10);color:var(--color-red);">Fixed Format</span>
-                  </div>
-                  <div class="offering-title">Fixed Set Spread</div>
-                  <div class="offering-blurb">Flat per-plate rate covering all published delicacies. Every guest gets the entire spread served fresh on-site.</div>
-                </div>
-              </div>
-            </div>
-          </article>
-
           <!-- ── STALL: DELICACIES CATALOG ── -->
           <article class="step-container" data-step-id="view-stall-delicacies">
             <header class="step-header">
@@ -1971,9 +1949,12 @@
           </div>
         </header>
 
-        <!-- Stepper Track Mobile -->
-        <nav class="wizard-stepper-bar">
+        <!-- Stepper Track Mobile (with Animated Progress) -->
+        <nav class="wizard-stepper-bar" aria-label="Onboarding Steps Mobile">
           <div class="stepper-track" id="mobile-stepper-track"></div>
+          <div class="stepper-overall-progress" aria-hidden="true">
+            <div class="stepper-overall-fill" id="mobile-stepper-overall-fill"></div>
+          </div>
         </nav>
 
         <!-- Mobile Persistent Context Header -->
@@ -2006,7 +1987,6 @@
         <!-- Mobile Subnav Breadcrumbs for Stall -->
         <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
           <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">Basics</button>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-format" onclick="goToStep('view-stall-format')">Format</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">Items</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">Pricing</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-live" onclick="goToStep('view-stall-live')">Live</button>
@@ -2670,12 +2650,6 @@
                   <button type="button" class="btn-sm btn-secondary" style="background:#FFF;border:1px solid #CCC;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;" onclick="toggleNewCategoryBox('mobile')">✕</button>
                 </div>
               </div>
-            </div>
-          </article>
-          <article class="step-container" data-step-id="view-stall-format">
-            <header class="step-header"><div class="step-eyebrow">Ordering Format</div><h1 class="step-heading">Ordering format</h1></header>
-            <div class="content-card">
-              <div class="offering-card stall-format-card active" data-format="fixed" onclick="setStallMenuType('fixed')"><div class="offering-title">Fixed Set Spread (₹280/p)</div></div>
             </div>
           </article>
           <article class="step-container" data-step-id="view-stall-delicacies">

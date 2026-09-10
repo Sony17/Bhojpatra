@@ -364,10 +364,9 @@ const STEP_SEQUENCE = [
   'view-cat-live',         // 5E. Catering: Live Counters (Separated!)
   'view-cat-extras',       // 5F. Catering: Extras, Essentials & Cutlery (Separated!)
   'view-stall-basics',     // 6A. Stall: Identity & Specialty
-  'view-stall-format',     // 6B. Stall: Menu Format (Fixed vs Varied)
-  'view-stall-delicacies', // 6C. Stall: Delicacies Catalog
-  'view-stall-pricing',    // 6D. Stall: Pricing & Pax
-  'view-stall-live',       // 6E. Stall: Equipment & Cutlery
+  'view-stall-delicacies', // 6B. Stall: Delicacies Catalog
+  'view-stall-pricing',    // 6C. Stall: Pricing & Pax
+  'view-stall-live',       // 6D. Stall: Equipment & Cutlery
   'view-baina-basics',     // 7A. Baina: Studio Story & Best For
   'view-baina-boxes',      // 7B. Baina: Box Catalog
   'view-baina-packaging',  // 7C. Baina: Packaging Styles
@@ -542,8 +541,7 @@ function nextStep() {
   }
 
   // Inside Stall Flow:
-  if (cur === 'view-stall-basics') { goToStep('view-stall-format'); return; }
-  if (cur === 'view-stall-format') { goToStep('view-stall-delicacies'); return; }
+  if (cur === 'view-stall-basics') { goToStep('view-stall-delicacies'); return; }
   if (cur === 'view-stall-delicacies') { goToStep('view-stall-pricing'); return; }
   if (cur === 'view-stall-pricing') { goToStep('view-stall-live'); return; }
   if (cur === 'view-stall-live') {
@@ -617,8 +615,7 @@ function prevStep() {
     }
     return;
   }
-  if (cur === 'view-stall-format') { goToStep('view-stall-basics'); return; }
-  if (cur === 'view-stall-delicacies') { goToStep('view-stall-format'); return; }
+  if (cur === 'view-stall-delicacies') { goToStep('view-stall-basics'); return; }
   if (cur === 'view-stall-pricing') { goToStep('view-stall-delicacies'); return; }
   if (cur === 'view-stall-live') { goToStep('view-stall-pricing'); return; }
 
@@ -745,7 +742,7 @@ function updateVendorContextHeader() {
   });
 }
 
-// ── Stepper Bar Progress Engine (Phase 1: Without Step Numbers) ──
+// ── Stepper Bar Progress Engine (Phase 1: Without Step Numbers, Phase 5: Animated Progress) ──
 function updateStepperProgress(stepId) {
   const phases = [
     { id: 'phase-identity', label: 'Identity', steps: ['view-details'] },
@@ -753,7 +750,7 @@ function updateStepperProgress(stepId) {
     { id: 'phase-offerings', label: 'Offerings', steps: ['view-offerings'] },
     { id: 'phase-builder', label: 'Service Setup', steps: [
       'view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers', 'view-cat-live', 'view-cat-extras',
-      'view-stall-basics', 'view-stall-format', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live',
+      'view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live',
       'view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'
     ]},
     { id: 'phase-review', label: 'Review & Submit', steps: ['view-review'] },
@@ -772,23 +769,60 @@ function updateStepperProgress(stepId) {
     const track = document.getElementById(trackId);
     if (!track) return;
 
-    let html = '';
-    phases.forEach((p, idx) => {
+    // Initialize DOM nodes once to preserve transition animation on subsequent step switches
+    if (track.querySelectorAll('.step-node').length !== phases.length) {
+      let html = '';
+      phases.forEach((p, idx) => {
+        html += `
+          <div class="step-node" data-phase-index="${idx}" onclick="jumpToPhase(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();jumpToPhase(${idx});}" role="button" tabindex="0" aria-label="${p.label}">
+            <div class="step-bullet"><span class="step-bullet-icon">•</span></div>
+            <span>${p.label}</span>
+          </div>
+        `;
+        if (idx < phases.length - 1) {
+          html += `<div class="stepper-line"><div class="stepper-line-fill"></div></div>`;
+        }
+      });
+      track.innerHTML = html;
+    }
+
+    // In-place update to trigger CSS transitions smoothly
+    const nodes = track.querySelectorAll('.step-node');
+    const lines = track.querySelectorAll('.stepper-line');
+
+    nodes.forEach((node, idx) => {
       const isActive = idx === currentPhaseIndex;
       const isCompleted = idx < currentPhaseIndex;
-      const statusClass = isActive ? 'active' : isCompleted ? 'completed' : '';
 
-      html += `
-        <div class="step-node ${statusClass}" onclick="jumpToPhase(${idx})">
-          <div class="step-bullet">${isCompleted ? '✓' : '•'}</div>
-          <span>${p.label}</span>
-        </div>
-      `;
-      if (idx < phases.length - 1) {
-        html += `<div class="stepper-line ${isCompleted ? 'completed' : ''}"></div>`;
+      node.classList.toggle('active', isActive);
+      node.classList.toggle('completed', isCompleted);
+      node.setAttribute('aria-current', isActive ? 'step' : 'false');
+
+      const icon = node.querySelector('.step-bullet-icon');
+      if (icon) {
+        icon.textContent = isCompleted ? '✓' : '•';
       }
     });
-    track.innerHTML = html;
+
+    lines.forEach((line, idx) => {
+      const isCompleted = idx < currentPhaseIndex;
+      line.classList.toggle('completed', isCompleted);
+      const fill = line.querySelector('.stepper-line-fill');
+      if (fill) {
+        fill.style.width = isCompleted ? '100%' : '0%';
+      }
+    });
+  });
+
+  // Animate overall continuous progress line
+  const totalPhases = phases.length;
+  const progressPercent = Math.min(100, Math.max(0, Math.round((currentPhaseIndex / (totalPhases - 1)) * 100)));
+  ['desktop-stepper-overall-fill', 'mobile-stepper-overall-fill'].forEach(fillId => {
+    const fill = document.getElementById(fillId);
+    if (fill) {
+      fill.style.width = `${progressPercent}%`;
+      fill.setAttribute('aria-valuenow', progressPercent);
+    }
   });
 }
 
@@ -2154,14 +2188,17 @@ function showToast(message) {
 
 // ── Universal Choice Chip Interactive Selection Engine ──
 function getChipLabel(chip) {
+  if (chip.hasAttribute('data-cuisine')) return chip.getAttribute('data-cuisine');
+  if (chip.hasAttribute('data-city')) return chip.getAttribute('data-city');
+  if (chip.hasAttribute('data-essential-key')) return chip.getAttribute('data-essential-key');
   const clone = chip.cloneNode(true);
   const check = clone.querySelector('.chip-check');
   if (check) check.remove();
-  return clone.textContent.replace(/[✓✔\s]+/g, ' ').trim();
+  return clone.textContent.replace(/[✓✔]+/g, '').trim();
 }
 
 function setChipState(chip, isActive) {
-  const label = getChipLabel(chip);
+  const label = chip.getAttribute('data-cuisine') || chip.getAttribute('data-city') || getChipLabel(chip);
   if (isActive) {
     chip.classList.add('active');
     chip.innerHTML = `<span class="chip-check">✓</span> ${label}`;
@@ -2387,6 +2424,51 @@ function renderPhase3StateToUI() {
       card.classList.toggle('active', id === state.catering.cutleryTier);
     });
   }
+}
+
+// ── Initial Bindings & Listeners ──
+function setupEventListeners() {
+  if (window.__listenersInitialized) return;
+  window.__listenersInitialized = true;
+
+  // Synchronize two-way input bindings
+  document.querySelectorAll('input[data-bind], select[data-bind], textarea[data-bind]').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const path = e.target.getAttribute('data-bind').split('.');
+      let obj = state;
+      for (let i = 0; i < path.length - 1; i++) {
+        obj = obj[path[i]];
+      }
+      obj[path[path.length - 1]] = e.target.value;
+
+      // Also mirror value to identical inputs on other canvas (desktop <-> mobile)
+      document.querySelectorAll(`[data-bind="${e.target.getAttribute('data-bind')}"]`).forEach(mirror => {
+        if (mirror !== e.target) mirror.value = e.target.value;
+      });
+
+      updateVendorContextHeader();
+    });
+  });
+
+  // Universal Choice Chip Click Delegator
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('.choice-chip');
+    if (!chip) return;
+    if (e.target.closest('.chip-custom-adder')) return;
+
+    toggleChoiceChip(chip);
+  });
+
+  // Universal Choice Chip Keyboard Accessibility (Enter / Space)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const chip = e.target.closest('.choice-chip');
+      if (chip && !e.target.closest('.chip-custom-adder')) {
+        e.preventDefault();
+        toggleChoiceChip(chip);
+      }
+    }
+  });
 }
 
 function renderAllViews() {

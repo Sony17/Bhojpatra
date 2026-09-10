@@ -424,9 +424,28 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
 .wizard-stepper-bar {
   background: var(--bg-card);
   border-bottom: 1px solid var(--color-cream-30);
-  padding: 10px 24px;
+  padding: 10px 24px 12px;
   flex-shrink: 0;
   overflow-x: auto;
+  position: relative;
+}
+
+.stepper-overall-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-cream-30, rgba(0, 0, 0, 0.06));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stepper-overall-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-red) 0%, var(--color-gold, #C5A059) 100%);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .stepper-track {
@@ -474,18 +493,31 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  transition: all var(--dur-fast) ease;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .step-node.active .step-bullet {
   background: var(--color-red);
   color: var(--color-cream);
+  transform: scale(1.08);
   box-shadow: 0 0 0 3px var(--color-red-15);
 }
 
 .step-node.completed .step-bullet {
   background: var(--color-red);
   color: var(--color-cream);
+  transform: scale(1);
+}
+
+.step-bullet-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .stepper-line {
@@ -493,10 +525,35 @@ body.mode-sidebyside #wrapper-mobile  { display: flex; }
   height: 2px;
   background: var(--color-cream-30);
   min-width: 20px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 1px;
 }
 
-.stepper-line.completed {
+.stepper-line-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
   background: var(--color-red);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 1px;
+}
+
+.stepper-line.completed .stepper-line-fill {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper-overall-fill,
+  .stepper-line-fill,
+  .step-node,
+  .step-bullet,
+  .step-bullet-icon {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* ==========================================================================
