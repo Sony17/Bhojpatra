@@ -244,6 +244,16 @@
       font-weight: 900;
       font-size: 18px;
       font-family: var(--font-display);
+      overflow: hidden;
+      padding: 0;
+    }
+    .brand-icon-pot img,
+    .bhojpatra-official-emblem {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      border-radius: inherit;
     }
     .brand-title {
       font-family: var(--font-display);
@@ -1423,7 +1433,9 @@
         <aside class="vendor-sidebar">
           <div class="sidebar-brand-block">
             <div class="brand-logo-row">
-              <div class="brand-icon-pot">भ</div>
+              <div class="brand-icon-pot" style="overflow:hidden; background:transparent;">
+                <img src="../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../public/bhojpatra-icon.png'" />
+              </div>
               <div>
                 <div class="brand-title">Bhojpatra</div>
                 <div class="portal-tag">Vendor Portal</div>
@@ -1805,7 +1817,9 @@
             </button>
 
             <div class="mobile-title-group">
-              <div class="brand-icon-pot" style="width:24px; height:24px; font-size:14px;">भ</div>
+              <div class="brand-icon-pot" style="width:24px; height:24px; overflow:hidden; background:transparent;">
+                <img src="../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../public/bhojpatra-icon.png'" />
+              </div>
               <span class="mobile-title">Royal Awadh Caterers</span>
             </div>
 

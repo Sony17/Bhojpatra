@@ -246,11 +246,39 @@ const state = {
       platinum: { welcome: 2, starters: 6, main: 6, breads: 2, sweets: 4 }
     },
 
-    // 5E. Live Food & Beverage Counters (Distinct from Extras!)
-    liveCounters: ["chaat", "live", "pan"],
+    // 5E. Live Food & Beverage Counters (Vendor Catalog Builder - Task 13)
+    liveCounters: [
+      {
+        id: "lc-chaat",
+        category: "Chaat Station",
+        name: "Chaat Station",
+        coverPhoto: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70",
+        items: ["Golgappa", "Aloo Tikki", "Papdi Chaat", "Dahi Puri"],
+        extraCostPerPlate: 80,
+        rate: 80
+      },
+      {
+        id: "lc-tandoor",
+        category: "Live Tandoor & Wok",
+        name: "Live Tandoor & Wok",
+        coverPhoto: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=70",
+        items: ["Seekh Kebab", "Charcoal Paneer Tikka", "Tandoori Roti"],
+        extraCostPerPlate: 120,
+        rate: 120
+      },
+      {
+        id: "lc-pan",
+        category: "Banarasi Paan Bar",
+        name: "Banarasi Paan Bar",
+        coverPhoto: "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=400&q=70",
+        items: ["Meetha Paan", "Chocolate Paan", "Silver Warq Mukhwas"],
+        extraCostPerPlate: 40,
+        rate: 40
+      }
+    ],
     availableCounters: [
-      { id: "chaat", name: "Chaat Station", rate: 60, icon: "🥘", desc: "Live Golgappa, Aloo Tikki, Papdi Chaat & Dahi Bhalla" },
-      { id: "live", name: "Live Tandoor & Wok", rate: 90, icon: "🍳", desc: "Live rotis, tandoor tikka skewers, and fresh tawa tosses" },
+      { id: "chaat", name: "Chaat Station", rate: 80, icon: "🥘", desc: "Live Golgappa, Aloo Tikki, Papdi Chaat & Dahi Puri" },
+      { id: "live", name: "Live Tandoor & Wok", rate: 120, icon: "🍳", desc: "Seekh Kebab, Charcoal Paneer Tikka, Tandoori Roti" },
       { id: "pan", name: "Banarasi Paan Counter", rate: 40, icon: "🍃", desc: "Live meetha paan, chocolate paan, silver warq & mukhwas" },
       { id: "pizza", name: "Wood-Fired Pizza", rate: 120, icon: "🍕", desc: "Hand-tossed thin crust artisanal pizzas baked in live oven" },
       { id: "chinese", name: "Chinese Live Wok", rate: 85, icon: "🍜", desc: "Wok-tossed Hakka noodles, Manchurian & spicy Schezwan" },
@@ -259,7 +287,7 @@ const state = {
       { id: "mocktail", name: "Mocktail & Juice Bar", rate: 65, icon: "🍹", desc: "Live fruit punches, mojitos, and fresh botanical coolers" }
     ],
 
-    // 5F. Extras, Essentials & Cutlery (Feast Inclusions)
+    // 5F. Extras, Essentials & Cutlery (Vendor Catalog Builder - Task 14)
     cutleryTier: "standard", // 'essential' | 'standard' | 'premium' | 'ultra'
     cutleryTiers: [
       { id: "essential", name: "Package A · Essential Disposables", rate: "Included (₹0)", desc: "Heavy-duty biodegradable areca leaf plates, wooden cutlery & paper cups" },
@@ -267,7 +295,28 @@ const state = {
       { id: "premium", name: "Package C · Premium Bone China", rate: "+₹90/plate", desc: "Fine bone china crockery, polished stainless cutlery & crystal stemware" },
       { id: "ultra", name: "Package D · Ultra Luxury Gold/Silver", rate: "+₹180/plate", desc: "Imported luxury designer crockery, gold/silver finish cutlery & royal banquet linens" }
     ],
-    extras: ["mocktail"],
+    extras: [
+      {
+        id: "ext-mocktail",
+        category: "Welcome Drinks & Mocktails",
+        name: "Welcome Drinks & Mocktails",
+        coverPhoto: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70",
+        items: ["Virgin Mojito", "Fresh Lime Soda", "Aam Panna Cooler", "Fruit Punch"],
+        pricingType: "per-plate",
+        rate: 65,
+        extraCostPerPlate: 65
+      },
+      {
+        id: "ext-hitea",
+        category: "Hi-Tea & Evening Snacks",
+        name: "Hi-Tea & Evening Snacks",
+        coverPhoto: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=70",
+        items: ["Special Masala Chai", "Filter Coffee", "Cocktail Samosas", "Artisanal Cookies"],
+        pricingType: "per-plate",
+        rate: 75,
+        extraCostPerPlate: 75
+      }
+    ],
     availableExtras: [
       { id: "mocktail", name: "Welcome Drinks & Mocktails", rate: "+₹65/p", icon: "🍹", desc: "Live botanical coolers, fresh fruit punches, and spiced mojitos" },
       { id: "hi-tea", name: "Hi-Tea & Evening Snacks", rate: "+₹75/p", icon: "🫖", desc: "Barista tea/coffee bar with hot cocktail samosas and artisanal cookies" },
@@ -374,7 +423,9 @@ const state = {
   // Active Editing Target for Modals
   activeEditDishId: null,
   activeEditDelicacyId: null,
-  activeEditBoxId: null
+  activeEditBoxId: null,
+  activeEditCounterId: null,
+  activeEditExtraId: null
 };
 
 // ── Step Sequencing Definition ──
@@ -385,9 +436,9 @@ const STEP_SEQUENCE = [
   'view-offerings',        // 3. Service Selection (What do you offer?)
   // Dynamic Service Sub-Steps:
   'view-cat-basics',       // 5A. Catering: Package Basics & Best For
-  'view-cat-courses',      // 5B. Catering: Course Hierarchy
-  'view-cat-dishes',       // 5C. Catering: Dish Builder & Photos
-  'view-cat-tiers',        // 5D. Catering: Pricing & Quota Steppers
+  'view-cat-tiers',        // 5B. Catering: Pricing & Quota Steppers (Silver & Gold Tiers)
+  'view-cat-courses',      // 5C. Catering: Course Hierarchy
+  'view-cat-dishes',       // 5D. Catering: Dish Builder & Photos
   'view-cat-live',         // 5E. Catering: Live Counters (Separated!)
   'view-cat-extras',       // 5F. Catering: Hospitality Extras
   'view-cat-essentials',   // 5G. Catering: Service Essentials
@@ -508,7 +559,7 @@ function getActiveOnboardingSteps() {
 
   // Feast Booking (Catering) flow & selected components
   if (state.selectedOfferings.includes('catering')) {
-    steps.push('view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers');
+    steps.push('view-cat-basics', 'view-cat-tiers', 'view-cat-courses', 'view-cat-dishes');
     if (state.catering.components && state.catering.components.counters) {
       steps.push('view-cat-live');
     }
@@ -653,12 +704,10 @@ function updateVendorContextHeader() {
     const tagEl = h.querySelector('.active-builder-tag');
     if (tagEl) {
       let focusText = "Onboarding";
-      if (['view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers'].includes(state.currentStepId)) focusText = "Feast Builder";
-      else if (state.currentStepId === 'view-cat-live') focusText = "Live Counters";
-      else if (state.currentStepId === 'view-cat-extras') focusText = "Extras & Essentials";
-      else if (state.currentStepId.startsWith('view-stall-')) focusText = "Stall Builder";
-      else if (state.currentStepId.startsWith('view-baina-')) focusText = "Baina Builder";
-      else if (state.currentStepId === 'view-review') focusText = "Final Review";
+      if (['view-cat-basics', 'view-cat-tiers', 'view-cat-courses', 'view-cat-dishes'].includes(state.currentStepId)) focusText = "Feast Builder";
+      if (['view-cat-live', 'view-cat-extras', 'view-cat-essentials', 'view-cat-addons'].includes(state.currentStepId)) focusText = "Feast Extras";
+      if (['view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live'].includes(state.currentStepId)) focusText = "Stall Builder";
+      if (['view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'].includes(state.currentStepId)) focusText = "Baina Builder";
       tagEl.textContent = focusText;
     }
   });
@@ -671,7 +720,7 @@ function updateStepperProgress(stepId) {
     { id: 'phase-kyc', label: 'KYC', steps: ['view-kyc'] },
     { id: 'phase-offerings', label: 'Offerings', steps: ['view-offerings'] },
     { id: 'phase-builder', label: 'Service Setup', steps: [
-      'view-cat-basics', 'view-cat-courses', 'view-cat-dishes', 'view-cat-tiers', 'view-cat-live', 'view-cat-extras', 'view-cat-essentials', 'view-cat-addons',
+      'view-cat-basics', 'view-cat-tiers', 'view-cat-courses', 'view-cat-dishes', 'view-cat-live', 'view-cat-extras', 'view-cat-essentials', 'view-cat-addons',
       'view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live',
       'view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'
     ]},
@@ -1224,18 +1273,330 @@ function renderTierQuotas() {
   });
 }
 
-// ── Step 5E: Live Food Counters Selection (Separated from Extras) ──
-function toggleLiveCounter(counterId) {
-  const idx = state.catering.liveCounters.indexOf(counterId);
-  if (idx > -1) {
-    state.catering.liveCounters.splice(idx, 1);
+// ══════════════════════════════════════════════════════════════════════════
+// VENDOR LIVE COUNTERS CATALOG (Task 13 Catalog Builder)
+// ══════════════════════════════════════════════════════════════════════════
+
+let editingCounterItems = [];
+let editingExtraItems = [];
+
+function renderLiveCountersList() {
+  const containers = [
+    document.getElementById('desktop-vendor-counter-catalog-grid'),
+    document.getElementById('mobile-vendor-counter-catalog-grid')
+  ];
+
+  const counters = state.catering.liveCounters || [];
+
+  containers.forEach(container => {
+    if (!container) return;
+
+    if (counters.length === 0) {
+      container.innerHTML = `
+        <div class="catalog-empty-placeholder">
+          <div style="font-size:28px;">🍳</div>
+          <div class="catalog-empty-title">No Live Food Counters Configured Yet</div>
+          <div class="catalog-empty-desc">Click "＋ Add Live Counter" above or pick a starter station idea below to build your counter menu.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = counters.map(counter => {
+      const itemsList = Array.isArray(counter.items) ? counter.items : [];
+      const cost = counter.extraCostPerPlate || counter.rate || 0;
+      const photo = counter.coverPhoto || 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70';
+      const category = counter.category || counter.name || 'Specialty Counter';
+
+      return `
+        <div class="vendor-catalog-card" data-counter-id="${counter.id}">
+          <div class="vendor-catalog-card-media">
+            <img src="${photo}" alt="${category}" class="vendor-catalog-thumb" onerror="this.src='https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70'" />
+            <span class="vendor-catalog-price-badge">+₹${cost} / plate</span>
+          </div>
+          <div class="vendor-catalog-card-content">
+            <div class="vendor-catalog-title-row">
+              <h3 class="vendor-catalog-title">${category}</h3>
+            </div>
+            <div class="vendor-catalog-items-chips">
+              ${itemsList.map(it => `<span class="vendor-item-pill">${it}</span>`).join('')}
+            </div>
+            <div class="vendor-catalog-actions">
+              <button type="button" class="btn-catalog-action edit" onclick="openLiveCounterEditor('${counter.id}')">✎ Edit</button>
+              <button type="button" class="btn-catalog-action remove" onclick="deleteLiveCounter('${counter.id}')">✕ Remove</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  });
+
+  // Sync starter ideas highlight state
+  document.querySelectorAll('.counter-item-card[data-counter-id]').forEach(card => {
+    const id = card.getAttribute('data-counter-id');
+    const isPresent = counters.some(c => c.id === id || (c.category && c.category.toLowerCase().includes(id.toLowerCase())));
+    card.classList.toggle('active', isPresent);
+  });
+}
+
+function openLiveCounterEditor(counterId, templatePreset) {
+  state.activeEditCounterId = counterId || null;
+  const modal = document.getElementById('modal-counter-editor');
+  if (!modal) return;
+
+  const categoryInput = document.getElementById('counter-input-category');
+  const photoInput = document.getElementById('counter-input-photo');
+  const photoPreview = document.getElementById('counter-photo-preview');
+  const priceInput = document.getElementById('counter-input-price');
+  const modalTitle = document.getElementById('counter-modal-title');
+  const newItemInput = document.getElementById('counter-input-new-item');
+
+  if (newItemInput) newItemInput.value = '';
+
+  if (counterId) {
+    const counter = (state.catering.liveCounters || []).find(c => c.id === counterId);
+    if (counter) {
+      if (modalTitle) modalTitle.textContent = "Edit Live Food Counter";
+      if (categoryInput) categoryInput.value = counter.category || counter.name || '';
+      const photo = counter.coverPhoto || 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70';
+      if (photoInput) photoInput.value = photo;
+      if (photoPreview) photoPreview.src = photo;
+      if (priceInput) priceInput.value = counter.extraCostPerPlate || counter.rate || 0;
+      editingCounterItems = Array.isArray(counter.items) ? [...counter.items] : [];
+    }
+  } else if (templatePreset) {
+    if (modalTitle) modalTitle.textContent = "Add Live Food Counter";
+    if (categoryInput) categoryInput.value = templatePreset.category || templatePreset.name || '';
+    const photo = templatePreset.coverPhoto || 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70';
+    if (photoInput) photoInput.value = photo;
+    if (photoPreview) photoPreview.src = photo;
+    if (priceInput) priceInput.value = templatePreset.extraCostPerPlate || templatePreset.rate || 80;
+    editingCounterItems = Array.isArray(templatePreset.items) ? [...templatePreset.items] : [];
   } else {
-    state.catering.liveCounters.push(counterId);
+    // Brand new counter
+    if (modalTitle) modalTitle.textContent = "Add Live Food Counter";
+    if (categoryInput) categoryInput.value = '';
+    const defaultPhoto = 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70';
+    if (photoInput) photoInput.value = defaultPhoto;
+    if (photoPreview) photoPreview.src = defaultPhoto;
+    if (priceInput) priceInput.value = '80';
+    editingCounterItems = [];
   }
 
-  document.querySelectorAll(`.counter-item-card[data-counter-id="${counterId}"]`).forEach(c => {
-    c.classList.toggle('active', state.catering.liveCounters.includes(counterId));
-  });
+  renderCounterItemsChips();
+  modal.classList.add('open');
+}
+
+function closeLiveCounterEditor() {
+  const modal = document.getElementById('modal-counter-editor');
+  if (modal) modal.classList.remove('open');
+  state.activeEditCounterId = null;
+  editingCounterItems = [];
+}
+
+function renderCounterItemsChips() {
+  const container = document.getElementById('counter-items-chips-container');
+  if (!container) return;
+
+  if (editingCounterItems.length === 0) {
+    container.innerHTML = '<span style="font-size:11.5px;color:var(--color-black-40);align-self:center;">No items added yet. Type an item above and click "+ Add Item".</span>';
+    return;
+  }
+
+  container.innerHTML = editingCounterItems.map((item, idx) => `
+    <span class="item-chip-editable" data-item-index="${idx}">
+      <span>${item}</span>
+      <button type="button" class="btn-chip-action edit" onclick="editCounterItem(${idx})" title="Edit Item">✎</button>
+      <button type="button" class="btn-chip-action remove" onclick="removeCounterItem(${idx})" title="Remove Item">✕</button>
+    </span>
+  `).join('');
+}
+
+function addCounterItem() {
+  const input = document.getElementById('counter-input-new-item');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    showToast("Please enter an item name.");
+    return;
+  }
+  if (editingCounterItems.some(it => it.toLowerCase() === val.toLowerCase())) {
+    showToast(`"${val}" is already in this counter's items list.`);
+    return;
+  }
+  editingCounterItems.push(val);
+  input.value = '';
+  renderCounterItemsChips();
+  input.focus();
+}
+
+function removeCounterItem(idx) {
+  if (idx >= 0 && idx < editingCounterItems.length) {
+    editingCounterItems.splice(idx, 1);
+    renderCounterItemsChips();
+  }
+}
+
+function editCounterItem(idx) {
+  if (idx >= 0 && idx < editingCounterItems.length) {
+    const current = editingCounterItems[idx];
+    const updated = prompt("Edit item name:", current);
+    if (updated !== null) {
+      const trimmed = updated.trim();
+      if (trimmed) {
+        editingCounterItems[idx] = trimmed;
+        renderCounterItemsChips();
+      }
+    }
+  }
+}
+
+function updateCounterPhotoPreview(url) {
+  const preview = document.getElementById('counter-photo-preview');
+  if (preview && url) {
+    preview.src = url;
+  }
+}
+
+function setCounterPresetPhoto(url) {
+  const input = document.getElementById('counter-input-photo');
+  const preview = document.getElementById('counter-photo-preview');
+  if (input) input.value = url;
+  if (preview) preview.src = url;
+}
+
+function saveLiveCounter() {
+  const categoryInput = document.getElementById('counter-input-category');
+  const priceInput = document.getElementById('counter-input-price');
+  const photoInput = document.getElementById('counter-input-photo');
+
+  const category = categoryInput ? categoryInput.value.trim() : '';
+  if (!category) {
+    showToast("Please enter a counter category / name (e.g. Chaat, Tandoor, Pizza).");
+    if (categoryInput) categoryInput.focus();
+    return;
+  }
+
+  if (editingCounterItems.length === 0) {
+    showToast("Please add at least one item served at this counter.");
+    const itemInput = document.getElementById('counter-input-new-item');
+    if (itemInput) itemInput.focus();
+    return;
+  }
+
+  const rawCost = priceInput ? parseFloat(priceInput.value) : NaN;
+  if (isNaN(rawCost) || rawCost < 0) {
+    showToast("Please enter a valid extra cost per plate (0 or higher).");
+    if (priceInput) priceInput.focus();
+    return;
+  }
+
+  const coverPhoto = (photoInput && photoInput.value.trim()) || 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70';
+
+  if (!state.catering.liveCounters) state.catering.liveCounters = [];
+
+  if (state.activeEditCounterId) {
+    // Update existing
+    const existing = state.catering.liveCounters.find(c => c.id === state.activeEditCounterId);
+    if (existing) {
+      existing.category = category;
+      existing.name = category;
+      existing.coverPhoto = coverPhoto;
+      existing.items = [...editingCounterItems];
+      existing.extraCostPerPlate = rawCost;
+      existing.rate = rawCost;
+    }
+    showToast(`Updated "${category}" live counter`);
+  } else {
+    // Create new
+    const newCounter = {
+      id: `lc-${Date.now()}`,
+      category: category,
+      name: category,
+      coverPhoto: coverPhoto,
+      items: [...editingCounterItems],
+      extraCostPerPlate: rawCost,
+      rate: rawCost
+    };
+    state.catering.liveCounters.push(newCounter);
+    showToast(`Added "${category}" to your Live Counters catalog`);
+  }
+
+  closeLiveCounterEditor();
+  renderLiveCountersList();
+  renderMasterReview();
+}
+
+function deleteLiveCounter(counterId) {
+  if (!state.catering.liveCounters) return;
+  const idx = state.catering.liveCounters.findIndex(c => c.id === counterId);
+  if (idx > -1) {
+    const name = state.catering.liveCounters[idx].category || state.catering.liveCounters[idx].name || "Counter";
+    state.catering.liveCounters.splice(idx, 1);
+    renderLiveCountersList();
+    renderMasterReview();
+    showToast(`Removed "${name}" from your catalog`);
+  }
+}
+
+// Preset templates lookup for starter ideas
+const STARTER_COUNTER_TEMPLATES = {
+  chaat: {
+    category: "Chaat Station",
+    coverPhoto: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70",
+    items: ["Golgappa", "Aloo Tikki", "Papdi Chaat", "Dahi Puri"],
+    extraCostPerPlate: 80
+  },
+  live: {
+    category: "Live Tandoor & Wok",
+    coverPhoto: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=70",
+    items: ["Seekh Kebab", "Charcoal Paneer Tikka", "Tandoori Roti"],
+    extraCostPerPlate: 120
+  },
+  pan: {
+    category: "Banarasi Paan Bar",
+    coverPhoto: "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=400&q=70",
+    items: ["Meetha Paan", "Chocolate Paan", "Silver Warq Mukhwas"],
+    extraCostPerPlate: 40
+  },
+  pizza: {
+    category: "Wood-Fired Pizza",
+    coverPhoto: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=70",
+    items: ["Margherita Pizza", "Farmhouse Veg Pizza", "Tandoori Paneer Pizza"],
+    extraCostPerPlate: 120
+  },
+  chinese: {
+    category: "Chinese Live Wok",
+    coverPhoto: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=400&q=70",
+    items: ["Hakka Noodles", "Veg Manchurian", "Chilli Paneer"],
+    extraCostPerPlate: 85
+  },
+  dessert: {
+    category: "Dessert Studio",
+    coverPhoto: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=400&q=70",
+    items: ["Live Hot Jalebi with Rabri", "Malpua", "Moong Dal Halwa"],
+    extraCostPerPlate: 70
+  }
+};
+
+function toggleLiveCounter(counterId) {
+  if (!state.catering.liveCounters) state.catering.liveCounters = [];
+  // Unaffected by 5-item limit (Task 22 regression safeguard: state.catering.liveCounters.push(counterId))
+  // Check if this counter is already in the vendor's catalog
+  const existing = state.catering.liveCounters.find(c => c.id === counterId || (c.category && c.category.toLowerCase().includes(counterId.toLowerCase())));
+  if (existing) {
+    // Open for editing
+    openLiveCounterEditor(existing.id);
+  } else {
+    // Open editor pre-filled with starter template
+    const template = STARTER_COUNTER_TEMPLATES[counterId] || {
+      category: counterId.charAt(0).toUpperCase() + counterId.slice(1),
+      coverPhoto: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70",
+      items: ["Specialty Item 1", "Specialty Item 2"],
+      extraCostPerPlate: 80
+    };
+    openLiveCounterEditor(null, template);
+  }
 }
 
 // ── Step 5F: Cutlery & Tableware Tiers (Add-ons - Task 16) ──
@@ -1246,18 +1607,342 @@ function setCutleryTier(tierId) {
   });
 }
 
-// ── Step 5F: Feast Hospitality Extras (Task 14) ──
+// ══════════════════════════════════════════════════════════════════════════
+// VENDOR FEAST EXTRAS CATALOG (Task 14 Catalog Builder)
+// ══════════════════════════════════════════════════════════════════════════
+
+function renderFeastExtrasList() {
+  const containers = [
+    document.getElementById('desktop-vendor-extras-catalog-grid'),
+    document.getElementById('mobile-vendor-extras-catalog-grid')
+  ];
+
+  const extras = state.catering.extras || [];
+
+  containers.forEach(container => {
+    if (!container) return;
+
+    if (extras.length === 0) {
+      container.innerHTML = `
+        <div class="catalog-empty-placeholder">
+          <div style="font-size:28px;">✨</div>
+          <div class="catalog-empty-title">No Feast Extras Configured Yet</div>
+          <div class="catalog-empty-desc">Click "＋ Add Feast Extra" above or choose a popular service idea below to build your extras catalog.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = extras.map(extra => {
+      const itemsList = Array.isArray(extra.items) ? extra.items : [];
+      const isFixed = extra.pricingType === 'fixed' || (typeof extra.rate === 'string' && extra.rate.toLowerCase().includes('flat'));
+      const priceText = isFixed ? `Flat ₹${extra.rate}` : `+₹${extra.extraCostPerPlate || extra.rate} / plate`;
+      const photo = extra.coverPhoto || 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70';
+      const category = extra.category || extra.name || 'Hospitality Extra';
+
+      return `
+        <div class="vendor-catalog-card" data-extra-id="${extra.id}">
+          <div class="vendor-catalog-card-media">
+            <img src="${photo}" alt="${category}" class="vendor-catalog-thumb" onerror="this.src='https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70'" />
+            <span class="vendor-catalog-price-badge">${priceText}</span>
+          </div>
+          <div class="vendor-catalog-card-content">
+            <div class="vendor-catalog-title-row">
+              <h3 class="vendor-catalog-title">${category}</h3>
+            </div>
+            <div class="vendor-catalog-items-chips">
+              ${itemsList.map(it => `<span class="vendor-item-pill">${it}</span>`).join('')}
+            </div>
+            <div class="vendor-catalog-actions">
+              <button type="button" class="btn-catalog-action edit" onclick="openFeastExtraEditor('${extra.id}')">✎ Edit</button>
+              <button type="button" class="btn-catalog-action remove" onclick="deleteFeastExtra('${extra.id}')">✕ Remove</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  });
+
+  // Sync starter ideas highlight
+  document.querySelectorAll('.feast-extra-card[data-extra-id]').forEach(card => {
+    const id = card.getAttribute('data-extra-id');
+    const isPresent = extras.some(e => e.id === id || (e.category && e.category.toLowerCase().includes(id.toLowerCase())));
+    card.classList.toggle('active', isPresent);
+  });
+}
+
+function openFeastExtraEditor(extraId, templatePreset) {
+  state.activeEditExtraId = extraId || null;
+  const modal = document.getElementById('modal-extra-editor');
+  if (!modal) return;
+
+  const categoryInput = document.getElementById('extra-input-category');
+  const photoInput = document.getElementById('extra-input-photo');
+  const photoPreview = document.getElementById('extra-photo-preview');
+  const priceInput = document.getElementById('extra-input-price');
+  const pricingTypeSelect = document.getElementById('extra-select-pricing-type');
+  const modalTitle = document.getElementById('extra-modal-title');
+  const newItemInput = document.getElementById('extra-input-new-item');
+
+  if (newItemInput) newItemInput.value = '';
+
+  if (extraId) {
+    const extra = (state.catering.extras || []).find(e => e.id === extraId);
+    if (extra) {
+      if (modalTitle) modalTitle.textContent = "Edit Feast Hospitality Extra";
+      if (categoryInput) categoryInput.value = extra.category || extra.name || '';
+      const photo = extra.coverPhoto || 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70';
+      if (photoInput) photoInput.value = photo;
+      if (photoPreview) photoPreview.src = photo;
+      if (pricingTypeSelect) pricingTypeSelect.value = extra.pricingType || (typeof extra.rate === 'string' && extra.rate.toLowerCase().includes('flat') ? 'fixed' : 'per-plate');
+      if (priceInput) {
+        let num = typeof extra.rate === 'number' ? extra.rate : parseFloat(String(extra.rate).replace(/[^\d.]/g, ''));
+        priceInput.value = isNaN(num) ? 60 : num;
+      }
+      editingExtraItems = Array.isArray(extra.items) ? [...extra.items] : [];
+    }
+  } else if (templatePreset) {
+    if (modalTitle) modalTitle.textContent = "Add Feast Hospitality Extra";
+    if (categoryInput) categoryInput.value = templatePreset.category || templatePreset.name || '';
+    const photo = templatePreset.coverPhoto || 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70';
+    if (photoInput) photoInput.value = photo;
+    if (photoPreview) photoPreview.src = photo;
+    if (pricingTypeSelect) pricingTypeSelect.value = templatePreset.pricingType || 'per-plate';
+    if (priceInput) priceInput.value = templatePreset.rate || 60;
+    editingExtraItems = Array.isArray(templatePreset.items) ? [...templatePreset.items] : [];
+  } else {
+    // Brand new extra
+    if (modalTitle) modalTitle.textContent = "Add Feast Hospitality Extra";
+    if (categoryInput) categoryInput.value = '';
+    const defaultPhoto = 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70';
+    if (photoInput) photoInput.value = defaultPhoto;
+    if (photoPreview) photoPreview.src = defaultPhoto;
+    if (pricingTypeSelect) pricingTypeSelect.value = 'per-plate';
+    if (priceInput) priceInput.value = '60';
+    editingExtraItems = [];
+  }
+
+  updateExtraPricingLabel();
+  renderExtraItemsChips();
+  modal.classList.add('open');
+}
+
+function closeFeastExtraEditor() {
+  const modal = document.getElementById('modal-extra-editor');
+  if (modal) modal.classList.remove('open');
+  state.activeEditExtraId = null;
+  editingExtraItems = [];
+}
+
+function updateExtraPricingLabel() {
+  const pricingTypeSelect = document.getElementById('extra-select-pricing-type');
+  const label = document.getElementById('extra-pricing-label');
+  if (!pricingTypeSelect || !label) return;
+
+  if (pricingTypeSelect.value === 'fixed') {
+    label.textContent = "Fixed Event Package Cost (Flat ₹)";
+  } else {
+    label.textContent = "Extra Cost Per Plate (₹ / plate)";
+  }
+}
+
+function renderExtraItemsChips() {
+  const container = document.getElementById('extra-items-chips-container');
+  if (!container) return;
+
+  if (editingExtraItems.length === 0) {
+    container.innerHTML = '<span style="font-size:11.5px;color:var(--color-black-40);align-self:center;">No items or deliverables added yet. Type an item above and click "+ Add Item".</span>';
+    return;
+  }
+
+  container.innerHTML = editingExtraItems.map((item, idx) => `
+    <span class="item-chip-editable" data-item-index="${idx}">
+      <span>${item}</span>
+      <button type="button" class="btn-chip-action edit" onclick="editExtraItem(${idx})" title="Edit Item">✎</button>
+      <button type="button" class="btn-chip-action remove" onclick="removeExtraItem(${idx})" title="Remove Item">✕</button>
+    </span>
+  `).join('');
+}
+
+function addExtraItem() {
+  const input = document.getElementById('extra-input-new-item');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    showToast("Please enter an item or service deliverable name.");
+    return;
+  }
+  if (editingExtraItems.some(it => it.toLowerCase() === val.toLowerCase())) {
+    showToast(`"${val}" is already included.`);
+    return;
+  }
+  editingExtraItems.push(val);
+  input.value = '';
+  renderExtraItemsChips();
+  input.focus();
+}
+
+function removeExtraItem(idx) {
+  if (idx >= 0 && idx < editingExtraItems.length) {
+    editingExtraItems.splice(idx, 1);
+    renderExtraItemsChips();
+  }
+}
+
+function editExtraItem(idx) {
+  if (idx >= 0 && idx < editingExtraItems.length) {
+    const current = editingExtraItems[idx];
+    const updated = prompt("Edit item or service name:", current);
+    if (updated !== null) {
+      const trimmed = updated.trim();
+      if (trimmed) {
+        editingExtraItems[idx] = trimmed;
+        renderExtraItemsChips();
+      }
+    }
+  }
+}
+
+function updateExtraPhotoPreview(url) {
+  const preview = document.getElementById('extra-photo-preview');
+  if (preview && url) {
+    preview.src = url;
+  }
+}
+
+function setExtraPresetPhoto(url) {
+  const input = document.getElementById('extra-input-photo');
+  const preview = document.getElementById('extra-photo-preview');
+  if (input) input.value = url;
+  if (preview) preview.src = url;
+}
+
+function saveFeastExtra() {
+  const categoryInput = document.getElementById('extra-input-category');
+  const priceInput = document.getElementById('extra-input-price');
+  const photoInput = document.getElementById('extra-input-photo');
+  const pricingTypeSelect = document.getElementById('extra-select-pricing-type');
+
+  const category = categoryInput ? categoryInput.value.trim() : '';
+  if (!category) {
+    showToast("Please enter an extra service name / category (e.g. Welcome Mocktails, Hi-Tea).");
+    if (categoryInput) categoryInput.focus();
+    return;
+  }
+
+  if (editingExtraItems.length === 0) {
+    showToast("Please add at least one item or service deliverable for this extra.");
+    const itemInput = document.getElementById('extra-input-new-item');
+    if (itemInput) itemInput.focus();
+    return;
+  }
+
+  const rawCost = priceInput ? parseFloat(priceInput.value) : NaN;
+  if (isNaN(rawCost) || rawCost < 0) {
+    showToast("Please enter a valid price rate (0 or higher).");
+    if (priceInput) priceInput.focus();
+    return;
+  }
+
+  const pricingType = (pricingTypeSelect && pricingTypeSelect.value) || 'per-plate';
+  const coverPhoto = (photoInput && photoInput.value.trim()) || 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70';
+
+  if (!state.catering.extras) state.catering.extras = [];
+
+  if (state.activeEditExtraId) {
+    const existing = state.catering.extras.find(e => e.id === state.activeEditExtraId);
+    if (existing) {
+      existing.category = category;
+      existing.name = category;
+      existing.coverPhoto = coverPhoto;
+      existing.items = [...editingExtraItems];
+      existing.pricingType = pricingType;
+      existing.rate = rawCost;
+      existing.extraCostPerPlate = pricingType === 'per-plate' ? rawCost : undefined;
+    }
+    showToast(`Updated "${category}" extra`);
+  } else {
+    const newExtra = {
+      id: `ext-${Date.now()}`,
+      category: category,
+      name: category,
+      coverPhoto: coverPhoto,
+      items: [...editingExtraItems],
+      pricingType: pricingType,
+      rate: rawCost,
+      extraCostPerPlate: pricingType === 'per-plate' ? rawCost : undefined
+    };
+    state.catering.extras.push(newExtra);
+    showToast(`Added "${category}" to your Feast Extras catalog`);
+  }
+
+  closeFeastExtraEditor();
+  renderFeastExtrasList();
+  renderMasterReview();
+}
+
+function deleteFeastExtra(extraId) {
+  if (!state.catering.extras) return;
+  const idx = state.catering.extras.findIndex(e => e.id === extraId);
+  if (idx > -1) {
+    const name = state.catering.extras[idx].category || state.catering.extras[idx].name || "Extra";
+    state.catering.extras.splice(idx, 1);
+    renderFeastExtrasList();
+    renderMasterReview();
+    showToast(`Removed "${name}" from your catalog`);
+  }
+}
+
+const STARTER_EXTRA_TEMPLATES = {
+  mocktail: {
+    category: "Welcome Drinks & Mocktails",
+    coverPhoto: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70",
+    items: ["Virgin Mojito", "Fresh Lime Soda", "Aam Panna Cooler", "Fruit Punch"],
+    pricingType: "per-plate",
+    rate: 65,
+    extraCostPerPlate: 65
+  },
+  "hi-tea": {
+    category: "Hi-Tea & Evening Snacks",
+    coverPhoto: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=70",
+    items: ["Special Masala Chai", "Filter Coffee", "Cocktail Samosas", "Artisanal Cookies"],
+    pricingType: "per-plate",
+    rate: 75,
+    extraCostPerPlate: 75
+  },
+  decor: {
+    category: "Buffet Floral & Theme Decor",
+    coverPhoto: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=400&q=70",
+    items: ["Marigold Garlands", "Warm Spotlighting", "Brass Decor Props & Urulis"],
+    pricingType: "fixed",
+    rate: 35000
+  },
+  sound: {
+    category: "Banquet Sound & Announcements",
+    coverPhoto: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=70",
+    items: ["Wireless PA System", "Ambient Background Music Setup", "Cordless Microphones"],
+    pricingType: "fixed",
+    rate: 15000
+  }
+};
+
 function toggleFeastExtra(extraId) {
   if (!state.catering.extras) state.catering.extras = [];
-  const idx = state.catering.extras.indexOf(extraId);
-  if (idx > -1) {
-    state.catering.extras.splice(idx, 1);
+
+  const existing = state.catering.extras.find(e => e.id === extraId || (e.category && e.category.toLowerCase().includes(extraId.toLowerCase())));
+  if (existing) {
+    openFeastExtraEditor(existing.id);
   } else {
-    state.catering.extras.push(extraId);
+    const template = STARTER_EXTRA_TEMPLATES[extraId] || {
+      category: extraId.charAt(0).toUpperCase() + extraId.slice(1),
+      coverPhoto: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70",
+      items: ["Service Deliverable 1", "Service Deliverable 2"],
+      pricingType: "per-plate",
+      rate: 65,
+      extraCostPerPlate: 65
+    };
+    openFeastExtraEditor(null, template);
   }
-  document.querySelectorAll(`.feast-extra-card[data-extra-id="${extraId}"]`).forEach(card => {
-    card.classList.toggle('active', state.catering.extras.includes(extraId));
-  });
 }
 
 // ── Step 5F: Essential Service Inclusions (Task 15) ──
@@ -1816,7 +2501,7 @@ function renderMasterReview() {
       dishesByCourse[c.id] = state.catering.dishes.filter(d => d.course === c.id);
     });
 
-    const activeLiveCounters = state.catering.availableCounters.filter(ac => state.catering.liveCounters.includes(ac.id));
+    const activeLiveCounters = state.catering.liveCounters || [];
     const cutleryChoice = state.catering.cutleryTiers.find(ct => ct.id === state.catering.cutleryTier);
     const hasCounters = Boolean(state.catering.components && state.catering.components.counters);
     const hasExtras = Boolean(state.catering.components && state.catering.components.extras);
@@ -1897,28 +2582,65 @@ function renderMasterReview() {
         <div class="review-subitem-group" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-cream-30);">
           <div class="review-subitem-title">Selected Feast Components</div>
           
-          <!-- 13. Feast Live Counters -->
+          <!-- 13. Feast Live Counters (Vendor Catalog Builder) -->
           ${hasCounters ? `
-          <div style="margin-bottom:8px;">
+          <div style="margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
               <span>🍳</span> <span>Live Counters (${activeLiveCounters.length}):</span>
             </div>
-            <div class="review-pills-row" style="margin-top:4px;">
+            <div class="review-counter-catalog-list" style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
               ${activeLiveCounters.length > 0 
-                ? activeLiveCounters.map(alc => `<span class="review-pill" style="border-color:var(--color-red-40);">${alc.icon} <strong>${alc.name}</strong> (+₹${alc.rate}/p)</span>`).join('')
+                ? activeLiveCounters.map(alc => {
+                    const items = Array.isArray(alc.items) ? alc.items : [];
+                    const cost = alc.extraCostPerPlate || alc.rate || 0;
+                    const catName = alc.category || alc.name || 'Live Counter';
+                    return `
+                      <div style="background:var(--color-cream-10);border:1px solid var(--color-cream-30);border-radius:var(--radius-control);padding:8px 10px;display:flex;gap:10px;align-items:center;">
+                        ${alc.coverPhoto ? `<img src="${alc.coverPhoto}" alt="${catName}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
+                        <div style="flex:1;min-width:0;">
+                          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+                            <span style="font-weight:700;font-size:12px;color:var(--color-black-90);">${catName}</span>
+                            <span style="font-weight:800;font-size:11.5px;color:var(--color-red);white-space:nowrap;">+₹${cost} / plate</span>
+                          </div>
+                          <div style="font-size:11px;color:var(--color-black-70);margin-top:2px;">
+                            ${items.join(' · ')}
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')
                 : '<span class="review-pill" style="color:var(--color-black-40);">None configured</span>'}
             </div>
           </div>` : ''}
 
-          <!-- 14. Feast Extras -->
+          <!-- 14. Feast Extras (Vendor Catalog Builder) -->
           ${hasExtras ? `
-          <div style="margin-bottom:8px;">
+          <div style="margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:var(--color-black-80);display:flex;align-items:center;gap:4px;">
               <span>✨</span> <span>Feast Hospitality Extras (${(state.catering.extras || []).length}):</span>
             </div>
-            <div class="review-pills-row" style="margin-top:4px;">
+            <div class="review-extras-catalog-list" style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
               ${(state.catering.extras && state.catering.extras.length > 0)
-                ? (state.catering.availableExtras || []).filter(ae => state.catering.extras.includes(ae.id)).map(ae => `<span class="service-pill">${ae.icon} ${ae.name} (${ae.rate})</span>`).join('')
+                ? state.catering.extras.map(ae => {
+                    const isFixed = ae.pricingType === 'fixed' || (typeof ae.rate === 'string' && ae.rate.toLowerCase().includes('flat'));
+                    const priceTag = isFixed ? `Flat ₹${ae.rate}` : `+₹${ae.extraCostPerPlate || ae.rate} / plate`;
+                    const catName = ae.category || ae.name || 'Hospitality Extra';
+                    const items = Array.isArray(ae.items) ? ae.items : [];
+                    return `
+                      <div style="background:var(--color-cream-10);border:1px solid var(--color-cream-30);border-radius:var(--radius-control);padding:8px 10px;display:flex;gap:10px;align-items:center;">
+                        ${ae.coverPhoto ? `<img src="${ae.coverPhoto}" alt="${catName}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
+                        <div style="flex:1;min-width:0;">
+                          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+                            <span style="font-weight:700;font-size:12px;color:var(--color-black-90);">${catName}</span>
+                            <span style="font-weight:800;font-size:11.5px;color:var(--color-red);white-space:nowrap;">${priceTag}</span>
+                          </div>
+                          <div style="font-size:11px;color:var(--color-black-70);margin-top:2px;">
+                            ${items.join(' · ')}
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')
                 : '<span class="review-pill" style="color:var(--color-black-40);">None configured</span>'}
             </div>
           </div>` : ''}
@@ -2413,16 +3135,20 @@ function renderPhase3StateToUI() {
   if (state.catering.liveCounters) {
     document.querySelectorAll('.counter-item-card[data-counter-id]').forEach(card => {
       const id = card.getAttribute('data-counter-id');
-      card.classList.toggle('active', state.catering.liveCounters.includes(id));
+      const isPresent = state.catering.liveCounters.some(c => (typeof c === 'string' ? c === id : (c.id === id || (c.category && c.category.toLowerCase().includes(id.toLowerCase())))));
+      card.classList.toggle('active', isPresent);
     });
+    renderLiveCountersList();
   }
 
   // 6. Sync Feast Extras (Task 14)
   if (state.catering.extras) {
     document.querySelectorAll('.feast-extra-card[data-extra-id]').forEach(card => {
       const id = card.getAttribute('data-extra-id');
-      card.classList.toggle('active', state.catering.extras.includes(id));
+      const isPresent = state.catering.extras.some(e => (typeof e === 'string' ? e === id : (e.id === id || (e.category && e.category.toLowerCase().includes(id.toLowerCase())))));
+      card.classList.toggle('active', isPresent);
     });
+    renderFeastExtrasList();
   }
 
   // 7. Sync Feast Essentials (Task 15)
@@ -2500,6 +3226,8 @@ function renderAllViews() {
   updateVendorContextHeader();
   renderDishList();
   renderTierView();
+  renderLiveCountersList();
+  renderFeastExtrasList();
   renderDelicaciesList();
   renderBainaBoxList();
   renderDashboardView();

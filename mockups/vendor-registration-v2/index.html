@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -44,9 +44,9 @@
           </optgroup>
           <optgroup label="Feast Menu Builder">
             <option value="view-cat-basics">Feast Basics & Best For</option>
+            <option value="view-cat-tiers">Silver & Gold Tiers</option>
             <option value="view-cat-courses">Course Hierarchy</option>
             <option value="view-cat-dishes">Dishes & Food Photos</option>
-            <option value="view-cat-tiers">Silver & Gold Tiers</option>
             <option value="view-cat-live">Live Food Counters</option>
             <option value="view-cat-extras">Feast Hospitality Extras</option>
             <option value="view-cat-essentials">Service Crew Essentials</option>
@@ -150,7 +150,9 @@
         <!-- Persistent Vendor Context Header (Sony: reflected at top once collected) -->
         <aside class="vendor-context-header" style="display: none;">
           <div class="vendor-context-main">
-            <div class="vendor-context-avatar">भ</div>
+            <div class="vendor-context-avatar">
+              <img src="../../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../../public/bhojpatra-icon.png'" />
+            </div>
             <div class="vendor-context-text">
               <div class="vendor-context-name-row">
                 <span class="vendor-context-biz-name">Royal Awadh Caterers</span>
@@ -173,11 +175,11 @@
         <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
           <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">Feast Details</button>
           <span class="subnav-divider">›</span>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Silver & Gold Tiers</button>
+          <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">Course Hierarchy</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">Dishes & Photos</button>
-          <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Silver & Gold Tiers</button>
           <span class="subnav-divider subnav-divider-live">›</span>
           <button type="button" class="subnav-pill subnav-pill-live" data-target-step="view-cat-live" onclick="goToStep('view-cat-live')">Live Counters</button>
           <span class="subnav-divider subnav-divider-extras">›</span>
@@ -685,112 +687,6 @@
           </article>
 
           <!-- ── FEAST: COURSE HIERARCHY ── -->
-          <article class="step-container" data-step-id="view-cat-courses">
-            <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · Course Hierarchy</div>
-              <h1 class="step-heading">Standard platform course hierarchy</h1>
-              <p class="step-subtext">Bhojpatra categorizes menus into 5 platform standard courses, creating clear navigation for guests rather than one long flat list.</p>
-            </header>
-
-            <div class="content-card">
-              <div class="items-catalog-grid">
-                <div class="dish-card">
-                  <div class="dish-card-left">
-                    <span style="font-size:28px;">🥤</span>
-                    <div>
-                      <div class="dish-name">Welcome Drinks</div>
-                      <div class="dish-desc">Arrival sherbets, coolers, and traditional welcome refreshments.</div>
-                    </div>
-                  </div>
-                  <span class="tab-badge" data-course-count="welcome">1</span>
-                </div>
-
-                <div class="dish-card" style="border-color: var(--color-red);">
-                  <div class="dish-card-left">
-                    <span style="font-size:28px;">🍢</span>
-                    <div>
-                      <div class="dish-name">Starters & Kebabs</div>
-                      <div class="dish-desc">Passed hot appetisers, tikkas, kebabs, and live charcoal grill items.</div>
-                    </div>
-                  </div>
-                  <span class="tab-badge" data-course-count="starters" style="background:var(--color-red);color:var(--color-cream);">4</span>
-                </div>
-
-                <div class="dish-card">
-                  <div class="dish-card-left">
-                    <span style="font-size:28px;">🍲</span>
-                    <div>
-                      <div class="dish-name">Main Course</div>
-                      <div class="dish-desc">Heritage slow-cooked curries, paneer delicacies, dal makhani, and dum biryani.</div>
-                    </div>
-                  </div>
-                  <span class="tab-badge" data-course-count="main">3</span>
-                </div>
-
-                <div class="dish-card">
-                  <div class="dish-card-left">
-                    <span style="font-size:28px;">🫓</span>
-                    <div>
-                      <div class="dish-name">Breads & Rice</div>
-                      <div class="dish-desc">Tandoori rotis, flaky parathas, saffron sheermal, and aromatic rice.</div>
-                    </div>
-                  </div>
-                  <span class="tab-badge" data-course-count="breads">2</span>
-                </div>
-
-                <div class="dish-card">
-                  <div class="dish-card-left">
-                    <span style="font-size:28px;">🍬</span>
-                    <div>
-                      <div class="dish-name">Sweets & Mithai</div>
-                      <div class="dish-desc">Shahi tukda, kulfi falooda, halwai sweets, and dessert studio delicacies.</div>
-                    </div>
-                  </div>
-                  <span class="tab-badge" data-course-count="sweets">2</span>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <!-- ── FEAST: GRANULAR DISH BUILDER ── -->
-          <article class="step-container" data-step-id="view-cat-dishes">
-            <header class="step-header">
-              <div class="step-eyebrow">Feast Builder · Dishes & Photos</div>
-              <h1 class="step-heading">Build your dishes with authentic photos</h1>
-              <p class="step-subtext">Add dishes to each course, set dietary status, attach food photos, and assign them to marketplace tiers.</p>
-            </header>
-
-            <div class="content-card">
-              <!-- Course Tabs -->
-              <div class="course-tabs-bar">
-                <button type="button" class="course-tab-btn" data-course-id="welcome" onclick="setCourseTab('welcome')">
-                  <span>🥤 Welcome</span> <span class="tab-badge" data-course-count="welcome">1</span>
-                </button>
-                <button type="button" class="course-tab-btn active" data-course-id="starters" onclick="setCourseTab('starters')">
-                  <span>🍢 Starters</span> <span class="tab-badge" data-course-count="starters">4</span>
-                </button>
-                <button type="button" class="course-tab-btn" data-course-id="main" onclick="setCourseTab('main')">
-                  <span>🍲 Main Course</span> <span class="tab-badge" data-course-count="main">3</span>
-                </button>
-                <button type="button" class="course-tab-btn" data-course-id="breads" onclick="setCourseTab('breads')">
-                  <span>🫓 Breads</span> <span class="tab-badge" data-course-count="breads">2</span>
-                </button>
-                <button type="button" class="course-tab-btn" data-course-id="sweets" onclick="setCourseTab('sweets')">
-                  <span>🍬 Sweets</span> <span class="tab-badge" data-course-count="sweets">2</span>
-                </button>
-              </div>
-
-              <!-- Dish Cards Container -->
-              <div class="dishes-catalog-container items-catalog-grid"></div>
-
-              <!-- + Add Dish Button -->
-              <button type="button" class="btn-add-item-dashed" onclick="openDishEditor()">
-                <span>＋</span> Add New Dish to this Course
-              </button>
-            </div>
-          </article>
-
-          <!-- ── FEAST: PRICING & TIER QUOTA STEPPERS ── -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
               <div class="step-eyebrow">Feast Builder · Tiers & Allowances</div>
@@ -974,114 +870,234 @@
             </div>
           </article>
 
-          <!-- ── LIVE COUNTERS (SEPARATED FROM FEAST) ── -->
+          <!-- ── LIVE COUNTERS (FEAST CATALOG BUILDER) ── -->
+          <article class="step-container" data-step-id="view-cat-courses">
+            <header class="step-header">
+              <div class="step-eyebrow">Feast Builder · Course Hierarchy</div>
+              <h1 class="step-heading">Standard platform course hierarchy</h1>
+              <p class="step-subtext">Bhojpatra categorizes menus into 5 platform standard courses, creating clear navigation for guests rather than one long flat list.</p>
+            </header>
+
+            <div class="content-card">
+              <div class="items-catalog-grid">
+                <div class="dish-card">
+                  <div class="dish-card-left">
+                    <span style="font-size:28px;">🥤</span>
+                    <div>
+                      <div class="dish-name">Welcome Drinks</div>
+                      <div class="dish-desc">Arrival sherbets, coolers, and traditional welcome refreshments.</div>
+                    </div>
+                  </div>
+                  <span class="tab-badge" data-course-count="welcome">1</span>
+                </div>
+
+                <div class="dish-card" style="border-color: var(--color-red);">
+                  <div class="dish-card-left">
+                    <span style="font-size:28px;">🍢</span>
+                    <div>
+                      <div class="dish-name">Starters & Kebabs</div>
+                      <div class="dish-desc">Passed hot appetisers, tikkas, kebabs, and live charcoal grill items.</div>
+                    </div>
+                  </div>
+                  <span class="tab-badge" data-course-count="starters" style="background:var(--color-red);color:var(--color-cream);">4</span>
+                </div>
+
+                <div class="dish-card">
+                  <div class="dish-card-left">
+                    <span style="font-size:28px;">🍲</span>
+                    <div>
+                      <div class="dish-name">Main Course</div>
+                      <div class="dish-desc">Heritage slow-cooked curries, paneer delicacies, dal makhani, and dum biryani.</div>
+                    </div>
+                  </div>
+                  <span class="tab-badge" data-course-count="main">3</span>
+                </div>
+
+                <div class="dish-card">
+                  <div class="dish-card-left">
+                    <span style="font-size:28px;">🫓</span>
+                    <div>
+                      <div class="dish-name">Breads & Rice</div>
+                      <div class="dish-desc">Tandoori rotis, flaky parathas, saffron sheermal, and aromatic rice.</div>
+                    </div>
+                  </div>
+                  <span class="tab-badge" data-course-count="breads">2</span>
+                </div>
+
+                <div class="dish-card">
+                  <div class="dish-card-left">
+                    <span style="font-size:28px;">🍬</span>
+                    <div>
+                      <div class="dish-name">Sweets & Mithai</div>
+                      <div class="dish-desc">Shahi tukda, kulfi falooda, halwai sweets, and dessert studio delicacies.</div>
+                    </div>
+                  </div>
+                  <span class="tab-badge" data-course-count="sweets">2</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- ── FEAST: GRANULAR DISH BUILDER ── -->
+          <article class="step-container" data-step-id="view-cat-dishes">
+            <header class="step-header">
+              <div class="step-eyebrow">Feast Builder · Dishes & Photos</div>
+              <h1 class="step-heading">Build your dishes with authentic photos</h1>
+              <p class="step-subtext">Add dishes to each course, set dietary status, attach food photos, and assign them to marketplace tiers.</p>
+            </header>
+
+            <div class="content-card">
+              <!-- Course Tabs -->
+              <div class="course-tabs-bar">
+                <button type="button" class="course-tab-btn" data-course-id="welcome" onclick="setCourseTab('welcome')">
+                  <span>🥤 Welcome</span> <span class="tab-badge" data-course-count="welcome">1</span>
+                </button>
+                <button type="button" class="course-tab-btn active" data-course-id="starters" onclick="setCourseTab('starters')">
+                  <span>🍢 Starters</span> <span class="tab-badge" data-course-count="starters">4</span>
+                </button>
+                <button type="button" class="course-tab-btn" data-course-id="main" onclick="setCourseTab('main')">
+                  <span>🍲 Main Course</span> <span class="tab-badge" data-course-count="main">3</span>
+                </button>
+                <button type="button" class="course-tab-btn" data-course-id="breads" onclick="setCourseTab('breads')">
+                  <span>🫓 Breads</span> <span class="tab-badge" data-course-count="breads">2</span>
+                </button>
+                <button type="button" class="course-tab-btn" data-course-id="sweets" onclick="setCourseTab('sweets')">
+                  <span>🍬 Sweets</span> <span class="tab-badge" data-course-count="sweets">2</span>
+                </button>
+              </div>
+
+              <!-- Dish Cards Container -->
+              <div class="dishes-catalog-container items-catalog-grid"></div>
+
+              <!-- + Add Dish Button -->
+              <button type="button" class="btn-add-item-dashed" onclick="openDishEditor()">
+                <span>＋</span> Add New Dish to this Course
+              </button>
+            </div>
+          </article>
+
+          <!-- ── FEAST: PRICING & TIER QUOTA STEPPERS ── -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
               <div class="step-eyebrow">Feast Menu Builder · Live Food Counters</div>
               <h1 class="step-heading">Select live food & beverage counters for feast</h1>
-              <p class="step-subtext">Select which experiential live cooking stations accompany this feast booking quotation.</p>
+              <p class="step-subtext">Build and manage the experiential live cooking stations and counters that you provide for this feast booking quotation.</p>
             </header>
 
             <div class="content-card">
-              <div class="counter-selection-grid">
-                <!-- Chaat Station -->
-                <div class="counter-item-card active" data-counter-id="chaat" onclick="toggleLiveCounter('chaat')">
-                  <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Chaat" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🥘 Chaat Station</span>
-                      <span class="counter-price-tag">+₹60/p</span>
-                    </div>
-                    <p class="counter-desc">Live Golgappa, Aloo Tikki, Papdi Chaat & Dahi Bhalla.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Pani Puri</span>
-                      <span class="spread-chip">Aloo Tikki</span>
-                      <span class="spread-chip">Dahi Bhalla</span>
+              <div class="catalog-builder-header-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                <div>
+                  <div class="catalog-builder-heading" style="font-size:14px; font-weight:700; color:var(--color-black-90);">Your Live Counters Catalog</div>
+                  <div class="catalog-builder-subheading" style="font-size:11.5px; color:var(--color-black-60);">Stations you set up, staff, and prepare on-site during the celebration.</div>
+                </div>
+                <button type="button" class="btn-tier-proceed btn-add-counter-trigger" style="margin:0; padding:8px 16px; font-size:12.5px;" onclick="openLiveCounterEditor()">
+                  ＋ Add Live Counter
+                </button>
+              </div>
+
+              <!-- Vendor's Own Live Counters Catalog Cards -->
+              <div class="vendor-counter-catalog-grid" id="desktop-vendor-counter-catalog-grid"></div>
+
+              <!-- Quick Starter Ideas / Preset Inspirations -->
+              <div class="catalog-builder-starter-section" style="margin-top:20px; padding-top:16px; border-top:1px dashed var(--color-cream-30);">
+                <div class="starter-section-title" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-black-60); margin-bottom:10px;">
+                  💡 Popular Station Ideas (Click to customize & add to your catalog):
+                </div>
+                <div class="counter-selection-grid">
+                  <!-- Chaat Station -->
+                  <div class="counter-item-card" data-counter-id="chaat" onclick="toggleLiveCounter('chaat')">
+                    <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Chaat" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🥘 Chaat Station</span>
+                        <span class="counter-price-tag">+₹80/p</span>
+                      </div>
+                      <p class="counter-desc">Live Golgappa, Aloo Tikki, Papdi Chaat & Dahi Puri.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Golgappa</span>
+                        <span class="spread-chip">Aloo Tikki</span>
+                        <span class="spread-chip">Papdi Chaat</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Live Tandoor & Wok -->
-                <div class="counter-item-card active" data-counter-id="live" onclick="toggleLiveCounter('live')">
-                  <img src="https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Tandoor" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🍳 Live Tandoor & Wok</span>
-                      <span class="counter-price-tag">+₹90/p</span>
-                    </div>
-                    <p class="counter-desc">Live rotis, tandoor tikka skewers, and fresh tawa tosses.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Paneer Tikka</span>
-                      <span class="spread-chip">Chicken Tikka</span>
-                      <span class="spread-chip">Tandoori Roti</span>
+                  <!-- Live Tandoor & Wok -->
+                  <div class="counter-item-card" data-counter-id="live" onclick="toggleLiveCounter('live')">
+                    <img src="https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Tandoor" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🍳 Live Tandoor & Wok</span>
+                        <span class="counter-price-tag">+₹120/p</span>
+                      </div>
+                      <p class="counter-desc">Seekh Kebab, Charcoal Paneer Tikka, Tandoori Roti.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Seekh Kebab</span>
+                        <span class="spread-chip">Paneer Tikka</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Banarasi Paan -->
-                <div class="counter-item-card active" data-counter-id="pan" onclick="toggleLiveCounter('pan')">
-                  <img src="https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Paan" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🍃 Banarasi Paan Bar</span>
-                      <span class="counter-price-tag">+₹40/p</span>
-                    </div>
-                    <p class="counter-desc">Live meetha paan, chocolate paan, silver warq & mukhwas.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Meetha Paan</span>
-                      <span class="spread-chip">Silver Warq</span>
-                      <span class="spread-chip">Chocolate Paan</span>
+                  <!-- Banarasi Paan -->
+                  <div class="counter-item-card" data-counter-id="pan" onclick="toggleLiveCounter('pan')">
+                    <img src="https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Paan" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🍃 Banarasi Paan Bar</span>
+                        <span class="counter-price-tag">+₹40/p</span>
+                      </div>
+                      <p class="counter-desc">Live meetha paan, chocolate paan, silver warq & mukhwas.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Meetha Paan</span>
+                        <span class="spread-chip">Chocolate Paan</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Wood-Fired Pizza -->
-                <div class="counter-item-card" data-counter-id="pizza" onclick="toggleLiveCounter('pizza')">
-                  <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Pizza" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🍕 Wood-Fired Pizza</span>
-                      <span class="counter-price-tag">+₹120/p</span>
-                    </div>
-                    <p class="counter-desc">Hand-tossed thin crust artisanal pizzas baked live.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Margherita</span>
-                      <span class="spread-chip">Farmhouse</span>
-                      <span class="spread-chip">Tandoori Paneer</span>
+                  <!-- Wood-Fired Pizza -->
+                  <div class="counter-item-card" data-counter-id="pizza" onclick="toggleLiveCounter('pizza')">
+                    <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Pizza" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🍕 Wood-Fired Pizza</span>
+                        <span class="counter-price-tag">+₹120/p</span>
+                      </div>
+                      <p class="counter-desc">Hand-tossed thin crust artisanal pizzas baked live.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Margherita</span>
+                        <span class="spread-chip">Farmhouse</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Chinese Live Wok -->
-                <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
-                  <img src="https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Chinese Wok" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🍜 Chinese Live Wok</span>
-                      <span class="counter-price-tag">+₹85/p</span>
-                    </div>
-                    <p class="counter-desc">Wok-tossed Hakka noodles, Manchurian & spicy Schezwan.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Hakka Noodles</span>
-                      <span class="spread-chip">Veg Manchurian</span>
-                      <span class="spread-chip">Chilli Paneer</span>
+                  <!-- Chinese Live Wok -->
+                  <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
+                    <img src="https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Chinese Wok" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🍜 Chinese Live Wok</span>
+                        <span class="counter-price-tag">+₹85/p</span>
+                      </div>
+                      <p class="counter-desc">Wok-tossed Hakka noodles, Manchurian & spicy Schezwan.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Hakka Noodles</span>
+                        <span class="spread-chip">Chilli Paneer</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Dessert Studio -->
-                <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
-                  <img src="https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Dessert Studio" />
-                  <div class="counter-info">
-                    <div class="counter-name-row">
-                      <span class="counter-name">🍨 Dessert Studio</span>
-                      <span class="counter-price-tag">+₹70/p</span>
-                    </div>
-                    <p class="counter-desc">Live hot jalebi with rabri, malpua & seasonal halwas.</p>
-                    <div class="counter-spread-chips">
-                      <span class="spread-chip">Live Jalebi</span>
-                      <span class="spread-chip">Kesar Rabri</span>
-                      <span class="spread-chip">Moong Dal Halwa</span>
+                  <!-- Dessert Studio -->
+                  <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
+                    <img src="https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=300&q=70" class="counter-thumb" alt="Dessert Studio" />
+                    <div class="counter-info">
+                      <div class="counter-name-row">
+                        <span class="counter-name">🍨 Dessert Studio</span>
+                        <span class="counter-price-tag">+₹70/p</span>
+                      </div>
+                      <p class="counter-desc">Live hot jalebi with rabri, malpua & seasonal halwas.</p>
+                      <div class="counter-spread-chips">
+                        <span class="spread-chip">Live Jalebi</span>
+                        <span class="spread-chip">Kesar Rabri</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1094,58 +1110,73 @@
             <header class="step-header">
               <div class="step-eyebrow">Feast Menu Builder · Hospitality Extras</div>
               <h1 class="step-heading">Configure feast hospitality extras</h1>
-              <p class="step-subtext">Configure optional welcome drinks, hi-tea, themed buffet decor, and sound upgrades for your feast bookings.</p>
+              <p class="step-subtext">Build and manage optional welcome drinks, hi-tea, themed buffet decor, and sound upgrades for your feast bookings.</p>
             </header>
 
             <div class="content-card">
               <!-- Task 14: Feast Hospitality Extras -->
               <div>
-                <div class="card-title-row">
-                  <span class="card-title">✨ Feast Hospitality Extras</span>
-                  <span class="badge">Selectable Upgrades</span>
+                <div class="catalog-builder-header-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                  <div>
+                    <div class="catalog-builder-heading" style="font-size:14px; font-weight:700; color:var(--color-black-90);">✨ Feast Hospitality Extras</div>
+                    <div class="catalog-builder-subheading" style="font-size:11.5px; color:var(--color-black-60);">Curate the special hospitality additions and upgrade services you provide.</div>
+                  </div>
+                  <button type="button" class="btn-tier-proceed btn-add-extra-trigger" style="margin:0; padding:8px 16px; font-size:12.5px;" onclick="openFeastExtraEditor()">
+                    ＋ Add Feast Extra
+                  </button>
                 </div>
-                <div class="feast-extras-grid">
-                  <div class="feast-extra-card active" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
-                    <span class="feast-extra-icon">🍹</span>
-                    <div class="feast-extra-info">
-                      <div class="feast-extra-title-row">
-                        <span class="feast-extra-name">Welcome Drinks & Mocktails</span>
-                        <span class="feast-extra-rate">+₹65/p</span>
-                      </div>
-                      <div class="feast-extra-desc">Live botanical coolers, fresh fruit punches, and spiced mojitos.</div>
-                    </div>
-                  </div>
 
-                  <div class="feast-extra-card" data-extra-id="hi-tea" onclick="toggleFeastExtra('hi-tea')">
-                    <span class="feast-extra-icon">🫖</span>
-                    <div class="feast-extra-info">
-                      <div class="feast-extra-title-row">
-                        <span class="feast-extra-name">Hi-Tea & Evening Snacks</span>
-                        <span class="feast-extra-rate">+₹75/p</span>
-                      </div>
-                      <div class="feast-extra-desc">Barista tea/coffee bar with hot cocktail samosas and artisanal cookies.</div>
-                    </div>
-                  </div>
+                <!-- Vendor's Own Feast Extras Catalog Cards -->
+                <div class="vendor-extras-catalog-grid" id="desktop-vendor-extras-catalog-grid"></div>
 
-                  <div class="feast-extra-card" data-extra-id="decor" onclick="toggleFeastExtra('decor')">
-                    <span class="feast-extra-icon">🎉</span>
-                    <div class="feast-extra-info">
-                      <div class="feast-extra-title-row">
-                        <span class="feast-extra-name">Buffet Floral & Theme Decor</span>
-                        <span class="feast-extra-rate">Flat ₹35,000</span>
-                      </div>
-                      <div class="feast-extra-desc">Marigold garlands, warm spotlighting, and brass decor props.</div>
-                    </div>
+                <!-- Quick Starter Ideas -->
+                <div class="catalog-builder-starter-section" style="margin-top:20px; padding-top:16px; border-top:1px dashed var(--color-cream-30);">
+                  <div class="starter-section-title" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-black-60); margin-bottom:10px;">
+                    💡 Popular Extras Ideas (Click to customize & add to your catalog):
                   </div>
-
-                  <div class="feast-extra-card" data-extra-id="sound" onclick="toggleFeastExtra('sound')">
-                    <span class="feast-extra-icon">🔊</span>
-                    <div class="feast-extra-info">
-                      <div class="feast-extra-title-row">
-                        <span class="feast-extra-name">Banquet Sound & Announcements</span>
-                        <span class="feast-extra-rate">Flat ₹15,000</span>
+                  <div class="feast-extras-grid">
+                    <div class="feast-extra-card" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
+                      <span class="feast-extra-icon">🍹</span>
+                      <div class="feast-extra-info">
+                        <div class="feast-extra-title-row">
+                          <span class="feast-extra-name">Welcome Drinks & Mocktails</span>
+                          <span class="feast-extra-rate">+₹65/p</span>
+                        </div>
+                        <div class="feast-extra-desc">Live botanical coolers, fresh fruit punches, and spiced mojitos.</div>
                       </div>
-                      <div class="feast-extra-desc">Professional wireless PA system, ambient instrumental music, and microphones.</div>
+                    </div>
+
+                    <div class="feast-extra-card" data-extra-id="hi-tea" onclick="toggleFeastExtra('hi-tea')">
+                      <span class="feast-extra-icon">🫖</span>
+                      <div class="feast-extra-info">
+                        <div class="feast-extra-title-row">
+                          <span class="feast-extra-name">Hi-Tea & Evening Snacks</span>
+                          <span class="feast-extra-rate">+₹75/p</span>
+                        </div>
+                        <div class="feast-extra-desc">Barista tea/coffee bar with hot cocktail samosas and artisanal cookies.</div>
+                      </div>
+                    </div>
+
+                    <div class="feast-extra-card" data-extra-id="decor" onclick="toggleFeastExtra('decor')">
+                      <span class="feast-extra-icon">🎉</span>
+                      <div class="feast-extra-info">
+                        <div class="feast-extra-title-row">
+                          <span class="feast-extra-name">Buffet Floral & Theme Decor</span>
+                          <span class="feast-extra-rate">Flat ₹35,000</span>
+                        </div>
+                        <div class="feast-extra-desc">Marigold garlands, warm spotlighting, and brass decor props.</div>
+                      </div>
+                    </div>
+
+                    <div class="feast-extra-card" data-extra-id="sound" onclick="toggleFeastExtra('sound')">
+                      <span class="feast-extra-icon">🔊</span>
+                      <div class="feast-extra-info">
+                        <div class="feast-extra-title-row">
+                          <span class="feast-extra-name">Banquet Sound & Announcements</span>
+                          <span class="feast-extra-rate">Flat ₹15,000</span>
+                        </div>
+                        <div class="feast-extra-desc">Professional wireless PA system, ambient instrumental music, and microphones.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1531,7 +1562,9 @@
           <aside class="vendor-sidebar">
             <div class="sidebar-brand-block">
               <div class="brand-logo-row">
-                <div class="brand-icon-pot">भ</div>
+                <div class="brand-icon-pot" style="overflow:hidden; background:transparent;">
+                  <img src="../../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../../public/bhojpatra-icon.png'" />
+                </div>
                 <div>
                   <div class="brand-title">Bhojpatra</div>
                   <div class="portal-tag">Vendor Portal</div>
@@ -2031,7 +2064,9 @@
         <!-- Mobile Persistent Context Header -->
         <aside class="vendor-context-header" style="display: none;">
           <div class="vendor-context-main">
-            <div class="vendor-context-avatar" style="width:30px;height:30px;font-size:16px;">भ</div>
+            <div class="vendor-context-avatar" style="width:30px;height:30px;">
+              <img src="../../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../../public/bhojpatra-icon.png'" />
+            </div>
             <div class="vendor-context-text">
               <div class="vendor-context-name-row">
                 <span class="vendor-context-biz-name" style="font-size:13px;">Royal Awadh Caterers</span>
@@ -2048,9 +2083,9 @@
         <!-- Mobile Subnav Breadcrumbs for Catering -->
         <nav class="builder-subnav-bar" data-subnav-group="catering" style="display: none;">
           <button type="button" class="subnav-pill" data-target-step="view-cat-basics" onclick="goToStep('view-cat-basics')">Basics</button>
+          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Tiers</button>
           <button type="button" class="subnav-pill" data-target-step="view-cat-courses" onclick="goToStep('view-cat-courses')">Courses</button>
           <button type="button" class="subnav-pill" data-target-step="view-cat-dishes" onclick="goToStep('view-cat-dishes')">Dishes</button>
-          <button type="button" class="subnav-pill" data-target-step="view-cat-tiers" onclick="goToStep('view-cat-tiers')">Tiers</button>
           <button type="button" class="subnav-pill subnav-pill-live" data-target-step="view-cat-live" onclick="goToStep('view-cat-live')">Live</button>
           <button type="button" class="subnav-pill subnav-pill-extras" data-target-step="view-cat-extras" onclick="goToStep('view-cat-extras')">Extras</button>
           <button type="button" class="subnav-pill subnav-pill-essentials" data-target-step="view-cat-essentials" onclick="goToStep('view-cat-essentials')">Essentials</button>
@@ -2437,40 +2472,6 @@
           </article>
 
           <!-- Mobile View: Cat Courses -->
-          <article class="step-container" data-step-id="view-cat-courses">
-            <header class="step-header">
-              <div class="step-eyebrow">Course Hierarchy</div>
-              <h1 class="step-heading">Course hierarchy</h1>
-            </header>
-            <div class="content-card">
-              <div class="items-catalog-grid">
-                <div class="dish-card"><div class="dish-card-left"><span>🥤</span> <span class="dish-name">Welcome Drinks</span></div><span class="tab-badge">1</span></div>
-                <div class="dish-card" style="border-color:var(--color-red);"><div class="dish-card-left"><span>🍢</span> <span class="dish-name">Starters</span></div><span class="tab-badge" style="background:var(--color-red);color:var(--color-cream);">4</span></div>
-                <div class="dish-card"><div class="dish-card-left"><span>🍲</span> <span class="dish-name">Main Course</span></div><span class="tab-badge">3</span></div>
-                <div class="dish-card"><div class="dish-card-left"><span>🫓</span> <span class="dish-name">Breads</span></div><span class="tab-badge">2</span></div>
-                <div class="dish-card"><div class="dish-card-left"><span>🍬</span> <span class="dish-name">Sweets</span></div><span class="tab-badge">2</span></div>
-              </div>
-            </div>
-          </article>
-
-          <!-- Mobile View: Cat Dishes -->
-          <article class="step-container" data-step-id="view-cat-dishes">
-            <header class="step-header">
-              <div class="step-eyebrow">Dishes & Photos</div>
-              <h1 class="step-heading">Dish builder</h1>
-            </header>
-            <div class="content-card">
-              <div class="course-tabs-bar">
-                <button type="button" class="course-tab-btn active" data-course-id="starters" onclick="setCourseTab('starters')">🍢 Starters</button>
-                <button type="button" class="course-tab-btn" data-course-id="main" onclick="setCourseTab('main')">🍲 Main</button>
-                <button type="button" class="course-tab-btn" data-course-id="sweets" onclick="setCourseTab('sweets')">🍬 Sweets</button>
-              </div>
-              <div class="dishes-catalog-container items-catalog-grid"></div>
-              <button type="button" class="btn-add-item-dashed" onclick="openDishEditor()">＋ Add Dish</button>
-            </div>
-          </article>
-
-          <!-- Mobile View: Cat Tiers (Sequential Single-Tier Progression) -->
           <article class="step-container" data-step-id="view-cat-tiers">
             <header class="step-header">
               <div class="step-eyebrow">Tiers & Allowances</div>
@@ -2645,68 +2646,120 @@
             </div>
           </article>
 
-          <!-- Mobile View: Cat Live (Task 13: Live Counters) -->
+          <!-- Mobile View: Cat Live (Task 13: Live Counters Catalog Builder) -->
+          <article class="step-container" data-step-id="view-cat-courses">
+            <header class="step-header">
+              <div class="step-eyebrow">Course Hierarchy</div>
+              <h1 class="step-heading">Course hierarchy</h1>
+            </header>
+            <div class="content-card">
+              <div class="items-catalog-grid">
+                <div class="dish-card"><div class="dish-card-left"><span>🥤</span> <span class="dish-name">Welcome Drinks</span></div><span class="tab-badge">1</span></div>
+                <div class="dish-card" style="border-color:var(--color-red);"><div class="dish-card-left"><span>🍢</span> <span class="dish-name">Starters</span></div><span class="tab-badge" style="background:var(--color-red);color:var(--color-cream);">4</span></div>
+                <div class="dish-card"><div class="dish-card-left"><span>🍲</span> <span class="dish-name">Main Course</span></div><span class="tab-badge">3</span></div>
+                <div class="dish-card"><div class="dish-card-left"><span>🫓</span> <span class="dish-name">Breads</span></div><span class="tab-badge">2</span></div>
+                <div class="dish-card"><div class="dish-card-left"><span>🍬</span> <span class="dish-name">Sweets</span></div><span class="tab-badge">2</span></div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Mobile View: Cat Dishes -->
+          <article class="step-container" data-step-id="view-cat-dishes">
+            <header class="step-header">
+              <div class="step-eyebrow">Dishes & Photos</div>
+              <h1 class="step-heading">Dish builder</h1>
+            </header>
+            <div class="content-card">
+              <div class="course-tabs-bar">
+                <button type="button" class="course-tab-btn active" data-course-id="starters" onclick="setCourseTab('starters')">🍢 Starters</button>
+                <button type="button" class="course-tab-btn" data-course-id="main" onclick="setCourseTab('main')">🍲 Main</button>
+                <button type="button" class="course-tab-btn" data-course-id="sweets" onclick="setCourseTab('sweets')">🍬 Sweets</button>
+              </div>
+              <div class="dishes-catalog-container items-catalog-grid"></div>
+              <button type="button" class="btn-add-item-dashed" onclick="openDishEditor()">＋ Add Dish</button>
+            </div>
+          </article>
+
+          <!-- Mobile View: Cat Tiers (Sequential Single-Tier Progression) -->
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
               <div class="step-eyebrow">Live Counters</div>
               <h1 class="step-heading">Live stations</h1>
             </header>
             <div class="content-card">
-              <div class="counter-selection-grid">
-                <div class="counter-item-card active" data-counter-id="chaat" onclick="toggleLiveCounter('chaat')">
-                  <div class="counter-info">
-                    <div class="counter-name">🥘 Chaat Station (+₹60/p)</div>
-                    <div class="counter-desc">Golgappa, Aloo Tikki, Papdi Chaat</div>
+              <div class="catalog-builder-header-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span class="catalog-builder-heading" style="font-size:13px; font-weight:700;">Your Live Counters</span>
+                <button type="button" class="btn-primary-action" style="padding:6px 12px; font-size:11px;" onclick="openLiveCounterEditor()">＋ Add Counter</button>
+              </div>
+
+              <!-- Vendor's Own Catalog Cards List (Mobile) -->
+              <div class="vendor-counter-catalog-grid" id="mobile-vendor-counter-catalog-grid"></div>
+
+              <!-- Quick Starter Ideas -->
+              <div class="catalog-builder-starter-section" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--color-cream-30);">
+                <div class="starter-section-title" style="font-size:10.5px; font-weight:700; color:var(--color-black-60); margin-bottom:8px;">💡 Popular Ideas (Tap to customize):</div>
+                <div class="counter-selection-grid">
+                  <div class="counter-item-card" data-counter-id="chaat" onclick="toggleLiveCounter('chaat')">
+                    <div class="counter-info">
+                      <div class="counter-name">🥘 Chaat Station (+₹80/p)</div>
+                      <div class="counter-desc">Golgappa, Aloo Tikki, Papdi Chaat</div>
+                    </div>
                   </div>
-                </div>
-                <div class="counter-item-card active" data-counter-id="live" onclick="toggleLiveCounter('live')">
-                  <div class="counter-info">
-                    <div class="counter-name">🍳 Live Tandoor & Wok (+₹90/p)</div>
-                    <div class="counter-desc">Fresh tikkas, hot tawa breads</div>
+                  <div class="counter-item-card" data-counter-id="live" onclick="toggleLiveCounter('live')">
+                    <div class="counter-info">
+                      <div class="counter-name">🍳 Live Tandoor & Wok (+₹120/p)</div>
+                      <div class="counter-desc">Seekh Kebab, Paneer Tikka</div>
+                    </div>
                   </div>
-                </div>
-                <div class="counter-item-card active" data-counter-id="pan" onclick="toggleLiveCounter('pan')">
-                  <div class="counter-info">
-                    <div class="counter-name">🍃 Banarasi Paan Bar (+₹40/p)</div>
-                    <div class="counter-desc">Meetha paan, chocolate paan, mukhwas</div>
+                  <div class="counter-item-card" data-counter-id="pan" onclick="toggleLiveCounter('pan')">
+                    <div class="counter-info">
+                      <div class="counter-name">🍃 Banarasi Paan Bar (+₹40/p)</div>
+                      <div class="counter-desc">Meetha paan, chocolate paan, mukhwas</div>
+                    </div>
                   </div>
-                </div>
-                <div class="counter-item-card" data-counter-id="pizza" onclick="toggleLiveCounter('pizza')">
-                  <div class="counter-info">
-                    <div class="counter-name">🍕 Wood-Fired Pizza (+₹120/p)</div>
-                    <div class="counter-desc">Artisanal pizzas baked in live oven</div>
+                  <div class="counter-item-card" data-counter-id="pizza" onclick="toggleLiveCounter('pizza')">
+                    <div class="counter-info">
+                      <div class="counter-name">🍕 Wood-Fired Pizza (+₹120/p)</div>
+                      <div class="counter-desc">Artisanal pizzas baked in live oven</div>
+                    </div>
                   </div>
-                </div>
-                <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
-                  <div class="counter-info">
-                    <div class="counter-name">🍜 Chinese Live Wok (+₹85/p)</div>
-                    <div class="counter-desc">Hakka noodles, Manchurian, Chilli Paneer</div>
+                  <div class="counter-item-card" data-counter-id="chinese" onclick="toggleLiveCounter('chinese')">
+                    <div class="counter-info">
+                      <div class="counter-name">🍜 Chinese Live Wok (+₹85/p)</div>
+                      <div class="counter-desc">Hakka noodles, Manchurian, Chilli Paneer</div>
+                    </div>
                   </div>
-                </div>
-                <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
-                  <div class="counter-info">
-                    <div class="counter-name">🍨 Dessert Studio (+₹70/p)</div>
-                    <div class="counter-desc">Hot jalebi with rabri, malpua, halwa</div>
+                  <div class="counter-item-card" data-counter-id="dessert" onclick="toggleLiveCounter('dessert')">
+                    <div class="counter-info">
+                      <div class="counter-name">🍨 Dessert Studio (+₹70/p)</div>
+                      <div class="counter-desc">Hot jalebi with rabri, malpua, halwa</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </article>
 
-          <!-- Mobile View: Cat Extras (Task 14) -->
+          <!-- Mobile View: Cat Extras (Task 14 Catalog Builder) -->
           <article class="step-container" data-step-id="view-cat-extras">
             <header class="step-header">
               <div class="step-eyebrow">Feast Extras</div>
               <h1 class="step-heading">Hospitality Extras</h1>
             </header>
             <div class="content-card">
-              <!-- Task 14: Feast Extras -->
-              <div>
-                <div class="card-title-row">
-                  <span class="card-title" style="font-size:13px;">✨ Feast Extras</span>
-                </div>
+              <div class="catalog-builder-header-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span class="card-title" style="font-size:13px;">✨ Feast Extras</span>
+                <button type="button" class="btn-primary-action" style="padding:6px 12px; font-size:11px;" onclick="openFeastExtraEditor()">＋ Add Extra</button>
+              </div>
+
+              <!-- Vendor's Own Extras Catalog Cards List (Mobile) -->
+              <div class="vendor-extras-catalog-grid" id="mobile-vendor-extras-catalog-grid"></div>
+
+              <!-- Quick Starter Ideas -->
+              <div class="catalog-builder-starter-section" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--color-cream-30);">
+                <div class="starter-section-title" style="font-size:10.5px; font-weight:700; color:var(--color-black-60); margin-bottom:8px;">💡 Popular Ideas (Tap to customize):</div>
                 <div class="feast-extras-grid" style="grid-template-columns:1fr;">
-                  <div class="feast-extra-card active" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
+                  <div class="feast-extra-card" data-extra-id="mocktail" onclick="toggleFeastExtra('mocktail')">
                     <span class="feast-extra-icon">🍹</span>
                     <div class="feast-extra-info">
                       <div class="feast-extra-title-row"><span class="feast-extra-name">Mocktails</span><span class="feast-extra-rate">+₹65/p</span></div>
@@ -2889,7 +2942,9 @@
           <!-- Mobile AppBar -->
           <header class="mobile-appbar">
             <div class="mobile-title-group">
-              <div class="brand-icon-pot" style="width:24px; height:24px; font-size:13px;">भ</div>
+              <div class="brand-icon-pot" style="width:24px; height:24px; overflow:hidden; background:transparent;">
+                <img src="../../public/icons/icon-192.png" alt="Bhojpatra Emblem" class="bhojpatra-official-emblem" onerror="this.src='../../public/bhojpatra-icon.png'" />
+              </div>
               <span class="mobile-title" id="mobile-dash-brand-name">Royal Awadh Caterers</span>
             </div>
 
@@ -3193,6 +3248,143 @@
       <div class="modal-footer">
         <button type="button" class="btn-back" onclick="closeBoxEditor()">Cancel</button>
         <button type="button" class="btn-next" onclick="saveBoxEditor()">Save Box</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Counter Editor Modal (Task 13: Vendor Live Counter Catalog Builder) -->
+  <div class="modal-backdrop" id="modal-counter-editor">
+    <div class="modal-sheet" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-title" id="counter-modal-title">Configure Live Food Counter</div>
+        <button type="button" class="modal-close-btn" onclick="closeLiveCounterEditor()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- 1. Category / Name -->
+        <div class="form-group">
+          <label class="form-label" for="counter-input-category">Counter Category / Station Name <span class="required">*</span></label>
+          <input type="text" id="counter-input-category" class="form-input" placeholder="e.g. Chaat, Tandoor, Wok, Pizza, Paan, Mocktail, Coffee, Dessert, etc." />
+          <span class="field-hint">Enter your custom station category or live counter name. Vendors are free to provide any category.</span>
+        </div>
+
+        <!-- 2. Cover Photo -->
+        <div class="form-group">
+          <label class="form-label">Cover Photo</label>
+          <div class="photo-uploader-box" style="margin-top: 4px;">
+            <img id="counter-photo-preview" src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70" class="photo-preview-thumb" alt="Counter Cover Preview" />
+            <div class="photo-upload-meta" style="flex:1;">
+              <input type="text" id="counter-input-photo" class="form-input" style="font-size:11px;" placeholder="Photo URL or choose preset below" oninput="updateCounterPhotoPreview(this.value)" />
+              <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=70')">Chaat</button>
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=70')">Tandoor</button>
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=70')">Pizza</button>
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=400&q=70')">Paan</button>
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=400&q=70')">Chinese Wok</button>
+                <button type="button" class="btn-preset-photo" onclick="setCounterPresetPhoto('https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=400&q=70')">Dessert</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Items Served -->
+        <div class="form-group">
+          <label class="form-label">Items Served at this Counter <span class="required">*</span></label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="counter-input-new-item" class="form-input" placeholder="e.g. Golgappa, Aloo Tikki, Papdi Chaat" onkeydown="if(event.key==='Enter'){event.preventDefault();addCounterItem();}" />
+            <button type="button" class="btn-tier-proceed" style="margin:0; padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="addCounterItem()">+ Add Item</button>
+          </div>
+          <div id="counter-items-chips-container" class="vendor-items-builder-container" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; min-height:36px; padding:8px; background:var(--color-cream-10); border:1px dashed var(--color-cream-40); border-radius:var(--radius-control);">
+            <!-- Dynamic item chips -->
+          </div>
+          <span class="field-hint">Add the food and beverage items included in this counter. You can edit an item or click ✕ to remove.</span>
+        </div>
+
+        <!-- 4. Extra Cost Per Plate -->
+        <div class="form-group">
+          <label class="form-label" for="counter-input-price">Extra Cost Per Plate (₹ / plate) <span class="required">*</span></label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="position:relative; flex:1;">
+              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--color-black-60);">₹</span>
+              <input type="number" id="counter-input-price" class="form-input" style="padding-left:24px;" min="0" step="5" placeholder="80" />
+            </div>
+            <span style="font-size:12px; font-weight:700; color:var(--color-black-60); white-space:nowrap;">/ plate</span>
+          </div>
+          <span class="field-hint">Additional per-guest charge added for this counter to the feast booking price.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="closeLiveCounterEditor()">Cancel</button>
+        <button type="button" class="btn-next" onclick="saveLiveCounter()">Save Counter to Catalog</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feast Extra Editor Modal (Task 14: Vendor Extras Catalog Builder) -->
+  <div class="modal-backdrop" id="modal-extra-editor">
+    <div class="modal-sheet" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-title" id="extra-modal-title">Configure Feast Hospitality Extra</div>
+        <button type="button" class="modal-close-btn" onclick="closeFeastExtraEditor()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- 1. Category / Name -->
+        <div class="form-group">
+          <label class="form-label" for="extra-input-category">Extra Service Name / Category <span class="required">*</span></label>
+          <input type="text" id="extra-input-category" class="form-input" placeholder="e.g. Welcome Mocktails, Hi-Tea, Buffet Floral Decor, Sound & DJ..." />
+          <span class="field-hint">Enter your custom extra service name or category. Freeform input for any hospitality service.</span>
+        </div>
+
+        <!-- 2. Cover Photo -->
+        <div class="form-group">
+          <label class="form-label">Cover Photo</label>
+          <div class="photo-uploader-box" style="margin-top: 4px;">
+            <img id="extra-photo-preview" src="https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70" class="photo-preview-thumb" alt="Extra Cover Preview" />
+            <div class="photo-upload-meta" style="flex:1;">
+              <input type="text" id="extra-input-photo" class="form-input" style="font-size:11px;" placeholder="Photo URL or choose preset below" oninput="updateExtraPhotoPreview(this.value)" />
+              <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                <button type="button" class="btn-preset-photo" onclick="setExtraPresetPhoto('https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=70')">Mocktails</button>
+                <button type="button" class="btn-preset-photo" onclick="setExtraPresetPhoto('https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=70')">Hi-Tea</button>
+                <button type="button" class="btn-preset-photo" onclick="setExtraPresetPhoto('https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=400&q=70')">Decor</button>
+                <button type="button" class="btn-preset-photo" onclick="setExtraPresetPhoto('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=70')">Sound & DJ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Included Items / Services -->
+        <div class="form-group">
+          <label class="form-label">Included Items / Service Deliverables <span class="required">*</span></label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="extra-input-new-item" class="form-input" placeholder="e.g. Virgin Mojito, Fresh Lime Soda, Fruit Punch" onkeydown="if(event.key==='Enter'){event.preventDefault();addExtraItem();}" />
+            <button type="button" class="btn-tier-proceed" style="margin:0; padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="addExtraItem()">+ Add Item</button>
+          </div>
+          <div id="extra-items-chips-container" class="vendor-items-builder-container" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; min-height:36px; padding:8px; background:var(--color-cream-10); border:1px dashed var(--color-cream-40); border-radius:var(--radius-control);">
+            <!-- Dynamic item chips -->
+          </div>
+          <span class="field-hint">List the items, beverages, or services included in this package. Click to edit, or ✕ to remove.</span>
+        </div>
+
+        <!-- 4. Pricing -->
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="extra-select-pricing-type">Pricing Model</label>
+            <select id="extra-select-pricing-type" class="form-select" onchange="updateExtraPricingLabel()">
+              <option value="per-plate">Per Plate / Guest (₹ / plate)</option>
+              <option value="fixed">Fixed Event Package Cost (Flat ₹)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="extra-input-price"><span id="extra-pricing-label">Price Rate (₹ / plate)</span> <span class="required">*</span></label>
+            <div style="position:relative;">
+              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--color-black-60);">₹</span>
+              <input type="number" id="extra-input-price" class="form-input" style="padding-left:24px;" min="0" step="5" placeholder="60" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="closeFeastExtraEditor()">Cancel</button>
+        <button type="button" class="btn-next" onclick="saveFeastExtra()">Save Extra to Catalog</button>
       </div>
     </div>
   </div>
