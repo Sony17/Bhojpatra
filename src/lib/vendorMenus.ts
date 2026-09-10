@@ -68,6 +68,47 @@ export interface VendorMenuItem {
   tiers?: VendorTier[];
 }
 
+/** Single Stall category selection structure for V2 vendor onboarding. */
+export interface SingleStallCategory {
+  id: string;
+  name: string;
+  icon: string;
+  desc?: string;
+  isCustom?: boolean;
+}
+
+/** Item in a category-specific Single Stall menu. */
+export interface SingleStallMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  diet: DietType;
+  desc?: string;
+  photo?: string;
+}
+
+/** Map of Category Name -> Array of Menu Items for Single Stall. */
+export type SingleStallMenuMap = {
+  [categoryName: string]: SingleStallMenuItem[];
+};
+
+/** Stall-level pricing and pax configuration per stall category. */
+export interface SingleStallCategoryPricing {
+  fixedPerPlate: number;
+  minPaxGuarantee: number;
+}
+
+/** Map of Category Name -> Stall Pricing & Pax for Single Stall. */
+export type SingleStallCategoryPricingMap = {
+  [categoryName: string]: SingleStallCategoryPricing;
+};
+
+/** Complete configuration for a Single Stall category (dishes + stall pricing/pax). */
+export interface SingleStallCategoryConfig {
+  dishes: SingleStallMenuItem[];
+  pricing: SingleStallCategoryPricing;
+}
+
 /** Content moderation for live vendors — a pre-approval model: new/edited menus
  *  land as "Pending" and stay OFF every customer surface (catalog, /book wizard,
  *  public detail page) until an admin marks them "Approved". A fresh save flips

@@ -53,10 +53,8 @@
             <option value="view-cat-addons">Tableware Presentation Add-ons</option>
           </optgroup>
           <optgroup label="Specialty Stall Builder">
-            <option value="view-stall-basics">Stall Identity & Specialty</option>
-            <option value="view-stall-delicacies">Delicacies Catalog</option>
-            <option value="view-stall-pricing">Stall Pricing & Capacity</option>
-            <option value="view-stall-live">Stall Setup & Cutlery</option>
+            <option value="view-stall-menu">Single Stall: Menus</option>
+            <option value="view-stall-live">Single Stall: Setup & Cutlery</option>
           </optgroup>
           <optgroup label="Baina Gifting Hamper Builder">
             <option value="view-baina-basics">Baina Studio & Best For</option>
@@ -132,10 +130,6 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
               <span>Sign In</span>
             </button>
-            <a class="help-link" onclick="showToast('Connecting to Bhojpatra Onboarding Concierge on WhatsApp...')">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.25-1.38c1.45.79 3.08 1.25 4.75 1.25 5.52 0 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
-              <span>Need help? Chat with Concierge</span>
-            </a>
           </div>
         </header>
 
@@ -192,11 +186,7 @@
 
         <!-- Subnav Breadcrumbs for Stall Builder -->
         <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
-          <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">Stall Identity</button>
-          <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">Delicacies Catalog</button>
-          <span class="subnav-divider">›</span>
-          <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">Pricing & Pax</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-menu" onclick="goToStep('view-stall-menu')">Menus</button>
           <span class="subnav-divider">›</span>
           <button type="button" class="subnav-pill" data-target-step="view-stall-live" onclick="goToStep('view-stall-live')">Live & Cutlery</button>
         </nav>
@@ -234,7 +224,6 @@
               <div class="diet-selection-section" id="desktop-diet-section" style="margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--color-cream-30);">
                 <div class="card-title-row" style="margin-bottom: 6px;">
                   <span class="card-title">Kitchen Dietary Offering <span class="required">*</span></span>
-                  <span class="badge" style="background:var(--color-cream-30);color:var(--color-black-80);">Mandatory Initial Gate</span>
                 </div>
                 <p class="field-hint" style="margin-bottom: 12px;">Choose your kitchen's core dietary classification. This determines your catalog classification across all services.</p>
                 <div class="diet-choice-grid">
@@ -303,7 +292,6 @@
 
               <div class="card-title-row">
                 <span class="card-title">Commercial Kitchen Operations</span>
-                <span class="card-title badge">Regional Scope</span>
               </div>
 
               <div class="form-grid-2">
@@ -381,7 +369,7 @@
 
               <!-- Cuisines Multi-Select (Task 9: Add Custom Cuisine) -->
               <div class="form-group" style="margin-top: 10px;">
-                <label class="form-label">Primary Culinary Specialties & Cuisines (Shown as tags on catalog)</label>
+                <label class="form-label">Primary Culinary Specialties & Cuisines</label>
                 <div class="chip-grid" id="desktop-cuisine-chips" data-chip-type="cuisine">
                   <span class="choice-chip active" data-cuisine="Awadhi"><span class="chip-check">✓</span> Awadhi</span>
                   <span class="choice-chip active" data-cuisine="Mughlai"><span class="chip-check">✓</span> Mughlai</span>
@@ -428,9 +416,8 @@
               <!-- Google Reviews & Reputation -->
               <div class="form-grid-2" style="margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--color-cream-30);">
                 <div class="form-group">
-                  <label class="form-label">Google Rating (Imported Reputation)</label>
+                  <label class="form-label">Google Rating</label>
                   <input type="text" class="form-input" data-bind="details.googleRating" value="4.8" placeholder="e.g. 4.8" />
-                  <span class="field-hint">Surfaced as Google rating on catalog cards.</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Total Google Reviews Count</label>
@@ -461,7 +448,7 @@
               </div>
 
               <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-cream-30);">
-                <label class="form-label" style="margin-bottom: 8px; display: block;">Document Uploads (Simulated Verification)</label>
+                <label class="form-label" style="margin-bottom: 8px; display: block;">Document Uploads</label>
                 <div class="form-grid-2">
                   <div class="photo-uploader-box">
                     <span style="font-size: 28px;">📄</span>
@@ -559,7 +546,7 @@
                   <div class="offering-title">Single Specialty Stall</div>
                   <div class="offering-blurb">One dedicated food station (Biryani, Chaat, Tandoor, Dosa, Wok) with custom delicacies for any celebration.</div>
                   <ul class="offering-features">
-                    <li>Fixed spread or varied delicacies</li>
+                    <li>Predefined or custom stall categories</li>
                     <li>Individual item pricing</li>
                     <li>Live tawa / sigdi setup</li>
                     <li>Dedicated stall cutlery</li>
@@ -606,7 +593,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Feast Builder · Feast Details</div>
               <h1 class="step-heading">Configure your signature feast booking</h1>
-              <p class="step-subtext">Vendor identity is already locked at the top. Here, define the storefront feast details customers see when browsing your offering.</p>
+              <p class="step-subtext">Define the package details customers see when browsing your feast offering.</p>
             </header>
 
             <div class="content-card">
@@ -645,7 +632,6 @@
                   <span class="choice-chip">Family Pujas & Gatherings</span>
                   <span class="choice-chip">Corporate Galas</span>
                 </div>
-                <span class="field-hint" style="margin-top: 4px;">Directly populates the "Best For" tag on the storefront package card.</span>
               </div>
 
               <!-- Guest Range & Capacity -->
@@ -662,7 +648,7 @@
 
               <!-- Food Images Collection (Sony Requirement) -->
               <div style="margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--color-cream-30);">
-                <label class="form-label" style="margin-bottom: 8px; display: block;">Package Hero Food Photo (Shown on Catalog & Detail)</label>
+                <label class="form-label" style="margin-bottom: 8px; display: block;">Package Hero Food Photo</label>
                 <div class="photo-uploader-box">
                   <img id="cat-hero-thumb" src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=400&q=70" class="photo-preview-thumb" alt="Feast Hero Photo" />
                   <div class="photo-upload-meta">
@@ -680,7 +666,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Feast Builder · Tiers & Allowances</div>
               <h1 class="step-heading">Configure tier allowances & pricing</h1>
-              <p class="step-subtext">Sequential single-tier onboarding. Silver / Bhoj City is the base tier. Complete and save Silver to unlock Gold / Bhoj Signature.</p>
+              <p class="step-subtext">Configure course allowances and pricing for Silver (Base) and Gold (Signature) feast tiers.</p>
             </header>
 
             <div class="content-card">
@@ -863,8 +849,8 @@
           <article class="step-container" data-step-id="view-cat-courses">
             <header class="step-header">
               <div class="step-eyebrow">Feast Builder · Course Hierarchy</div>
-              <h1 class="step-heading">Standard platform course hierarchy</h1>
-              <p class="step-subtext">Bhojpatra categorizes menus into 5 platform standard courses, creating clear navigation for guests rather than one long flat list.</p>
+              <h1 class="step-heading">Feast course hierarchy</h1>
+              <p class="step-subtext">Review the 5 standard courses structured for guest banquet navigation.</p>
             </header>
 
             <div class="content-card">
@@ -969,8 +955,8 @@
           <article class="step-container" data-step-id="view-cat-live">
             <header class="step-header">
               <div class="step-eyebrow">Feast Menu Builder · Live Food Counters</div>
-              <h1 class="step-heading">Select live food & beverage counters for feast</h1>
-              <p class="step-subtext">Build and manage the experiential live cooking stations and counters that you provide for this feast booking quotation.</p>
+              <h1 class="step-heading">Configure live food & beverage counters</h1>
+              <p class="step-subtext">Build and manage the live cooking stations and beverage counters you provide for feast bookings.</p>
             </header>
 
             <div class="content-card">
@@ -1099,7 +1085,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Feast Menu Builder · Hospitality Extras</div>
               <h1 class="step-heading">Configure feast hospitality extras</h1>
-              <p class="step-subtext">Build and manage optional welcome drinks, hi-tea, themed buffet decor, and sound upgrades for your feast bookings.</p>
+              <p class="step-subtext">Add and manage optional hospitality additions, decor, and beverages for feast bookings.</p>
             </header>
 
             <div class="content-card">
@@ -1108,7 +1094,7 @@
                 <div class="catalog-builder-header-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                   <div>
                     <div class="catalog-builder-heading" style="font-size:14px; font-weight:700; color:var(--color-black-90);">✨ Feast Hospitality Extras</div>
-                    <div class="catalog-builder-subheading" style="font-size:11.5px; color:var(--color-black-60);">Curate the special hospitality additions and upgrade services you provide.</div>
+                    <div class="catalog-builder-subheading" style="font-size:11.5px; color:var(--color-black-60);">Curate the special hospitality additions you provide.</div>
                   </div>
                   <button type="button" class="btn-tier-proceed btn-add-extra-trigger" style="margin:0; padding:8px 16px; font-size:12.5px;" onclick="openFeastExtraEditor()">
                     ＋ Add Feast Extra
@@ -1186,7 +1172,6 @@
               <div>
                 <div class="card-title-row">
                   <span class="card-title">🧑‍🍳 Essential Hospitality & Service Inclusions</span>
-                  <span class="badge">Included Service Crew</span>
                 </div>
                 <div class="review-pills-row" id="desktop-feast-essentials-row">
                   <span class="choice-chip active" data-essential-key="staff" onclick="toggleFeastEssential('staff')"><span class="chip-check">✓</span> Uniformed Stewards & Service Captain</span>
@@ -1213,7 +1198,6 @@
               <div>
                 <div class="card-title-row">
                   <span class="card-title">🍽️ Tableware & Cutlery Presentation Add-ons</span>
-                  <span class="badge">Bhojpatra Packages A–D</span>
                 </div>
                 <div class="cutlery-tier-grid">
                   <!-- Package A -->
@@ -1268,107 +1252,137 @@
             </div>
           </article>
 
-          <!-- ── STALL: IDENTITY & SPECIALTY ── -->
-          <article class="step-container" data-step-id="view-stall-basics">
+          <!-- ── SINGLE STALL: UNIFIED MENUS WORKSPACE ── -->
+          <article class="step-container" data-step-id="view-stall-menu">
             <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · Stall Identity</div>
-              <h1 class="step-heading">Dynamic specialty food stall builder</h1>
-              <p class="step-subtext">Sony emphasized: Stall must be as dynamic as menu building! Configure your station specialty, description, and photo.</p>
+              <div class="step-eyebrow">Single Stall · Menus & Stations</div>
+              <h1 class="step-heading">Build your stall menus</h1>
+              <p class="step-subtext">Select the stall categories you can serve, then build dishes and configure stall pricing & capacity for each stall.</p>
             </header>
 
-            <div class="content-card">
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label class="form-label">Stall Display Brand Name <span class="field-optional">(Optional)</span></label>
-                  <input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="e.g. Awadhi Dum Biryani Corner (optional)" />
-                </div>
-                <div class="form-group">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                    <label class="form-label" style="margin-bottom:0;">Category Specialty <span class="required">*</span></label>
-                    <button type="button" class="btn-new-category" id="btn-desktop-new-cat" onclick="toggleNewCategoryBox('desktop')">＋ NEW CATEGORY</button>
+            <div class="content-card stall-menus-unified-card">
+              <!-- TOP SECTION: Category Selection -->
+              <div class="stall-menu-section-block stall-categories-selection-block">
+                <div class="stall-section-header-row">
+                  <div>
+                    <h3 class="stall-section-title"><span>📂</span> Choose your stall categories</h3>
+                    <p class="stall-section-desc">Select all stall categories you can deploy. Each selected category becomes an active stall with its own menu and pricing.</p>
                   </div>
-                  <select class="form-select stall-specialty-select" id="desktop-stall-specialty" data-bind="stall.specialty">
-                    <option value="Biryani & Tandoor Station" selected>Biryani & Dum Handi Station</option>
-                    <option value="Chaat & Street Food">Banarasi Chaat & Street Food</option>
-                    <option value="Tandoor & Kebab Grills">Live Tandoor & Kebab Grills</option>
-                    <option value="South Indian Dosa Bar">South Indian Dosa & Tiffin Bar</option>
-                    <option value="Artisanal Pizza & Pasta">Artisanal Pizza & Pasta Station</option>
-                    <option value="Chinese Wok & Dimsums">Chinese Live Wok & Dimsums</option>
-                  </select>
-                  <div class="new-category-inline-box" id="desktop-new-cat-box" style="display:none;">
-                    <input type="text" class="form-input" id="desktop-new-cat-input" placeholder="Enter custom category (e.g. Amritsari Kulcha Station)" />
-                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red);color:#FFF;border:none;padding:6px 14px;border-radius:4px;font-weight:700;cursor:pointer;" onclick="submitNewStallCategory('desktop')">Add</button>
-                    <button type="button" class="btn-sm btn-secondary" style="background:#FFF;border:1px solid #CCC;padding:6px 10px;border-radius:4px;cursor:pointer;" onclick="toggleNewCategoryBox('desktop')">Cancel</button>
+                  <span class="stall-cat-selected-pill" id="desktop-stall-cat-selected-count">0 categories selected</span>
+                </div>
+
+                <!-- Validation Error for Categories -->
+                <div class="stall-cat-validation-error alert-box alert-error" id="desktop-stall-cat-error" style="display:none; margin-top:12px; margin-bottom:12px;">
+                  <span>⚠️ Please select at least one stall category to continue.</span>
+                </div>
+
+                <!-- Categories Grid (13 predefined categories) -->
+                <div class="stall-categories-grid" id="desktop-stall-categories-grid" style="margin-top:12px;">
+                  <!-- Dynamically populated by renderStallCategoriesUI() -->
+                </div>
+
+                <!-- Custom Stall Category Adder -->
+                <div class="custom-stall-cat-adder" style="margin-top:16px; padding:12px 14px; border:1px dashed var(--color-gold); border-radius:var(--radius-card); background:var(--color-cream-10);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:12.5px; font-weight:700; color:var(--color-black);">✨ Need a Custom Stall Category?</span>
                   </div>
-                  <span class="field-hint">Defines your stall's culinary niche on the /book/stall marketplace.</span>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Stall Culinary Story / Tagline</label>
-                <textarea class="form-textarea" data-bind="stall.tagline">Authentic slow-dum Awadhi degchis and live sigdi kebab station cooked on-site.</textarea>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Best For (Occasions displayed on stall listing)</label>
-                <div class="chip-grid">
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Weddings</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> House Parties</span>
-                  <span class="choice-chip active"><span class="chip-check">✓</span> Corporate Lunches</span>
-                  <span class="choice-chip">Cultural Fairs & Festivals</span>
-                </div>
-              </div>
-
-              <div style="margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--color-cream-30);">
-                <label class="form-label" style="margin-bottom: 8px; display: block;">Stall Counter & Setup Photo</label>
-                <div class="photo-uploader-box">
-                  <img src="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=70" class="photo-preview-thumb" alt="Stall Photo" />
-                  <div class="photo-upload-meta">
-                    <div class="photo-upload-title">Stall Presentation Photo</div>
-                    <div class="photo-upload-desc">Live counter degchi photo displayed to guests on /book/stall.</div>
-                    <button type="button" class="btn-upload-photo" onclick="showToast('Stall photography updated.')">Change Photo 📷</button>
+                  <div style="display:flex; gap:8px;">
+                    <input type="text" id="desktop-custom-stall-cat-input" class="form-input" style="flex:1; font-size:12px;" placeholder="Enter custom category name (e.g. Mocktail Bar, Regional Mithai)" onkeydown="if(event.key==='Enter'){event.preventDefault();submitCustomStallCategory('desktop');}" />
+                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red); color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;" onclick="submitCustomStallCategory('desktop')">
+                      ＋ Add Category
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          </article>
 
-          <!-- ── STALL: DELICACIES CATALOG ── -->
-          <article class="step-container" data-step-id="view-stall-delicacies">
-            <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · Delicacies Catalog</div>
-              <h1 class="step-heading">Manage stall delicacies & item pricing</h1>
-              <p class="step-subtext">Add each food item prepared at your station with its dietary marker, unit price, and appetizing photo.</p>
-            </header>
+              <!-- DIVIDER -->
+              <div class="stall-menu-section-divider"></div>
 
-            <div class="content-card">
-              <div class="delicacies-catalog-container items-catalog-grid"></div>
-
-              <button type="button" class="btn-add-item-dashed" onclick="openDelicacyEditor()">
-                <span>＋</span> Add New Delicacy Item to Stall
-              </button>
-            </div>
-          </article>
-
-          <!-- ── STALL: PRICING & CAPACITY ── -->
-          <article class="step-container" data-step-id="view-stall-pricing">
-            <header class="step-header">
-              <div class="step-eyebrow">Stall Builder · Rates & Minimums</div>
-              <h1 class="step-heading">Pricing & guest guarantee</h1>
-              <p class="step-subtext">Set your fixed per-plate rate (for Fixed format) and minimum guest guarantee required to deploy the stall.</p>
-            </header>
-
-            <div class="content-card">
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label class="form-label">Fixed Per-Plate Rate (₹)</label>
-                  <input type="number" class="form-input" data-bind="stall.fixedPerPlate" value="280" />
-                  <span class="field-hint">Covers the entire set spread per guest.</span>
+              <!-- MIDDLE / LOWER SECTION: Active Stall Configuration -->
+              <div class="stall-menu-section-block stall-active-config-block" id="desktop-stall-active-config-block">
+                <!-- Internal Stall / Category Switcher Tabs -->
+                <div class="stall-menu-cat-switcher-wrapper">
+                  <div class="stall-switcher-label">Select stall to configure:</div>
+                  <div class="stall-menu-cat-switcher" id="desktop-stall-menu-cat-switcher">
+                    <!-- Dynamically rendered tabs for each selected category -->
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Minimum Guest Guarantee (Min Pax)</label>
-                  <input type="number" class="form-input" data-bind="stall.minPaxGuarantee" value="50" />
-                  <span class="field-hint">Platform default baseline is 50 guests.</span>
+
+                <!-- Active Stall Banner -->
+                <div class="stall-current-configuring-strip" id="desktop-stall-current-strip">
+                  <div class="stall-current-meta">
+                    <span class="stall-current-prefix">Currently configuring:</span>
+                    <span class="stall-current-name" id="desktop-active-stall-title">Chaat</span>
+                  </div>
+                  <span class="stall-current-badge" id="desktop-active-stall-status">Active Configuration</span>
+                </div>
+
+                <!-- Menu Items Validation Error -->
+                <div class="stall-menu-validation-error alert-box alert-error" id="desktop-stall-menu-error" style="display:none; margin-top:12px; margin-bottom:12px;">
+                  <span>⚠️ Please add at least 1 dish to this stall before proceeding.</span>
+                </div>
+
+                <!-- PART 1: DISHES (Dish pricing comes before stall pricing) -->
+                <div class="stall-dishes-section" style="margin-top:16px;">
+                  <div class="stall-section-header-row" style="margin-bottom:12px;">
+                    <div>
+                      <h4 class="stall-subsection-title"><span>🍽️</span> Your Dishes</h4>
+                      <p class="stall-section-desc">Add each food item prepared at this stall with dish-level per-plate pricing and dietary markers.</p>
+                    </div>
+                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red); color:#fff; border:none; padding:7px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="openStallItemEditor()">
+                      <span>＋</span> Add Dish
+                    </button>
+                  </div>
+
+                  <!-- Dishes Grid -->
+                  <div class="stall-category-items-grid" id="desktop-stall-category-items-grid">
+                    <!-- Dynamically rendered items -->
+                  </div>
+
+                  <!-- Add New Item Dashed Button -->
+                  <button type="button" class="btn-add-item-dashed" id="desktop-btn-add-stall-item" style="margin-top:12px;" onclick="openStallItemEditor()">
+                    <span>＋</span> Add Dish to <span class="active-cat-name-label">Stall</span>
+                  </button>
+                </div>
+
+                <!-- PART 2: STALL PRICING & PAX (Strictly below dishes, independent per stall) -->
+                <div class="stall-pricing-pax-card" id="desktop-stall-pricing-pax-card" style="margin-top:24px; padding:18px 20px; border:1.5px solid var(--color-gold); border-radius:var(--radius-card); background:#FFFDF9;">
+                  <div class="stall-pricing-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                    <div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:18px;">🏷️</span>
+                        <h4 style="font-size:14px; font-weight:800; color:var(--color-black-90); margin:0;">Stall Pricing & Pax Guarantee</h4>
+                      </div>
+                      <p style="font-size:11.5px; color:var(--color-black-60); margin:4px 0 0 0;">
+                        Set the commercial rate and minimum guest guarantee required to book the <strong id="desktop-pricing-stall-name" style="color:var(--color-black-90);">Chaat</strong> stall. Data is stored independently for each stall.
+                      </p>
+                    </div>
+                    <span class="stall-pricing-independent-pill">Independent per stall</span>
+                  </div>
+
+                  <div class="form-grid-2" style="margin-top:12px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="form-label" for="desktop-stall-fixed-rate" style="font-weight:700;">Fixed Per-Plate Rate (₹) <span class="required">*</span></label>
+                      <div style="position:relative;">
+                        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--color-black-60);">₹</span>
+                        <input type="number" id="desktop-stall-fixed-rate" class="form-input" style="padding-left:24px;" placeholder="e.g. 150" min="0" oninput="updateStallPricingFromInput('desktop')" />
+                      </div>
+                      <span class="field-hint" style="margin-top:4px; font-size:11px;">Fixed package price per guest covering this stall's spread.</span>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="form-label" for="desktop-stall-min-pax" style="font-weight:700;">Minimum Guest Guarantee (Min Pax) <span class="required">*</span></label>
+                      <input type="number" id="desktop-stall-min-pax" class="form-input" placeholder="e.g. 50" min="1" oninput="updateStallPricingFromInput('desktop')" />
+                      <span class="field-hint" style="margin-top:4px; font-size:11px;">Minimum guest headcount required to deploy this stall (default 50).</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Wizard Action Bar -->
+              <div class="wizard-actions-bar" style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" class="btn-back" onclick="prevStep()">← Back to Offerings</button>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <button type="button" class="btn-next" id="desktop-stall-menu-btn-next" onclick="nextStep()">Continue to Setup & Cutlery →</button>
                 </div>
               </div>
             </div>
@@ -1379,7 +1393,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Stall Builder · Setup & Cutlery</div>
               <h1 class="step-heading">On-site equipment & stall cutlery</h1>
-              <p class="step-subtext">Sony emphasized including cutlery and essentials. Define what cooking gear and eco-disposables accompany the stall.</p>
+              <p class="step-subtext">Specify live cooking equipment and tableware inclusions accompanying your stall.</p>
             </header>
 
             <div class="content-card">
@@ -1396,6 +1410,12 @@
               <div class="form-group" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-cream-30);">
                 <label class="form-label">Stall Tableware & Disposables Inclusions</label>
                 <input type="text" class="form-input" data-bind="stall.cutleryOption" value="Eco-friendly Areca nut plates, birchwood spoons, and paper napkins included" />
+              </div>
+
+              <!-- Wizard Action Bar -->
+              <div class="wizard-actions-bar" style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" class="btn-back" onclick="prevStep()">← Back to Menus</button>
+                <button type="button" class="btn-next" onclick="nextStep()">Continue →</button>
               </div>
             </div>
           </article>
@@ -1491,12 +1511,12 @@
             </div>
           </article>
 
-          <!-- ── VIEW 08: CONSOLIDATED REVIEW & SUBMIT (Sony Requirement) ── -->
+          <!-- ── VIEW 08: CONSOLIDATED REVIEW & SUBMIT ── -->
           <article class="step-container" data-step-id="view-review">
             <header class="step-header">
               <div class="step-eyebrow">Consolidated Master Review</div>
               <h1 class="step-heading">Review & submit your vendor registration</h1>
-              <p class="step-subtext">Sony requested: Summary and review clubbed together in one place for all services, exposing meaningful sub-items with direct edit links.</p>
+              <p class="step-subtext">Review all configured service offerings, menus, and business details before final submission.</p>
             </header>
 
             <div class="review-master-container" id="master-review-content"></div>
@@ -1513,12 +1533,6 @@
                 <div style="font-size:11px;color:var(--color-black-60);">Assigned Bhojpatra Vendor ID</div>
                 <div style="font-size:18px;font-weight:800;color:var(--color-red);letter-spacing:1px;margin-top:2px;">VEN-884291</div>
                 <div style="font-size:11px;color:var(--color-black-80);margin-top:6px;">KYC Status: <strong style="color:var(--color-veg);">Under Express Review (12–24h)</strong></div>
-              </div>
-
-              <!-- Sony's Clarification on Future Dashboard Structure -->
-              <div style="background:#FFF;border:1px dashed var(--color-cream-30);border-radius:var(--radius-control);padding:14px;max-width:540px;margin:0 auto 24px auto;font-size:12px;color:var(--color-black-80);line-height:1.5;">
-                <p><strong>Vendor Profile Architecture Note (Stakeholder Requirement):</strong></p>
-                <p>All identity and menu offerings gathered here feed your live <strong>Vendor Profile</strong>. As clarified by Sony, the upcoming vendor portal will focus strictly on: <strong>Dashboard · My Services · Orders</strong> (all other modules marked Coming Soon).</p>
               </div>
 
               <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
@@ -2083,6 +2097,8 @@
 
         <!-- Mobile Subnav Breadcrumbs for Stall -->
         <nav class="builder-subnav-bar" data-subnav-group="stall" style="display: none;">
+          <button type="button" class="subnav-pill" data-target-step="view-stall-categories" onclick="goToStep('view-stall-categories')">Categories</button>
+          <button type="button" class="subnav-pill" data-target-step="view-stall-menu" onclick="goToStep('view-stall-menu')">Menus</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-basics" onclick="goToStep('view-stall-basics')">Basics</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-delicacies" onclick="goToStep('view-stall-delicacies')">Items</button>
           <button type="button" class="subnav-pill" data-target-step="view-stall-pricing" onclick="goToStep('view-stall-pricing')">Pricing</button>
@@ -2458,7 +2474,7 @@
             <header class="step-header">
               <div class="step-eyebrow">Tiers & Allowances</div>
               <h1 class="step-heading">Pricing & allowances</h1>
-              <p class="step-subtext">Sequential progression: Silver base first, then Gold featured with specialization.</p>
+              <p class="step-subtext">Configure course allowances and pricing for Silver and Gold tiers.</p>
             </header>
             <div class="content-card">
               <!-- Tier Progression Nav Bar Mobile -->
@@ -2832,49 +2848,110 @@
             </div>
           </article>
 
-          <!-- Mobile Stall Views (Task 12: Add New Category) -->
-          <article class="step-container" data-step-id="view-stall-basics">
-            <header class="step-header"><div class="step-eyebrow">Stall Details</div><h1 class="step-heading">Stall details</h1></header>
-            <div class="content-card">
-              <div class="form-group"><label class="form-label">Stall Name <span class="field-optional">(Optional)</span></label><input type="text" class="form-input" data-bind="stall.stallName" value="Awadhi Dum Biryani & Galouti Corner" placeholder="Stall Brand Name (optional)" /></div>
-              <div class="form-group">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                  <label class="form-label" style="margin-bottom:0;">Category *</label>
-                  <button type="button" class="btn-new-category" style="padding:4px 8px;font-size:11px;" id="btn-mobile-new-cat" onclick="toggleNewCategoryBox('mobile')">＋ NEW</button>
+          <!-- ── MOBILE SINGLE STALL: UNIFIED MENUS WORKSPACE ── -->
+          <article class="step-container" data-step-id="view-stall-menu">
+            <header class="step-header">
+              <div class="step-eyebrow">Single Stall Menus</div>
+              <h1 class="step-heading">Build stall menus</h1>
+              <p class="step-subtext" style="font-size:12px;">Select categories, build dishes, and configure independent stall pricing & pax for each stall.</p>
+            </header>
+            <div class="content-card stall-menus-unified-card">
+              <!-- TOP SECTION: Category Selection -->
+              <div class="stall-menu-section-block">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:12px; font-weight:700; color:var(--color-black);">📂 Choose Categories</span>
+                  <span class="stall-cat-selected-pill" id="mobile-stall-cat-selected-count" style="font-size:10.5px; padding:2px 8px;">0 categories</span>
                 </div>
-                <select class="form-select stall-specialty-select" id="mobile-stall-specialty" data-bind="stall.specialty">
-                  <option value="Biryani & Tandoor Station" selected>Biryani & Dum Handi Station</option>
-                  <option value="Chaat & Street Food">Banarasi Chaat & Street Food</option>
-                  <option value="Tandoor & Kebab Grills">Live Tandoor & Kebab Grills</option>
-                  <option value="South Indian Dosa Bar">South Indian Dosa & Tiffin Bar</option>
-                  <option value="Artisanal Pizza & Pasta">Artisanal Pizza & Pasta Station</option>
-                  <option value="Chinese Wok & Dimsums">Chinese Live Wok & Dimsums</option>
-                </select>
-                <div class="new-category-inline-box" id="mobile-new-cat-box" style="display:none;">
-                  <input type="text" class="form-input" id="mobile-new-cat-input" placeholder="Custom category..." style="height:32px;font-size:12px;" />
-                  <button type="button" class="btn-sm btn-primary" style="background:var(--color-red);color:#FFF;border:none;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;" onclick="submitNewStallCategory('mobile')">Add</button>
-                  <button type="button" class="btn-sm btn-secondary" style="background:#FFF;border:1px solid #CCC;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;" onclick="toggleNewCategoryBox('mobile')">✕</button>
+                <div class="stall-cat-validation-error alert-box alert-error" id="mobile-stall-cat-error" style="display:none; margin-bottom:10px; font-size:11.5px;">
+                  <span>⚠️ Select at least one category to continue.</span>
                 </div>
+                <div class="stall-categories-grid" id="mobile-stall-categories-grid"></div>
+                <div class="custom-stall-cat-adder" style="margin-top:10px; padding:10px; border:1px dashed var(--color-gold); border-radius:var(--radius-card); background:var(--color-cream-10);">
+                  <div style="font-size:11px; font-weight:700; margin-bottom:4px;">✨ Add Custom Category</div>
+                  <div style="display:flex; gap:6px;">
+                    <input type="text" id="mobile-custom-stall-cat-input" class="form-input" style="flex:1; font-size:11.5px;" placeholder="Category Name" onkeydown="if(event.key==='Enter'){event.preventDefault();submitCustomStallCategory('mobile');}" />
+                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red); color:#fff; border:none; padding:6px 10px; border-radius:4px; font-size:11.5px; font-weight:700;" onclick="submitCustomStallCategory('mobile')">Add</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DIVIDER -->
+              <div class="stall-menu-section-divider" style="margin:16px 0;"></div>
+
+              <!-- ACTIVE STALL CONFIGURATION -->
+              <div class="stall-menu-section-block">
+                <div class="stall-switcher-label" style="font-size:11px; margin-bottom:4px;">Select stall to configure:</div>
+                <div class="stall-menu-cat-switcher" id="mobile-stall-menu-cat-switcher" style="margin-bottom:10px; display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;"></div>
+
+                <div class="stall-current-configuring-strip" style="margin-bottom:10px; padding:6px 10px;">
+                  <span style="font-size:11.5px; color:var(--color-black-60);">Configuring:</span>
+                  <span class="stall-current-name" id="mobile-active-stall-title" style="font-size:13px; font-weight:800; color:var(--color-red);">Chaat</span>
+                </div>
+
+                <div class="stall-menu-validation-error alert-box alert-error" id="mobile-stall-menu-error" style="display:none; margin-bottom:10px; font-size:11.5px;">
+                  <span>⚠️ Add at least 1 dish to this stall.</span>
+                </div>
+
+                <!-- PART 1: DISHES -->
+                <div class="stall-dishes-section">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:12px; font-weight:700;">🍽️ Your Dishes</span>
+                    <button type="button" class="btn-sm btn-primary" style="background:var(--color-red); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700;" onclick="openStallItemEditor()">＋ Add Dish</button>
+                  </div>
+                  <div class="stall-category-items-grid" id="mobile-stall-category-items-grid"></div>
+                  <button type="button" class="btn-add-item-dashed" id="mobile-btn-add-stall-item" style="margin-top:10px; padding:8px; font-size:12px;" onclick="openStallItemEditor()">
+                    <span>＋</span> Add Dish to <span class="active-cat-name-label">Stall</span>
+                  </button>
+                </div>
+
+                <!-- PART 2: STALL PRICING & PAX -->
+                <div class="stall-pricing-pax-card" id="mobile-stall-pricing-pax-card" style="margin-top:16px; padding:12px 14px; border:1.5px solid var(--color-gold); border-radius:var(--radius-card); background:#FFFDF9;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div style="font-size:12px; font-weight:800; color:var(--color-black-90);">🏷️ Stall Pricing & Pax</div>
+                    <span class="stall-pricing-independent-pill" style="font-size:9.5px;">Per Stall</span>
+                  </div>
+                  <p style="font-size:10.5px; color:var(--color-black-60); margin:0 0 8px 0;">Independent commercial package rate & minimums for this stall.</p>
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="form-label" for="mobile-stall-fixed-rate" style="font-size:11px; font-weight:700;">Fixed Per-Plate Rate (₹) *</label>
+                      <input type="number" id="mobile-stall-fixed-rate" class="form-input" style="font-size:12px; padding:6px 8px;" placeholder="e.g. 150" min="0" oninput="updateStallPricingFromInput('mobile')" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="form-label" for="mobile-stall-min-pax" style="font-size:11px; font-weight:700;">Min Pax Guarantee *</label>
+                      <input type="number" id="mobile-stall-min-pax" class="form-input" style="font-size:12px; padding:6px 8px;" placeholder="e.g. 50" min="1" oninput="updateStallPricingFromInput('mobile')" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Wizard Action Bar -->
+              <div class="wizard-actions-bar" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" class="btn-back" onclick="prevStep()" style="font-size:12px; padding:6px 10px;">← Back</button>
+                <button type="button" class="btn-next" id="mobile-stall-menu-btn-next" onclick="nextStep()" style="font-size:12px; padding:6px 14px;">Next: Setup & Cutlery →</button>
               </div>
             </div>
           </article>
-          <article class="step-container" data-step-id="view-stall-delicacies">
-            <header class="step-header"><div class="step-eyebrow">Stall Delicacies</div><h1 class="step-heading">Stall delicacies</h1></header>
-            <div class="content-card">
-              <div class="delicacies-catalog-container items-catalog-grid"></div>
-              <button type="button" class="btn-add-item-dashed" onclick="openDelicacyEditor()">＋ Add Item</button>
-            </div>
-          </article>
-          <article class="step-container" data-step-id="view-stall-pricing">
-            <header class="step-header"><div class="step-eyebrow">Pricing & Capacity</div><h1 class="step-heading">Capacity</h1></header>
-            <div class="content-card">
-              <div class="form-group"><label class="form-label">Rate (₹)</label><input type="number" class="form-input" data-bind="stall.fixedPerPlate" value="280" /></div>
-              <div class="form-group"><label class="form-label">Min Pax</label><input type="number" class="form-input" data-bind="stall.minPaxGuarantee" value="50" /></div>
-            </div>
-          </article>
+
+          <!-- Mobile Stall: Setup & Cutlery -->
           <article class="step-container" data-step-id="view-stall-live">
-            <header class="step-header"><div class="step-eyebrow">Stall Setup</div><h1 class="step-heading">Stall setup</h1></header>
-            <div class="content-card"><div class="review-pill">✓ Sigdi & Ulta Tawa Included</div></div>
+            <header class="step-header">
+              <div class="step-eyebrow">Stall Setup</div>
+              <h1 class="step-heading">Stall setup & cutlery</h1>
+            </header>
+            <div class="content-card">
+              <div class="form-group">
+                <label class="form-label" style="font-size:11.5px;">Live Cooking Equipment Included</label>
+                <div class="review-pill">✓ Sigdi & Ulta Tawa Included</div>
+              </div>
+              <div class="form-group" style="margin-top:10px;">
+                <label class="form-label" style="font-size:11.5px;">Tableware & Disposables</label>
+                <div class="review-pill">Eco-friendly Areca nut plates included</div>
+              </div>
+              <div class="wizard-actions-bar" style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" class="btn-back" onclick="prevStep()" style="font-size:12px; padding:6px 10px;">← Back to Menus</button>
+                <button type="button" class="btn-next" onclick="nextStep()" style="font-size:12px; padding:6px 14px;">Continue →</button>
+              </div>
+            </div>
           </article>
 
           <!-- Mobile Baina Views -->
@@ -3192,6 +3269,53 @@
       <div class="modal-footer">
         <button type="button" class="btn-back" onclick="closeDelicacyEditor()">Cancel</button>
         <button type="button" class="btn-next" onclick="saveDelicacyEditor()">Save Delicacy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Stall Menu Item Editor -->
+  <div class="modal-backdrop" id="modal-stall-item-editor">
+    <div class="modal-sheet" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title" id="stall-item-modal-title">Configure Stall Menu Item</div>
+        <button type="button" class="modal-close-btn" onclick="closeStallItemEditor()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="stall-item-target-category" value="" />
+        <input type="hidden" id="stall-item-edit-id" value="" />
+        
+        <div class="form-group">
+          <label class="form-label" for="stall-item-input-name">Dish Name <span class="required">*</span></label>
+          <input type="text" id="stall-item-input-name" class="form-input" placeholder="e.g. Kurkuri Aloo Tikki, Special Suji Golgappa, Masala Dosa" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="stall-item-input-diet">Dietary Type</label>
+            <select id="stall-item-input-diet" class="form-select">
+              <option value="veg">🟢 Vegetarian</option>
+              <option value="non-veg">🔴 Non-Vegetarian</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="stall-item-input-price">Dish Cost (₹ / plate) <span class="required">*</span></label>
+            <input type="number" id="stall-item-input-price" class="form-input" placeholder="e.g. 120" min="0" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="stall-item-input-desc">Dish Description</label>
+          <textarea id="stall-item-input-desc" class="form-textarea" placeholder="Portion size, ingredients, and preparation style..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="stall-item-input-photo">Dish Photo URL</label>
+          <input type="text" id="stall-item-input-photo" class="form-input" placeholder="https://images.unsplash.com/..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-back" onclick="closeStallItemEditor()">Cancel</button>
+        <button type="button" class="btn-next" onclick="saveStallItemEditor()">Save Dish</button>
       </div>
     </div>
   </div>

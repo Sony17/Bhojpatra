@@ -345,6 +345,45 @@ const state = {
     stallName: "Awadhi Dum Biryani & Galouti Corner",
     specialty: "Biryani & Tandoor Station",
     customCategories: [],
+    // Dedicated Category Selection & Dynamic Menus Model (Sony Single Stall Flow)
+    customStallCategories: [],
+    selectedCategories: ['Chaat', 'Live Grills'],
+    activeMenuCategory: 'Chaat',
+    menus: {
+      'Chaat': [
+        {
+          id: 'item-chaat-1',
+          name: 'Special Suji Golgappa (6 Pcs)',
+          diet: 'veg',
+          price: 60,
+          desc: 'Crispy semolina puris served with 4 flavoured waters (Khatta, Meetha, Hing, Pudina) and spiced potato filling.',
+          photo: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=400&q=70'
+        },
+        {
+          id: 'item-chaat-2',
+          name: 'Kurkuri Dahi Aloo Tikki',
+          diet: 'veg',
+          price: 90,
+          desc: 'Golden crisp griddled potato patty topped with thick sweet curd, saunth chutney, spicy green mint sauce and sev.',
+          photo: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=400&q=70'
+        }
+      ],
+      'Live Grills': [
+        {
+          id: 'item-grill-1',
+          name: 'Angara Paneer Tikka Skewers',
+          diet: 'veg',
+          price: 180,
+          desc: 'Fresh cottage cheese cubes marinated in tandoori masala and chargrilled with crisp bell peppers.',
+          photo: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=70'
+        }
+      ]
+    },
+    // Per-category independent pricing & pax guarantees (Consolidated Single Stall Menus Architecture)
+    categoryPricing: {
+      'Chaat': { fixedPerPlate: 120, minPaxGuarantee: 50 },
+      'Live Grills': { fixedPerPlate: 280, minPaxGuarantee: 50 }
+    },
     tagline: "Authentic slow-dum Awadhi degchis and live sigdi kebab station cooked on-site.",
     bestFor: ["Weddings", "House Parties", "Corporate Lunches", "Cultural Fairs"],
     menuType: "fixed", // 'fixed' | 'varied'
@@ -450,10 +489,8 @@ const STEP_SEQUENCE = [
   'view-cat-extras',       // 5F. Catering: Hospitality Extras
   'view-cat-essentials',   // 5G. Catering: Service Essentials
   'view-cat-addons',       // 5H. Catering: Tableware Add-ons
-  'view-stall-basics',     // 6A. Stall: Identity & Specialty
-  'view-stall-delicacies', // 6B. Stall: Delicacies Catalog
-  'view-stall-pricing',    // 6C. Stall: Pricing & Pax
-  'view-stall-live',       // 6D. Stall: Equipment & Cutlery
+  'view-stall-menu',       // Single Stall: Unified Menus (Categories, Dishes, Stall Pricing & Pax)
+  'view-stall-live',       // Single Stall: Equipment & Cutlery
   'view-baina-basics',     // 7A. Baina: Studio Story & Best For
   'view-baina-boxes',      // 7B. Baina: Box Catalog
   'view-baina-packaging',  // 7C. Baina: Packaging Styles
@@ -532,12 +569,16 @@ function goToStep(stepId) {
 
   // Toggle active containers across both Desktop and Mobile frames
   document.querySelectorAll('.step-container').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('data-step-id') === stepId);
+    const elStepId = el.getAttribute('data-step-id');
+    const isActive = (elStepId === stepId);
+    el.classList.toggle('active', isActive);
   });
 
   // Update Top Prototyping Dropdown
   const jumpSelect = document.getElementById('prototype-step-jump');
-  if (jumpSelect) jumpSelect.value = stepId;
+  if (jumpSelect) {
+    jumpSelect.value = stepId;
+  }
 
   // Render Persistent Context Header
   updateVendorContextHeader();
@@ -551,7 +592,7 @@ function goToStep(stepId) {
   // Re-render dynamic step views if necessary
   if (stepId === 'view-cat-dishes') renderDishList();
   if (stepId === 'view-cat-tiers') { renderTierView(); }
-  if (stepId === 'view-stall-delicacies') renderDelicaciesList();
+  if (stepId === 'view-stall-menu') renderStallMenuWorkspace();
   if (stepId === 'view-baina-boxes') renderBainaBoxList();
   if (stepId === 'view-review') renderMasterReview();
   renderPhase3StateToUI();
@@ -581,9 +622,9 @@ function getActiveOnboardingSteps() {
     }
   }
 
-  // Stall flow
+  // Stall flow (Unified Menus Workspace -> Live Setup & Cutlery)
   if (state.selectedOfferings.includes('stall')) {
-    steps.push('view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live');
+    steps.push('view-stall-menu', 'view-stall-live');
   }
 
   // Baina flow
@@ -622,6 +663,50 @@ function nextStep() {
     return;
   }
 
+  // Single Stall Menus Validation Gate (Menus -> Live & Cutlery)
+  if (cur === 'view-stall-menu') {
+    // 1. Validate >= 1 stall category selected
+    if (!state.stall.selectedCategories || state.stall.selectedCategories.length === 0) {
+      document.querySelectorAll('.stall-cat-validation-error').forEach(el => el.style.display = 'block');
+      showToast("Please select at least one stall category to continue.");
+      return;
+    }
+    document.querySelectorAll('.stall-cat-validation-error').forEach(el => el.style.display = 'none');
+
+    // 2. Validate every selected category has >= 1 dish
+    for (const cat of state.stall.selectedCategories) {
+      const catItems = (state.stall.menus && state.stall.menus[cat]) ? state.stall.menus[cat] : [];
+      if (catItems.length === 0) {
+        state.stall.activeMenuCategory = cat;
+        renderStallMenuWorkspace(cat);
+        document.querySelectorAll('.stall-menu-validation-error').forEach(el => el.style.display = 'block');
+        showToast(`Please add at least 1 dish to "${cat}" before proceeding.`);
+        return;
+      }
+    }
+    document.querySelectorAll('.stall-menu-validation-error').forEach(el => el.style.display = 'none');
+
+    // 3. Validate stall pricing & pax for each selected category
+    for (const cat of state.stall.selectedCategories) {
+      const pricing = getStallPricing(cat);
+      if (!pricing.fixedPerPlate || pricing.fixedPerPlate <= 0) {
+        state.stall.activeMenuCategory = cat;
+        renderStallMenuWorkspace(cat);
+        showToast(`Please set a valid per-plate rate for "${cat}".`);
+        return;
+      }
+      if (!pricing.minPaxGuarantee || pricing.minPaxGuarantee <= 0) {
+        state.stall.activeMenuCategory = cat;
+        renderStallMenuWorkspace(cat);
+        showToast(`Please set a valid minimum pax guarantee for "${cat}".`);
+        return;
+      }
+    }
+
+    goToStep('view-stall-live');
+    return;
+  }
+
   // Dynamic next step progression
   const activeSteps = getActiveOnboardingSteps();
   const curIdx = activeSteps.indexOf(cur);
@@ -637,6 +722,7 @@ function prevStep() {
 
   if (cur === 'view-kyc') { goToStep('view-details'); return; }
   if (cur === 'view-offerings') { goToStep('view-kyc'); return; }
+  if (cur === 'view-stall-live') { goToStep('view-stall-menu'); return; }
 
   const activeSteps = getActiveOnboardingSteps();
   const curIdx = activeSteps.indexOf(cur);
@@ -713,7 +799,7 @@ function updateVendorContextHeader() {
       let focusText = "Onboarding";
       if (['view-cat-basics', 'view-cat-tiers', 'view-cat-courses', 'view-cat-dishes'].includes(state.currentStepId)) focusText = "Feast Builder";
       if (['view-cat-live', 'view-cat-extras', 'view-cat-essentials', 'view-cat-addons'].includes(state.currentStepId)) focusText = "Feast Extras";
-      if (['view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live'].includes(state.currentStepId)) focusText = "Stall Builder";
+      if (state.currentStepId.startsWith('view-stall-')) focusText = "Stall Builder";
       if (['view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'].includes(state.currentStepId)) focusText = "Baina Builder";
       tagEl.textContent = focusText;
     }
@@ -728,7 +814,7 @@ function updateStepperProgress(stepId) {
     { id: 'phase-offerings', label: 'Offerings', steps: ['view-offerings'] },
     { id: 'phase-builder', label: 'Service Setup', steps: [
       'view-cat-basics', 'view-cat-tiers', 'view-cat-courses', 'view-cat-dishes', 'view-cat-live', 'view-cat-extras', 'view-cat-essentials', 'view-cat-addons',
-      'view-stall-basics', 'view-stall-delicacies', 'view-stall-pricing', 'view-stall-live',
+      'view-stall-menu', 'view-stall-live',
       'view-baina-basics', 'view-baina-boxes', 'view-baina-packaging'
     ]},
     { id: 'phase-review', label: 'Review & Submit', steps: ['view-review'] },
@@ -850,7 +936,9 @@ function updateSubnavBreadcrumbs(stepId) {
 
     if (isVisible) {
       bar.querySelectorAll('.subnav-pill').forEach(pill => {
-        pill.classList.toggle('active', pill.getAttribute('data-target-step') === stepId);
+        const target = pill.getAttribute('data-target-step');
+        const isActive = (target === stepId) || (target === 'view-stall-menu' && stepId.startsWith('view-stall-menu'));
+        pill.classList.toggle('active', isActive);
       });
     }
   });
@@ -2241,6 +2329,489 @@ function deleteDelicacy(delId) {
   showToast("Delicacy removed.");
 }
 
+// ── Single Stall Category Selection & Dedicated Menu-Building Flow ──
+
+const PREDEFINED_STALL_CATEGORIES = [
+  { id: 'chaat', name: 'Chaat', icon: '🥘', desc: 'Live pani puri, aloo tikki, dahi bhalla & papdi' },
+  { id: 'juices', name: 'Juices & Shakes', icon: '🥤', desc: 'Freshly squeezed fruit juices, shakes & coolers' },
+  { id: 'beverages', name: 'Beverages & Chai', icon: '☕', desc: 'Kulhad chai, filter coffee, artisan mocktails' },
+  { id: 'south-indian', name: 'South Indian', icon: '🥥', desc: 'Crispy dosas, idlis, vadas with sambar & chutneys' },
+  { id: 'north-indian', name: 'North Indian & Mughlai', icon: '🍛', desc: 'Curries, rolls, kebabs, tandoor specials & naans' },
+  { id: 'chinese', name: 'Chinese & Pan-Asian', icon: '🍜', desc: 'Hakka noodles, dim sums, momos & Manchurian' },
+  { id: 'snacks', name: 'Snacks & Fast Food', icon: '🥪', desc: 'Sandwiches, burgers, fries, kathi rolls' },
+  { id: 'desserts', name: 'Desserts & Sweets', icon: '🍬', desc: 'Hot jalebi, gulab jamun, rabri, kulfi' },
+  { id: 'ice-cream', name: 'Ice Cream & Kulfi', icon: '🍨', desc: 'Artisanal rolled scoops, matka kulfi & sundaes' },
+  { id: 'street-food', name: 'Street Food Specials', icon: '🍢', desc: 'Pav bhaji, chole bhature, dabeli, momos' },
+  { id: 'live-grills', name: 'Live Grills & Barbecue', icon: '🔥', desc: 'Smoked paneer skewers, tikkas & charcoal kebabs' },
+  { id: 'breakfast', name: 'Breakfast Counter', icon: '🥞', desc: 'Poori sabzi, parathas, poha, upma & chole kulche' },
+  { id: 'regional', name: 'Regional / Specialty', icon: '🏺', desc: 'Awadhi, Rajasthani, Gujarati or hyperlocal specials' }
+];
+
+function slugifyCategory(name) {
+  if (!name) return '';
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function resolveCategoryFromStepId(stepId) {
+  if (!stepId || !stepId.startsWith('view-stall-menu')) {
+    return state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  }
+  const slug = stepId.replace(/^view-stall-menu-?/, '');
+  if (!slug) {
+    return state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  }
+  const found = (state.stall.selectedCategories || []).find(c => slugifyCategory(c) === slug);
+  if (found) return found;
+  const allKnown = [...(state.stall.customStallCategories || []), ...PREDEFINED_STALL_CATEGORIES.map(p => p.name)];
+  const fallback = allKnown.find(c => slugifyCategory(c) === slug);
+  return fallback || slug;
+}
+
+// ── Consolidated Single Stall Menus Architecture ──
+function getStallPricing(catName) {
+  if (!catName) {
+    catName = state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  }
+  if (!state.stall.categoryPricing) {
+    state.stall.categoryPricing = {};
+  }
+  if (!state.stall.categoryPricing[catName]) {
+    const defaultsByCat = {
+      'Chaat': { fixedPerPlate: 120, minPaxGuarantee: 50 },
+      'Live Grills': { fixedPerPlate: 280, minPaxGuarantee: 50 },
+      'Biryani & Handi Hub': { fixedPerPlate: 240, minPaxGuarantee: 50 },
+      'Paan & Mukhwas Studio': { fixedPerPlate: 50, minPaxGuarantee: 50 },
+      'Tandoor & Kebab Station': { fixedPerPlate: 220, minPaxGuarantee: 50 },
+      'Juices & Shake Bar': { fixedPerPlate: 80, minPaxGuarantee: 50 },
+      'Artisanal Desserts & Kulfi': { fixedPerPlate: 90, minPaxGuarantee: 50 },
+      'South Indian Live Tiffin': { fixedPerPlate: 110, minPaxGuarantee: 50 },
+      'Wood-Fired Pizza Station': { fixedPerPlate: 160, minPaxGuarantee: 50 },
+      'Asian Wok & Dimsum Kiosk': { fixedPerPlate: 140, minPaxGuarantee: 50 },
+      'Regional Sweet / Halwai Counter': { fixedPerPlate: 100, minPaxGuarantee: 50 },
+      'Chai, Kahwa & Filter Coffee': { fixedPerPlate: 60, minPaxGuarantee: 50 },
+      'Salad, Fruit & Mezze Bar': { fixedPerPlate: 90, minPaxGuarantee: 50 }
+    };
+    state.stall.categoryPricing[catName] = defaultsByCat[catName] || { fixedPerPlate: 150, minPaxGuarantee: 50 };
+  }
+  return state.stall.categoryPricing[catName];
+}
+
+function setStallPricing(catName, field, value) {
+  if (!catName) {
+    catName = state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  }
+  if (!state.stall.categoryPricing) state.stall.categoryPricing = {};
+  if (!state.stall.categoryPricing[catName]) {
+    state.stall.categoryPricing[catName] = { fixedPerPlate: 150, minPaxGuarantee: 50 };
+  }
+  const numVal = parseFloat(value) || 0;
+  state.stall.categoryPricing[catName][field] = numVal;
+  if (catName === state.stall.activeMenuCategory) {
+    if (field === 'fixedPerPlate') state.stall.fixedPerPlate = numVal;
+    if (field === 'minPaxGuarantee') state.stall.minPaxGuarantee = numVal;
+  }
+}
+
+function updateStallPricingFromInput(source = 'desktop') {
+  const activeCat = state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  const rateInput = document.getElementById(source === 'mobile' ? 'mobile-stall-fixed-rate' : 'desktop-stall-fixed-rate');
+  const paxInput = document.getElementById(source === 'mobile' ? 'mobile-stall-min-pax' : 'desktop-stall-min-pax');
+
+  if (rateInput && rateInput.value !== '') {
+    const rateVal = parseFloat(rateInput.value) || 0;
+    setStallPricing(activeCat, 'fixedPerPlate', rateVal);
+    const otherRate = document.getElementById(source === 'mobile' ? 'desktop-stall-fixed-rate' : 'mobile-stall-fixed-rate');
+    if (otherRate) otherRate.value = rateInput.value;
+  }
+
+  if (paxInput && paxInput.value !== '') {
+    const paxVal = parseInt(paxInput.value, 10) || 0;
+    setStallPricing(activeCat, 'minPaxGuarantee', paxVal);
+    const otherPax = document.getElementById(source === 'mobile' ? 'desktop-stall-min-pax' : 'mobile-stall-min-pax');
+    if (otherPax) otherPax.value = paxInput.value;
+  }
+
+  renderMasterReview();
+}
+
+function toggleStallCategory(catName) {
+  if (!state.stall.selectedCategories) state.stall.selectedCategories = [];
+  if (!state.stall.menus) state.stall.menus = {};
+  if (!state.stall.categoryPricing) state.stall.categoryPricing = {};
+
+  const idx = state.stall.selectedCategories.indexOf(catName);
+  if (idx > -1) {
+    state.stall.selectedCategories.splice(idx, 1);
+    // Preserves dishes and pricing data in state.stall.menus and state.stall.categoryPricing
+    if (state.stall.activeMenuCategory === catName) {
+      state.stall.activeMenuCategory = state.stall.selectedCategories[0] || null;
+    }
+  } else {
+    state.stall.selectedCategories.push(catName);
+    if (!state.stall.menus[catName]) {
+      state.stall.menus[catName] = [];
+    }
+    getStallPricing(catName);
+    state.stall.activeMenuCategory = catName;
+  }
+
+  if (state.stall.selectedCategories.length > 0) {
+    document.querySelectorAll('.stall-cat-validation-error').forEach(el => el.style.display = 'none');
+  }
+
+  renderStallMenuWorkspace(state.stall.activeMenuCategory);
+  renderMasterReview();
+}
+
+function submitCustomStallCategory(source = 'desktop') {
+  const inputId = source === 'mobile' ? 'mobile-custom-stall-cat-input' : 'desktop-custom-stall-cat-input';
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) {
+    showToast('Please enter a category name');
+    return;
+  }
+
+  if (!state.stall.customStallCategories) state.stall.customStallCategories = [];
+  if (!state.stall.selectedCategories) state.stall.selectedCategories = [];
+  if (!state.stall.menus) state.stall.menus = {};
+  if (!state.stall.categoryPricing) state.stall.categoryPricing = {};
+
+  const allExisting = [
+    ...PREDEFINED_STALL_CATEGORIES.map(p => p.name.toLowerCase()),
+    ...state.stall.customStallCategories.map(c => c.toLowerCase())
+  ];
+  if (allExisting.includes(name.toLowerCase())) {
+    showToast(`Category "${name}" already exists`);
+    return;
+  }
+
+  state.stall.customStallCategories.push(name);
+  if (!state.stall.selectedCategories.includes(name)) {
+    state.stall.selectedCategories.push(name);
+  }
+  if (!state.stall.menus[name]) {
+    state.stall.menus[name] = [];
+  }
+  getStallPricing(name);
+  state.stall.activeMenuCategory = name;
+
+  input.value = '';
+  document.querySelectorAll('.stall-cat-validation-error').forEach(el => el.style.display = 'none');
+  renderStallMenuWorkspace(name);
+  renderMasterReview();
+  showToast(`Added and selected "${name}"`);
+}
+
+function removeCustomStallCategory(catName) {
+  if (!state.stall.customStallCategories) return;
+  state.stall.customStallCategories = state.stall.customStallCategories.filter(c => c !== catName);
+  if (state.stall.selectedCategories) {
+    state.stall.selectedCategories = state.stall.selectedCategories.filter(c => c !== catName);
+  }
+  if (state.stall.activeMenuCategory === catName) {
+    state.stall.activeMenuCategory = (state.stall.selectedCategories && state.stall.selectedCategories[0]) || null;
+  }
+  renderStallMenuWorkspace(state.stall.activeMenuCategory);
+  renderMasterReview();
+  showToast(`Removed custom category "${catName}"`);
+}
+
+function switchStallMenuCategory(catName) {
+  state.stall.activeMenuCategory = catName;
+  renderStallMenuWorkspace(catName);
+}
+
+function renderStallMenuWorkspace(activeCat) {
+  const selected = state.stall.selectedCategories || [];
+  if (selected.length === 0) {
+    state.stall.activeMenuCategory = null;
+  } else if (!activeCat || !selected.includes(activeCat)) {
+    if (!state.stall.activeMenuCategory || !selected.includes(state.stall.activeMenuCategory)) {
+      state.stall.activeMenuCategory = selected[0];
+    }
+  } else {
+    state.stall.activeMenuCategory = activeCat;
+  }
+
+  renderStallCategoriesUI();
+  renderStallCategoryMenuUI(state.stall.activeMenuCategory);
+}
+
+function renderStallCategoriesUI() {
+  const selected = state.stall.selectedCategories || [];
+  const customList = state.stall.customStallCategories || [];
+
+  const countText = `${selected.length} categor${selected.length === 1 ? 'y' : 'ies'} selected`;
+  const countElDesktop = document.getElementById('desktop-stall-cat-selected-count');
+  const countElMobile = document.getElementById('mobile-stall-cat-selected-count');
+  if (countElDesktop) countElDesktop.textContent = countText;
+  if (countElMobile) countElMobile.textContent = countText;
+
+  const combined = [
+    ...PREDEFINED_STALL_CATEGORIES.map(p => ({ ...p, isCustom: false })),
+    ...customList.map(c => ({
+      id: slugifyCategory(c),
+      name: c,
+      icon: '✨',
+      desc: 'Custom vendor category',
+      isCustom: true
+    }))
+  ];
+
+  const html = combined.map(cat => {
+    const isSelected = selected.includes(cat.name);
+    const items = (state.stall.menus && state.stall.menus[cat.name]) ? state.stall.menus[cat.name] : [];
+    const itemCount = items.length;
+
+    return `
+      <div class="stall-category-card ${isSelected ? 'selected' : ''}" onclick="toggleStallCategory('${cat.name.replace(/'/g, "\\'")}')">
+        <div class="stall-cat-checkbox">${isSelected ? '✓' : ''}</div>
+        <div class="stall-cat-icon">${cat.icon}</div>
+        <div class="stall-cat-info" style="flex:1;">
+          <div class="stall-cat-name">${cat.name}</div>
+          <div class="stall-cat-desc">${cat.desc}</div>
+          ${isSelected ? `<span class="stall-cat-count-badge" style="display:inline-block;margin-top:4px;font-size:10.5px;font-weight:700;color:var(--color-red);">${itemCount} dish${itemCount === 1 ? '' : 'es'} added</span>` : ''}
+        </div>
+        ${cat.isCustom ? `
+          <button type="button" class="btn-remove-custom-cat" onclick="event.stopPropagation(); removeCustomStallCategory('${cat.name.replace(/'/g, "\\'")}')" title="Delete custom category">✕</button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const gridDesktop = document.getElementById('desktop-stall-categories-grid');
+  const gridMobile = document.getElementById('mobile-stall-categories-grid');
+  if (gridDesktop) gridDesktop.innerHTML = html;
+  if (gridMobile) gridMobile.innerHTML = html;
+}
+
+function renderStallCategoryMenuUI(categoryName) {
+  const selectedCats = state.stall.selectedCategories || [];
+  if (!categoryName) {
+    categoryName = state.stall.activeMenuCategory || selectedCats[0] || null;
+  }
+  state.stall.activeMenuCategory = categoryName;
+
+  const dActiveConfigBlock = document.getElementById('desktop-stall-active-config-block');
+  if (selectedCats.length === 0 || !categoryName) {
+    if (dActiveConfigBlock) dActiveConfigBlock.style.display = 'none';
+    const dSwitcher = document.getElementById('desktop-stall-menu-cat-switcher');
+    const mSwitcher = document.getElementById('mobile-stall-menu-cat-switcher');
+    if (dSwitcher) dSwitcher.innerHTML = '<span style="font-size:12px;color:var(--color-black-40);font-style:italic;">Please select at least one stall category above</span>';
+    if (mSwitcher) mSwitcher.innerHTML = '<span style="font-size:12px;color:var(--color-black-40);font-style:italic;">Please select a category above</span>';
+    return;
+  }
+  if (dActiveConfigBlock) dActiveConfigBlock.style.display = 'block';
+
+  // Header texts & Active Stall Labels
+  const dTitle = document.getElementById('desktop-active-stall-title');
+  const mTitle = document.getElementById('mobile-active-stall-title');
+  const dPriceName = document.getElementById('desktop-pricing-stall-name');
+  if (dTitle) dTitle.textContent = categoryName;
+  if (mTitle) mTitle.textContent = categoryName;
+  if (dPriceName) dPriceName.textContent = categoryName;
+
+  document.querySelectorAll('.active-cat-name-label').forEach(el => {
+    el.textContent = categoryName;
+  });
+
+  // Render Category Switcher Tabs
+  const tabsHtml = selectedCats.map(cat => {
+    const isActive = cat === categoryName;
+    const items = (state.stall.menus && state.stall.menus[cat]) ? state.stall.menus[cat] : [];
+    const count = items.length;
+    return `
+      <button type="button" class="stall-menu-cat-tab ${isActive ? 'active' : ''}" onclick="switchStallMenuCategory('${cat.replace(/'/g, "\\'")}')">
+        <span>${cat}</span>
+        <span class="stall-cat-tab-badge ${count > 0 ? 'has-items' : 'empty'}">${count}</span>
+      </button>
+    `;
+  }).join('');
+
+  const dSwitcher = document.getElementById('desktop-stall-menu-cat-switcher');
+  const mSwitcher = document.getElementById('mobile-stall-menu-cat-switcher');
+  if (dSwitcher) dSwitcher.innerHTML = tabsHtml;
+  if (mSwitcher) mSwitcher.innerHTML = tabsHtml;
+
+  // Render Dishes Grid (Dish pricing comes before Stall Pricing)
+  const items = (state.stall.menus && state.stall.menus[categoryName]) ? state.stall.menus[categoryName] : [];
+
+  let itemsHtml = '';
+  if (items.length === 0) {
+    itemsHtml = `
+      <div class="stall-menu-empty-state" style="grid-column: 1 / -1; text-align:center; padding:28px 16px; background:var(--color-cream-10); border:1.5px dashed var(--color-cream-60); border-radius:var(--radius-card);">
+        <div style="font-size:30px; margin-bottom:6px;">🍽️</div>
+        <h4 style="font-size:14px; font-weight:700; color:var(--color-black); margin-bottom:4px;">No dishes added to ${categoryName} yet</h4>
+        <p style="font-size:11.5px; color:var(--color-black-60); max-width:360px; margin:0 auto 12px;">Add at least 1 food item with photo, dietary marker, and per-plate pricing to complete this stall menu.</p>
+        <button type="button" class="btn-sm btn-primary" style="background:var(--color-red); color:#fff; border:none; padding:7px 16px; border-radius:6px; font-weight:700; cursor:pointer;" onclick="openStallItemEditor('${categoryName.replace(/'/g, "\\'")}')">
+          ＋ Add First Dish
+        </button>
+      </div>
+    `;
+  } else {
+    itemsHtml = items.map(it => `
+      <div class="stall-menu-item-card">
+        <div class="stall-item-photo-wrapper">
+          <img src="${it.photo || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=400&q=70'}" alt="${escapeHtml(it.name)}" onerror="this.src='https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=400&q=70'" />
+          <span class="fssai-icon ${it.diet || 'veg'} stall-item-diet-badge"></span>
+        </div>
+        <div class="stall-item-details">
+          <div class="stall-item-name-row">
+            <h4 class="stall-item-name">${escapeHtml(it.name)}</h4>
+            <span class="stall-item-price">₹${it.price} <small style="font-size:10px;font-weight:600;color:var(--color-black-60);">/ plate</small></span>
+          </div>
+          ${it.desc ? `<p class="stall-item-desc">${escapeHtml(it.desc)}</p>` : ''}
+          <div class="stall-item-actions">
+            <button type="button" class="btn-item-action btn-item-edit" onclick="openStallItemEditor('${categoryName.replace(/'/g, "\\'")}', '${it.id}')">Edit ✎</button>
+            <button type="button" class="btn-item-action btn-item-delete" onclick="deleteStallMenuItem('${categoryName.replace(/'/g, "\\'")}', '${it.id}')">Delete 🗑</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const dGrid = document.getElementById('desktop-stall-category-items-grid');
+  const mGrid = document.getElementById('mobile-stall-category-items-grid');
+  if (dGrid) dGrid.innerHTML = itemsHtml;
+  if (mGrid) mGrid.innerHTML = itemsHtml;
+
+  // Clear validation error if >= 1 item
+  if (items.length > 0) {
+    document.querySelectorAll('.stall-menu-validation-error').forEach(el => el.style.display = 'none');
+  }
+
+  // Populate Stall-Level Pricing & Pax Guarantee (Below Dishes, Independent per Stall)
+  const pricing = getStallPricing(categoryName);
+  const dRateInput = document.getElementById('desktop-stall-fixed-rate');
+  const dPaxInput = document.getElementById('desktop-stall-min-pax');
+  const mRateInput = document.getElementById('mobile-stall-fixed-rate');
+  const mPaxInput = document.getElementById('mobile-stall-min-pax');
+
+  if (dRateInput) dRateInput.value = pricing.fixedPerPlate || '';
+  if (dPaxInput) dPaxInput.value = pricing.minPaxGuarantee || '';
+  if (mRateInput) mRateInput.value = pricing.fixedPerPlate || '';
+  if (mPaxInput) mPaxInput.value = pricing.minPaxGuarantee || '';
+}
+
+function openStallItemEditor(catName, itemId) {
+  if (!catName) {
+    catName = state.stall.activeMenuCategory || (state.stall.selectedCategories && state.stall.selectedCategories[0]) || 'Chaat';
+  }
+  const modal = document.getElementById('modal-stall-item-editor');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('stall-item-modal-title');
+  const catInput = document.getElementById('stall-item-target-category');
+  const idInput = document.getElementById('stall-item-edit-id');
+  const nameInput = document.getElementById('stall-item-input-name');
+  const dietInput = document.getElementById('stall-item-input-diet');
+  const priceInput = document.getElementById('stall-item-input-price');
+  const descInput = document.getElementById('stall-item-input-desc');
+  const photoInput = document.getElementById('stall-item-input-photo');
+
+  if (catInput) catInput.value = catName;
+  if (idInput) idInput.value = itemId || '';
+
+  if (itemId) {
+    const items = (state.stall.menus && state.stall.menus[catName]) ? state.stall.menus[catName] : [];
+    const item = items.find(it => it.id === itemId);
+    if (item) {
+      if (titleEl) titleEl.textContent = `Edit Dish: ${item.name}`;
+      if (nameInput) nameInput.value = item.name;
+      if (dietInput) dietInput.value = item.diet || 'veg';
+      if (priceInput) priceInput.value = item.price;
+      if (descInput) descInput.value = item.desc || '';
+      if (photoInput) photoInput.value = item.photo || '';
+    }
+  } else {
+    if (titleEl) titleEl.textContent = `Add Dish to ${catName}`;
+    if (nameInput) nameInput.value = '';
+    if (dietInput) dietInput.value = 'veg';
+    if (priceInput) priceInput.value = '';
+    if (descInput) descInput.value = '';
+    if (photoInput) photoInput.value = '';
+  }
+
+  modal.classList.add('open', 'active');
+  if (nameInput) nameInput.focus();
+}
+
+function closeStallItemEditor() {
+  const modal = document.getElementById('modal-stall-item-editor');
+  if (modal) modal.classList.remove('open', 'active');
+}
+
+function saveStallItemEditor() {
+  const catInput = document.getElementById('stall-item-target-category');
+  const idInput = document.getElementById('stall-item-edit-id');
+  const nameInput = document.getElementById('stall-item-input-name');
+  const dietInput = document.getElementById('stall-item-input-diet');
+  const priceInput = document.getElementById('stall-item-input-price');
+  const descInput = document.getElementById('stall-item-input-desc');
+  const photoInput = document.getElementById('stall-item-input-photo');
+
+  const catName = (catInput && catInput.value) ? catInput.value : (state.stall.activeMenuCategory || 'Chaat');
+  const itemId = idInput ? idInput.value : '';
+  const name = nameInput ? nameInput.value.trim() : '';
+  const diet = dietInput ? dietInput.value : 'veg';
+  const price = priceInput ? parseFloat(priceInput.value) : NaN;
+  const desc = descInput ? descInput.value.trim() : '';
+  let photo = photoInput ? photoInput.value.trim() : '';
+
+  if (!name) {
+    showToast('Please enter an item name');
+    if (nameInput) nameInput.focus();
+    return;
+  }
+  if (isNaN(price) || price < 0) {
+    showToast('Please enter a valid price (>= 0)');
+    if (priceInput) priceInput.focus();
+    return;
+  }
+  if (!photo) {
+    photo = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=400&q=70';
+  }
+
+  if (!state.stall.menus) state.stall.menus = {};
+  if (!state.stall.menus[catName]) state.stall.menus[catName] = [];
+
+  if (itemId) {
+    const existing = state.stall.menus[catName].find(it => it.id === itemId);
+    if (existing) {
+      existing.name = name;
+      existing.diet = diet;
+      existing.price = price;
+      existing.desc = desc;
+      existing.photo = photo;
+    }
+    showToast(`Updated "${name}"`);
+  } else {
+    state.stall.menus[catName].push({
+      id: `stall-item-${Date.now()}`,
+      name,
+      diet,
+      price,
+      desc,
+      photo
+    });
+    showToast(`Added "${name}" to ${catName}`);
+  }
+
+  closeStallItemEditor();
+  renderStallMenuWorkspace(catName);
+  renderMasterReview();
+}
+
+function deleteStallMenuItem(catName, itemId) {
+  if (!state.stall.menus || !state.stall.menus[catName]) return;
+  state.stall.menus[catName] = state.stall.menus[catName].filter(it => it.id !== itemId);
+  renderStallMenuWorkspace(catName);
+  renderMasterReview();
+  showToast('Item deleted');
+}
+
 // ── Step 7: Baina Gifting Box Engine ──
 function setPackagingStyle(styleKey) {
   state.baina.packaging = styleKey;
@@ -2688,36 +3259,59 @@ function renderMasterReview() {
 
   // 3. Feast Sub-Parts (Live Counters, Extras, Essentials, Add-ons) are integrated inside Feast Booking card above.
 
-  // 3. Stall Review (if selected)
+  // 3. Single Stall Review (Consolidated Menus Architecture)
   if (hasStall) {
     html += `
       <div class="review-section-card">
         <div class="review-section-header">
           <div class="review-section-title">
             <span>🍢</span>
-            <span>Single Stall: ${state.stall.stallName || state.details.businessName || 'Specialty Food Stall'}</span>
+            <span>Single Stall: Menus & Stations</span>
           </div>
-          <button type="button" class="btn-review-edit" onclick="goToStep('view-stall-delicacies')">Edit Stall ✎</button>
-        </div>
-        <div style="margin-bottom:12px;">
-          <p style="font-size:12px;color:var(--color-black-80);">${state.stall.tagline}</p>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-            <span class="review-pill"><strong>Specialty:</strong> ${state.stall.specialty}</span>
-            <span class="review-pill"><strong>Format:</strong> ${state.stall.menuType === 'fixed' ? `Fixed Set Spread (₹${state.stall.fixedPerPlate}/pax)` : 'Varied Build-Your-Own'}</span>
-            <span class="review-pill"><strong>Min Guarantee:</strong> ${state.stall.minPaxGuarantee} Pax</span>
-          </div>
+          <button type="button" class="btn-review-edit" onclick="goToStep('view-stall-menu')">Edit Stall Menus ✎</button>
         </div>
 
+        <!-- Stall Configurations Grouped by Category -->
         <div class="review-subitem-group">
-          <div class="review-subitem-title">Stall Delicacies (${state.stall.delicacies.length} Items)</div>
-          <div class="review-pills-row">
-            ${state.stall.delicacies.map(d => `
-              <span class="review-pill">
-                <span class="fssai-icon ${d.diet}" style="transform:scale(0.8);"></span>
-                ${d.name} · <strong>₹${d.price}</strong>
-              </span>
-            `).join('')}
-          </div>
+          <div class="review-subitem-title">Stall Configurations (${(state.stall.selectedCategories || []).length} Categories Configured)</div>
+          ${(state.stall.selectedCategories && state.stall.selectedCategories.length > 0)
+            ? state.stall.selectedCategories.map(cat => {
+                const items = (state.stall.menus && state.stall.menus[cat]) ? state.stall.menus[cat] : [];
+                const pricing = getStallPricing(cat);
+                return `
+                  <div class="stall-review-cat-card" style="margin-bottom:12px;background:var(--color-cream-10);border:1px solid var(--color-cream-30);border-radius:var(--radius-control);padding:12px 14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-weight:700;font-size:13px;color:var(--color-black-90);">📂 ${cat} Stall</span>
+                      <span style="font-size:11px;font-weight:700;color:var(--color-red);">${items.length} dish${items.length === 1 ? '' : 'es'}</span>
+                    </div>
+
+                    <!-- Independent Stall Pricing & Pax Guarantee -->
+                    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+                      <span class="review-pill" style="border-color:var(--color-gold);background:#FFFDF9;font-weight:700;color:var(--color-black-90);font-size:11.5px;">
+                        🏷️ Fixed Package Rate: ₹${pricing.fixedPerPlate} / plate
+                      </span>
+                      <span class="review-pill" style="border-color:var(--color-gold);background:#FFFDF9;font-weight:700;color:var(--color-black-90);font-size:11.5px;">
+                        👥 Min Guarantee: ${pricing.minPaxGuarantee} Pax
+                      </span>
+                    </div>
+
+                    <!-- Dishes in this stall -->
+                    ${items.length > 0 ? `
+                      <div class="review-pills-row" style="margin-top:6px;">
+                        ${items.map(it => `
+                          <span class="review-pill" style="display:inline-flex;align-items:center;gap:6px;">
+                            <span class="fssai-icon ${it.diet || 'veg'}" style="transform:scale(0.8);"></span>
+                            <span style="font-weight:600;">${it.name}</span>
+                            <strong style="color:var(--color-red);">₹${it.price}/plate</strong>
+                            ${it.desc ? `<small style="color:var(--color-black-60);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${it.desc})</small>` : ''}
+                          </span>
+                        `).join('')}
+                      </div>
+                    ` : `<span style="font-size:11px;color:var(--color-black-40);font-style:italic;">No dishes entered yet</span>`}
+                  </div>
+                `;
+              }).join('')
+            : '<p style="font-size:12px;color:var(--color-black-40);">No stall categories selected.</p>'}
         </div>
 
         <div class="review-subitem-group" style="padding-top:8px;border-top:1px dashed var(--color-cream-30);">
@@ -3053,14 +3647,7 @@ function syncChipToState(chip, label, isNowActive) {
         }
       });
     }
-  } else if (stepId === 'view-stall-basics') {
-    // Step 6A: Stall Occasions
-    if (!state.stall.bestFor) state.stall.bestFor = [];
-    if (isNowActive && !state.stall.bestFor.includes(label)) {
-      state.stall.bestFor.push(label);
-    } else if (!isNowActive) {
-      state.stall.bestFor = state.stall.bestFor.filter(c => c !== label);
-    }
+
   } else if (stepId === 'view-stall-live') {
     // Step 6E: Stall Live Equipment
     if (!state.stall.liveEquipment) state.stall.liveEquipment = [];
@@ -3274,6 +3861,8 @@ function renderAllViews() {
   renderLiveCountersList();
   renderFeastExtrasList();
   renderDelicaciesList();
+  renderStallCategoriesUI();
+  renderStallCategoryMenuUI();
   renderBainaBoxList();
   renderDashboardView();
   initBadgeState();
@@ -3498,13 +4087,13 @@ function renderServicesHub() {
       icon: '🎪',
       isActive: state.selectedOfferings.includes('stall'),
       activeDetails: [
-        { label: 'Stall Name', value: state.stall.stallName || 'Not Specified (Optional)' },
-        { label: 'Menu Format', value: `Fixed Set Spread (₹${state.stall.fixedPerPlate}/p)` },
-        { label: 'Min Pax Guarantee', value: `${state.stall.minPaxGuarantee} Guests` },
-        { label: 'Specialty Items', value: `${state.stall.delicacies.length} Delicacies Configured` }
+        { label: 'Configured Stalls', value: `${(state.stall.selectedCategories || []).length} Categories Active` },
+        { label: 'Total Dishes', value: `${Object.values(state.stall.menus || {}).reduce((acc, arr) => acc + (arr ? arr.length : 0), 0)} Dishes configured` },
+        { label: 'Pricing Model', value: 'Per-Stall Independent Package & Pax Guarantee' },
+        { label: 'Equipment & Cutlery', value: 'Live on-site setup included' }
       ],
       unconfiguredNote: 'Deploy standalone specialty stalls like Biryani handis or live Sigdi kebabs.',
-      editStep: 'view-stall-basics',
+      editStep: 'view-stall-menu',
       addStep: 'view-offerings'
     },
     {
