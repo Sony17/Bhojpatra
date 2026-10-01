@@ -328,7 +328,7 @@ export default function Step3Offerings({
           ← Back to KYC
         </Button>
         <Button type="submit" size="lg" disabled={saving}>
-          {saving ? "Saving..." : "Complete Step 3 →"}
+          {saving ? "Saving..." : "Continue to Service Builders →"}
         </Button>
       </div>
     </form>
