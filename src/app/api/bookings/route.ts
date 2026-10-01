@@ -101,6 +101,10 @@ export interface StoredOrder {
   review?: { rating: number; comment: string; createdAt: string };
   /** Set when the customer reopened a Completed booking (stops auto-complete). */
   reopened?: boolean;
+  /** Vendor workflow extras */
+  vendorAcknowledged?: boolean;
+  acknowledgedAt?: string;
+  vendorNotes?: string;
 }
 
 const store = createStore<StoredOrder>({

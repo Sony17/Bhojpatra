@@ -15,11 +15,19 @@ import {
   type VendorTier,
 } from "@/lib/admin/types";
 import {
+  cleanBadges,
   cleanBainaBoxes,
+  cleanBainaDetails,
+  cleanBestFor,
   cleanCateringCategories,
+  cleanCustomOfferings,
+  cleanCutleryTier,
+  cleanDietaryOffering,
   cleanEssentialService,
   cleanGoogleRating,
   cleanGoogleReviews,
+  cleanServiceCities,
+  cleanStallConfig,
 } from "@/lib/vendorMenus";
 import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendVendorApplicationAlert } from "@/lib/email";
@@ -133,6 +141,19 @@ export async function POST(request: Request) {
   const bainaBoxes = boxesCheck.value;
   const essentialService = cleanEssentialService(body.essentialService);
 
+  const serviceCities = cleanServiceCities(body.serviceCities);
+  const dietaryOffering = cleanDietaryOffering(body.dietaryOffering);
+  const minPaxNum = Number(body.minPax) || (Number(body.minGuests) || undefined);
+  const leadHoursNum = Number(body.leadHours) || undefined;
+  const bestFor = cleanBestFor(body.bestFor);
+  const packageName = str(body.packageName).slice(0, 80) || undefined;
+  const goldSpecialization = str(body.goldSpecialization).slice(0, 80) || undefined;
+  const cutleryTier = cleanCutleryTier(body.cutleryTier);
+  const customOfferings = cleanCustomOfferings(body.customOfferings);
+  const stallConfig = cleanStallConfig(body.stallConfig);
+  const bainaDetails = cleanBainaDetails(body.bainaDetails);
+  const badges = cleanBadges(body.badges);
+
   const rawPackages = Array.isArray(body.packages) ? body.packages : [];
   const packages: VendorPackageInput[] = rawPackages.map((p) => {
     const pkg = (p ?? {}) as Record<string, unknown>;
@@ -171,17 +192,30 @@ export async function POST(request: Request) {
     minGuests: str(body.minGuests),
     maxGuests: str(body.maxGuests),
     maxEventsPerDay: str(body.maxEventsPerDay),
-    serviceCities: strList(body.serviceCities),
+    serviceCities: serviceCities.length ? serviceCities : strList(body.serviceCities),
     counters: strList(body.counters),
     // A category whose builder has content is always declared (same invariant
     // as the dashboard menu save).
     cateringCategories: cleanCateringCategories([
       ...cleanCateringCategories(body.cateringCategories),
-      ...(bainaBoxes.length ? ["baina-box"] : []),
+      ...(bainaBoxes.length || bainaDetails ? ["baina-box"] : []),
+      ...(stallConfig ? ["single-stall"] : []),
       ...(essentialService ? ["essential"] : []),
     ]),
     ...(bainaBoxes.length ? { bainaBoxes } : {}),
     ...(essentialService ? { essentialService } : {}),
+    /* ── V2 Extensions ── */
+    ...(dietaryOffering ? { dietaryOffering } : {}),
+    ...(minPaxNum ? { minPax: Math.round(minPaxNum) } : {}),
+    ...(leadHoursNum ? { leadHours: Math.round(leadHoursNum) } : {}),
+    ...(bestFor.length ? { bestFor } : {}),
+    ...(packageName ? { packageName } : {}),
+    ...(goldSpecialization ? { goldSpecialization } : {}),
+    ...(cutleryTier ? { cutleryTier } : {}),
+    ...(customOfferings.length ? { customOfferings } : {}),
+    ...(stallConfig ? { stallConfig } : {}),
+    ...(bainaDetails ? { bainaDetails } : {}),
+    ...(badges ? { badges } : {}),
     status: "Pending",
     submitted: now.toISOString().slice(0, 10),
     submittedAt: now.toISOString(),

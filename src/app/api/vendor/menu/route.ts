@@ -73,6 +73,19 @@ export async function GET() {
             // Tier chips start from the admin's review decision, else the
             // price-derived baseline captured at registration.
             tiers: app.assignedTiers ?? app.requestedTiers,
+            // V2 onboarding prefill
+            serviceCities: app.serviceCities ?? [],
+            dietaryOffering: app.dietaryOffering,
+            minPax: app.minPax,
+            leadHours: app.leadHours,
+            bestFor: app.bestFor ?? [],
+            packageName: app.packageName,
+            goldSpecialization: app.goldSpecialization,
+            cutleryTier: app.cutleryTier,
+            customOfferings: app.customOfferings ?? [],
+            stallConfig: app.stallConfig,
+            bainaDetails: app.bainaDetails,
+            badges: app.badges,
           }
         : { business: guard.name ?? "" },
     });
@@ -180,6 +193,7 @@ export async function PUT(request: Request) {
           : "Pending";
 
     const record: LiveVendorRecord = {
+      ...(existing ?? {}),
       id: existing?.id ?? newVendorId(),
       ownerUserId: guard.id,
       ownerEmail: guard.email,

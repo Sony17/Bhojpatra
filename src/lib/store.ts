@@ -32,11 +32,13 @@ const DB_URL_ENV_VARS = [
   "DATABASE_URL_UNPOOLED",
   "POSTGRES_URL_NON_POOLING",
 ] as const;
-const DATABASE_URL = DB_URL_ENV_VARS.reduce<string | undefined>(
-  (found, name) =>
-    found ?? (process.env[name] ?? "").match(/postgres(?:ql)?:\/\/\S+/i)?.[0],
-  undefined,
-);
+function getDatabaseUrl(): string | undefined {
+  return DB_URL_ENV_VARS.reduce<string | undefined>(
+    (found, name) =>
+      found ?? (process.env[name] ?? "").match(/postgres(?:ql)?:\/\/\S+/i)?.[0],
+    undefined,
+  );
+}
 
 // Lazily create the Neon client on first use. Creating it at module load would
 // crash the build (Next.js evaluates route modules to collect page data);
@@ -45,13 +47,14 @@ const DATABASE_URL = DB_URL_ENV_VARS.reduce<string | undefined>(
 let sqlClient: NeonQueryFunction<false, false> | null = null;
 function getSql(): NeonQueryFunction<false, false> {
   if (!sqlClient) {
-    if (!DATABASE_URL) {
+    const dbUrl = getDatabaseUrl();
+    if (!dbUrl) {
       throw new Error(
         "DATABASE_URL is required — set a Neon/Postgres connection string " +
           "(DATABASE_URL or POSTGRES_URL). There is no file fallback.",
       );
     }
-    sqlClient = neon(DATABASE_URL);
+    sqlClient = neon(dbUrl);
   }
   return sqlClient;
 }
