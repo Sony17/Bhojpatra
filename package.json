@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/homeContentData.test.ts src/lib/dietSplit.test.ts src/lib/vendorMenusV2.test.ts src/lib/vendorApisStage2.test.ts"
+    "test": "npx tsx --test src/lib/homeContentData.test.ts src/lib/dietSplit.test.ts src/lib/vendorMenusV2.test.ts src/lib/vendorApisStage2.test.ts src/lib/vendorOnboardingStage3.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
