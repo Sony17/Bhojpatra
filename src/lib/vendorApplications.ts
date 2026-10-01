@@ -94,6 +94,7 @@ export interface VendorApplicationRecord {
   stallConfig?: SingleStallConfig;
   bainaDetails?: VendorBainaDetails;
   badges?: VendorBadgesState;
+  cateringComponents?: import("@/lib/vendorMenus").CateringComponentsSelection;
 
   status: VerificationStatus;
   /** Display date (YYYY-MM-DD) shown in the approvals table. */

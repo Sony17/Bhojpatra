@@ -86,6 +86,7 @@ export async function GET() {
             stallConfig: app.stallConfig,
             bainaDetails: app.bainaDetails,
             badges: app.badges,
+            cateringComponents: app.cateringComponents,
           }
         : { business: guard.name ?? "" },
     });

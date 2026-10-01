@@ -14,6 +14,7 @@ import type {
   SingleStallConfig,
   VendorBainaDetails,
   VendorBainaBox,
+  CateringComponentsSelection,
 } from "@/lib/vendorMenus";
 import VendorContextHeader from "./VendorContextHeader";
 import Step1IdentityOps from "./steps/Step1IdentityOps";
@@ -51,6 +52,7 @@ interface OnboardingState {
   // Step 3: Service Offerings Scope
   serviceCategories: string[];
   customOfferings: VendorCustomOffering[];
+  cateringComponents: CateringComponentsSelection;
 
   // Stage 4 Part 1: Catering Builder (5A–5H)
   packageName: string;
@@ -187,6 +189,7 @@ export default function VendorOnboarding() {
     badges: { applied: [], granted: [], applications: [] },
     serviceCategories: ["full-catering"],
     customOfferings: [],
+    cateringComponents: { counters: true, extras: true, essentials: true, addons: true },
     // Catering
     packageName: "Royal Awadhi Feast",
     about: "",
@@ -296,6 +299,12 @@ export default function VendorOnboarding() {
             customOfferings: record?.customOfferings?.length
               ? record.customOfferings
               : (prefill.customOfferings?.length ? prefill.customOfferings : prev.customOfferings),
+            cateringComponents: {
+              counters: record?.cateringComponents?.counters ?? prefill.cateringComponents?.counters ?? prev.cateringComponents.counters,
+              extras: record?.cateringComponents?.extras ?? prefill.cateringComponents?.extras ?? prev.cateringComponents.extras,
+              essentials: record?.cateringComponents?.essentials ?? prefill.cateringComponents?.essentials ?? prev.cateringComponents.essentials,
+              addons: record?.cateringComponents?.addons ?? prefill.cateringComponents?.addons ?? prev.cateringComponents.addons,
+            },
             // Catering
             packageName: record?.packageName || prev.packageName,
             about: record?.about || prefill.about || prev.about,
@@ -397,6 +406,7 @@ export default function VendorOnboarding() {
           stallConfig: target.stallConfig,
           bainaDetails: target.bainaDetails,
           bainaBoxes: target.bainaBoxes,
+          cateringComponents: target.cateringComponents,
           menu: reconciledMenu,
         };
 
@@ -676,6 +686,11 @@ export default function VendorOnboarding() {
             dietaryOffering: formData.dietaryOffering,
             googleRating: formData.googleRating,
             googleReviews: formData.googleReviews,
+            accountId: formData.existingVendorId
+              ? `VND-${formData.existingVendorId.slice(-6).toUpperCase()}`
+              : formData.email
+                ? `VND-${Math.abs(formData.email.split("").reduce((acc, c) => (acc << 5) - acc + c.charCodeAt(0), 0)).toString().slice(-6).padStart(6, "0")}`
+                : "VND-884291",
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onContinue={handleStep1Continue}
@@ -710,6 +725,7 @@ export default function VendorOnboarding() {
           data={{
             serviceCategories: formData.serviceCategories,
             customOfferings: formData.customOfferings,
+            cateringComponents: formData.cateringComponents,
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onBack={() => {
@@ -744,6 +760,7 @@ export default function VendorOnboarding() {
                 counters: formData.counters,
                 essentialService: formData.essentialService,
                 cutleryTier: formData.cutleryTier,
+                cateringComponents: formData.cateringComponents,
               }}
               onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
               onBackToPreviousService={handleBackFromBranch}

@@ -8,6 +8,12 @@ import { Button } from "@/components/ui";
 export interface Step3Data {
   serviceCategories: string[];
   customOfferings: VendorCustomOffering[];
+  cateringComponents?: {
+    counters?: boolean;
+    extras?: boolean;
+    essentials?: boolean;
+    addons?: boolean;
+  };
 }
 
 interface Step3OfferingsProps {
@@ -73,26 +79,35 @@ const PRIMARY_SERVICES: PrimaryServiceCard[] = [
   },
 ];
 
-const FEAST_COMPONENTS = [
+const FEAST_COMPONENTS: {
+  key: "counters" | "extras" | "essentials" | "addons";
+  title: string;
+  icon: string;
+  desc: string;
+}[] = [
   {
+    key: "counters",
     title: "Live Food Counters",
     icon: "🍳",
-    desc: "Chaat, kebabs, pasta, and interactive chef stations made-to-order.",
+    desc: "Interactive live cooking & beverage stations (Chaat, Tandoor, Wok, Pizza, Paan).",
   },
   {
-    title: "Hospitality & Welcome",
-    icon: "🍹",
-    desc: "Welcome drinks, mocktail bars, fruit counters, and arrival hospitality.",
+    key: "extras",
+    title: "Feast Extras",
+    icon: "✨",
+    desc: "Welcome mocktails, evening hi-tea snacks & theme floral buffet decor.",
   },
   {
+    key: "essentials",
     title: "Service Crew Essentials",
     icon: "👨‍🍳",
-    desc: "Captains, uniformed servers, table attendants, and dish stewards.",
+    desc: "Uniformed banquet stewards, bilingual food labels, handwash setup & hygiene crew.",
   },
   {
-    title: "Tableware & Chinaware",
+    key: "addons",
+    title: "Tableware Add-ons",
     icon: "🍽️",
-    desc: "Melamine, Standard Chinaware, Premium Gold-rim, or Ultra Royal cutlery tiers.",
+    desc: "Tableware presentation packages (Eco Disposables to Royal Gold/Silver).",
   },
 ];
 
@@ -222,36 +237,78 @@ export default function Step3Offerings({
         {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
       </section>
 
-      {/* ── Section B: Feast Sub-Components Preview (if Catering selected) ── */}
+      {/* ── Section B: Feast Sub-Components Selection (if Catering selected) ── */}
       {hasFullCatering && (
         <section className="rounded-card border border-cream-3 bg-cream/30 p-5 sm:p-7 shadow-xs space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-1.5 rounded-full bg-maroon/10 px-2.5 py-0.5 text-xs font-semibold text-maroon mb-1">
-                Feast Sub-Components Included
+                Feast Sub-Components
               </div>
               <h3 className="text-base font-bold text-ink">
-                Full Catering Package Capabilities
+                Select Your Feast Capabilities
               </h3>
               <p className="text-xs text-ink-soft mt-0.5">
-                Bhojpatra catering packages incorporate these core experiences. Detailed dish selections and courses will be configured in Stage 4 (Menu Builder).
+                Choose the components you provide for feast bookings. The menu builder adapts and opens dedicated sub-builders for each enabled component.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-            {FEAST_COMPONENTS.map((item, idx) => (
-              <div
-                key={idx}
-                className="rounded-control border border-cream-3 bg-white p-3.5 shadow-xs"
-              >
-                <div className="text-2xl mb-1">{item.icon}</div>
-                <h4 className="text-xs font-bold text-ink">{item.title}</h4>
-                <p className="mt-1 text-[11px] text-ink-soft leading-normal">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
+            {FEAST_COMPONENTS.map((item) => {
+              const currentComponents = {
+                counters: data.cateringComponents?.counters !== false,
+                extras: data.cateringComponents?.extras !== false,
+                essentials: data.cateringComponents?.essentials !== false,
+                addons: data.cateringComponents?.addons !== false,
+              };
+              const isEnabled = currentComponents[item.key];
+
+              const toggleComponent = () => {
+                onChange({
+                  cateringComponents: {
+                    ...currentComponents,
+                    [item.key]: !isEnabled,
+                  },
+                });
+              };
+
+              return (
+                <div
+                  key={item.key}
+                  onClick={toggleComponent}
+                  className={`flex flex-col justify-between rounded-control border-2 p-3.5 shadow-xs cursor-pointer transition-all ${
+                    isEnabled
+                      ? "border-maroon bg-white shadow-xs"
+                      : "border-cream-3 bg-white/50 opacity-60 hover:opacity-80"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-2xl">{item.icon}</span>
+                      <div
+                        className={`h-4.5 w-4.5 rounded-xs border flex items-center justify-center text-[10px] font-bold ${
+                          isEnabled
+                            ? "border-maroon bg-maroon text-white"
+                            : "border-cream-3 bg-white text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </div>
+                    </div>
+                    <h4 className="text-xs font-bold text-ink">{item.title}</h4>
+                    <p className="mt-1 text-[11px] text-ink-soft leading-normal">
+                      {item.desc}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-cream-2/70 text-[10px] font-semibold text-ink-soft flex items-center justify-between">
+                    <span className={isEnabled ? "text-maroon font-bold" : "text-ink-soft"}>
+                      {isEnabled ? "Included in builder" : "Omitted from builder"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

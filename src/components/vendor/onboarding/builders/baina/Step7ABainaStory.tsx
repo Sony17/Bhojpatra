@@ -58,6 +58,29 @@ export default function Step7ABainaStory({
     }
   };
 
+  const selectedOccasions = bainaDetails.occasions ?? [
+    "Weddings",
+    "Tilak",
+    "Diwali",
+    "Corporate",
+  ];
+
+  const toggleOccasion = (id: string) => {
+    const current = bainaDetails.occasions ?? [
+      "Weddings",
+      "Tilak",
+      "Diwali",
+      "Corporate",
+    ];
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id];
+    onChangeBainaDetails({
+      ...bainaDetails,
+      occasions: next,
+    });
+  };
+
   return (
     <div className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs">
       <BuilderSectionHeader
@@ -191,16 +214,32 @@ export default function Step7ABainaStory({
             Target Celebrations & Gifting Occasions
           </label>
           <div className="flex flex-wrap gap-2">
-            {BAINA_OCCASIONS.map((occ) => (
-              <div
-                key={occ.id}
-                className="inline-flex items-center gap-1.5 rounded-pill border border-cream-3 bg-cream-1/60 px-3.5 py-2 text-xs font-semibold text-ink"
-              >
-                <span>{occ.icon}</span>
-                <span>{occ.label}</span>
-              </div>
-            ))}
+            {BAINA_OCCASIONS.map((occ) => {
+              const isSelected = selectedOccasions.includes(occ.id);
+              return (
+                <button
+                  key={occ.id}
+                  type="button"
+                  onClick={() => toggleOccasion(occ.id)}
+                  aria-pressed={isSelected}
+                  className={`inline-flex items-center gap-1.5 rounded-pill border px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-maroon bg-maroon/10 text-maroon shadow-2xs font-bold ring-1 ring-maroon/20"
+                      : "border-cream-3 bg-cream-1/60 text-ink-soft hover:border-maroon/40 hover:text-ink"
+                  }`}
+                >
+                  <span>{occ.icon}</span>
+                  <span>{occ.label}</span>
+                  {isSelected && (
+                    <span className="ml-1 text-[11px] font-bold text-maroon">✓</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+          <p className="mt-1.5 text-[11px] text-ink-soft">
+            Select the occasions for which your confections and hampers are customized.
+          </p>
         </div>
       </div>
 

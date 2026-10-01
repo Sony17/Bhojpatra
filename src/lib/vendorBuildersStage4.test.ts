@@ -540,3 +540,44 @@ test("legacy vendor compatibility: older vendor records without V2 builder field
     assert.equal(check.value.cutleryTier, undefined);
   }
 });
+
+/* ── 21. Catering Components Sub-Selection ────────────────────────────────── */
+test("catering sub-components: counters, extras, essentials, addons validate and persist", () => {
+  const payload = {
+    business: "Royal Awadh Grand",
+    city: "Lucknow",
+    priceFrom: 799,
+    menu: [],
+    cateringComponents: {
+      counters: true,
+      extras: false,
+      essentials: true,
+      addons: false,
+    },
+  };
+
+  const check = validateVendorMenuInput(payload);
+  assert.equal(check.ok, true);
+  if (check.ok) {
+    assert.deepEqual(check.value.cateringComponents, {
+      counters: true,
+      extras: false,
+      essentials: true,
+      addons: false,
+    });
+  }
+});
+
+/* ── 22. Baina Occasions Multi-Select ─────────────────────────────────────── */
+test("baina occasions: cleanBainaDetails validates and cleans occasions list", () => {
+  const rawDetails = {
+    studioName: "Mithai Atelier",
+    story: "Generational khoya crafting",
+    occasions: ["Weddings", "Tilak", "Diwali", "Corporate", "Weddings"], // with duplicate
+  };
+
+  const cleaned = cleanBainaDetails(rawDetails);
+  assert.ok(cleaned);
+  assert.deepEqual(cleaned.occasions, ["Weddings", "Tilak", "Diwali", "Corporate"]);
+});
+

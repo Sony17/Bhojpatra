@@ -19,6 +19,7 @@ export interface Step1Data {
   dietaryOffering?: VendorDietaryOffering;
   googleRating?: number;
   googleReviews?: number;
+  accountId?: string;
 }
 
 interface Step1IdentityOpsProps {
@@ -93,13 +94,21 @@ export default function Step1IdentityOps({
     <form onSubmit={handleContinue} className="space-y-8 animate-in fade-in duration-200">
       {/* ── Section A: Identity & Account Bindings ── */}
       <section className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs space-y-5">
-        <div>
-          <h3 className="text-base font-bold text-ink sm:text-lg">
-            1. Brand & Contact Identity
-          </h3>
-          <p className="text-xs text-ink-soft mt-0.5">
-            Verified contact details from your Bhojpatra account and commercial kitchen brand.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-cream-2 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-ink sm:text-lg">
+              1. Brand & Contact Identity
+            </h3>
+            <p className="text-xs text-ink-soft mt-0.5">
+              Verified contact details from your Bhojpatra account and commercial kitchen brand.
+            </p>
+          </div>
+          {data.accountId && (
+            <div className="flex items-center gap-1.5 self-start sm:self-auto rounded-pill bg-cream-2/80 px-3 py-1 text-xs font-semibold text-ink-soft border border-cream-3">
+              <span>Account ID:</span>
+              <span className="font-mono font-bold text-maroon">{data.accountId}</span>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -184,6 +193,13 @@ export default function Step1IdentityOps({
               />
             </div>
           </div>
+        </div>
+
+        <div className="rounded-control bg-cream-1/60 border border-cream-2/80 p-3 text-[11px] text-ink-soft flex items-center gap-2">
+          <span className="text-sm">ℹ️</span>
+          <span>
+            Linked directly to your authenticated Bhojpatra vendor login. These credentials are automatically preserved and reused across all your feast packages, stalls, and gifting storefronts.
+          </span>
         </div>
       </section>
 

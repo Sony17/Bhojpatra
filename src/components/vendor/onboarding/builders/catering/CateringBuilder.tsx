@@ -34,6 +34,12 @@ export interface CateringBuilderData {
   counters: VendorCounter[];
   essentialService: VendorEssentialService;
   cutleryTier: CutleryTierOption;
+  cateringComponents?: {
+    counters?: boolean;
+    extras?: boolean;
+    essentials?: boolean;
+    addons?: boolean;
+  };
 }
 
 interface CateringBuilderProps {
@@ -44,17 +50,6 @@ interface CateringBuilderProps {
   onSaveDraft?: () => void;
   saving?: boolean;
 }
-
-const CATERING_SECTIONS = [
-  { id: "5A", label: "Feast Basics", short: "5A. Basics" },
-  { id: "5B", label: "Pricing & Quotas", short: "5B. Pricing" },
-  { id: "5C", label: "Course Hierarchy", short: "5C. Courses" },
-  { id: "5D", label: "Granular Dishes", short: "5D. Dishes" },
-  { id: "5E", label: "Live Counters", short: "5E. Counters" },
-  { id: "5F", label: "Hospitality Extras", short: "5F. Extras" },
-  { id: "5G", label: "Service Crew", short: "5G. Crew" },
-  { id: "5H", label: "Tableware", short: "5H. Tableware" },
-];
 
 export default function CateringBuilder({
   data,
@@ -67,11 +62,31 @@ export default function CateringBuilder({
   const [activeSection, setActiveSection] = useState<string>("5A");
   const [targetCourseForDishes, setTargetCourseForDishes] = useState<string>("starters");
 
-  const currentIndex = CATERING_SECTIONS.findIndex((s) => s.id === activeSection);
+  const activeSections = [
+    { id: "5A", label: "Feast Basics", short: "5A. Basics" },
+    { id: "5B", label: "Pricing & Quotas", short: "5B. Pricing" },
+    { id: "5C", label: "Course Hierarchy", short: "5C. Courses" },
+    { id: "5D", label: "Granular Dishes", short: "5D. Dishes" },
+    ...(data.cateringComponents?.counters !== false
+      ? [{ id: "5E", label: "Live Counters", short: "5E. Counters" }]
+      : []),
+    ...(data.cateringComponents?.extras !== false
+      ? [{ id: "5F", label: "Hospitality Extras", short: "5F. Extras" }]
+      : []),
+    ...(data.cateringComponents?.essentials !== false
+      ? [{ id: "5G", label: "Service Crew", short: "5G. Crew" }]
+      : []),
+    ...(data.cateringComponents?.addons !== false
+      ? [{ id: "5H", label: "Tableware", short: "5H. Tableware" }]
+      : []),
+  ];
+
+  const currentIndex = activeSections.findIndex((s) => s.id === activeSection);
+  const safeCurrentIndex = currentIndex === -1 ? 0 : currentIndex;
 
   const handleNextSection = () => {
-    if (currentIndex < CATERING_SECTIONS.length - 1) {
-      setActiveSection(CATERING_SECTIONS[currentIndex + 1].id);
+    if (safeCurrentIndex < activeSections.length - 1) {
+      setActiveSection(activeSections[safeCurrentIndex + 1].id);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onFinishCatering();
@@ -79,8 +94,8 @@ export default function CateringBuilder({
   };
 
   const handlePrevSection = () => {
-    if (currentIndex > 0) {
-      setActiveSection(CATERING_SECTIONS[currentIndex - 1].id);
+    if (safeCurrentIndex > 0) {
+      setActiveSection(activeSections[safeCurrentIndex - 1].id);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onBackToPreviousService();
@@ -103,14 +118,14 @@ export default function CateringBuilder({
             <span>Full Catering Builder</span>
           </span>
           <span className="text-xs text-ink-soft">
-            Section {currentIndex + 1} of {CATERING_SECTIONS.length}
+            Section {safeCurrentIndex + 1} of {activeSections.length}
           </span>
         </div>
 
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-          {CATERING_SECTIONS.map((sec, idx) => {
+          {activeSections.map((sec, idx) => {
             const isActive = sec.id === activeSection;
-            const isCompleted = idx < currentIndex;
+            const isCompleted = idx < safeCurrentIndex;
 
             return (
               <button

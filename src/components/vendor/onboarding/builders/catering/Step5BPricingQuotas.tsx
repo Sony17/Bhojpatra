@@ -37,6 +37,17 @@ const COURSES: { key: keyof CourseQuotas; label: string; icon: string }[] = [
   { key: "sweets", label: "Mithai & Sweets", icon: "🍬" },
 ];
 
+const SPECIALIZATION_PRESETS = [
+  { value: "Awadhi", label: "Awadhi Cuisine (Lucknowi Dum & Kebabs)" },
+  { value: "Mughlai", label: "Mughlai Cuisine (Rich Gravies & Royal Dastarkhwan)" },
+  { value: "North Indian", label: "North Indian (Paneer, Dal Makhani & Tandoor)" },
+  { value: "Tandoori & Grills", label: "Tandoori & Grills (Live Sigdi & Charcoal Skewers)" },
+  { value: "Indo-Chinese", label: "Indo-Chinese (Live Wok Tosses & Dimsums)" },
+  { value: "South Indian", label: "South Indian (Live Dosa Bar & Traditional Thali)" },
+  { value: "Banarasi Chaat", label: "Banarasi Chaat (Live Kashi Street Food)" },
+  { value: "Artisanal Sweets", label: "Artisanal Sweets (Heritage Mithai & Halwai Studio)" },
+];
+
 export default function Step5BPricingQuotas({
   data,
   onChange,
@@ -46,6 +57,16 @@ export default function Step5BPricingQuotas({
   saving = false,
 }: Step5BPricingQuotasProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customSpecText, setCustomSpecText] = useState("");
+
+  const handleApplyCustomSpec = () => {
+    const trimmed = customSpecText.trim();
+    if (!trimmed) return;
+    onChange({ goldSpecialization: trimmed });
+    setIsAddingCustom(false);
+    setCustomSpecText("");
+  };
 
   const handleSilverQuotaChange = (course: keyof CourseQuotas, val: number) => {
     const clamped = Math.max(0, Math.min(24, val || 0));
@@ -170,7 +191,21 @@ export default function Step5BPricingQuotas({
                         <span>{c.icon}</span>
                         <span>{c.label}</span>
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSilverQuotaChange(
+                              c.key,
+                              (data.silverQuotas[c.key] || 0) - 1,
+                            )
+                          }
+                          disabled={(data.silverQuotas[c.key] || 0) <= 0}
+                          aria-label={`Decrease Silver quota for ${c.label}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-control border border-slate-300 bg-white text-xs font-bold text-ink hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          −
+                        </button>
                         <input
                           type="number"
                           min={0}
@@ -183,9 +218,23 @@ export default function Step5BPricingQuotas({
                             )
                           }
                           aria-label={`Silver quota for ${c.label}`}
-                          className="w-16 rounded-control border border-slate-200 bg-slate-50 text-center py-1 text-xs font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[36px]"
+                          className="w-12 rounded-control border border-slate-200 bg-slate-50 text-center py-1 text-xs font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[32px]"
                         />
-                        <span className="text-[10px] text-ink-soft">picks</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSilverQuotaChange(
+                              c.key,
+                              (data.silverQuotas[c.key] || 0) + 1,
+                            )
+                          }
+                          disabled={(data.silverQuotas[c.key] || 0) >= 24}
+                          aria-label={`Increase Silver quota for ${c.label}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-control border border-slate-300 bg-white text-xs font-bold text-ink hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          +
+                        </button>
+                        <span className="text-[10px] text-ink-soft pl-1">picks</span>
                       </div>
                     </div>
                   ))}
@@ -248,16 +297,94 @@ export default function Step5BPricingQuotas({
                 >
                   Gold Specialization / Signature Delicacy
                 </label>
-                <input
+                <select
                   id="goldSpec"
-                  type="text"
-                  value={data.goldSpecialization || ""}
-                  onChange={(e) =>
-                    onChange({ goldSpecialization: e.target.value })
+                  value={
+                    SPECIALIZATION_PRESETS.some((p) => p.value === data.goldSpecialization)
+                      ? data.goldSpecialization
+                      : data.goldSpecialization
+                      ? data.goldSpecialization
+                      : "Awadhi"
                   }
-                  placeholder="e.g. Handi Dum Gosht, Royal Zafrani Kheer, Live Wok Counter"
-                  className="mt-1 w-full rounded-control border border-amber-300 bg-white px-3 py-2 text-xs text-ink placeholder:text-ink-soft/60 focus:border-maroon focus:outline-hidden min-h-[40px]"
-                />
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setIsAddingCustom(true);
+                      setCustomSpecText("");
+                    } else {
+                      onChange({ goldSpecialization: e.target.value });
+                    }
+                  }}
+                  className="mt-1 w-full rounded-control border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-ink focus:border-maroon focus:outline-hidden min-h-[40px]"
+                >
+                  {SPECIALIZATION_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                  {data.goldSpecialization &&
+                    !SPECIALIZATION_PRESETS.some((p) => p.value === data.goldSpecialization) && (
+                      <option value={data.goldSpecialization}>
+                        {data.goldSpecialization} (Custom Specialization)
+                      </option>
+                    )}
+                  <option value="__custom__">➕ Add New Specialization...</option>
+                </select>
+
+                {isAddingCustom ? (
+                  <div className="mt-2 rounded-control border border-amber-300 bg-amber-50/70 p-2.5">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={customSpecText}
+                        onChange={(e) => setCustomSpecText(e.target.value)}
+                        placeholder="e.g. Kashmiri Wazwan, Chettinad, Marwari..."
+                        className="flex-1 rounded-control border border-amber-300 bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-soft/60 focus:border-maroon focus:outline-hidden min-h-[36px]"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyCustomSpec();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomSpec}
+                        className="rounded-control bg-maroon px-3 py-1.5 text-xs font-bold text-white hover:bg-maroon-dark transition-colors whitespace-nowrap min-h-[36px]"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingCustom(false);
+                          setCustomSpecText("");
+                        }}
+                        className="rounded-control border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-ink hover:bg-slate-50 transition-colors min-h-[36px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="mt-1 text-[11px] text-ink-soft">
+                      Type your kitchen's unique regional cuisine or signature culinary craft.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="text-[11px] text-ink-soft">
+                      Don't see your regional cuisine above?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCustom(true);
+                        setCustomSpecText("");
+                      }}
+                      className="text-[11px] font-bold text-maroon hover:underline cursor-pointer"
+                    >
+                      + Add New Specialization
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -274,7 +401,21 @@ export default function Step5BPricingQuotas({
                         <span>{c.icon}</span>
                         <span>{c.label}</span>
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGoldQuotaChange(
+                              c.key,
+                              (data.goldQuotas[c.key] || 0) - 1,
+                            )
+                          }
+                          disabled={(data.goldQuotas[c.key] || 0) <= 0}
+                          aria-label={`Decrease Gold quota for ${c.label}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-control border border-amber-300 bg-white text-xs font-bold text-ink hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          −
+                        </button>
                         <input
                           type="number"
                           min={0}
@@ -287,9 +428,23 @@ export default function Step5BPricingQuotas({
                             )
                           }
                           aria-label={`Gold quota for ${c.label}`}
-                          className="w-16 rounded-control border border-amber-200 bg-amber-50/50 text-center py-1 text-xs font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[36px]"
+                          className="w-12 rounded-control border border-amber-200 bg-amber-50/50 text-center py-1 text-xs font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[32px]"
                         />
-                        <span className="text-[10px] text-ink-soft">picks</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGoldQuotaChange(
+                              c.key,
+                              (data.goldQuotas[c.key] || 0) + 1,
+                            )
+                          }
+                          disabled={(data.goldQuotas[c.key] || 0) >= 24}
+                          aria-label={`Increase Gold quota for ${c.label}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-control border border-amber-300 bg-white text-xs font-bold text-ink hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          +
+                        </button>
+                        <span className="text-[10px] text-ink-soft pl-1">picks</span>
                       </div>
                     </div>
                   ))}

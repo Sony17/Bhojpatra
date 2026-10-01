@@ -249,6 +249,16 @@ export interface VendorBainaDetails {
   leadDays?: number;
   /** Packaging presentation style. */
   packaging?: BainaPackagingStyle;
+  /** Target celebrations & gifting occasions. */
+  occasions?: string[];
+}
+
+/** Toggled catering sub-components from Step 3. */
+export interface CateringComponentsSelection {
+  counters?: boolean;
+  extras?: boolean;
+  essentials?: boolean;
+  addons?: boolean;
 }
 
 /** Bespoke vendor-authored custom offerings / counters beyond the platform set. */
@@ -354,6 +364,8 @@ export interface LiveVendorRecord {
   bainaDetails?: VendorBainaDetails;
   /** Recognition badges applied for and granted (Verified, Icon, Heritage). */
   badges?: VendorBadgesState;
+  /** Feast Booking sub-components enabled for this vendor (Live Counters, Extras, Essentials, Add-ons). */
+  cateringComponents?: CateringComponentsSelection;
 }
 
 const store = createStore<LiveVendorRecord>({
@@ -1121,6 +1133,7 @@ export interface VendorMenuInput {
   stallConfig?: SingleStallConfig;
   bainaDetails?: VendorBainaDetails;
   badges?: VendorBadgesState;
+  cateringComponents?: CateringComponentsSelection;
 }
 
 type BainaBoxesCheck =
@@ -1392,13 +1405,23 @@ export function cleanBainaDetails(v: unknown): VendorBainaDetails | undefined {
   const packaging = VALID_BAINA_PACKAGING.has(rawPkg as BainaPackagingStyle)
     ? (rawPkg as BainaPackagingStyle)
     : undefined;
+  const occasions = Array.isArray(raw.occasions)
+    ? Array.from(
+        new Set(
+          raw.occasions
+            .map((o) => cleanString(o, 40))
+            .filter(Boolean),
+        ),
+      ).slice(0, 10)
+    : [];
 
   if (
     !studioName &&
     !story &&
     (minOrderBoxes === null || minOrderBoxes <= 0) &&
     (leadDays === null || leadDays <= 0) &&
-    !packaging
+    !packaging &&
+    occasions.length === 0
   ) {
     return undefined;
   }
@@ -1409,7 +1432,20 @@ export function cleanBainaDetails(v: unknown): VendorBainaDetails | undefined {
     ...(minOrderBoxes !== null && minOrderBoxes > 0 ? { minOrderBoxes } : {}),
     ...(leadDays !== null && leadDays > 0 ? { leadDays } : {}),
     ...(packaging ? { packaging } : {}),
+    ...(occasions.length ? { occasions } : {}),
   };
+}
+
+export function cleanCateringComponents(
+  v: unknown,
+): CateringComponentsSelection | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const raw = v as Record<string, unknown>;
+  const counters = raw.counters !== false;
+  const extras = raw.extras !== false;
+  const essentials = raw.essentials !== false;
+  const addons = raw.addons !== false;
+  return { counters, extras, essentials, addons };
 }
 
 export function cleanBadges(v: unknown): VendorBadgesState | undefined {
@@ -1806,6 +1842,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
   const stallConfig = cleanStallConfig(body.stallConfig);
   const bainaDetails = cleanBainaDetails(body.bainaDetails);
   const badges = cleanBadges(body.badges);
+  const cateringComponents = cleanCateringComponents(body.cateringComponents);
 
   return {
     ok: true,
@@ -1839,6 +1876,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(stallConfig ? { stallConfig } : {}),
       ...(bainaDetails ? { bainaDetails } : {}),
       ...(badges ? { badges } : {}),
+      ...(cateringComponents ? { cateringComponents } : {}),
     },
   };
 }
