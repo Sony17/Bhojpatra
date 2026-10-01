@@ -1,0 +1,105 @@
+﻿<USER_REQUEST>
+We are now starting implementation of the V2 onboarding changes for the Bhojpatra project.
+
+IMPORTANT: Before making any feature changes, create an INTERNAL implementation tracking sheet/document inside the project repository to track all 24 planned V2 changes.
+
+The tracker must contain these columns:
+
+- ID
+- Phase
+- Change
+- Status
+- Implementation Notes
+- Files / Components Changed
+- Verification / Test Result
+- Last Updated
+
+Populate it with all 24 changes in the exact order below:
+
+PHASE 1 â€” Independent, isolated fixes
+1. Add Sign In to Cutleries
+2. Remove Host Number from Dashboard
+3. Remove Preview Storefront
+4. Make Stall Identity Display Name Optional
+5. Remove Varied Delicacies from Stall Identity
+6. Remove Onboarding Step Numbers
+
+PHASE 2 â€” Structural/foundational onboarding changes
+7. Reuse Existing Vendor Signup Details
+8. Make Vendor Offerings Customizable
+
+PHASE 3 â€” Specific field/section additions
+9. Add Custom Cuisine
+10. Add Serviceable Cities
+11. Add Minimum Preparation Notice
+12. Add New Category to Stall Identity
+13. Add Live Counters to Feast
+14. Add Extras to Feast
+15. Add Essentials to Feast
+16. Add Add-ons to Feast
+
+PHASE 4 â€” Badge system
+17. Add Badge Application Section After Offerings
+18. Add Verified Caterer Badge to Vendor Signup
+19. Add City Icon Caterer Badge to Vendor Signup
+20. Add Heritage Caterer Badge to Vendor Signup
+
+PHASE 5 â€” Onboarding-wide UI/UX behavior
+21. Add Onboarding Progress Animation
+22. Limit Box Selection to 5
+23. Remove Excess Details from Onboarding Pages
+
+PHASE 6 â€” Global visual pass
+24. Beautify the Whole Website
+
+Set the initial status of all items to "Not Started".
+
+IMPORTANT TRACKING RULE:
+Every time you work on this project in a subsequent run, FIRST inspect this internal tracker before making changes.
+
+After completing a change:
+- Update its Status.
+- Record the relevant files/components changed.
+- Record concise implementation notes.
+- Record what was actually verif
+<truncated 3079 bytes>
+electable/configurable option to the vendor.
+- Ensure removing the UI does not break submission, validation, or existing stored vendor data.
+
+6. REMOVE ONBOARDING STEP NUMBERS
+- Remove explicit labels such as "Step 1", "Step 2", "Step 3", etc. from the V2 onboarding interface.
+- Keep the existing top linear navigation/progress path.
+- Do not remove the navigation itself.
+- Do not implement the progress animation yet. That belongs to Phase 5, item 21.
+- The onboarding should still clearly indicate the current section without showing numbered steps.
+
+IMPLEMENTATION ORDER WITHIN THIS RUN:
+1. Inspect the repository and existing V1/V2 implementation.
+2. Create/populate the internal tracker if it does not already exist.
+3. Implement Phase 1 items 1â€“6.
+4. After each item, verify the affected flow.
+5. Update the internal tracker with the actual implementation status and verification results.
+6. Run the relevant project checks.
+7. At the end, provide a concise summary of:
+   - What was changed
+   - Files/components changed
+   - What was verified
+   - Any issues or blockers
+   - Current tracker status
+
+DO NOT IMPLEMENT PHASE 2, 3, 4, 5 OR 6 YET.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-09T23:15:31+05:30.
+
+The user's current state is as follows:
+Other open documents:
+- c:\Users\Zeeshaan\Bhojpatra\src\app\api\leads\route.ts (LANGUAGE_TYPESCRIPT)
+- c:\Users\Zeeshaan\Bhojpatra\src\app\api\bookings\route.ts (LANGUAGE_TYPESCRIPT)
+- c:\Users\Zeeshaan\Bhojpatra\src\app\baina-box\page.tsx (LANGUAGE_TSX)
+- c:\Users\Zeeshaan\Bhojpatra\src\app\api\vendors\moderation\route.ts (LANGUAGE_TYPESCRIPT)
+- c:\Users\Zeeshaan\Bhojpatra\src\lib\vendorMenus.ts (LANGUAGE_TYPESCRIPT)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

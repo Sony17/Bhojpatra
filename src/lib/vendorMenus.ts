@@ -74,6 +74,8 @@ export interface VendorMenuItem {
    *  many dishes those bands pick. Stored only while it's a real restriction —
    *  see `pruneDishTiers`. */
   tiers?: VendorTier[];
+  /** Dish culinary description / preparation details. Optional. */
+  desc?: string;
 }
 
 /** Content moderation for live vendors — a pre-approval model: new/edited menus
@@ -199,6 +201,83 @@ export interface VendorCounterExtra {
 /** Most items a vendor may add to a single counter beyond the platform list. */
 const MAX_COUNTER_EXTRAS = 12;
 
+/** Dietary offering classification: veg-only, non-veg only, or both. */
+export type VendorDietaryOffering = "veg" | "non-veg" | "both";
+
+/** Tableware and cutlery tier options for caterers and stalls. */
+export type CutleryTierOption = "essential" | "standard" | "premium" | "ultra";
+
+/** Independent pricing & minimum guest guarantees per Single Stall category. */
+export interface SingleStallCategoryPricing {
+  fixedPerPlate: number;
+  minPaxGuarantee: number;
+}
+
+export type SingleStallCategoryPricingMap = Record<
+  string,
+  SingleStallCategoryPricing
+>;
+
+/** Single Stall operational configuration. */
+export interface SingleStallConfig {
+  /** The stall category ids or names selected by this stall vendor (e.g. ["chaat", "live-woks"]). */
+  categories: string[];
+  /** Independent category pricing & minimum guest guarantees per category. Keyed by categoryId. */
+  categoryPricing?: SingleStallCategoryPricingMap;
+  /** Equipment requirements / provisions (e.g. ["Gas Burner", "Tandoor Bhatti", "Chafing Dishes"]). */
+  equipment?: string[];
+  /** Cutlery setup / tier for the stall (e.g. "Biodegradable Bagasse", "Melamine", "Standard Chinaware"). */
+  cutlery?: string;
+}
+
+/** Packaging presentation styles for Baina gift boxes. */
+export type BainaPackagingStyle =
+  | "velvet"
+  | "gold-foil"
+  | "eco-kraft"
+  | "brocade";
+
+/** Artisan Baina Box studio metadata and operational parameters. */
+export interface VendorBainaDetails {
+  /** The artisan mithai / gifting studio or brand name. */
+  studioName?: string;
+  /** The artisan heritage story or craft narrative. */
+  story?: string;
+  /** Minimum order quantity in boxes (e.g. 10, 25, 50). */
+  minOrderBoxes?: number;
+  /** Preparation & delivery lead time in days (e.g. 2, 3, 5). */
+  leadDays?: number;
+  /** Packaging presentation style. */
+  packaging?: BainaPackagingStyle;
+}
+
+/** Bespoke vendor-authored custom offerings / counters beyond the platform set. */
+export interface VendorCustomOffering {
+  id: string;
+  title: string;
+  blurb: string;
+  icon?: string;
+}
+
+/** Recognition badges available in Bhojpatra. */
+export type RecognitionBadgeKey = "verified" | "icon" | "heritage";
+
+/** Individual badge application audit trail and verification status. */
+export interface VendorBadgeApplication {
+  badgeKey: RecognitionBadgeKey;
+  appliedAt: string;
+  criteria?: Record<string, boolean>;
+  details?: Record<string, string>;
+  status: "applied" | "approved" | "rejected";
+}
+
+/** Recognition badges state: applied badges, granted badges, and application records. */
+export interface VendorBadgesState {
+  applied: RecognitionBadgeKey[];
+  granted: RecognitionBadgeKey[];
+  applications?: VendorBadgeApplication[];
+}
+
 export interface LiveVendorRecord {
   id: string;
   /** Auth user (role "vendor") who owns this profile. Absent on platform seeds. */
@@ -249,6 +328,32 @@ export interface LiveVendorRecord {
   essentialService?: VendorEssentialService;
   createdAt: string;
   updatedAt: string;
+
+  /* ── V2 Extensions ── */
+  /** Cities this vendor actively travels to / serves. */
+  serviceCities?: string[];
+  /** Dietary orientation: vegetarian only, non-veg only, or both. */
+  dietaryOffering?: VendorDietaryOffering;
+  /** Minimum guest guarantee across their standard service. */
+  minPax?: number;
+  /** Minimum booking lead time required (hours). */
+  leadHours?: number;
+  /** Event types this caterer specializes in (e.g. Weddings, Corporate, Birthdays). */
+  bestFor?: string[];
+  /** Custom package display name (e.g. "Royal Awadhi Dawat"). */
+  packageName?: string;
+  /** Distinctive specialization or signature craft focus (e.g. "Dum Pukht Specialist"). */
+  goldSpecialization?: string;
+  /** Tableware / cutlery tier provided with their service. */
+  cutleryTier?: CutleryTierOption;
+  /** Bespoke vendor-authored custom offerings / counters beyond the platform set. */
+  customOfferings?: VendorCustomOffering[];
+  /** Single Stall configuration (categories, independent pricing, min pax, equipment, cutlery). */
+  stallConfig?: SingleStallConfig;
+  /** Baina Box artisan studio metadata (story, min order, lead days, packaging style). */
+  bainaDetails?: VendorBainaDetails;
+  /** Recognition badges applied for and granted (Verified, Icon, Heritage). */
+  badges?: VendorBadgesState;
 }
 
 const store = createStore<LiveVendorRecord>({
@@ -591,11 +696,19 @@ const tiersFor = tiersForPrice;
 export function toVendorListing(r: LiveVendorRecord): VendorListing {
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
   const diets = new Set(visible.flatMap((s) => s.items.map((i) => i.diet)));
-  const diet: VendorListing["diet"] = diets.has("non-veg")
+  const fallbackDiet: VendorListing["diet"] = diets.has("non-veg")
     ? diets.has("veg")
       ? "Veg & Non-Veg"
       : "Non-Veg"
     : "Veg";
+  const diet: VendorListing["diet"] =
+    r.dietaryOffering === "veg"
+      ? "Veg"
+      : r.dietaryOffering === "non-veg"
+        ? "Non-Veg"
+        : r.dietaryOffering === "both"
+          ? "Veg & Non-Veg"
+          : fallbackDiet;
   const mealTypes = Array.from(
     new Set([
       ...visible.flatMap((s) => CATEGORY_MEAL_TYPES[s.categoryId] ?? []),
@@ -624,6 +737,7 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     priceFrom: r.priceFrom,
     verified: r.verified,
     image: r.image,
+    ...(r.leadHours ? { leadDays: Math.ceil(r.leadHours / 24) } : {}),
     ...(r.serviceCategories?.length
       ? { serviceCategories: r.serviceCategories }
       : {}),
@@ -711,6 +825,8 @@ export interface PublicVendorProfile {
       price?: number;
       /** Bands this dish is served on; absent = every band above. */
       tiers?: VendorTier[];
+      /** Dish culinary description / preparation details. Optional. */
+      desc?: string;
     }[];
   }[];
   /** Live counters & services the vendor offers, resolved for display. */
@@ -739,6 +855,20 @@ export interface PublicVendorProfile {
   bainaBoxes: VendorBainaBox[];
   /** The vendor's Essential Service offer, or null when not offered. */
   essentialService: VendorEssentialService | null;
+
+  /* ── V2 Extensions ── */
+  serviceCities?: string[];
+  dietaryOffering?: VendorDietaryOffering;
+  minPax?: number;
+  leadHours?: number;
+  bestFor?: string[];
+  packageName?: string;
+  goldSpecialization?: string;
+  cutleryTier?: CutleryTierOption;
+  customOfferings?: VendorCustomOffering[];
+  stallConfig?: SingleStallConfig;
+  bainaDetails?: VendorBainaDetails;
+  badges?: VendorBadgesState;
 }
 
 /** Resolve a vendor's declared counter ids into display rows (name/icon/price),
@@ -881,6 +1011,18 @@ export function toPublicVendorProfile(
     serviceCategories: resolveServiceCategories(r.serviceCategories),
     bainaBoxes: r.bainaBoxes ?? [],
     essentialService: r.essentialService ?? null,
+    ...(r.serviceCities?.length ? { serviceCities: r.serviceCities } : {}),
+    ...(r.dietaryOffering ? { dietaryOffering: r.dietaryOffering } : {}),
+    ...(r.minPax ? { minPax: r.minPax } : {}),
+    ...(r.leadHours ? { leadHours: r.leadHours } : {}),
+    ...(r.bestFor?.length ? { bestFor: r.bestFor } : {}),
+    ...(r.packageName ? { packageName: r.packageName } : {}),
+    ...(r.goldSpecialization ? { goldSpecialization: r.goldSpecialization } : {}),
+    ...(r.cutleryTier ? { cutleryTier: r.cutleryTier } : {}),
+    ...(r.customOfferings?.length ? { customOfferings: r.customOfferings } : {}),
+    ...(r.stallConfig ? { stallConfig: r.stallConfig } : {}),
+    ...(r.bainaDetails ? { bainaDetails: r.bainaDetails } : {}),
+    ...(r.badges ? { badges: r.badges } : {}),
   };
 }
 
@@ -893,9 +1035,47 @@ const MAX_ITEMS_PER_SECTION = MAX_COURSE_QUOTA;
  *  none at all (a new vendor with fewer dishes simply skips it). */
 const FEATURED_COUNT = 4;
 const MAX_CUISINES = 12;
-const MAX_BAINA_BOXES = 12;
+const MAX_BAINA_BOXES = 5;
 const MAX_BOX_CUSTOM_SIZES = 4;
 const MAX_ESSENTIAL_INCLUDES = 20;
+const MAX_SERVICE_CITIES = 20;
+const MAX_BEST_FOR = 12;
+const MAX_CUSTOM_OFFERINGS = 10;
+const MAX_STALL_CATEGORIES = 15;
+const MAX_STALL_EQUIPMENT = 20;
+
+const VALID_DIETARY_OFFERINGS = new Set<VendorDietaryOffering>([
+  "veg",
+  "non-veg",
+  "both",
+]);
+const VALID_CUTLERY_TIERS = new Set<CutleryTierOption>([
+  "essential",
+  "standard",
+  "premium",
+  "ultra",
+]);
+const VALID_BAINA_PACKAGING = new Set<BainaPackagingStyle>([
+  "velvet",
+  "gold-foil",
+  "eco-kraft",
+  "brocade",
+]);
+const VALID_BADGE_KEYS = new Set<RecognitionBadgeKey>([
+  "verified",
+  "icon",
+  "heritage",
+]);
+
+const cleanString = (v: unknown, max: number): string =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
+
+const cleanMoney = (v: unknown, max: number): number | null => {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > max) return null;
+  return Math.round(n);
+};
+
 /** Allow-list of live-counter / service ids a vendor may declare. */
 const OFFERING_IDS = new Set(vendorOfferingIds);
 
@@ -927,6 +1107,20 @@ export interface VendorMenuInput {
   essentialService?: VendorEssentialService;
   /** Self-selected marketplace tier bands (absent = keep assigned/derived). */
   tiers?: VendorTier[];
+
+  /* ── V2 Extensions ── */
+  serviceCities?: string[];
+  dietaryOffering?: VendorDietaryOffering;
+  minPax?: number;
+  leadHours?: number;
+  bestFor?: string[];
+  packageName?: string;
+  goldSpecialization?: string;
+  cutleryTier?: CutleryTierOption;
+  customOfferings?: VendorCustomOffering[];
+  stallConfig?: SingleStallConfig;
+  bainaDetails?: VendorBainaDetails;
+  badges?: VendorBadgesState;
 }
 
 type BainaBoxesCheck =
@@ -942,6 +1136,16 @@ type BainaBoxesCheck =
 export function cleanBainaBoxes(v: unknown): BainaBoxesCheck {
   const boxes: VendorBainaBox[] = [];
   if (!Array.isArray(v)) return { ok: true, value: boxes };
+  const namedBoxes = v.filter((raw) => {
+    const b = (raw ?? {}) as Record<string, unknown>;
+    return Boolean(cleanString(b.name, 60) || cleanString(b.contents, 200));
+  });
+  if (namedBoxes.length > MAX_BAINA_BOXES) {
+    return {
+      ok: false,
+      error: `You can offer a maximum of ${MAX_BAINA_BOXES} Baina boxes.`,
+    };
+  }
   for (const raw of v.slice(0, MAX_BAINA_BOXES)) {
     const b = (raw ?? {}) as Record<string, unknown>;
     const name = cleanString(b.name, 60);
@@ -1043,6 +1247,268 @@ export function cleanGoogleReviews(v: unknown): number | undefined {
   return Math.floor(n);
 }
 
+export function cleanServiceCities(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const cities: string[] = [];
+  for (const raw of v.slice(0, MAX_SERVICE_CITIES)) {
+    const city = cleanString(raw, 60);
+    if (!city || seen.has(city.toLowerCase())) continue;
+    seen.add(city.toLowerCase());
+    cities.push(city);
+  }
+  return cities;
+}
+
+export function cleanDietaryOffering(
+  v: unknown,
+): VendorDietaryOffering | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().toLowerCase() as VendorDietaryOffering;
+  return VALID_DIETARY_OFFERINGS.has(s) ? s : undefined;
+}
+
+export function cleanBestFor(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const raw of v.slice(0, MAX_BEST_FOR)) {
+    const item = cleanString(raw, 50);
+    if (!item || seen.has(item.toLowerCase())) continue;
+    seen.add(item.toLowerCase());
+    list.push(item);
+  }
+  return list;
+}
+
+export function cleanCutleryTier(v: unknown): CutleryTierOption | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().toLowerCase() as CutleryTierOption;
+  return VALID_CUTLERY_TIERS.has(s) ? s : undefined;
+}
+
+export function cleanCustomOfferings(v: unknown): VendorCustomOffering[] {
+  if (!Array.isArray(v)) return [];
+  const list: VendorCustomOffering[] = [];
+  for (const raw of v.slice(0, MAX_CUSTOM_OFFERINGS)) {
+    if (!raw || typeof raw !== "object") continue;
+    const o = raw as Record<string, unknown>;
+    const title = cleanString(o.title, 80);
+    const blurb = cleanString(o.blurb, 300);
+    if (!title && !blurb) continue;
+    const id = cleanString(o.id, 40) || `cust-${randomUUID().slice(0, 8)}`;
+    const icon = cleanString(o.icon, 40);
+    list.push({
+      id,
+      title: title || "Custom Offering",
+      blurb,
+      ...(icon ? { icon } : {}),
+    });
+  }
+  return list;
+}
+
+export function cleanStallConfig(v: unknown): SingleStallConfig | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const raw = v as Record<string, unknown>;
+
+  const categories: string[] = [];
+  if (Array.isArray(raw.categories)) {
+    const seen = new Set<string>();
+    for (const cat of raw.categories.slice(0, MAX_STALL_CATEGORIES)) {
+      const c = cleanString(cat, 50);
+      if (!c || seen.has(c.toLowerCase())) continue;
+      seen.add(c.toLowerCase());
+      categories.push(c);
+    }
+  }
+
+  let categoryPricing: SingleStallCategoryPricingMap | undefined = undefined;
+  if (
+    raw.categoryPricing &&
+    typeof raw.categoryPricing === "object" &&
+    !Array.isArray(raw.categoryPricing)
+  ) {
+    const pricingMap: SingleStallCategoryPricingMap = {};
+    for (const [key, val] of Object.entries(
+      raw.categoryPricing as Record<string, unknown>,
+    )) {
+      const cleanKey = cleanString(key, 50);
+      if (!cleanKey || !val || typeof val !== "object") continue;
+      const p = val as Record<string, unknown>;
+      const fixedPerPlate = cleanMoney(p.fixedPerPlate, 100000);
+      const minPaxGuarantee = cleanMoney(p.minPaxGuarantee, 10000);
+      if (fixedPerPlate !== null || minPaxGuarantee !== null) {
+        pricingMap[cleanKey] = {
+          fixedPerPlate: fixedPerPlate ?? 0,
+          minPaxGuarantee: minPaxGuarantee ?? 0,
+        };
+      }
+    }
+    if (Object.keys(pricingMap).length > 0) {
+      categoryPricing = pricingMap;
+    }
+  }
+
+  const equipment: string[] = [];
+  if (Array.isArray(raw.equipment)) {
+    const seen = new Set<string>();
+    for (const eq of raw.equipment.slice(0, MAX_STALL_EQUIPMENT)) {
+      const e = cleanString(eq, 60);
+      if (!e || seen.has(e.toLowerCase())) continue;
+      seen.add(e.toLowerCase());
+      equipment.push(e);
+    }
+  }
+
+  const cutlery = cleanString(raw.cutlery, 60);
+
+  if (
+    categories.length === 0 &&
+    !categoryPricing &&
+    equipment.length === 0 &&
+    !cutlery
+  ) {
+    return undefined;
+  }
+
+  return {
+    categories,
+    ...(categoryPricing ? { categoryPricing } : {}),
+    ...(equipment.length ? { equipment } : {}),
+    ...(cutlery ? { cutlery } : {}),
+  };
+}
+
+export function cleanBainaDetails(v: unknown): VendorBainaDetails | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const raw = v as Record<string, unknown>;
+  const studioName = cleanString(raw.studioName, 80);
+  const story = cleanString(raw.story, 1000);
+  const minOrderBoxes = cleanMoney(raw.minOrderBoxes, 10000);
+  const leadDays = cleanMoney(raw.leadDays, 90);
+  const rawPkg =
+    typeof raw.packaging === "string" ? raw.packaging.trim().toLowerCase() : "";
+  const packaging = VALID_BAINA_PACKAGING.has(rawPkg as BainaPackagingStyle)
+    ? (rawPkg as BainaPackagingStyle)
+    : undefined;
+
+  if (
+    !studioName &&
+    !story &&
+    (minOrderBoxes === null || minOrderBoxes <= 0) &&
+    (leadDays === null || leadDays <= 0) &&
+    !packaging
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(studioName ? { studioName } : {}),
+    ...(story ? { story } : {}),
+    ...(minOrderBoxes !== null && minOrderBoxes > 0 ? { minOrderBoxes } : {}),
+    ...(leadDays !== null && leadDays > 0 ? { leadDays } : {}),
+    ...(packaging ? { packaging } : {}),
+  };
+}
+
+export function cleanBadges(v: unknown): VendorBadgesState | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const raw = v as Record<string, unknown>;
+
+  const applied: RecognitionBadgeKey[] = [];
+  if (Array.isArray(raw.applied)) {
+    const seen = new Set<RecognitionBadgeKey>();
+    for (const key of raw.applied) {
+      if (typeof key === "string") {
+        const k = key.trim().toLowerCase() as RecognitionBadgeKey;
+        if (VALID_BADGE_KEYS.has(k) && !seen.has(k)) {
+          seen.add(k);
+          applied.push(k);
+        }
+      }
+    }
+  }
+
+  const granted: RecognitionBadgeKey[] = [];
+  if (Array.isArray(raw.granted)) {
+    const seen = new Set<RecognitionBadgeKey>();
+    for (const key of raw.granted) {
+      if (typeof key === "string") {
+        const k = key.trim().toLowerCase() as RecognitionBadgeKey;
+        if (VALID_BADGE_KEYS.has(k) && !seen.has(k)) {
+          seen.add(k);
+          granted.push(k);
+        }
+      }
+    }
+  }
+
+  const applications: VendorBadgeApplication[] = [];
+  if (Array.isArray(raw.applications)) {
+    for (const app of raw.applications.slice(0, 10)) {
+      if (!app || typeof app !== "object") continue;
+      const a = app as Record<string, unknown>;
+      const badgeKey =
+        typeof a.badgeKey === "string"
+          ? (a.badgeKey.trim().toLowerCase() as RecognitionBadgeKey)
+          : null;
+      if (!badgeKey || !VALID_BADGE_KEYS.has(badgeKey)) continue;
+      const appliedAt =
+        cleanString(a.appliedAt, 40) || new Date().toISOString();
+      const statusRaw =
+        typeof a.status === "string" ? a.status.trim().toLowerCase() : "";
+      const status: VendorBadgeApplication["status"] =
+        statusRaw === "approved" || statusRaw === "rejected"
+          ? statusRaw
+          : "applied";
+
+      const criteria: Record<string, boolean> = {};
+      if (a.criteria && typeof a.criteria === "object") {
+        for (const [ck, cv] of Object.entries(
+          a.criteria as Record<string, unknown>,
+        )) {
+          const k = cleanString(ck, 60);
+          if (k && typeof cv === "boolean") criteria[k] = cv;
+        }
+      }
+
+      const details: Record<string, string> = {};
+      if (a.details && typeof a.details === "object") {
+        for (const [dk, dv] of Object.entries(
+          a.details as Record<string, unknown>,
+        )) {
+          const k = cleanString(dk, 60);
+          const val = cleanString(dv, 300);
+          if (k && val) details[k] = val;
+        }
+      }
+
+      applications.push({
+        badgeKey,
+        appliedAt,
+        status,
+        ...(Object.keys(criteria).length ? { criteria } : {}),
+        ...(Object.keys(details).length ? { details } : {}),
+      });
+    }
+  }
+
+  if (
+    applied.length === 0 &&
+    granted.length === 0 &&
+    applications.length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    applied,
+    granted,
+    ...(applications.length ? { applications } : {}),
+  };
+}
+
 /** Reconcile a validated menu against the bands the caterer actually sells.
  *  Run by the save route once the record's final tiers are known — validation
  *  alone can't do it, because the tiers may come from the admin's review
@@ -1095,15 +1561,6 @@ export function pruneMenuBands(
 }
 
 type Check = { ok: true; value: VendorMenuInput } | { ok: false; error: string };
-
-const cleanString = (v: unknown, max: number): string =>
-  typeof v === "string" ? v.trim().slice(0, max) : "";
-
-const cleanMoney = (v: unknown, max: number): number | null => {
-  const n = typeof v === "string" ? Number(v) : v;
-  if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > max) return null;
-  return Math.round(n);
-};
 
 /** Validate + normalize the body of PUT /api/vendor/menu. */
 export function validateVendorMenuInput(body: Record<string, unknown>): Check {
@@ -1182,12 +1639,14 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       // `pruneMenuBands` below then drops any list that covers every band the
       // caterer sells, so "everywhere" stays implicit.
       const itemTiers = parseTiers(it.tiers);
+      const desc = cleanString(it.desc, 300);
       items.push({
         name,
         diet,
         ...(photo ? { photo } : {}),
         ...(price !== null && price > 0 ? { price } : {}),
         ...(itemTiers.length ? { tiers: itemTiers } : {}),
+        ...(desc ? { desc } : {}),
       });
     }
     // The vendor's own per-band dish quota for this course. Only the three
@@ -1335,6 +1794,19 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
     declared.has(id),
   );
 
+  const serviceCities = cleanServiceCities(body.serviceCities);
+  const dietaryOffering = cleanDietaryOffering(body.dietaryOffering);
+  const minPax = cleanMoney(body.minPax, 10000);
+  const leadHours = cleanMoney(body.leadHours, 1000);
+  const bestFor = cleanBestFor(body.bestFor);
+  const packageName = cleanString(body.packageName, 80);
+  const goldSpecialization = cleanString(body.goldSpecialization, 80);
+  const cutleryTier = cleanCutleryTier(body.cutleryTier);
+  const customOfferings = cleanCustomOfferings(body.customOfferings);
+  const stallConfig = cleanStallConfig(body.stallConfig);
+  const bainaDetails = cleanBainaDetails(body.bainaDetails);
+  const badges = cleanBadges(body.badges);
+
   return {
     ok: true,
     value: {
@@ -1355,6 +1827,18 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(bainaBoxes.length ? { bainaBoxes } : {}),
       ...(essentialService ? { essentialService } : {}),
       ...(tiers.length ? { tiers } : {}),
+      ...(serviceCities.length ? { serviceCities } : {}),
+      ...(dietaryOffering ? { dietaryOffering } : {}),
+      ...(minPax !== null && minPax > 0 ? { minPax } : {}),
+      ...(leadHours !== null && leadHours > 0 ? { leadHours } : {}),
+      ...(bestFor.length ? { bestFor } : {}),
+      ...(packageName ? { packageName } : {}),
+      ...(goldSpecialization ? { goldSpecialization } : {}),
+      ...(cutleryTier ? { cutleryTier } : {}),
+      ...(customOfferings.length ? { customOfferings } : {}),
+      ...(stallConfig ? { stallConfig } : {}),
+      ...(bainaDetails ? { bainaDetails } : {}),
+      ...(badges ? { badges } : {}),
     },
   };
 }
