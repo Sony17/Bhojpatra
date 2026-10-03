@@ -1675,9 +1675,7 @@ export default function StallBookingWizard() {
         className={
           showSummary
             ? "mt-3 grid gap-7 sm:mt-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : showTypePicker
-              ? "mt-3.5 sm:mt-7"
-              : "mt-7"
+            : "mt-3 sm:mt-7"
         }
       >
         <div className="min-w-0">
@@ -1890,7 +1888,7 @@ export default function StallBookingWizard() {
           <div className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2 shadow-pop-up backdrop-blur-xl">
               {pickedCount > 0 ? null : (
-                <div className="mb-2 text-[11px] leading-tight text-ink-soft">
+                <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
                   {t(
                     "Your total appears once you add courses — nothing is booked yet.",
                     "कोर्स जोड़ते ही आपका कुल दिखेगा — अभी कुछ भी बुक नहीं हुआ है।",
@@ -2100,7 +2098,12 @@ function StepStallMenu({
 
   return (
     <div>
+      {/* Phones: the step rail already names this step, so the heading gives
+          its room to the dishes. */}
+      <div className="hidden sm:block">
       <SectionHead
+        compact
+        phoneMinimal
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
         title={
           stall.allFixed
@@ -2119,12 +2122,13 @@ function StepStallMenu({
               )
         }
       />
+      </div>
 
       {/* Whose stall this is — the counterpart to the tiered flow's package
           rail. The guest picked this brand on the Brands page, so its identity
           rides along here, with the way back to change it. */}
-      <div className="mb-6 flex items-center gap-3 rounded-[1.5rem] border border-cream bg-white p-3 shadow-card sm:gap-4 sm:p-4">
-        <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-cream bg-cream/40 sm:h-16 sm:w-16">
+      <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-cream bg-white px-2 py-1.5 shadow-soft sm:mb-6 sm:gap-4 sm:rounded-[1.5rem] sm:p-4 sm:shadow-card">
+        <span className="relative block h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-cream bg-cream/40 sm:h-16 sm:w-16 sm:rounded-2xl">
           <Image
             src={stall.image}
             alt={stall.name}
@@ -2134,13 +2138,13 @@ function StepStallMenu({
           />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="eyebrow text-[10px] font-bold text-maroon">
+          <p className="eyebrow hidden text-[10px] font-bold text-maroon sm:block">
             {t("YOUR STALL", "आपका स्टॉल")}
           </p>
-          <p className="truncate font-sans text-base font-semibold text-ink sm:text-lg">
+          <p className="truncate font-sans text-sm font-semibold text-ink sm:text-lg">
             {stall.name}
           </p>
-          <p className="mt-0.5 truncate text-xs text-ink-soft">
+          <p className="truncate text-[11px] text-ink-soft sm:mt-0.5 sm:text-xs">
             ★ {stall.rating.toFixed(1)}
             {stall.city ? ` · ${stall.city}` : ""}
             {stall.allFixed ? ` · ${t("set menu", "तय मेन्यू")}` : ""}
@@ -2148,14 +2152,21 @@ function StepStallMenu({
         </div>
         <a
           href={brandsHref}
-          className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:text-xs"
+          className="shrink-0 rounded-full border border-maroon px-3 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:py-1.5 sm:text-xs"
         >
           {t("Change stall", "स्टॉल बदलें")}
         </a>
       </div>
 
       {/* Course tabs — only the courses this stall actually publishes. */}
-      <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap">
+      <div
+        className={
+          "flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:mt-5 sm:flex sm:flex-wrap " +
+          // One course is nothing to switch between — on phones the bold
+          // course heading below already names it.
+          (stall.courses.length > 1 ? "flex" : "hidden")
+        }
+      >
         {stall.courses.map((c, i) => {
           const active = i === activeCat;
           const n = itemsFor(c.id).length;
@@ -2166,7 +2177,7 @@ function StepStallMenu({
               aria-pressed={active}
               onClick={() => setActiveCat(i)}
               className={
-                "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 " +
                 (active
                   ? "border-maroon bg-maroon text-cream"
                   : "border-cream-3 bg-white text-ink hover:bg-cream-2")
@@ -2191,7 +2202,7 @@ function StepStallMenu({
       {/* What the craft-my-plate filter is doing here, so a shorter menu never
           reads as the stall having lost dishes. */}
       {filterNote && (
-        <p className="mt-4 rounded-xl border border-maroon/30 bg-cream/35 px-4 py-2.5 text-xs text-ink">
+        <p className="mt-2 rounded-xl border border-maroon/30 bg-cream/35 px-3 py-1.5 text-xs text-ink sm:mt-4 sm:px-4 sm:py-2.5">
           <span className="font-bold uppercase tracking-[0.06em] text-maroon">
             {t("Pure veg plate", "शुद्ध शाकाहारी थाली")}
           </span>
@@ -2201,7 +2212,7 @@ function StepStallMenu({
       )}
 
       {course.live && (
-        <p className="mt-4 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-xs text-ink-soft">
+        <p className="mt-2 rounded-xl border border-cream-3 bg-cream-2/40 px-3 py-1.5 text-xs text-ink-soft sm:mt-4 sm:px-4 sm:py-2.5">
           {t(
             "Live station — cooked fresh in front of your guests.",
             "लाइव स्टेशन — आपके मेहमानों के सामने ताज़ा बनता है।",
@@ -2212,24 +2223,38 @@ function StepStallMenu({
       {/* A set-menu course: one control for the whole spread, and the dishes
           below listed rather than offered. Taking it adds every dish at the
           course's own per-plate rate. */}
+      {/* Phones: the course named in bold beside its set-menu bar. */}
+      <div className="mt-2 flex items-center gap-2.5 sm:block">
+      <h3 className="shrink-0 font-sans text-lg font-bold leading-tight text-ink sm:hidden">
+        {lang === "hi" ? course.nameHi : course.name}
+      </h3>
       {course.fixed && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream bg-cream/35 px-4 py-3">
-          <span className="min-w-0 text-sm text-ink">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-cream bg-cream/35 px-2.5 py-1.5 sm:mt-4 sm:flex-wrap sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3">
+          <span className="min-w-0 text-[11px] leading-tight text-ink sm:text-sm">
             <span className="font-semibold">
               {t("Set menu", "तय मेन्यू")}
             </span>
-            {" — "}
-            {t(
-              `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
-              `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
-            )}
+            {/* Phones: the facts in one line; the full sentence from tablet up. */}
+            <span className="block sm:hidden">
+              {t(
+                `${course.items.length} dishes · ${money(course.perPlate)} / plate`,
+                `${course.items.length} डिश · ${money(course.perPlate)} / प्लेट`,
+              )}
+            </span>
+            <span className="hidden sm:inline">
+              {" — "}
+              {t(
+                `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
+                `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
+              )}
+            </span>
           </span>
           <button
             type="button"
             aria-pressed={courseTaken}
             onClick={() => toggleCourse(course.id)}
             className={
-              "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition " +
+              "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-xs " +
               (courseTaken
                 ? "border-maroon bg-cream text-maroon shadow-soft"
                 : "border-maroon bg-white text-maroon hover:bg-cream")
@@ -2241,8 +2266,9 @@ function StepStallMenu({
           </button>
         </div>
       )}
+      </div>
 
-      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+      <ul className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
         {course.items.map((it) => {
           const active = picks.includes(it.id);
           const price = dishPrice(it, course);
@@ -2251,7 +2277,9 @@ function StepStallMenu({
           // turns it into a control.
           const body = (
             <>
-              <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-2">
+              <span
+                className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-cream-2 sm:h-14 sm:w-14 sm:rounded-xl"
+              >
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
                   alt={it.name}
@@ -2263,17 +2291,19 @@ function StepStallMenu({
                     card prints it — not floating out in the row. */}
                 <span
                   aria-hidden="true"
-                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
+                  className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border-[1.5px] bg-white sm:left-1 sm:top-1 sm:h-4 sm:w-4 sm:rounded-[4px]"
                   style={{ borderColor: mark }}
                 >
                   <span
-                    className="block h-2 w-2 rounded-full"
+                    className="block h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2"
                     style={{ backgroundColor: mark }}
                   />
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-ink">
+                <span
+                  className="block truncate text-sm font-semibold text-ink"
+                >
                   <span className="sr-only">
                     {it.diet === "veg"
                       ? t("Veg", "शाकाहारी")
@@ -2323,23 +2353,102 @@ function StepStallMenu({
             </>
           );
           const rowClass =
-            "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
+            "w-full items-center gap-2.5 rounded-xl border px-2 py-1.5 text-left transition sm:gap-3 sm:rounded-2xl sm:p-3 " +
             (active
               ? "border-maroon/40 bg-cream/35 shadow-soft"
               : "border-cream-3 bg-white" + (course.fixed ? "" : " hover:bg-cream/25"));
+          // Phones: a photo-led card (Swiggy/Zomato style) carrying the same
+          // facts and the same control as the row — status pill on a set menu,
+          // price + Add on a varied course. No new per-dish choices.
+          const card = (
+            <>
+              <span className="relative block h-full min-h-0 w-full overflow-hidden rounded-lg bg-cream-2">
+                <Image
+                  src={it.photo || dummyDishPhoto(it.id)}
+                  alt={it.name}
+                  fill
+                  sizes="50vw"
+                  className="object-cover"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
+                  style={{ borderColor: mark }}
+                >
+                  <span
+                    className="block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: mark }}
+                  />
+                </span>
+              </span>
+              <span
+                className={
+                  "flex min-h-0 flex-col justify-center px-1 " +
+                  (course.fixed ? "py-1" : "pt-0.5")
+                }
+              >
+                <span className="block truncate text-[13px] font-bold leading-tight text-ink">
+                  {it.name}
+                </span>
+                {/* Set menus need no per-dish status — the bar above says it
+                    all, and the card tint shows once the course is added. */}
+                {!course.fixed && (
+                  <span className="mt-0.5 flex items-center justify-between gap-1">
+                    <span className="min-w-0 truncate text-[11px] text-ink-soft">
+                      <span className="font-semibold text-ink">{money(price)}</span>
+                      /{t("plate", "प्लेट")}
+                    </span>
+                    <span
+                      className={
+                        "shrink-0 rounded-full border px-2 py-px text-[10px] font-semibold " +
+                        (active
+                          ? "border-maroon/40 bg-cream text-maroon"
+                          : "border-cream-3 text-ink-soft")
+                      }
+                    >
+                      {active ? t("Added", "जोड़ा") : t("Add", "जोड़ें")}
+                    </span>
+                  </span>
+                )}
+              </span>
+            </>
+          );
+          // Fixed height, split 70% photo / 30% name + status. A set-menu card
+          // keeps the same photo and just loses the status line, so it's shorter.
+          const cardClass =
+            "grid w-full rounded-xl border p-1 text-left transition " +
+            (course.fixed
+              ? "h-[7.75rem] grid-rows-[1fr_auto] "
+              : "h-[8.75rem] grid-rows-[7fr_3fr] ") +
+            (active
+              ? "border-maroon/40 bg-cream/35 shadow-soft"
+              : "border-cream-3 bg-white");
           return (
             <li key={it.id}>
               {course.fixed ? (
-                <div className={rowClass}>{body}</div>
+                <>
+                  <div className={cardClass + " sm:hidden"}>{card}</div>
+                  <div className={rowClass + " hidden sm:flex"}>{body}</div>
+                </>
               ) : (
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleItem(course.id, it.id)}
-                  className={rowClass}
-                >
-                  {body}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleItem(course.id, it.id)}
+                    className={cardClass + " sm:hidden"}
+                  >
+                    {card}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleItem(course.id, it.id)}
+                    className={rowClass + " hidden sm:flex"}
+                  >
+                    {body}
+                  </button>
+                </>
               )}
             </li>
           );
@@ -2347,7 +2456,7 @@ function StepStallMenu({
       </ul>
 
       {/* Running per-plate — the number a Single Stall guest actually shops on. */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3">
+      <div className="mt-6 hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3 sm:flex">
         <span className="text-sm text-ink-soft">
           {inr.format(pickedCount)}{" "}
           {stall.allFixed
