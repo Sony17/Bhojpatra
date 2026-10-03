@@ -351,6 +351,16 @@ export default function VendorCatalog() {
     }
   }, [sort]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Arriving from the Single Stall picker (/book/stall → a stall-type tile),
+  // the guest has already chosen the category, stall type and city. Fold the
+  // category row, search and filter chips into one summary line; "Change"
+  // brings the full controls back. Decided once from the landing URL.
+  const [fromStallPicker] = useState<boolean>(
+    () =>
+      searchParams.get("category") === "single-stall" &&
+      isStallTypeId(searchParams.get("counter") ?? ""),
+  );
+  const [refineOpen, setRefineOpen] = useState(false);
 
   // Real customer ratings, matched to these listings by name (best-effort).
   const ratings = useVendorRatings();
@@ -696,6 +706,43 @@ export default function VendorCatalog() {
       {/* Every way Bhojpatra sells, written out up front — categories, tier
           bands and add-ons in one row. Pick one to focus the grid, trim the
           filters to what that offering needs, and pin every card to that tag. */}
+      {fromStallPicker && !refineOpen && counter !== "" ? (
+        <div className="app-sticky-chrome -mx-4 mt-3 px-4 py-2 sm:-mx-5 sm:px-5">
+          <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft">
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cream-2 text-base"
+              aria-hidden="true"
+            >
+              {stallTypeById(counter)?.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="eyebrow block text-[10px] font-bold text-maroon">
+                {t("Single Stall", "सिंगल स्टॉल")}
+              </span>
+              <span className="block truncate text-[13px] font-semibold text-ink">
+                {[
+                  (lang === "hi"
+                    ? stallTypeById(counter)?.nameHi
+                    : stallTypeById(counter)?.name) ?? counter,
+                  city !== ALL ? city : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setRefineOpen(true)}
+              aria-expanded={false}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-maroon px-3 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95"
+            >
+              <FilterGlyph />
+              {t("Change", "बदलें")}
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
       <CategoryChips className="mt-4 px-1" label={t("Browse by", "इसके अनुसार देखें")}>
         <CategoryChip selected={lens === ""} onClick={() => selectLens("")}>
           {t("All", "सभी")}
@@ -913,6 +960,9 @@ export default function VendorCatalog() {
           </div>
         </div>
       </div>
+
+      </>
+      )}
 
       {/* Mobile filter sheet */}
       <Drawer

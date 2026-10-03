@@ -36,7 +36,22 @@ export default function StepExtras({
   fullFilter,
   nonVegGuests = null,
   eligibleVendorsFor,
+  pageSize,
+  compact = false,
+  onSkip,
+  skipDisabled = false,
 }: {
+  /** Offer a "Skip" link beside the heading while nothing is added — extras
+   *  are optional, so the guest can move straight on. */
+  onSkip?: () => void;
+  skipDisabled?: boolean;
+  /** Show this many extras, then a "Load more" button (another page per tap).
+   *  Selected extras always stay visible. Absent → the whole list. */
+  pageSize?: number;
+  /** Phones: the dense, app-style layout — slim heading, search behind an
+   *  icon in the chip row, one-line rows. Tablet / desktop are unchanged.
+   *  Used by the Single Stall flow so a page of extras fits on one screen. */
+  compact?: boolean;
   lang: Lang;
   t: (en: string, hi: string) => string;
   guests: number;
@@ -67,6 +82,10 @@ export default function StepExtras({
   // Chaat Station). Selections live in the parent, so filtering never drops a
   // chosen add-on from the order — it only hides its card.
   const [addOnQuery, setAddOnQuery] = useState("");
+  // Compact phones keep the search behind an icon until it's wanted.
+  const [searchOpen, setSearchOpen] = useState(false);
+  // How many pages of extras are showing (with `pageSize`).
+  const [pages, setPages] = useState(1);
   // Category filter — only the full-filter tiers (Gold/Platinum) can narrow the
   // roster to live counters vs whole-event services. We derive the effective
   // category from `fullFilter` (rather than resetting stored state in an effect)
@@ -100,6 +119,13 @@ export default function StepExtras({
       (a.keywords ?? []).some((k) => k.toLowerCase().includes(query));
     return matchesCat && matchesQuery;
   });
+  // Paging: a search shows every match; otherwise the first N, plus any
+  // selected extra further down so a pick never disappears from view.
+  const limit = pageSize && !query ? pageSize * pages : Infinity;
+  const shownAddOns = visibleAddOns.filter(
+    (a, i) => i < limit || selectedAddOns.includes(a.id),
+  );
+  const moreCount = visibleAddOns.length - shownAddOns.length;
   // A counter's real cost depends on which vendor runs the station, so each card
   // shows a price *range* rather than one figure: the counter's base price
   // scaled across the eligible vendors' spread — cheapest → priciest, anchored
@@ -141,14 +167,32 @@ export default function StepExtras({
   ];
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        className={
+          "flex items-center justify-between gap-3 " +
+          (compact ? "flex-nowrap sm:flex-wrap" : "flex-wrap")
+        }
+      >
         <SectionHead
+          compact={compact}
+          phoneMinimal={compact}
           title={t("Add Extras & Counters", "एक्स्ट्रा और काउंटर जोड़ें")}
           sub={t(
             "Little extras and live counters to round out your menu — add them only if you fancy.",
             "अपने मेन्यू को पूरा करने के लिए छोटे-छोटे एक्स्ट्रा और लाइव काउंटर — मन हो तभी जोड़ें।",
           )}
         />
+        {selectedAddOns.length === 0 && onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={skipDisabled}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-maroon px-3 py-1 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95 disabled:opacity-50"
+          >
+            {t("Skip", "छोड़ें")}
+            <span aria-hidden="true">›</span>
+          </button>
+        )}
         {selectedAddOns.length > 0 && (
           <span className="shrink-0 rounded-full bg-maroon px-3 py-1 text-xs font-semibold text-cream">
             {t(
@@ -159,7 +203,12 @@ export default function StepExtras({
         )}
       </div>
 
-      <div className="relative mt-4">
+      <div
+        className={
+          "relative " +
+          (compact ? (searchOpen || query ? "mt-1 sm:mt-4" : "hidden sm:block sm:mt-4") : "mt-4")
+        }
+      >
         <span
           aria-hidden="true"
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft"
@@ -175,6 +224,7 @@ export default function StepExtras({
             "पिज़्ज़ा या गोल गप्पे जैसे एक्स्ट्रा खोजें",
           )}
           aria-label={t("Search extras", "एक्स्ट्रा खोजें")}
+          autoFocus={compact && searchOpen}
           className="w-full rounded-lg border border-cream-3 bg-white py-2 pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-maroon"
         />
       </div>
@@ -186,8 +236,27 @@ export default function StepExtras({
         <div
           role="group"
           aria-label={t("Filter extras", "एक्स्ट्रा फ़िल्टर करें")}
-          className="mt-3 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible"
+          className={
+            (compact ? "mt-1.5 sm:mt-3" : "mt-3") +
+            " flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible"
+          }
         >
+          {compact && (
+            <button
+              type="button"
+              aria-label={t("Search extras", "एक्स्ट्रा खोजें")}
+              aria-expanded={searchOpen || Boolean(query)}
+              onClick={() => setSearchOpen((v) => !v)}
+              className={
+                "grid h-[1.875rem] w-[1.875rem] shrink-0 place-items-center rounded-full border text-xs transition sm:hidden " +
+                (searchOpen || query
+                  ? "border-maroon bg-cream-2"
+                  : "border-cream-3 bg-white")
+              }
+            >
+              <span aria-hidden="true">🔍</span>
+            </button>
+          )}
           {catChips.map((c) => {
             const active = addOnCat === c.id;
             return (
@@ -210,8 +279,14 @@ export default function StepExtras({
         </div>
       )}
 
-      <div className="mt-5 flex flex-col gap-4">
-        {visibleAddOns.map((a: AddOn) => {
+      <div
+        className={
+          compact
+            ? "mt-2 flex flex-col gap-1 sm:mt-5 sm:gap-4"
+            : "mt-5 flex flex-col gap-4"
+        }
+      >
+        {shownAddOns.map((a: AddOn) => {
           const active = selectedAddOns.includes(a.id);
           // Per-unit range across eligible vendors, and the same range projected
           // over the headcount for the "≈ … for N guests" estimate.
@@ -269,7 +344,12 @@ export default function StepExtras({
                     banner cost ~250px of phone screen per counter and pushed
                     the next one out of sight; the price now reads in the copy
                     column instead of riding on the image. */}
-                <div className="relative w-24 shrink-0 self-stretch overflow-hidden bg-cream-2 sm:w-40">
+                <div
+                  className={
+                    "relative shrink-0 self-stretch overflow-hidden bg-cream-2 sm:w-40 " +
+                    (compact ? "w-12" : "w-24")
+                  }
+                >
                   <Image
                     src={a.image}
                     alt={lang === "hi" ? a.nameHi : a.name}
@@ -278,23 +358,55 @@ export default function StepExtras({
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <div className="flex flex-1 items-start gap-2.5 p-3 sm:gap-3 sm:p-4">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-display text-sm font-semibold text-ink sm:text-base">
+                <div
+                  className={
+                    "flex min-w-0 flex-1 gap-2.5 sm:items-start sm:gap-3 sm:p-4 " +
+                    (compact ? "min-h-10 items-center px-2.5 py-1.5" : "items-start p-3")
+                  }
+                >
+                  <div
+                    className={
+                      "min-w-0 flex-1 " +
+                      (compact ? "flex items-center gap-2 sm:block" : "")
+                    }
+                  >
+                    <h4
+                      className={
+                        "font-display font-semibold text-ink sm:text-base " +
+                        (compact
+                          ? "min-w-0 flex-1 truncate text-[13px] sm:whitespace-normal"
+                          : "text-sm")
+                      }
+                    >
                       <span aria-hidden="true" className="mr-1.5">
                         {a.icon}
                       </span>
                       {lang === "hi" ? a.nameHi : a.name}
                     </h4>
-                    <p className="mt-0.5 text-xs text-ink-soft sm:text-sm">
+                    <p
+                      className={
+                        "mt-0.5 text-xs text-ink-soft sm:block sm:text-sm " +
+                        (compact ? "hidden" : "")
+                      }
+                    >
                       {a.description}
                     </p>
-                    <p className="mt-1 text-xs font-bold text-maroon sm:text-sm">
+                    <p
+                      className={
+                        "text-xs font-bold text-maroon sm:mt-1 sm:text-sm " +
+                        (compact ? "shrink-0 whitespace-nowrap" : "mt-1")
+                      }
+                    >
                       {a.perPlate
                         ? `${unitLabel} / ${t("plate", "प्लेट")}`
                         : unitLabel}
                     </p>
-                    <p className="text-[11px] text-ink-soft">
+                    <p
+                      className={
+                        "text-[11px] text-ink-soft " +
+                        (compact ? "hidden sm:block" : "")
+                      }
+                    >
                       {a.perPlate
                         ? t(
                             `≈ ${guestsLabel} for ${guests} guests`,
@@ -305,7 +417,8 @@ export default function StepExtras({
                   </div>
                   <span
                     className={
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm transition " +
+                      "flex shrink-0 items-center justify-center rounded-md border text-sm transition sm:h-6 sm:w-6 " +
+                      (compact ? "h-5 w-5 " : "h-6 w-6 ") +
                       (active
                         ? "border-maroon bg-maroon text-cream"
                         : "border-cream-3 text-transparent")
@@ -626,6 +739,19 @@ export default function StepExtras({
           );
         })}
       </div>
+      {moreCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setPages((n) => n + 1)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-maroon/40 bg-white py-2.5 text-sm font-semibold text-maroon transition hover:bg-cream-2 active:scale-[0.99]"
+        >
+          {t(
+            `Load more (${moreCount})`,
+            `और देखें (${moreCount})`,
+          )}
+          <span aria-hidden="true">▾</span>
+        </button>
+      )}
       {visibleAddOns.length === 0 && (
         <p className="mt-5 rounded-xl border border-dashed border-cream-3 bg-cream-2/40 px-4 py-6 text-center text-sm text-ink-soft">
           {query

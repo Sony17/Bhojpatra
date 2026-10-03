@@ -93,8 +93,13 @@ export function ProgressRail({
   totalSteps,
   stepLabels,
   onStartOver,
+  compact = false,
 }: {
   t: (en: string, hi: string) => string;
+  /** Phones only: a flat, card-less rail with "Start over" folded into the
+   *  step line — the denser, app-style header the Single Stall flow uses.
+   *  Tablet / desktop are unchanged. */
+  compact?: boolean;
   /** 1-based current step. */
   step: number;
   totalSteps: number;
@@ -106,11 +111,54 @@ export function ProgressRail({
   const nextStepLabel = step < totalSteps ? stepLabels[step] : "";
   return (
     <>
+      {compact && (
+        <div className="-mt-1 px-1 sm:hidden">
+          <div className="flex items-baseline justify-between gap-3 text-[12px] font-semibold">
+            <span className="min-w-0 truncate text-maroon">
+              {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
+              {" · "}
+              <span className="text-ink">{stepLabels[step - 1]}</span>
+            </span>
+            <span className="flex shrink-0 items-baseline gap-2 text-[11px] font-medium text-ink/45">
+              {nextStepLabel && (
+                <span>
+                  {t("Next: ", "आगे: ")}
+                  {nextStepLabel}
+                </span>
+              )}
+              {onStartOver && (
+                <>
+                  {nextStepLabel && <span aria-hidden="true">·</span>}
+                  <button
+                    type="button"
+                    onClick={onStartOver}
+                    className="font-semibold text-ink/50 underline underline-offset-2 transition-colors hover:text-maroon"
+                  >
+                    {t("Start over", "फिर से शुरू करें")}
+                  </button>
+                </>
+              )}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-cream">
+            <div
+              className="h-full rounded-full bg-maroon transition-all duration-300"
+              style={{ width: `${(step / totalSteps) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
       {/* Phones — a slim, non-sticky progress bar + "Step X of Y · Label".
           (The shared sticky chrome is desktop-only via sm:static, and its
           sticky offset — meant to sit under a hero that phones no longer
           show — would otherwise cover the event chip below.) */}
-      <div className="mx-2 -mt-6 rounded-card border border-cream bg-white px-4 py-2.5 shadow-soft sm:hidden">
+      <div
+        className={
+          compact
+            ? "hidden"
+            : "mx-2 -mt-6 rounded-card border border-cream bg-white px-4 py-2.5 shadow-soft sm:hidden"
+        }
+      >
         <div className="flex items-baseline justify-between gap-3 text-[12px] font-semibold">
           <span className="text-maroon">
             {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
@@ -151,7 +199,12 @@ export function ProgressRail({
         </p>
       </div>
       {onStartOver && (
-        <div className="mx-2 mt-2 flex justify-end sm:mx-5 lg:mx-8">
+        <div
+          className={
+            "mx-2 mt-2 justify-end sm:mx-5 lg:mx-8 " +
+            (compact ? "hidden sm:flex" : "flex")
+          }
+        >
           <button
             type="button"
             onClick={onStartOver}

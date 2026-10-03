@@ -153,6 +153,7 @@ export default function EventBar({
   collapsible = false,
   collapseAt = "lg",
   embedded = false,
+  chipSummary = false,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -205,6 +206,10 @@ export default function EventBar({
    *  collapsed line gets a pencil affordance and expands to the full editor.
    *  Used by the combined mobile brief + package card on the builder steps. */
   embedded?: boolean;
+  /** Phones: the collapsed line as an app-style chip — calendar icon, the
+   *  "YOUR EVENT" label stacked over the summary, tinted card. Same content
+   *  and the same tap-to-expand editor; used by the Single Stall flow. */
+  chipSummary?: boolean;
 }) {
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
@@ -328,8 +333,10 @@ export default function EventBar({
       className={
         embedded
           ? "relative"
-          : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 " +
-            (flush ? "" : "mt-5 sm:mt-7")
+          : (chipSummary
+              ? "relative rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft sm:rounded-[1.5rem] sm:p-6 sm:shadow-card "
+              : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 ") +
+            (flush ? "" : chipSummary ? "mt-2.5 sm:mt-7" : "mt-5 sm:mt-7")
       }
     >
       {Boolean(leadWarning) && !embedded && (
@@ -351,14 +358,44 @@ export default function EventBar({
             (embedded ? "" : collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
           }
         >
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
-              {t("YOUR EVENT", "आपका इवेंट")}
+          {chipSummary && !embedded ? (
+            <span className="flex min-w-0 items-center gap-3">
+              <span
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cream-2 text-maroon"
+                aria-hidden="true"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
+                  <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+                </svg>
+              </span>
+              <span className="min-w-0">
+                <span className="eyebrow block text-[10px] font-bold text-maroon">
+                  {t("YOUR EVENT", "आपका इवेंट")}
+                </span>
+                <span className="block truncate text-[13px] font-semibold leading-snug text-ink">
+                  {summaryLine}
+                </span>
+              </span>
             </span>
-            <span className="min-w-0 text-xs text-ink/70 line-clamp-2 sm:line-clamp-none break-words">
-              {summaryLine}
+          ) : (
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
+                {t("YOUR EVENT", "आपका इवेंट")}
+              </span>
+              <span className="min-w-0 text-xs text-ink/70 line-clamp-2 sm:line-clamp-none break-words">
+                {summaryLine}
+              </span>
             </span>
-          </span>
+          )}
           {embedded ? (
             <svg
               viewBox="0 0 24 24"

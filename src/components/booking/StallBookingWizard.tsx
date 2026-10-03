@@ -115,7 +115,8 @@ import {
 // step either — that choice happens on the Brands page, which already lists
 // every stall with its photos, ratings, filters and full menu; the wizard is
 // entered from a brand's "Book Now" and opens straight on that stall's menu.
-const TOTAL_STEPS = 3;
+// Menu → Extras → Essentials → Review.
+const TOTAL_STEPS = 4;
 
 // Where a guest picks their stall: the Brands catalogue, lensed to the Single
 // Stall category. Every entry point into this flow that doesn't already name a
@@ -1548,7 +1549,8 @@ export default function StallBookingWizard() {
   /* ─── Render ───────────────────────────────────────────────────────── */
   const stepLabels = [
     t("Menu", "मेन्यू"),
-    t("Details", "विवरण"),
+    t("Extras", "एक्स्ट्रा"),
+    t("Essentials", "ज़रूरी सामान"),
     t("Review", "समीक्षा"),
   ];
 
@@ -1589,6 +1591,7 @@ export default function StallBookingWizard() {
       showGuests={step !== TOTAL_STEPS}
       collapsible={mobileCollapse}
       collapseAt="sm"
+      chipSummary
     />
   );
 
@@ -1614,9 +1617,9 @@ export default function StallBookingWizard() {
     );
   }
 
-  // Details (2) and Review (3) run beside the live order summary; the menu
-  // builder (1) takes the full width.
-  const showSummary = step === 2 || step === 3;
+  // Extras (2), Essentials (3) and Review (4) run beside the live order
+  // summary; the menu builder (1) takes the full width.
+  const showSummary = step >= 2;
   // The stall-type grid owns the whole screen: it carries its own way onward
   // (a tile) and its own way out ("See all stalls"), so the wizard's step nav —
   // a disabled Continue over a duplicate back-link — would only be noise.
@@ -1661,6 +1664,7 @@ export default function StallBookingWizard() {
         totalSteps={TOTAL_STEPS}
         stepLabels={stepLabels}
         onStartOver={startOver}
+        compact
       />
 
       {/* Event brief — up top on every step, collapsed to one editable line on
@@ -1670,8 +1674,10 @@ export default function StallBookingWizard() {
       <div
         className={
           showSummary
-            ? "mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "mt-7"
+            ? "mt-3 grid gap-7 sm:mt-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : showTypePicker
+              ? "mt-3.5 sm:mt-7"
+              : "mt-7"
         }
       >
         <div className="min-w-0">
@@ -1718,8 +1724,11 @@ export default function StallBookingWizard() {
               />
             ))}
 
-          {step === 2 && (
+          {(step === 2 || step === 3) && (
             <StepStallDetails
+              part={step === 2 ? "extras" : "essentials"}
+              onSkip={goNext}
+              skipDisabled={!canNext}
               t={t}
               lang={lang}
               guests={guests}
@@ -1736,7 +1745,7 @@ export default function StallBookingWizard() {
             />
           )}
 
-          {step === 3 &&
+          {step === TOTAL_STEPS &&
             (sessionStatus === undefined ? (
               <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
             ) : sessionStatus === null ? (
@@ -1798,7 +1807,9 @@ export default function StallBookingWizard() {
                 confirmError={confirmError}
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
-                onEditExtras={() => setStep(2)}
+                onEditExtras={() =>
+                  setStep(selectedAddOns.length > 0 || !selectedService ? 2 : 3)
+                }
                 brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
                 blocker={reviewBlocker}
@@ -1865,7 +1876,11 @@ export default function StallBookingWizard() {
               </a>
             )}
             <Button onClick={goNext} disabled={!canNext}>
-              {`${t("Continue", "आगे")} · ${stepLabels[step]} →`}
+              {`${
+                step === 2 && selectedAddOns.length === 0
+                  ? t("Skip", "छोड़ें")
+                  : t("Continue", "आगे")
+              } · ${stepLabels[step]} →`}
             </Button>
           </div>
           {/* Mobile sticky checkout chrome. The estimate only appears once the
@@ -1873,26 +1888,8 @@ export default function StallBookingWizard() {
               not an order, and pricing one they never assembled reads as a quote
               they're on the hook for. */}
           <div className="app-sticky-cta md:hidden">
-            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
-              {pickedCount > 0 ? (
-                <div className="mb-2 flex items-end justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                      {t("Per plate", "प्रति प्लेट")}
-                    </span>
-                    <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
-                      {money(perPlate)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
-                    {money(grandTotal)} ·{" "}
-                    {t(
-                      `${inr.format(guests)} guests`,
-                      `${inr.format(guests)} मेहमान`,
-                    )}
-                  </span>
-                </div>
-              ) : (
+            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2 shadow-pop-up backdrop-blur-xl">
+              {pickedCount > 0 ? null : (
                 <div className="mb-2 text-[11px] leading-tight text-ink-soft">
                   {t(
                     "Your total appears once you add courses — nothing is booked yet.",
@@ -1901,13 +1898,32 @@ export default function StallBookingWizard() {
                 </div>
               )}
               <div className="flex items-center gap-2">
+                {/* One row: the running estimate beside the actions, so the
+                    bar costs one line of screen instead of two. */}
+                {pickedCount > 0 && (
+                  <span className="mr-auto min-w-0 shrink pr-1">
+                    <span className="block truncate font-sans text-[15px] font-bold leading-tight text-maroon">
+                      {money(perPlate)}
+                      <span className="text-[11px] font-semibold text-ink-soft">
+                        {" "}/ {t("plate", "प्लेट")}
+                      </span>
+                    </span>
+                    <span className="block truncate text-[11px] leading-tight text-ink-soft">
+                      {money(grandTotal)} ·{" "}
+                      {t(
+                        `${inr.format(guests)} guests`,
+                        `${inr.format(guests)} मेहमान`,
+                      )}
+                    </span>
+                  </span>
+                )}
                 {step > 1 && (
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={goBack}
                     aria-label={t("Back", "पीछे")}
-                    className="min-h-11 px-4"
+                    className="min-h-10 shrink-0 px-3"
                   >
                     ←
                   </Button>
@@ -1915,10 +1931,14 @@ export default function StallBookingWizard() {
                 <Button
                   onClick={goNext}
                   disabled={!canNext}
-                  fullWidth
-                  className="min-h-11"
+                  fullWidth={pickedCount === 0}
+                  className="min-h-10 shrink-0 px-3.5 text-[13px]"
                 >
-                  {`${t("Continue", "आगे")} · ${stepLabels[step]}`}
+                  {`${
+                    step === 2 && selectedAddOns.length === 0
+                      ? t("Skip", "छोड़ें")
+                      : t("Continue", "आगे")
+                  } · ${stepLabels[step]}`}
                 </Button>
               </div>
             </div>
@@ -2367,6 +2387,9 @@ function StepStallMenu({
  * above it and the optional service package below.
  */
 function StepStallDetails({
+  part,
+  onSkip,
+  skipDisabled,
   t,
   lang,
   guests,
@@ -2381,6 +2404,11 @@ function StepStallDetails({
   vendorsForCounter,
   nonVegGuests,
 }: {
+  /** Which step this is: the extras list (2) or the service package (3). */
+  part: "extras" | "essentials";
+  /** Extras are optional — move on without adding any. */
+  onSkip: () => void;
+  skipDisabled: boolean;
   t: (en: string, hi: string) => string;
   lang: Lang;
   guests: number;
@@ -2408,7 +2436,12 @@ function StepStallDetails({
           The tiered wizard's own extras step, verbatim. Single Stall opens the
           whole catalogue (no tier narrowing) and holds one vendor per counter,
           so the multi-vendor toggle is off and the id list is a single pick. */}
+      {part === "extras" && (
       <StepExtras
+        pageSize={5}
+        compact
+        onSkip={onSkip}
+        skipDisabled={skipDisabled}
         lang={lang}
         t={t}
         guests={guests}
@@ -2425,6 +2458,7 @@ function StepStallDetails({
         fullFilter
         nonVegGuests={nonVegGuests}
       />
+      )}
 
 
       {/* Service package — the same tiered Essentials comparison the feast
@@ -2433,9 +2467,14 @@ function StepStallDetails({
           list). Optional here, unlike the tiered feast flow where a
           full-service crew is part of the package promise — hence the skip
           control, and re-tapping the chosen tier also clears it. */}
-      {services.length > 0 && (
+      {part === "essentials" && services.length === 0 && (
+        <p className="text-sm text-ink-soft">
+          {t("No service needed", "कोई सर्विस नहीं चाहिए")}
+        </p>
+      )}
+      {part === "essentials" && services.length > 0 && (
         <>
-          <h3 className="mt-9 text-lg font-semibold text-ink">
+          <h3 className="text-lg font-semibold text-ink">
             {t("Serving & essentials", "सर्विस और ज़रूरी सामान")}
             <span className="ml-2 text-sm font-normal text-ink-soft">
               {t("optional", "वैकल्पिक")}
