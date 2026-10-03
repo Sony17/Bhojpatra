@@ -2,130 +2,114 @@
 
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
 
+/** Short state codes for the "Lucknow, UP" badge. */
+const STATE_CODES: Record<string, string> = {
+  "Andhra Pradesh": "AP", "Arunachal Pradesh": "AR", Assam: "AS", Bihar: "BR", Chhattisgarh: "CG",
+  Delhi: "DL", Goa: "GA", Gujarat: "GJ", Haryana: "HR", "Himachal Pradesh": "HP", "Jammu and Kashmir": "JK",
+  Jharkhand: "JH", Karnataka: "KA", Kerala: "KL", Ladakh: "LA", "Madhya Pradesh": "MP", Maharashtra: "MH",
+  Manipur: "MN", Meghalaya: "ML", Mizoram: "MZ", Nagaland: "NL", Odisha: "OD", Puducherry: "PY", Punjab: "PB",
+  Rajasthan: "RJ", Sikkim: "SK", "Tamil Nadu": "TN", Telangana: "TS", Tripura: "TR", "Uttar Pradesh": "UP",
+  Uttarakhand: "UK", "West Bengal": "WB", Chandigarh: "CH",
+};
+
+export const DIET_NAMES: Record<VendorDietaryOffering, string> = {
+  veg: "Pure Veg",
+  "non-veg": "Non-Veg Only",
+  both: "Both Veg & Non-Veg",
+};
+
 interface VendorContextHeaderProps {
   businessName?: string;
-  ownerName?: string;
   city?: string;
   state?: string;
+  googleRating?: number;
+  googleReviews?: number;
+  services: string[];
   dietaryOffering?: VendorDietaryOffering;
-  serviceCities?: string[];
-  currentStep: number;
-  totalSteps: number;
-  stepTitle: string;
+  builderTag: string;
+  onEditDetails: () => void;
   isSaving?: boolean;
   lastSavedAt?: string | null;
 }
 
-const DIET_LABELS: Record<VendorDietaryOffering, { label: string; icon: string; cls: string }> = {
-  veg: { label: "100% Pure Veg", icon: "🌱", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
-  "non-veg": { label: "Non-Veg Only", icon: "🍗", cls: "bg-amber-100 text-amber-900 border-amber-300" },
-  both: { label: "Veg & Non-Veg", icon: "🍲", cls: "bg-maroon/10 text-maroon border-maroon/30" },
-};
-
+/**
+ * Persistent Vendor Context Header (handover: shown on every screen after
+ * Step 1). Identity is captured once and reflected here; "Edit Details ✎"
+ * jumps back to Step 1.
+ */
 export default function VendorContextHeader({
   businessName,
-  ownerName,
   city,
   state,
+  googleRating,
+  googleReviews,
+  services,
   dietaryOffering,
-  serviceCities = [],
-  currentStep,
-  totalSteps,
-  stepTitle,
-  isSaving = false,
+  builderTag,
+  onEditDetails,
+  isSaving,
   lastSavedAt,
 }: VendorContextHeaderProps) {
-  const dietMeta = dietaryOffering ? DIET_LABELS[dietaryOffering] : null;
-  const locationLabel = [city, state].filter(Boolean).join(", ");
-  const coverageLabel =
-    serviceCities.length > 0
-      ? `${serviceCities.length} ${serviceCities.length === 1 ? "City" : "Cities"}`
-      : null;
-
+  const code = state ? STATE_CODES[state] || state : "";
   return (
-    <header className="sticky top-0 z-30 mb-6 rounded-card border border-cream-3 bg-white/95 px-4 py-3.5 shadow-xs backdrop-blur-md sm:px-6 sm:py-4 transition-all">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Left: Vendor & Brand Context */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-maroon text-lg font-bold text-cream shadow-xs">
-            {businessName ? businessName.charAt(0).toUpperCase() : "B"}
+    <div className="-mx-4 mb-4 border-b-2 border-cream bg-gradient-to-br from-white to-cream/20 px-4 py-2.5 sm:mx-0 sm:rounded-card sm:border sm:px-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            aria-hidden
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-maroon font-display text-lg text-cream"
+          >
+            भ
           </div>
-
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-base font-bold text-ink sm:text-lg">
-                {businessName || "Your Catering Brand"}
-              </h2>
-              {dietMeta && (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${dietMeta.cls}`}
-                >
-                  <span>{dietMeta.icon}</span>
-                  <span>{dietMeta.label}</span>
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-soft">
-              {ownerName && (
-                <span className="flex items-center gap-1">
-                  <span>Owner:</span>
-                  <span className="font-medium text-ink">{ownerName}</span>
-                </span>
-              )}
-              {locationLabel && (
-                <span className="flex items-center gap-1">
-                  <span>📍</span>
-                  <span>{locationLabel}</span>
-                </span>
-              )}
-              {coverageLabel && (
-                <span className="hidden sm:inline-flex items-center gap-1 text-ink-soft/80">
-                  <span>•</span>
-                  <span>Serving {coverageLabel}</span>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Step Indicator & Save Status */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t border-cream-2 sm:border-0">
-          <div className="text-left sm:text-right">
-            <div className="flex items-center gap-1.5 sm:justify-end">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-maroon">
-                Step {currentStep} of {totalSteps}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="truncate text-sm font-bold text-ink sm:text-base">
+                {businessName || "Vendor Partner"}
               </span>
-              <span className="text-ink-soft">•</span>
-              <span className="text-xs font-semibold text-ink">{stepTitle}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[11px] text-ink-soft sm:justify-end">
-              {isSaving ? (
-                <span className="inline-flex items-center gap-1 text-amber-700">
-                  <span className="inline-block h-2 w-2 animate-ping rounded-full bg-amber-500" />
-                  Saving draft...
+              {city && (
+                <span className="rounded-full bg-cream/40 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                  <span className="hidden sm:inline">{code ? `${city}, ${code}` : city}</span>
+                  <span className="sm:hidden">{city}</span>
                 </span>
-              ) : lastSavedAt ? (
-                <span className="text-emerald-700 flex items-center gap-1">
-                  <span>✓</span>
-                  <span>Draft saved</span>
-                </span>
-              ) : (
-                <span>Auto-saved to cloud</span>
               )}
+              {googleRating ? (
+                <span className="hidden text-[11px] font-semibold text-ink/70 sm:inline">
+                  <span className="text-maroon">★</span> {googleRating} ({googleReviews ?? 0} reviews)
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-1 hidden flex-wrap items-center gap-1.5 sm:flex">
+              <span className="text-[11px] font-semibold text-ink/50">Registered Services:</span>
+              {services.map((s) => (
+                <span key={s} className="rounded bg-cream/40 px-1.5 py-px text-[10px] font-bold uppercase text-ink">
+                  {s}
+                </span>
+              ))}
+              {dietaryOffering && (
+                <span className="rounded border border-ink/40 px-1.5 py-px text-[10px] font-bold uppercase text-ink">
+                  {DIET_NAMES[dietaryOffering]}
+                </span>
+              )}
+              <span className="rounded-full bg-maroon px-2 py-px text-[10px] font-bold uppercase text-cream">
+                {builderTag}
+              </span>
             </div>
           </div>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hidden text-[11px] text-ink/50 lg:inline" aria-live="polite">
+            {isSaving ? "Saving draft..." : lastSavedAt ? "✓ Draft saved" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={onEditDetails}
+            className="min-h-[36px] rounded-full border border-maroon/30 bg-maroon/5 px-3 text-[11px] font-bold text-maroon"
+          >
+            <span className="hidden sm:inline">Edit Details ✎</span>
+            <span className="sm:hidden">Edit ✎</span>
+          </button>
+        </div>
       </div>
-
-      {/* Progress line */}
-      <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-cream-2">
-        <div
-          className="h-full bg-maroon transition-all duration-300"
-          style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-        />
-      </div>
-    </header>
+    </div>
   );
 }

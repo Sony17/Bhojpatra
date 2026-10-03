@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import BuilderSectionHeader from "../common/BuilderSectionHeader";
 import BuilderNav from "../common/BuilderNav";
 import BainaBoxModal from "./BainaBoxModal";
 import type { VendorBainaBox } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
-import { Button } from "@/components/ui";
+import { AddDashed, ContentCard, R, StepHeading } from "../../ui";
 
 interface Step7BBainaCatalogProps {
   boxes: VendorBainaBox[];
@@ -86,156 +85,72 @@ export default function Step7BBainaCatalog({
   };
 
   return (
-    <div className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs">
-      <BuilderSectionHeader
-        badge="Section 7B"
-        title="Curated Baina Box Catalog"
-        description="Craft up to 5 signature celebratory sweet and dry fruit gifting boxes. Specify assortment contents, ½ kg base rates, 1 kg upgrades, and custom sizes."
-        tip="Platform Rule: Bhojpatra enforces a strict maximum of 5 signature boxes per artisan studio to keep the catalog curated and premium."
+    <div className="animate-in fade-in duration-200">
+      <StepHeading
+        eyebrow="Baina Builder · Box Catalog"
+        heading="Artisanal gifting box hampers"
+        subtext="Manage signature gift boxes with itemized sweet contents, ½ kg base rates, 1 kg rates, and hamper photography."
+        mEyebrow="Gift Boxes"
+        mHeading="Gift boxes"
+        mSubtext={null}
       />
 
-      <div className="mt-6 space-y-4">
-        {/* Top Control Bar with Limit Counter */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-ink-soft">
-              Catalog Capacity:
-            </span>
-            <span
-              className={`rounded-pill px-2.5 py-0.5 text-xs font-bold ${
-                isAtLimit
-                  ? "bg-amber-100 text-amber-900 border border-amber-300"
-                  : "bg-emerald-100 text-emerald-800"
-              }`}
-            >
-              {boxes.length} of {MAX_BOXES} boxes used
-            </span>
-            {isAtLimit && (
-              <span className="text-[11px] font-semibold text-amber-700">
-                (Maximum reached)
-              </span>
-            )}
-          </div>
-
-          <Button
-            type="button"
-            size="md"
-            onClick={handleOpenAdd}
-            disabled={isAtLimit}
-            className="min-h-[44px] shrink-0"
-          >
-            + Add Baina Box
-          </Button>
-        </div>
-
-        {error && (
-          <div className="rounded-control bg-red-50 p-2.5 text-xs text-red-700">
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* Catalog Grid */}
-        {boxes.length === 0 ? (
-          <div className="rounded-card border-2 border-dashed border-cream-3 p-8 text-center bg-cream-1/20">
-            <span className="text-3xl" aria-hidden="true">
-              🎁
-            </span>
-            <h4 className="mt-2 text-sm font-bold text-ink">
-              No Baina Boxes in Catalog
-            </h4>
-            <p className="mt-1 text-xs text-ink-soft max-w-md mx-auto">
-              Add your signature mithai gifting box. Include items like Kaju Katli, Besan Ladoos, or Roasted Dry Fruits.
-            </p>
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                onClick={handleOpenAdd}
-                className="min-h-[44px]"
-              >
-                + Add First Baina Box
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {boxes.map((box, idx) => {
-              const imgSrc = box.photo || dummyDishPhoto(box.name);
-
-              return (
-                <div
-                  key={`${box.name}-${idx}`}
-                  className="flex flex-col justify-between rounded-card border border-cream-3 bg-white p-4 shadow-xs hover:border-maroon/40 transition-all"
-                >
-                  <div>
-                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-control bg-cream-2 mb-3">
-                      <Image
-                        src={imgSrc}
-                        alt={box.name}
-                        fill
-                        sizes="(max-width: 640px) 100vw, 33vw"
-                        className="object-cover"
-                        unoptimized={Boolean(box.photo?.startsWith("/api/vendor/photo"))}
-                      />
-                      <div className="absolute top-2 right-2 rounded-pill bg-maroon px-2.5 py-0.5 text-xs font-bold text-white shadow-2xs">
-                        ₹{box.price} / ½ kg
-                      </div>
-                    </div>
-
-                    <h4 className="font-bold text-ink text-sm leading-tight">
-                      {box.name}
-                    </h4>
-
-                    <p className="mt-1.5 text-xs text-ink-soft line-clamp-3 leading-relaxed">
-                      {box.contents}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-soft border-t border-cream-2 pt-2.5">
-                      <span className="font-semibold text-ink">Sizes:</span>
-                      <span className="rounded-control bg-cream-1 px-1.5 py-0.5 text-ink">
-                        ½ kg: ₹{box.price}
+      <ContentCard>
+        {boxes.length > 0 && (
+          <ul className="space-y-2.5">
+            {boxes.map((b, idx) => (
+              <li key={`${b.name}-${idx}`} className="flex items-start gap-3 rounded-control border border-cream/70 p-2.5">
+                <Image
+                  src={b.photo || dummyDishPhoto(b.name)}
+                  alt={b.name}
+                  width={64}
+                  height={64}
+                  unoptimized
+                  className="h-16 w-16 shrink-0 rounded-control object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-bold text-ink">{b.name}</div>
+                  <p className="line-clamp-2 text-[11px] text-ink/60">{b.contents}</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <span className="rounded border border-cream px-1.5 text-[11px] font-bold text-maroon">½ kg: ₹{b.price}</span>
+                    {b.price1kg ? (
+                      <span className="rounded border border-cream px-1.5 text-[11px] font-bold text-ink">1 kg: ₹{b.price1kg}</span>
+                    ) : null}
+                    {(b.customSizes || []).map((cs) => (
+                      <span key={cs.label} className="rounded bg-cream/40 px-1.5 text-[10px] font-bold uppercase text-ink">
+                        {cs.label}: ₹{cs.price}
                       </span>
-                      {box.price1kg && (
-                        <span className="rounded-control bg-cream-1 px-1.5 py-0.5 text-ink">
-                          1 kg: ₹{box.price1kg}
-                        </span>
-                      )}
-                      {(box.customSizes || []).map((cs, i) => (
-                        <span
-                          key={i}
-                          className="rounded-control bg-cream-1 px-1.5 py-0.5 text-ink"
-                        >
-                          {cs.label}: ₹{cs.price}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-end gap-2 border-t border-cream-2 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(box, idx)}
-                      className="rounded-control border border-cream-3 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-cream-1 min-h-[36px]"
-                    >
-                      Edit Box
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBox(idx)}
-                      className="rounded-control border border-cream-3 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 min-h-[36px]"
-                      title="Remove box"
-                      aria-label={`Remove ${box.name}`}
-                    >
-                      ✕
-                    </button>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                  <button
+                    type="button"
+                    aria-label={`Edit ${b.name}`}
+                    onClick={() => handleOpenEdit(b, idx)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${b.name}`}
+                    onClick={() => handleRemoveBox(idx)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+        <AddDashed onClick={handleOpenAdd} disabled={isAtLimit}>
+          <R d="Add New Gifting Box Hamper" m="Add Box" />
+        </AddDashed>
+        <p className="mt-2 text-center text-[11px] font-semibold text-ink/50">Maximum 5 selections allowed.</p>
+        {error && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {error}</p>}
+      </ContentCard>
 
       <BainaBoxModal
         isOpen={modalOpen}
@@ -244,13 +159,7 @@ export default function Step7BBainaCatalog({
         onSave={handleSaveBox}
       />
 
-      <BuilderNav
-        onBack={onBack}
-        onContinue={validateAndContinue}
-        onSaveDraft={onSaveDraft}
-        saving={saving}
-        continueLabel="Continue to Packaging Styles →"
-      />
+      <BuilderNav onBack={onBack} onContinue={validateAndContinue} onSaveDraft={onSaveDraft} saving={saving} />
     </div>
   );
 }

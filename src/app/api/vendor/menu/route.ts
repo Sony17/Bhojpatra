@@ -54,6 +54,7 @@ export async function GET() {
       prefill: app
         ? {
             business: app.business,
+            phone: app.phone,
             city: app.city,
             state: app.state,
             cuisines: app.cuisines,
@@ -180,6 +181,29 @@ export async function PUT(request: Request) {
           };
     });
 
+    // Single-stall dish photos follow the same ownership rule.
+    const stallConfig = check.value.stallConfig?.menus
+      ? {
+          ...check.value.stallConfig,
+          menus: Object.fromEntries(
+            Object.entries(check.value.stallConfig.menus).map(([cat, items]) => [
+              cat,
+              items.map((it) => {
+                if (!it.photo) return it;
+                const photoId = photoIdFromUrl(it.photo);
+                if (photoId && ownedDishPhotoIds.has(photoId)) return it;
+                return {
+                  name: it.name,
+                  diet: it.diet,
+                  ...(it.price != null ? { price: it.price } : {}),
+                  ...(it.desc ? { desc: it.desc } : {}),
+                };
+              }),
+            ]),
+          ),
+        }
+      : check.value.stallConfig;
+
     const verified = app?.status === "Verified";
 
     // Content moderation: a Hidden vendor stays hidden until an admin restores
@@ -211,6 +235,7 @@ export async function PUT(request: Request) {
       ...check.value,
       menu,
       ...(check.value.bainaBoxes ? { bainaBoxes } : {}),
+      ...(stallConfig ? { stallConfig } : {}),
     };
 
     await saveVendor(record);
@@ -220,6 +245,7 @@ export async function PUT(request: Request) {
       [
         ...menu.flatMap((s) => s.items.map((it) => it.photo)),
         ...bainaBoxes.map((b) => b.photo),
+        ...Object.values(stallConfig?.menus ?? {}).flatMap((items) => items.map((it) => it.photo)),
       ].flatMap((url) => {
         const id = url ? photoIdFromUrl(url) : null;
         return id ? [id] : [];

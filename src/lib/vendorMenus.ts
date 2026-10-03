@@ -1380,11 +1380,41 @@ export function cleanStallConfig(v: unknown): SingleStallConfig | undefined {
 
   const cutlery = cleanString(raw.cutlery, 60);
 
+  // Per-stall dishes: same rules as plated menu dishes (name, diet, price,
+  // description, own-photo URL only). Photo ownership is enforced by the route.
+  let menus: Record<string, VendorMenuItem[]> | undefined;
+  if (raw.menus && typeof raw.menus === "object" && !Array.isArray(raw.menus)) {
+    const out: Record<string, VendorMenuItem[]> = {};
+    for (const [key, list] of Object.entries(raw.menus as Record<string, unknown>).slice(0, MAX_STALL_CATEGORIES)) {
+      const cleanKey = cleanString(key, 50);
+      if (!cleanKey || !Array.isArray(list)) continue;
+      const items: VendorMenuItem[] = [];
+      for (const rawItem of list.slice(0, MAX_ITEMS_PER_SECTION)) {
+        const it = (rawItem ?? {}) as Record<string, unknown>;
+        const name = cleanString(it.name, 60);
+        if (!name) continue;
+        const price = cleanMoney(it.price, 100000);
+        const desc = cleanString(it.desc, 300);
+        const photo = typeof it.photo === "string" && PHOTO_URL_RE.test(it.photo) ? it.photo : undefined;
+        items.push({
+          name,
+          diet: it.diet === "non-veg" ? "non-veg" : "veg",
+          ...(price !== null && price > 0 ? { price } : {}),
+          ...(desc ? { desc } : {}),
+          ...(photo ? { photo } : {}),
+        });
+      }
+      if (items.length) out[cleanKey] = items;
+    }
+    if (Object.keys(out).length) menus = out;
+  }
+
   if (
     categories.length === 0 &&
     !categoryPricing &&
     equipment.length === 0 &&
-    !cutlery
+    !cutlery &&
+    !menus
   ) {
     return undefined;
   }
@@ -1394,6 +1424,7 @@ export function cleanStallConfig(v: unknown): SingleStallConfig | undefined {
     ...(categoryPricing ? { categoryPricing } : {}),
     ...(equipment.length ? { equipment } : {}),
     ...(cutlery ? { cutlery } : {}),
+    ...(menus ? { menus } : {}),
   };
 }
 

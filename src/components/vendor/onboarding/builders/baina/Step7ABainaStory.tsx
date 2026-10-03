@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import BuilderSectionHeader from "../common/BuilderSectionHeader";
+import { ChoiceChip, ContentCard, FieldError, FormLabel, R, StepHeading, inputCls } from "../../ui";
 import BuilderNav from "../common/BuilderNav";
 import type { VendorBainaDetails } from "@/lib/vendorMenus";
 
@@ -14,12 +14,12 @@ interface Step7ABainaStoryProps {
   saving?: boolean;
 }
 
+/** Handover: Best For (Gifting Occasions). */
 const BAINA_OCCASIONS = [
-  { id: "Weddings", label: "Wedding Return Gifting", icon: "💍" },
-  { id: "Tilak", label: "Tilak & Roka Ceremonies", icon: "🪔" },
-  { id: "Diwali", label: "Festive Diwali / Eid Hampers", icon: "✨" },
-  { id: "BabyShower", label: "Baby Shower / Annaprashan", icon: "🍼" },
-  { id: "Corporate", label: "Corporate Executive Gifting", icon: "🏢" },
+  "Wedding Announcements",
+  "Festival Sweets (Diwali/Eid)",
+  "Corporate Favours",
+  "Family Ceremonies",
 ];
 
 export default function Step7ABainaStory({
@@ -31,225 +31,89 @@ export default function Step7ABainaStory({
   saving = false,
 }: Step7ABainaStoryProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const occasions = bainaDetails.occasions || [];
+  const set = (patch: Partial<VendorBainaDetails>) => onChangeBainaDetails({ ...bainaDetails, ...patch });
 
   const validateAndContinue = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!bainaDetails.studioName?.trim()) {
-      newErrors.studioName = "Confectionery / Studio name is required.";
-    }
-
-    if (!bainaDetails.story?.trim()) {
-      newErrors.story = "Heritage craft story is required.";
-    }
-
-    if (!bainaDetails.minOrderBoxes || bainaDetails.minOrderBoxes < 5) {
-      newErrors.minOrderBoxes = "Minimum order quantity must be at least 5 boxes.";
-    }
-
-    if (!bainaDetails.leadDays || bainaDetails.leadDays < 1) {
-      newErrors.leadDays = "Production lead time must be at least 1 day.";
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      onContinue();
-    }
-  };
-
-  const selectedOccasions = bainaDetails.occasions ?? [
-    "Weddings",
-    "Tilak",
-    "Diwali",
-    "Corporate",
-  ];
-
-  const toggleOccasion = (id: string) => {
-    const current = bainaDetails.occasions ?? [
-      "Weddings",
-      "Tilak",
-      "Diwali",
-      "Corporate",
-    ];
-    const next = current.includes(id)
-      ? current.filter((x) => x !== id)
-      : [...current, id];
-    onChangeBainaDetails({
-      ...bainaDetails,
-      occasions: next,
-    });
+    const e: Record<string, string> = {};
+    if (!bainaDetails.studioName?.trim()) e.studioName = "Gifting Studio Brand Name is required.";
+    if (!bainaDetails.leadDays || bainaDetails.leadDays < 1) e.leadDays = "Production Notice must be at least 1 day.";
+    setErrors(e);
+    if (!Object.keys(e).length) onContinue();
   };
 
   return (
-    <div className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs">
-      <BuilderSectionHeader
-        badge="Section 7A"
-        title="Artisan Baina Studio Story"
-        description="Introduce your traditional mithai confectionery, gifting atelier, or dry fruit gifting house. Share your generational recipes, purity commitments, and order guarantees."
-        tip="Baina gifting boxes are ordered by wedding families in batches of 25–500 boxes. Articulating your pure desi ghee craft inspires high-volume orders."
+    <div className="animate-in fade-in duration-200">
+      <StepHeading
+        eyebrow="Baina Builder · Studio Story"
+        heading="Artisanal gifting studio & traditions"
+        subtext="Define your gifting brand, pure ghee commitment, bulk minimums, and occasion specialties."
+        mEyebrow="Gifting Story"
+        mHeading="Gifting story"
+        mSubtext={null}
       />
 
-      <div className="mt-6 space-y-6">
-        <div>
-          <label
-            htmlFor="studioName"
-            className="block text-xs font-bold uppercase tracking-wider text-ink"
-          >
-            Confectionery / Studio Brand Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="studioName"
-            type="text"
-            value={bainaDetails.studioName || ""}
-            onChange={(e) =>
-              onChangeBainaDetails({
-                ...bainaDetails,
-                studioName: e.target.value,
-              })
-            }
-            placeholder="e.g. Mithai Mahal Artisans, Royal Awadh Gifting House"
-            className="mt-1.5 w-full rounded-control border border-cream-3 bg-cream-1/30 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-soft/60 focus:border-maroon focus:outline-hidden min-h-[44px]"
-          />
-          {errors.studioName && (
-            <p className="mt-1 text-xs text-red-600">{errors.studioName}</p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor="story"
-            className="block text-xs font-bold uppercase tracking-wider text-ink"
-          >
-            Heritage Story & Craft Philosophy <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            id="story"
-            rows={4}
-            value={bainaDetails.story || ""}
-            onChange={(e) =>
-              onChangeBainaDetails({
-                ...bainaDetails,
-                story: e.target.value,
-              })
-            }
-            placeholder="Share the craft behind your sweets: 100% bilona cow ghee, slow-reduced khoya, organic nuts, heirloom recipes handed down across generations..."
-            className="mt-1.5 w-full rounded-control border border-cream-3 bg-cream-1/30 p-3 text-sm text-ink placeholder:text-ink-soft/60 focus:border-maroon focus:outline-hidden"
-          />
-          {errors.story && (
-            <p className="mt-1 text-xs text-red-600">{errors.story}</p>
-          )}
-        </div>
-
-        {/* Operational Guarantees: Min Order Boxes, Lead Days */}
+      <ContentCard>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label
-              htmlFor="minOrderBoxes"
-              className="block text-xs font-bold uppercase tracking-wider text-ink"
-            >
-              Minimum Order Guarantee (Boxes) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative mt-1.5">
-              <input
-                id="minOrderBoxes"
-                type="number"
-                min={5}
-                max={5000}
-                value={bainaDetails.minOrderBoxes || ""}
-                onChange={(e) =>
-                  onChangeBainaDetails({
-                    ...bainaDetails,
-                    minOrderBoxes: parseInt(e.target.value, 10) || 0,
-                  })
-                }
-                placeholder="25"
-                className="w-full rounded-control border border-cream-3 bg-cream-1/30 px-3.5 py-2.5 text-sm text-ink focus:border-maroon focus:outline-hidden min-h-[44px]"
-              />
-            </div>
-            {errors.minOrderBoxes && (
-              <p className="mt-1 text-xs text-red-600">{errors.minOrderBoxes}</p>
-            )}
-            <p className="mt-1 text-[10px] text-ink-soft">
-              Smallest batch size accepted for custom packing (default: 25).
-            </p>
+            <FormLabel required htmlFor="baina-studio-name">
+              <R d="Gifting Studio Brand Name" m="Studio Name" />
+            </FormLabel>
+            <input
+              id="baina-studio-name"
+              type="text"
+              value={bainaDetails.studioName || ""}
+              onChange={(ev) => set({ studioName: ev.target.value })}
+              placeholder="e.g. Ram Asrey Royal Baina Studio"
+              className={inputCls}
+            />
+            <FieldError>{errors.studioName}</FieldError>
           </div>
-
           <div>
-            <label
-              htmlFor="leadDays"
-              className="block text-xs font-bold uppercase tracking-wider text-ink"
-            >
-              Production Lead Time (Days) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative mt-1.5">
-              <input
-                id="leadDays"
-                type="number"
-                min={1}
-                max={60}
-                value={bainaDetails.leadDays || ""}
-                onChange={(e) =>
-                  onChangeBainaDetails({
-                    ...bainaDetails,
-                    leadDays: parseInt(e.target.value, 10) || 0,
-                  })
-                }
-                placeholder="3"
-                className="w-full rounded-control border border-cream-3 bg-cream-1/30 px-3.5 py-2.5 text-sm text-ink focus:border-maroon focus:outline-hidden min-h-[44px]"
-              />
-            </div>
-            {errors.leadDays && (
-              <p className="mt-1 text-xs text-red-600">{errors.leadDays}</p>
-            )}
-            <p className="mt-1 text-[10px] text-ink-soft">
-              Days needed to prepare, pack, and box fresh confections (default: 3).
-            </p>
+            <FormLabel required htmlFor="baina-lead-days">
+              Production Notice (Days)
+            </FormLabel>
+            <input
+              id="baina-lead-days"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={bainaDetails.leadDays ?? ""}
+              onChange={(ev) => set({ leadDays: Number(ev.target.value) })}
+              placeholder="3"
+              className={inputCls}
+            />
+            <FieldError>{errors.leadDays}</FieldError>
           </div>
         </div>
-
-        {/* Best For Occasions Showcase */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-2">
-            Target Celebrations & Gifting Occasions
-          </label>
+        <div className="mt-4">
+          <FormLabel htmlFor="baina-story">Heritage Confectionery Story</FormLabel>
+          <textarea
+            id="baina-story"
+            rows={3}
+            value={bainaDetails.story || ""}
+            onChange={(ev) => set({ story: ev.target.value })}
+            placeholder="Heritage Lucknow sweetmakers since 1850, handcrafting artisanal sweet hampers..."
+            className={inputCls}
+          />
+        </div>
+        <div className="mt-4">
+          <FormLabel>Best For (Gifting Occasions)</FormLabel>
           <div className="flex flex-wrap gap-2">
-            {BAINA_OCCASIONS.map((occ) => {
-              const isSelected = selectedOccasions.includes(occ.id);
-              return (
-                <button
-                  key={occ.id}
-                  type="button"
-                  onClick={() => toggleOccasion(occ.id)}
-                  aria-pressed={isSelected}
-                  className={`inline-flex items-center gap-1.5 rounded-pill border px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-maroon bg-maroon/10 text-maroon shadow-2xs font-bold ring-1 ring-maroon/20"
-                      : "border-cream-3 bg-cream-1/60 text-ink-soft hover:border-maroon/40 hover:text-ink"
-                  }`}
-                >
-                  <span>{occ.icon}</span>
-                  <span>{occ.label}</span>
-                  {isSelected && (
-                    <span className="ml-1 text-[11px] font-bold text-maroon">✓</span>
-                  )}
-                </button>
-              );
-            })}
+            {BAINA_OCCASIONS.map((o) => (
+              <ChoiceChip
+                key={o}
+                active={occasions.includes(o)}
+                onClick={() => set({ occasions: occasions.includes(o) ? occasions.filter((x) => x !== o) : [...occasions, o] })}
+              >
+                {o}
+              </ChoiceChip>
+            ))}
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-soft">
-            Select the occasions for which your confections and hampers are customized.
-          </p>
         </div>
-      </div>
+      </ContentCard>
 
-      <BuilderNav
-        onBack={onBack}
-        onContinue={validateAndContinue}
-        onSaveDraft={onSaveDraft}
-        saving={saving}
-        continueLabel="Continue to Box Catalog →"
-      />
+      <BuilderNav onBack={onBack} onContinue={validateAndContinue} onSaveDraft={onSaveDraft} saving={saving} />
     </div>
   );
 }

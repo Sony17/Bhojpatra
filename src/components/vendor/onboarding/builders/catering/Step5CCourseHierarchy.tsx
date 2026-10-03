@@ -1,9 +1,9 @@
 "use client";
 
-import BuilderSectionHeader from "../common/BuilderSectionHeader";
 import BuilderNav from "../common/BuilderNav";
 import type { VendorMenuSection } from "@/lib/vendorMenus";
 import type { CourseQuotas } from "./Step5BPricingQuotas";
+import { ContentCard, R, StepHeading } from "../../ui";
 
 interface Step5CCourseHierarchyProps {
   sections: VendorMenuSection[];
@@ -16,46 +16,42 @@ interface Step5CCourseHierarchyProps {
   saving?: boolean;
 }
 
-const COURSES_INFO = [
+/** Handover: the 5 platform-standard courses. */
+export const COURSES_INFO = [
   {
     id: "welcome",
     name: "Welcome Drinks",
+    short: "Welcome Drinks",
     icon: "🥤",
-    desc: "Arrival refreshments, coolers, punches & mocktails greeting incoming guests.",
-    color: "from-blue-500/10 to-blue-500/5 border-blue-200",
-    badgeBg: "bg-blue-100 text-blue-800",
+    desc: "Arrival sherbets, coolers, and traditional welcome refreshments.",
   },
   {
     id: "starters",
-    name: "Starters & Appetizers",
+    name: "Starters & Kebabs",
+    short: "Starters",
     icon: "🍢",
-    desc: "Hand-passed kebabs, tikkas, crispy bites & chaat appetisers served during gathering.",
-    color: "from-amber-500/10 to-amber-500/5 border-amber-200",
-    badgeBg: "bg-amber-100 text-amber-800",
+    desc: "Passed hot appetisers, tikkas, kebabs, and live charcoal grill items.",
   },
   {
     id: "main",
     name: "Main Course",
+    short: "Main Course",
     icon: "🍲",
-    desc: "Handi curries, gravies, slow-dum biryanis, signature dals and vegetable specialties.",
-    color: "from-emerald-500/10 to-emerald-500/5 border-emerald-200",
-    badgeBg: "bg-emerald-100 text-emerald-800",
+    desc: "Heritage slow-cooked curries, paneer delicacies, dal makhani, and dum biryani.",
   },
   {
     id: "breads",
-    name: "Artisan Breads",
+    name: "Breads & Rice",
+    short: "Breads",
     icon: "🫓",
-    desc: "Fresh tandoori rotis, naans, paranthas, sheermals and kulchas hot off the chulha.",
-    color: "from-orange-500/10 to-orange-500/5 border-orange-200",
-    badgeBg: "bg-orange-100 text-orange-800",
+    desc: "Tandoori rotis, flaky parathas, saffron sheermal, and aromatic rice.",
   },
   {
     id: "sweets",
-    name: "Mithai & Sweets",
+    name: "Sweets & Mithai",
+    short: "Sweets",
     icon: "🍬",
-    desc: "Halwai confections, hot jalebi-rabri, kulfis, gulab jamuns and celebratory desserts.",
-    color: "from-pink-500/10 to-pink-500/5 border-pink-200",
-    badgeBg: "bg-pink-100 text-pink-800",
+    desc: "Shahi tukda, kulfi falooda, halwai sweets, and dessert studio delicacies.",
   },
 ];
 
@@ -69,129 +65,60 @@ export default function Step5CCourseHierarchy({
   onSaveDraft,
   saving = false,
 }: Step5CCourseHierarchyProps) {
-  const getDishCount = (courseId: string) => {
-    const sec = sections.find((s) => s.categoryId === courseId);
-    return sec?.items.length || 0;
-  };
-
-  const totalDishes = COURSES_INFO.reduce(
-    (acc, c) => acc + getDishCount(c.id),
-    0,
-  );
+  const count = (id: string) => sections.find((s) => s.categoryId === id)?.items.length || 0;
 
   return (
-    <div className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs">
-      <BuilderSectionHeader
-        badge="Section 5C"
-        title="Course Hierarchy & Catalog Overview"
-        description="Review the 5 official plated courses for your feast packages. Ensure each course has enough published dishes to satisfy Silver and Gold quotas."
-        tip="Hosts pick dishes based on package quotas. Having 1.5× to 2× variety compared to the quota gives hosts exciting choices."
+    <div className="animate-in fade-in duration-200">
+      <StepHeading
+        eyebrow="Feast Builder · Course Hierarchy"
+        heading="Feast course hierarchy"
+        subtext="Review the 5 standard courses structured for guest banquet navigation."
+        mEyebrow="Course Hierarchy"
+        mHeading="Course hierarchy"
+        mSubtext={null}
       />
 
-      <div className="mt-6 space-y-6">
-        {/* Total Dishes KPI banner */}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-control bg-cream-1/80 border border-cream-2 p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-maroon text-white font-bold text-lg">
-              🍽️
-            </span>
-            <div>
-              <span className="text-xs uppercase tracking-wider text-ink-soft font-bold">
-                Catering Roster Summary
-              </span>
-              <p className="text-sm font-bold text-ink">
-                {totalDishes} Dishes Published across 5 Plated Courses
-              </p>
-            </div>
-          </div>
-          <div className="text-xs text-ink-soft">
-            <span className="font-semibold text-ink">Next Step:</span> Granular Dish Builder allows adding and editing items.
-          </div>
-        </div>
-
-        {/* 5 Plated Courses Grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {COURSES_INFO.map((course) => {
-            const count = getDishCount(course.id);
-            const silverQ = silverQuotas[course.id as keyof CourseQuotas] ?? 0;
-            const goldQ = goldQuotas[course.id as keyof CourseQuotas] ?? 0;
-            const maxQuota = Math.max(silverQ, goldQ);
-            const isDeficient = count < maxQuota;
-
+      <ContentCard>
+        <ul className="divide-y divide-cream/50">
+          {COURSES_INFO.map((c) => {
+            const n = count(c.id);
+            const key = c.id as keyof CourseQuotas;
             return (
-              <div
-                key={course.id}
-                className={`relative flex flex-col justify-between rounded-card border bg-gradient-to-b ${course.color} p-4.5 transition-all hover:shadow-xs`}
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-2xl" aria-hidden="true">
-                      {course.icon}
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectCourseToBuild?.(c.id)}
+                  className="flex min-h-[56px] w-full items-center gap-3 py-3 text-left"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-cream/30 text-xl" aria-hidden>
+                    {c.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-bold text-ink">
+                      <R d={c.name} m={c.short} />
                     </span>
-                    <span
-                      className={`rounded-pill px-2.5 py-0.5 text-xs font-bold ${
-                        isDeficient && count > 0
-                          ? "bg-amber-100 text-amber-800"
-                          : count === 0
-                            ? "bg-red-100 text-red-800"
-                            : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {count} {count === 1 ? "dish" : "dishes"}
+                    <span className="hidden text-xs text-ink/60 sm:block">{c.desc}</span>
+                    <span className="hidden text-[11px] text-ink/40 sm:block">
+                      Silver {silverQuotas[key] ?? 0} · Gold {goldQuotas[key] ?? 0} picks
                     </span>
-                  </div>
-
-                  <h3 className="mt-3 font-bold text-ink">{course.name}</h3>
-                  <p className="mt-1 text-xs text-ink-soft leading-relaxed line-clamp-2">
-                    {course.desc}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-cream-3/60 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-ink-soft">
-                    <span>Quotas:</span>
-                    <span className="font-semibold text-ink">
-                      Silver: {silverQ} · Gold: {goldQ}
-                    </span>
-                  </div>
-
-                  {count === 0 ? (
-                    <div className="text-[11px] text-red-600 font-medium">
-                      ⚠️ No dishes added yet.
-                    </div>
-                  ) : isDeficient ? (
-                    <div className="text-[11px] text-amber-700 font-medium">
-                      ⚠️ Needs at least {maxQuota} dishes to meet quotas.
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-emerald-700 font-medium">
-                      ✓ Quota satisfied ({count} available)
-                    </div>
-                  )}
-
-                  {onSelectCourseToBuild && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectCourseToBuild(course.id)}
-                      className="mt-2 w-full rounded-control border border-cream-3 bg-white/90 py-1.5 text-xs font-semibold text-ink hover:bg-white hover:text-maroon transition-colors min-h-[36px]"
-                    >
-                      Manage {course.name} Dishes →
-                    </button>
-                  )}
-                </div>
-              </div>
+                  </span>
+                  <span
+                    className="flex h-7 min-w-7 items-center justify-center rounded-full bg-maroon px-2 text-xs font-bold text-cream"
+                    title={`${n} dishes`}
+                  >
+                    {n}
+                  </span>
+                  <span className="text-ink/30" aria-hidden>
+                    ›
+                  </span>
+                </button>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </ContentCard>
 
-      <BuilderNav
-        onBack={onBack}
-        onContinue={onContinue}
-        onSaveDraft={onSaveDraft}
-        saving={saving}
-        continueLabel="Continue to Granular Dish Builder →"
-      />
+      <BuilderNav onBack={onBack} onContinue={onContinue} onSaveDraft={onSaveDraft} saving={saving} />
     </div>
   );
 }

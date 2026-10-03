@@ -581,3 +581,27 @@ test("baina occasions: cleanBainaDetails validates and cleans occasions list", (
   assert.deepEqual(cleaned.occasions, ["Weddings", "Tilak", "Diwali", "Corporate"]);
 });
 
+
+test("V2 stall: per-category menus are sanitized and kept for custom categories", () => {
+  const cleaned = cleanStallConfig({
+    categories: ["juices", "Mocktail Bar"],
+    menus: {
+      juices: [
+        { name: "  Fresh Mosambi  ", diet: "veg", price: 80, desc: "Cold pressed", photo: "/api/vendor/photo/abc-123" },
+        { name: "", price: 10 },
+        { name: "Bad Photo", diet: "non-veg", price: 0, photo: "https://evil.example/x.png" },
+      ],
+      "Mocktail Bar": [{ name: "Virgin Mojito", price: 120 }],
+      empty: [],
+      notAList: "x",
+    },
+  });
+  assert.ok(cleaned?.menus);
+  assert.deepEqual(cleaned.menus.juices, [
+    { name: "Fresh Mosambi", diet: "veg", price: 80, desc: "Cold pressed", photo: "/api/vendor/photo/abc-123" },
+    { name: "Bad Photo", diet: "non-veg" },
+  ]);
+  assert.deepEqual(cleaned.menus["Mocktail Bar"], [{ name: "Virgin Mojito", diet: "veg", price: 120 }]);
+  assert.equal(cleaned.menus.empty, undefined);
+  assert.equal(cleaned.menus.notAList, undefined);
+});

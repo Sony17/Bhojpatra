@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SubnavPills } from "../../ui";
 import Step6AStallWorkspace from "./Step6AStallWorkspace";
 import Step6BStallSetup from "./Step6BStallSetup";
 import type { SingleStallConfig, VendorMenuSection } from "@/lib/vendorMenus";
@@ -17,11 +18,14 @@ interface SingleStallBuilderProps {
   onFinishStall: () => void;
   onSaveDraft?: () => void;
   saving?: boolean;
+  section?: string;
+  onSectionChange?: (id: string) => void;
 }
 
-const STALL_SECTIONS = [
-  { id: "6A", label: "Stall Menus", short: "6A. Menus Workspace" },
-  { id: "6B", label: "Setup & Cutlery", short: "6B. Setup & Cutlery" },
+/** Handover breadcrumb: Menus › Live & Cutlery. */
+export const STALL_SECTIONS = [
+  { id: "6A", label: "Menus", short: "Menus" },
+  { id: "6B", label: "Live & Cutlery", short: "Live" },
 ];
 
 export default function SingleStallBuilder({
@@ -31,8 +35,15 @@ export default function SingleStallBuilder({
   onFinishStall,
   onSaveDraft,
   saving = false,
+  section,
+  onSectionChange,
 }: SingleStallBuilderProps) {
-  const [activeSection, setActiveSection] = useState<string>("6A");
+  const [localSection, setLocalSection] = useState<string>("6A");
+  const activeSection = section ?? localSection;
+  const setActiveSection = (id: string) => {
+    setLocalSection(id);
+    onSectionChange?.(id);
+  };
 
   const currentIndex = STALL_SECTIONS.findIndex((s) => s.id === activeSection);
 
@@ -55,44 +66,15 @@ export default function SingleStallBuilder({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sub-Section Navigation Bar */}
-      <div className="rounded-card border border-cream-3 bg-white p-3 shadow-xs">
-        <div className="flex items-center justify-between border-b border-cream-2 pb-2 mb-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-maroon flex items-center gap-1.5">
-            <span>🍢</span>
-            <span>Single Stall Builder</span>
-          </span>
-          <span className="text-xs text-ink-soft">
-            Section {currentIndex + 1} of {STALL_SECTIONS.length}
-          </span>
-        </div>
-
-        <div className="flex gap-2">
-          {STALL_SECTIONS.map((sec, idx) => {
-            const isActive = sec.id === activeSection;
-            const isCompleted = idx < currentIndex;
-
-            return (
-              <button
-                key={sec.id}
-                type="button"
-                onClick={() => setActiveSection(sec.id)}
-                className={`flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold transition-all min-h-[36px] ${
-                  isActive
-                    ? "bg-maroon text-white shadow-2xs"
-                    : isCompleted
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                      : "bg-cream-1 text-ink-soft hover:bg-cream-2 hover:text-ink"
-                }`}
-              >
-                <span>{sec.short}</span>
-                {isCompleted && <span className="text-[10px]">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div>
+      <SubnavPills
+        items={STALL_SECTIONS}
+        active={activeSection}
+        onSelect={(id) => {
+          setActiveSection(id);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
 
       {activeSection === "6A" && (
         <Step6AStallWorkspace

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorCustomOffering } from "@/lib/vendorMenus";
-import CustomOfferingModal from "../components/CustomOfferingModal";
-import { Button } from "@/components/ui";
+import type { RecognitionBadgeKey, VendorBadgesState, VendorCustomOffering } from "@/lib/vendorMenus";
+import { cn } from "@/components/ui/cn";
+import BadgeApplicationModal, { BADGE_DEFINITIONS } from "../components/BadgeApplicationModal";
+import { CardTitle, ContentCard, FlowFooter, Pill, R, StepHeading } from "../ui";
 
 export interface Step3Data {
   serviceCategories: string[];
@@ -14,6 +15,7 @@ export interface Step3Data {
     essentials?: boolean;
     addons?: boolean;
   };
+  badges: VendorBadgesState;
 }
 
 interface Step3OfferingsProps {
@@ -24,370 +26,286 @@ interface Step3OfferingsProps {
   saving?: boolean;
 }
 
-interface PrimaryServiceCard {
-  id: "full-catering" | "single-stall" | "baina-box";
-  title: string;
-  hindiTitle: string;
-  badge: string;
-  icon: string;
-  description: string;
-  highlights: string[];
-}
+type ServiceId = "full-catering" | "single-stall" | "baina-box";
 
-const PRIMARY_SERVICES: PrimaryServiceCard[] = [
+const SERVICES: {
+  id: ServiceId;
+  icon: string;
+  title: string;
+  mTitle: string;
+  blurb: string;
+  mBlurb: string;
+  bullets: string[];
+}[] = [
   {
     id: "full-catering",
-    title: "Complete Feast Catering",
-    hindiTitle: "फुल कैटरिंग एवं दावत",
-    badge: "Core Service",
     icon: "🍲",
-    description:
-      "Full-scale multi-course catering with starters, live counters, main courses, and desserts for weddings and large gatherings.",
-    highlights: [
-      "Silver, Gold & Platinum package tiers",
-      "Per-plate pricing for 50 to 1,000+ guests",
-      "Complete course structure & service crew",
+    title: "Feast Booking",
+    mTitle: "Feast Booking",
+    blurb:
+      "Complete multi-course feasts (Silver & Gold) with tiered menus, defined dish allowances, and regional culinary heritage.",
+    mBlurb: "Multi-course feasts (Silver & Gold) with tiered menus & allowances.",
+    bullets: [
+      "Multi-course menu builder",
+      "Tier pricing (Silver Base / Gold Featured)",
+      "Defined dish allowances per course",
+      "Culinary specialization mapping",
     ],
   },
   {
     id: "single-stall",
-    title: "Single Stall Speciality",
-    hindiTitle: "सिंगल स्टॉल",
-    badge: "Food Stalls",
     icon: "🍢",
-    description:
-      "Dedicated standalone counters (Live Chaat, Kebab Station, Mocktail Bar, Tandoor) booked as standalone highlights or party add-ons.",
-    highlights: [
-      "Standalone live counter setup",
-      "Fixed event fee or minimum pax guarantee",
-      "Operates independently alongside other vendors",
+    title: "Single Specialty Stall",
+    mTitle: "Single Stall",
+    blurb:
+      "One dedicated food station (Biryani, Chaat, Tandoor, Dosa, Wok) with custom delicacies for any celebration.",
+    mBlurb: "Dedicated food station for live parties and events.",
+    bullets: [
+      "Predefined or custom stall categories",
+      "Individual item pricing",
+      "Live tawa / sigdi setup",
+      "Dedicated stall cutlery",
     ],
   },
   {
     id: "baina-box",
-    title: "Artisanal Baina Boxes",
-    hindiTitle: "बैना बॉक्स एवं उपहार",
-    badge: "Mithai & Gifting",
     icon: "🎁",
-    description:
-      "Heirloom sweets, dry fruits, and handcrafted packaging boxes ordered for wedding invitations, tilak ceremonies, and festive gifting.",
-    highlights: [
-      "½ kg, 1 kg, and artisanal gift box sizes",
-      "Pre-order lead times and bulk orders",
-      "Custom branding & celebratory card inserts",
+    title: "Baina Gifting Boxes",
+    mTitle: "Baina Boxes",
+    blurb:
+      "Artisanal sweet hampers and wedding announcement invitation boxes delivered in luxury packaging.",
+    mBlurb: "Artisanal sweet gift hampers & invitation boxes.",
+    bullets: [
+      "Box catalog with sweets contents",
+      "½ kg, 1 kg & custom sizes",
+      "Luxury packaging finishes",
+      "Bulk minimum order rules",
     ],
   },
 ];
 
-const FEAST_COMPONENTS: {
+const COMPONENTS: {
   key: "counters" | "extras" | "essentials" | "addons";
-  title: string;
-  icon: string;
+  name: string;
   desc: string;
+  mDesc: string;
 }[] = [
   {
     key: "counters",
-    title: "Live Food Counters",
-    icon: "🍳",
-    desc: "Interactive live cooking & beverage stations (Chaat, Tandoor, Wok, Pizza, Paan).",
+    name: "🍳 Live Counters",
+    desc: "Interactive live cooking & beverage stations (Chaat, Tandoor, Wok, Pizza, Paan)",
+    mDesc: "Interactive live cooking & beverage stations",
   },
   {
     key: "extras",
-    title: "Feast Extras",
-    icon: "✨",
-    desc: "Welcome mocktails, evening hi-tea snacks & theme floral buffet decor.",
+    name: "✨ Feast Extras",
+    desc: "Welcome mocktails, evening hi-tea snacks & theme floral buffet decor",
+    mDesc: "Welcome mocktails, hi-tea snacks & theme floral decor",
   },
   {
     key: "essentials",
-    title: "Service Crew Essentials",
-    icon: "👨‍🍳",
-    desc: "Uniformed banquet stewards, bilingual food labels, handwash setup & hygiene crew.",
+    name: "🛡️ Essentials",
+    desc: "Uniformed banquet stewards, bilingual food labels, handwash setup & waste crews",
+    mDesc: "Uniformed banquet stewards, labels & waste crews",
   },
   {
     key: "addons",
-    title: "Tableware Add-ons",
-    icon: "🍽️",
-    desc: "Tableware presentation packages (Eco Disposables to Royal Gold/Silver).",
+    name: "🍽️ Add-ons",
+    desc: "Tableware presentation packages (Base Disposables to Royal Gold/Silver)",
+    mDesc: "Tableware presentation packages (A–D)",
   },
 ];
 
-export default function Step3Offerings({
-  data,
-  onChange,
-  onBack,
-  onFinishStep3,
-  saving = false,
-}: Step3OfferingsProps) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [error, setError] = useState("");
+const BADGE_KEYS: RecognitionBadgeKey[] = ["verified", "icon", "heritage"];
 
-  const toggleService = (id: string) => {
-    const current = data.serviceCategories || [];
-    if (current.includes(id)) {
-      if (current.length === 1) {
-        setError("You must select at least one primary service offering.");
-        return;
-      }
-      onChange({ serviceCategories: current.filter((c) => c !== id) });
-    } else {
-      onChange({ serviceCategories: [...current, id] });
-    }
+export default function Step3Offerings({ data, onChange, onBack, onFinishStep3, saving = false }: Step3OfferingsProps) {
+  const [error, setError] = useState("");
+  const [badgeModal, setBadgeModal] = useState<RecognitionBadgeKey | null>(null);
+  const selected = data.serviceCategories || [];
+  const comps = data.cateringComponents || {};
+
+  const toggleService = (id: ServiceId) => {
+    onChange({ serviceCategories: selected.includes(id) ? selected.filter((c) => c !== id) : [...selected, id] });
     setError("");
   };
 
-  const handleAddCustom = (newOffering: VendorCustomOffering) => {
-    onChange({
-      customOfferings: [...(data.customOfferings || []), newOffering],
-    });
+  const toggleComponent = (key: (typeof COMPONENTS)[number]["key"]) => {
+    onChange({ cateringComponents: { ...comps, [key]: comps[key] === false } });
   };
 
-  const handleRemoveCustom = (id: string) => {
-    onChange({
-      customOfferings: (data.customOfferings || []).filter((o) => o.id !== id),
-    });
-  };
-
-  const hasFullCatering = data.serviceCategories?.includes("full-catering");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!data.serviceCategories || data.serviceCategories.length === 0) {
-      setError("Please select at least one service category.");
+  const handleContinue = () => {
+    if (!selected.some((s) => SERVICES.some((x) => x.id === s))) {
+      setError("Please select at least one service offering to proceed.");
       return;
     }
-    setError("");
     onFinishStep3();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in duration-200">
-      {/* ── Section A: Primary Services ── */}
-      <section className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs space-y-5">
-        <div>
-          <h3 className="text-base font-bold text-ink sm:text-lg">
-            1. Select Your Core Service Lines
-          </h3>
-          <p className="text-xs text-ink-soft mt-0.5">
-            Choose all offerings your team provides on Bhojpatra. You can offer full dawat catering, individual live stalls, or gifting boxes.
-          </p>
-        </div>
+    <div className="animate-in fade-in duration-200">
+      <StepHeading
+        eyebrow="Commercial Service Offerings"
+        heading="What services do you offer?"
+        subtext="Select the services that match your business. The onboarding flow will adapt and open dedicated builders for each selection."
+        mEyebrow="Commercial Offerings"
+        mHeading="What do you offer?"
+        mSubtext="Select the services that match your business."
+      />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {PRIMARY_SERVICES.map((svc) => {
-            const isSelected = data.serviceCategories?.includes(svc.id);
+      <ContentCard>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {SERVICES.map((svc) => {
+            const active = selected.includes(svc.id);
             return (
               <div
                 key={svc.id}
-                onClick={() => toggleService(svc.id)}
-                className={`relative flex flex-col justify-between rounded-card border-2 p-5 text-left cursor-pointer transition-all ${
-                  isSelected
-                    ? "border-maroon bg-cream/40 shadow-xs ring-1 ring-maroon/20"
-                    : "border-cream-3 bg-white/70 hover:border-cream-4 hover:bg-white"
-                }`}
+                className={cn(
+                  "relative flex flex-col gap-2 rounded-card border-2 p-4 transition-colors",
+                  active ? "border-maroon bg-maroon/5" : "border-cream/60 bg-white",
+                )}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-3xl">{svc.icon}</span>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${
-                        isSelected
-                          ? "bg-maroon text-cream"
-                          : "bg-cream-2 text-ink-soft"
-                      }`}
-                    >
-                      {svc.badge}
-                    </span>
-                  </div>
-
-                  <h4 className="mt-3 text-base font-bold text-ink">{svc.title}</h4>
-                  <p className="text-xs text-ink-soft/70">{svc.hindiTitle}</p>
-                  <p className="mt-2 text-xs text-ink-soft leading-relaxed">
-                    {svc.description}
-                  </p>
-
-                  <ul className="mt-3 space-y-1.5 pt-3 border-t border-cream-2/70 text-[11px] text-ink-soft">
-                    {svc.highlights.map((h, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="text-maroon font-bold">•</span>
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-cream-2/70 flex items-center justify-between text-xs">
-                  <span className={isSelected ? "font-semibold text-maroon" : "text-ink-soft"}>
-                    {isSelected ? "Active Service" : "Click to Enable"}
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleService(svc.id)}
+                  className="flex min-h-[44px] items-start gap-3 text-left"
+                >
+                  <span className="text-2xl" aria-hidden>
+                    {svc.icon}
                   </span>
-                  <div
-                    className={`h-5 w-5 rounded-full border flex items-center justify-center ${
-                      isSelected
-                        ? "border-maroon bg-maroon text-white"
-                        : "border-cream-3 bg-white"
-                    }`}
+                  <span className="flex-1">
+                    <span className="block text-[15px] font-bold text-ink">
+                      <R d={svc.title} m={svc.mTitle} />
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-ink/60">
+                      <R d={svc.blurb} m={svc.mBlurb} />
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
+                      active ? "border-maroon bg-maroon text-cream" : "border-cream text-transparent",
+                    )}
+                    aria-hidden
                   >
-                    {isSelected && <span className="text-[11px]">✓</span>}
+                    ✓
+                  </span>
+                </button>
+                <ul className="hidden space-y-1 pl-1 text-xs text-ink/70 sm:block">
+                  {svc.bullets.map((b) => (
+                    <li key={b} className="flex gap-1.5">
+                      <span className="text-maroon">•</span>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+
+                {svc.id === "full-catering" && active && (
+                  <div className="mt-2 rounded-control border border-cream bg-white p-3">
+                    <div className="text-[13px] font-bold text-ink">🍲 Select Feast Components</div>
+                    <div className="mb-2 text-[11px] text-ink/60">
+                      <R d="Choose which components you provide for feast bookings:" m="Select which components you provide:" />
+                    </div>
+                    <div className="space-y-2">
+                      {COMPONENTS.map((c) => {
+                        const on = comps[c.key] !== false;
+                        return (
+                          <button
+                            key={c.key}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={on}
+                            onClick={() => toggleComponent(c.key)}
+                            className={cn(
+                              "flex min-h-[44px] w-full items-start gap-2.5 rounded-control border p-2 text-left",
+                              on ? "border-maroon/40 bg-maroon/5" : "border-cream/60",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] font-bold",
+                                on ? "border-maroon bg-maroon text-cream" : "border-cream text-transparent",
+                              )}
+                              aria-hidden
+                            >
+                              ✓
+                            </span>
+                            <span>
+                              <span className="block text-xs font-bold text-ink">{c.name}</span>
+                              <span className="block text-[11px] text-ink/60">
+                                <R d={c.desc} m={c.mDesc} />
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
         </div>
+        {error && <p className="mt-3 text-xs font-semibold text-maroon">⚠️ {error}</p>}
+      </ContentCard>
 
-        {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
-      </section>
-
-      {/* ── Section B: Feast Sub-Components Selection (if Catering selected) ── */}
-      {hasFullCatering && (
-        <section className="rounded-card border border-cream-3 bg-cream/30 p-5 sm:p-7 shadow-xs space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-maroon/10 px-2.5 py-0.5 text-xs font-semibold text-maroon mb-1">
-                Feast Sub-Components
-              </div>
-              <h3 className="text-base font-bold text-ink">
-                Select Your Feast Capabilities
-              </h3>
-              <p className="text-xs text-ink-soft mt-0.5">
-                Choose the components you provide for feast bookings. The menu builder adapts and opens dedicated sub-builders for each enabled component.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-            {FEAST_COMPONENTS.map((item) => {
-              const currentComponents = {
-                counters: data.cateringComponents?.counters !== false,
-                extras: data.cateringComponents?.extras !== false,
-                essentials: data.cateringComponents?.essentials !== false,
-                addons: data.cateringComponents?.addons !== false,
-              };
-              const isEnabled = currentComponents[item.key];
-
-              const toggleComponent = () => {
-                onChange({
-                  cateringComponents: {
-                    ...currentComponents,
-                    [item.key]: !isEnabled,
-                  },
-                });
-              };
-
-              return (
-                <div
-                  key={item.key}
-                  onClick={toggleComponent}
-                  className={`flex flex-col justify-between rounded-control border-2 p-3.5 shadow-xs cursor-pointer transition-all ${
-                    isEnabled
-                      ? "border-maroon bg-white shadow-xs"
-                      : "border-cream-3 bg-white/50 opacity-60 hover:opacity-80"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="text-2xl">{item.icon}</span>
-                      <div
-                        className={`h-4.5 w-4.5 rounded-xs border flex items-center justify-center text-[10px] font-bold ${
-                          isEnabled
-                            ? "border-maroon bg-maroon text-white"
-                            : "border-cream-3 bg-white text-transparent"
-                        }`}
-                      >
-                        ✓
-                      </div>
-                    </div>
-                    <h4 className="text-xs font-bold text-ink">{item.title}</h4>
-                    <p className="mt-1 text-[11px] text-ink-soft leading-normal">
-                      {item.desc}
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-cream-2/70 text-[10px] font-semibold text-ink-soft flex items-center justify-between">
-                    <span className={isEnabled ? "text-maroon font-bold" : "text-ink-soft"}>
-                      {isEnabled ? "Included in builder" : "Omitted from builder"}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ── Section C: Custom Offerings Adder ── */}
-      <section className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h3 className="text-base font-bold text-ink sm:text-lg">
-            2. Custom Stations & Signature Offerings
-            </h3>
-            <p className="text-xs text-ink-soft mt-0.5">
-              Highlight unique cooking stations, artisanal counters, or specialty services that set your brand apart.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setModalOpen(true)}
-          >
-            + Add Custom Station
-          </Button>
-        </div>
-
-        {(!data.customOfferings || data.customOfferings.length === 0) ? (
-          <div className="rounded-control border border-dashed border-cream-3 p-6 text-center text-xs text-ink-soft bg-cream/20">
-            <span className="text-2xl block mb-1">✨</span>
-            <p className="font-semibold text-ink">No custom stations added yet</p>
-            <p className="mt-0.5 text-ink-soft">
-              Click &quot;Add Custom Station&quot; above to declare bespoke stations like Sheermal Counter, Live Sigri, or Artisanal Mocktails.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {data.customOfferings.map((offering) => (
+      {/* Badges & Recognition (Optional) */}
+      <ContentCard>
+        <CardTitle badge="Optional">
+          <span aria-hidden>🛡️</span> Badges & Recognition
+        </CardTitle>
+        <p className="-mt-2 mb-4 text-[11px] text-ink/50">
+          <R
+            d="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust to customers from day one."
+            m="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust."
+          />
+        </p>
+        <div className="space-y-2.5">
+          {BADGE_KEYS.map((key) => {
+            const meta = BADGE_DEFINITIONS[key];
+            const granted = data.badges?.granted?.includes(key);
+            const applied = data.badges?.applied?.includes(key);
+            return (
               <div
-                key={offering.id}
-                className="flex items-start justify-between gap-3 rounded-control border border-cream-3 bg-cream/30 p-3.5"
+                key={key}
+                className="flex flex-col gap-3 rounded-control border border-cream/70 bg-cream/10 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-start gap-2.5">
-                  <span className="text-2xl">{offering.icon || "🍢"}</span>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl" aria-hidden>
+                    {meta.icon}
+                  </span>
                   <div>
-                    <h4 className="text-xs font-bold text-ink">{offering.title}</h4>
-                    <p className="mt-1 text-[11px] text-ink-soft leading-relaxed">
-                      {offering.blurb}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] font-bold text-ink">{meta.title}</span>
+                      <Pill tone="cream">{meta.badgeTag}</Pill>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-ink/60">{meta.description}</p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleRemoveCustom(offering.id)}
-                  className="text-xs text-ink-soft hover:text-red-600 font-bold p-1"
-                  aria-label="Remove custom offering"
+                  onClick={() => setBadgeModal(key)}
+                  className={cn(
+                    "min-h-[44px] shrink-0 rounded-full px-4 text-xs font-bold",
+                    granted || applied ? "border border-maroon/40 text-maroon" : "bg-maroon text-cream",
+                  )}
                 >
-                  ✕
+                  {granted ? "✓ Granted (View)" : applied ? "✓ Application Submitted (View)" : "Apply for Badge"}
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            );
+          })}
+        </div>
+      </ContentCard>
 
-      {/* Custom offering modal */}
-      <CustomOfferingModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleAddCustom}
+      <BadgeApplicationModal
+        badgeKey={badgeModal}
+        badgesState={data.badges}
+        onClose={() => setBadgeModal(null)}
+        onSuccess={(badges) => onChange({ badges })}
       />
 
-      {/* ── Wizard Actions ── */}
-      <div className="sticky bottom-0 z-20 flex items-center justify-between rounded-card border border-cream-3 bg-white/95 p-4 shadow-md backdrop-blur-md">
-        <Button type="button" variant="secondary" size="lg" onClick={onBack}>
-          ← Back to KYC
-        </Button>
-        <Button type="submit" size="lg" disabled={saving}>
-          {saving ? "Saving..." : "Continue to Service Builders →"}
-        </Button>
-      </div>
-    </form>
+      <FlowFooter onBack={onBack} onContinue={handleContinue} saving={saving} />
+    </div>
   );
 }

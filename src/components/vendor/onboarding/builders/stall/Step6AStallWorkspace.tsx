@@ -2,16 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import BuilderSectionHeader from "../common/BuilderSectionHeader";
 import BuilderNav from "../common/BuilderNav";
 import StallDishModal from "./StallDishModal";
-import type {
-  VendorMenuSection,
-  VendorMenuItem,
-  SingleStallConfig,
-} from "@/lib/vendorMenus";
+import type { VendorMenuSection, VendorMenuItem, SingleStallConfig } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
-import { Button } from "@/components/ui";
+import { cn } from "@/components/ui/cn";
+import { AddDashed, ContentCard, DietMark, FieldHint, FormLabel, Pill, R, StepHeading, inputCls } from "../../ui";
 
 interface Step6AStallWorkspaceProps {
   stallConfig?: SingleStallConfig;
@@ -24,24 +20,55 @@ interface Step6AStallWorkspaceProps {
   saving?: boolean;
 }
 
-export const PLATFORM_STALL_CATEGORIES = [
-  { id: "chaat", name: "Chaat Station", icon: "🥘", defaultPrice: 60, defaultPax: 50 },
-  { id: "live", name: "Live Tandoor & Grill", icon: "🔥", defaultPrice: 90, defaultPax: 50 },
-  { id: "chinese", name: "Indo-Chinese Wok", icon: "🥡", defaultPrice: 75, defaultPax: 50 },
-  { id: "south-indian", name: "South Indian Dosa Bar", icon: "🥥", defaultPrice: 70, defaultPax: 50 },
-  { id: "pizza", name: "Wood-Fired Pizza", icon: "🍕", defaultPrice: 120, defaultPax: 40 },
-  { id: "pasta", name: "Live Pasta Piazza", icon: "🍝", defaultPrice: 110, defaultPax: 40 },
-  { id: "pan", name: "Banarasi Paan Counter", icon: "🍃", defaultPrice: 40, defaultPax: 100 },
-  { id: "momo", name: "Momo & Dimsum Counter", icon: "🥟", defaultPrice: 70, defaultPax: 50 },
-  { id: "waffle", name: "Waffle & Pancake Bar", icon: "🧇", defaultPrice: 80, defaultPax: 50 },
-  { id: "dessert", name: "Live Sweets & Dessert", icon: "🍨", defaultPrice: 75, defaultPax: 50 },
-  { id: "hi-tea", name: "Evening Hi-Tea & Nasta", icon: "🫖", defaultPrice: 75, defaultPax: 50 },
-  { id: "coffee", name: "Barista Coffee & Chai", icon: "☕", defaultPrice: 45, defaultPax: 50 },
-  { id: "mocktail", name: "Mocktail & Juice Bar", icon: "🍹", defaultPrice: 65, defaultPax: 50 },
+/** Handover: PREDEFINED_STALL_CATEGORIES. `menuId` = the platform menu category the
+ *  stall's dishes are mirrored into for the customer stall-booking flow. */
+export const PLATFORM_STALL_CATEGORIES: { id: string; name: string; icon: string; desc: string; menuId?: string }[] = [
+  { id: "chaat", name: "Chaat", icon: "🥘", desc: "Live pani puri, aloo tikki, dahi bhalla & papdi", menuId: "chaat" },
+  { id: "juices", name: "Juices & Shakes", icon: "🥤", desc: "Freshly squeezed fruit juices, shakes & coolers" },
+  { id: "beverages", name: "Beverages & Chai", icon: "☕", desc: "Kulhad chai, filter coffee, artisan mocktails" },
+  { id: "south-indian", name: "South Indian", icon: "🥥", desc: "Crispy dosas, idlis, vadas with sambar & chutneys", menuId: "south-indian" },
+  { id: "north-indian", name: "North Indian & Mughlai", icon: "🍛", desc: "Curries, rolls, kebabs, tandoor specials & naans" },
+  { id: "chinese", name: "Chinese & Pan-Asian", icon: "🍜", desc: "Hakka noodles, dim sums, momos & Manchurian", menuId: "chinese" },
+  { id: "snacks", name: "Snacks & Fast Food", icon: "🥪", desc: "Sandwiches, burgers, fries, kathi rolls" },
+  { id: "desserts", name: "Desserts & Sweets", icon: "🍬", desc: "Hot jalebi, gulab jamun, rabri, kulfi" },
+  { id: "ice-cream", name: "Ice Cream & Kulfi", icon: "🍨", desc: "Artisanal rolled scoops, matka kulfi & sundaes" },
+  { id: "street-food", name: "Street Food Specials", icon: "🍢", desc: "Pav bhaji, chole bhature, dabeli, momos" },
+  { id: "live-grills", name: "Live Grills & Barbecue", icon: "🔥", desc: "Smoked paneer skewers, tikkas & charcoal kebabs", menuId: "live" },
+  { id: "breakfast", name: "Breakfast Counter", icon: "🥞", desc: "Poori sabzi, parathas, poha, upma & chole kulche" },
+  { id: "regional", name: "Regional / Specialty", icon: "🏺", desc: "Awadhi, Rajasthani, Gujarati or hyperlocal specials" },
 ];
 
+/** Older stall ids saved before the V2 category list. */
+const LEGACY_NAMES: Record<string, string> = {
+  live: "Live Tandoor & Grill",
+  pizza: "Wood-Fired Pizza",
+  pasta: "Live Pasta Piazza",
+  pan: "Banarasi Paan Counter",
+  momo: "Momo & Dimsum Counter",
+  waffle: "Waffle & Pancake Bar",
+  dessert: "Live Sweets & Dessert",
+  "hi-tea": "Evening Hi-Tea & Nasta",
+  coffee: "Barista Coffee & Chai",
+  mocktail: "Mocktail & Juice Bar",
+};
+const LEGACY_MENU_IDS = new Set(["live", "pizza", "pasta"]);
+
+export function stallCategoryName(id: string) {
+  return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.name ?? LEGACY_NAMES[id] ?? id;
+}
+export function stallMenuId(id: string) {
+  return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : undefined);
+}
+/** Dishes of one stall: V2 `stallConfig.menus`, else the mirrored `menu[]` section. */
+export function stallDishes(cfg: SingleStallConfig | undefined, menu: VendorMenuSection[], id: string) {
+  const own = cfg?.menus?.[id];
+  if (own) return own;
+  const mid = stallMenuId(id);
+  return mid ? menu.find((s) => s.categoryId === mid)?.items ?? [] : [];
+}
+
 export default function Step6AStallWorkspace({
-  stallConfig = { categories: ["chaat"] },
+  stallConfig = { categories: [] },
   menu,
   onChangeStallConfig,
   onChangeMenu,
@@ -50,533 +77,348 @@ export default function Step6AStallWorkspace({
   onSaveDraft,
   saving = false,
 }: Step6AStallWorkspaceProps) {
-  const selectedCategories = stallConfig.categories || ["chaat"];
-  const [activeTab, setActiveTab] = useState<string>(selectedCategories[0] || "chaat");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [delicacyToEdit, setDelicacyToEdit] = useState<{
-    item: VendorMenuItem;
-    index: number;
-  } | null>(null);
-  const [customCatInput, setCustomCatInput] = useState("");
+  const selected = stallConfig.categories || [];
+  const [activeCat, setActiveCat] = useState<string>(selected[0] || "");
+  const [modal, setModal] = useState<{ item: VendorMenuItem; index: number } | null | "new">(null);
+  const [customCat, setCustomCat] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const current = selected.includes(activeCat) ? activeCat : selected[0] || "";
   const pricingMap = stallConfig.categoryPricing || {};
-  const currentPricing = pricingMap[activeTab] || {
-    fixedPerPlate:
-      PLATFORM_STALL_CATEGORIES.find((c) => c.id === activeTab)?.defaultPrice || 75,
-    minPaxGuarantee:
-      PLATFORM_STALL_CATEGORIES.find((c) => c.id === activeTab)?.defaultPax || 50,
+  const pricing = pricingMap[current] || { fixedPerPlate: 0, minPaxGuarantee: 50 };
+  const dishes = current ? stallDishes(stallConfig, menu, current) : [];
+  const currentName = current ? stallCategoryName(current) : "";
+
+  const customCats = selected.filter((id) => !PLATFORM_STALL_CATEGORIES.some((c) => c.id === id));
+  const chips = [...PLATFORM_STALL_CATEGORIES.map((c) => ({ id: c.id, name: c.name, icon: c.icon })), ...customCats.map((id) => ({ id, name: stallCategoryName(id), icon: "✨" }))];
+
+  /** Write a stall's dishes to stallConfig.menus and mirror platform ones into menu[]. */
+  const writeDishes = (catId: string, items: VendorMenuItem[], cfg: SingleStallConfig = stallConfig) => {
+    onChangeStallConfig({ ...cfg, menus: { ...(cfg.menus || {}), [catId]: items } });
+    const mid = stallMenuId(catId);
+    if (!mid) return;
+    const perPlate = (cfg.categoryPricing || {})[catId]?.fixedPerPlate || 0;
+    const idx = menu.findIndex((s) => s.categoryId === mid);
+    if (idx === -1) onChangeMenu([...menu, { categoryId: mid, perPlate, items }]);
+    else onChangeMenu(menu.map((s, i) => (i === idx ? { ...s, items, perPlate: perPlate || s.perPlate } : s)));
   };
 
-  const activeCategoryMeta = PLATFORM_STALL_CATEGORIES.find((c) => c.id === activeTab) || {
-    id: activeTab,
-    name: activeTab.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-    icon: "🍢",
-  };
-
-  const activeSection = menu.find((s) => s.categoryId === activeTab);
-  const delicacies = activeSection?.items || [];
-
-  const handleToggleCategory = (catId: string) => {
-    let updated: string[];
-    if (selectedCategories.includes(catId)) {
-      if (selectedCategories.length === 1) {
-        setErrors({ categories: "You must operate at least one stall category." });
-        return;
-      }
-      updated = selectedCategories.filter((c) => c !== catId);
-      if (activeTab === catId) {
-        setActiveTab(updated[0]);
-      }
+  const toggleCategory = (id: string) => {
+    if (selected.includes(id)) {
+      const next = selected.filter((c) => c !== id);
+      onChangeStallConfig({ ...stallConfig, categories: next });
+      if (current === id) setActiveCat(next[0] || "");
     } else {
-      updated = [...selectedCategories, catId];
+      onChangeStallConfig({
+        ...stallConfig,
+        categories: [...selected, id],
+        categoryPricing: { ...pricingMap, [id]: pricingMap[id] || { fixedPerPlate: 0, minPaxGuarantee: 50 } },
+      });
+      setActiveCat(id);
     }
     setErrors({});
-
-    // Ensure category pricing exists for new category
-    const catMeta = PLATFORM_STALL_CATEGORIES.find((c) => c.id === catId);
-    const updatedPricing = { ...pricingMap };
-    if (!updatedPricing[catId]) {
-      updatedPricing[catId] = {
-        fixedPerPlate: catMeta?.defaultPrice || 75,
-        minPaxGuarantee: catMeta?.defaultPax || 50,
-      };
-    }
-
-    onChangeStallConfig({
-      ...stallConfig,
-      categories: updated,
-      categoryPricing: updatedPricing,
-    });
   };
 
-  const handleAddCustomCategory = () => {
-    const trimmed = customCatInput.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!trimmed) return;
-    if (selectedCategories.includes(trimmed)) {
-      setCustomCatInput("");
+  const addCustomCategory = () => {
+    const name = customCat.trim().slice(0, 50);
+    if (!name) return;
+    const exists = chips.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      if (!selected.includes(exists.id)) toggleCategory(exists.id);
+      setCustomCat("");
       return;
     }
-
-    const updated = [...selectedCategories, trimmed];
-    const updatedPricing = {
-      ...pricingMap,
-      [trimmed]: { fixedPerPlate: 80, minPaxGuarantee: 50 },
-    };
-
     onChangeStallConfig({
       ...stallConfig,
-      categories: updated,
-      categoryPricing: updatedPricing,
+      categories: [...selected, name],
+      categoryPricing: { ...pricingMap, [name]: { fixedPerPlate: 0, minPaxGuarantee: 50 } },
     });
-    setActiveTab(trimmed);
-    setCustomCatInput("");
+    setActiveCat(name);
+    setCustomCat("");
   };
 
-  const handlePricingChange = (field: "fixedPerPlate" | "minPaxGuarantee", val: number) => {
-    const updatedPricing = {
-      ...pricingMap,
-      [activeTab]: {
-        ...currentPricing,
-        [field]: Math.max(0, val || 0),
-      },
-    };
-
-    onChangeStallConfig({
+  const setPricing = (field: "fixedPerPlate" | "minPaxGuarantee", val: number) => {
+    const nextCfg: SingleStallConfig = {
       ...stallConfig,
-      categoryPricing: updatedPricing,
-    });
-
-    // Also update perPlate in menu section
-    if (field === "fixedPerPlate") {
-      const updatedMenu = menu.map((sec) => {
-        if (sec.categoryId === activeTab) {
-          return { ...sec, perPlate: Math.max(0, val || 0) };
-        }
-        return sec;
-      });
-      onChangeMenu(updatedMenu);
-    }
-  };
-
-  const handleSaveDelicacy = (item: VendorMenuItem, existingIndex?: number) => {
-    const updatedMenu = [...menu];
-    let secIndex = updatedMenu.findIndex((s) => s.categoryId === activeTab);
-
-    if (secIndex === -1) {
-      updatedMenu.push({
-        categoryId: activeTab,
-        perPlate: currentPricing.fixedPerPlate,
-        menuType: "fixed",
-        items: [],
-      });
-      secIndex = updatedMenu.length - 1;
-    }
-
-    const items = [...updatedMenu[secIndex].items];
-    if (existingIndex !== undefined) {
-      items[existingIndex] = item;
-    } else {
-      items.push(item);
-    }
-
-    updatedMenu[secIndex] = {
-      ...updatedMenu[secIndex],
-      items,
-      menuType: "fixed",
-      perPlate: currentPricing.fixedPerPlate,
+      categoryPricing: { ...pricingMap, [current]: { ...pricing, [field]: Math.max(0, val || 0) } },
     };
-
-    onChangeMenu(updatedMenu);
-  };
-
-  const handleDeleteDelicacy = (index: number) => {
-    const updatedMenu = menu.map((sec) => {
-      if (sec.categoryId !== activeTab) return sec;
-      return {
-        ...sec,
-        items: sec.items.filter((_, idx) => idx !== index),
-      };
-    });
-    onChangeMenu(updatedMenu);
-  };
-
-  const validateAndContinue = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (selectedCategories.length === 0) {
-      newErrors.categories = "Select at least one stall category.";
+    onChangeStallConfig(nextCfg);
+    const mid = stallMenuId(current);
+    if (field === "fixedPerPlate" && mid) {
+      onChangeMenu(menu.map((s) => (s.categoryId === mid ? { ...s, perPlate: Math.max(0, val || 0) } : s)));
     }
+  };
 
-    // Check that each selected category has valid pricing and min pax
-    for (const cat of selectedCategories) {
+  const saveDish = (item: VendorMenuItem, index?: number) => {
+    const list = [...dishes];
+    if (index !== undefined) list[index] = item;
+    else list.push(item);
+    writeDishes(current, list);
+  };
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!selected.length) e.categories = "Please select at least one stall category to continue.";
+    for (const cat of selected) {
+      if (!stallDishes(stallConfig, menu, cat).length) {
+        e.dishes = `Please add at least 1 dish to the ${stallCategoryName(cat)} stall before proceeding.`;
+        setActiveCat(cat);
+        break;
+      }
       const p = pricingMap[cat];
-      if (!p || !p.fixedPerPlate || p.fixedPerPlate < 20) {
-        newErrors[`pricing_${cat}`] = `Set a valid per-plate price for ${cat}.`;
+      if (!p?.fixedPerPlate || p.fixedPerPlate <= 0) {
+        e.pricing = `Set the Fixed Per-Plate Rate for the ${stallCategoryName(cat)} stall.`;
+        setActiveCat(cat);
+        break;
       }
-      if (!p || !p.minPaxGuarantee || p.minPaxGuarantee < 10) {
-        newErrors[`minPax_${cat}`] = `Minimum pax for ${cat} must be at least 10 guests.`;
+      if (!p?.minPaxGuarantee || p.minPaxGuarantee < 10) {
+        e.pricing = `Minimum Guest Guarantee for the ${stallCategoryName(cat)} stall must be at least 10.`;
+        setActiveCat(cat);
+        break;
       }
     }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      onContinue();
-    }
+    setErrors(e);
+    if (!Object.keys(e).length) onContinue();
   };
 
   return (
-    <div className="rounded-card border border-cream-3 bg-white p-5 sm:p-7 shadow-xs">
-      <BuilderSectionHeader
-        badge="Section 6A"
-        title="Single Stall Menus & Category Workspace"
-        description="Select the platform stall categories your kitchen specializes in. Set independent fixed package pricing, guest guarantees, and delicacies for each individual stall."
-        tip="Each stall category maintains independent dishes, fixed per-plate pricing, and pax guarantees so hosts can book a single focused counter."
+    <div className="animate-in fade-in duration-200">
+      <StepHeading
+        eyebrow="Single Stall · Menus & Stations"
+        heading="Build your stall menus"
+        subtext="Select the stall categories you can serve, then build dishes and configure stall pricing & capacity for each stall."
+        mEyebrow="Single Stall Menus"
+        mHeading="Build stall menus"
+        mSubtext="Select categories, build dishes, and configure independent stall pricing & pax for each stall."
       />
 
-      {/* 13 Platform Categories Selector Ribbon */}
-      <div className="mt-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-wider text-ink">
-            Active Stall Categories ({selectedCategories.length} selected)
-          </label>
-          <span className="text-[11px] text-ink-soft">
-            Click to activate / deactivate stalls
-          </span>
+      {/* Categories */}
+      <ContentCard>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="[font-family:inherit] normal-case text-[15px] font-bold text-ink">
+            📂 <R d="Choose your stall categories" m="Choose Categories" />
+          </h3>
+          <Pill tone="cream">
+            {selected.length} <R d={selected.length === 1 ? "category selected" : "categories selected"} m="categories" />
+          </Pill>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {PLATFORM_STALL_CATEGORIES.map((cat) => {
-            const isSelected = selectedCategories.includes(cat.id);
-
+        <p className="mb-3 hidden text-xs text-ink/60 sm:block">
+          Select all stall categories you can deploy. Each selected category becomes an active stall with its own menu
+          and pricing.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {chips.map((c) => {
+            const on = selected.includes(c.id);
             return (
               <button
-                key={cat.id}
+                key={c.id}
                 type="button"
-                onClick={() => handleToggleCategory(cat.id)}
-                className={`flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold transition-all min-h-[38px] ${
-                  isSelected
-                    ? "border border-maroon bg-maroon text-white shadow-2xs"
-                    : "border border-cream-3 bg-cream-1/40 text-ink hover:border-maroon/40 hover:bg-cream-1"
-                }`}
+                aria-pressed={on}
+                onClick={() => toggleCategory(c.id)}
+                className={cn(
+                  "flex min-h-[48px] items-center gap-2 rounded-control border-2 px-2.5 text-left text-xs font-bold",
+                  on ? "border-maroon bg-maroon/5 text-ink" : "border-cream/70 bg-white text-ink/70",
+                )}
               >
-                <span aria-hidden="true">{cat.icon}</span>
-                <span>{cat.name}</span>
-                {isSelected && <span className="ml-1 text-[10px]">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Custom Category Adder */}
-        <div className="flex items-center gap-2 pt-1 max-w-sm">
-          <input
-            type="text"
-            value={customCatInput}
-            onChange={(e) => setCustomCatInput(e.target.value)}
-            placeholder="+ Custom station (e.g. Churros Bar)"
-            className="flex-1 rounded-control border border-cream-3 bg-cream-1/30 px-3 py-1.5 text-xs text-ink placeholder:text-ink-soft/60 focus:border-maroon focus:outline-hidden min-h-[38px]"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleAddCustomCategory();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleAddCustomCategory}
-            className="min-h-[38px]"
-          >
-            Add
-          </Button>
-        </div>
-
-        {errors.categories && (
-          <p className="text-xs text-red-600">{errors.categories}</p>
-        )}
-      </div>
-
-      {/* Category Switcher Tabs */}
-      <div className="mt-8 border-b border-cream-2">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {selectedCategories.map((catId) => {
-            const meta = PLATFORM_STALL_CATEGORIES.find((c) => c.id === catId) || {
-              id: catId,
-              name: catId.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-              icon: "🍢",
-            };
-            const count =
-              menu.find((s) => s.categoryId === catId)?.items.length || 0;
-            const isActive = activeTab === catId;
-
-            return (
-              <button
-                key={catId}
-                type="button"
-                onClick={() => setActiveTab(catId)}
-                className={`flex shrink-0 items-center gap-2 rounded-control px-4 py-2 text-xs font-bold transition-all min-h-[44px] ${
-                  isActive
-                    ? "border border-maroon bg-maroon text-white shadow-xs"
-                    : "border border-cream-3 bg-cream-1/50 text-ink hover:bg-cream-1"
-                }`}
-              >
-                <span>{meta.icon}</span>
-                <span>{meta.name}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] ${
-                    isActive
-                      ? "bg-white/20 text-white"
-                      : "bg-cream-3/60 text-ink-soft"
-                  }`}
-                >
-                  {count} items
+                <span className="text-lg" aria-hidden>
+                  {c.icon}
                 </span>
+                <span className="flex-1 leading-tight">{c.name}</span>
+                {on && <span className="text-maroon">✓</span>}
               </button>
             );
           })}
         </div>
-      </div>
+        {errors.categories && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.categories}</p>}
 
-      {/* Active Category Operational Settings Panel */}
-      <div className="mt-6 rounded-card border border-cream-3 bg-cream-1/30 p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-cream-2 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-control bg-cream-2 text-xl">
-              {activeCategoryMeta.icon}
-            </span>
-            <div>
-              <h3 className="font-bold text-ink text-sm">
-                {activeCategoryMeta.name} Setup
-              </h3>
-              <p className="text-[11px] text-ink-soft">
-                Independent pricing and guarantee for this single stall
-              </p>
-            </div>
+        <div className="mt-4 rounded-control border border-dashed border-cream bg-cream/10 p-3">
+          <div className="mb-2 text-xs font-bold text-ink">
+            ✨ <R d="Need a Custom Stall Category?" m="Add Custom Category" />
           </div>
-          <span className="rounded-pill bg-cream-2 px-2.5 py-1 text-xs font-bold text-ink">
-            Category: {activeTab}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="fixedPerPlate"
-              className="block text-xs font-bold uppercase tracking-wider text-ink"
-            >
-              Fixed Spread Rate (₹/guest) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative mt-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-bold text-ink-soft">
-                ₹
-              </span>
-              <input
-                id="fixedPerPlate"
-                type="number"
-                min={20}
-                max={5000}
-                value={currentPricing.fixedPerPlate || ""}
-                onChange={(e) =>
-                  handlePricingChange(
-                    "fixedPerPlate",
-                    parseInt(e.target.value, 10) || 0,
-                  )
+          <div className="flex gap-2">
+            <input
+              id="custom-stall-cat-input"
+              type="text"
+              value={customCat}
+              onChange={(e) => setCustomCat(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomCategory();
                 }
-                className="w-full rounded-control border border-cream-3 bg-white pl-8 pr-3 py-2 text-sm font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[44px]"
-              />
-            </div>
-            {errors[`pricing_${activeTab}`] && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors[`pricing_${activeTab}`]}
-              </p>
-            )}
-            <p className="mt-1 text-[10px] text-ink-soft">
-              Billed when host books this entire station spread.
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="minPaxGuarantee"
-              className="block text-xs font-bold uppercase tracking-wider text-ink"
-            >
-              Minimum Guest Guarantee (Pax){" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <div className="relative mt-1">
-              <input
-                id="minPaxGuarantee"
-                type="number"
-                min={10}
-                max={5000}
-                value={currentPricing.minPaxGuarantee || ""}
-                onChange={(e) =>
-                  handlePricingChange(
-                    "minPaxGuarantee",
-                    parseInt(e.target.value, 10) || 0,
-                  )
-                }
-                className="w-full rounded-control border border-cream-3 bg-white px-3.5 py-2 text-sm font-bold text-ink focus:border-maroon focus:outline-hidden min-h-[44px]"
-              />
-            </div>
-            {errors[`minPax_${activeTab}`] && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors[`minPax_${activeTab}`]}
-              </p>
-            )}
-            <p className="mt-1 text-[10px] text-ink-soft">
-              Minimum plates required to set up this station.
-            </p>
+              }}
+              placeholder="Enter custom category name (e.g. Mocktail Bar, Regional Mithai)"
+              className={inputCls}
+              aria-label="Custom stall category name"
+            />
+            <button type="button" onClick={addCustomCategory} className="min-h-[44px] shrink-0 rounded-full bg-maroon px-4 text-xs font-bold text-cream">
+              <R d="＋ Add Category" m="Add" />
+            </button>
           </div>
         </div>
-      </div>
+      </ContentCard>
 
-      {/* Active Category Delicacies List */}
-      <div className="mt-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="font-bold text-ink text-sm">
-            Delicacies in {activeCategoryMeta.name} ({delicacies.length})
-          </h4>
-          <Button
-            type="button"
-            size="md"
-            onClick={() => {
-              setDelicacyToEdit(null);
-              setModalOpen(true);
-            }}
-            className="min-h-[44px]"
-          >
-            + Add Delicacy
-          </Button>
-        </div>
-
-        {delicacies.length === 0 ? (
-          <div className="rounded-card border-2 border-dashed border-cream-3 p-8 text-center bg-cream-1/10">
-            <span className="text-2xl" aria-hidden="true">
-              🥢
-            </span>
-            <p className="mt-2 text-xs font-semibold text-ink">
-              No items added to {activeCategoryMeta.name} yet
-            </p>
-            <p className="text-[11px] text-ink-soft mt-0.5">
-              Add signature varieties or preparations served at this station.
-            </p>
-            <div className="mt-3">
-              <Button
+      {/* Active stall configuration */}
+      {selected.length > 0 && (
+        <ContentCard>
+          <FormLabel>Select stall to configure:</FormLabel>
+          <div className="-mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+            {selected.map((id) => (
+              <button
+                key={id}
                 type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setDelicacyToEdit(null);
-                  setModalOpen(true);
-                }}
-                className="min-h-[38px]"
+                onClick={() => setActiveCat(id)}
+                className={cn(
+                  "min-h-[40px] shrink-0 rounded-full border px-3 text-xs font-semibold",
+                  id === current ? "border-maroon bg-maroon text-cream" : "border-cream text-ink/70",
+                )}
               >
-                + Add First Delicacy
-              </Button>
+                {stallCategoryName(id)} ({stallDishes(stallConfig, menu, id).length})
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-control bg-cream/20 p-2.5 text-xs">
+            <span className="text-ink/60">
+              <R d="Currently configuring:" m="Configuring:" />
+            </span>
+            <strong className="text-ink">{currentName}</strong>
+            <span className="hidden sm:inline">
+              <Pill tone="red">Active Configuration</Pill>
+            </span>
+          </div>
+
+          {/* Dishes */}
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div>
+              <h4 className="[font-family:inherit] normal-case text-[14px] font-bold text-ink">🍽️ Your Dishes</h4>
+              <p className="hidden text-xs text-ink/60 sm:block">
+                Add each food item prepared at this stall with dish-level per-plate pricing and dietary markers.
+              </p>
             </div>
+            <button type="button" onClick={() => setModal("new")} className="min-h-[40px] shrink-0 rounded-full bg-maroon px-3 text-xs font-bold text-cream">
+              ＋ Add Dish
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {delicacies.map((item, idx) => {
-              const imgSrc = item.photo || dummyDishPhoto(item.name);
-
-              return (
-                <div
-                  key={`${item.name}-${idx}`}
-                  className="flex items-center gap-3 rounded-card border border-cream-3 bg-white p-3 shadow-xs hover:border-maroon/40 transition-all"
-                >
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-control bg-cream-2">
-                    <Image
-                      src={imgSrc}
-                      alt={item.name}
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                      unoptimized={Boolean(item.photo?.startsWith("/api/vendor/photo"))}
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`flex h-2.5 w-2.5 items-center justify-center rounded-xs border ${
-                          item.diet === "veg"
-                            ? "border-emerald-600"
-                            : "border-red-600"
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            item.diet === "veg"
-                              ? "bg-emerald-600"
-                              : "bg-red-600"
-                          }`}
-                        />
-                      </span>
-                      <h5 className="font-bold text-ink text-xs truncate">
-                        {item.name}
-                      </h5>
+          {dishes.length === 0 ? (
+            <p className="rounded-control border border-dashed border-maroon/40 p-4 text-center text-xs font-semibold text-maroon">
+              ⚠️ <R d="Please add at least 1 dish to this stall before proceeding." m="Add at least 1 dish to this stall." />
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {dishes.map((d, idx) => (
+                <li key={`${d.name}-${idx}`} className="flex items-center gap-3 rounded-control border border-cream/70 p-2.5">
+                  <Image
+                    src={d.photo || dummyDishPhoto(d.name)}
+                    alt={d.name}
+                    width={56}
+                    height={56}
+                    unoptimized
+                    className="h-14 w-14 shrink-0 rounded-control object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <DietMark diet={d.diet} />
+                      <span className="text-[13px] font-bold text-ink">{d.name}</span>
+                      {d.price ? <span className="text-xs font-bold text-maroon">₹{d.price}</span> : null}
                     </div>
-
-                    {item.desc && (
-                      <p className="text-[11px] text-ink-soft truncate mt-0.5">
-                        {item.desc}
-                      </p>
-                    )}
-
-                    <div className="mt-1 flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-maroon">
-                        {item.price ? `₹${item.price}/portion` : "Fixed spread"}
-                      </span>
-
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDelicacyToEdit({ item, index: idx });
-                            setModalOpen(true);
-                          }}
-                          className="text-xs font-semibold text-ink hover:text-maroon min-h-[32px] px-1"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDelicacy(idx)}
-                          className="text-xs font-semibold text-red-600 hover:text-red-700 min-h-[32px] px-1"
-                          aria-label={`Delete ${item.name}`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
+                    {d.desc && <p className="line-clamp-1 text-[11px] text-ink/60">{d.desc}</p>}
                   </div>
-                </div>
-              );
-            })}
+                  <button
+                    type="button"
+                    aria-label={`Edit ${d.name}`}
+                    onClick={() => setModal({ item: d, index: idx })}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream text-ink/70"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${d.name}`}
+                    onClick={() => writeDishes(current, dishes.filter((_, i) => i !== idx))}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream text-ink/70"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <AddDashed onClick={() => setModal("new")}>Add Dish to Stall</AddDashed>
+          {errors.dishes && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.dishes}</p>}
+
+          {/* Pricing */}
+          <div className="mt-6 rounded-card border border-cream bg-white p-4">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="[font-family:inherit] normal-case text-[14px] font-bold text-ink">
+                🏷️ <R d="Stall Pricing & Pax Guarantee" m="Stall Pricing & Pax" />
+              </h4>
+              <Pill tone="outline">
+                <R d="Independent per stall" m="Per Stall" />
+              </Pill>
+            </div>
+            <p className="mb-3 text-xs text-ink/60">
+              <R
+                d={`Set the commercial rate and minimum guest guarantee required to book the ${currentName} stall. Data is stored independently for each stall.`}
+                m="Independent commercial package rate & minimums for this stall."
+              />
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FormLabel required htmlFor="stall-fixed-rate">
+                  Fixed Per-Plate Rate (₹)
+                </FormLabel>
+                <input
+                  id="stall-fixed-rate"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={pricing.fixedPerPlate || ""}
+                  onChange={(e) => setPricing("fixedPerPlate", Number(e.target.value))}
+                  placeholder="e.g. 150"
+                  className={inputCls}
+                />
+                <FieldHint className="hidden sm:block">Fixed package price per guest covering this stall&apos;s spread.</FieldHint>
+              </div>
+              <div>
+                <FormLabel required htmlFor="stall-min-pax">
+                  <R d="Minimum Guest Guarantee (Min Pax)" m="Min Pax Guarantee" />
+                </FormLabel>
+                <input
+                  id="stall-min-pax"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={pricing.minPaxGuarantee || ""}
+                  onChange={(e) => setPricing("minPaxGuarantee", Number(e.target.value))}
+                  placeholder="e.g. 50"
+                  className={inputCls}
+                />
+                <FieldHint className="hidden sm:block">Minimum guest headcount required to deploy this stall (default 50).</FieldHint>
+              </div>
+            </div>
+            {errors.pricing && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.pricing}</p>}
           </div>
-        )}
-      </div>
+        </ContentCard>
+      )}
 
       <StallDishModal
-        isOpen={modalOpen}
-        categoryName={activeCategoryMeta.name}
-        delicacyToEdit={delicacyToEdit}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSaveDelicacy}
+        isOpen={modal !== null}
+        categoryName={currentName}
+        delicacyToEdit={modal === "new" ? null : modal}
+        onClose={() => setModal(null)}
+        onSave={saveDish}
       />
 
       <BuilderNav
+        backLabel="← Back to Offerings"
+        mBackLabel="← Back"
+        continueLabel="Continue to Setup & Cutlery →"
+        mContinueLabel="Next: Setup & Cutlery →"
         onBack={onBack}
-        onContinue={validateAndContinue}
+        onContinue={validate}
         onSaveDraft={onSaveDraft}
         saving={saving}
-        continueLabel="Continue to Stall Setup & Cutlery →"
       />
     </div>
   );

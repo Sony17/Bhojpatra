@@ -148,7 +148,7 @@ export default function RegistrationGateway() {
     return (
       <div>
         {hasExistingLiveProfile && (
-          <div className="mx-auto max-w-4xl mb-4 rounded-card border border-emerald-300 bg-emerald-50/80 p-4 text-xs sm:text-sm text-emerald-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+          <div className="mx-auto max-w-4xl mb-4 rounded-card border border-cream bg-cream/30 p-4 text-xs sm:text-sm text-ink flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-2">
               <span className="text-lg">✓</span>
               <span>
@@ -157,7 +157,7 @@ export default function RegistrationGateway() {
             </div>
             <Link
               href="/vendor/dashboard"
-              className="inline-flex items-center justify-center shrink-0 rounded-control bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 transition-colors"
+              className="inline-flex items-center justify-center shrink-0 rounded-control bg-maroon px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:opacity-90 transition-colors"
             >
               Go to Dashboard →
             </Link>
@@ -194,7 +194,7 @@ export default function RegistrationGateway() {
           </div>
 
           {authError && (
-            <p className="mt-4 text-xs text-red-600 font-medium">{authError}</p>
+            <p className="mt-4 text-xs text-maroon font-medium">{authError}</p>
           )}
 
           <div className="mt-6 flex flex-col gap-3">
@@ -242,7 +242,7 @@ export default function RegistrationGateway() {
 
           <div className="space-y-3 pt-2">
             <div className="flex items-start gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/30 text-xs font-bold text-ink">
                 ✓
               </div>
               <div>
@@ -254,7 +254,7 @@ export default function RegistrationGateway() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/30 text-xs font-bold text-ink">
                 ✓
               </div>
               <div>
@@ -266,7 +266,7 @@ export default function RegistrationGateway() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/30 text-xs font-bold text-ink">
                 ✓
               </div>
               <div>
@@ -315,7 +315,7 @@ export default function RegistrationGateway() {
             </div>
 
             {authError && (
-              <div className="mb-4 rounded-control bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+              <div className="mb-4 rounded-control bg-maroon/5 border border-maroon/30 p-3 text-xs text-maroon">
                 {authError}
               </div>
             )}

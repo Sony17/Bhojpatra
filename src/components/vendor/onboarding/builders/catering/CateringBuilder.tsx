@@ -9,6 +9,7 @@ import Step5ELiveCounters from "./Step5ELiveCounters";
 import Step5FHospitalityExtras from "./Step5FHospitalityExtras";
 import Step5GServiceCrew from "./Step5GServiceCrew";
 import Step5HTablewareAddons from "./Step5HTablewareAddons";
+import { SubnavPills } from "../../ui";
 import type {
   VendorMenuSection,
   VendorCounter,
@@ -49,6 +50,27 @@ interface CateringBuilderProps {
   onFinishCatering: () => void;
   onSaveDraft?: () => void;
   saving?: boolean;
+  /** Controlled section id (5A–5H); lets the shell deep-link from Review. */
+  section?: string;
+  onSectionChange?: (id: string) => void;
+}
+
+/** Handover breadcrumb: desktop label + mobile short label. */
+export const CATERING_SECTIONS = [
+  { id: "5A", label: "Feast Details", short: "Basics" },
+  { id: "5B", label: "Silver & Gold Tiers", short: "Tiers" },
+  { id: "5C", label: "Course Hierarchy", short: "Courses" },
+  { id: "5D", label: "Dishes & Photos", short: "Dishes" },
+  { id: "5E", label: "Live Counters", short: "Live", component: "counters" },
+  { id: "5F", label: "Feast Extras", short: "Extras", component: "extras" },
+  { id: "5G", label: "Essentials", short: "Essentials", component: "essentials" },
+  { id: "5H", label: "Tableware Add-ons", short: "Add-ons", component: "addons" },
+] as const;
+
+export function activeCateringSections(components?: CateringBuilderData["cateringComponents"]) {
+  return CATERING_SECTIONS.filter(
+    (s) => !("component" in s) || components?.[s.component as keyof NonNullable<typeof components>] !== false,
+  );
 }
 
 export default function CateringBuilder({
@@ -58,28 +80,18 @@ export default function CateringBuilder({
   onFinishCatering,
   onSaveDraft,
   saving = false,
+  section,
+  onSectionChange,
 }: CateringBuilderProps) {
-  const [activeSection, setActiveSection] = useState<string>("5A");
+  const [localSection, setLocalSection] = useState<string>("5A");
+  const activeSection = section ?? localSection;
+  const setActiveSection = (id: string) => {
+    setLocalSection(id);
+    onSectionChange?.(id);
+  };
   const [targetCourseForDishes, setTargetCourseForDishes] = useState<string>("starters");
 
-  const activeSections = [
-    { id: "5A", label: "Feast Basics", short: "5A. Basics" },
-    { id: "5B", label: "Pricing & Quotas", short: "5B. Pricing" },
-    { id: "5C", label: "Course Hierarchy", short: "5C. Courses" },
-    { id: "5D", label: "Granular Dishes", short: "5D. Dishes" },
-    ...(data.cateringComponents?.counters !== false
-      ? [{ id: "5E", label: "Live Counters", short: "5E. Counters" }]
-      : []),
-    ...(data.cateringComponents?.extras !== false
-      ? [{ id: "5F", label: "Hospitality Extras", short: "5F. Extras" }]
-      : []),
-    ...(data.cateringComponents?.essentials !== false
-      ? [{ id: "5G", label: "Service Crew", short: "5G. Crew" }]
-      : []),
-    ...(data.cateringComponents?.addons !== false
-      ? [{ id: "5H", label: "Tableware", short: "5H. Tableware" }]
-      : []),
-  ];
+  const activeSections = activeCateringSections(data.cateringComponents);
 
   const currentIndex = activeSections.findIndex((s) => s.id === activeSection);
   const safeCurrentIndex = currentIndex === -1 ? 0 : currentIndex;
@@ -109,44 +121,15 @@ export default function CateringBuilder({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Catering Sub-Section Navigation Bar */}
-      <div className="rounded-card border border-cream-3 bg-white p-3 shadow-xs">
-        <div className="flex items-center justify-between border-b border-cream-2 pb-2 mb-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-maroon flex items-center gap-1.5">
-            <span>🍲</span>
-            <span>Full Catering Builder</span>
-          </span>
-          <span className="text-xs text-ink-soft">
-            Section {safeCurrentIndex + 1} of {activeSections.length}
-          </span>
-        </div>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-          {activeSections.map((sec, idx) => {
-            const isActive = sec.id === activeSection;
-            const isCompleted = idx < safeCurrentIndex;
-
-            return (
-              <button
-                key={sec.id}
-                type="button"
-                onClick={() => setActiveSection(sec.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold transition-all min-h-[36px] ${
-                  isActive
-                    ? "bg-maroon text-white shadow-2xs"
-                    : isCompleted
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                      : "bg-cream-1 text-ink-soft hover:bg-cream-2 hover:text-ink"
-                }`}
-              >
-                <span>{sec.short}</span>
-                {isCompleted && <span className="text-[10px]">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div>
+      <SubnavPills
+        items={activeSections.map((s) => ({ id: s.id, label: s.label, short: s.short }))}
+        active={activeSection}
+        onSelect={(id) => {
+          setActiveSection(id);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
 
       {/* Render Current Section */}
       {activeSection === "5A" && (

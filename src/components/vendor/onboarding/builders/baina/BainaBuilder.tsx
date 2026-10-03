@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SubnavPills } from "../../ui";
 import Step7ABainaStory from "./Step7ABainaStory";
 import Step7BBainaCatalog from "./Step7BBainaCatalog";
 import Step7CPackaging from "./Step7CPackaging";
@@ -18,12 +19,15 @@ interface BainaBuilderProps {
   onFinishBaina: () => void;
   onSaveDraft?: () => void;
   saving?: boolean;
+  section?: string;
+  onSectionChange?: (id: string) => void;
 }
 
-const BAINA_SECTIONS = [
-  { id: "7A", label: "Studio Story", short: "7A. Studio Story" },
-  { id: "7B", label: "Box Catalog", short: "7B. Box Catalog" },
-  { id: "7C", label: "Packaging Styles", short: "7C. Packaging" },
+/** Handover breadcrumb: Studio Story › Box Catalog › Packaging Styles. */
+export const BAINA_SECTIONS = [
+  { id: "7A", label: "Studio Story", short: "Story" },
+  { id: "7B", label: "Box Catalog", short: "Boxes" },
+  { id: "7C", label: "Packaging Styles", short: "Styles" },
 ];
 
 export default function BainaBuilder({
@@ -33,8 +37,15 @@ export default function BainaBuilder({
   onFinishBaina,
   onSaveDraft,
   saving = false,
+  section,
+  onSectionChange,
 }: BainaBuilderProps) {
-  const [activeSection, setActiveSection] = useState<string>("7A");
+  const [localSection, setLocalSection] = useState<string>("7A");
+  const activeSection = section ?? localSection;
+  const setActiveSection = (id: string) => {
+    setLocalSection(id);
+    onSectionChange?.(id);
+  };
 
   const currentIndex = BAINA_SECTIONS.findIndex((s) => s.id === activeSection);
 
@@ -57,44 +68,15 @@ export default function BainaBuilder({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sub-Section Navigation Bar */}
-      <div className="rounded-card border border-cream-3 bg-white p-3 shadow-xs">
-        <div className="flex items-center justify-between border-b border-cream-2 pb-2 mb-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-maroon flex items-center gap-1.5">
-            <span>🎁</span>
-            <span>Baina Box Builder</span>
-          </span>
-          <span className="text-xs text-ink-soft">
-            Section {currentIndex + 1} of {BAINA_SECTIONS.length}
-          </span>
-        </div>
-
-        <div className="flex gap-2">
-          {BAINA_SECTIONS.map((sec, idx) => {
-            const isActive = sec.id === activeSection;
-            const isCompleted = idx < currentIndex;
-
-            return (
-              <button
-                key={sec.id}
-                type="button"
-                onClick={() => setActiveSection(sec.id)}
-                className={`flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold transition-all min-h-[36px] ${
-                  isActive
-                    ? "bg-maroon text-white shadow-2xs"
-                    : isCompleted
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                      : "bg-cream-1 text-ink-soft hover:bg-cream-2 hover:text-ink"
-                }`}
-              >
-                <span>{sec.short}</span>
-                {isCompleted && <span className="text-[10px]">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div>
+      <SubnavPills
+        items={BAINA_SECTIONS}
+        active={activeSection}
+        onSelect={(id) => {
+          setActiveSection(id);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
 
       {activeSection === "7A" && (
         <Step7ABainaStory

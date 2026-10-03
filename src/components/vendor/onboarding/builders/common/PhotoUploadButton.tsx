@@ -111,7 +111,7 @@ export default function PhotoUploadButton({
                 type="button"
                 onClick={onPhotoRemoved}
                 disabled={uploading}
-                className="min-h-[44px] min-w-[44px] rounded-control bg-red-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center"
+                className="min-h-[44px] min-w-[44px] rounded-control bg-maroon/95 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center"
                 title="Remove photo"
                 aria-label="Remove photo"
               >
@@ -145,7 +145,7 @@ export default function PhotoUploadButton({
       )}
 
       {error && (
-        <p className="text-xs text-red-600" role="alert">
+        <p className="text-xs text-maroon" role="alert">
           {error}
         </p>
       )}

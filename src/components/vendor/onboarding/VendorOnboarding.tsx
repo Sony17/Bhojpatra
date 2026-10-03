@@ -24,9 +24,13 @@ import CateringBuilder from "./builders/catering/CateringBuilder";
 import SingleStallBuilder from "./builders/stall/SingleStallBuilder";
 import BainaBuilder from "./builders/baina/BainaBuilder";
 import type { CourseQuotas } from "./builders/catering/Step5BPricingQuotas";
-import { Button } from "@/components/ui";
+import { activeCateringSections } from "./builders/catering/CateringBuilder";
+import Step8MasterReview, { type ReviewJump } from "./steps/Step8MasterReview";
+import Step9Complete from "./steps/Step9Complete";
+import StorefrontPreviewModal from "./components/StorefrontPreviewModal";
+import { OnboardingAppBar, PhaseStepper, VendorSignInModal } from "./OnboardingChrome";
 
-interface OnboardingState {
+export interface OnboardingState {
   // Step 1: Identity & Operations
   ownerName: string;
   businessName: string;
@@ -154,12 +158,7 @@ const DEFAULT_BAINA_BOXES: VendorBainaBox[] = [
   },
 ];
 
-const STEP_TITLES = [
-  "Identity & Operations",
-  "KYC & Compliance",
-  "Service Offerings",
-  "Specialized Service Builders",
-];
+
 
 export default function VendorOnboarding() {
   const session = useSession();
@@ -169,7 +168,13 @@ export default function VendorOnboarding() {
   const [saving, setSaving] = useState<boolean>(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string>("");
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  /** 1–3 = Identity/KYC/Offerings, 4 = service builders, 5 = review, 6 = complete. */
+  const [maxPhase, setMaxPhase] = useState<number>(0);
+  const [catSection, setCatSection] = useState<string>("5A");
+  const [stallSection, setStallSection] = useState<string>("6A");
+  const [bainaSection, setBainaSection] = useState<string>("7A");
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [formData, setFormData] = useState<OnboardingState>({
     ownerName: session?.name || "",
@@ -283,6 +288,7 @@ export default function VendorOnboarding() {
             ownerName: session?.name || prev.ownerName,
             businessName: record?.business || prefill.business || prev.businessName,
             email: record?.ownerEmail || session?.email || prev.email,
+            phone: prev.phone || prefill.phone || "",
             city: record?.city || prefill.city || prev.city,
             state: record?.state || prefill.state || prev.state,
             serviceCities: record?.serviceCities?.length
@@ -290,8 +296,8 @@ export default function VendorOnboarding() {
               : (prefill.serviceCities?.length ? prefill.serviceCities : prev.serviceCities),
             cuisines: record?.cuisines?.length ? record.cuisines : (prefill.cuisines?.length ? prefill.cuisines : prev.cuisines),
             dietaryOffering: record?.dietaryOffering || prefill.dietaryOffering || prev.dietaryOffering,
-            googleRating: record?.googleRating || prev.googleRating,
-            googleReviews: record?.googleReviews || prev.googleReviews,
+            googleRating: record?.googleRating || prefill.googleRating || prev.googleRating,
+            googleReviews: record?.googleReviews || prefill.googleReviews || prev.googleReviews,
             badges: record?.badges || prefill.badges || prev.badges,
             serviceCategories: record?.serviceCategories?.length
               ? record.serviceCategories
@@ -422,6 +428,10 @@ export default function VendorOnboarding() {
           return false;
         }
 
+        const saved = await res.json().catch(() => null);
+        if (saved?.vendor?.id) {
+          setFormData((prev) => (prev.existingVendorId ? prev : { ...prev, existingVendorId: saved.vendor.id }));
+        }
         setLastSavedAt(new Date().toLocaleTimeString());
         return true;
       } catch (err) {
@@ -435,243 +445,158 @@ export default function VendorOnboarding() {
     [formData],
   );
 
-  const handleStep1Continue = async () => {
-    const ok = await persistDraft();
-    if (ok) {
-      setCurrentStep(2);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  const top = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const goStep = (step: number) => {
+    setCurrentStep(step);
+    setMaxPhase((m) => Math.max(m, Math.min(step, 5) - 1));
+    top();
   };
 
-  const handleStep2Continue = async () => {
-    const ok = await persistDraft();
-    if (ok) {
-      setCurrentStep(3);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  const saveThen = async (next: () => void) => {
+    if (await persistDraft()) next();
   };
 
-  const handleStep3Finish = async () => {
-    const ok = await persistDraft();
-    if (ok) {
+  const handleStep1Continue = () => saveThen(() => goStep(2));
+  const handleStep2Continue = () => saveThen(() => goStep(3));
+
+  const handleStep3Finish = () =>
+    saveThen(() => {
       const branches = getActiveBranches(formData.serviceCategories);
-      if (branches.length > 0) {
-        setBranchIndex(0);
-        setCurrentStep(4);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        setIsCompleted(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    }
-  };
+      setBranchIndex(0);
+      setCatSection("5A");
+      setStallSection("6A");
+      setBainaSection("7A");
+      goStep(branches.length > 0 ? 4 : 5);
+    });
 
-  const handleFinishBranch = async () => {
-    const ok = await persistDraft();
-    if (ok) {
+  const handleFinishBranch = () =>
+    saveThen(() => {
       if (branchIndex < activeBranches.length - 1) {
         setBranchIndex(branchIndex + 1);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        top();
       } else {
-        setIsCompleted(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        goStep(5);
       }
-    }
-  };
+    });
 
   const handleBackFromBranch = () => {
     if (branchIndex > 0) {
-      setBranchIndex(branchIndex - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const prevIdx = branchIndex - 1;
+      const prevBranch = activeBranches[prevIdx];
+      // land on the last section of the previous builder
+      if (prevBranch === "catering") {
+        const secs = activeCateringSections(formData.cateringComponents);
+        setCatSection(secs[secs.length - 1].id);
+      } else if (prevBranch === "stall") setStallSection("6B");
+      else if (prevBranch === "baina") setBainaSection("7C");
+      setBranchIndex(prevIdx);
+      top();
     } else {
-      setCurrentStep(3);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      goStep(3);
     }
+  };
+
+  const handleBackFromReview = () => {
+    if (activeBranches.length === 0) return goStep(3);
+    const last = activeBranches.length - 1;
+    const b = activeBranches[last];
+    if (b === "catering") {
+      const secs = activeCateringSections(formData.cateringComponents);
+      setCatSection(secs[secs.length - 1].id);
+    } else if (b === "stall") setStallSection("6B");
+    else setBainaSection("7C");
+    setBranchIndex(last);
+    goStep(4);
+  };
+
+  const handleReviewEdit = (to: ReviewJump) => {
+    if (to.step === "details") return goStep(1);
+    if (to.step === "offerings") return goStep(3);
+    const idx = activeBranches.indexOf(to.step);
+    if (idx === -1) return;
+    if (to.step === "catering") setCatSection(to.section);
+    if (to.step === "stall") setStallSection(to.section);
+    if (to.step === "baina") setBainaSection(to.section);
+    setBranchIndex(idx);
+    goStep(4);
+  };
+
+  const handleSubmit = () => saveThen(() => goStep(6));
+
+  const jumpToPhase = (idx: number) => {
+    // 0 Identity · 1 KYC · 2 Offerings · 3 Service Setup · 4 Review · 5 Go Live
+    if (idx > maxPhase || idx === 5) return;
+    if (idx === 3) {
+      if (!activeBranches.length) return;
+      setBranchIndex(0);
+    }
+    goStep(idx + 1);
   };
 
   if (loading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-3 border-maroon border-t-transparent" />
-        <p className="text-sm text-ink-soft">Loading your vendor registration workspace...</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-maroon border-t-transparent" />
+        <p className="text-sm text-ink/60">Loading your vendor registration workspace...</p>
       </div>
     );
   }
 
-  // ── Stage 4 Milestone Completed View ──
-  if (isCompleted) {
-    const totalDishes = (formData.menu || []).reduce(
-      (acc, sec) => acc + (sec.items?.length || 0),
-      0,
-    );
+  const vendorId = formData.existingVendorId
+    ? `VEN-${formData.existingVendorId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+    : "VEN-PENDING";
 
-    return (
-      <div className="mx-auto max-w-4xl space-y-6 py-6 animate-in fade-in duration-200">
-        <div className="rounded-card border-2 border-emerald-500/40 bg-emerald-50/60 p-6 sm:p-8 text-center shadow-xs">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-3xl text-white shadow-sm">
-            ✓
-          </div>
-          <h2 className="mt-4 text-xl sm:text-2xl font-bold text-ink">
-            Stage 4 Complete: Specialized Service Builders Configured!
-          </h2>
-          <p className="mt-2 text-sm text-ink-soft max-w-2xl mx-auto leading-relaxed">
-            Your brand identity, KYC compliance, and detailed service builder configurations have been successfully validated and persisted to Bhojpatra&apos;s live database.
-          </p>
+  const builderTag = (() => {
+    if (currentStep !== 4) return "Onboarding";
+    if (currentBranch === "catering") return ["5E", "5F", "5G", "5H"].includes(catSection) ? "Feast Extras" : "Feast Builder";
+    if (currentBranch === "stall") return "Stall Builder";
+    return "Baina Builder";
+  })();
 
-          {/* Detailed Recap Cards */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 text-left text-xs sm:text-sm">
-            {/* Identity & Operations Recap */}
-            <div className="rounded-card border border-cream-3 bg-white p-4.5 space-y-2.5 shadow-2xs">
-              <h4 className="font-bold text-ink flex items-center gap-1.5 border-b border-cream-2 pb-2">
-                <span>🏢</span>
-                <span>Brand & Operations</span>
-              </h4>
-              <div className="flex justify-between">
-                <span className="text-ink-soft">Business Name:</span>
-                <span className="font-bold text-ink">{formData.businessName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-soft">Kitchen Base:</span>
-                <span className="font-semibold text-ink">{formData.city}, {formData.state}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-soft">Dietary Offering:</span>
-                <span className="font-semibold text-maroon uppercase">{formData.dietaryOffering}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-soft">Service Coverage:</span>
-                <span className="font-semibold text-ink">{formData.serviceCities.join(", ") || "Base city"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-soft">Compliance:</span>
-                <span className="font-semibold text-emerald-700">GST & FSSAI Declared</span>
-              </div>
-            </div>
+  const servicePills = [
+    ...(formData.serviceCategories.includes("full-catering") ? ["Feast Booking"] : []),
+    ...(formData.serviceCategories.includes("single-stall") ? ["Stall"] : []),
+    ...(formData.serviceCategories.includes("baina-box") ? ["Baina Boxes"] : []),
+  ];
 
-            {/* Service Scope Recap */}
-            <div className="rounded-card border border-cream-3 bg-white p-4.5 space-y-2.5 shadow-2xs">
-              <h4 className="font-bold text-ink flex items-center gap-1.5 border-b border-cream-2 pb-2">
-                <span>📦</span>
-                <span>Active Service Builders</span>
-              </h4>
-              {formData.serviceCategories.includes("full-catering") && (
-                <div className="space-y-1">
-                  <div className="flex justify-between font-semibold text-ink">
-                    <span>🍲 Full Catering Package:</span>
-                    <span className="text-maroon">Silver ₹{formData.priceFrom} / Gold ₹{formData.goldRate}</span>
-                  </div>
-                  <p className="text-[11px] text-ink-soft">
-                    {totalDishes} dishes published across 5 plated courses · {formData.counters.length} counters & extras · Tableware {formData.cutleryTier}
-                  </p>
-                </div>
-              )}
-              {formData.serviceCategories.includes("single-stall") && (
-                <div className="space-y-1 pt-1 border-t border-cream-2/60">
-                  <div className="flex justify-between font-semibold text-ink">
-                    <span>🍢 Single Stall Workspace:</span>
-                    <span className="text-maroon">{(formData.stallConfig.categories || []).length} categories</span>
-                  </div>
-                  <p className="text-[11px] text-ink-soft">
-                    Equipment: {(formData.stallConfig.equipment || []).join(", ") || "Standard"} · Cutlery: {formData.stallConfig.cutlery}
-                  </p>
-                </div>
-              )}
-              {formData.serviceCategories.includes("baina-box") && (
-                <div className="space-y-1 pt-1 border-t border-cream-2/60">
-                  <div className="flex justify-between font-semibold text-ink">
-                    <span>🎁 Baina Box Atelier:</span>
-                    <span className="text-maroon">{(formData.bainaBoxes || []).length} curated boxes</span>
-                  </div>
-                  <p className="text-[11px] text-ink-soft">
-                    Min guarantee: {formData.bainaDetails.minOrderBoxes} boxes · Lead: {formData.bainaDetails.leadDays} days · Style: {formData.bainaDetails.packaging}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-control bg-cream-2/70 p-4 text-xs text-ink-soft max-w-xl mx-auto text-left leading-relaxed">
-            ℹ️ <strong>Stage 4 Complete:</strong> Specialized service builders are saved. In Stage 5, the Master Review, Public Storefront Preview, and Final Jury Tasting application will be unlocked.
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button href="/vendor/dashboard" size="lg" className="min-h-[44px]">
-              Go to Vendor Dashboard →
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              onClick={() => {
-                setIsCompleted(false);
-                setCurrentStep(4);
-                setBranchIndex(0);
-              }}
-              className="min-h-[44px]"
-            >
-              Review / Edit Service Builders
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="lg"
-              onClick={() => {
-                setIsCompleted(false);
-                setCurrentStep(1);
-              }}
-              className="min-h-[44px] text-ink-soft"
-            >
-              Edit Steps 1–3
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Determine header step title
-  let headerStepTitle = STEP_TITLES[currentStep - 1];
-  if (currentStep === 4) {
-    if (currentBranch === "catering") {
-      headerStepTitle = `Full Catering Builder (${branchIndex + 1}/${activeBranches.length})`;
-    } else if (currentBranch === "stall") {
-      headerStepTitle = `Single Stall Builder (${branchIndex + 1}/${activeBranches.length})`;
-    } else if (currentBranch === "baina") {
-      headerStepTitle = `Baina Box Builder (${branchIndex + 1}/${activeBranches.length})`;
-    }
-  }
+  const phase = currentStep <= 3 ? currentStep - 1 : currentStep === 4 ? 3 : currentStep === 5 ? 4 : 5;
 
   return (
-    <div className="mx-auto max-w-4xl py-4 sm:py-6">
-      {/* Persistent V2 Context Header */}
-      <VendorContextHeader
-        businessName={formData.businessName}
-        ownerName={formData.ownerName}
-        city={formData.city}
-        state={formData.state}
-        dietaryOffering={formData.dietaryOffering}
-        serviceCities={formData.serviceCities}
-        currentStep={currentStep}
-        totalSteps={4}
-        stepTitle={headerStepTitle}
-        isSaving={saving}
-        lastSavedAt={lastSavedAt}
-      />
+    <div className="mx-auto max-w-4xl px-4 py-3 sm:px-0 sm:py-6">
+      <OnboardingAppBar onSignIn={() => setSignInOpen(true)} />
+      {currentStep !== 6 && <PhaseStepper phase={phase} maxReached={maxPhase} onJump={jumpToPhase} />}
+
+      {currentStep > 1 && currentStep < 6 && (
+        <VendorContextHeader
+          businessName={formData.businessName}
+          city={formData.city}
+          state={formData.state}
+          googleRating={formData.googleRating}
+          googleReviews={formData.googleReviews}
+          services={servicePills}
+          dietaryOffering={formData.dietaryOffering}
+          builderTag={builderTag}
+          onEditDetails={() => goStep(1)}
+          isSaving={saving}
+          lastSavedAt={lastSavedAt}
+        />
+      )}
 
       {saveError && (
-        <div className="mb-4 rounded-control bg-red-50 border border-red-200 p-3 text-xs text-red-700 flex items-center justify-between">
+        <div role="alert" className="mb-4 flex items-center justify-between gap-2 rounded-control border border-maroon/40 bg-maroon/5 p-3 text-xs font-semibold text-maroon">
           <span>⚠️ {saveError}</span>
           <button
             type="button"
             onClick={() => setSaveError("")}
-            className="text-red-500 font-bold ml-2 min-h-[32px] min-w-[32px]"
+            aria-label="Dismiss"
+            className="flex h-11 w-11 shrink-0 items-center justify-center"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Step 1: Identity & Operations */}
       {currentStep === 1 && (
         <Step1IdentityOps
           data={{
@@ -687,18 +612,16 @@ export default function VendorOnboarding() {
             googleRating: formData.googleRating,
             googleReviews: formData.googleReviews,
             accountId: formData.existingVendorId
-              ? `VND-${formData.existingVendorId.slice(-6).toUpperCase()}`
-              : formData.email
-                ? `VND-${Math.abs(formData.email.split("").reduce((acc, c) => (acc << 5) - acc + c.charCodeAt(0), 0)).toString().slice(-6).padStart(6, "0")}`
-                : "VND-884291",
+              ? `VND-${formData.existingVendorId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+              : undefined,
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onContinue={handleStep1Continue}
+          onSignIn={() => setSignInOpen(true)}
           saving={saving}
         />
       )}
 
-      {/* Step 2: KYC & Compliance */}
       {currentStep === 2 && (
         <Step2KycCompliance
           data={{
@@ -710,95 +633,102 @@ export default function VendorOnboarding() {
           businessName={formData.businessName}
           email={formData.email}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
-          onBack={() => {
-            setCurrentStep(1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
+          onBack={() => goStep(1)}
           onContinue={handleStep2Continue}
           saving={saving}
         />
       )}
 
-      {/* Step 3: Service Offerings Scope */}
       {currentStep === 3 && (
         <Step3Offerings
           data={{
             serviceCategories: formData.serviceCategories,
             customOfferings: formData.customOfferings,
             cateringComponents: formData.cateringComponents,
+            badges: formData.badges,
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
-          onBack={() => {
-            setCurrentStep(2);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
+          onBack={() => goStep(2)}
           onFinishStep3={handleStep3Finish}
           saving={saving}
         />
       )}
 
-      {/* Step 4: Specialized Service Builders */}
-      {currentStep === 4 && (
-        <>
-          {currentBranch === "catering" && (
-            <CateringBuilder
-              data={{
-                packageName: formData.packageName,
-                about: formData.about,
-                bestFor: formData.bestFor,
-                minPax: formData.minPax,
-                maxCapacity: formData.maxCapacity,
-                leadHours: formData.leadHours,
-                image: formData.image,
-                priceFrom: formData.priceFrom,
-                goldRate: formData.goldRate,
-                goldSpecialization: formData.goldSpecialization,
-                silverQuotas: formData.silverQuotas,
-                goldQuotas: formData.goldQuotas,
-                menu: formData.menu,
-                featured: formData.featured,
-                counters: formData.counters,
-                essentialService: formData.essentialService,
-                cutleryTier: formData.cutleryTier,
-                cateringComponents: formData.cateringComponents,
-              }}
-              onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
-              onBackToPreviousService={handleBackFromBranch}
-              onFinishCatering={handleFinishBranch}
-              onSaveDraft={() => persistDraft()}
-              saving={saving}
-            />
-          )}
-
-          {currentBranch === "stall" && (
-            <SingleStallBuilder
-              data={{
-                stallConfig: formData.stallConfig,
-                menu: formData.menu,
-              }}
-              onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
-              onBackToPreviousService={handleBackFromBranch}
-              onFinishStall={handleFinishBranch}
-              onSaveDraft={() => persistDraft()}
-              saving={saving}
-            />
-          )}
-
-          {currentBranch === "baina" && (
-            <BainaBuilder
-              data={{
-                bainaDetails: formData.bainaDetails,
-                bainaBoxes: formData.bainaBoxes,
-              }}
-              onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
-              onBackToPreviousService={handleBackFromBranch}
-              onFinishBaina={handleFinishBranch}
-              onSaveDraft={() => persistDraft()}
-              saving={saving}
-            />
-          )}
-        </>
+      {currentStep === 4 && currentBranch === "catering" && (
+        <CateringBuilder
+          data={{
+            packageName: formData.packageName,
+            about: formData.about,
+            bestFor: formData.bestFor,
+            minPax: formData.minPax,
+            maxCapacity: formData.maxCapacity,
+            leadHours: formData.leadHours,
+            image: formData.image,
+            priceFrom: formData.priceFrom,
+            goldRate: formData.goldRate,
+            goldSpecialization: formData.goldSpecialization,
+            silverQuotas: formData.silverQuotas,
+            goldQuotas: formData.goldQuotas,
+            menu: formData.menu,
+            featured: formData.featured,
+            counters: formData.counters,
+            essentialService: formData.essentialService,
+            cutleryTier: formData.cutleryTier,
+            cateringComponents: formData.cateringComponents,
+          }}
+          onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          onBackToPreviousService={handleBackFromBranch}
+          onFinishCatering={handleFinishBranch}
+          onSaveDraft={() => persistDraft()}
+          saving={saving}
+          section={catSection}
+          onSectionChange={setCatSection}
+        />
       )}
+
+      {currentStep === 4 && currentBranch === "stall" && (
+        <SingleStallBuilder
+          data={{ stallConfig: formData.stallConfig, menu: formData.menu }}
+          onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          onBackToPreviousService={handleBackFromBranch}
+          onFinishStall={handleFinishBranch}
+          onSaveDraft={() => persistDraft()}
+          saving={saving}
+          section={stallSection}
+          onSectionChange={setStallSection}
+        />
+      )}
+
+      {currentStep === 4 && currentBranch === "baina" && (
+        <BainaBuilder
+          data={{ bainaDetails: formData.bainaDetails, bainaBoxes: formData.bainaBoxes }}
+          onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          onBackToPreviousService={handleBackFromBranch}
+          onFinishBaina={handleFinishBranch}
+          onSaveDraft={() => persistDraft()}
+          saving={saving}
+          section={bainaSection}
+          onSectionChange={setBainaSection}
+        />
+      )}
+
+      {currentStep === 5 && (
+        <Step8MasterReview
+          data={formData}
+          onEdit={handleReviewEdit}
+          onBack={handleBackFromReview}
+          onSubmit={handleSubmit}
+          onPreview={() => setPreviewOpen(true)}
+          saving={saving}
+        />
+      )}
+
+      {currentStep === 6 && (
+        <Step9Complete vendorId={vendorId} onPreview={() => setPreviewOpen(true)} onBack={() => goStep(5)} />
+      )}
+
+      <StorefrontPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} data={formData} />
+      <VendorSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
     </div>
   );
 }
