@@ -50,7 +50,7 @@ export default function SingleStallBuilder({
   const handleNextSection = () => {
     if (currentIndex < STALL_SECTIONS.length - 1) {
       setActiveSection(STALL_SECTIONS[currentIndex + 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onFinishStall();
     }
@@ -59,7 +59,7 @@ export default function SingleStallBuilder({
   const handlePrevSection = () => {
     if (currentIndex > 0) {
       setActiveSection(STALL_SECTIONS[currentIndex - 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onBackToPreviousService();
     }
@@ -72,7 +72,7 @@ export default function SingleStallBuilder({
         active={activeSection}
         onSelect={(id) => {
           setActiveSection(id);
-          document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       />
 

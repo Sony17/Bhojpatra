@@ -52,7 +52,7 @@ export default function BainaBuilder({
   const handleNextSection = () => {
     if (currentIndex < BAINA_SECTIONS.length - 1) {
       setActiveSection(BAINA_SECTIONS[currentIndex + 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onFinishBaina();
     }
@@ -61,7 +61,7 @@ export default function BainaBuilder({
   const handlePrevSection = () => {
     if (currentIndex > 0) {
       setActiveSection(BAINA_SECTIONS[currentIndex - 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onBackToPreviousService();
     }
@@ -74,7 +74,7 @@ export default function BainaBuilder({
         active={activeSection}
         onSelect={(id) => {
           setActiveSection(id);
-          document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       />
 

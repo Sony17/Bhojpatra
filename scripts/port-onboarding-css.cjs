@@ -86,8 +86,16 @@ const extra = `.vob {
 `;
 const appCss = `
 /* ── App integration (not in the prototype) ───────────────────────────────── */
-.vob.vob-shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-page); }
-.vob .wizard-body { flex: 1; }
+.vob.vob-shell { display: flex; flex-direction: column; min-height: 60vh; background: var(--bg-page); }
+.vob .wizard-body { flex: 1; overflow: visible; }
+.vob .vob-footer-slot { position: sticky; bottom: 0; z-index: 40; }
+.vob-main.app-page-pad { padding-bottom: 0; }
+/* Below lg the site shows a fixed bottom tab bar (~3.5rem tall; --tab-bar-h is a
+   looser 4.5rem reserve): dock Back / Continue flush on top of it. */
+@media (max-width: 1023px) {
+  .vob .vob-footer-slot { bottom: calc(3.5rem + var(--safe-bottom)); }
+  .vob.vob-shell { padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom)); }
+}
 .vob h1, .vob h2, .vob h3, .vob h4 { font-family: var(--font-sans); margin: 0; }
 .vob .step-heading, .vob .modal-title { font-family: var(--font-display); }
 .vob .vob-m { display: none; }
@@ -106,7 +114,6 @@ const appCss = `
 .vob textarea.form-input { resize: vertical; min-height: 72px; }
 .vob .modal-backdrop { position: fixed; }
 .vob button:disabled { opacity: 0.55; cursor: not-allowed; }
-.vob .wizard-footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
 @media (max-width: 639px) {
   .vob .vob-d { display: none; }
   .vob .vob-m { display: inline; }

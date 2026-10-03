@@ -99,7 +99,7 @@ export default function CateringBuilder({
   const handleNextSection = () => {
     if (safeCurrentIndex < activeSections.length - 1) {
       setActiveSection(activeSections[safeCurrentIndex + 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onFinishCatering();
     }
@@ -108,7 +108,7 @@ export default function CateringBuilder({
   const handlePrevSection = () => {
     if (safeCurrentIndex > 0) {
       setActiveSection(activeSections[safeCurrentIndex - 1].id);
-      document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       onBackToPreviousService();
     }
@@ -117,7 +117,7 @@ export default function CateringBuilder({
   const handleJumpToCourseDishes = (courseId: string) => {
     setTargetCourseForDishes(courseId);
     setActiveSection("5D");
-    document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -127,7 +127,7 @@ export default function CateringBuilder({
         active={activeSection}
         onSelect={(id) => {
           setActiveSection(id);
-          document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       />
 

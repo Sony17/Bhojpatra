@@ -115,7 +115,11 @@ export default function RegistrationGateway() {
 
   // 2. Authenticated as a Vendor -> Render the V2 Onboarding Flow directly!
   if (session && session.type === "vendor") {
-    return <VendorOnboarding />;
+    return (
+      <PublicShell footer={false} chat={false} mainClassName="vob-main">
+        <VendorOnboarding />
+      </PublicShell>
+    );
   }
 
   // 3. Authenticated as a Customer

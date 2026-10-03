@@ -29,7 +29,7 @@ import { activeCateringSections } from "./builders/catering/CateringBuilder";
 import Step8MasterReview, { type ReviewJump } from "./steps/Step8MasterReview";
 import Step9Complete from "./steps/Step9Complete";
 import StorefrontPreviewModal from "./components/StorefrontPreviewModal";
-import { OnboardingAppBar, PhaseStepper } from "./OnboardingChrome";
+import { PhaseStepper } from "./OnboardingChrome";
 import { ShellSlots } from "./ui";
 import "./onboarding.css";
 
@@ -450,7 +450,7 @@ export default function VendorOnboarding() {
     [formData],
   );
 
-  const top = () => document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
+  const top = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   const goStep = (step: number) => {
     setCurrentStep(step);
@@ -571,8 +571,6 @@ export default function VendorOnboarding() {
   return (
     <ShellSlots.Provider value={{ footer: footerSlot, subnav: subnavSlot }}>
     <div className="vob vob-shell">
-      {/* Already signed in as a vendor, so "Sign In" goes straight to the portal. */}
-      <OnboardingAppBar onSignIn={() => router.push("/vendor/dashboard")} />
       <PhaseStepper phase={phase} maxReached={maxPhase} onJump={jumpToPhase} />
 
       {currentStep > 1 && (
@@ -740,7 +738,7 @@ export default function VendorOnboarding() {
       </div>
 
       {/* Each step's Back / Continue footer portals in here (FlowFooter). */}
-      <div ref={setFooterSlot} />
+      <div ref={setFooterSlot} className="vob-footer-slot" />
     </div>
     </ShellSlots.Provider>
   );

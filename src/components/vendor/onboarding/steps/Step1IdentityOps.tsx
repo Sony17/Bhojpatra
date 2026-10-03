@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react";
 import { indianStates } from "@/lib/data";
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
-import { cn } from "@/components/ui/cn";
 import DietaryOfferingSelector from "../components/DietaryOfferingSelector";
 import { ChipAddInput, ChoiceChip, ContentCard, FieldError, FlowFooter, R, StepHeading } from "../ui";
 
@@ -43,12 +42,11 @@ const CUISINE_CHIPS = [
   "Artisanal Sweets", "Banarasi Chaat",
 ];
 
-/** Handover: Serviceable Coverage Cities chips (mobile shows the first 12). */
+/** Handover: Serviceable Coverage Cities chips (all shown on phone too — full parity with desktop). */
 const COVERAGE_CHIPS = [
   "Lucknow", "Kanpur", "Ayodhya", "Varanasi", "Prayagraj", "Gorakhpur", "Agra", "Delhi NCR", "Noida",
   "Mumbai", "Bengaluru", "Hyderabad", "Kolkata", "Jaipur", "Pune",
 ];
-const MOBILE_COVERAGE_COUNT = 12;
 
 function withExtras(base: string[], selected: string[]) {
   const extra = selected.filter((s) => !base.some((b) => b.toLowerCase() === s.toLowerCase()));
@@ -128,7 +126,7 @@ export default function Step1IdentityOps({
   );
   const phoneInput = (compact: boolean, id?: string) => (
     <div className="input-with-prefix" style={compact ? { maxWidth: "60%" } : undefined}>
-      <span className="input-prefix" style={{ padding: "6px 8px" }}>
+      <span className="input-prefix" style={{ padding: "6px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>
         +91
       </span>
       <input
@@ -377,14 +375,13 @@ export default function Step1IdentityOps({
             <span className="form-label-sub vob-d">Where can your team travel to cater?</span>
           </span>
           <div className="chip-grid" data-chip-type="city">
-            {coverageChips.map((c, i) => {
+            {coverageChips.map((c) => {
               const active = data.serviceCities.includes(c);
               return (
                 <ChoiceChip
                   key={c}
                   active={active}
                   onClick={() => toggle("serviceCities", c)}
-                  className={cn(!active && i >= MOBILE_COVERAGE_COUNT && i < COVERAGE_CHIPS.length && "vob-d")}
                 >
                   {c}
                 </ChoiceChip>

@@ -126,7 +126,7 @@ export default function Step5AFeastBasics({
           </div>
         </div>
 
-        <div className="form-group vob-d">
+        <div className="form-group">
           <FormLabel htmlFor="cat-pkg-desc">Culinary Heritage Story & Description</FormLabel>
           <textarea
             id="cat-pkg-desc"

@@ -97,6 +97,9 @@ export default function Step9Complete({
         >
           🚀 Enter Vendor Dashboard →
         </a>
+        <button type="button" className="btn-back" onClick={onPreview} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
+          Preview Live Storefront 👁️
+        </button>
         <button type="button" className="btn-back" onClick={onBack} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
           ← Back
         </button>
