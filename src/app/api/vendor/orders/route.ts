@@ -3,6 +3,7 @@ import { createStore } from "@/lib/store";
 import { findVendorByOwner } from "@/lib/vendorMenus";
 import type { StoredOrder } from "@/app/api/bookings/route";
 import { orderMatchesVendor, toVendorOrderSummary } from "@/lib/vendorOrders";
+import { pendingPayoutFor } from "@/lib/settlements";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export async function GET() {
         completed: [],
         cancelled: [],
         orders: [],
+        pendingPayout: 0,
       });
     }
 
@@ -47,12 +49,19 @@ export async function GET() {
       (o) => o.status === "Cancelled" || (o.vendorDeclined && o.status !== "Completed"),
     );
 
+    // Settlements are paid per booking, not split between vendors, so only
+    // bookings this vendor served alone count towards their payout.
+    const pendingPayout = await pendingPayoutFor(
+      vendorBookings.filter((b) => b.vendors?.length === 1),
+    );
+
     return Response.json({
       pending,
       confirmed,
       completed,
       cancelled,
       orders: mapped,
+      pendingPayout,
     });
   } catch (err) {
     console.error("Failed to load vendor orders", err);

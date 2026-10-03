@@ -26,6 +26,8 @@ interface OrdersPayload {
   pending: VendorOrderSummary[];
   confirmed: VendorOrderSummary[];
   completed: VendorOrderSummary[];
+  /** What Bhojpatra still owes this vendor (unsettled Completed bookings). */
+  pendingPayout: number;
 }
 
 const inr = (n: number) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
@@ -122,7 +124,7 @@ export default function VendorDashboard() {
   const [vendor, setVendor] = useState<LiveVendorRecord | null>(null);
   const [fallbackName, setFallbackName] = useState("");
   const [gallery, setGallery] = useState<{ id: string }[]>([]);
-  const [orders, setOrders] = useState<OrdersPayload>({ pending: [], confirmed: [], completed: [] });
+  const [orders, setOrders] = useState<OrdersPayload>({ pending: [], confirmed: [], completed: [], pendingPayout: 0 });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [review, setReview] = useState<VendorOrderSummary | null>(null);
@@ -140,7 +142,7 @@ export default function VendorDashboard() {
     const r = await fetch("/api/vendor/orders").catch(() => null);
     if (r?.ok) {
       const d = await r.json();
-      setOrders({ pending: d.pending ?? [], confirmed: d.confirmed ?? [], completed: d.completed ?? [] });
+      setOrders({ pending: d.pending ?? [], confirmed: d.confirmed ?? [], completed: d.completed ?? [], pendingPayout: Number(d.pendingPayout) || 0 });
     }
   }, []);
 
@@ -543,7 +545,7 @@ interface HomeCtx {
 }
 
 function useHomeStats({ vendor, orders, galleryCount }: Pick<HomeCtx, "vendor" | "orders" | "galleryCount">) {
-  const payout = orders.confirmed.reduce((n, o) => n + Math.max(0, (o.amount || 0) - (o.paid || 0)), 0);
+  const payout = orders.pendingPayout;
   const rating = vendor?.rating || vendor?.googleRating;
   const reviews = vendor?.reviews || vendor?.googleReviews || 0;
   const checklist: { done: boolean; label: string; weight: number }[] = [
@@ -656,7 +658,7 @@ function DesktopHome(ctx: HomeCtx) {
             ["Upcoming Bookings", "event", `${upcoming.length} Event${upcoming.length === 1 ? "" : "s"}`, upcoming[0] ? `Next: ${fmtDate(upcoming[0])}` : "No events scheduled"],
             ["Completed Events", "check", `${orders.completed.length} Event${orders.completed.length === 1 ? "" : "s"}`, "Lifetime events"],
             ["Average Rating", "star", rating ? `★ ${rating}` : "★ —", reviews ? `Based on ${reviews} reviews` : "No reviews yet"],
-            ["Pending Payout", "wallet", inr(payout), "Due on event completion"],
+            ["Pending Payout", "wallet", inr(payout), "Completed events, awaiting settlement"],
           ] as [string, IconName, string, string][]
         ).map(([label, icon, value, sub]) => (
           <div key={label} className={cn(CARD, "flex flex-col gap-1 p-[18px]")}>
@@ -944,7 +946,7 @@ function MobileHome(ctx: HomeCtx) {
         {(
           [
             ["Active Orders", String(upcoming.length), upcoming[0] ? `Next: ${fmtDate(upcoming[0], { day: "numeric", month: "short" })}` : "None scheduled", false],
-            ["Pending Payout", inrCompact(payout), "Due upon serving", true],
+            ["Pending Payout", inrCompact(payout), "Awaiting settlement", true],
             ["Rating", rating ? `★ ${rating}` : "★ —", reviews ? `${reviews} reviews` : "No reviews yet", false],
             ["Completed", String(orders.completed.length), "Lifetime events", false],
           ] as [string, string, string, boolean][]
