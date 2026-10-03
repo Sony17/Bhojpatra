@@ -1,0 +1,81 @@
+﻿Column 1
+Business Description
+Status
+Tested
+Remarks
+Update Step 1 text to read “Choose a Vendor”
+UI text update on the vendor booking page
+Done
+Fix the estimated total/budget not refreshing after clicking “Start Over”
+Bug fix on the Feast Flow booking page
+Create a separate booking flow for Single Stall vendors instead of Silver/Gold/Platinum tiers
+New booking flow for Single Stall vendors
+Make the Single Stall menu fixed so customers cannot customize dishes
+Menu behavior update for Single Stall bookings
+Remove Silver/Gold/Platinum tier options from the Single Stall booking flow
+Simplified package options for Single Stall bookings
+Complete the Baina Box booking flow
+New booking flow for Baina Box
+Fix the “Explore Baina Box” button
+Bug fix on the Baina Box section
+Ensure the Baina Box filter routes to the Baina Box booking flow
+Navigation fix for Baina Box filter
+Fix Reset Password email not being sent
+Bug fix in the authentication/login flow
+After selecting a vendor, collapse the list and show only the top 5 vendors, with an option to expand and view the rest
+UI behavior update on the vendor selection screen
+Show each brand’s fixed add-on menu directly on the add-ons page, alongside the brand name
+UI enhancement on the add-ons selection page
+Use a better colour combination for the service package cards to improve visibility and appearance
+Visual design update on service package cards
+Stop asking for the same information (e.g. phone number) multiple times during the booking process
+Form/data-entry improvement across the booking flow
+Update the top text on the service package page from “Menu final ho gaya? Ab choose kijiye apna perfect service experience” to “Menu finalised. Now choose your perfect service experience.”
+UI text update on the service package page
+Define package vendor logic — Silver: verified vendors from your city, fixed menu with one verified vendor; Gold: best vendors from your city, one best vendor per category; Platinum: iconic vendors across India, multiple iconic vendors per category; Single Stall: verified vendors from your city, fixed menu with one verified vendor
+Business logic clarification for package tiers
+Update package descriptions — Silver: One Brand, Fixed Menu, Small Functions; Gold: Multiple City Brands, Mix &amp; Match for every category, Weddings &amp; Celebrations; Platinum: Premium &amp; Iconic Brands, No Selection Limits, Ultimate Freedom
+Content update for package tier descriptions
+Keep the tax invoice format consistent with the shared sample invoice (no changes needed)
+Invoice template/formatting requirement — retain as-is
+Remove the default price estimate shown before vendors, etc. have been selected (during occasion/guest count entry)
+UI fix on booking summary — remove premature price estimate
+App icon fro google website
+State option Availability
+incomplete selection popup behavior .Handle missed sequence condition
+Late response on click on Venue
+Logo change
+Use brand colours accordingly
+brown, yellow, orange
+change the package cost buttons to get price quote and align them
+editable package options for add package
+remove owner name
+add lunch box, bfast, lunch, dinner stall
+gallery should be editable
+hindi and english languages
+make about section editable
+venue list
+Done by Sony
+add shashank's number for call space
+Create an in-depth data flow and system architecture diagram for the complete website, covering the customer journey, Feast, Baina, Single Stall and Live Stall booking flows, vendor and menu data, tier logic, admin controls, booking confirmation, payment/Razorpay integration, WhatsApp/custom enquiries, database interactions, APIs, authentication/authorization and sensitive data flows. This should serve as the technical reference for implementing the upcoming changes.
+Conduct a security audit of the existing website architecture and fix identified security vulnerabilities, particularly around authentication, authorization, role permissions, API access, customer/vendor data, booking manipulation, payment-related data and other sensitive flows identified through the data flow analysis.
+Implement Razorpay payment integration based on the finalized website architecture, including secure payment initiation, order creation, payment verification, webhook handling where required, booking/payment status synchronization and prevention of unauthorized or manipulated payment confirmations.
+Pending
+Redesign and clearly separate the booking flows into four distinct flows: Feast, Baina, Single Stall and Live Stall. Baina should be positioned for smaller parties and automatically included as an applicable option within the Feast booking flow. Single Stall should have only one option provided by the vendor, while Live Stall should allow customers to choose from multiple options provided by the vendor, such as pasta, pani puri, etc.
+Fix the booking flow completion issue where the flow stops at the final stage when only a partial selection has been made. Customers should be able to complete the booking with optional sections left unselected, with appropriate skip functionality for Live Stalls and Add-ons.
+Add a post-selection confirmation message/card indicating that the items have been selected, along with an option for the customer to return directly to any section where the menu selection is incomplete or needs modification.
+Implement occasion-wise search and improve occasion navigation. Clicking on the relevant “Select Occasion” text/link anywhere on the website should directly scroll the customer to the occasion selection section.
+Implement next-day availability for Single Stalls and Baina Boxes. Single Stall bookings should be available for the following day, and Baina Boxes should also support next-day booking.
+Create a dedicated Single Stall booking flow and make it accessible from all relevant entry points, including the homepage sliding image section and the search bar. Single Stall bookings should not force customers through the regular Feast booking flow.
+Improve vendor and brand selection based on service tiers. All brands should be displayed under their respective tiers, with the top 5 relevant brands shown first, followed by the remaining brands and, where applicable, brands from lower tiers. Within the top 5, caterers should be sorted from minimum to maximum cost per plate.
+Allow customers to select any service tier irrespective of the package tier selected earlier in the booking flow. Service-tier availability should not be unnecessarily restricted by the previously selected package tier.
+Implement Veg/Non-Veg based vendor and menu classification according to the customer's requirements. Add a “Craft My Plate” style selection where customers can specify the number of vegetarian and non-vegetarian attendees, and use this information to provide relevant vendor/menu options.
+Give admins per-vendor control over the number of items customers are allowed to select in the booking flow. Admins should be able to increase or decrease the selectable item limits independently for each vendor.
+Improve the homepage Explore More section so that it displays only Baina Boxes and Single Stalls.
+Remove the Silver, Gold and Platinum cards from the homepage to reduce visual clutter while retaining the underlying tier functionality wherever required.
+Add a custom catering enquiry/upload option to the homepage WhatsApp enquiry section. Customers should be able to upload their own menu and budget PDF so the admin can understand their requirements, and the uploaded PDF should be automatically included when the enquiry is forwarded to WhatsApp.
+Update the website terminology and overall language to be less technical and more natural, friendly and homely for customers. Begin with the “Pick a Vendor” section and related booking-flow terminology, then apply the revised language consistently throughout the website.
+Add global naming controls for the Silver, Gold and Platinum tiers and other relevant tier names so that admins can change the names centrally and have the updated terminology reflected consistently throughout the website.
+Enforce a one-email-one-role permission structure. A vendor should not be able to have multiple roles or be assigned roles such as vendor and promoter simultaneously. Each email ID should correspond to one defined role only.
+Fix the mobile number validation issue at the booking confirmation stage where valid customer mobile numbers are currently not being accepted.
+Completed

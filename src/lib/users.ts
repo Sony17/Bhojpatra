@@ -18,6 +18,8 @@ export interface UserRecord {
   /** Lowercased, unique — the login handle. */
   email: string;
   name?: string;
+  /** Primary contact phone number. */
+  phone?: string;
   /**
    * The account's single role. One email holds exactly one role — customer,
    * vendor OR referral partner — and gets that role's one dashboard; roles are
@@ -49,6 +51,7 @@ export interface PublicUser {
   id: string;
   email: string;
   name?: string;
+  phone?: string;
   /** The single effective role (see `effectiveRole`). */
   role: UserRole;
   /** Exactly one entry — the effective role. Kept as an array only because the
@@ -128,6 +131,7 @@ export function toPublicUser(u: UserRecord): PublicUser {
     name: u.name,
     role,
     accounts,
+    ...(u.phone ? { phone: u.phone } : {}),
     ...(membership ? { partnerRoles: [membership] } : {}),
     ...(u.lang ? { lang: u.lang } : {}),
   };

@@ -16,7 +16,13 @@ import type {
   VerificationStatus,
 } from "@/lib/admin/types";
 import type {
+  CutleryTierOption,
+  SingleStallConfig,
+  VendorBadgesState,
   VendorBainaBox,
+  VendorBainaDetails,
+  VendorCustomOffering,
+  VendorDietaryOffering,
   VendorEssentialService,
 } from "@/lib/vendorMenus";
 
@@ -75,6 +81,21 @@ export interface VendorApplicationRecord {
   bainaBoxes?: VendorBainaBox[];
   /** Essential Service offer declared at registration (essential category). */
   essentialService?: VendorEssentialService;
+
+  /* ── V2 Extensions ── */
+  dietaryOffering?: VendorDietaryOffering;
+  minPax?: number;
+  leadHours?: number;
+  bestFor?: string[];
+  packageName?: string;
+  goldSpecialization?: string;
+  cutleryTier?: CutleryTierOption;
+  customOfferings?: VendorCustomOffering[];
+  stallConfig?: SingleStallConfig;
+  bainaDetails?: VendorBainaDetails;
+  badges?: VendorBadgesState;
+  cateringComponents?: import("@/lib/vendorMenus").CateringComponentsSelection;
+
   status: VerificationStatus;
   /** Display date (YYYY-MM-DD) shown in the approvals table. */
   submitted: string;

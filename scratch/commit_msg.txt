@@ -1,0 +1,20 @@
+feat(v2-onboarding): implement 6-stage badge application flow & streamline commercial offerings
+
+- Badge Application Flow (Vendor Signup & Visual Mockup):
+  - Created `BadgeApplicationModal.tsx` in `src/components/auth/` and wired into `AuthForm.tsx` (`/signup?type=vendor`).
+  - Added full 6-stage lifecycle: Intro -> Requirements -> Application Details -> Review -> Submit Declaration -> Confirmed.
+  - Implemented all 3 recognition tiers with exact requirements:
+    * Verified Caterer: 10 mandatory criteria with explicit brand exception (min 2 yrs for high-traction brands).
+    * City Icon Caterer: 8 mandatory criteria + 6 distinct non-mandatory Plus Points.
+    * Heritage Caterer: 9 legacy criteria with explicit "15-20 years OR 2+ generations" condition preserved.
+  - Integrated complete standalone visual & behavioral flow in `mockups/vendor-registration-v2/` (`index.html`, `script.js`, `styles.css`) for native `file:///` interactive testing.
+  - Implemented pre-filled vendor data reuse, isolated per-badge application state, reference ID generation (`BHOJ-BADGE-XXXXXX`), duplicate submission prevention, read-only review, and consolidated master review integration.
+  - Added accessible modal UX: backdrop close, keyboard Escape listener, and stepper indicators.
+
+- Commercial Offerings Streamlining:
+  - Removed custom offering adder card and grid from desktop and mobile views in `mockups/vendor-registration-v2/index.html`.
+  - Allowed commercial offerings to connect directly to the Badges & Recognition section without clutter.
+
+- Documentation & Verification:
+  - Updated `V2_ONBOARDING_IMPLEMENTATION_TRACKER.md` with visual prototype implementation and test suites.
+  - Updated test suites with 100% pass across all 105 tests.

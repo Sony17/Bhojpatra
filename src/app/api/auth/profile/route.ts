@@ -26,17 +26,24 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  if (typeof body.name !== "string") {
-    return Response.json({ error: "Invalid name." }, { status: 400 });
-  }
-  const name = body.name.trim().slice(0, MAX_NAME_LEN);
-
   const record = await getUserById(publicUser.id);
   if (!record) {
     return Response.json({ error: "Not signed in." }, { status: 401 });
   }
-  // An empty name clears it — the UI then falls back to the account-type label.
-  record.name = name || undefined;
+
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string") {
+      return Response.json({ error: "Invalid name." }, { status: 400 });
+    }
+    const name = body.name.trim().slice(0, MAX_NAME_LEN);
+    record.name = name || undefined;
+  }
+
+  // Allow a customer account to upgrade to a vendor account
+  if (body.role === "vendor" && (record.role === "customer" || record.role === "vendor")) {
+    record.role = "vendor";
+    record.accounts = ["vendor"];
+  }
 
   try {
     await saveUser(record);
