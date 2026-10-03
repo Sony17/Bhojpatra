@@ -18,6 +18,7 @@ import type { LiveVendorRecord } from "@/lib/vendorMenus";
 import type { VendorOrderSummary } from "@/lib/vendorOrders";
 import { sortTiers } from "@/lib/admin/types";
 import { cn } from "@/components/ui/cn";
+import { logout } from "@/lib/session";
 import { BtnBack, BtnNext, DIET_NAMES, Sheet, stallCategoryName } from "@/components/vendor/portalUi";
 
 type Tab = "dashboard" | "services" | "orders";
@@ -90,6 +91,7 @@ const ICONS = {
   print:
     "M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z",
   check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  logout: "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z",
   more: "M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
   scale:
     "M12 3c-.55 0-1 .45-1 1v1H5.5L3 11c0 1.66 1.34 3 3 3s3-1.34 3-3L6.97 7H11v12H7v2h10v-2h-4V7h4.03L15 11c0 1.66 1.34 3 3 3s3-1.34 3-3l-2.5-6H13V4c0-.55-.45-1-1-1zM6 8.6 7.6 11H4.4L6 8.6zm12 0 1.6 2.4h-3.2L18 8.6z",
@@ -193,6 +195,15 @@ export default function VendorDashboard() {
     setTab(t);
     setMoreOpen(false);
     window.scrollTo({ top: 0 });
+  };
+  // Menus & services are edited in the in-page builder on My Services.
+  const editServices = () => {
+    go("services");
+    setTimeout(() => document.getElementById(BUILDER_ID)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const signOut = async () => {
+    await logout();
+    window.location.href = "/";
   };
   const openNotifications = () => (pending ? setReview(pending) : flash("No new booking notifications."));
 
@@ -299,10 +310,14 @@ export default function VendorDashboard() {
             <Icon name="help" size={16} />
             Partner Helpdesk
           </a>
-          <a href="/vendor/register" className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
+          <button type="button" onClick={editServices} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
             <Icon name="edit" size={16} />
-            Edit Onboarding Data
-          </a>
+            Edit Menu & Services
+          </button>
+          <button type="button" onClick={signOut} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
+            <Icon name="logout" size={16} />
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -359,7 +374,7 @@ export default function VendorDashboard() {
               </div>
             </>
           ) : tab === "services" ? (
-            <ServicesHub services={services} />
+            <ServicesHub services={services} onEdit={editServices} />
           ) : (
             <OrdersPipeline orders={orders} upcoming={upcoming} onReview={setReview} onDecline={(o) => act(o, "decline")} onPrep={setPrep} />
           )}
@@ -397,7 +412,7 @@ export default function VendorDashboard() {
         </button>
       </nav>
 
-      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} onSoon={(m) => (setMoreOpen(false), flash(m))} />
+      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} onSoon={(m) => (setMoreOpen(false), flash(m))} onEdit={editServices} onSignOut={signOut} />
       <BookingReviewModal order={review} onClose={() => setReview(null)} onAccept={(o) => act(o, "accept")} onDecline={(o) => act(o, "decline")} />
       <PrepSheetModal order={prep} onClose={() => setPrep(null)} />
     </div>
@@ -421,7 +436,19 @@ function BellButton({ dot, onClick, bare }: { dot: boolean; onClick: () => void;
   );
 }
 
-function MoreSheet({ open, onClose, onSoon }: { open: boolean; onClose: () => void; onSoon: (msg: string) => void }) {
+function MoreSheet({
+  open,
+  onClose,
+  onSoon,
+  onEdit,
+  onSignOut,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSoon: (msg: string) => void;
+  onEdit: () => void;
+  onSignOut: () => void;
+}) {
   if (!open) return null;
   const row = "flex min-h-[48px] w-full items-center gap-3 border-b border-cream/30 px-1 text-left text-sm font-semibold text-ink";
   return (
@@ -437,13 +464,13 @@ function MoreSheet({ open, onClose, onSoon }: { open: boolean; onClose: () => vo
         <Icon name="help" className="text-maroon" />
         Partner Helpdesk
       </a>
-      <a href="/vendor/register" className={row}>
+      <button type="button" onClick={onEdit} className={row}>
         <Icon name="edit" className="text-maroon" />
-        Edit Onboarding Data
-      </a>
-      <a href="/api/auth/logout" className={cn(row, "border-b-0 text-maroon")}>
+        Edit Menu & Services
+      </button>
+      <button type="button" onClick={onSignOut} className={cn(row, "border-b-0 text-maroon")}>
         Sign out
-      </a>
+      </button>
     </Sheet>
   );
 }
@@ -986,7 +1013,9 @@ function BookingList({ list, onOpen }: { list: VendorOrderSummary[]; onOpen?: (o
 }
 
 /* ── My Services ──────────────────────────────────────────────────────────── */
-function ServicesHub({ services }: { services: ServiceCard[] }) {
+const BUILDER_ID = "vendor-menu-builder";
+
+function ServicesHub({ services, onEdit }: { services: ServiceCard[]; onEdit: () => void }) {
   const active = services.filter((s) => s.configured).length;
   return (
     <div className="flex flex-col gap-4">
@@ -994,19 +1023,19 @@ function ServicesHub({ services }: { services: ServiceCard[] }) {
         <div>
           <h1 className="font-sans text-xl font-extrabold">My Services & Offerings ({services.length} Independent Services)</h1>
           <p className="mt-0.5 text-[12.5px] text-ink/60">
-            Configured offerings reflecting your V2 onboarding selections. Click any service to edit its parameters in the builder.
+            Your live offerings. Edit dishes, counters and Baina boxes in the menu builder below — changes go to admin review before they appear to customers.
           </p>
         </div>
-        <a href="/vendor/register" className="inline-flex shrink-0 items-center justify-center rounded-control bg-maroon px-4 py-2 text-[13px] font-bold text-cream">
+        <button type="button" onClick={onEdit} className="inline-flex shrink-0 items-center justify-center rounded-control bg-maroon px-4 py-2 text-[13px] font-bold text-cream">
           + Add / Configure Services
-        </a>
+        </button>
       </div>
       <p className="text-xs font-semibold text-ink/60">
         {active} of {services.length} services active
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {services.map((s) => (
-          <a key={s.key} href="/vendor/register" className={cn(CARD, "p-4 hover:border-maroon/40")}>
+          <button key={s.key} type="button" onClick={onEdit} className={cn(CARD, "p-4 text-left hover:border-maroon/40")}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[14px] font-bold">{s.title}</span>
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", s.configured ? "bg-maroon text-cream" : "bg-cream/40 text-ink/70")}>
@@ -1015,11 +1044,13 @@ function ServicesHub({ services }: { services: ServiceCard[] }) {
             </div>
             <p className="mt-1 text-xs text-ink/60">{s.configured ? s.detail : "Add this service in the builder."}</p>
             <span className="mt-2 inline-block text-xs font-bold text-maroon">{s.configured ? "Edit in builder →" : "Add +"}</span>
-          </a>
+          </button>
         ))}
       </div>
-      <BainaBoxSpecial variant="dashboard" />
-      <MenuBuilder />
+      <div id={BUILDER_ID} className="flex scroll-mt-20 flex-col gap-4">
+        <BainaBoxSpecial variant="dashboard" />
+        <MenuBuilder />
+      </div>
     </div>
   );
 }

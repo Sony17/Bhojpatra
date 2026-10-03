@@ -6,7 +6,6 @@
  */
 import type { BookingStatus } from "@/lib/data";
 import type { InvoiceData } from "@/lib/invoice";
-import { slugifyName } from "@/lib/bookings";
 import type { LiveVendorRecord } from "@/lib/vendorMenus";
 import type { StoredOrder } from "@/app/api/bookings/route";
 
@@ -42,46 +41,20 @@ export interface VendorOrderSummary {
   vendorNotes?: string;
 }
 
-/** Check if a stored order belongs to the given live vendor record. */
+/**
+ * Does a stored order belong to this live vendor? Matched on the vendor's own
+ * id only: the booking wizards store each booked vendor as `{ id, name }`, and
+ * a live vendor's catalogue id is its record id. Names are never used — a
+ * business name is free text, so name matching would let a vendor who
+ * registers under another caterer's name read that caterer's customers.
+ */
 export function orderMatchesVendor(
   order: StoredOrder,
   vendor: LiveVendorRecord,
 ): boolean {
-  if (!vendor || !order) return false;
-  const vendorId = (vendor.id ?? "").trim().toLowerCase();
-  const businessName = (vendor.business ?? "").trim().toLowerCase();
-  const businessSlug = slugifyName(vendor.business ?? "");
-
-  // 1. Structured vendors array
-  if (Array.isArray(order.vendors) && order.vendors.length > 0) {
-    const matched = order.vendors.some((v) => {
-      if (!v) return false;
-      const vId = (v.id ?? "").trim().toLowerCase();
-      const vName = (v.name ?? "").trim().toLowerCase();
-      const vSlug = slugifyName(v.name ?? "");
-      return (
-        (vId && vId === vendorId) ||
-        (vName && vName === businessName) ||
-        (vSlug && vSlug === businessSlug)
-      );
-    });
-    if (matched) return true;
-  }
-
-  // 2. Comma-separated vendor label
-  if (typeof order.vendor === "string" && order.vendor.trim()) {
-    const vendorNames = order.vendor.split(",").map((s) => s.trim().toLowerCase());
-    const matched = vendorNames.some((name) => {
-      return (
-        name === vendorId ||
-        name === businessName ||
-        slugifyName(name) === businessSlug
-      );
-    });
-    if (matched) return true;
-  }
-
-  return false;
+  const vendorId = vendor?.id?.trim();
+  if (!vendorId || !Array.isArray(order?.vendors)) return false;
+  return order.vendors.some((v) => v?.id?.trim() === vendorId);
 }
 
 /** Map a stored order to the vendor order summary projection. */
