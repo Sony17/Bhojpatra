@@ -108,6 +108,14 @@ export interface StoredOrder {
   review?: { rating: number; comment: string; createdAt: string };
   /** Set when the customer reopened a Completed booking (stops auto-complete). */
   reopened?: boolean;
+  /** Vendor Portal response. Never moves `status` — Pending/Confirmed track
+   *  payment, so a vendor's accept/decline is recorded alongside it. */
+  vendorAcknowledged?: boolean;
+  acknowledgedAt?: string;
+  /** Vendor declined the booking; admin follows up (refund / reassignment). */
+  vendorDeclined?: boolean;
+  declinedAt?: string;
+  vendorNotes?: string;
 }
 
 const store = createStore<StoredOrder>({

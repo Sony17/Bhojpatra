@@ -6,6 +6,7 @@ import { useLang, type Lang } from "@/lib/i18n";
 import {
   logout,
   DASHBOARD_HOME_PATH,
+  DASHBOARD_PATH,
   ACCOUNT_LABEL,
   useSession,
   hasAccount,
@@ -94,6 +95,19 @@ export default function AccountMenuPanel({ onClose }: { onClose: () => void }) {
 
       {session ? (
         <>
+          {/* Vendors & partners reach their dashboard here; customers' dashboard
+              is "My Bookings" (below). */}
+          {session.type !== "customer" && (
+            <li className="border-b border-maroon/10">
+              <Link
+                href={DASHBOARD_PATH[session.type]}
+                onClick={onClose}
+                className="block px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-maroon/5"
+              >
+                {t("My Dashboard", "मेरा डैशबोर्ड")}
+              </Link>
+            </li>
+          )}
           {ACCOUNT_LINKS.filter(
             (item) => !item.customerOnly || hasAccount(session, "customer"),
           ).map((item) => (

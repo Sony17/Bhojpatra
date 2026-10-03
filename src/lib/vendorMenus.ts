@@ -199,6 +199,55 @@ export interface VendorCounterExtra {
 /** Most items a vendor may add to a single counter beyond the platform list. */
 const MAX_COUNTER_EXTRAS = 12;
 
+/** Dietary offering classification: veg-only, non-veg only, or both. */
+export type VendorDietaryOffering = "veg" | "non-veg" | "both";
+
+/** Tableware and cutlery tier options for caterers and stalls. */
+export type CutleryTierOption = "essential" | "standard" | "premium" | "ultra";
+
+/** Independent pricing & minimum guest guarantees per Single Stall category. */
+export interface SingleStallCategoryPricing {
+  fixedPerPlate: number;
+  minPaxGuarantee: number;
+}
+
+export type SingleStallCategoryPricingMap = Record<
+  string,
+  SingleStallCategoryPricing
+>;
+
+/** Single Stall operational configuration. */
+export interface SingleStallConfig {
+  /** The stall category ids or names selected by this stall vendor (e.g. ["chaat", "live-woks"]). */
+  categories: string[];
+  /** Independent category pricing & minimum guest guarantees per category. Keyed by categoryId. */
+  categoryPricing?: SingleStallCategoryPricingMap;
+  /** Equipment requirements / provisions (e.g. ["Gas Burner", "Tandoor Bhatti", "Chafing Dishes"]). */
+  equipment?: string[];
+  /** Cutlery setup / tier for the stall (e.g. "Biodegradable Bagasse", "Melamine", "Standard Chinaware"). */
+  cutlery?: string;
+  /** Per-stall dish lists keyed by stall category (V2 handover: every stall —
+   *  predefined or custom — keeps its own dishes). Categories that are also
+   *  platform menu categories are mirrored into `menu[]` for the booking flow. */
+  menus?: Record<string, VendorMenuItem[]>;
+}
+
+/** Toggled catering sub-components from Step 3. */
+export interface CateringComponentsSelection {
+  counters?: boolean;
+  extras?: boolean;
+  essentials?: boolean;
+  addons?: boolean;
+}
+
+/** Bespoke vendor-authored custom offerings / counters beyond the platform set. */
+export interface VendorCustomOffering {
+  id: string;
+  title: string;
+  blurb: string;
+  icon?: string;
+}
+
 export interface LiveVendorRecord {
   id: string;
   /** Auth user (role "vendor") who owns this profile. Absent on platform seeds. */
@@ -249,6 +298,18 @@ export interface LiveVendorRecord {
   essentialService?: VendorEssentialService;
   createdAt: string;
   updatedAt: string;
+
+  /* ── V2 Extensions (read by the Vendor Portal; set by V2 onboarding) ── */
+  /** Dietary orientation: vegetarian only, non-veg only, or both. */
+  dietaryOffering?: VendorDietaryOffering;
+  /** Tableware / cutlery tier provided with their service. */
+  cutleryTier?: CutleryTierOption;
+  /** Bespoke vendor-authored custom offerings / counters beyond the platform set. */
+  customOfferings?: VendorCustomOffering[];
+  /** Single Stall configuration (categories, independent pricing, equipment, cutlery). */
+  stallConfig?: SingleStallConfig;
+  /** Feast Booking sub-components enabled for this vendor. */
+  cateringComponents?: CateringComponentsSelection;
 }
 
 const store = createStore<LiveVendorRecord>({
