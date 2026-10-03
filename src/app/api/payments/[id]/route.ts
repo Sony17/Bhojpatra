@@ -59,6 +59,14 @@ export async function PATCH(
     return Response.json({ error: "Payment not found." }, { status: 404 });
   }
 
+  // A failed attempt moved no money — there is nothing to settle or refund.
+  if (payment.status === "Failed") {
+    return Response.json(
+      { error: "A failed payment can't be changed." },
+      { status: 409 },
+    );
+  }
+
   const next: StoredPayment = { ...payment, status: body.status };
 
   // Flipping a gateway payment to Refunded moves REAL money — execute the

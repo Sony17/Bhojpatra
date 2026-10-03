@@ -52,6 +52,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Expired: "muted",
   Suspended: "muted",
   Refunded: "muted",
+  Failed: "muted",
   Inactive: "muted",
 };
 

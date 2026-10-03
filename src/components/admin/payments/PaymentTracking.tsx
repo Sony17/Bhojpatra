@@ -10,6 +10,8 @@ import StatusBadge from "@/components/admin/shared/StatusBadge";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { money } from "@/components/admin/shared/money";
+import { exportCsv } from "@/components/admin/shared/exportCsv";
+import { Button } from "@/components/ui";
 import { Wallet } from "@/components/admin/shared/icons";
 import { adminPayments, paymentsSummary } from "@/lib/admin/mockData";
 import type { AdminPayment } from "@/lib/admin/types";
@@ -24,10 +26,16 @@ interface LivePayment {
   method: "UPI" | "QR" | "Razorpay";
   type: "Advance";
   amount: number;
-  status: "Advance Received";
+  status: AdminPayment["status"];
   createdAt: string;
   customerTxnId?: string;
+  razorpayOrderId?: string;
+  failureReason?: string;
+  refundedAmount?: number;
 }
+
+/** A failed gateway attempt moved no money — keep it out of every total. */
+const countsAsCollected = (p: AdminPayment) => p.status !== "Failed";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -47,6 +55,10 @@ function toAdminPayment(p: LivePayment): AdminPayment {
     status: p.status,
     date: formatDate(p.createdAt),
     ref: p.customerTxnId,
+    orderRef: p.razorpayOrderId,
+    failureReason: p.failureReason,
+    refundedAmount: p.refundedAmount,
+    createdAt: p.createdAt,
   };
 }
 
@@ -56,6 +68,7 @@ const STATUS_OPTIONS = [
   { label: "Advance Received", value: "Advance Received" },
   { label: "Pending", value: "Pending" },
   { label: "Refunded", value: "Refunded" },
+  { label: "Failed", value: "Failed" },
 ];
 
 const METHOD_OPTIONS = [
@@ -83,7 +96,9 @@ export default function PaymentTracking() {
     };
   }, []);
 
-  const liveCollected = live.reduce((sum, p) => sum + p.amount, 0);
+  const liveCollected = live
+    .filter(countsAsCollected)
+    .reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -116,24 +131,55 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
     setPage(1);
   };
 
-  // Live checkout payments shown ahead of the seeded history.
-  const result = useMemo(() => {
+  // One predicate for both the table and the CSV export.
+  const matches = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const filtered = [...live, ...adminPayments].filter((p) => {
+    return (p: AdminPayment) => {
       const matchesQ =
         !needle ||
         p.id.toLowerCase().includes(needle) ||
         p.bookingId.toLowerCase().includes(needle) ||
         p.customer.toLowerCase().includes(needle) ||
-        (p.ref?.toLowerCase().includes(needle) ?? false);
+        (p.ref?.toLowerCase().includes(needle) ?? false) ||
+        (p.orderRef?.toLowerCase().includes(needle) ?? false);
       const matchesStatus = status === "All" || p.status === status;
       const matchesMethod = method === "All" || p.method === method;
       return matchesQ && matchesStatus && matchesMethod;
-    });
+    };
+  }, [q, status, method]);
+
+  // Real recorded transactions matching the current filters — what the CSV
+  // exports. The demo seed rows are display-only and never exported.
+  const liveFiltered = useMemo(() => live.filter(matches), [live, matches]);
+
+  // Live checkout payments shown ahead of the seeded history.
+  const result = useMemo(() => {
+    const filtered = [...liveFiltered, ...adminPayments.filter(matches)];
     const total = filtered.length;
     const start = (page - 1) * PAGE_SIZE;
     return { data: filtered.slice(start, start + PAGE_SIZE), page, pageSize: PAGE_SIZE, total };
-  }, [q, status, method, page, live]);
+  }, [liveFiltered, matches, page]);
+
+  const handleExport = () => {
+    exportCsv(
+      `bhojpatra-payments-${new Date().toISOString().slice(0, 10)}.csv`,
+      liveFiltered.map((p) => ({
+        "Payment ID": p.id,
+        "Booking ID": p.bookingId,
+        Customer: p.customer,
+        Method: p.method,
+        Type: p.type,
+        "Amount (INR)": p.amount,
+        Status: p.status,
+        "Refunded (INR)": p.refundedAmount ?? (p.status === "Refunded" ? p.amount : 0),
+        "Payment Ref": p.ref ?? "",
+        "Razorpay Order": p.orderRef ?? "",
+        "Failure Reason": p.failureReason ?? "",
+        Date: p.date,
+        Timestamp: p.createdAt ?? "",
+      })),
+    );
+  };
 
   const columns: Column<AdminPayment>[] = [
     {
@@ -145,6 +191,12 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
           <p className="text-xs text-ink-soft">{p.bookingId} · {p.customer}</p>
           {p.ref && (
             <p className="truncate text-xs text-ink-soft">Txn ID: {p.ref}</p>
+          )}
+          {p.failureReason && (
+            <p className="truncate text-xs text-maroon">{p.failureReason}</p>
+          )}
+          {p.refundedAmount !== undefined && p.refundedAmount < p.amount && (
+            <p className="text-xs text-ink-soft">Partly refunded: {money(p.refundedAmount)}</p>
           )}
         </div>
       ),
@@ -170,6 +222,15 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
           <SelectFilter label="Status" value={status} options={STATUS_OPTIONS} onChange={onFilter(setStatus)} />
           <SelectFilter label="Method" value={method} options={METHOD_OPTIONS} onChange={onFilter(setMethod)} />
         </div>
+        <Button
+          type="button"
+          variant="primary"
+          onClick={handleExport}
+          disabled={liveFiltered.length === 0}
+          className="lg:ml-auto"
+        >
+          Export CSV
+        </Button>
       </div>
 
       <DataTable

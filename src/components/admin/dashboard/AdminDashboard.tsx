@@ -91,10 +91,15 @@ export default function AdminDashboard() {
         }
         if (pRes.ok) {
           const { payments } = (await pRes.json()) as {
-            payments?: { amount?: number }[];
+            payments?: { amount?: number; status?: string }[];
           };
+          // Failed gateway attempts moved no money — never count them.
           if (active && Array.isArray(payments))
-            setCollected(payments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
+            setCollected(
+              payments
+                .filter((p) => p.status !== "Failed")
+                .reduce((s, p) => s + (Number(p.amount) || 0), 0),
+            );
         }
       } catch {
         // Network/parse failure — the empty states below stand in.

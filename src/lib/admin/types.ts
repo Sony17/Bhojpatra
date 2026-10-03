@@ -229,7 +229,7 @@ export interface CustomerQuery {
 
 export type PaymentMethod = "UPI" | "QR" | "Card" | "Razorpay";
 export type PaymentType = "Advance" | "Balance" | "Refund";
-export type PaymentStatus = "Settled" | "Pending" | "Advance Received" | "Refunded";
+export type PaymentStatus = "Settled" | "Pending" | "Advance Received" | "Refunded" | "Failed";
 
 export interface AdminPayment {
   id: string;
@@ -242,6 +242,14 @@ export interface AdminPayment {
   date: string;
   /** Customer-entered UPI transaction reference (UTR), when captured at checkout. */
   ref?: string;
+  /** Razorpay order id, for gateway payments. */
+  orderRef?: string;
+  /** Gateway's reason, for a Failed attempt. */
+  failureReason?: string;
+  /** Rupees refunded so far (partial refunds are less than `amount`). */
+  refundedAmount?: number;
+  /** ISO timestamp — exported to CSV alongside the display date. */
+  createdAt?: string;
 }
 
 export interface VendorSettlement {

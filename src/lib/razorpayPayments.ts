@@ -9,6 +9,7 @@ import { sendPaymentAlert } from "@/lib/email";
 import { refundRazorpayPayment } from "@/lib/razorpay";
 import { syncBookingWithLedger } from "@/lib/bookingPaymentSync";
 import type { StoredPayment } from "@/app/api/payments/route";
+import { store as refundStore, displayDate } from "@/lib/refunds";
 
 const store = createStore<StoredPayment>({
   table: "payments",
@@ -24,7 +25,11 @@ export async function recordRazorpayPayment(opts: {
 }): Promise<StoredPayment> {
   const payments = await store.list();
 
-  const existing = payments.find((p) => p.txnRef === opts.orderId);
+  // A "Failed" attempt on the same order is history, not a recorded payment —
+  // it must never make the later successful capture look already-recorded.
+  const existing = payments.find(
+    (p) => p.txnRef === opts.orderId && p.status !== "Failed",
+  );
   if (existing) {
     // Already recorded (verify and webhook race, or a webhook redelivery) —
     // still re-sync the booking: the first record may have landed before the
@@ -117,4 +122,95 @@ export async function refundBookingGatewayPayment(
   });
 
   return { refundId: refund.id, paymentRecordId: target.id };
+}
+
+/** Record a failed checkout attempt (payment.failed webhook) so it shows in
+ *  the admin Payments view with status "Failed". Moves no money: Failed rows
+ *  are excluded from every paid-total, and the booking itself is untouched.
+ *  Keyed on the Razorpay payment id, so a redelivered event is a no-op, and
+ *  `txnRef` holds the payment id (never the order id) so a later successful
+ *  attempt on the same order still records normally. */
+export async function recordFailedRazorpayPayment(opts: {
+  bookingId: string;
+  amountRupees: number;
+  orderId: string;
+  paymentId: string;
+  customer?: string;
+  reason?: string;
+}): Promise<StoredPayment> {
+  const id = `PMT-F${opts.paymentId.replace(/^pay_/, "")}`;
+  const existing = await store.get(id);
+  if (existing) return existing;
+
+  const row: StoredPayment = {
+    id,
+    bookingId: opts.bookingId,
+    customer: opts.customer?.trim() || "Online Booking",
+    method: "Razorpay",
+    type: "Advance",
+    amount: Math.round(opts.amountRupees),
+    vpa: "razorpay",
+    txnRef: opts.paymentId,
+    customerTxnId: opts.paymentId,
+    razorpayOrderId: opts.orderId,
+    razorpayPaymentId: opts.paymentId,
+    status: "Failed",
+    ...(opts.reason ? { failureReason: opts.reason.slice(0, 300) } : {}),
+    createdAt: new Date().toISOString(),
+  };
+  await store.upsert(row);
+  return row;
+}
+
+/** Apply a processed refund (refund.processed webhook) to the ledger and to
+ *  the matching refund request. Idempotent: the refunded figure comes from
+ *  Razorpay's cumulative `amount_refunded`, and statuses only move forward.
+ *  Covers refunds issued from the Razorpay dashboard too. Returns false when
+ *  no ledger row carries this payment id. */
+export async function applyRazorpayRefund(opts: {
+  refundId: string;
+  paymentId: string;
+  /** Paise refunded by this refund. */
+  refundAmountPaise: number;
+  /** Paise refunded on the payment so far, when the event carries it. */
+  totalRefundedPaise?: number;
+}): Promise<{ bookingId: string } | null> {
+  const payments = await store.list();
+  const row = payments.find(
+    (p) => p.razorpayPaymentId === opts.paymentId && p.status !== "Failed",
+  );
+  if (!row) return null;
+
+  const refundedRupees = Math.round(
+    (opts.totalRefundedPaise ?? opts.refundAmountPaise) / 100,
+  );
+  const next: StoredPayment = {
+    ...row,
+    status: "Refunded",
+    razorpayRefundId: row.razorpayRefundId ?? opts.refundId,
+    refundedAmount: Math.min(
+      row.amount,
+      Math.max(row.refundedAmount ?? 0, refundedRupees),
+    ),
+  };
+  if (
+    next.status !== row.status ||
+    next.razorpayRefundId !== row.razorpayRefundId ||
+    next.refundedAmount !== row.refundedAmount
+  ) {
+    await store.upsert(next);
+  }
+
+  // The refund request that executed this refund, if any, is now settled.
+  const requests = await refundStore.list();
+  const request = requests.find((r) => r.gatewayRefundId === opts.refundId);
+  if (request && request.status !== "Processed" && request.status !== "Declined") {
+    await refundStore.upsert({
+      ...request,
+      status: "Processed",
+      processedAt: request.processedAt ?? displayDate(new Date()),
+    });
+  }
+
+  return { bookingId: row.bookingId };
 }

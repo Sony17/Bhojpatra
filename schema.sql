@@ -20,6 +20,18 @@ create table if not exists payments (
   updated_at timestamptz not null default now()
 );
 
+-- Razorpay audit log: one row per gateway API call (method, path, HTTP status,
+-- duration, a PII-free summary of the response) and one per webhook event
+-- (keyed by Razorpay's event id, which also makes redeliveries detectable).
+-- Written best-effort — if this table is missing, payments still work and the
+-- same lines go to the server log.
+create table if not exists payment_events (
+  id         text primary key,
+  seq        bigint generated always as identity,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Customer refund requests against bookings. Their own lifecycle
 -- (Requested → Approved → Processed / Declined), distinct from the raw money
 -- movement recorded in `payments`.

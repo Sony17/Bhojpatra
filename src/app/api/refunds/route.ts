@@ -58,7 +58,8 @@ export async function GET(request: Request) {
 }
 
 // POST /api/refunds → a signed-in customer raises a refund request against one
-// of their own bookings. The customer/amount/method are all derived server-side
+// of their own bookings, or an admin raises one (full or partial) against any
+// paid booking from the Refunds console. The customer/amount/method are all derived server-side
 // from the persisted booking, so a tampered payload can't over-claim or spoof.
 export async function POST(request: Request) {
   const guard = await requireRole();
@@ -126,14 +127,23 @@ export async function POST(request: Request) {
   const record: StoredRefund = {
     id: `RFD-${now.getFullYear()}${String(seq).padStart(4, "0")}`,
     bookingId,
-    userId: user.id,
-    customer: order.customer || user.name || "Online Booking",
+    // The booking's owner, even when an admin raises it on their behalf — so
+    // the customer still sees the refund in My Bookings.
+    ...(isAdmin
+      ? order.userId
+        ? { userId: order.userId }
+        : {}
+      : { userId: user.id }),
+    customer: order.customer || (isAdmin ? "" : user.name) || "Online Booking",
     ...(order.email ? { email: order.email } : {}),
     ...(order.phone ? { phone: order.phone } : {}),
     amount,
     reason,
     method: refundMethodFor(order),
-    status: "Requested",
+    // An admin raising a refund has already decided on it — it starts
+    // Approved, one "Process" click away from the gateway refund.
+    status: isAdmin ? "Approved" : "Requested",
+    raisedBy: isAdmin ? "admin" : "customer",
     requestedAt: displayDate(now),
     createdAt: now.toISOString(),
   };
