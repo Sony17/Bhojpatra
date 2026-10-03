@@ -30,7 +30,7 @@ import {
 
 type Lang = "en" | "hi";
 
-/* ─── Craft-my-plate count box ────────────────────────────────────────────
+/* ─── Veg / non-veg count box ────────────────────────────────────────────
  * Buffered numeric input for one side of the veg / non-veg split, so a guest
  * can clear the box and type freely (same pattern as the head-count field);
  * the committed value is clamped into 0..guests on blur.
@@ -74,6 +74,7 @@ function SplitCountInput({
     />
   );
 }
+
 
 /* ─── "Other" free-text field ─────────────────────────────────────────────
  * Replaces a select once the guest picks "Other" — a text box with a Change
@@ -168,10 +169,10 @@ export default function EventBar({
   setEventTime: (v: string) => void;
   foodPreference: string;
   setFoodPreference: (v: string) => void;
-  /** Veg / non-veg guest split ("Craft my plate") — how many of `guests` eat
-   *  non-veg, ALREADY DERIVED by the parent via `resolveNonVeg` from the food
-   *  preference plus the dialled-in mix. `null` = not declared, and nothing
-   *  downstream gets diet-filtered. Read-only here. */
+  /** Veg / non-veg guest split — how many of `guests` eat non-veg, ALREADY
+   *  DERIVED by the parent via `resolveNonVeg` from the food preference plus
+   *  the dialled-in mix. `null` = not declared, and nothing downstream gets
+   *  diet-filtered. Read-only here. */
   nonVegGuests: NonVegCount;
   /** Writes the guest's dialled-in non-veg count (the "Both" mix). Editing the
    *  split always writes this AND `setFoodPreference` together, so the label
@@ -208,9 +209,12 @@ export default function EventBar({
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
   const selectButtonClass =
-    "min-h-12 w-full rounded-control border border-cream bg-white px-3.5 py-2.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
+    "h-12 w-full rounded-control border border-cream bg-white px-3.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
+  // Every field shares one fixed-height label line, so the controls below
+  // line up across the row whether or not a label carries an action.
+  const labelRowClass = "flex h-4 items-center justify-between gap-2";
   const labelClass =
-    "text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60";
+    "truncate text-[11px] font-bold uppercase tracking-[0.08em] text-ink/60";
 
   // GPS "use my location" for the City field. autoDetect is off — the header
   // bar already runs the silent IP pre-fill, and detecting here persists to the
@@ -260,9 +264,8 @@ export default function EventBar({
   const stepGuests = (delta: number) => setGuests(clampGuests(guests + delta));
 
   // `nonVegGuests` arrives already derived from the preference + the guest's
-  // dialled-in mix (see `resolveNonVeg`), so there is nothing to sync here —
-  // a split edit just writes both halves of the source state at once: the
-  // mix itself, and the preference label that count now derives to.
+  // dialled-in mix (see `resolveNonVeg`) — a split edit writes both halves of
+  // the source state at once: the mix, and the preference it derives to.
   const commitNonVeg = (nv: number) => {
     const clamped = Math.max(0, Math.min(guests, Math.round(nv)));
     setNonVegMix(clamped);
@@ -390,7 +393,7 @@ export default function EventBar({
       )}
       <div
         className={
-          "flex items-center justify-between gap-4 " +
+          "flex items-baseline gap-3 " +
           (embedded
             ? "hidden"
             : collapsible
@@ -400,34 +403,22 @@ export default function EventBar({
               : "")
         }
       >
-        <div className="flex min-w-0 items-baseline gap-2">
-          <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
-            {t("YOUR EVENT", "आपका इवेंट")}
-          </p>
-          <p className="min-w-0 truncate text-xs text-ink/50 sm:text-sm">
-            {t(
-              "Tell us the essentials — you can edit these anytime.",
-              "ज़रूरी जानकारी दें — इसे कभी भी बदल सकते हैं।",
-            )}
-          </p>
-        </div>
-        <span className="hidden rounded-full bg-cream/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-maroon sm:inline">
-          {t("Event brief", "इवेंट ब्रीफ़")}
-        </span>
+        <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
+          {t("YOUR EVENT", "आपका इवेंट")}
+        </p>
+        <span className="h-px flex-1 self-center bg-cream" aria-hidden="true" />
+        <p className="shrink-0 text-caption text-ink/50">
+          {t("Editable anytime", "कभी भी बदलें")}
+        </p>
       </div>
       <div
         className={
-          "mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
-          // Web view keeps the whole brief on one row. Guests and the plate
-          // split get the widest share (their steppers, count boxes and slider
-          // bars have real minimum widths), while Meal / Time / Food are
-          // trimmed narrower. With the plate field there are eight of them, so
-          // the single row starts at xl (each column minmax(0,…) so the selects
-          // truncate instead of holding the row open); lg lays them out
-          // four-up on two rows rather than squeezing Food off the end. The Review step drops
-          // Guests + plate and keeps its six on one row from lg, as before.
+          "mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
+          // One aligned row on wide screens: every field is a label line over a
+          // 48px control, so the boxes share a baseline and a height. Guests is
+          // a compact inline stepper (no slider) so it fits a single column.
           (showGuests
-            ? "lg:grid-cols-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.85fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,0.9fr)_minmax(0,0.72fr)] "
+            ? "lg:grid-cols-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.4fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] "
             : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
           (embedded
             ? open
@@ -440,8 +431,10 @@ export default function EventBar({
               : "")
         }
       >
-        <label className="block">
-          <span className={labelClass}>{t("Occasion", "अवसर")}</span>
+        <label className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("Occasion", "अवसर")}</span>
+          </span>
           {occasionId === OTHER_OCCASION_ID ? (
             <OtherField
               value={customOccasion}
@@ -458,7 +451,7 @@ export default function EventBar({
               value={occasionId}
               onChange={setOccasionId}
               ariaLabel={t("Occasion", "अवसर")}
-              placeholder={t("Choose your occasion", "अवसर चुनें")}
+              placeholder={t("Choose occasion", "अवसर चुनें")}
               className="mt-1.5"
               buttonClassName={selectButtonClass}
               options={[
@@ -472,19 +465,19 @@ export default function EventBar({
           )}
         </label>
 
-        <div className="block">
-          <span className={labelClass}>{t("Date", "तारीख")}</span>
-          {/* Branded calendar (same on-brand popup as the Hero booking bar)
-              instead of the OS-grey native date control. Controlled by the
-              carried-over event date; the floor is just today (no past dates,
-              `minDaysAhead={0}`) — the lead-time shortfall is surfaced softly by
-              `leadWarning` below, per the date-floor note in the wizards. */}
+        <div className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("Date", "तारीख")}</span>
+          </span>
+          {/* Branded calendar (same on-brand popup as the Hero booking bar).
+              The floor is just today (`minDaysAhead={0}`) — the lead-time
+              shortfall is surfaced softly by `leadWarning` below. */}
           <DatePicker
             className={
-              "mt-1.5 min-h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
+              "mt-1.5 h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
               (leadWarning ? "border-maroon" : "border-cream focus-within:border-maroon")
             }
-            buttonClassName="min-h-12 w-full px-3.5 py-2.5 pr-11 text-sm"
+            buttonClassName="h-12 w-full px-3.5 pr-11 text-sm"
             iconClassName="right-3.5"
             placeholder={t("Pick a date", "तारीख चुनें")}
             ariaLabel={t("Event date", "इवेंट की तारीख")}
@@ -507,18 +500,20 @@ export default function EventBar({
           )}
         </div>
 
-        <div className="block">
-          <div className="flex items-center justify-between gap-2">
-            <span className={labelClass}>{t("City / Location", "शहर / लोकेशन")}</span>
+        <div className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("City", "शहर")}</span>
             <button
               type="button"
               onClick={() => void detectLocation()}
               disabled={detecting}
+              aria-label={t("Use my location", "मेरी लोकेशन")}
+              title={t("Use my location", "मेरी लोकेशन")}
               className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.06em] text-maroon transition hover:underline disabled:opacity-60"
             >
               <svg
                 viewBox="0 0 24 24"
-                className="h-3.5 w-3.5"
+                className={"h-3.5 w-3.5 " + (detecting ? "animate-spin" : "")}
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -529,11 +524,9 @@ export default function EventBar({
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
               </svg>
-              {detecting
-                ? t("Detecting…", "पता लगा रहे हैं…")
-                : t("Use my location", "मेरी लोकेशन")}
+              {t("Locate", "लोकेट")}
             </button>
-          </div>
+          </span>
           {cityId === OTHER_LOCATION_ID ? (
             <OtherField
               value={customCity}
@@ -550,7 +543,7 @@ export default function EventBar({
               value={cityId}
               onChange={setCityId}
               ariaLabel={t("City / Location", "शहर / लोकेशन")}
-              placeholder={t("Choose your city", "शहर चुनें")}
+              placeholder={t("Choose city", "शहर चुनें")}
               className="mt-1.5"
               buttonClassName={selectButtonClass}
               options={[
@@ -570,78 +563,59 @@ export default function EventBar({
         </div>
 
         {showGuests && (
-          <div className="flex flex-col justify-center gap-3 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
-            {/* Label above the stepper rather than beside it: side by side the
-                card's minimum width grew past its share of the eight-field
-                row and squeezed the last field off the end. */}
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
-                {t("Guests", "मेहमान")}
-              </p>
-              <p className="shrink-0 text-caption text-ink/50">
+          <div className="block min-w-0">
+            <span className={labelRowClass}>
+              <span className={labelClass}>{t("Guests", "मेहमान")}</span>
+              <span className="shrink-0 text-[10px] tabular-nums text-ink/40">
                 {inr.format(paxMin)}–{inr.format(paxMax)}
-              </p>
+              </span>
+            </span>
+            {/* Inline stepper in a field-height box: − [count] + */}
+            <div className="mt-1.5 flex h-12 items-center justify-between gap-1 rounded-control border border-cream bg-white px-1.5 shadow-soft transition focus-within:border-maroon focus-within:shadow-card">
+              <button
+                type="button"
+                onClick={() => stepGuests(-10)}
+                disabled={guests <= paxMin}
+                aria-label={t("Decrease guests", "मेहमान घटाएं")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg leading-none text-maroon transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={guestsText}
+                min={paxMin}
+                max={paxMax}
+                onChange={(e) => commitGuestsText(e.target.value)}
+                onBlur={blurGuests}
+                aria-label={t("Number of guests", "मेहमानों की संख्या")}
+                className="h-full w-full min-w-0 bg-transparent text-center text-sm font-bold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <button
+                type="button"
+                onClick={() => stepGuests(10)}
+                disabled={guests >= paxMax}
+                aria-label={t("Increase guests", "मेहमान बढ़ाएं")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg leading-none text-maroon transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
+              >
+                +
+              </button>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex w-full items-center justify-between gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => stepGuests(-10)}
-                  disabled={guests <= paxMin}
-                  aria-label={t("Decrease guests", "मेहमान घटाएं")}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-cream bg-white text-lg font-bold leading-none text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={guestsText}
-                  min={paxMin}
-                  max={paxMax}
-                  onChange={(e) => commitGuestsText(e.target.value)}
-                  onBlur={blurGuests}
-                  aria-label={t("Number of guests", "मेहमानों की संख्या")}
-                  className="h-9 w-16 rounded-full border border-cream bg-white text-center text-sm font-bold tabular-nums text-ink shadow-soft outline-none transition focus:border-maroon [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => stepGuests(10)}
-                  disabled={guests >= paxMax}
-                  aria-label={t("Increase guests", "मेहमान बढ़ाएं")}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-cream bg-white text-lg font-bold leading-none text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95 disabled:opacity-30"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <input
-              type="range"
-              min={paxMin}
-              max={paxMax}
-              step={10}
-              value={guests}
-              onChange={(e) => setGuests(clampGuests(Number(e.target.value)))}
-              aria-label={t("Number of guests", "मेहमानों की संख्या")}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-cream outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-maroon [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-maroon [&::-webkit-slider-thumb]:shadow-soft"
-            />
-
           </div>
         )}
 
-        {/* Craft my plate — the veg / non-veg split of the head-count, its own
-            field in the brief rather than a shelf inside Guests: it is a
-            decision in its own right (menus and stall rosters filter STRICTLY
-            off it), and the two cards read as a pair — how many are coming,
-            and who eats what. Undeclared, three chips set the preference;
-            once set, a cream(veg) / red(non-veg) slider and two count boxes
-            tune the exact mix. */}
+        {/* Veg / non-veg split of the head-count — menus and stall rosters
+            filter STRICTLY off it. Undeclared, three chips set the preference;
+            once set, the veg count, a cream(veg) / red(non-veg) slider and the
+            non-veg count tune the exact mix — all inside one field-height box
+            so it lines up with the rest of the row. */}
         {showGuests && (
-          <div className="flex flex-col justify-center gap-2.5 rounded-control border border-cream bg-cream/20 px-4 py-3 shadow-soft">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-maroon">
-                {t("Craft my plate", "अपनी थाली बनाएं")}
-              </p>
+          <div className="block min-w-0">
+            <span className={labelRowClass}>
+              <span className={labelClass}>
+                {t("Who eats what?", "कौन क्या खाएगा?")}
+              </span>
               {splitSet && (
                 <button
                   type="button"
@@ -654,95 +628,72 @@ export default function EventBar({
                   {t("Clear", "हटाएं")}
                 </button>
               )}
+            </span>
+            <div className="mt-1.5 flex h-12 items-center gap-1.5 rounded-control border border-cream bg-white px-2 shadow-soft">
+              {!splitSet ? (
+                bookingFoodPreferences.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setFoodPreference(f.value)}
+                    className="min-w-0 flex-1 truncate rounded-full border border-cream bg-white px-2 py-1.5 text-[11px] font-bold text-maroon transition hover:bg-cream/40 active:scale-95"
+                  >
+                    {lang === "hi" ? f.nameHi : f.value}
+                  </button>
+                ))
+              ) : (
+                <>
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm border border-maroon/40 bg-cream"
+                    title={t("Veg", "वेज")}
+                    aria-hidden="true"
+                  />
+                  <SplitCountInput
+                    value={vegGuests}
+                    max={guests}
+                    onCommit={(n) => commitNonVeg(guests - n)}
+                    ariaLabel={t("Vegetarian guests", "शाकाहारी मेहमान")}
+                  />
+                  <input
+                    type="range"
+                    min={0}
+                    max={guests}
+                    step={1}
+                    value={vegGuests}
+                    onChange={(e) => commitNonVeg(guests - Number(e.target.value))}
+                    aria-label={t("Vegetarian guests", "शाकाहारी मेहमान")}
+                    aria-valuetext={`${vegGuests} ${t("veg", "वेज")}, ${guests - vegGuests} ${t("non-veg", "नॉन-वेज")}`}
+                    style={{
+                      // Track = the plate itself: cream share eats veg, red
+                      // share eats non-veg. Both stops are brand hexes.
+                      background: `linear-gradient(to right, #f0d09e 0%, #f0d09e ${vegPct}%, #b92025 ${vegPct}%, #b92025 100%)`,
+                    }}
+                    className="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-maroon [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-maroon [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-soft"
+                  />
+                  <SplitCountInput
+                    value={guests - vegGuests}
+                    max={guests}
+                    onCommit={commitNonVeg}
+                    ariaLabel={t("Non-veg guests", "मांसाहारी मेहमान")}
+                  />
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm bg-maroon"
+                    title={t("Non-veg", "नॉन-वेज")}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
             </div>
-            {!splitSet ? (
-              <>
-                <p className="-mt-1 text-caption text-ink/50">
-                  {t("Who eats what?", "कौन क्या खाएगा?")}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {bookingFoodPreferences.map((f) => (
-                    <button
-                      key={f.value}
-                      type="button"
-                      onClick={() => setFoodPreference(f.value)}
-                      className="rounded-full border border-cream bg-white px-2.5 py-1 text-[11px] font-bold text-maroon shadow-soft transition hover:bg-cream/40 active:scale-95"
-                    >
-                      {lang === "hi" ? f.nameHi : f.value}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                {/* The two halves as stacked rows — swatch, who they are, how
-                    many. Side by side they'd never fit this column. */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1.5">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm border border-maroon/40 bg-cream"
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase text-ink/60">
-                      {t("Veg", "वेज")}
-                    </span>
-                    <SplitCountInput
-                      value={vegGuests}
-                      max={guests}
-                      onCommit={(n) => commitNonVeg(guests - n)}
-                      ariaLabel={t("Vegetarian guests", "शाकाहारी मेहमान")}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm bg-maroon"
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase text-ink/60">
-                      {t("Non-veg", "नॉन-वेज")}
-                    </span>
-                    <SplitCountInput
-                      value={guests - vegGuests}
-                      max={guests}
-                      onCommit={commitNonVeg}
-                      ariaLabel={t("Non-veg guests", "मांसाहारी मेहमान")}
-                    />
-                  </label>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={guests}
-                  step={1}
-                  value={vegGuests}
-                  onChange={(e) => commitNonVeg(guests - Number(e.target.value))}
-                  aria-label={t("Vegetarian guests", "शाकाहारी मेहमान")}
-                  aria-valuetext={`${vegGuests} ${t("veg", "वेज")}, ${guests - vegGuests} ${t("non-veg", "नॉन-वेज")}`}
-                  style={{
-                    // Track = the plate itself: cream share eats veg, red
-                    // share eats non-veg. Both stops are brand hexes.
-                    background: `linear-gradient(to right, #f0d09e 0%, #f0d09e ${vegPct}%, #b92025 ${vegPct}%, #b92025 100%)`,
-                  }}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-maroon [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-maroon [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-soft"
-                />
-              </>
-            )}
           </div>
         )}
 
-        {/* Serving time — the meal period plus a clock slot within it. Folded
-            into the grid above so the whole brief sits on one row in web view;
-            each select carries its own label. Optional; when set it rides onto
-            the order, invoice ("Serving time") and admin/My-Bookings via
-            `servingTimeLabel`. */}
-        <div className="block">
-          <span className={labelClass}>
-            {t("Meal", "भोजन")}{" "}
-            <span className="font-medium normal-case tracking-normal text-ink/40">
-              ({t("optional", "वैकल्पिक")})
-            </span>
+        {/* Serving time — the meal period plus a clock slot within it.
+            Optional; when set it rides onto the order, invoice ("Serving
+            time") and admin/My-Bookings via `servingTimeLabel`. */}
+        <div className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("Meal", "भोजन")}</span>
           </span>
-          {/* Meal period — Breakfast / Lunch / Dinner. */}
           <ThemedSelect
             value={mealTime}
             onChange={(v) => {
@@ -753,7 +704,7 @@ export default function EventBar({
                 setEventTime("");
             }}
             ariaLabel={t("Meal period", "भोजन अवधि")}
-            placeholder={t("Choose your meal", "भोजन चुनें")}
+            placeholder={t("Optional", "वैकल्पिक")}
             className="mt-1.5"
             buttonClassName={selectButtonClass}
             options={bookingMealTimes.map((m) => ({
@@ -763,8 +714,10 @@ export default function EventBar({
           />
         </div>
 
-        <div className="block">
-          <span className={labelClass}>{t("Time", "समय")}</span>
+        <div className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("Time", "समय")}</span>
+          </span>
           {/* Time slot within the chosen meal — enabled once a meal is picked. */}
           <ThemedSelect
             value={eventTime}
@@ -774,7 +727,7 @@ export default function EventBar({
             placeholder={
               mealTime
                 ? t("Pick a time", "समय चुनें")
-                : t("Pick a meal first", "पहले भोजन चुनें")
+                : t("After meal", "भोजन के बाद")
             }
             className="mt-1.5"
             buttonClassName={selectButtonClass}
@@ -787,18 +740,15 @@ export default function EventBar({
 
         {/* Food preference — Pure Veg / Non-veg / Both. Optional; rides onto the
             order, invoice ("Food preference") and admin / My-Bookings. */}
-        <div className="block">
-          <span className={labelClass}>
-            {t("Food", "खाना")}{" "}
-            <span className="font-medium normal-case tracking-normal text-ink/40">
-              ({t("optional", "वैकल्पिक")})
-            </span>
+        <div className="block min-w-0">
+          <span className={labelRowClass}>
+            <span className={labelClass}>{t("Food", "खाना")}</span>
           </span>
           <ThemedSelect
             value={foodPreference}
             onChange={setFoodPreference}
             ariaLabel={t("Food preference", "खाने की पसंद")}
-            placeholder={t("Veg or non-veg?", "वेज या नॉन-वेज?")}
+            placeholder={t("Optional", "वैकल्पिक")}
             className="mt-1.5"
             buttonClassName={selectButtonClass}
             options={bookingFoodPreferences.map((f) => ({
