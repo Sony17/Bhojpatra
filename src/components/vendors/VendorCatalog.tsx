@@ -22,6 +22,7 @@ import {
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import { useAllVendors } from "@/lib/useAllVendors";
+import { isStallTypeId, stallTypeById } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
 import { useLocations } from "@/lib/locations";
 import {
@@ -283,6 +284,13 @@ export default function VendorCatalog() {
   const [addOnsOnly, setAddOnsOnly] = useState<boolean>(
     () => searchParams.get("addons") === "1",
   );
+  // One specific counter, handed over by the stall-type grid at /book/stall
+  // ("show me the chaat stalls"). Narrower than the Add-ons lens, which only
+  // asks whether a caterer runs any counter at all. Clearable like any chip.
+  const [counter, setCounter] = useState<string>(() => {
+    const c = searchParams.get("counter") ?? "";
+    return isStallTypeId(c) ? c : "";
+  });
   const [price, setPrice] = useState<PriceRange>(() => {
     const p = searchParams.get("price");
     if (PRICE_RANGES.some((r) => r.value === p)) return p as PriceRange;
@@ -483,6 +491,9 @@ export default function VendorCatalog() {
       // service. Live vendors declare theirs, curated seeds derive them.
       const matchesAddOns = !addOnsOnly || listingOfferings(v).length > 0;
 
+      // The stall-type lens: this exact counter, declared or derived.
+      const matchesCounter = counter === "" || listingOfferings(v).includes(counter);
+
       const matchesMeals =
         !visibleFilters.has("meals") ||
         meals.length === 0 ||
@@ -500,6 +511,7 @@ export default function VendorCatalog() {
         matchesQuery &&
         matchesCategory &&
         matchesAddOns &&
+        matchesCounter &&
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
         (!visibleFilters.has("cuisine") || cuisine === ALL || v.cuisines.includes(cuisine)) &&
@@ -545,6 +557,7 @@ export default function VendorCatalog() {
     bainaMode,
     category,
     addOnsOnly,
+    counter,
     visibleFilters,
     city,
     state,
@@ -579,6 +592,7 @@ export default function VendorCatalog() {
     query !== "" ||
     category !== "" ||
     addOnsOnly ||
+    counter !== "" ||
     city !== ALL ||
     state !== ALL ||
     cuisine !== ALL ||
@@ -606,6 +620,7 @@ export default function VendorCatalog() {
     setQuery("");
     setCategory("");
     setAddOnsOnly(false);
+    setCounter("");
     setCity(ALL);
     setState(ALL);
     setCuisine(ALL);
@@ -729,6 +744,24 @@ export default function VendorCatalog() {
               >
                 {t("Filters", "फ़िल्टर")}
               </CategoryChip>
+
+              {/* The stall type carried over from /book/stall — clearable, so a
+                  guest can widen back out to every stall without going back. */}
+              {counter !== "" && (
+                <CategoryChip
+                  id="vendor-counter-chip"
+                  selected
+                  onClick={() => setCounter("")}
+                  leftIcon={
+                    <span aria-hidden="true">{stallTypeById(counter)?.icon}</span>
+                  }
+                >
+                  {(lang === "hi"
+                    ? stallTypeById(counter)?.nameHi
+                    : stallTypeById(counter)?.name) ?? counter}{" "}
+                  ✕
+                </CategoryChip>
+              )}
 
               {showFilter("price") && (
                 <CategoryChip
@@ -1074,6 +1107,9 @@ export default function VendorCatalog() {
               // shows a Silver tag, and a Single Stall search never shows a
               // Baina Box one — even on a caterer who is genuinely all three.
               lens={lens}
+              // Carried into the wizard so backing out of a stall returns to
+              // the stall type the guest was browsing, not a blank grid.
+              counter={counter}
             />
           ))}
         </ul>
@@ -1158,9 +1194,12 @@ function VendorCard({
   stats,
   bainaMode,
   lens,
+  counter = "",
 }: {
   vendor: VendorListing;
   stats?: VendorRatingSummary;
+  /** The stall type the catalog is filtered to, passed on to the wizard. */
+  counter?: string;
   /** Browsing the Baina Box lens (chip or "baina" search) — a brand with a
    *  Baina Box storefront then links there instead of to its caterer page. */
   bainaMode?: boolean;
@@ -1196,7 +1235,7 @@ function VendorCard({
       ? `/vendors/${vendor.id}#baina-order`
       : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
           cityId ? `&city=${cityId}` : ""
-        }`;
+        }${counter ? `&counter=${encodeURIComponent(counter)}` : ""}`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {

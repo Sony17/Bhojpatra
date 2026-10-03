@@ -16,6 +16,7 @@ import {
   type ReferralRates,
 } from "@/lib/referralRates";
 import LoginGate from "@/components/auth/LoginGate";
+import StallTypePicker from "@/components/booking/StallTypePicker";
 import StepDone from "@/components/booking/shared/StepDone";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
@@ -64,6 +65,8 @@ import {
   type StallItemMap as ItemMap,
 } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
+import { useAllVendors } from "@/lib/useAllVendors";
+import { stallTypeCounts, isStallTypeId } from "@/lib/stallTypes";
 import {
   readStoredLocation,
   markManualLocation,
@@ -212,6 +215,8 @@ export default function StallBookingWizard() {
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
 
+  const brandsBaseHref = BRANDS_HREF;
+
   const [step, setStep] = useState<number>(1);
 
   // Step 1 — the chosen stall (one vendor for the whole order).
@@ -219,6 +224,16 @@ export default function StallBookingWizard() {
   // A `?vendor=` hand-off from a brand page, held until the live roster loads.
   const [pendingVendorId, setPendingVendorId] = useState<string>("");
   const [missingBrand, setMissingBrand] = useState<string>("");
+  // The stall TYPE (a counter id) the guest picked on the way in. Purely a
+  // browsing lens — it narrows the Brands catalog, never the stall's own menu.
+  const [counterType, setCounterType] = useState<string>("");
+
+  // Every "back to the Brands page" link keeps the stall type in hand, so a
+  // guest who changes their mind about the caterer stays inside the type they
+  // chose instead of being dropped back into the whole catalogue.
+  const brandsHref = counterType
+    ? `${brandsBaseHref}&counter=${encodeURIComponent(counterType)}`
+    : brandsBaseHref;
 
   // Step 2 — the stall's own menu.
   const [activeCat, setActiveCat] = useState<number>(0);
@@ -363,6 +378,10 @@ export default function StallBookingWizard() {
     // drop the guest straight onto the menu builder for that stall.
     const vendorParam = sp.get("vendor")?.trim();
     if (vendorParam) setPendingVendorId(vendorParam);
+    // Returning from the Brands catalog keeps the stall type, so a guest who
+    // backs out of a stall lands on the type they were browsing, not step one.
+    const counterParam = sp.get("counter")?.trim() ?? "";
+    if (isStallTypeId(counterParam)) setCounterType(counterParam);
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
@@ -563,7 +582,34 @@ export default function StallBookingWizard() {
     };
   }, []);
 
-  const cityName = resolveCity(cityId)?.name.toLowerCase();
+  const cityDisplayName = resolveCity(cityId)?.name ?? "";
+  const cityName = cityDisplayName.toLowerCase();
+
+  // Catalog listings (curated seeds + live vendors) — the only source that
+  // knows which counters a vendor runs, so the stall-type grid counts against
+  // them rather than the menu roster, which carries no offerings.
+  const catalogVendors = useAllVendors();
+  const stallTypeCount = useMemo(
+    () => stallTypeCounts(catalogVendors, cityDisplayName),
+    [catalogVendors, cityDisplayName],
+  );
+
+  // A stall type hands off to the Brands catalog pre-filtered to that counter;
+  // the catalog's "Book" then comes back here with `?vendor=`, and the guest's
+  // date / guests / occasion survive the round trip in the persisted draft.
+  const stallTypeHref = (typeId: string) => {
+    const sp = new URLSearchParams({
+      category: "single-stall",
+      counter: typeId,
+    });
+    if (cityDisplayName) sp.set("city", cityDisplayName);
+    return `/vendors?${sp.toString()}`;
+  };
+  // Deliberately the UNfiltered lens — this is the escape hatch for a guest who
+  // doesn't want to commit to a stall type at all.
+  const browseAllStallsHref = cityDisplayName
+    ? `${brandsBaseHref}&city=${encodeURIComponent(cityDisplayName)}`
+    : brandsBaseHref;
 
   // Every stall a guest can book, collapsed from the per-course roster into one
   // card per vendor. NO tier gate — that is the whole point of this flow: a
@@ -717,17 +763,10 @@ export default function StallBookingWizard() {
     setPendingVendorId("");
   }, [stalls, pendingVendorId, menuSettled]);
 
-  // Nobody books a stall they haven't seen. Landing here without one — a bare
-  // /book/stall, a cleared draft — means the guest hasn't chosen yet, so send
-  // them to the Brands page, which lists every stall with its photos, filters
-  // and full menu. They come back through a brand's "Book Now" with `?vendor=`,
-  // and the draft (event brief and all) is still in session storage. A hand-off
-  // we couldn't resolve keeps them here instead, so the notice is read first.
-  useEffect(() => {
-    if (!menuSettled || stallId || pendingVendorId || missingBrand) return;
-    if (typeof window === "undefined") return;
-    window.location.replace(BRANDS_HREF);
-  }, [menuSettled, stallId, pendingVendorId, missingBrand]);
+  // Landing here without a stall — a bare /book/stall, a cleared draft — shows
+  // the stall-type grid (step 1 below). A type leads to the Brands page filtered
+  // to it, whose "Book Now" comes back with `?vendor=`; the draft (event brief
+  // and all) survives the round trip in session storage.
 
   // Keep the active course tab in range when the stall (and its course list)
   // changes.
@@ -1014,10 +1053,10 @@ export default function StallBookingWizard() {
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   // Start over drops every pick — including the stall — so it lands back where
-  // the flow begins: the Brands page.
+  // the flow begins: the stall-type grid.
   const startOver = () => {
     clearStallDraft();
-    if (typeof window !== "undefined") window.location.assign(BRANDS_HREF);
+    if (typeof window !== "undefined") window.location.assign("/book/stall");
   };
 
   const applyCouponCode = (raw: string) => {
@@ -1470,6 +1509,11 @@ export default function StallBookingWizard() {
   // Details (2) and Review (3) run beside the live order summary; the menu
   // builder (1) takes the full width.
   const showSummary = step === 2 || step === 3;
+  // The stall-type grid owns the whole screen: it carries its own way onward
+  // (a tile) and its own way out ("See all stalls"), so the wizard's step nav —
+  // a disabled Continue over a duplicate back-link — would only be noise.
+  const showTypePicker =
+    step === 1 && !stall && !pendingVendorId && !missingBrand;
 
   return (
     <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
@@ -1518,8 +1562,10 @@ export default function StallBookingWizard() {
         }
       >
         <div className="min-w-0">
-          {/* Step 1 · the chosen stall's menu. Without a stall this is a hand-off
-              back to the Brands page — the only place stalls are picked. */}
+          {/* Step 1 · the chosen stall's menu. Without a stall the guest picks a
+              stall TYPE first, then the caterer who runs it on the Brands page
+              — the only place stalls themselves are picked. A broken brand
+              link skips the grid and shows live alternatives straight away. */}
           {step === 1 &&
             (stall ? (
               <StepStallMenu
@@ -1534,16 +1580,26 @@ export default function StallBookingWizard() {
                 perPlate={perPlate}
                 pickedCount={pickedCount}
                 guests={guests}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
                 nonVegGuests={nonVegGuests}
                 hiddenDishes={dietView.hiddenDishes}
                 blockedCourses={dietView.blockedCourses}
+              />
+            ) : showTypePicker ? (
+              <StallTypePicker
+                t={t}
+                lang={lang}
+                cityLabel={cityDisplayName}
+                counts={stallTypeCount}
+                selectedId={counterType}
+                hrefFor={stallTypeHref}
+                browseAllHref={browseAllStallsHref}
               />
             ) : (
               <StallHandoff
                 t={t}
                 missingBrand={missingBrand}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
               />
             ))}
 
@@ -1627,7 +1683,7 @@ export default function StallBookingWizard() {
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
                 onEditExtras={() => setStep(2)}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
               />
             ))}
@@ -1657,7 +1713,7 @@ export default function StallBookingWizard() {
           cream notice, Back / Continue on desktop, and a sticky checkout bar on
           phones carrying the running estimate. Review carries its own actions,
           so the nav stops before it. */}
-      {step < TOTAL_STEPS && (
+      {step < TOTAL_STEPS && !showTypePicker && (
         <div className="mt-8 sm:mt-10">
           {nextBlockers.length > 0 && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-maroon/30 bg-cream/40 px-3 py-2.5 text-[13px] text-ink/70 sm:rounded-card sm:px-4 sm:py-3 sm:text-sm sm:text-ink-soft">
@@ -1685,7 +1741,7 @@ export default function StallBookingWizard() {
               </Button>
             ) : (
               <a
-                href={BRANDS_HREF}
+                href={brandsHref}
                 className="text-sm font-semibold text-ink-soft underline underline-offset-4 transition hover:text-maroon"
               >
                 ← {t("Back to all stalls", "सभी स्टॉल पर वापस")}
