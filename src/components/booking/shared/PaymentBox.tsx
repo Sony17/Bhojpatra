@@ -58,6 +58,7 @@ export default function PaymentBox({
   eventDate,
   emiCount,
   setEmiCount,
+  blocker = "",
 }: {
   t: (en: string, hi: string) => string;
   bookingId: string;
@@ -72,6 +73,10 @@ export default function PaymentBox({
   eventDate: string;
   emiCount: number;
   setEmiCount: (n: number) => void;
+  /** Why the order can't be paid for yet (an unmet step rule — too-soon date,
+   *  empty menu…). Non-empty disables the pay button and is shown under it,
+   *  so money is never taken for an order the booking POST would reject. */
+  blocker?: string;
 }) {
   const [merchant, setMerchant] = useState<UpiPayeeConfig>(DEFAULT_MERCHANT);
   // Razorpay publishable key id — non-empty means the gateway is configured
@@ -642,6 +647,7 @@ export default function PaymentBox({
             disabled={
               submitting ||
               !contactReady ||
+              Boolean(blocker) ||
               (!gatewayMode && !isValidTxnId(txnId))
             }
             className="mt-4 rounded-full bg-maroon px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 disabled:opacity-60"
@@ -660,6 +666,11 @@ export default function PaymentBox({
                 "Your booking confirms automatically once the payment succeeds. Secured by Razorpay.",
                 "भुगतान सफल होते ही आपकी बुकिंग अपने आप कन्फर्म हो जाएगी। Razorpay द्वारा सुरक्षित।",
               )}
+            </p>
+          )}
+          {blocker && (
+            <p role="alert" className="mt-2 text-xs font-medium text-maroon">
+              {blocker}
             </p>
           )}
           {!contactReady && (

@@ -56,6 +56,7 @@ import {
   type Coupon,
   type BookingStatus,
   type VendorListing,
+  listingOfferings,
 } from "@/lib/data";
 import { slugifyName } from "@/lib/bookings";
 import {
@@ -87,12 +88,16 @@ import {
   MAX_GUESTS,
   ADVANCE_RATE,
   computeOrderTotals,
-  deriveBookingId,
+  bookingRef,
   daysUntil,
   formatEventDate,
   isoAfterDays,
 } from "@/lib/bookingPricing";
-import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
+import {
+  getBookingSalt,
+  bookingSaltFor,
+  rotateBookingSalt,
+} from "@/lib/bookingSalt";
 import {
   PREF_BOTH,
   dishAllowed,
@@ -135,6 +140,17 @@ function prettifyVendorId(id: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
   return words.length ? words.join(" ") : id;
 }
+
+/** A brand name reduced to a slug, tolerating the catalog listing's trailing
+ *  "Caterers" — how a catalogue id with no booking-menu record under it is
+ *  bridged to its wizard counterpart ("Awadhi Royal Caterers" ↔ "Awadhi Royal"). */
+function brandKey(name: string): string {
+  return slugifyName(name).replace(/-caterers$/, "");
+}
+
+/** Curated seed listings — city-agnostic in every roster (they stand in for
+ *  the platform's own network); only live vendors cook locally. */
+const SEED_LISTING_IDS = new Set(vendorListings.map((v) => v.id));
 
 /** One course a stall publishes, with that stall's dishes for it. */
 interface StallCourse {
@@ -209,8 +225,10 @@ function coursePrice(course: StallCourse, picks: string[]): number {
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function StallBookingWizard() {
-  // Per-browser booking salt — see lib/bookingSalt.ts.
-  const [bookingSalt] = useState(getBookingSalt);
+  // Per-browser booking salt — see lib/bookingSalt.ts. Re-keyed to the account
+  // once the session is known (below), so two people on one browser never
+  // share a booking id.
+  const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
@@ -525,6 +543,16 @@ export default function StallBookingWizard() {
     if (sessionStatus.email) setCustomerEmail((e) => e || sessionStatus.email!);
   }, [sessionStatus]);
 
+  // Tie the booking id to the account: a different account signing in on this
+  // browser gets a fresh salt. Never once money has moved — the id a payment
+  // was recorded against is final.
+  useEffect(() => {
+    const owner = sessionStatus?.email;
+    if (!owner || paidAmount > 0) return;
+    const salt = bookingSaltFor(owner);
+    if (salt !== bookingSalt) setBookingSalt(salt);
+  }, [sessionStatus?.email, paidAmount, bookingSalt]);
+
   const [lastBookingPhone, setLastBookingPhone] = useState<string>("");
   useEffect(() => {
     if (!sessionStatus) return;
@@ -584,15 +612,16 @@ export default function StallBookingWizard() {
 
   const cityDisplayName = resolveCity(cityId)?.name ?? "";
   const cityName = cityDisplayName.toLowerCase();
+  // The city as the Brands catalog knows it. A typed-in "Other" city isn't a
+  // catalog option — filtering on it would only ever show an empty page — so
+  // the catalog links and the stall-type counts leave the city open then.
+  const catalogCity =
+    cityId && cityId !== OTHER_LOCATION_ID ? cityDisplayName : "";
 
   // Catalog listings (curated seeds + live vendors) — the only source that
   // knows which counters a vendor runs, so the stall-type grid counts against
   // them rather than the menu roster, which carries no offerings.
   const catalogVendors = useAllVendors();
-  const stallTypeCount = useMemo(
-    () => stallTypeCounts(catalogVendors, cityDisplayName),
-    [catalogVendors, cityDisplayName],
-  );
 
   // A stall type hands off to the Brands catalog pre-filtered to that counter;
   // the catalog's "Book" then comes back here with `?vendor=`, and the guest's
@@ -602,13 +631,13 @@ export default function StallBookingWizard() {
       category: "single-stall",
       counter: typeId,
     });
-    if (cityDisplayName) sp.set("city", cityDisplayName);
+    if (catalogCity) sp.set("city", catalogCity);
     return `/vendors?${sp.toString()}`;
   };
   // Deliberately the UNfiltered lens — this is the escape hatch for a guest who
   // doesn't want to commit to a stall type at all.
-  const browseAllStallsHref = cityDisplayName
-    ? `${brandsBaseHref}&city=${encodeURIComponent(cityDisplayName)}`
+  const browseAllStallsHref = catalogCity
+    ? `${brandsBaseHref}&city=${encodeURIComponent(catalogCity)}`
     : brandsBaseHref;
 
   // Every stall a guest can book, collapsed from the per-course roster into one
@@ -628,7 +657,8 @@ export default function StallBookingWizard() {
           v.live &&
           cityName &&
           v.city?.toLowerCase() !== cityName &&
-          v.id !== stallId
+          v.id !== stallId &&
+          v.id !== pendingVendorId
         )
           continue;
         if (!v.items.length) continue;
@@ -681,7 +711,24 @@ export default function StallBookingWizard() {
       (a, b) =>
         Number(b.pinned) - Number(a.pinned) || b.rating - a.rating,
     );
-  }, [liveMenuCategories, cityName, stallId]);
+  }, [liveMenuCategories, cityName, stallId, pendingVendorId]);
+
+  // Which catalog listings can actually be booked here — by id, or by brand
+  // name for a curated listing bridged to its wizard record. The stall-type
+  // tiles count only these, so a tile never leads to "we couldn't find it".
+  const bookableStallKeys = useMemo(
+    () => new Set(stalls.flatMap((s) => [s.id, brandKey(s.name)])),
+    [stalls],
+  );
+  const stallTypeCount = useMemo(
+    () =>
+      stallTypeCounts(
+        catalogVendors,
+        catalogCity,
+        (v) => bookableStallKeys.has(v.id) || bookableStallKeys.has(brandKey(v.name)),
+      ),
+    [catalogVendors, catalogCity, bookableStallKeys],
+  );
 
   const rawStall = useMemo<StallOption | undefined>(
     () => stalls.find((s) => s.id === stallId),
@@ -733,17 +780,13 @@ export default function StallBookingWizard() {
   // "Caterers" ("Awadhi Royal Caterers" ↔ "Awadhi Royal").
   useEffect(() => {
     if (!pendingVendorId) return;
-    const nameKey = (name: string) =>
-      slugifyName(name).replace(/-caterers$/, "");
-    let targetId = pendingVendorId;
-    if (!stalls.some((s) => s.id === pendingVendorId)) {
+    let target = stalls.find((s) => s.id === pendingVendorId);
+    if (!target) {
       const listing = vendorListings.find((l) => l.id === pendingVendorId);
-      const hit = listing
-        ? stalls.find((s) => nameKey(s.name) === nameKey(listing.name))
-        : undefined;
-      if (hit) targetId = hit.id;
+      if (listing)
+        target = stalls.find((s) => brandKey(s.name) === brandKey(listing.name));
     }
-    if (!stalls.some((s) => s.id === targetId)) {
+    if (!target) {
       // While the live roster is in flight this only means "not loaded yet".
       if (!menuSettled) return;
       const listing = vendorListings.find((l) => l.id === pendingVendorId);
@@ -754,14 +797,32 @@ export default function StallBookingWizard() {
     setMissingBrand("");
     // A different stall than the draft held invalidates every dish pick — item
     // ids are vendor-scoped.
-    setStallId((prev) => {
-      if (prev !== targetId) setCategoryItems({});
-      return targetId;
-    });
+    if (stallId !== target.id) setCategoryItems({});
+    setStallId(target.id);
+    // The guest's own event city always wins; only when they have none yet
+    // does the stall's home city stand in (a live vendor cooks locally).
+    if (!cityId && target.city) {
+      const home = target.city.toLowerCase();
+      const loc = locations.find((c) => c.name.toLowerCase() === home);
+      if (loc) setCityId(loc.id);
+    }
     setActiveCat(0);
     setStep(1);
     setPendingVendorId("");
-  }, [stalls, pendingVendorId, menuSettled]);
+  }, [stalls, pendingVendorId, menuSettled, stallId, cityId, locations]);
+
+  // A draft whose stall has since left the roster (vendor unpublished, menu
+  // hidden) must not resume as a half-built order with a "—" stall that could
+  // still be paid for on extras alone. Once the live roster has answered, drop
+  // the stall, say which one went missing, and start from the menu step.
+  useEffect(() => {
+    if (!menuSettled || !stallId || rawStall || pendingVendorId) return;
+    const listing = vendorListings.find((l) => l.id === stallId);
+    setMissingBrand(listing?.name ?? prettifyVendorId(stallId));
+    setStallId("");
+    setCategoryItems({});
+    setStep(1);
+  }, [menuSettled, stallId, rawStall, pendingVendorId]);
 
   // Landing here without a stall — a bare /book/stall, a cleared draft — shows
   // the stall-type grid (step 1 below). A type leads to the Brands page filtered
@@ -864,20 +925,34 @@ export default function StallBookingWizard() {
       : selectedService.priceMin
     : 0;
 
-  // Counter vendors: the whole catalogue (no tier narrowing on Single Stall),
-  // STRICTLY minus meat-only kitchens when the plate is pure veg.
+  // Counter vendors: the whole catalogue (curated seeds + live vendors, no tier
+  // narrowing on Single Stall), live ones in the event city only — the same
+  // rule as the stall roster — and STRICTLY minus meat-only kitchens when the
+  // plate is pure veg.
   const counterVendors = useMemo(
-    () => vendorListings.filter((v) => kitchenFitsSplit(v.diet, nonVegGuests)),
-    [nonVegGuests],
+    () =>
+      catalogVendors.filter(
+        (v) =>
+          kitchenFitsSplit(v.diet, nonVegGuests) &&
+          (SEED_LISTING_IDS.has(v.id) ||
+            !cityName ||
+            v.city?.toLowerCase() === cityName),
+      ),
+    [catalogVendors, nonVegGuests, cityName],
   );
+  // …and per counter, only the vendors who actually run it — a chaat counter
+  // can't be handed to a caterer who never declared one.
+  const vendorsForCounter = (addOnId: string): VendorListing[] =>
+    counterVendors.filter((v) => listingOfferings(v).includes(addOnId));
 
-  // A counter's vendor: the guest's pick when it's still valid (and still
-  // serves the plate), else the first eligible one so a selected counter is
-  // never vendorless.
+  // A counter's vendor: the guest's pick when it's still valid (runs the
+  // counter, in reach, serves the plate), else the first eligible one so a
+  // selected counter is never vendorless while someone can run it.
   const addOnVendorId = (addOnId: string): string => {
+    const pool = vendorsForCounter(addOnId);
     const chosen = addOnVendor[addOnId];
-    if (chosen && counterVendors.some((v) => v.id === chosen)) return chosen;
-    return counterVendors[0]?.id ?? "";
+    if (chosen && pool.some((v) => v.id === chosen)) return chosen;
+    return pool[0]?.id ?? "";
   };
   const addOnVendorName = (addOnId: string): string =>
     counterVendors.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
@@ -942,11 +1017,12 @@ export default function StallBookingWizard() {
     [sessionStatus, lastBookingPhone],
   );
 
-  const totalItems = Object.values(categoryItems).reduce(
-    (n, arr) => n + arr.length,
-    0,
-  );
-  const bookingId = deriveBookingId(bookingSalt, guests, grandTotal, totalItems);
+  // The booking id is the browser's (account-keyed) salt alone — NOT the
+  // order's shape. The event brief stays editable on Review, so a shape-based
+  // id would change under a payment the moment the guest fixed a date or a
+  // coupon, and the server could then neither match the money nor stop a
+  // second charge. One visit, one id; the salt rotates once the order is saved.
+  const bookingId = bookingRef(bookingSalt, STALL_PACKAGE_ID);
 
   /* ─── Advance-booking lead time ────────────────────────────────────── */
   // "As per vendor specification": the longest lead among the stall and any
@@ -991,6 +1067,8 @@ export default function StallBookingWizard() {
         return (
           occasionId !== "" &&
           (occasionId !== OTHER_OCCASION_ID || customOccasion.trim() !== "") &&
+          cityId !== "" &&
+          (cityId !== OTHER_LOCATION_ID || customCity.trim() !== "") &&
           guests >= MIN_GUESTS &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
@@ -1002,9 +1080,9 @@ export default function StallBookingWizard() {
   };
   const canNext = stepValid(step);
 
-  const nextBlockers = ((): string[] => {
-    if (canNext) return [];
-    if (step === 1) {
+  const blockersFor = (s: number): string[] => {
+    if (stepValid(s)) return [];
+    if (s === 1) {
       if (!stall) return [t("Choose a stall", "एक स्टॉल चुनें")];
       if (stall.courses.length === 0)
         return [
@@ -1025,7 +1103,7 @@ export default function StallBookingWizard() {
             ),
       ];
     }
-    if (step === 2) {
+    if (s === 2) {
       const out: string[] = [];
       if (occasionId === "") out.push(t("Choose an occasion", "अवसर चुनें"));
       else if (
@@ -1033,6 +1111,9 @@ export default function StallBookingWizard() {
         customOccasion.trim() === ""
       )
         out.push(t("Name your occasion", "अपने अवसर का नाम लिखें"));
+      if (cityId === "") out.push(t("Choose your city", "अपना शहर चुनें"));
+      else if (cityId === OTHER_LOCATION_ID && customCity.trim() === "")
+        out.push(t("Name your city", "अपने शहर का नाम लिखें"));
       if (eventDate === "")
         out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
@@ -1046,7 +1127,16 @@ export default function StallBookingWizard() {
       return out;
     }
     return [];
-  })();
+  };
+  const nextBlockers = blockersFor(step);
+  // Review re-checks every earlier rule: the event brief is still editable
+  // there, so a date pulled inside the notice window or a plate switched to
+  // pure veg (emptying a set-menu stall) must block payment — otherwise the
+  // advance is taken and the booking POST then rejects the order.
+  const reviewBlocker =
+    step === TOTAL_STEPS
+      ? [...blockersFor(1), ...blockersFor(2)].join(" • ")
+      : "";
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
@@ -1308,6 +1398,10 @@ export default function StallBookingWizard() {
 
   const handleConfirm = async (paidOverride?: number, refOverride?: string) => {
     setConfirmError("");
+    if (reviewBlocker) {
+      setConfirmError(reviewBlocker);
+      return;
+    }
     if (!customerName.trim()) {
       setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
@@ -1336,7 +1430,7 @@ export default function StallBookingWizard() {
         [
           ...(stall ? [{ id: stall.id, name: stall.name }] : []),
           ...selectedAddOns.flatMap((id) => {
-            const v = vendorListings.find((x) => x.id === addOnVendorId(id));
+            const v = counterVendors.find((x) => x.id === addOnVendorId(id));
             return v ? [{ id: v.id, name: v.name }] : [];
           }),
         ].map((v) => [v.id, v] as const),
@@ -1401,6 +1495,20 @@ export default function StallBookingWizard() {
           receipt: buildReceipt(),
           invoice: invoiceData,
           invoiceToken: encodeInvoice(invoiceData),
+          // What this total was built from — the server re-prices the order
+          // from its own data and refuses a total that doesn't match.
+          pricing: {
+            stallId: stall?.id ?? stallId,
+            picks: Object.fromEntries(
+              (stall?.courses ?? [])
+                .map((c) => [c.id, itemsFor(c.id)] as const)
+                .filter(([, ids]) => ids.length > 0),
+            ),
+            addOnIds: selectedAddOns,
+            serviceId: selectedService?.id ?? "",
+            venueFee,
+            couponCode: appliedCoupon?.code ?? "",
+          },
         }),
       });
       if (!res.ok) {
@@ -1512,8 +1620,13 @@ export default function StallBookingWizard() {
   // The stall-type grid owns the whole screen: it carries its own way onward
   // (a tile) and its own way out ("See all stalls"), so the wizard's step nav —
   // a disabled Continue over a duplicate back-link — would only be noise.
+  // A stall named by the draft or the URL that the live roster hasn't answered
+  // for yet — show a hold, not the stall-type grid (which would flash and then
+  // vanish) and not the hand-off panel.
+  const stallLoading =
+    !menuSettled && !stall && Boolean(stallId || pendingVendorId);
   const showTypePicker =
-    step === 1 && !stall && !pendingVendorId && !missingBrand;
+    step === 1 && !stall && !stallLoading && !pendingVendorId && !missingBrand;
 
   return (
     <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
@@ -1585,11 +1698,13 @@ export default function StallBookingWizard() {
                 hiddenDishes={dietView.hiddenDishes}
                 blockedCourses={dietView.blockedCourses}
               />
+            ) : stallLoading ? (
+              <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
             ) : showTypePicker ? (
               <StallTypePicker
                 t={t}
                 lang={lang}
-                cityLabel={cityDisplayName}
+                cityLabel={catalogCity}
                 counts={stallTypeCount}
                 selectedId={counterType}
                 hrefFor={stallTypeHref}
@@ -1616,6 +1731,7 @@ export default function StallBookingWizard() {
               serviceId={serviceId}
               setServiceId={setServiceId}
               counterVendors={counterVendors}
+              vendorsForCounter={vendorsForCounter}
               nonVegGuests={nonVegGuests}
             />
           )}
@@ -1685,6 +1801,7 @@ export default function StallBookingWizard() {
                 onEditExtras={() => setStep(2)}
                 brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
+                blocker={reviewBlocker}
               />
             ))}
         </div>
@@ -2261,6 +2378,7 @@ function StepStallDetails({
   serviceId,
   setServiceId,
   counterVendors,
+  vendorsForCounter,
   nonVegGuests,
 }: {
   t: (en: string, hi: string) => string;
@@ -2277,6 +2395,8 @@ function StepStallDetails({
   setServiceId: (v: string) => void;
   /** Catalogue vendors already narrowed to kitchens that fit the plate. */
   counterVendors: VendorListing[];
+  /** …and, per counter, to the ones who actually run it. */
+  vendorsForCounter: (addOnId: string) => VendorListing[];
   nonVegGuests: NonVegCount;
 }) {
   return (
@@ -2297,6 +2417,7 @@ function StepStallDetails({
         packageName={t("Single Stall", "सिंगल स्टॉल")}
         multiVendor={false}
         eligibleVendors={counterVendors}
+        eligibleVendorsFor={vendorsForCounter}
         vendorIdsFor={(id) => [addOnVendorId(id)].filter(Boolean)}
         onVendorToggle={(addOnId, vendorId) =>
           setAddOnVendor((m) => ({ ...m, [addOnId]: vendorId }))
@@ -2432,6 +2553,7 @@ function StepStallConfirm({
   onEditExtras,
   brandsHref,
   whatsappHref,
+  blocker,
 }: {
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
@@ -2490,6 +2612,8 @@ function StepStallConfirm({
   /** The Brands page — where a different stall is chosen. */
   brandsHref: string;
   whatsappHref: string;
+  /** An earlier step's rule the Review-time edits broke — blocks payment. */
+  blocker: string;
 }) {
   return (
     // A form, like the tiered wizard's review: the shared checkout panel's
@@ -2676,6 +2800,7 @@ function StepStallConfirm({
         confirming={confirming}
         confirmError={confirmError}
         whatsappHref={whatsappHref}
+        blocker={blocker}
       />
 
       <div className="mt-6">

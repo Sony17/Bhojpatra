@@ -55,6 +55,7 @@ export default function CheckoutPanel({
   confirming,
   confirmError,
   whatsappHref,
+  blocker = "",
 }: {
   t: (en: string, hi: string) => string;
   venue: string;
@@ -99,6 +100,9 @@ export default function CheckoutPanel({
   confirming: boolean;
   confirmError: string;
   whatsappHref: string;
+  /** An unmet order rule (see PaymentBox) — blocks both the pay and the
+   *  pay-later confirm buttons until the guest fixes it. */
+  blocker?: string;
 }) {
   // A contact field counts as "already known" only while it still matches what
   // we have on file — the moment the guest edits it, it's their own input and
@@ -504,6 +508,7 @@ export default function CheckoutPanel({
       eventDate={eventDate}
       emiCount={emiCount}
       setEmiCount={setEmiCount}
+      blocker={blocker}
     />
 
     {confirmError && (
@@ -519,7 +524,7 @@ export default function CheckoutPanel({
       {(payMethod === "Connect" || paidAmount > 0) && (
         <button
           type="submit"
-          disabled={confirming}
+          disabled={confirming || Boolean(blocker)}
           className="rounded-full bg-maroon px-6 py-3 text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon/90 disabled:opacity-60"
         >
           {confirming

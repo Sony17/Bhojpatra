@@ -35,6 +35,7 @@ export default function StepExtras({
   onVendorToggle,
   fullFilter,
   nonVegGuests = null,
+  eligibleVendorsFor,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -54,7 +55,13 @@ export default function StepExtras({
    *  the vendor cooks the veg spread only. The vendor roster itself is
    *  narrowed by the caller (`kitchenFitsSplit`), not here. */
   nonVegGuests?: NonVegCount;
+  /** Narrow the roster per counter — only the vendors who actually run THAT
+   *  counter (Single Stall). Absent, every counter shares `eligibleVendors`
+   *  (the tiered flow, where the tier is the only gate). */
+  eligibleVendorsFor?: (addOnId: string) => VendorListing[];
 }) {
+  const vendorsFor = (addOnId: string): VendorListing[] =>
+    eligibleVendorsFor ? eligibleVendorsFor(addOnId) : eligibleVendors;
   // Free-text filter over the add-on roster. Matches the English/Hindi names,
   // the description, and the hidden `keywords` aliases (so "gol gappe" finds the
   // Chaat Station). Selections live in the parent, so filtering never drops a
@@ -222,10 +229,11 @@ export default function StepExtras({
           const pickedVendorIds = active ? vendorIdsFor(a.id) : [];
           // The chosen brand(s) lead, with this counter's set menu docked under
           // each; everyone else folds into the roster behind one row.
-          const pickedVendors = eligibleVendors.filter((v) =>
+          const counterVendors = vendorsFor(a.id);
+          const pickedVendors = counterVendors.filter((v) =>
             pickedVendorIds.includes(v.id),
           );
-          const rosterVendors = eligibleVendors.filter(
+          const rosterVendors = counterVendors.filter(
             (v) => !pickedVendorIds.includes(v.id),
           );
           // Nothing picked (no eligible roster at all, or the guest reopened it)
@@ -316,7 +324,7 @@ export default function StepExtras({
                   below stays within reach instead of being pushed off-screen. */}
               {active && (
                 <div className="border-t border-cream-3 px-4 pb-4 pt-3">
-                  {eligibleVendors.length === 0 ? (
+                  {counterVendors.length === 0 ? (
                     <>
                       <span className="block text-xs font-semibold uppercase tracking-wide text-ink-soft">
                         {t("Caterer for this counter", "इस काउंटर के लिए कैटरर")}

@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import {
   bookingTimeSlots,
   cateringCategoryIds,
-  cities,
   formatClockTime,
   listingCateringCategories,
   listingOfferings,
@@ -1212,7 +1211,6 @@ function VendorCard({
   const { has, toggle, isFull } = useCompare();
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
-  const cityId = cities.find((c) => c.name === vendor.city)?.id;
 
   const bainaVendorData = bainaMode
     ? getBainaBoxVendorByVendorId(vendor.id)
@@ -1224,6 +1222,10 @@ function VendorCard({
   // "Book" from a brand card starts a Single Stall order with this vendor
   // pre-selected (still changeable in that wizard). Live vendors resolve by id;
   // a curated seed id absent from the booking menu falls back to the stall picker.
+  // The vendor's city is NOT passed along: the guest's event city is theirs to
+  // set (the wizard keeps the one they chose, and only falls back to the
+  // vendor's when it has none), and a `?city=` that only knew the static city
+  // list used to drop live vendors from newer cities out of the roster.
   // Boxes are ordered per box, not per plate, so a Baina Box brand goes to its
   // own order panel instead — the flow that actually sells what the lens shows.
   // Curated brands have a storefront; a live vendor's boxes are ordered from
@@ -1234,8 +1236,8 @@ function VendorCard({
     : bainaMode
       ? `/vendors/${vendor.id}#baina-order`
       : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
-          cityId ? `&city=${cityId}` : ""
-        }${counter ? `&counter=${encodeURIComponent(counter)}` : ""}`;
+          counter ? `&counter=${encodeURIComponent(counter)}` : ""
+        }`;
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
