@@ -394,6 +394,18 @@ export async function POST(request: Request) {
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a
   // network blip) updates the existing record rather than duplicating it.
   const existing = await store.get(order.id);
+  // …but only the booking's own customer may update it. A different account
+  // landing on an existing id must never overwrite (or inherit the payments
+  // of) someone else's order. Legacy rows without an owner stay updatable.
+  if (existing?.userId && existing.userId !== user.id) {
+    return Response.json(
+      {
+        error:
+          "This booking reference is already in use. Please refresh the page and try again.",
+      },
+      { status: 409 },
+    );
+  }
   const merged = existing ? { ...existing, ...order } : order;
   try {
     await store.upsert(merged);

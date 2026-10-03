@@ -89,6 +89,7 @@ import {
   formatEventDate,
   isoAfterDays,
 } from "@/lib/bookingPricing";
+import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
 import {
   PREF_BOTH,
   dishAllowed,
@@ -205,6 +206,8 @@ function coursePrice(course: StallCourse, picks: string[]): number {
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function StallBookingWizard() {
+  // Per-browser booking salt — see lib/bookingSalt.ts.
+  const [bookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
@@ -904,7 +907,7 @@ export default function StallBookingWizard() {
     (n, arr) => n + arr.length,
     0,
   );
-  const bookingId = deriveBookingId(guests, grandTotal, totalItems);
+  const bookingId = deriveBookingId(bookingSalt, guests, grandTotal, totalItems);
 
   /* ─── Advance-booking lead time ────────────────────────────────────── */
   // "As per vendor specification": the longest lead among the stall and any
@@ -1389,6 +1392,7 @@ export default function StallBookingWizard() {
     setConfirmed(true);
     setConfirming(false);
     clearStallDraft();
+    rotateBookingSalt();
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }

@@ -10,6 +10,8 @@ import { useSessionStatus } from "@/lib/session";
 import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
 import type { BainaOrderVendor } from "@/lib/bainaBoxData";
+import { bookingRef } from "@/lib/bookingPricing";
+import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -29,14 +31,11 @@ function cityOf(location: string): string {
   return parts[parts.length - 1] || location;
 }
 
-/** Deterministic `BHJ-` reference derived from the order's content — the same
- *  no-random/no-time approach the booking wizard uses, and doubling as an
- *  idempotency key: a double-tap or retry upserts the same record server-side
- *  instead of duplicating it. */
+/** `BHJ-B` reference from this browser's booking salt + the order's content —
+ *  doubling as an idempotency key (a double-tap or retry upserts the same
+ *  record) while staying unique across customers. */
 function orderRef(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return `BHJ-B${(Math.abs(h) % 90000) + 10000}`;
+  return bookingRef(getBookingSalt(), seed, "BHJ-B");
 }
 
 function isValidEmail(v: string): boolean {
@@ -201,6 +200,7 @@ export default function BainaBoxOrderPanel({
         return;
       }
       setPlaced({ id, amount: totalAmount });
+      rotateBookingSalt();
     } catch {
       setError(
         t(

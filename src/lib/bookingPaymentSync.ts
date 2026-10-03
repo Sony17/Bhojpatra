@@ -23,6 +23,14 @@ const paymentStore = createStore<StoredPayment>({
   idField: "id",
 });
 
+/** The account that owns a booking, or undefined when the booking doesn't
+ *  exist yet (wizard flow: payment precedes the booking POST) or is legacy. */
+export async function bookingOwner(
+  bookingId: string,
+): Promise<string | undefined> {
+  return (await bookingStore.get(bookingId))?.userId;
+}
+
 /** Ledger rows that count as money actually received for a booking (refunded
  *  and merely-pending rows don't). Newest last, matching insertion order. */
 export async function receivedPayments(
