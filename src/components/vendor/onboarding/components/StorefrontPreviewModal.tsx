@@ -4,7 +4,7 @@ import Image from "next/image";
 import type { OnboardingState } from "../VendorOnboarding";
 import { BtnBack, BtnNext, Sheet } from "../ui";
 
-/** Handover: "Customer Storefront Preview" (optional — "good but additional"). */
+/** Handover: "Customer Storefront Preview" (#modal-storefront-preview — optional, "good but additional"). */
 export default function StorefrontPreviewModal({
   open,
   onClose,
@@ -25,56 +25,75 @@ export default function StorefrontPreviewModal({
       wide
       footer={<BtnBack onClick={onClose}>Close Preview</BtnBack>}
     >
-      <p className="mb-4 text-[13px] text-ink/70">
+      <p style={{ fontSize: 12, color: "var(--color-black-60)", marginBottom: 14 }}>
         This preview shows exactly how your onboarded profile and signature feast will appear to celebration hosts
         browsing the Bhojpatra marketplace:
       </p>
-      <article className="overflow-hidden rounded-card border border-cream bg-white shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-        <div className="relative h-44 w-full">
-          <Image src={hero} alt={data.packageName || data.businessName} fill unoptimized className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/70 to-transparent" />
-          <div className="absolute bottom-3 left-4 right-4 text-white">
-            <span className="rounded-full bg-maroon px-2 py-0.5 text-[10px] font-bold uppercase text-cream">
-              Feast Booking Partner
-            </span>
-            <h2 className="mt-1 font-display text-2xl">{data.businessName || "Your Catering Brand"}</h2>
-            <p className="text-xs text-cream">{data.cuisines.slice(0, 3).join(" · ")}</p>
+
+      {/* Simulated Bhojpatra Marketplace Catalog Card */}
+      <div className="storefront-preview-card">
+        <div className="storefront-card-hero">
+          <Image src={hero} alt={data.packageName || data.businessName || "Hero"} fill unoptimized sizes="820px" />
+          <div className="storefront-hero-overlay">
+            <div className="storefront-hero-tags">
+              <span className="storefront-hero-tag" style={{ background: "var(--color-cream)", color: "var(--color-red)" }}>
+                Feast Booking Partner
+              </span>
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-white)" }}>{data.businessName || "Your Catering Brand"}</h2>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{data.cuisines.join(" · ")}</p>
           </div>
         </div>
-        <div className="space-y-3 p-4">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-ink/70">
+        <div className="storefront-card-body">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-black)" }}>
               {data.city} · Min {data.minPax} Guests
-            </span>
+            </div>
             {data.googleRating ? (
-              <span className="font-bold text-ink">
-                {data.googleRating} <span className="text-maroon">★</span> ({data.googleReviews ?? 0} reviews)
-              </span>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-red)" }}>
+                {data.googleRating} ★ ({data.googleReviews ?? 0} reviews)
+              </div>
             ) : null}
           </div>
+
+          {/* Signature Tags */}
           {signature.length > 0 && (
-            <div>
-              <span className="text-[11px] font-bold text-ink/60">Signature Specialties:</span>
-              <div className="mt-1 flex flex-wrap gap-1">
+            <div style={{ marginTop: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-black-60)" }}>Signature Specialties:</span>
+              <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                 {signature.map((s) => (
-                  <span key={s} className="rounded-full bg-cream/40 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                  <span key={s} className="spread-chip" style={{ background: "var(--color-cream)", color: "var(--color-red)", fontWeight: 700 }}>
                     {s}
                   </span>
                 ))}
               </div>
             </div>
           )}
-          <div className="flex items-end justify-between gap-3 border-t border-cream/50 pt-3">
+
+          <div
+            style={{
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: "1px solid var(--color-cream-30)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
             <div>
-              <span className="text-[11px] text-ink/60">Feast starts from:</span>
-              <div className="text-xl font-bold text-maroon">
-                ₹{data.priceFrom} <small className="text-xs font-normal text-ink/60">/ plate</small>
+              <span style={{ fontSize: 11, color: "var(--color-black-60)" }}>Feast starts from:</span>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--color-red)" }}>
+                ₹{data.priceFrom} <small style={{ fontSize: 11, color: "var(--color-black-60)" }}>/ plate</small>
               </div>
             </div>
-            <BtnNext disabled>Book This Caterer →</BtnNext>
+            {/* Preview only — the real booking flow opens once the profile is live. */}
+            <BtnNext disabled>
+              Book This Caterer →
+            </BtnNext>
           </div>
         </div>
-      </article>
+      </div>
     </Sheet>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import BuilderNav from "../common/BuilderNav";
 import PhotoUploadButton from "../common/PhotoUploadButton";
-import { ChoiceChip, ContentCard, FieldError, FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
+import { ChoiceChip, ContentCard, FieldError, FieldHint, FormLabel, R, StepHeading } from "../../ui";
 
 export interface FeastBasicsData {
   packageName: string;
@@ -78,7 +78,7 @@ export default function Step5AFeastBasics({
     : [...LEAD_OPTIONS, { hours: data.leadHours, label: `${data.leadHours} hours notice` }];
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Builder · Feast Details"
         heading="Configure your signature feast booking"
@@ -89,8 +89,8 @@ export default function Step5AFeastBasics({
       />
 
       <ContentCard>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
+        <div className="form-grid-2">
+          <div className="form-group">
             <FormLabel required htmlFor="cat-pkg-name">
               <R d="Package / Feast Display Name" m="Package Name" />
             </FormLabel>
@@ -100,12 +100,13 @@ export default function Step5AFeastBasics({
               value={data.packageName}
               onChange={(ev) => onChange({ packageName: ev.target.value })}
               placeholder="e.g. Royal Awadh Wedding Feast"
-              className={inputCls}
+              className="form-input"
             />
-            <FieldHint className="hidden sm:block">e.g. Royal Awadh Wedding Feast, Shahi Dastarkhwan</FieldHint>
+            <FieldHint className="vob-d">e.g. Royal Awadh Wedding Feast, Shahi Dastarkhwan</FieldHint>
             <FieldError>{errors.packageName}</FieldError>
           </div>
-          <div>
+
+          <div className="form-group">
             <FormLabel required htmlFor="cat-lead-hours">
               Minimum Preparation Notice
             </FormLabel>
@@ -113,7 +114,7 @@ export default function Step5AFeastBasics({
               id="cat-lead-hours"
               value={data.leadHours}
               onChange={(ev) => onChange({ leadHours: Number(ev.target.value) })}
-              className={inputCls}
+              className="form-select"
             >
               {leadOptions.map((o) => (
                 <option key={o.hours} value={o.hours}>
@@ -121,27 +122,26 @@ export default function Step5AFeastBasics({
                 </option>
               ))}
             </select>
-            <FieldHint className="hidden sm:block">Minimum advance notice you require before accepting a booking.</FieldHint>
+            <FieldHint className="vob-d">Minimum advance notice you require before accepting a booking.</FieldHint>
           </div>
         </div>
 
-        <div className="mt-4 hidden sm:block">
+        <div className="form-group vob-d">
           <FormLabel htmlFor="cat-pkg-desc">Culinary Heritage Story & Description</FormLabel>
           <textarea
             id="cat-pkg-desc"
-            rows={3}
             value={data.about}
             onChange={(ev) => onChange({ about: ev.target.value })}
-            placeholder="Heritage multi-course feast slow-cooked on charcoal dum..."
-            className={inputCls}
+            placeholder="Heritage multi-course feast slow-cooked on charcoal dum, celebrating centuries of Lucknow's Nawabi culinary art."
+            className="form-textarea"
           />
         </div>
 
-        <div className="mt-4">
+        <div className="form-group" style={{ marginTop: 10 }}>
           <FormLabel required>
             <R d="Best For (Occasions displayed on package card)" m="Best For" />
           </FormLabel>
-          <div className="flex flex-wrap gap-2">
+          <div className="chip-grid">
             {BEST_FOR_OPTIONS.map((tag) => (
               <ChoiceChip key={tag} active={(data.bestFor || []).includes(tag)} onClick={() => toggleBestFor(tag)}>
                 {tag}
@@ -151,8 +151,11 @@ export default function Step5AFeastBasics({
           <FieldError>{errors.bestFor}</FieldError>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div>
+        <div
+          className="form-grid-2"
+          style={{ marginTop: 10, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}
+        >
+          <div className="form-group">
             <FormLabel htmlFor="cat-min-pax">
               <R d="Minimum Guests (Min Pax Guarantee)" m="Min Guests" />
             </FormLabel>
@@ -164,11 +167,11 @@ export default function Step5AFeastBasics({
               value={data.minPax || ""}
               onChange={(ev) => onChange({ minPax: Number(ev.target.value) })}
               placeholder="50"
-              className={inputCls}
+              className="form-input"
             />
             <FieldError>{errors.minPax}</FieldError>
           </div>
-          <div>
+          <div className="form-group">
             <FormLabel htmlFor="cat-max-pax">
               <R d="Maximum Guest Capacity" m="Max Capacity" />
             </FormLabel>
@@ -179,22 +182,23 @@ export default function Step5AFeastBasics({
               value={data.maxCapacity || ""}
               onChange={(ev) => onChange({ maxCapacity: Number(ev.target.value) })}
               placeholder="1500"
-              className={inputCls}
+              className="form-input"
             />
             <FieldError>{errors.maxCapacity}</FieldError>
           </div>
         </div>
 
-        <div className="mt-4">
-          <FormLabel>
-            <R d="Package Hero Food Photo" m="Feast Cover Photo" />
-          </FormLabel>
+        <div style={{ marginTop: 10, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}>
+          <label className="form-label vob-d" style={{ marginBottom: 8, display: "block" }}>
+            Package Hero Food Photo
+          </label>
           <PhotoUploadButton
             currentPhoto={data.image}
             kind="card"
             aspectRatio="landscape"
+            title={<R d="Feast Cover Photography" m="Feast Cover Photo" />}
             label="Change Photo 📷"
-            helperText="Feast Cover Photography · Authentic royal feast spread photo shown on catalog & detail page."
+            helperText="Authentic royal feast spread photo shown on your catalog card & detail page."
             onPhotoUploaded={(url) => onChange({ image: url })}
             onPhotoRemoved={() => onChange({ image: undefined })}
           />

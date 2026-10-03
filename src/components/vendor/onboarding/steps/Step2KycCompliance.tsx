@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { isValidGst } from "@/lib/validate";
 import type { VendorBadgesState } from "@/lib/vendorMenus";
-import { ContentCard, FieldError, FlowFooter, FormLabel, StepHeading, inputCls } from "../ui";
+import { ContentCard, FieldError, FlowFooter, R, StepHeading } from "../ui";
 
 export interface KycDocState {
   fileName: string;
@@ -93,84 +93,99 @@ export default function Step2KycCompliance({
       />
 
       <ContentCard>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <FormLabel required htmlFor="d-gst">
-              <span className="hidden sm:inline">GSTIN (Goods and Services Tax Identification)</span>
-              <span className="sm:hidden">GSTIN</span>
-            </FormLabel>
+        <div className="form-grid-2">
+          <div className="form-group">
+            <label className="form-label" htmlFor="d-gst">
+              <R d="GSTIN (Goods and Services Tax Identification) *" m="GSTIN *" />
+            </label>
             <input
               id="d-gst"
               type="text"
               autoCapitalize="characters"
               maxLength={15}
+              className="form-input"
+              style={{ textTransform: "uppercase" }}
               value={data.gstNumber}
               onChange={(ev) => {
                 onChange({ gstNumber: ev.target.value.toUpperCase() });
                 if (errors.gstNumber) setErrors((p) => ({ ...p, gstNumber: "" }));
               }}
               placeholder="e.g. 09ABCDE1234F1Z5"
-              className={`${inputCls} font-mono uppercase`}
+              aria-invalid={Boolean(errors.gstNumber) || undefined}
             />
             <FieldError>{errors.gstNumber}</FieldError>
           </div>
-          <div>
-            <FormLabel required htmlFor="d-fssai">
-              <span className="hidden sm:inline">FSSAI Food Safety Licence (14 Digits)</span>
-              <span className="sm:hidden">FSSAI Licence</span>
-            </FormLabel>
+          <div className="form-group">
+            <label className="form-label" htmlFor="d-fssai">
+              <R d="FSSAI Food Safety Licence (14 Digits) *" m="FSSAI Licence *" />
+            </label>
             <input
               id="d-fssai"
               type="text"
               inputMode="numeric"
               maxLength={14}
+              className="form-input"
               value={data.fssaiNumber}
               onChange={(ev) => {
                 onChange({ fssaiNumber: ev.target.value.replace(/\D/g, "") });
                 if (errors.fssaiNumber) setErrors((p) => ({ ...p, fssaiNumber: "" }));
               }}
               placeholder="e.g. 10000000000000"
-              className={`${inputCls} font-mono`}
+              aria-invalid={Boolean(errors.fssaiNumber) || undefined}
             />
             <FieldError>{errors.fssaiNumber}</FieldError>
           </div>
         </div>
 
-        <div className="mt-5">
-          <FormLabel>Document Uploads</FormLabel>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}>
+          <span className="form-label vob-d" style={{ marginBottom: 8, display: "block" }}>
+            Document Uploads
+          </span>
+          <div className="form-grid-2">
             {DOCS.map((doc) => {
               const st = data.documents[doc.key] || { status: "idle", fileName: "" };
+              const inputId = `kyc-doc-${doc.key}`;
               return (
-                <label
-                  key={doc.key}
-                  className="flex min-h-[64px] cursor-pointer items-center gap-3 rounded-control border-2 border-dashed border-cream bg-cream/10 p-3 hover:border-maroon/40"
-                >
-                  <span className="text-2xl" aria-hidden>
+                <label key={doc.key} className="photo-uploader-box" htmlFor={inputId} style={{ cursor: "pointer", position: "relative" }}>
+                  <span style={{ fontSize: 28 }} aria-hidden>
                     {doc.icon}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-bold text-ink">{doc.label}</span>
-                    <span className="block truncate text-[11px] text-ink/60">
-                      {st.status === "uploading"
-                        ? `Uploading ${st.fileName}...`
-                        : st.status === "done"
-                          ? `${st.fileName} (Uploaded ✓)`
-                          : st.status === "error"
-                            ? `⚠️ ${st.error}`
-                            : "Tap to upload PDF, JPG or PNG"}
+                  <div className="photo-upload-meta" style={{ minWidth: 0 }}>
+                    <div className="photo-upload-title">{doc.label}</div>
+                    <div
+                      className="photo-upload-desc"
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        color: st.status === "error" ? "var(--color-red)" : undefined,
+                      }}
+                    >
+                      {st.status === "uploading" ? (
+                        `Uploading ${st.fileName}...`
+                      ) : st.status === "done" ? (
+                        <R d={`${st.fileName} (Uploaded ✓)`} m="Uploaded ✓" />
+                      ) : st.status === "error" ? (
+                        `⚠️ ${st.error}`
+                      ) : (
+                        "PDF, JPG or PNG"
+                      )}
+                    </div>
+                    <span className="btn-upload-photo">
+                      {st.status === "done" ? "Replace File" : st.status === "uploading" ? "Uploading..." : "Upload File"}
                     </span>
-                  </span>
-                  <span className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-bold text-maroon">
-                    {st.status === "done" ? "Replace" : "Upload"}
-                  </span>
+                  </div>
                   <input
+                    id={inputId}
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg"
-                    className="sr-only"
+                    aria-label={`Upload ${doc.label}`}
+                    disabled={st.status === "uploading"}
+                    style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
                     onChange={(ev) => {
                       const f = ev.target.files?.[0];
                       if (f) upload(doc.key, f);
+                      ev.target.value = "";
                     }}
                   />
                 </label>

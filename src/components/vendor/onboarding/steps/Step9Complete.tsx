@@ -1,8 +1,6 @@
 "use client";
 
-import { R } from "../ui";
-
-/** Handover: "09. Registration successfully submitted!" */
+/** Handover: "09. Registration successfully submitted!" (view-complete). */
 export default function Step9Complete({
   vendorId,
   onPreview,
@@ -14,54 +12,95 @@ export default function Step9Complete({
 }) {
   return (
     <div className="animate-in fade-in duration-200">
-      <section className="mx-auto max-w-2xl rounded-card border border-cream/60 bg-white p-6 text-center shadow-[0_2px_6px_rgba(0,0,0,0.04)] sm:p-10">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-maroon text-3xl font-bold text-cream" aria-hidden>
+      {/* Desktop (prototype desktop article) */}
+      <div className="content-card vob-d-flex" style={{ textAlign: "center", padding: "48px 24px", flexDirection: "column" }}>
+        <div
+          aria-hidden
+          style={{
+            width: 72,
+            height: 72,
+            background: "var(--color-red)",
+            color: "var(--color-cream)",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 36,
+            margin: "0 auto 16px auto",
+            boxShadow: "var(--shadow-brand)",
+          }}
+        >
           ✓
         </div>
-        <h1 className="mt-4 font-display text-[22px] leading-tight text-ink sm:text-[26px]">
-          <R d="Registration successfully submitted!" m="Registration Submitted!" />
+        <h1 className="step-heading" style={{ fontSize: 28 }}>
+          Registration successfully submitted!
         </h1>
-        <p className="mx-auto mt-2 hidden max-w-md text-[13px] text-ink/60 sm:block">
+        <p className="step-subtext" style={{ margin: "8px auto 20px auto" }}>
           Your application has been received and routed for statutory KYC and menu compliance verification.
         </p>
 
-        <div className="mx-auto mt-6 max-w-sm rounded-card border border-cream bg-cream/15 p-4">
-          <div className="hidden text-[11px] font-bold uppercase tracking-wide text-ink/50 sm:block">Assigned Bhojpatra Vendor ID</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-maroon">
-            <span className="sm:hidden text-sm [font-family:inherit] text-ink/60">Vendor ID: </span>
-            {vendorId}
+        <div
+          style={{
+            background: "var(--bg-cream-tint)",
+            border: "1px solid var(--color-cream)",
+            borderRadius: "var(--radius-control)",
+            padding: 14,
+            maxWidth: 440,
+            width: "100%",
+            margin: "0 auto 24px auto",
+          }}
+        >
+          <div style={{ fontSize: 11, color: "var(--color-black-60)" }}>Assigned Bhojpatra Vendor ID</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "var(--color-red)", letterSpacing: 1, marginTop: 2 }}>{vendorId}</div>
+          <div style={{ fontSize: 11, color: "var(--color-black-80)", marginTop: 6 }}>
+            KYC Status: <strong style={{ color: "var(--color-veg)" }}>Under Express Review (12–24h)</strong>
           </div>
-          <div className="mt-2 hidden text-xs font-semibold text-ink sm:block">KYC Status: Under Express Review (12–24h)</div>
         </div>
 
-        <p className="mx-auto mt-5 hidden max-w-md text-xs text-ink/60 sm:block">
-          All identity and menu offerings gathered here feed your live Vendor Profile. Your vendor portal focuses on:{" "}
-          <strong className="text-ink">Dashboard · My Services · Orders</strong> (other modules coming soon).
-        </p>
-
-        <div className="mt-6 flex flex-col items-stretch justify-center gap-2.5 sm:flex-row sm:items-center">
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
           <a
             href="/vendor/dashboard"
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-maroon px-6 text-[13px] font-bold text-cream"
+            className="btn-next"
+            style={{ background: "var(--color-red)", color: "var(--color-cream)", fontWeight: 800, padding: "9px 22px", textDecoration: "none" }}
           >
             🚀 Enter Vendor Dashboard →
           </a>
-          <button
-            type="button"
-            onClick={onPreview}
-            className="hidden min-h-[48px] items-center justify-center rounded-full border border-cream px-5 text-[13px] font-bold text-ink/80 sm:inline-flex"
-          >
+          <button type="button" className="btn-back" onClick={onPreview}>
             Preview Live Storefront 👁️
           </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="min-h-[48px] rounded-full border border-cream px-5 text-[13px] font-bold text-ink/80"
-          >
+          <button type="button" className="btn-back" onClick={onBack}>
             ← Back
           </button>
         </div>
-      </section>
+      </div>
+
+      {/* Phone (prototype compact mobile article) */}
+      <div className="content-card vob-m-flex" style={{ textAlign: "center", padding: "32px 14px", flexDirection: "column" }}>
+        <div aria-hidden style={{ fontSize: 32, color: "var(--color-red)" }}>
+          ✓
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 800 }}>Registration Submitted!</h2>
+        <p style={{ fontSize: 12, color: "var(--color-black-60)", marginTop: 6 }}>Vendor ID: {vendorId}</p>
+        <a
+          href="/vendor/dashboard"
+          className="btn-next"
+          style={{
+            width: "100%",
+            marginTop: 14,
+            background: "var(--color-red)",
+            color: "var(--color-cream)",
+            fontWeight: 800,
+            padding: 10,
+            justifyContent: "center",
+            textDecoration: "none",
+          }}
+        >
+          🚀 Enter Vendor Dashboard →
+        </a>
+        <button type="button" className="btn-back" onClick={onBack} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
+          ← Back
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import Image from "next/image";
 import BuilderNav from "../common/BuilderNav";
 import StallDishModal from "./StallDishModal";
 import type { VendorMenuSection, VendorMenuItem, SingleStallConfig } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
-import { cn } from "@/components/ui/cn";
-import { AddDashed, ContentCard, DietMark, FieldHint, FormLabel, Pill, R, StepHeading, inputCls } from "../../ui";
+import { FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
 
 interface Step6AStallWorkspaceProps {
   stallConfig?: SingleStallConfig;
@@ -67,6 +66,23 @@ export function stallDishes(cfg: SingleStallConfig | undefined, menu: VendorMenu
   return mid ? menu.find((s) => s.categoryId === mid)?.items ?? [] : [];
 }
 
+/** Phone breakpoint (matches onboarding.css `max-width: 639px`) — for copy that
+ *  can't be swapped with <R> (input placeholders). */
+const PHONE_MQ = "(max-width: 639px)";
+function useIsPhone() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia(PHONE_MQ);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(PHONE_MQ).matches,
+    () => false,
+  );
+}
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 export default function Step6AStallWorkspace({
   stallConfig = { categories: [] },
   menu,
@@ -90,7 +106,11 @@ export default function Step6AStallWorkspace({
   const currentName = current ? stallCategoryName(current) : "";
 
   const customCats = selected.filter((id) => !PLATFORM_STALL_CATEGORIES.some((c) => c.id === id));
-  const chips = [...PLATFORM_STALL_CATEGORIES.map((c) => ({ id: c.id, name: c.name, icon: c.icon })), ...customCats.map((id) => ({ id, name: stallCategoryName(id), icon: "✨" }))];
+  const chips = [
+    ...PLATFORM_STALL_CATEGORIES.map((c) => ({ id: c.id, name: c.name, icon: c.icon, desc: c.desc, isCustom: false })),
+    ...customCats.map((id) => ({ id, name: stallCategoryName(id), icon: "✨", desc: "Custom vendor category", isCustom: true })),
+  ];
+  const isPhone = useIsPhone();
 
   /** Write a stall's dishes to stallConfig.menus and mirror platform ones into menu[]. */
   const writeDishes = (catId: string, items: VendorMenuItem[], cfg: SingleStallConfig = stallConfig) => {
@@ -181,8 +201,15 @@ export default function Step6AStallWorkspace({
     if (!Object.keys(e).length) onContinue();
   };
 
+  const onCardKey = (e: KeyboardEvent, id: string) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleCategory(id);
+    }
+  };
+
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Single Stall · Menus & Stations"
         heading="Build your stall menus"
@@ -192,215 +219,423 @@ export default function Step6AStallWorkspace({
         mSubtext="Select categories, build dishes, and configure independent stall pricing & pax for each stall."
       />
 
-      {/* Categories */}
-      <ContentCard>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="[font-family:inherit] normal-case text-[15px] font-bold text-ink">
-            📂 <R d="Choose your stall categories" m="Choose Categories" />
-          </h3>
-          <Pill tone="cream">
-            {selected.length} <R d={selected.length === 1 ? "category selected" : "categories selected"} m="categories" />
-          </Pill>
-        </div>
-        <p className="mb-3 hidden text-xs text-ink/60 sm:block">
-          Select all stall categories you can deploy. Each selected category becomes an active stall with its own menu
-          and pricing.
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {chips.map((c) => {
-            const on = selected.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleCategory(c.id)}
-                className={cn(
-                  "flex min-h-[48px] items-center gap-2 rounded-control border-2 px-2.5 text-left text-xs font-bold",
-                  on ? "border-maroon bg-maroon/5 text-ink" : "border-cream/70 bg-white text-ink/70",
-                )}
-              >
-                <span className="text-lg" aria-hidden>
-                  {c.icon}
-                </span>
-                <span className="flex-1 leading-tight">{c.name}</span>
-                {on && <span className="text-maroon">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-        {errors.categories && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.categories}</p>}
-
-        <div className="mt-4 rounded-control border border-dashed border-cream bg-cream/10 p-3">
-          <div className="mb-2 text-xs font-bold text-ink">
-            ✨ <R d="Need a Custom Stall Category?" m="Add Custom Category" />
-          </div>
-          <div className="flex gap-2">
-            <input
-              id="custom-stall-cat-input"
-              type="text"
-              value={customCat}
-              onChange={(e) => setCustomCat(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomCategory();
-                }
-              }}
-              placeholder="Enter custom category name (e.g. Mocktail Bar, Regional Mithai)"
-              className={inputCls}
-              aria-label="Custom stall category name"
-            />
-            <button type="button" onClick={addCustomCategory} className="min-h-[44px] shrink-0 rounded-full bg-maroon px-4 text-xs font-bold text-cream">
-              <R d="＋ Add Category" m="Add" />
-            </button>
-          </div>
-        </div>
-      </ContentCard>
-
-      {/* Active stall configuration */}
-      {selected.length > 0 && (
-        <ContentCard>
-          <FormLabel>Select stall to configure:</FormLabel>
-          <div className="-mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-            {selected.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveCat(id)}
-                className={cn(
-                  "min-h-[40px] shrink-0 rounded-full border px-3 text-xs font-semibold",
-                  id === current ? "border-maroon bg-maroon text-cream" : "border-cream text-ink/70",
-                )}
-              >
-                {stallCategoryName(id)} ({stallDishes(stallConfig, menu, id).length})
-              </button>
-            ))}
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-control bg-cream/20 p-2.5 text-xs">
-            <span className="text-ink/60">
-              <R d="Currently configuring:" m="Configuring:" />
-            </span>
-            <strong className="text-ink">{currentName}</strong>
-            <span className="hidden sm:inline">
-              <Pill tone="red">Active Configuration</Pill>
-            </span>
-          </div>
-
-          {/* Dishes */}
-          <div className="mb-2 flex items-start justify-between gap-2">
+      <div className="content-card stall-menus-unified-card">
+        {/* TOP SECTION: Category Selection */}
+        <div className="stall-menu-section-block stall-categories-selection-block">
+          <div className="stall-section-header-row">
             <div>
-              <h4 className="[font-family:inherit] normal-case text-[14px] font-bold text-ink">🍽️ Your Dishes</h4>
-              <p className="hidden text-xs text-ink/60 sm:block">
-                Add each food item prepared at this stall with dish-level per-plate pricing and dietary markers.
+              <h3 className="stall-section-title">
+                <span>📂</span> <R d="Choose your stall categories" m="Choose Categories" />
+              </h3>
+              <p className="stall-section-desc vob-d">
+                Select all stall categories you can deploy. Each selected category becomes an active stall with its own
+                menu and pricing.
               </p>
             </div>
-            <button type="button" onClick={() => setModal("new")} className="min-h-[40px] shrink-0 rounded-full bg-maroon px-3 text-xs font-bold text-cream">
-              ＋ Add Dish
+            <span className="stall-cat-selected-pill">
+              {selected.length} {plural(selected.length, "category", "categories")} selected
+            </span>
+          </div>
+
+          {errors.categories && (
+            <div className="stall-cat-validation-error alert-box alert-error" role="alert" style={{ marginTop: 12, marginBottom: 12 }}>
+              <span className="vob-field-error" style={{ marginTop: 0 }}>
+                <R
+                  d="⚠️ Please select at least one stall category to continue."
+                  m="⚠️ Select at least one category to continue."
+                />
+              </span>
+            </div>
+          )}
+
+          <div className="stall-categories-grid" style={{ marginTop: 12 }}>
+            {chips.map((cat) => {
+              const on = selected.includes(cat.id);
+              const count = on ? stallDishes(stallConfig, menu, cat.id).length : 0;
+              return (
+                <div
+                  key={cat.id}
+                  role="checkbox"
+                  aria-checked={on}
+                  tabIndex={0}
+                  className={`stall-category-card${on ? " selected" : ""}`}
+                  onClick={() => toggleCategory(cat.id)}
+                  onKeyDown={(e) => onCardKey(e, cat.id)}
+                >
+                  <div className="stall-cat-checkbox">{on ? "✓" : ""}</div>
+                  <div className="stall-cat-icon">{cat.icon}</div>
+                  <div className="stall-cat-info" style={{ flex: 1 }}>
+                    <div className="stall-cat-name">{cat.name}</div>
+                    <div className="stall-cat-desc">{cat.desc}</div>
+                    {on && (
+                      <span
+                        className="stall-cat-count-badge"
+                        style={{ display: "inline-block", marginTop: 4, fontSize: 10.5, fontWeight: 700, color: "var(--color-red)" }}
+                      >
+                        {count} {plural(count, "dish", "dishes")} added
+                      </span>
+                    )}
+                  </div>
+                  {cat.isCustom && (
+                    <button
+                      type="button"
+                      className="btn-remove-custom-cat"
+                      title="Delete custom category"
+                      aria-label={`Delete custom category ${cat.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCategory(cat.id);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Custom Stall Category Adder */}
+          <div
+            className="custom-stall-cat-adder"
+            style={{
+              marginTop: 16,
+              padding: "12px 14px",
+              border: "1px dashed var(--color-gold)",
+              borderRadius: "var(--radius-card)",
+              background: "var(--color-cream-10)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-black)" }}>
+                <R d="✨ Need a Custom Stall Category?" m="✨ Add Custom Category" />
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                id="custom-stall-cat-input"
+                type="text"
+                className="form-input"
+                style={{ flex: 1, fontSize: 12 }}
+                value={customCat}
+                onChange={(e) => setCustomCat(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomCategory();
+                  }
+                }}
+                placeholder={isPhone ? "Category Name" : "Enter custom category name (e.g. Mocktail Bar, Regional Mithai)"}
+                aria-label="Custom stall category name"
+              />
+              <button
+                type="button"
+                className="btn-sm btn-primary"
+                onClick={addCustomCategory}
+                style={{
+                  background: "var(--color-red)",
+                  color: "var(--color-white)",
+                  border: "none",
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  minHeight: 44,
+                }}
+              >
+                <R d="＋ Add Category" m="Add" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="stall-menu-section-divider" />
+
+        {/* Active Stall Configuration */}
+        {selected.length > 0 && current && (
+          <div className="stall-menu-section-block stall-active-config-block">
+            <div className="stall-menu-cat-switcher-wrapper">
+              <div className="stall-switcher-label">Select stall to configure:</div>
+              <div className="stall-menu-cat-switcher" role="tablist" aria-label="Stalls">
+                {selected.map((id) => {
+                  const count = stallDishes(stallConfig, menu, id).length;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={id === current}
+                      className={`stall-menu-cat-tab${id === current ? " active" : ""}`}
+                      onClick={() => setActiveCat(id)}
+                    >
+                      <span>{stallCategoryName(id)}</span>
+                      <span className={`stall-cat-tab-badge ${count > 0 ? "has-items" : "empty"}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="stall-current-configuring-strip">
+              <div className="stall-current-meta">
+                <span className="stall-current-prefix">
+                  <R d="Currently configuring:" m="Configuring:" />
+                </span>
+                <span className="stall-current-name">{currentName}</span>
+              </div>
+              <span className="stall-current-badge vob-d">Active Configuration</span>
+            </div>
+
+            {errors.dishes && dishes.length === 0 && (
+              <div className="stall-menu-validation-error alert-box alert-error" role="alert" style={{ marginTop: 12, marginBottom: 12 }}>
+                <span className="vob-field-error" style={{ marginTop: 0 }}>
+                  <R
+                    d="⚠️ Please add at least 1 dish to this stall before proceeding."
+                    m="⚠️ Add at least 1 dish to this stall."
+                  />
+                </span>
+              </div>
+            )}
+
+            {/* PART 1: DISHES */}
+            <div className="stall-dishes-section" style={{ marginTop: 16 }}>
+              <div className="stall-section-header-row" style={{ marginBottom: 12 }}>
+                <div>
+                  <h4 className="stall-subsection-title">
+                    <span>🍽️</span> Your Dishes
+                  </h4>
+                  <p className="stall-section-desc vob-d">
+                    Add each food item prepared at this stall with dish-level per-plate pricing and dietary markers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-sm btn-primary"
+                  onClick={() => setModal("new")}
+                  style={{
+                    background: "var(--color-red)",
+                    color: "var(--color-white)",
+                    border: "none",
+                    padding: "7px 14px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    whiteSpace: "nowrap",
+                    minHeight: 36,
+                  }}
+                >
+                  <span>＋</span> Add Dish
+                </button>
+              </div>
+
+              <div className="stall-category-items-grid">
+                {dishes.length === 0 ? (
+                  <div
+                    className="stall-menu-empty-state"
+                    style={{
+                      gridColumn: "1 / -1",
+                      textAlign: "center",
+                      padding: "28px 16px",
+                      background: "var(--color-cream-10)",
+                      border: "1.5px dashed var(--color-cream-60)",
+                      borderRadius: "var(--radius-card)",
+                    }}
+                  >
+                    <div style={{ fontSize: 30, marginBottom: 6 }}>🍽️</div>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-black)", marginBottom: 4 }}>
+                      No dishes added to {currentName} yet
+                    </h4>
+                    <p style={{ fontSize: 11.5, color: "var(--color-black-60)", maxWidth: 360, margin: "0 auto 12px" }}>
+                      Add at least 1 food item with photo, dietary marker, and per-plate pricing to complete this stall menu.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-sm btn-primary"
+                      onClick={() => setModal("new")}
+                      style={{
+                        background: "var(--color-red)",
+                        color: "var(--color-white)",
+                        border: "none",
+                        padding: "7px 16px",
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        minHeight: 36,
+                      }}
+                    >
+                      ＋ Add First Dish
+                    </button>
+                  </div>
+                ) : (
+                  dishes.map((d, idx) => (
+                    <div key={`${d.name}-${idx}`} className="stall-menu-item-card">
+                      <div className="stall-item-photo-wrapper">
+                        <Image src={d.photo || dummyDishPhoto(d.name)} alt={d.name} width={64} height={64} unoptimized />
+                        <span
+                          className={`fssai-icon ${d.diet === "non-veg" ? "nonveg" : "veg"} stall-item-diet-badge`}
+                          title={d.diet === "non-veg" ? "Non-Vegetarian" : "100% Vegetarian"}
+                        />
+                      </div>
+                      <div className="stall-item-details">
+                        <div className="stall-item-name-row">
+                          <h4 className="stall-item-name">{d.name}</h4>
+                          {d.price ? (
+                            <span className="stall-item-price">
+                              ₹{d.price}{" "}
+                              <small style={{ fontSize: 10, fontWeight: 600, color: "var(--color-black-60)" }}>/ plate</small>
+                            </span>
+                          ) : null}
+                        </div>
+                        {d.desc && <p className="stall-item-desc">{d.desc}</p>}
+                        <div className="stall-item-actions">
+                          <button
+                            type="button"
+                            className="btn-item-action btn-item-edit"
+                            aria-label={`Edit ${d.name}`}
+                            onClick={() => setModal({ item: d, index: idx })}
+                          >
+                            Edit ✎
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-item-action btn-item-delete"
+                            aria-label={`Delete ${d.name}`}
+                            onClick={() => writeDishes(current, dishes.filter((_, i) => i !== idx))}
+                          >
+                            Delete 🗑
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <button type="button" className="btn-add-item-dashed" style={{ marginTop: 12 }} onClick={() => setModal("new")}>
+                <span>＋</span> Add Dish to <span className="active-cat-name-label">{currentName || "Stall"}</span>
+              </button>
+            </div>
+
+            {/* PART 2: STALL PRICING & PAX */}
+            <div
+              className="stall-pricing-pax-card"
+              style={{
+                marginTop: 24,
+                padding: "18px 20px",
+                border: "1.5px solid var(--color-gold)",
+                borderRadius: "var(--radius-card)",
+                background: "var(--bg-cream-tint)",
+              }}
+            >
+              <div
+                className="stall-pricing-header-row"
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 12 }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>🏷️</span>
+                    <h4 style={{ fontSize: 14, fontWeight: 800, color: "var(--color-black-90)", margin: 0 }}>
+                      <R d="Stall Pricing & Pax Guarantee" m="Stall Pricing & Pax" />
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: 11.5, color: "var(--color-black-60)", margin: "4px 0 0 0" }}>
+                    <R
+                      d={
+                        <>
+                          Set the commercial rate and minimum guest guarantee required to book the{" "}
+                          <strong style={{ color: "var(--color-black-90)" }}>{currentName}</strong> stall. Data is stored
+                          independently for each stall.
+                        </>
+                      }
+                      m="Independent commercial package rate & minimums for this stall."
+                    />
+                  </p>
+                </div>
+                <span className="stall-pricing-independent-pill">
+                  <R d="Independent per stall" m="Per Stall" />
+                </span>
+              </div>
+
+              <div className="form-grid-2" style={{ marginTop: 12 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <FormLabel required htmlFor="stall-fixed-rate">
+                    Fixed Per-Plate Rate (₹)
+                  </FormLabel>
+                  <div style={{ position: "relative" }}>
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        fontWeight: 700,
+                        color: "var(--color-black-60)",
+                      }}
+                    >
+                      ₹
+                    </span>
+                    <input
+                      id="stall-fixed-rate"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={pricing.fixedPerPlate || ""}
+                      onChange={(e) => setPricing("fixedPerPlate", Number(e.target.value))}
+                      placeholder="e.g. 150"
+                      className={inputCls}
+                      style={{ paddingLeft: 24 }}
+                    />
+                  </div>
+                  <FieldHint className="vob-d">Fixed package price per guest covering this stall&apos;s spread.</FieldHint>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <FormLabel required htmlFor="stall-min-pax">
+                    <R d="Minimum Guest Guarantee (Min Pax)" m="Min Pax Guarantee" />
+                  </FormLabel>
+                  <input
+                    id="stall-min-pax"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={pricing.minPaxGuarantee || ""}
+                    onChange={(e) => setPricing("minPaxGuarantee", Number(e.target.value))}
+                    placeholder="e.g. 50"
+                    className={inputCls}
+                  />
+                  <FieldHint className="vob-d">Minimum guest headcount required to deploy this stall (default 50).</FieldHint>
+                </div>
+              </div>
+              {errors.pricing && (
+                <span className="vob-field-error" role="alert">
+                  ⚠️ {errors.pricing}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Wizard Action Bar */}
+        <div
+          className="wizard-actions-bar"
+          style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+        >
+          <button type="button" className="btn-back" onClick={onBack} disabled={saving}>
+            <R d="← Back to Offerings" m="← Back" />
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="btn-next" onClick={validate} disabled={saving}>
+              <R d="Continue to Setup & Cutlery →" m="Next: Setup & Cutlery →" />
             </button>
           </div>
-          {dishes.length === 0 ? (
-            <p className="rounded-control border border-dashed border-maroon/40 p-4 text-center text-xs font-semibold text-maroon">
-              ⚠️ <R d="Please add at least 1 dish to this stall before proceeding." m="Add at least 1 dish to this stall." />
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {dishes.map((d, idx) => (
-                <li key={`${d.name}-${idx}`} className="flex items-center gap-3 rounded-control border border-cream/70 p-2.5">
-                  <Image
-                    src={d.photo || dummyDishPhoto(d.name)}
-                    alt={d.name}
-                    width={56}
-                    height={56}
-                    unoptimized
-                    className="h-14 w-14 shrink-0 rounded-control object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <DietMark diet={d.diet} />
-                      <span className="text-[13px] font-bold text-ink">{d.name}</span>
-                      {d.price ? <span className="text-xs font-bold text-maroon">₹{d.price}</span> : null}
-                    </div>
-                    {d.desc && <p className="line-clamp-1 text-[11px] text-ink/60">{d.desc}</p>}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`Edit ${d.name}`}
-                    onClick={() => setModal({ item: d, index: idx })}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream text-ink/70"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${d.name}`}
-                    onClick={() => writeDishes(current, dishes.filter((_, i) => i !== idx))}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cream text-ink/70"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <AddDashed onClick={() => setModal("new")}>Add Dish to Stall</AddDashed>
-          {errors.dishes && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.dishes}</p>}
-
-          {/* Pricing */}
-          <div className="mt-6 rounded-card border border-cream bg-white p-4">
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-              <h4 className="[font-family:inherit] normal-case text-[14px] font-bold text-ink">
-                🏷️ <R d="Stall Pricing & Pax Guarantee" m="Stall Pricing & Pax" />
-              </h4>
-              <Pill tone="outline">
-                <R d="Independent per stall" m="Per Stall" />
-              </Pill>
-            </div>
-            <p className="mb-3 text-xs text-ink/60">
-              <R
-                d={`Set the commercial rate and minimum guest guarantee required to book the ${currentName} stall. Data is stored independently for each stall.`}
-                m="Independent commercial package rate & minimums for this stall."
-              />
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <FormLabel required htmlFor="stall-fixed-rate">
-                  Fixed Per-Plate Rate (₹)
-                </FormLabel>
-                <input
-                  id="stall-fixed-rate"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={pricing.fixedPerPlate || ""}
-                  onChange={(e) => setPricing("fixedPerPlate", Number(e.target.value))}
-                  placeholder="e.g. 150"
-                  className={inputCls}
-                />
-                <FieldHint className="hidden sm:block">Fixed package price per guest covering this stall&apos;s spread.</FieldHint>
-              </div>
-              <div>
-                <FormLabel required htmlFor="stall-min-pax">
-                  <R d="Minimum Guest Guarantee (Min Pax)" m="Min Pax Guarantee" />
-                </FormLabel>
-                <input
-                  id="stall-min-pax"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={pricing.minPaxGuarantee || ""}
-                  onChange={(e) => setPricing("minPaxGuarantee", Number(e.target.value))}
-                  placeholder="e.g. 50"
-                  className={inputCls}
-                />
-                <FieldHint className="hidden sm:block">Minimum guest headcount required to deploy this stall (default 50).</FieldHint>
-              </div>
-            </div>
-            {errors.pricing && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {errors.pricing}</p>}
-          </div>
-        </ContentCard>
-      )}
+        </div>
+      </div>
 
       <StallDishModal
         isOpen={modal !== null}
@@ -410,16 +645,7 @@ export default function Step6AStallWorkspace({
         onSave={saveDish}
       />
 
-      <BuilderNav
-        backLabel="← Back to Offerings"
-        mBackLabel="← Back"
-        continueLabel="Continue to Setup & Cutlery →"
-        mContinueLabel="Next: Setup & Cutlery →"
-        onBack={onBack}
-        onContinue={validate}
-        onSaveDraft={onSaveDraft}
-        saving={saving}
-      />
+      <BuilderNav onBack={onBack} onContinue={validate} onSaveDraft={onSaveDraft} saving={saving} />
     </div>
   );
 }

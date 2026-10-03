@@ -3,7 +3,7 @@
 import { useState } from "react";
 import BuilderNav from "../common/BuilderNav";
 import type { SingleStallConfig } from "@/lib/vendorMenus";
-import { ChipAddInput, ChoiceChip, ContentCard, FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
+import { ChipAddInput, ChoiceChip, FormLabel, R, StepHeading } from "../../ui";
 
 interface Step6BStallSetupProps {
   stallConfig?: SingleStallConfig;
@@ -47,7 +47,7 @@ export default function Step6BStallSetup({
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Stall Builder · Setup & Cutlery"
         heading="On-site equipment & stall cutlery"
@@ -57,18 +57,23 @@ export default function Step6BStallSetup({
         mSubtext={null}
       />
 
-      <ContentCard>
-        <FormLabel>Live Cooking Equipment Included</FormLabel>
-        <div className="flex flex-wrap items-center gap-2">
-          {options.map((eq) => (
-            <ChoiceChip key={eq} active={equipment.includes(eq)} onClick={() => toggle(eq)}>
-              {eq}
-            </ChoiceChip>
-          ))}
-          <ChipAddInput value={custom} onChange={setCustom} onAdd={addCustom} placeholder="+ Other equipment" />
+      <div className="content-card">
+        <div className="form-group">
+          <FormLabel>Live Cooking Equipment Included</FormLabel>
+          <div className="review-pills-row" style={{ alignItems: "center" }}>
+            {options.map((eq) => (
+              <ChoiceChip key={eq} active={equipment.includes(eq)} onClick={() => toggle(eq)}>
+                {eq}
+              </ChoiceChip>
+            ))}
+            <ChipAddInput value={custom} onChange={setCustom} onAdd={addCustom} placeholder="+ Other equipment" />
+          </div>
         </div>
 
-        <div className="mt-5">
+        <div
+          className="form-group"
+          style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}
+        >
           <FormLabel htmlFor="stall-cutlery">
             <R d="Stall Tableware & Disposables Inclusions" m="Tableware & Disposables" />
           </FormLabel>
@@ -79,13 +84,25 @@ export default function Step6BStallSetup({
             value={stallConfig.cutlery || ""}
             onChange={(e) => onChangeStallConfig({ ...stallConfig, cutlery: e.target.value })}
             placeholder="Eco-friendly Areca nut plates, birchwood spoons & napkins"
-            className={inputCls}
+            className="form-input"
           />
-          <FieldHint>Shown to guests on the stall listing (max 60 characters).</FieldHint>
         </div>
-      </ContentCard>
 
-      <BuilderNav backLabel="← Back to Menus" onBack={onBack} onContinue={onFinishStall} onSaveDraft={onSaveDraft} saving={saving} />
+        {/* Wizard Action Bar */}
+        <div
+          className="wizard-actions-bar"
+          style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+        >
+          <button type="button" className="btn-back" onClick={onBack} disabled={saving}>
+            ← Back to Menus
+          </button>
+          <button type="button" className="btn-next" onClick={onFinishStall} disabled={saving}>
+            Continue →
+          </button>
+        </div>
+      </div>
+
+      <BuilderNav onBack={onBack} onContinue={onFinishStall} onSaveDraft={onSaveDraft} saving={saving} />
     </div>
   );
 }

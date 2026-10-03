@@ -68,7 +68,7 @@ export default function Step5CCourseHierarchy({
   const count = (id: string) => sections.find((s) => s.categoryId === id)?.items.length || 0;
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Builder · Course Hierarchy"
         heading="Feast course hierarchy"
@@ -79,43 +79,52 @@ export default function Step5CCourseHierarchy({
       />
 
       <ContentCard>
-        <ul className="divide-y divide-cream/50">
+        <div className="items-catalog-grid">
           {COURSES_INFO.map((c) => {
             const n = count(c.id);
             const key = c.id as keyof CourseQuotas;
+            // Red accent = the course still has dishes to add vs. its Gold allowance.
+            const highlight = n > 0 && n < (goldQuotas[key] ?? 0);
             return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectCourseToBuild?.(c.id)}
-                  className="flex min-h-[56px] w-full items-center gap-3 py-3 text-left"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-cream/30 text-xl" aria-hidden>
+              <button
+                key={c.id}
+                type="button"
+                className="dish-card"
+                onClick={() => onSelectCourseToBuild?.(c.id)}
+                aria-label={`${c.name}: ${n} dishes. Open in dish builder`}
+                title={`Silver ${silverQuotas[key] ?? 0} · Gold ${goldQuotas[key] ?? 0} picks`}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  font: "inherit",
+                  ...(highlight ? { borderColor: "var(--color-red)" } : null),
+                }}
+              >
+                <div className="dish-card-left">
+                  <span className="vob-d" style={{ fontSize: 28 }} aria-hidden>
                     {c.icon}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold text-ink">
+                  <span className="vob-m" aria-hidden>
+                    {c.icon}
+                  </span>
+                  <div>
+                    <div className="dish-name">
                       <R d={c.name} m={c.short} />
-                    </span>
-                    <span className="hidden text-xs text-ink/60 sm:block">{c.desc}</span>
-                    <span className="hidden text-[11px] text-ink/40 sm:block">
-                      Silver {silverQuotas[key] ?? 0} · Gold {goldQuotas[key] ?? 0} picks
-                    </span>
-                  </span>
-                  <span
-                    className="flex h-7 min-w-7 items-center justify-center rounded-full bg-maroon px-2 text-xs font-bold text-cream"
-                    title={`${n} dishes`}
-                  >
-                    {n}
-                  </span>
-                  <span className="text-ink/30" aria-hidden>
-                    ›
-                  </span>
-                </button>
-              </li>
+                    </div>
+                    <div className="dish-desc vob-d">{c.desc}</div>
+                  </div>
+                </div>
+                <span
+                  className="tab-badge"
+                  style={highlight ? { background: "var(--color-red)", color: "var(--color-cream)" } : undefined}
+                >
+                  {n}
+                </span>
+              </button>
             );
           })}
-        </ul>
+        </div>
       </ContentCard>
 
       <BuilderNav onBack={onBack} onContinue={onContinue} onSaveDraft={onSaveDraft} saving={saving} />

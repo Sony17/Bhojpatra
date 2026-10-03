@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { VendorCounter } from "@/lib/vendorMenus";
 import { vendorOfferings, addOnMenus, addOns } from "@/lib/data";
 import { cn } from "@/components/ui/cn";
-import { BtnBack, BtnNext, FieldError, FieldHint, FormLabel, Sheet, inputCls } from "../../ui";
+import { BtnBack, BtnNext, FieldError, FormLabel, Sheet } from "../../ui";
 
 /** Platform offerings shown under "Feast Extras" (5F); everything else that
  *  isn't a whole-event service is a Live Counter (5E). Staff / tableware live
@@ -111,11 +111,43 @@ function CounterModalInner({
     onClose();
   };
 
+  const selectedOffering = options.find((o) => o.id === selectedId);
+  const rupeeStyle = {
+    position: "absolute" as const,
+    left: 10,
+    top: "50%",
+    transform: "translateY(-50%)",
+    fontWeight: 700,
+    color: "var(--color-black-60)",
+  };
+  const priceInput = (placeholder: string) => (
+    <input
+      id="counter-input-price"
+      type="number"
+      inputMode="numeric"
+      min={0}
+      step={5}
+      value={price ?? ""}
+      onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
+      placeholder={placeholder}
+      className="form-input"
+      style={{ paddingLeft: 24 }}
+    />
+  );
+
   return (
     <Sheet
       open
       onClose={onClose}
-      title={isExtra ? "Configure Feast Hospitality Extra" : "Configure Live Food Counter"}
+      title={
+        counterToEdit
+          ? isExtra
+            ? "Edit Feast Hospitality Extra"
+            : "Edit Live Food Counter"
+          : isExtra
+            ? "Configure Feast Hospitality Extra"
+            : "Configure Live Food Counter"
+      }
       footer={
         <>
           <BtnBack onClick={onClose}>Cancel</BtnBack>
@@ -123,143 +155,211 @@ function CounterModalInner({
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <FormLabel required htmlFor="counter-input-category">
-            {isExtra ? "Extra Service Name / Category" : "Counter Category / Station Name"}
-          </FormLabel>
-          <select
-            id="counter-input-category"
-            value={selectedId}
-            disabled={Boolean(counterToEdit)}
-            onChange={(e) => changeOffering(e.target.value)}
-            className={inputCls}
-          >
-            {free.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.icon} {o.name}
-              </option>
-            ))}
-          </select>
-          <FieldHint>
-            {isExtra
-              ? "Choose the hospitality service this extra covers."
-              : "Choose the live station category this counter runs."}
-          </FieldHint>
-        </div>
+      {/* 1. Category / Name — mapped to a platform offering id */}
+      <div className="form-group">
+        <FormLabel required htmlFor="counter-input-category">
+          {isExtra ? "Extra Service Name / Category" : "Counter Category / Station Name"}
+        </FormLabel>
+        <select
+          id="counter-input-category"
+          value={selectedId}
+          disabled={Boolean(counterToEdit)}
+          onChange={(e) => changeOffering(e.target.value)}
+          className="form-select"
+        >
+          {free.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.icon} {o.name}
+            </option>
+          ))}
+        </select>
+        <span className="field-hint">
+          {isExtra
+            ? "Choose the hospitality service this extra covers from the Bhojpatra platform catalog."
+            : "Choose the live station category this counter runs from the Bhojpatra platform catalog."}
+        </span>
+      </div>
 
-        {addOn?.image && (
-          <div>
-            <FormLabel>Cover Photo</FormLabel>
+      {/* 2. Cover Photo — platform photography for the chosen station */}
+      <div className="form-group">
+        <span className="form-label">Cover Photo</span>
+        <div className="photo-uploader-box" style={{ marginTop: 4 }}>
+          {addOn?.image ? (
             <Image
               src={addOn.image}
-              alt={addOn.name}
-              width={480}
-              height={200}
+              alt={`${addOn.name} cover`}
+              width={90}
+              height={70}
               unoptimized
-              className="h-28 w-full rounded-control object-cover"
+              className="photo-preview-thumb"
             />
+          ) : (
+            <div
+              className="photo-preview-thumb"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}
+              aria-hidden
+            >
+              {selectedOffering?.icon ?? "📷"}
+            </div>
+          )}
+          <div className="photo-upload-meta" style={{ flex: 1 }}>
+            <div className="photo-upload-title">{selectedOffering?.name ?? "Cover Photo"}</div>
+            <div className="photo-upload-desc">
+              Authentic Bhojpatra food photography for this {isExtra ? "service" : "station"} — shown on your catalog card.
+            </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        <div>
-          <FormLabel required htmlFor="counter-input-new-item">
-            {isExtra ? "Included Items / Service Deliverables" : "Items Served at this Counter"}
-          </FormLabel>
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {platformMenu.map((m) => {
-              const on = items.includes(m.name);
-              return (
+      {/* 3. Items Served */}
+      <div className="form-group">
+        <FormLabel required htmlFor="counter-input-new-item">
+          {isExtra ? "Included Items / Service Deliverables" : "Items Served at this Counter"}
+        </FormLabel>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            id="counter-input-new-item"
+            type="text"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addItem();
+              }
+            }}
+            placeholder={
+              isExtra ? "e.g. Virgin Mojito, Fresh Lime Soda, Fruit Punch" : "e.g. Golgappa, Aloo Tikki, Papdi Chaat"
+            }
+            className="form-input"
+          />
+          <button
+            type="button"
+            className="btn-tier-proceed"
+            style={{ margin: 0, padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+            onClick={addItem}
+          >
+            + Add Item
+          </button>
+        </div>
+        <div
+          className="vendor-items-builder-container"
+          style={{
+            marginTop: 8,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            minHeight: 36,
+            padding: 8,
+            background: "var(--color-cream-10)",
+            border: "1px dashed var(--color-cream-40)",
+            borderRadius: "var(--radius-control)",
+          }}
+        >
+          {platformMenu.length === 0 && extras.length === 0 && (
+            <span style={{ fontSize: 11.5, color: "var(--color-black-40)", alignSelf: "center" }}>
+              No items added yet. Type an item above and click &quot;+ Add Item&quot;.
+            </span>
+          )}
+          {platformMenu.map((m) => {
+            const on = items.includes(m.name);
+            return (
+              <span
+                key={m.name}
+                className="item-chip-editable"
+                style={on ? undefined : { opacity: 0.5, textDecoration: "line-through" }}
+              >
+                <span>{m.name}</span>
                 <button
-                  key={m.name}
                   type="button"
+                  className={cn("btn-chip-action", on ? "remove" : "edit")}
                   onClick={() => togglePlatformItem(m.name)}
                   aria-pressed={on}
-                  className={cn(
-                    "min-h-[36px] rounded-full border px-3 text-xs font-semibold",
-                    on ? "border-maroon bg-maroon text-cream" : "border-cream text-ink/50 line-through",
-                  )}
+                  aria-label={on ? `Remove ${m.name}` : `Add ${m.name} back`}
+                  title={on ? "Remove Item" : "Add Item back"}
                 >
-                  {m.name}
-                </button>
-              );
-            })}
-            {extras.map((n) => (
-              <span key={n} className="inline-flex min-h-[36px] items-center gap-1 rounded-full bg-maroon pl-3 text-xs font-semibold text-cream">
-                {n}
-                <button
-                  type="button"
-                  aria-label={`Remove ${n}`}
-                  onClick={() => setExtras(extras.filter((x) => x !== n))}
-                  className="flex h-9 w-9 items-center justify-center"
-                >
-                  ✕
+                  {on ? "✕" : "＋"}
                 </button>
               </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              id="counter-input-new-item"
-              type="text"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addItem();
-                }
-              }}
-              placeholder={
-                isExtra ? "e.g. Virgin Mojito, Fresh Lime Soda, Fruit Punch" : "e.g. Golgappa, Aloo Tikki, Papdi Chaat"
-              }
-              className={inputCls}
-            />
-            <button type="button" onClick={addItem} className="min-h-[44px] shrink-0 rounded-full bg-maroon px-4 text-xs font-bold text-cream">
-              + Add Item
-            </button>
-          </div>
-          <FieldHint>
-            {isExtra
-              ? "List the items, beverages, or services included in this package. Click to edit, or ✕ to remove."
-              : "Add the food and beverage items included in this counter. You can edit an item or click ✕ to remove."}
-          </FieldHint>
+            );
+          })}
+          {extras.map((n) => (
+            <span key={n} className="item-chip-editable">
+              <span>{n}</span>
+              <button
+                type="button"
+                className="btn-chip-action edit"
+                aria-label={`Edit ${n}`}
+                title="Edit Item"
+                onClick={() => {
+                  setExtras(extras.filter((x) => x !== n));
+                  setNewItem(n);
+                }}
+              >
+                ✎
+              </button>
+              <button
+                type="button"
+                className="btn-chip-action remove"
+                aria-label={`Remove ${n}`}
+                title="Remove Item"
+                onClick={() => setExtras(extras.filter((x) => x !== n))}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
         </div>
+        <span className="field-hint">
+          {isExtra
+            ? "List the items, beverages, or services included in this package. Click to edit, or ✕ to remove."
+            : "Add the food and beverage items included in this counter. You can edit an item or click ✕ to remove."}
+        </span>
+      </div>
 
-        {isExtra && (
-          <div>
+      {/* 4. Pricing */}
+      {isExtra ? (
+        <div className="form-grid-2">
+          <div className="form-group">
             <FormLabel htmlFor="extra-select-pricing-type">Pricing Model</FormLabel>
-            <select id="extra-select-pricing-type" value={perPlate ? "plate" : "flat"} disabled className={inputCls}>
-              <option value="plate">Per Plate / Guest (₹ / plate)</option>
-              <option value="flat">Fixed Event Package Cost (Flat ₹)</option>
+            <select
+              id="extra-select-pricing-type"
+              value={perPlate ? "per-plate" : "fixed"}
+              disabled
+              className="form-select"
+            >
+              <option value="per-plate">Per Plate / Guest (₹ / plate)</option>
+              <option value="fixed">Fixed Event Package Cost (Flat ₹)</option>
             </select>
           </div>
-        )}
-
-        <div>
-          <FormLabel required htmlFor="counter-input-price">
-            {isExtra ? (perPlate ? "Price Rate (₹ / plate)" : "Price Rate (Flat ₹)") : "Extra Cost Per Plate (₹ / plate)"}
-          </FormLabel>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-ink/60">₹</span>
-            <input
-              id="counter-input-price"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={price ?? ""}
-              onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
-              placeholder={isExtra ? "60" : "80"}
-              className={inputCls}
-            />
-            {perPlate && <span className="shrink-0 text-xs text-ink/60">/ plate</span>}
+          <div className="form-group">
+            <FormLabel required htmlFor="counter-input-price">
+              {perPlate ? "Price Rate (₹ / plate)" : "Price Rate (Flat ₹)"}
+            </FormLabel>
+            <div style={{ position: "relative" }}>
+              <span style={rupeeStyle}>₹</span>
+              {priceInput("60")}
+            </div>
           </div>
-          {!isExtra && (
-            <FieldHint>Additional per-guest charge added for this counter to the feast booking price.</FieldHint>
-          )}
         </div>
-        <FieldError>{error}</FieldError>
-      </div>
+      ) : (
+        <div className="form-group">
+          <FormLabel required htmlFor="counter-input-price">
+            Extra Cost Per Plate (₹ / plate)
+          </FormLabel>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <span style={rupeeStyle}>₹</span>
+              {priceInput("80")}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-black-60)", whiteSpace: "nowrap" }}>
+              / plate
+            </span>
+          </div>
+          <span className="field-hint">Additional per-guest charge added for this counter to the feast booking price.</span>
+        </div>
+      )}
+      <FieldError>{error}</FieldError>
     </Sheet>
   );
 }

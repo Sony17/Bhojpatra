@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChoiceChip, ContentCard, FieldError, FormLabel, R, StepHeading, inputCls } from "../../ui";
+import { ChoiceChip, FieldError, FormLabel, R, StepHeading } from "../../ui";
 import BuilderNav from "../common/BuilderNav";
 import type { VendorBainaDetails } from "@/lib/vendorMenus";
 
@@ -43,7 +43,7 @@ export default function Step7ABainaStory({
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Baina Builder · Studio Story"
         heading="Artisanal gifting studio & traditions"
@@ -53,9 +53,9 @@ export default function Step7ABainaStory({
         mSubtext={null}
       />
 
-      <ContentCard>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
+      <div className="content-card">
+        <div className="form-grid-2">
+          <div className="form-group">
             <FormLabel required htmlFor="baina-studio-name">
               <R d="Gifting Studio Brand Name" m="Studio Name" />
             </FormLabel>
@@ -65,11 +65,11 @@ export default function Step7ABainaStory({
               value={bainaDetails.studioName || ""}
               onChange={(ev) => set({ studioName: ev.target.value })}
               placeholder="e.g. Ram Asrey Royal Baina Studio"
-              className={inputCls}
+              className="form-input"
             />
             <FieldError>{errors.studioName}</FieldError>
           </div>
-          <div>
+          <div className="form-group">
             <FormLabel required htmlFor="baina-lead-days">
               Production Notice (Days)
             </FormLabel>
@@ -81,25 +81,26 @@ export default function Step7ABainaStory({
               value={bainaDetails.leadDays ?? ""}
               onChange={(ev) => set({ leadDays: Number(ev.target.value) })}
               placeholder="3"
-              className={inputCls}
+              className="form-input"
             />
             <FieldError>{errors.leadDays}</FieldError>
           </div>
         </div>
-        <div className="mt-4">
+
+        <div className="form-group">
           <FormLabel htmlFor="baina-story">Heritage Confectionery Story</FormLabel>
           <textarea
             id="baina-story"
-            rows={3}
             value={bainaDetails.story || ""}
             onChange={(ev) => set({ story: ev.target.value })}
             placeholder="Heritage Lucknow sweetmakers since 1850, handcrafting artisanal sweet hampers..."
-            className={inputCls}
+            className="form-textarea"
           />
         </div>
-        <div className="mt-4">
+
+        <div className="form-group">
           <FormLabel>Best For (Gifting Occasions)</FormLabel>
-          <div className="flex flex-wrap gap-2">
+          <div className="chip-grid">
             {BAINA_OCCASIONS.map((o) => (
               <ChoiceChip
                 key={o}
@@ -111,7 +112,7 @@ export default function Step7ABainaStory({
             ))}
           </div>
         </div>
-      </ContentCard>
+      </div>
 
       <BuilderNav onBack={onBack} onContinue={validateAndContinue} onSaveDraft={onSaveDraft} saving={saving} />
     </div>

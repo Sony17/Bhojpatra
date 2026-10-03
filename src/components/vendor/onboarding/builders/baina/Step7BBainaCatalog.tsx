@@ -6,7 +6,7 @@ import BuilderNav from "../common/BuilderNav";
 import BainaBoxModal from "./BainaBoxModal";
 import type { VendorBainaBox } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
-import { AddDashed, ContentCard, R, StepHeading } from "../../ui";
+import { AddDashed, R, StepHeading } from "../../ui";
 
 interface Step7BBainaCatalogProps {
   boxes: VendorBainaBox[];
@@ -38,7 +38,8 @@ export default function Step7BBainaCatalog({
 
   const handleOpenAdd = () => {
     if (isAtLimit) {
-      setError(`Catalog limit reached. You can publish a maximum of ${MAX_BOXES} curated Baina boxes.`);
+      // The "Maximum 5 selections allowed." notice is already shown below the button.
+      setError("");
       return;
     }
     setError("");
@@ -85,7 +86,7 @@ export default function Step7BBainaCatalog({
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Baina Builder · Box Catalog"
         heading="Artisanal gifting box hampers"
@@ -95,62 +96,91 @@ export default function Step7BBainaCatalog({
         mSubtext={null}
       />
 
-      <ContentCard>
-        {boxes.length > 0 && (
-          <ul className="space-y-2.5">
-            {boxes.map((b, idx) => (
-              <li key={`${b.name}-${idx}`} className="flex items-start gap-3 rounded-control border border-cream/70 p-2.5">
-                <Image
-                  src={b.photo || dummyDishPhoto(b.name)}
-                  alt={b.name}
-                  width={64}
-                  height={64}
-                  unoptimized
-                  className="h-16 w-16 shrink-0 rounded-control object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold text-ink">{b.name}</div>
-                  <p className="line-clamp-2 text-[11px] text-ink/60">{b.contents}</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    <span className="rounded border border-cream px-1.5 text-[11px] font-bold text-maroon">½ kg: ₹{b.price}</span>
-                    {b.price1kg ? (
-                      <span className="rounded border border-cream px-1.5 text-[11px] font-bold text-ink">1 kg: ₹{b.price1kg}</span>
-                    ) : null}
-                    {(b.customSizes || []).map((cs) => (
-                      <span key={cs.label} className="rounded bg-cream/40 px-1.5 text-[10px] font-bold uppercase text-ink">
-                        {cs.label}: ₹{cs.price}
+      <div className="content-card">
+        <div className="baina-box-catalog-container items-catalog-grid">
+          {boxes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 24, color: "var(--color-black-60)", fontSize: 13 }}>
+              No gifting boxes added yet. Click below to add your first box hamper (up to 5).
+            </div>
+          ) : (
+            boxes.map((b, idx) => (
+              <div key={`${b.name}-${idx}`} className="dish-card selected">
+                <div className="dish-card-left">
+                  <Image
+                    src={b.photo || dummyDishPhoto(b.name)}
+                    alt={b.name}
+                    width={54}
+                    height={54}
+                    unoptimized
+                    className="dish-thumb"
+                  />
+                  <div className="dish-info">
+                    <div className="dish-name-row" style={{ flexWrap: "wrap" }}>
+                      <span className="dish-name">{b.name}</span>
+                      <span
+                        className="service-pill"
+                        style={{ fontSize: 10, background: "var(--color-cream)", color: "var(--color-red)", fontWeight: 700 }}
+                      >
+                        Box {idx + 1} of {MAX_BOXES}
                       </span>
-                    ))}
+                    </div>
+                    <p className="dish-desc">{b.contents}</p>
+                    <div className="dish-meta-row" style={{ marginTop: 5, flexWrap: "wrap" }}>
+                      <span className="review-pill" style={{ fontWeight: 700, color: "var(--color-red)" }}>
+                        ½ kg: ₹{b.price}
+                      </span>
+                      {b.price1kg ? (
+                        <span className="review-pill" style={{ fontWeight: 700 }}>
+                          1 kg: ₹{b.price1kg}
+                        </span>
+                      ) : null}
+                      {(b.customSizes || []).map((cs) => (
+                        <span key={cs.label} className="service-pill">
+                          {cs.label}: ₹{cs.price}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                <div className="dish-card-actions">
                   <button
                     type="button"
+                    className="btn-icon-action"
+                    title="Edit Box"
                     aria-label={`Edit ${b.name}`}
                     onClick={() => handleOpenEdit(b, idx)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
                   >
                     ✎
                   </button>
                   <button
                     type="button"
+                    className="btn-icon-action"
+                    title="Remove Box"
                     aria-label={`Remove ${b.name}`}
                     onClick={() => handleRemoveBox(idx)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
                   >
                     ✕
                   </button>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+            ))
+          )}
+        </div>
+
         <AddDashed onClick={handleOpenAdd} disabled={isAtLimit}>
           <R d="Add New Gifting Box Hamper" m="Add Box" />
         </AddDashed>
-        <p className="mt-2 text-center text-[11px] font-semibold text-ink/50">Maximum 5 selections allowed.</p>
-        {error && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {error}</p>}
-      </ContentCard>
+        {isAtLimit && (
+          <div className="box-selection-limit-notice" role="status" aria-live="polite">
+            Maximum 5 selections allowed.
+          </div>
+        )}
+        {error && (
+          <span className="vob-field-error" role="alert">
+            ⚠️ {error}
+          </span>
+        )}
+      </div>
 
       <BainaBoxModal
         isOpen={modalOpen}

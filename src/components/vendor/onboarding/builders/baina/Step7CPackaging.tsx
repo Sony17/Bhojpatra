@@ -2,8 +2,7 @@
 
 import BuilderNav from "../common/BuilderNav";
 import type { BainaPackagingStyle } from "@/lib/vendorMenus";
-import { cn } from "@/components/ui/cn";
-import { ContentCard, StepHeading } from "../../ui";
+import { StepHeading } from "../../ui";
 
 interface Step7CPackagingProps {
   packaging?: BainaPackagingStyle;
@@ -31,7 +30,7 @@ export default function Step7CPackaging({
   saving = false,
 }: Step7CPackagingProps) {
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Baina Builder · Packaging Presentation"
         heading="Select luxury packaging presentation"
@@ -41,35 +40,47 @@ export default function Step7CPackaging({
         mSubtext={null}
       />
 
-      <ContentCard>
-        <div role="radiogroup" aria-label="Packaging style" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="content-card">
+        <div className="form-grid-2" role="radiogroup" aria-label="Packaging style">
           {PACKAGING_STYLES.map((st) => {
             const active = packaging === st.id;
             return (
-              <button
+              <div
                 key={st.id}
-                type="button"
                 role="radio"
                 aria-checked={active}
+                tabIndex={active ? 0 : -1}
+                data-package-style={st.id}
+                className={`offering-card packaging-card${active ? " active" : ""}`}
                 onClick={() => onChangePackaging(st.id)}
-                className={cn(
-                  "flex min-h-[64px] items-start gap-3 rounded-card border-2 p-3.5 text-left",
-                  active ? "border-maroon bg-maroon/5" : "border-cream/70 bg-white hover:border-maroon/40",
-                )}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChangePackaging(st.id);
+                  }
+                  if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    const i = PACKAGING_STYLES.findIndex((p) => p.id === st.id);
+                    const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
+                    const next = PACKAGING_STYLES[(i + step + PACKAGING_STYLES.length) % PACKAGING_STYLES.length];
+                    onChangePackaging(next.id);
+                    const group = e.currentTarget.parentElement;
+                    requestAnimationFrame(() =>
+                      group?.querySelector<HTMLElement>(`[data-package-style="${next.id}"]`)?.focus(),
+                    );
+                  }
+                }}
               >
-                <span className="text-2xl" aria-hidden>
+                <div style={{ fontSize: 24 }} aria-hidden>
                   {st.icon}
-                </span>
-                <span className="flex-1">
-                  <span className="block text-[14px] font-bold text-ink">{st.title}</span>
-                  <span className="hidden text-xs text-ink/60 sm:block">{st.blurb}</span>
-                </span>
-                {active && <span className="text-sm font-bold text-maroon">✓</span>}
-              </button>
+                </div>
+                <div className="offering-title">{st.title}</div>
+                <div className="offering-blurb">{st.blurb}</div>
+              </div>
             );
           })}
         </div>
-      </ContentCard>
+      </div>
 
       <BuilderNav onBack={onBack} onContinue={onFinishBaina} onSaveDraft={onSaveDraft} saving={saving} />
     </div>

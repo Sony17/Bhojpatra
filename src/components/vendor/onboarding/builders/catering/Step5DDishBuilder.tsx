@@ -7,7 +7,7 @@ import DishModal from "./DishModal";
 import type { VendorMenuSection, VendorMenuItem } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
 import { cn } from "@/components/ui/cn";
-import { AddDashed, ContentCard, DietMark, R, StepHeading } from "../../ui";
+import { AddDashed, ContentCard, DietMark, FieldError, R, StepHeading } from "../../ui";
 
 interface Step5DDishBuilderProps {
   sections: VendorMenuSection[];
@@ -153,7 +153,7 @@ export default function Step5DDishBuilder({
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Builder · Dishes & Photos"
         heading="Build your dishes with authentic photos"
@@ -164,7 +164,8 @@ export default function Step5DDishBuilder({
       />
 
       <ContentCard>
-        <div role="tablist" className="-mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {/* Course Tabs */}
+        <div className="course-tabs-bar" role="tablist" aria-label="Courses">
           {COURSES.map((c) => {
             const n = sections.find((s) => s.categoryId === c.id)?.items.length || 0;
             const active = c.id === activeTab;
@@ -174,102 +175,105 @@ export default function Step5DDishBuilder({
                 type="button"
                 role="tab"
                 aria-selected={active}
+                className={cn("course-tab-btn", active && "active")}
                 onClick={() => setActiveTab(c.id)}
-                className={cn(
-                  "flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold",
-                  active ? "border-maroon bg-maroon text-cream" : "border-cream bg-white text-ink/70",
-                )}
               >
                 <span>
                   {c.icon} <R d={c.name} m={c.short} />
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-1.5 text-[10px] font-bold",
-                    active ? "bg-cream text-maroon" : "bg-cream/40 text-ink",
-                  )}
-                >
-                  {n}
-                </span>
+                </span>{" "}
+                <span className="tab-badge">{n}</span>
               </button>
             );
           })}
         </div>
 
-        {activeDishes.length === 0 ? (
-          <div className="rounded-control border border-dashed border-cream p-6 text-center text-[13px] text-ink/60">
-            No dishes added to this course yet. Click below to add your first delicacy!
-          </div>
-        ) : (
-          <ul className="space-y-2.5">
-            {activeDishes.map((dish, idx) => {
+        {/* Dish Cards Container */}
+        <div className="dishes-catalog-container items-catalog-grid">
+          {activeDishes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 24, color: "var(--color-black-60)", fontSize: 13 }}>
+              No dishes added to this course yet. Click below to add your first delicacy!
+            </div>
+          ) : (
+            activeDishes.map((dish, idx) => {
               const isSig = featured.includes(dish.name);
               const tiers = dish.tiers?.length ? dish.tiers : ["Silver", "Gold"];
               return (
-                <li key={`${dish.name}-${idx}`} className="flex items-start gap-3 rounded-control border border-cream/70 bg-white p-2.5">
-                  <Image
-                    src={dish.photo || dummyDishPhoto(dish.name)}
-                    alt={dish.name}
-                    width={64}
-                    height={64}
-                    unoptimized
-                    className="h-16 w-16 shrink-0 rounded-control object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <DietMark diet={dish.diet} />
-                      <span className="text-[13px] font-bold text-ink">{dish.name}</span>
-                      {isSig && (
-                        <span className="rounded-full bg-cream px-1.5 text-[10px] font-bold text-maroon">★ Signature</span>
-                      )}
-                    </div>
-                    {dish.desc && <p className="mt-0.5 line-clamp-2 text-[11px] text-ink/60">{dish.desc}</p>}
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {tiers.map((t) => (
-                        <span key={t} className="rounded border border-cream px-1.5 text-[10px] font-bold uppercase text-ink/70">
-                          {t}
-                        </span>
-                      ))}
+                <div key={`${dish.name}-${idx}`} className="dish-card">
+                  <div className="dish-card-left">
+                    <Image
+                      src={dish.photo || dummyDishPhoto(dish.name)}
+                      alt={dish.name}
+                      width={54}
+                      height={54}
+                      unoptimized
+                      className="dish-thumb"
+                    />
+                    <div className="dish-info">
+                      <div className="dish-name-row">
+                        <DietMark diet={dish.diet} />
+                        <span className="dish-name">{dish.name}</span>
+                        {isSig && (
+                          <span
+                            className="service-pill"
+                            style={{ background: "var(--color-cream)", color: "var(--color-red)" }}
+                          >
+                            ★ Signature
+                          </span>
+                        )}
+                      </div>
+                      {dish.desc && <p className="dish-desc">{dish.desc}</p>}
+                      <div className="dish-meta-row">
+                        {tiers.map((t) => (
+                          <span key={t} className={`dish-tier-tag ${t.toLowerCase()}`}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                  <div className="dish-card-actions">
                     <button
                       type="button"
+                      className="btn-icon-action"
                       onClick={() => toggleSignature(dish.name)}
                       title={isSig ? "Signature Dish (Click to remove)" : "Mark as Signature Dish (Featured on card)"}
+                      aria-label={isSig ? `Remove ${dish.name} from signature dishes` : `Mark ${dish.name} as signature dish`}
                       aria-pressed={isSig}
-                      className={cn(
-                        "flex h-10 w-10 items-center justify-center rounded-full border text-sm",
-                        isSig ? "border-maroon bg-maroon text-cream" : "border-cream text-ink/50",
-                      )}
+                      style={
+                        isSig
+                          ? { background: "var(--color-red)", color: "var(--color-cream)", borderColor: "var(--color-red)" }
+                          : undefined
+                      }
                     >
                       ★
                     </button>
                     <button
                       type="button"
+                      className="btn-icon-action"
                       onClick={() => handleOpenEditModal(dish, idx)}
                       title="Edit Dish"
                       aria-label={`Edit ${dish.name}`}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
                     >
                       ✎
                     </button>
                     <button
                       type="button"
+                      className="btn-icon-action"
                       onClick={() => handleDeleteDish(idx)}
                       title="Remove Dish"
                       aria-label={`Remove ${dish.name}`}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-cream text-ink/70"
                     >
                       ✕
                     </button>
                   </div>
-                </li>
+                </div>
               );
-            })}
-          </ul>
-        )}
-        {notice && <p className="mt-2 text-xs font-semibold text-maroon">⚠️ {notice}</p>}
+            })
+          )}
+        </div>
+        {notice && <FieldError>{notice}</FieldError>}
+
+        {/* + Add Dish Button */}
         <AddDashed onClick={handleOpenAddModal}>
           <R d="Add New Dish to this Course" m="Add Dish" />
         </AddDashed>

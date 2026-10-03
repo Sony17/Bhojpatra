@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import type {
   LiveVendorRecord,
@@ -28,7 +29,9 @@ import { activeCateringSections } from "./builders/catering/CateringBuilder";
 import Step8MasterReview, { type ReviewJump } from "./steps/Step8MasterReview";
 import Step9Complete from "./steps/Step9Complete";
 import StorefrontPreviewModal from "./components/StorefrontPreviewModal";
-import { OnboardingAppBar, PhaseStepper, VendorSignInModal } from "./OnboardingChrome";
+import { OnboardingAppBar, PhaseStepper } from "./OnboardingChrome";
+import { ShellSlots } from "./ui";
+import "./onboarding.css";
 
 export interface OnboardingState {
   // Step 1: Identity & Operations
@@ -173,7 +176,9 @@ export default function VendorOnboarding() {
   const [catSection, setCatSection] = useState<string>("5A");
   const [stallSection, setStallSection] = useState<string>("6A");
   const [bainaSection, setBainaSection] = useState<string>("7A");
-  const [signInOpen, setSignInOpen] = useState(false);
+  const router = useRouter();
+  const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
+  const [subnavSlot, setSubnavSlot] = useState<HTMLElement | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const [formData, setFormData] = useState<OnboardingState>({
@@ -445,7 +450,7 @@ export default function VendorOnboarding() {
     [formData],
   );
 
-  const top = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const top = () => document.querySelector(".vob .wizard-body")?.scrollTo({ top: 0, behavior: "smooth" });
 
   const goStep = (step: number) => {
     setCurrentStep(step);
@@ -536,9 +541,10 @@ export default function VendorOnboarding() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-maroon border-t-transparent" />
-        <p className="text-sm text-ink/60">Loading your vendor registration workspace...</p>
+      <div className="vob vob-shell">
+        <div className="wizard-body" style={{ justifyContent: "center" }}>
+          <p className="step-subtext">Loading your vendor registration workspace...</p>
+        </div>
       </div>
     );
   }
@@ -563,11 +569,13 @@ export default function VendorOnboarding() {
   const phase = currentStep <= 3 ? currentStep - 1 : currentStep === 4 ? 3 : currentStep === 5 ? 4 : 5;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-3 sm:px-0 sm:py-6">
-      <OnboardingAppBar onSignIn={() => setSignInOpen(true)} />
-      {currentStep !== 6 && <PhaseStepper phase={phase} maxReached={maxPhase} onJump={jumpToPhase} />}
+    <ShellSlots.Provider value={{ footer: footerSlot, subnav: subnavSlot }}>
+    <div className="vob vob-shell">
+      {/* Already signed in as a vendor, so "Sign In" goes straight to the portal. */}
+      <OnboardingAppBar onSignIn={() => router.push("/vendor/dashboard")} />
+      <PhaseStepper phase={phase} maxReached={maxPhase} onJump={jumpToPhase} />
 
-      {currentStep > 1 && currentStep < 6 && (
+      {currentStep > 1 && (
         <VendorContextHeader
           businessName={formData.businessName}
           city={formData.city}
@@ -583,15 +591,15 @@ export default function VendorOnboarding() {
         />
       )}
 
+      {/* Builder breadcrumb pills portal in here (SubnavPills). */}
+      <div ref={setSubnavSlot} />
+
+      <div className="wizard-body">
+      <article className="step-container active">
       {saveError && (
-        <div role="alert" className="mb-4 flex items-center justify-between gap-2 rounded-control border border-maroon/40 bg-maroon/5 p-3 text-xs font-semibold text-maroon">
+        <div role="alert" className="vob-save-error">
           <span>⚠️ {saveError}</span>
-          <button
-            type="button"
-            onClick={() => setSaveError("")}
-            aria-label="Dismiss"
-            className="flex h-11 w-11 shrink-0 items-center justify-center"
-          >
+          <button type="button" onClick={() => setSaveError("")} aria-label="Dismiss">
             ✕
           </button>
         </div>
@@ -617,7 +625,7 @@ export default function VendorOnboarding() {
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onContinue={handleStep1Continue}
-          onSignIn={() => setSignInOpen(true)}
+          onSignIn={() => router.push("/vendor/dashboard")}
           saving={saving}
         />
       )}
@@ -728,7 +736,12 @@ export default function VendorOnboarding() {
       )}
 
       <StorefrontPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} data={formData} />
-      <VendorSignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
+      </article>
+      </div>
+
+      {/* Each step's Back / Continue footer portals in here (FlowFooter). */}
+      <div ref={setFooterSlot} />
     </div>
+    </ShellSlots.Provider>
   );
 }

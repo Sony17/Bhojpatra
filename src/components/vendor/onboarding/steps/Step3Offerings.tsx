@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import type { RecognitionBadgeKey, VendorBadgesState, VendorCustomOffering } from "@/lib/vendorMenus";
 import { cn } from "@/components/ui/cn";
-import BadgeApplicationModal, { BADGE_DEFINITIONS } from "../components/BadgeApplicationModal";
-import { CardTitle, ContentCard, FlowFooter, Pill, R, StepHeading } from "../ui";
+import BadgeApplicationModal, { BADGE_DEFINITIONS, BadgeReqItems } from "../components/BadgeApplicationModal";
+import { ContentCard, FlowFooter, R, StepHeading } from "../ui";
 
 export interface Step3Data {
   serviceCategories: string[];
@@ -118,9 +118,18 @@ const COMPONENTS: {
 
 const BADGE_KEYS: RecognitionBadgeKey[] = ["verified", "icon", "heritage"];
 
+/** Enter / Space activate a div-based (role=checkbox) card, like a button. */
+const onActivateKey = (fn: () => void) => (e: KeyboardEvent<HTMLElement>) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    fn();
+  }
+};
+
 export default function Step3Offerings({ data, onChange, onBack, onFinishStep3, saving = false }: Step3OfferingsProps) {
   const [error, setError] = useState("");
   const [badgeModal, setBadgeModal] = useState<RecognitionBadgeKey | null>(null);
+  const [expanded, setExpanded] = useState<Partial<Record<RecognitionBadgeKey, boolean>>>({});
   const selected = data.serviceCategories || [];
   const comps = data.cateringComponents || {};
 
@@ -153,90 +162,84 @@ export default function Step3Offerings({ data, onChange, onBack, onFinishStep3, 
       />
 
       <ContentCard>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="offering-cards-grid">
           {SERVICES.map((svc) => {
             const active = selected.includes(svc.id);
             return (
               <div
                 key={svc.id}
-                className={cn(
-                  "relative flex flex-col gap-2 rounded-card border-2 p-4 transition-colors",
-                  active ? "border-maroon bg-maroon/5" : "border-cream/60 bg-white",
-                )}
+                className={cn("offering-card", active && "active")}
+                data-offering-key={svc.id}
+                role="checkbox"
+                aria-checked={active}
+                aria-label={svc.title}
+                tabIndex={0}
+                onClick={() => toggleService(svc.id)}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget) onActivateKey(() => toggleService(svc.id))(e);
+                }}
               >
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleService(svc.id)}
-                  className="flex min-h-[44px] items-start gap-3 text-left"
-                >
-                  <span className="text-2xl" aria-hidden>
+                <div className="offering-header">
+                  <span className="offering-icon" aria-hidden>
                     {svc.icon}
                   </span>
-                  <span className="flex-1">
-                    <span className="block text-[15px] font-bold text-ink">
-                      <R d={svc.title} m={svc.mTitle} />
-                    </span>
-                    <span className="mt-0.5 block text-xs leading-snug text-ink/60">
-                      <R d={svc.blurb} m={svc.mBlurb} />
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
-                      active ? "border-maroon bg-maroon text-cream" : "border-cream text-transparent",
-                    )}
-                    aria-hidden
-                  >
-                    ✓
-                  </span>
-                </button>
-                <ul className="hidden space-y-1 pl-1 text-xs text-ink/70 sm:block">
+                  <div className="offering-checkbox" aria-hidden>
+                    {active ? "✓" : ""}
+                  </div>
+                </div>
+                <div className="offering-title">
+                  <R d={svc.title} m={svc.mTitle} />
+                </div>
+                <div className="offering-blurb">
+                  <R d={svc.blurb} m={svc.mBlurb} />
+                </div>
+                <ul className="offering-features vob-d">
                   {svc.bullets.map((b) => (
-                    <li key={b} className="flex gap-1.5">
-                      <span className="text-maroon">•</span>
-                      {b}
-                    </li>
+                    <li key={b}>{b}</li>
                   ))}
                 </ul>
 
-                {svc.id === "full-catering" && active && (
-                  <div className="mt-2 rounded-control border border-cream bg-white p-3">
-                    <div className="text-[13px] font-bold text-ink">🍲 Select Feast Components</div>
-                    <div className="mb-2 text-[11px] text-ink/60">
-                      <R d="Choose which components you provide for feast bookings:" m="Select which components you provide:" />
+                {svc.id === "full-catering" && (
+                  <div
+                    className="feast-components-section"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="feast-components-header">
+                      <div className="feast-components-title">
+                        <span aria-hidden>🍲</span> Select Feast Components
+                      </div>
+                      <div className="feast-components-subtext">
+                        <R
+                          d="Choose which components you provide for feast bookings:"
+                          m="Select which components you provide:"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="feast-components-list">
                       {COMPONENTS.map((c) => {
                         const on = comps[c.key] !== false;
                         return (
-                          <button
+                          <div
                             key={c.key}
-                            type="button"
+                            className={cn("feast-component-item", on && "active")}
+                            data-component-key={c.key}
                             role="checkbox"
                             aria-checked={on}
+                            tabIndex={active ? 0 : -1}
                             onClick={() => toggleComponent(c.key)}
-                            className={cn(
-                              "flex min-h-[44px] w-full items-start gap-2.5 rounded-control border p-2 text-left",
-                              on ? "border-maroon/40 bg-maroon/5" : "border-cream/60",
-                            )}
+                            onKeyDown={onActivateKey(() => toggleComponent(c.key))}
                           >
-                            <span
-                              className={cn(
-                                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] font-bold",
-                                on ? "border-maroon bg-maroon text-cream" : "border-cream text-transparent",
-                              )}
-                              aria-hidden
-                            >
+                            <div className="component-checkbox" aria-hidden>
                               ✓
-                            </span>
-                            <span>
-                              <span className="block text-xs font-bold text-ink">{c.name}</span>
-                              <span className="block text-[11px] text-ink/60">
+                            </div>
+                            <div className="component-info">
+                              <div className="component-name">{c.name}</div>
+                              <div className="component-desc">
                                 <R d={c.desc} m={c.mDesc} />
-                              </span>
-                            </span>
-                          </button>
+                              </div>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -246,59 +249,130 @@ export default function Step3Offerings({ data, onChange, onBack, onFinishStep3, 
             );
           })}
         </div>
-        {error && <p className="mt-3 text-xs font-semibold text-maroon">⚠️ {error}</p>}
-      </ContentCard>
+        {error && (
+          <span className="vob-field-error" role="alert">
+            ⚠️ {error}
+          </span>
+        )}
 
-      {/* Badges & Recognition (Optional) */}
-      <ContentCard>
-        <CardTitle badge="Optional">
-          <span aria-hidden>🛡️</span> Badges & Recognition
-        </CardTitle>
-        <p className="-mt-2 mb-4 text-[11px] text-ink/50">
-          <R
-            d="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust to customers from day one."
-            m="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust."
-          />
-        </p>
-        <div className="space-y-2.5">
-          {BADGE_KEYS.map((key) => {
-            const meta = BADGE_DEFINITIONS[key];
-            const granted = data.badges?.granted?.includes(key);
-            const applied = data.badges?.applied?.includes(key);
-            return (
-              <div
-                key={key}
-                className="flex flex-col gap-3 rounded-control border border-cream/70 bg-cream/10 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl" aria-hidden>
-                    {meta.icon}
-                  </span>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[13px] font-bold text-ink">{meta.title}</span>
-                      <Pill tone="cream">{meta.badgeTag}</Pill>
+        {/* Bhojpatra Recognition Badges */}
+        <div className="mockup-badges-section">
+          <div className="badges-section-header">
+            <div className="card-title-row" style={{ marginBottom: 4 }}>
+              <span className="card-title" style={{ fontSize: 15 }}>
+                <span aria-hidden>🛡️</span> Badges &amp; Recognition
+              </span>
+              <span className="vob-badge">Optional</span>
+            </div>
+            <p className="field-hint" style={{ marginBottom: 14 }}>
+              <R
+                d="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust to customers from day one."
+                m="Apply for Bhojpatra recognition badges to highlight your kitchen's standards, heritage, and verified trust."
+              />
+            </p>
+          </div>
+          <div className="badge-cards-list">
+            {BADGE_KEYS.map((key) => {
+              const meta = BADGE_DEFINITIONS[key];
+              const granted = Boolean(data.badges?.granted?.includes(key));
+              const applied = Boolean(data.badges?.applied?.includes(key));
+              const isOpen = Boolean(expanded[key]);
+              return (
+                <div key={key} className={cn("mockup-badge-card", (granted || applied) && "is-submitted")}>
+                  <div className="badge-card-main">
+                    <div className="badge-card-identity">
+                      <div className="badge-avatar-icon" aria-hidden>
+                        {meta.icon}
+                      </div>
+                      <div className="badge-card-info">
+                        <div className="badge-card-title-row">
+                          <h4 className="badge-card-title">{meta.title}</h4>
+                          {granted ? (
+                            <span className="badge-status-pill submitted">✓ Badge Granted</span>
+                          ) : applied ? (
+                            <span className="badge-status-pill submitted">✓ Application Submitted · Applied</span>
+                          ) : null}
+                        </div>
+                        <div className="badge-tagline">{meta.badgeTag}</div>
+                        <div className="badge-description">{meta.description}</div>
+                      </div>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-ink/60">{meta.description}</p>
+                    <div className="badge-card-actions">
+                      <button
+                        type="button"
+                        className={cn("btn-badge-action", granted || applied ? "submitted" : "unapplied")}
+                        onClick={() => setBadgeModal(key)}
+                      >
+                        {granted
+                          ? "✓ Badge Granted (View)"
+                          : applied
+                            ? "✓ Application Submitted (View)"
+                            : "Apply for Badge"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="badge-requirements-accordion">
+                    <button
+                      type="button"
+                      className="btn-badge-toggle-req"
+                      aria-expanded={isOpen}
+                      onClick={() => setExpanded((p) => ({ ...p, [key]: !p[key] }))}
+                    >
+                      <span>{isOpen ? "Hide Requirements ▲" : "View Requirements ▼"}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="badge-req-dropdown">
+                        <div
+                          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}
+                        >
+                          <strong
+                            style={{
+                              fontSize: 11.5,
+                              color: "var(--color-black-80)",
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            Requirements
+                          </strong>
+                          <span style={{ fontSize: 11, color: "var(--color-black-60)" }}>{meta.reqCount[0]}</span>
+                        </div>
+                        <BadgeReqItems items={meta.criteriaList} />
+                        {meta.plusPoints && (
+                          <>
+                            <div className="badge-plus-points-header">
+                              <strong
+                                style={{
+                                  fontSize: 11.5,
+                                  color: "var(--color-black-80)",
+                                  textTransform: "uppercase",
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                Optional Plus Points (6 Criteria)
+                              </strong>
+                              <span className="vob-badge" style={{ fontSize: 10 }}>
+                                Non-Mandatory
+                              </span>
+                            </div>
+                            <div style={{ marginTop: 6 }}>
+                              <BadgeReqItems items={meta.plusPoints} plus />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setBadgeModal(key)}
-                  className={cn(
-                    "min-h-[44px] shrink-0 rounded-full px-4 text-xs font-bold",
-                    granted || applied ? "border border-maroon/40 text-maroon" : "bg-maroon text-cream",
-                  )}
-                >
-                  {granted ? "✓ Granted (View)" : applied ? "✓ Application Submitted (View)" : "Apply for Badge"}
-                </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </ContentCard>
 
       <BadgeApplicationModal
+        key={badgeModal ?? "closed"}
         badgeKey={badgeModal}
         badgesState={data.badges}
         onClose={() => setBadgeModal(null)}

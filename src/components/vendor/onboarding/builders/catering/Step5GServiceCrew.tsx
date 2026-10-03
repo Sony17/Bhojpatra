@@ -2,7 +2,7 @@
 
 import BuilderNav from "../common/BuilderNav";
 import type { VendorEssentialService } from "@/lib/vendorMenus";
-import { CardTitle, ChoiceChip, ContentCard, FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
+import { CardTitle, ChoiceChip, ContentCard, FieldHint, FormLabel, R, StepHeading } from "../../ui";
 
 interface Step5GServiceCrewProps {
   essentialService?: VendorEssentialService;
@@ -44,7 +44,7 @@ export default function Step5GServiceCrew({
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Menu Builder · Service Essentials"
         heading="Configure feast crew & hygiene essentials"
@@ -55,18 +55,23 @@ export default function Step5GServiceCrew({
       />
 
       <ContentCard>
-        <CardTitle>
-          <R d="🧑‍🍳 Essential Hospitality & Service Inclusions" m="🧑‍🍳 Service Crew" />
-        </CardTitle>
-        <div className="flex flex-wrap gap-2">
-          {ESSENTIAL_CHIPS.map((chip) => (
-            <ChoiceChip key={chip.value} active={hasEssential(includes, chip)} onClick={() => toggle(chip)}>
-              <R d={chip.value} m={chip.short} />
-            </ChoiceChip>
-          ))}
+        <div>
+          <CardTitle>
+            <R d="🧑‍🍳 Essential Hospitality & Service Inclusions" m="🧑‍🍳 Service Crew" />
+          </CardTitle>
+          <div className="review-pills-row">
+            {ESSENTIAL_CHIPS.map((chip) => (
+              <ChoiceChip key={chip.value} active={hasEssential(includes, chip)} onClick={() => toggle(chip)}>
+                <R d={chip.value} m={chip.short} />
+              </ChoiceChip>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-5 max-w-xs">
+        <div
+          className="form-group"
+          style={{ marginTop: 16, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)", maxWidth: 320 }}
+        >
           <FormLabel htmlFor="crewRate">Service Crew Supplement (₹/guest)</FormLabel>
           <input
             id="crewRate"
@@ -77,7 +82,7 @@ export default function Step5GServiceCrew({
             onChange={(e) =>
               onChangeEssentialService({ ...essentialService, perGuest: Math.max(0, parseInt(e.target.value, 10) || 0) })
             }
-            className={inputCls}
+            className="form-input"
           />
           <FieldHint>Keep ₹0 if standard crew is bundled into your Silver/Gold package rates.</FieldHint>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/components/ui/cn";
-import { ContentCard, FieldError, QtyStepper, R, StepHeading, inputCls } from "../../ui";
+import { ContentCard, FieldError, QtyStepper, R, StepHeading } from "../../ui";
 import BuilderNav from "../common/BuilderNav";
 
 export interface CourseQuotas {
@@ -104,11 +104,10 @@ export default function Step5BPricingQuotas({
     onContinue();
   };
 
-  const tabBase =
-    "flex min-h-[48px] shrink-0 items-center gap-2 rounded-control border-[1.5px] px-3 py-2 text-left text-xs transition-colors";
+  const goldUnlocked = silverDone;
 
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Builder · Tiers & Allowances"
         heading="Configure tier allowances & pricing"
@@ -119,204 +118,261 @@ export default function Step5BPricingQuotas({
       />
 
       <ContentCard>
-        {/* Progression tabs */}
-        <div className="-mx-1 mb-5 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {/* Tier Progression Nav Bar (only 1 active at a time) */}
+        <div className="tier-progression-bar">
           <button
             type="button"
+            className={cn("tier-prog-tab", activeTier === "silver" && "active", silverDone && "completed")}
+            aria-current={activeTier === "silver" ? "step" : undefined}
             onClick={() => setActiveTier("silver")}
-            className={cn(tabBase, activeTier === "silver" ? "border-maroon bg-maroon/5 text-ink" : "border-transparent text-ink/60")}
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-maroon text-[11px] font-bold text-cream">
-              {silverDone ? "✓" : "1"}
-            </span>
-            <span>
-              <span className="block font-bold">
+            <div className="tab-step-num">1</div>
+            <div className="tab-label">
+              <span>
                 <R d="Silver Tier" m={`Silver (Base) · ${fmt(data.priceFrom)}`} />
               </span>
-              <span className="hidden text-[11px] sm:block">Bhoj City (Base) · {fmt(data.priceFrom)}</span>
-              <span className="block text-[10px] font-semibold text-maroon">{silverDone ? "✓ Completed" : "In Progress"}</span>
-            </span>
+              <span className="tab-tag base vob-d">Bhoj City (Base) · {fmt(data.priceFrom)}</span>
+            </div>
+            <span className="tab-status">{silverDone ? "✓ Completed" : "In Progress"}</span>
           </button>
-          <span className="hidden text-ink/30 sm:inline" aria-hidden>→</span>
+          <span className="prog-arrow" aria-hidden>
+            →
+          </span>
           <button
             type="button"
-            disabled={!silverDone}
-            onClick={() => setActiveTier("gold")}
-            className={cn(
-              tabBase,
-              activeTier === "gold" ? "border-maroon bg-maroon/5 text-ink" : "border-transparent text-ink/60",
-              !silverDone && "opacity-60",
-            )}
+            className={cn("tier-prog-tab", activeTier === "gold" && "active", !goldUnlocked && "locked")}
+            aria-current={activeTier === "gold" ? "step" : undefined}
+            aria-disabled={!goldUnlocked || undefined}
+            title={!goldUnlocked ? "Please configure and save Silver tier first." : undefined}
+            onClick={() => goldUnlocked && setActiveTier("gold")}
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-maroon text-[11px] font-bold text-maroon">
-              2
-            </span>
-            <span>
-              <span className="block font-bold">
+            <div className="tab-step-num">2</div>
+            <div className="tab-label">
+              <span>
                 <R d="Gold Tier" m={`Gold (Featured) · ${fmt(data.goldRate)}`} />
               </span>
-              <span className="hidden text-[11px] sm:block">Bhoj Signature · {fmt(data.goldRate)}</span>
-              <span className="block text-[10px] font-semibold text-maroon">
-                {!silverDone ? "🔒 Locked" : activeTier === "gold" ? "In Progress" : "Configured"}
-              </span>
+              <span className="tab-tag featured vob-d">Bhoj Signature · {fmt(data.goldRate)}</span>
+            </div>
+            <span className="tab-status">
+              {!goldUnlocked ? "🔒 Locked" : activeTier === "gold" ? "In Progress" : "Configured"}
             </span>
           </button>
-          <span className="hidden text-ink/30 sm:inline" aria-hidden>→</span>
-          <div className={cn(tabBase, "border-transparent text-ink/40")} aria-disabled>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-cream text-[11px] font-bold">3</span>
-            <span>
-              <span className="block font-bold">Platinum / Coming Soon</span>
-              <span className="block text-[10px] font-semibold">Coming Soon</span>
-            </span>
-          </div>
+          <span className="prog-arrow" aria-hidden>
+            →
+          </span>
+          <button
+            type="button"
+            className="tier-prog-tab coming-soon"
+            aria-disabled
+            title="Platinum tier onboarding is coming soon."
+          >
+            <div className="tab-step-num">3</div>
+            <div className="tab-label">
+              <span>Platinum / Coming Soon</span>
+            </div>
+            <span className="tab-status">Coming Soon</span>
+          </button>
         </div>
 
         {activeTier === "silver" ? (
-          <div className="rounded-card border border-cream bg-white p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="text-sm font-bold text-ink">
-                  <R d="Silver / Bhoj City (Base Tier)" m="Silver / Bhoj City" />
-                </div>
-                <div className="text-[11px] text-ink/60">
-                  <R d="Standard base platform package. Silver has no specialization." m="Base tier (no specialization)" />
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xl font-bold text-maroon">{fmt(data.priceFrom)}</span>
-                <span className="text-xs text-ink/60">
-                  <R d=" / plate" m=" / p" />
-                </span>
-              </div>
-            </div>
-            <div className="mt-4 divide-y divide-cream/50">
-              {COURSES.map((c) => (
-                <div key={c.key} className="flex items-center justify-between py-2">
-                  <span className="text-[13px] font-semibold text-ink">
-                    <R d={c.label} m={c.short} />
+          /* PANEL 1: SILVER TIER (BASE TIER) */
+          <div className="tier-panel tier-panel-silver active">
+            <div className="tier-card">
+              <div className="tier-header">
+                <div>
+                  <span className="tier-badge-label" style={{ color: "var(--color-black-80)", fontSize: 14 }}>
+                    <R d="Silver / Bhoj City (Base Tier)" m="Silver / Bhoj City" />
                   </span>
-                  <QtyStepper value={data.silverQuotas[c.key]} onChange={(v) => setSilverQuota(c.key, v)} />
+                  <div style={{ fontSize: 11, color: "var(--color-black-60)", marginTop: 2 }}>
+                    <R d="Standard base platform package. Silver has no specialization." m="Base tier (no specialization)" />
+                  </div>
                 </div>
-              ))}
+                <div className="tier-price-row">
+                  <span className="tier-price">{fmt(data.priceFrom)}</span>
+                  <span className="tier-unit">
+                    <R d="/ plate" m="/ p" />
+                  </span>
+                </div>
+              </div>
+
+              <div className="quota-list" style={{ marginTop: 14 }}>
+                {COURSES.map((c) => (
+                  <div key={c.key} className="quota-row">
+                    <span className="quota-label">
+                      <R d={c.label} m={c.short} />
+                    </span>
+                    <QtyStepper value={data.silverQuotas[c.key]} onChange={(v) => setSilverQuota(c.key, v)} />
+                  </div>
+                ))}
+              </div>
+
+              <FieldError>{error}</FieldError>
+
+              <div className="tier-action-bar">
+                <div className="tier-notice-box vob-d" style={{ marginTop: 0, flex: 1, fontSize: 11 }}>
+                  ℹ️ Base tier covering essential multi-course offerings. Saving unlocks Gold tier.
+                </div>
+                <button type="button" className="btn-tier-proceed" onClick={saveSilver}>
+                  <R d="Save & Proceed to Gold Tier →" m="Save & Proceed to Gold →" />
+                </button>
+              </div>
             </div>
-            <p className="mt-3 hidden rounded-control bg-cream/20 p-2.5 text-[11px] text-ink/70 sm:block">
-              ℹ️ Base tier covering essential multi-course offerings. Saving unlocks Gold tier.
-            </p>
-            <FieldError>{error}</FieldError>
-            <button
-              type="button"
-              onClick={saveSilver}
-              className="mt-4 min-h-[44px] w-full rounded-full bg-maroon px-5 text-[13px] font-bold text-cream sm:w-auto"
-            >
-              <R d="Save & Proceed to Gold Tier →" m="Save & Proceed to Gold →" />
-            </button>
           </div>
         ) : (
-          <div className="rounded-card border-2 border-maroon/40 bg-white p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="text-sm font-bold text-ink">
-                  <R d="Gold / Bhoj Signature (Featured Tier)" m="Gold / Bhoj Signature" />
-                </div>
-                <div className="text-[11px] text-ink/60">
-                  <R d="Expanded allowances with your kitchen's certified culinary specialization." m="With culinary specialization" />
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xl font-bold text-maroon">{fmt(data.goldRate)}</span>
-                <span className="text-xs text-ink/60">
-                  <R d=" / plate" m=" / p" />
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-control border border-cream bg-cream/10 p-3">
-              <div className="text-[13px] font-bold text-ink">
-                <R d="Culinary Specialization Category" m="Specialization Category" />
-                <span className="text-maroon"> *</span>
-              </div>
-              <div className="mb-2 text-[11px] text-ink/60">
-                <R d="Select your specialization category and fill your menu accordingly:" m="Select specialization to fill menu:" />
-              </div>
-              {isAddingCustom ? (
+          /* PANEL 2: GOLD TIER (FEATURED WITH SPECIALIZATION) */
+          <div className="tier-panel tier-panel-gold active">
+            <div className="tier-card featured featured-gold">
+              <div className="tier-header">
                 <div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={customSpecText}
-                      onChange={(ev) => setCustomSpecText(ev.target.value)}
-                      onKeyDown={(ev) => ev.key === "Enter" && applyCustom()}
-                      placeholder="e.g. Kashmiri Wazwan, Chettinad, Marwari, Bengali Feast..."
-                      className={inputCls}
+                  <span className="tier-badge-label" style={{ color: "var(--color-red)", fontSize: 14 }}>
+                    <R d="Gold / Bhoj Signature (Featured Tier)" m="Gold / Bhoj Signature" />
+                  </span>
+                  <div style={{ fontSize: 11, color: "var(--color-black-60)", marginTop: 2 }}>
+                    <R
+                      d="Expanded allowances with your kitchen's certified culinary specialization."
+                      m="With culinary specialization"
                     />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={applyCustom} className="min-h-[44px] flex-1 rounded-full bg-maroon px-4 text-xs font-bold text-cream sm:flex-none">
+                  </div>
+                </div>
+                <div className="tier-price-row">
+                  <span className="tier-price" style={{ color: "var(--color-red)" }}>
+                    {fmt(data.goldRate)}
+                  </span>
+                  <span className="tier-unit">
+                    <R d="/ plate" m="/ p" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Specialization Selector for Gold Tier */}
+              <div className="specialization-box">
+                <div className="specialization-title">
+                  <R d="Culinary Specialization Category" m="Specialization Category" />{" "}
+                  <span className="required">*</span>
+                </div>
+                <div className="specialization-subtext">
+                  <R d="Select your specialization category and fill your menu accordingly:" m="Select specialization to fill menu:" />
+                </div>
+                <select
+                  value={isAddingCustom ? "__custom__" : data.goldSpecialization}
+                  onChange={(ev) => {
+                    if (ev.target.value === "__custom__") {
+                      setCustomSpecText("");
+                      setIsAddingCustom(true);
+                    } else {
+                      setIsAddingCustom(false);
+                      onChange({ goldSpecialization: ev.target.value });
+                    }
+                  }}
+                  className="form-select"
+                  aria-label="Culinary Specialization Category"
+                >
+                  {!presets.some((p) => p.value === data.goldSpecialization) && !isAddingCustom && (
+                    <option value="">Select specialization</option>
+                  )}
+                  {presets.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                  <option value="__custom__">➕ Add New Specialization...</option>
+                </select>
+
+                {isAddingCustom ? (
+                  <div className="custom-spec-wrapper" style={{ marginTop: 8 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={customSpecText}
+                        onChange={(ev) => setCustomSpecText(ev.target.value)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter") {
+                            ev.preventDefault();
+                            applyCustom();
+                          }
+                        }}
+                        placeholder="e.g. Kashmiri Wazwan, Chettinad, Marwari, Bengali Feast..."
+                        aria-label="New specialization"
+                        className="form-input custom-spec-input"
+                        style={{ flex: "1 1 220px" }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-tier-proceed"
+                        style={{ padding: "7px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+                        onClick={applyCustom}
+                      >
                         <R d="Add Specialization" m="Add" />
                       </button>
-                      <button type="button" onClick={() => setIsAddingCustom(false)} className="min-h-[44px] flex-1 rounded-full border border-cream px-4 text-xs font-bold text-ink/80 sm:flex-none">
+                      <button
+                        type="button"
+                        className="btn-tier-back"
+                        style={{ padding: "7px 12px", fontSize: 12 }}
+                        onClick={() => setIsAddingCustom(false)}
+                      >
                         Cancel
                       </button>
                     </div>
+                    <span className="field-hint vob-d" style={{ marginTop: 4, display: "block" }}>
+                      Type your kitchen&apos;s unique regional cuisine or signature culinary craft.
+                    </span>
                   </div>
-                  <p className="mt-1 hidden text-[11px] text-ink/50 sm:block">
-                    Type your kitchen&apos;s unique regional cuisine or signature culinary craft.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={data.goldSpecialization}
-                    onChange={(ev) =>
-                      ev.target.value === "__custom__"
-                        ? setIsAddingCustom(true)
-                        : onChange({ goldSpecialization: ev.target.value })
-                    }
-                    className={inputCls}
-                    aria-label="Culinary Specialization Category"
+                ) : (
+                  <div
+                    className="spec-footer-action"
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}
                   >
-                    {!presets.some((p) => p.value === data.goldSpecialization) && <option value="">Select specialization</option>}
-                    {presets.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                    <option value="__custom__">➕ Add New Specialization...</option>
-                  </select>
-                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-ink/50">
-                    <R d="Don't see your regional cuisine above?" m="Not listed?" />
-                    <button type="button" onClick={() => setIsAddingCustom(true)} className="min-h-[32px] font-bold text-maroon">
+                    <span className="field-hint">
+                      <R d="Don't see your regional cuisine above?" m="Not listed?" />
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-link-spec"
+                      onClick={() => {
+                        setCustomSpecText("");
+                        setIsAddingCustom(true);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--color-red)",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
                       + Add New Specialization
                     </button>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="mt-4 divide-y divide-cream/50">
-              {COURSES.map((c) => (
-                <div key={c.key} className="flex items-center justify-between py-2.5">
-                  <span className="text-[13px] font-semibold text-ink">
-                    <R d={c.label} m={c.short} />
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="rounded-full bg-cream/40 px-2 py-0.5 text-[11px] font-semibold text-ink">
-                      {data.goldQuotas[c.key]} {c.unit}
-                      <span className="hidden sm:inline"> included</span>
+              <div className="quota-list" style={{ marginTop: 14 }}>
+                {COURSES.map((c) => (
+                  <div key={c.key} className="quota-row">
+                    <span className="quota-label">
+                      <R d={c.label} m={c.short} />
                     </span>
-                    <span className="w-6 text-center text-base font-bold text-ink">{data.goldQuotas[c.key]}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-            <FieldError>{error}</FieldError>
-            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-              <button type="button" onClick={() => setActiveTier("silver")} className="min-h-[44px] rounded-full border border-cream px-4 text-[13px] font-bold text-ink/80">
-                <R d="← Back to Silver (Review/Edit)" m="← Back to Silver" />
-              </button>
-              <button type="button" onClick={saveGold} className="min-h-[44px] rounded-full bg-maroon px-5 text-[13px] font-bold text-cream">
-                Save & Continue →
-              </button>
+                    <span className="quota-badge-readonly">
+                      <span className="stepper-val">{data.goldQuotas[c.key]}</span> {c.unit}
+                      <span className="vob-d"> included</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <FieldError>{error}</FieldError>
+
+              <div className="tier-action-bar">
+                <button type="button" className="btn-tier-back" onClick={() => setActiveTier("silver")}>
+                  <R d="← Back to Silver (Review/Edit)" m="← Back to Silver" />
+                </button>
+                <button type="button" className="btn-tier-proceed" onClick={saveGold}>
+                  Save & Continue →
+                </button>
+              </div>
             </div>
           </div>
         )}

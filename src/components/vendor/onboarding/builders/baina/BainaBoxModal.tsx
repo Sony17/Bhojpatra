@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { VendorBainaBox, VendorBoxSize } from "@/lib/vendorMenus";
 import PhotoUploadButton from "../common/PhotoUploadButton";
-import { BtnBack, BtnNext, FieldError, FormLabel, Sheet, inputCls } from "../../ui";
+import { BtnBack, BtnNext, FieldError, FormLabel, Sheet } from "../../ui";
 
 interface BainaBoxModalProps {
   isOpen: boolean;
@@ -104,119 +104,150 @@ function BainaBoxModalInner({
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <FormLabel required htmlFor="box-input-name">
-            Hamper Box Name
+      <div className="form-group">
+        <FormLabel required htmlFor="box-input-name">
+          Hamper Box Name
+        </FormLabel>
+        <input
+          id="box-input-name"
+          type="text"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Royal Shahi Celebration Hamper"
+          className="form-input"
+        />
+      </div>
+      <div className="form-group">
+        <FormLabel required htmlFor="box-input-contents">
+          Itemized Contents Description
+        </FormLabel>
+        <textarea
+          id="box-input-contents"
+          value={contents}
+          onChange={(e) => setContents(e.target.value)}
+          placeholder="e.g. Kaju Katli, Motichoor Ladoo, Roasted Pistachios..."
+          className="form-textarea"
+        />
+      </div>
+      <div className="form-grid-2">
+        <div className="form-group">
+          <FormLabel required htmlFor="box-input-halfkg">
+            ½ kg Box Price (₹)
           </FormLabel>
           <input
-            id="box-input-name"
-            type="text"
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Royal Shahi Celebration Hamper"
-            className={inputCls}
+            id="box-input-halfkg"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={price ?? ""}
+            onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
+            placeholder="650"
+            className="form-input"
           />
         </div>
-        <div>
-          <FormLabel required htmlFor="box-input-contents">
-            Itemized Contents Description
-          </FormLabel>
-          <textarea
-            id="box-input-contents"
-            rows={3}
-            value={contents}
-            onChange={(e) => setContents(e.target.value)}
-            placeholder="e.g. Kaju Katli, Motichoor Ladoo, Roasted Pistachios..."
-            className={inputCls}
+        <div className="form-group">
+          <FormLabel htmlFor="box-input-onekg">1 kg Box Price (₹)</FormLabel>
+          <input
+            id="box-input-onekg"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={price1kg ?? ""}
+            onChange={(e) => setPrice1kg(e.target.value === "" ? undefined : Number(e.target.value))}
+            placeholder="1200"
+            className="form-input"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <FormLabel required htmlFor="box-input-halfkg">
-              ½ kg Box Price (₹)
-            </FormLabel>
-            <input
-              id="box-input-halfkg"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={price ?? ""}
-              onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
-              placeholder="650"
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <FormLabel htmlFor="box-input-onekg">1 kg Box Price (₹)</FormLabel>
-            <input
-              id="box-input-onekg"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={price1kg ?? ""}
-              onChange={(e) => setPrice1kg(e.target.value === "" ? undefined : Number(e.target.value))}
-              placeholder="1200"
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div>
-          <FormLabel>Custom Sizes (e.g. 250 g, 2 kg)</FormLabel>
-          {customSizes.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {customSizes.map((cs, i) => (
-                <span key={cs.label} className="inline-flex min-h-[36px] items-center gap-1 rounded-full bg-cream/40 pl-3 text-xs font-semibold text-ink">
-                  {cs.label}: ₹{cs.price}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${cs.label}`}
-                    onClick={() => handleRemoveCustomSize(i)}
-                    className="flex h-9 w-9 items-center justify-center"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={customLabel}
-              onChange={(e) => setCustomLabel(e.target.value)}
-              placeholder="Size (e.g. 250 g)"
-              aria-label="Custom size label"
-              className={inputCls}
-            />
-            <input
-              type="number"
-              inputMode="numeric"
-              value={customPrice ?? ""}
-              onChange={(e) => setCustomPrice(e.target.value === "" ? undefined : Number(e.target.value))}
-              placeholder="₹ Price"
-              aria-label="Custom size price"
-              className={`${inputCls} max-w-[110px]`}
-            />
-            <button type="button" onClick={handleAddCustomSize} className="min-h-[44px] shrink-0 rounded-full bg-maroon px-3 text-xs font-bold text-cream">
-              + Add
-            </button>
-          </div>
-        </div>
-        <div>
-          <FormLabel>Hamper Photo</FormLabel>
-          <PhotoUploadButton
-            currentPhoto={photo}
-            kind="dish"
-            aspectRatio="landscape"
-            label="Upload Hamper Photo 📷"
-            onPhotoUploaded={setPhoto}
-            onPhotoRemoved={() => setPhoto(undefined)}
-          />
-        </div>
-        <FieldError>{error}</FieldError>
       </div>
+      <div className="form-group">
+        <FormLabel htmlFor="box-input-custom-size">Custom Sizes (e.g. 250 g, 2 kg)</FormLabel>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            id="box-input-custom-size"
+            type="text"
+            value={customLabel}
+            onChange={(e) => setCustomLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddCustomSize();
+              }
+            }}
+            placeholder="Size (e.g. 250 g)"
+            aria-label="Custom size label"
+            className="form-input"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            value={customPrice ?? ""}
+            onChange={(e) => setCustomPrice(e.target.value === "" ? undefined : Number(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddCustomSize();
+              }
+            }}
+            placeholder="₹ Price"
+            aria-label="Custom size price"
+            className="form-input"
+            style={{ maxWidth: 110 }}
+          />
+          <button
+            type="button"
+            className="btn-tier-proceed"
+            style={{ margin: 0, padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+            onClick={handleAddCustomSize}
+          >
+            + Add
+          </button>
+        </div>
+        {customSizes.length > 0 && (
+          <div
+            className="vendor-items-builder-container"
+            style={{
+              marginTop: 8,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              padding: 8,
+              background: "var(--color-cream-10)",
+              border: "1px dashed var(--color-cream-40)",
+              borderRadius: "var(--radius-control)",
+            }}
+          >
+            {customSizes.map((cs, i) => (
+              <span key={cs.label} className="item-chip-editable">
+                <span>
+                  {cs.label}: ₹{cs.price}
+                </span>
+                <button
+                  type="button"
+                  className="btn-chip-action remove"
+                  title="Remove Size"
+                  aria-label={`Remove ${cs.label}`}
+                  onClick={() => handleRemoveCustomSize(i)}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="form-group">
+        <FormLabel>Hamper Photo</FormLabel>
+        <PhotoUploadButton
+          currentPhoto={photo}
+          kind="dish"
+          aspectRatio="landscape"
+          label="Upload Hamper Photo 📷"
+          onPhotoUploaded={setPhoto}
+          onPhotoRemoved={() => setPhoto(undefined)}
+        />
+      </div>
+      <FieldError>{error}</FieldError>
     </Sheet>
   );
 }

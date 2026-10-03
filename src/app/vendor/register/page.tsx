@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import PublicShell from "@/components/app/PublicShell";
 import RegistrationGateway from "@/components/vendor/onboarding/RegistrationGateway";
 
 export const metadata: Metadata = {
@@ -9,9 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function VendorRegisterPage() {
-  return (
-    <PublicShell>
-      <RegistrationGateway />
-    </PublicShell>
-  );
+  // The signed-in vendor onboarding owns the full viewport (prototype shell);
+  // the gateway wraps its signed-out / non-vendor screens in PublicShell itself.
+  return <RegistrationGateway />;
 }

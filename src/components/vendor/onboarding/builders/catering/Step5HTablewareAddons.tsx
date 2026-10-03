@@ -39,7 +39,7 @@ export default function Step5HTablewareAddons({
   saving = false,
 }: Step5HTablewareAddonsProps) {
   return (
-    <div className="animate-in fade-in duration-200">
+    <div>
       <StepHeading
         eyebrow="Feast Menu Builder · Tableware Add-ons"
         heading="Configure tableware presentation packages"
@@ -50,40 +50,37 @@ export default function Step5HTablewareAddons({
       />
 
       <ContentCard>
-        <CardTitle>
-          <R d="🍽️ Tableware & Cutlery Presentation Add-ons" m="🍽️ Tableware Add-on" />
-        </CardTitle>
-        <div role="radiogroup" aria-label="Tableware package" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          {TABLEWARE_PACKAGES.map((pkg) => {
-            const active = cutleryTier === pkg.id;
-            return (
-              <button
-                key={pkg.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => onChangeCutleryTier(pkg.id)}
-                className={cn(
-                  "flex min-h-[56px] flex-col gap-1 rounded-card border-2 p-3 text-left transition-colors",
-                  active ? "border-maroon bg-maroon/5" : "border-cream/70 bg-white hover:border-maroon/40",
-                )}
-              >
-                <span className="flex items-center justify-between">
-                  <span className="rounded-full bg-maroon px-2 py-0.5 text-[10px] font-bold uppercase text-cream">{pkg.badge}</span>
-                  {active && <span className="text-sm font-bold text-maroon">✓</span>}
-                </span>
-                <span className="text-[14px] font-bold text-ink">
-                  <R d={pkg.name} m={pkg.mName} />
-                </span>
-                <span className="hidden text-xs font-semibold text-maroon sm:block">{pkg.rate}</span>
-                <ul className="mt-1 hidden space-y-0.5 text-[11px] text-ink/70 sm:block">
-                  {pkg.features.map((f) => (
-                    <li key={f}>• {f}</li>
-                  ))}
-                </ul>
-              </button>
-            );
-          })}
+        <div>
+          <CardTitle>
+            <R d="🍽️ Tableware & Cutlery Presentation Add-ons" m="🍽️ Tableware Add-on" />
+          </CardTitle>
+          <div className="cutlery-tier-grid" role="radiogroup" aria-label="Tableware package">
+            {TABLEWARE_PACKAGES.map((pkg) => {
+              const active = cutleryTier === pkg.id;
+              return (
+                <button
+                  key={pkg.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={cn("cutlery-tier-card", active && "active")}
+                  onClick={() => onChangeCutleryTier(pkg.id)}
+                  style={{ width: "100%", textAlign: "left", font: "inherit", minHeight: 44 }}
+                >
+                  <div className="cutlery-pkg-badge">{pkg.badge}</div>
+                  <div className="cutlery-tier-name">
+                    <R d={pkg.name} m={pkg.mName} />
+                  </div>
+                  <div className="cutlery-rate-hint vob-d">{pkg.rate}</div>
+                  <ul className="cutlery-inclusions vob-d">
+                    {pkg.features.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </ContentCard>
 

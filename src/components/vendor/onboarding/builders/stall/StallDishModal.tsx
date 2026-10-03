@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { VendorMenuItem } from "@/lib/vendorMenus";
 import PhotoUploadButton from "../common/PhotoUploadButton";
-import { BtnBack, BtnNext, FieldError, FormLabel, Sheet, inputCls } from "../../ui";
+import { BtnBack, BtnNext, FieldError, FormLabel, Sheet } from "../../ui";
 
 interface StallDishModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export default function StallDishModal(props: StallDishModalProps) {
 }
 
 /** Handover: "Configure Stall Menu Item". */
-function StallDishModalInner({ categoryName, delicacyToEdit, onClose, onSave }: StallDishModalProps) {
+function StallDishModalInner({ delicacyToEdit, onClose, onSave }: StallDishModalProps) {
   const [name, setName] = useState(delicacyToEdit?.item.name || "");
   const [diet, setDiet] = useState<"veg" | "non-veg">(delicacyToEdit?.item.diet || "veg");
   const [price, setPrice] = useState<number | undefined>(delicacyToEdit?.item.price);
@@ -52,7 +52,6 @@ function StallDishModalInner({ categoryName, delicacyToEdit, onClose, onSave }: 
     <Sheet
       open
       onClose={onClose}
-      eyebrow={`${categoryName} Stall`}
       title="Configure Stall Menu Item"
       footer={
         <>
@@ -61,74 +60,74 @@ function StallDishModalInner({ categoryName, delicacyToEdit, onClose, onSave }: 
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <FormLabel required htmlFor="stall-item-input-name">
-            Dish Name
+      <div className="form-group">
+        <FormLabel required htmlFor="stall-item-input-name">
+          Dish Name
+        </FormLabel>
+        <input
+          id="stall-item-input-name"
+          type="text"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Kurkuri Aloo Tikki, Special Suji Golgappa, Masala Dosa"
+          className="form-input"
+        />
+      </div>
+
+      <div className="form-grid-2">
+        <div className="form-group">
+          <FormLabel htmlFor="stall-item-input-diet">Dietary Type</FormLabel>
+          <select
+            id="stall-item-input-diet"
+            value={diet}
+            onChange={(e) => setDiet(e.target.value as "veg" | "non-veg")}
+            className="form-select"
+          >
+            <option value="veg">Vegetarian</option>
+            <option value="non-veg">Non-Vegetarian</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <FormLabel required htmlFor="stall-item-input-price">
+            Dish Cost (₹ / plate)
           </FormLabel>
           <input
-            id="stall-item-input-name"
-            type="text"
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Kurkuri Aloo Tikki, Special Suji Golgappa, Masala Dosa"
-            className={inputCls}
+            id="stall-item-input-price"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={price ?? ""}
+            onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
+            placeholder="e.g. 120"
+            className="form-input"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <FormLabel htmlFor="stall-item-input-diet">Dietary Type</FormLabel>
-            <select
-              id="stall-item-input-diet"
-              value={diet}
-              onChange={(e) => setDiet(e.target.value as "veg" | "non-veg")}
-              className={inputCls}
-            >
-              <option value="veg">🟢 Vegetarian</option>
-              <option value="non-veg">🔴 Non-Vegetarian</option>
-            </select>
-          </div>
-          <div>
-            <FormLabel required htmlFor="stall-item-input-price">
-              Dish Cost (₹ / plate)
-            </FormLabel>
-            <input
-              id="stall-item-input-price"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={price ?? ""}
-              onChange={(e) => setPrice(e.target.value === "" ? undefined : Number(e.target.value))}
-              placeholder="e.g. 120"
-              className={inputCls}
-            />
-          </div>
-        </div>
-        <div>
-          <FormLabel htmlFor="stall-item-input-desc">Dish Description</FormLabel>
-          <textarea
-            id="stall-item-input-desc"
-            rows={3}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            placeholder="Portion size, ingredients, and preparation style..."
-            className={inputCls}
-          />
-        </div>
-        <div>
-          <FormLabel>Dish Photo</FormLabel>
-          <PhotoUploadButton
-            currentPhoto={photo}
-            kind="dish"
-            aspectRatio="landscape"
-            label="Upload Dish Photo 📷"
-            onPhotoUploaded={setPhoto}
-            onPhotoRemoved={() => setPhoto(undefined)}
-          />
-        </div>
-        <FieldError>{error}</FieldError>
       </div>
+
+      <div className="form-group">
+        <FormLabel htmlFor="stall-item-input-desc">Dish Description</FormLabel>
+        <textarea
+          id="stall-item-input-desc"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          placeholder="Portion size, ingredients, and preparation style..."
+          className="form-textarea"
+        />
+      </div>
+
+      <div className="form-group">
+        <FormLabel>Dish Photo</FormLabel>
+        <PhotoUploadButton
+          currentPhoto={photo}
+          kind="dish"
+          aspectRatio="landscape"
+          label="Upload Dish Photo 📷"
+          onPhotoUploaded={setPhoto}
+          onPhotoRemoved={() => setPhoto(undefined)}
+        />
+      </div>
+      <FieldError>{error}</FieldError>
     </Sheet>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 
 interface PhotoUploadButtonProps {
@@ -8,12 +8,27 @@ interface PhotoUploadButtonProps {
   kind?: "card" | "dish" | "gallery";
   onPhotoUploaded: (url: string) => void;
   onPhotoRemoved?: () => void;
+  /** Text on the `.btn-upload-photo` button. */
   label?: string;
   aspectRatio?: "square" | "landscape" | "banner";
   className?: string;
+  /** Rendered as `.photo-upload-desc`. */
   helperText?: string;
+  /** Optional `.photo-upload-title` line (mockup: "Feast Cover Photography"). */
+  title?: ReactNode;
 }
 
+/** Thumb sizes per aspect — landscape is the mockup's default 90×70. */
+const THUMB_SIZE: Record<NonNullable<PhotoUploadButtonProps["aspectRatio"]>, CSSProperties> = {
+  square: { width: 70, height: 70 },
+  landscape: { width: 90, height: 70 },
+  banner: { width: 140, height: 60 },
+};
+
+/**
+ * Real photo upload (POST /api/vendor/photo) dressed as the handover's
+ * `.photo-uploader-box` (thumb + title/desc + "Change Photo 📷" pill).
+ */
 export default function PhotoUploadButton({
   currentPhoto,
   kind = "dish",
@@ -23,6 +38,7 @@ export default function PhotoUploadButton({
   aspectRatio = "square",
   className = "",
   helperText = "JPG, PNG or WebP · Max 5 MB",
+  title,
 }: PhotoUploadButtonProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -69,86 +85,85 @@ export default function PhotoUploadButton({
     }
   };
 
-  const aspectClass =
-    aspectRatio === "banner"
-      ? "aspect-[21/9] w-full"
-      : aspectRatio === "landscape"
-        ? "aspect-[16/9] w-full"
-        : "aspect-square w-28 sm:w-32";
+  const thumb = THUMB_SIZE[aspectRatio];
+  const buttonText =
+    uploading ? "Uploading..." : currentPhoto && label === "Upload Photo" ? "Change Photo 📷" : label;
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`photo-uploader-box ${className}`.trim()}>
       <input
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
         onChange={handleFileChange}
-        className="hidden"
+        style={{ display: "none" }}
         aria-label={label}
       />
 
       {currentPhoto ? (
-        <div className={`relative overflow-hidden rounded-control border border-cream-3 bg-cream-1 group ${aspectClass}`}>
-          <Image
-            src={currentPhoto}
-            alt="Uploaded preview"
-            fill
-            sizes="(max-width: 768px) 100vw, 300px"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            unoptimized={currentPhoto.startsWith("/api/vendor/photo")}
-          />
-          <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
-              className="min-h-[44px] min-w-[44px] rounded-control bg-white/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-1"
-            >
-              {uploading ? "..." : "Change"}
-            </button>
-            {onPhotoRemoved && (
-              <button
-                type="button"
-                onClick={onPhotoRemoved}
-                disabled={uploading}
-                className="min-h-[44px] min-w-[44px] rounded-control bg-maroon/95 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 active:scale-95 transition-all flex items-center justify-center"
-                title="Remove photo"
-                aria-label="Remove photo"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
+        <Image
+          src={currentPhoto}
+          alt="Uploaded preview"
+          width={Number(thumb.width)}
+          height={Number(thumb.height)}
+          unoptimized
+          className="photo-preview-thumb"
+          style={thumb}
+        />
       ) : (
         <button
           type="button"
+          className="photo-preview-thumb"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className={`flex min-h-[44px] flex-col items-center justify-center rounded-control border-2 border-dashed border-cream-3 bg-cream-1/60 p-4 text-center transition-all hover:border-maroon/50 hover:bg-cream-1 active:scale-[0.99] ${aspectClass}`}
+          aria-label={label}
+          style={{
+            ...thumb,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            background: "var(--color-cream-10)",
+            border: "1px dashed var(--color-cream)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
         >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-maroon border-t-transparent" />
-              <span className="text-xs text-ink-soft">Uploading...</span>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-1.5">
-              <span className="text-2xl" aria-hidden="true">
-                📷
-              </span>
-              <span className="text-xs font-semibold text-ink">{label}</span>
-              <span className="text-[10px] text-ink-soft">{helperText}</span>
-            </div>
-          )}
+          <span aria-hidden="true">📷</span>
         </button>
       )}
 
-      {error && (
-        <p className="text-xs text-maroon" role="alert">
-          {error}
-        </p>
-      )}
+      <div className="photo-upload-meta">
+        {title && <div className="photo-upload-title">{title}</div>}
+        {helperText && <div className="photo-upload-desc">{helperText}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <button
+            type="button"
+            className="btn-upload-photo"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+          >
+            {buttonText}
+          </button>
+          {currentPhoto && onPhotoRemoved && (
+            <button
+              type="button"
+              className="btn-upload-photo"
+              onClick={onPhotoRemoved}
+              disabled={uploading}
+              aria-label="Remove photo"
+              title="Remove photo"
+            >
+              ✕ Remove
+            </button>
+          )}
+        </div>
+        {error && (
+          <span className="vob-field-error" role="alert">
+            ⚠️ {error}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

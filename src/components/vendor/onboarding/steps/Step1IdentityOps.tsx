@@ -1,23 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { indianStates } from "@/lib/data";
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
+import { cn } from "@/components/ui/cn";
 import DietaryOfferingSelector from "../components/DietaryOfferingSelector";
-import {
-  CardTitle,
-  ChipAddInput,
-  ChoiceChip,
-  ContentCard,
-  FieldError,
-  FieldHint,
-  FlowFooter,
-  FormLabel,
-  Pill,
-  R,
-  StepHeading,
-  inputCls,
-} from "../ui";
+import { ChipAddInput, ChoiceChip, ContentCard, FieldError, FlowFooter, R, StepHeading } from "../ui";
 
 export interface Step1Data {
   ownerName: string;
@@ -60,6 +48,7 @@ const COVERAGE_CHIPS = [
   "Lucknow", "Kanpur", "Ayodhya", "Varanasi", "Prayagraj", "Gorakhpur", "Agra", "Delhi NCR", "Noida",
   "Mumbai", "Bengaluru", "Hyderabad", "Kolkata", "Jaipur", "Pune",
 ];
+const MOBILE_COVERAGE_COUNT = 12;
 
 function withExtras(base: string[], selected: string[]) {
   const extra = selected.filter((s) => !base.some((b) => b.toLowerCase() === s.toLowerCase()));
@@ -76,6 +65,10 @@ export default function Step1IdentityOps({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [customCuisine, setCustomCuisine] = useState("");
   const [customCity, setCustomCity] = useState("");
+  // Values carried over from signup render read-only. A value the signup did
+  // not capture (business name / mobile) is asked here once, inline.
+  const [editingBiz, setEditingBiz] = useState(!data.businessName);
+  const [editingPhone, setEditingPhone] = useState(!data.phone);
 
   const toggle = (key: "cuisines" | "serviceCities", value: string) => {
     const list = data[key] || [];
@@ -102,15 +95,67 @@ export default function Step1IdentityOps({
     setErrors(e);
     const first = Object.keys(e)[0];
     if (first) {
+      if (first === "businessName") setEditingBiz(true);
       document.getElementById(`field-${first}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     onContinue();
   };
 
+  const editBiz = (v: string) => {
+    onChange({ businessName: v });
+    if (errors.businessName) setErrors((p) => ({ ...p, businessName: "" }));
+  };
+  const editPhone = (v: string) => onChange({ phone: v });
+
   const cityOptions = withExtras(KITCHEN_CITIES, data.city ? [data.city] : []);
   const cuisineChips = withExtras(CUISINE_CHIPS, data.cuisines || []);
   const coverageChips = withExtras(COVERAGE_CHIPS, data.serviceCities || []);
+
+  /* Editable account values (business name / WhatsApp mobile). */
+  const bizInput = (compact: boolean, id?: string) => (
+    <input
+      id={id}
+      type="text"
+      className="form-input"
+      value={data.businessName}
+      autoComplete="off"
+      onChange={(e) => editBiz(e.target.value)}
+      placeholder="e.g. Royal Awadh Caterers"
+      aria-label="Registered Business Name"
+      style={compact ? { maxWidth: "60%", padding: "6px 10px" } : { padding: "6px 10px" }}
+    />
+  );
+  const phoneInput = (compact: boolean, id?: string) => (
+    <div className="input-with-prefix" style={compact ? { maxWidth: "60%" } : undefined}>
+      <span className="input-prefix" style={{ padding: "6px 8px" }}>
+        +91
+      </span>
+      <input
+        id={id}
+        type="tel"
+        className="form-input"
+        value={data.phone}
+        autoComplete="off"
+        onChange={(e) => editPhone(e.target.value)}
+        placeholder="10-digit mobile number"
+        aria-label="Registered WhatsApp Mobile"
+        style={{ padding: "6px 10px" }}
+      />
+    </div>
+  );
+  const editLink = (onClick: () => void, label: string) => (
+    <button
+      type="button"
+      className="btn-badge-toggle-req"
+      onClick={onClick}
+      aria-label={`Edit ${label}`}
+      style={{ fontSize: 11, minHeight: 24 }}
+    >
+      Edit ✎
+    </button>
+  );
+  const phoneDisplay = data.phone ? `+91 ${data.phone}` : "—";
 
   return (
     <div className="animate-in fade-in duration-200">
@@ -123,28 +168,28 @@ export default function Step1IdentityOps({
         mSubtext="Collected once and reflected everywhere."
       />
 
-      {/* Already registered banner */}
-      <div className="mb-5 flex flex-col gap-3 rounded-card border border-maroon/25 bg-maroon/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-[13px] text-ink">
-          <strong className="hidden sm:inline">Already registered as a Bhojpatra Vendor? </strong>
-          <strong className="sm:hidden">Registered Vendor? </strong>
-          <R
-            d="Directly sign in to access your vendor dashboard, active pipeline, and kitchen orders."
-            m="Sign in directly to your vendor dashboard."
-          />
+      <ContentCard>
+        {/* Existing Vendor Direct Sign In Banner */}
+        <div className="existing-vendor-signin-banner">
+          <div className="signin-banner-text">
+            <strong>
+              <R d="Already registered as a Bhojpatra Vendor?" m="Registered Vendor?" />
+            </strong>
+            <span>
+              <R
+                d="Directly sign in to access your vendor dashboard, active pipeline, and kitchen orders."
+                m="Sign in directly to your vendor dashboard."
+              />
+            </span>
+          </div>
+          <button type="button" className="btn-banner-signin" onClick={onSignIn}>
+            <R d="Sign In to Dashboard →" m="Sign In →" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onSignIn}
-          className="min-h-[44px] shrink-0 rounded-full bg-maroon px-4 text-xs font-bold text-cream"
-        >
-          <R d="Sign In to Dashboard →" m="Sign In →" />
-        </button>
-      </div>
 
-      {/* Kitchen Dietary Offering — mandatory gate */}
-      <ContentCard id="field-dietaryOffering">
+        {/* Mandatory Dietary Offering */}
         <DietaryOfferingSelector
+          id="field-dietaryOffering"
           value={data.dietaryOffering}
           onChange={(diet) => {
             onChange({ dietaryOffering: diet });
@@ -152,156 +197,233 @@ export default function Step1IdentityOps({
           }}
           error={errors.dietaryOffering}
         />
-      </ContentCard>
 
-      {/* Verified Vendor Account Details — reused from signup */}
-      <ContentCard>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[15px] font-bold text-ink">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-maroon text-xs text-cream">✓</span>
-            <R d="Verified Vendor Account Details" m="Signup Details Linked" />
-            <Pill tone="cream">
-              <R d="Reused from Signup" m="Reused" />
-            </Pill>
+        <div id="field-businessName">
+          {/* Verified Vendor Account Details — desktop */}
+          <div className="vendor-account-reused-card vob-d-flex" style={{ flexDirection: "column" }}>
+            <div className="account-reused-header">
+              <div className="account-reused-title">
+                <span className="account-verified-icon">✓</span>
+                <span>Verified Vendor Account Details</span>
+                <span className="vob-badge">Reused from Signup</span>
+              </div>
+              {data.accountId && (
+                <span style={{ fontSize: 11.5, color: "var(--color-black-60)" }}>
+                  Account ID: <strong>{data.accountId}</strong>
+                </span>
+              )}
+            </div>
+            <div className="account-reused-grid">
+              <AccountItem label="Primary Account Holder" value={data.ownerName || "—"} />
+              <AccountItem
+                label="Registered Business Name"
+                labelFor="d-biz-name"
+                value={
+                  editingBiz ? (
+                    bizInput(false, "d-biz-name")
+                  ) : (
+                    <>
+                      {data.businessName} {editLink(() => setEditingBiz(true), "Registered Business Name")}
+                    </>
+                  )
+                }
+              />
+              <AccountItem
+                label="Registered WhatsApp Mobile"
+                labelFor="d-phone"
+                value={
+                  editingPhone ? (
+                    phoneInput(false, "d-phone")
+                  ) : (
+                    <>
+                      {phoneDisplay} {editLink(() => setEditingPhone(true), "Registered WhatsApp Mobile")}
+                    </>
+                  )
+                }
+              />
+              <AccountItem label="Registered Account Email" value={data.email || "—"} />
+            </div>
+            <FieldError>{errors.businessName}</FieldError>
+            <div className="account-reused-hint">
+              ℹ️ Linked directly to your active Bhojpatra vendor login. These credentials are automatically preserved
+              and never requested again.
+            </div>
           </div>
-          {data.accountId && (
-            <span className="hidden text-xs font-semibold text-ink/60 sm:inline">Account ID: {data.accountId}</span>
-          )}
-        </div>
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <AccountField label="Primary Account Holder" mLabel="Owner:" value={data.ownerName} />
-          <AccountField
-            id="field-businessName"
-            label="Registered Business Name"
-            mLabel="Business:"
-            value={data.businessName}
-            editable
-            placeholder="e.g. Royal Awadh Caterers"
-            onEdit={(v) => {
-              onChange({ businessName: v });
-              if (errors.businessName) setErrors((p) => ({ ...p, businessName: "" }));
-            }}
-            error={errors.businessName}
-          />
-          <AccountField
-            id="field-phone"
-            label="Registered WhatsApp Mobile"
-            mLabel="Mobile:"
-            value={data.phone}
-            prefix="+91"
-            editable
-            type="tel"
-            placeholder="10-digit mobile number"
-            onEdit={(v) => {
-              onChange({ phone: v });
-              if (errors.phone) setErrors((p) => ({ ...p, phone: "" }));
-            }}
-            error={errors.phone}
-          />
-          <AccountField label="Registered Account Email" mLabel="Email:" value={data.email} />
-        </dl>
-        <p className="mt-4 rounded-control bg-cream/20 p-3 text-[11px] text-ink/70">
-          <R
-            d="ℹ️ Linked directly to your active Bhojpatra vendor login. These credentials are automatically preserved and never requested again."
-            m="ℹ️ Reused from active signup account. No re-entry required."
-          />
-        </p>
-      </ContentCard>
 
-      {/* Commercial Kitchen Operations */}
-      <ContentCard>
-        <div className="hidden sm:block">
-          <CardTitle>Commercial Kitchen Operations</CardTitle>
+          {/* Verified Vendor Account Details — phone */}
+          <div
+            className="vendor-account-reused-card mobile-reused-card vob-m-flex"
+            style={{ flexDirection: "column" }}
+          >
+            <div className="account-reused-header">
+              <div className="account-reused-title">
+                <span className="account-verified-icon">✓</span>
+                <span style={{ fontSize: 12, fontWeight: 800 }}>Signup Details Linked</span>
+              </div>
+              <span className="vob-badge" style={{ fontSize: 10 }}>
+                Reused
+              </span>
+            </div>
+            <div className="mobile-account-list">
+              <MobileRow label="Owner:" value={data.ownerName || "—"} />
+              <MobileRow
+                label="Business:"
+                labelFor="m-biz-name"
+                editing={editingBiz}
+                input={bizInput(true, "m-biz-name")}
+                value={data.businessName}
+                onEdit={() => setEditingBiz(true)}
+              />
+              <MobileRow
+                label="Mobile:"
+                labelFor="m-phone"
+                editing={editingPhone}
+                input={phoneInput(true, "m-phone")}
+                value={phoneDisplay}
+                onEdit={() => setEditingPhone(true)}
+              />
+              <MobileRow label="Email:" value={data.email || "—"} />
+            </div>
+            <FieldError>{errors.businessName}</FieldError>
+            <div className="account-reused-hint" style={{ fontSize: 11 }}>
+              ℹ️ Reused from active signup account. No re-entry required.
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div id="field-city">
-            <FormLabel required htmlFor="d-city">
-              <R d="Primary Kitchen City" m="City" />
-            </FormLabel>
+
+        <div className="card-title-row vob-d-flex">
+          <span className="card-title">Commercial Kitchen Operations</span>
+        </div>
+
+        <div className="form-grid-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <div className="form-group" id="field-city">
+            <label className="form-label" htmlFor="d-city">
+              <R d="Primary Kitchen City" m="City" /> <span className="required">*</span>
+            </label>
             <select
               id="d-city"
+              className="form-select"
               value={data.city}
               onChange={(e) => onChange({ city: e.target.value })}
-              className={inputCls}
             >
               {!data.city && <option value="">Select city</option>}
               {cityOptions.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
             <FieldError>{errors.city}</FieldError>
           </div>
-          <div id="field-state">
-            <FormLabel required htmlFor="d-state">
-              State
-            </FormLabel>
+
+          <div className="form-group" id="field-state">
+            <label className="form-label" htmlFor="d-state">
+              State <span className="required">*</span>
+            </label>
             <select
               id="d-state"
+              className="form-select"
               value={data.state}
               onChange={(e) => onChange({ state: e.target.value })}
-              className={inputCls}
             >
               {!data.state && <option value="">Select state</option>}
               {indianStates.map((s) => (
-                <option key={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
             <FieldError>{errors.state}</FieldError>
           </div>
         </div>
 
-        <div id="field-cuisines" className="mt-5">
-          <FormLabel>
+        {/* Cuisines Multi-Select */}
+        <div className="form-group" id="field-cuisines" style={{ marginTop: 10 }}>
+          <span className="form-label">
             <R d="Primary Culinary Specialties & Cuisines" m="Cuisines" />
-          </FormLabel>
-          <div className="flex flex-wrap items-center gap-2">
+          </span>
+          <div className="chip-grid" data-chip-type="cuisine">
             {cuisineChips.map((c) => (
               <ChoiceChip key={c} active={data.cuisines.includes(c)} onClick={() => toggle("cuisines", c)}>
                 {c}
               </ChoiceChip>
             ))}
-            <ChipAddInput
-              id="input-custom-cuisine"
-              value={customCuisine}
-              onChange={setCustomCuisine}
-              onAdd={() => addCustom("cuisines", customCuisine, () => setCustomCuisine(""))}
-              placeholder="+ Custom cuisine"
-            />
+            <span className="vob-d">
+              <ChipAddInput
+                id="input-custom-cuisine"
+                value={customCuisine}
+                onChange={setCustomCuisine}
+                onAdd={() => addCustom("cuisines", customCuisine, () => setCustomCuisine(""))}
+                placeholder="+ Custom cuisine"
+              />
+            </span>
+            <span className="vob-m">
+              <ChipAddInput
+                id="m-input-custom-cuisine"
+                value={customCuisine}
+                onChange={setCustomCuisine}
+                onAdd={() => addCustom("cuisines", customCuisine, () => setCustomCuisine(""))}
+                placeholder="+ Custom"
+              />
+            </span>
           </div>
           <FieldError>{errors.cuisines}</FieldError>
         </div>
 
-        <div id="field-serviceCities" className="mt-5">
-          <FormLabel required sub="Where can your team travel to cater?">
-            <R d="Serviceable Coverage Cities" m="Coverage Cities" />
-          </FormLabel>
-          <div className="flex flex-wrap items-center gap-2">
-            {coverageChips.map((c) => (
-              <ChoiceChip
-                key={c}
-                active={data.serviceCities.includes(c)}
-                onClick={() => toggle("serviceCities", c)}
-              >
-                {c}
-              </ChoiceChip>
-            ))}
-            <ChipAddInput
-              id="input-custom-city"
-              value={customCity}
-              onChange={setCustomCity}
-              onAdd={() => addCustom("serviceCities", customCity, () => setCustomCity(""))}
-              placeholder="+ Other city"
-            />
+        {/* Serviceable Cities Multi-Select */}
+        <div className="form-group full-width" id="field-serviceCities" style={{ marginTop: 10 }}>
+          <span className="form-label">
+            <R d="Serviceable Coverage Cities" m="Coverage Cities" /> <span className="required">*</span>{" "}
+            <span className="form-label-sub vob-d">Where can your team travel to cater?</span>
+          </span>
+          <div className="chip-grid" data-chip-type="city">
+            {coverageChips.map((c, i) => {
+              const active = data.serviceCities.includes(c);
+              return (
+                <ChoiceChip
+                  key={c}
+                  active={active}
+                  onClick={() => toggle("serviceCities", c)}
+                  className={cn(!active && i >= MOBILE_COVERAGE_COUNT && i < COVERAGE_CHIPS.length && "vob-d")}
+                >
+                  {c}
+                </ChoiceChip>
+              );
+            })}
+            <span className="vob-d">
+              <ChipAddInput
+                id="input-custom-city"
+                value={customCity}
+                onChange={setCustomCity}
+                onAdd={() => addCustom("serviceCities", customCity, () => setCustomCity(""))}
+                placeholder="+ Other city"
+              />
+            </span>
+            <span className="vob-m">
+              <ChipAddInput
+                id="m-input-custom-city"
+                value={customCity}
+                onChange={setCustomCity}
+                onAdd={() => addCustom("serviceCities", customCity, () => setCustomCity(""))}
+                placeholder="+ City"
+              />
+            </span>
           </div>
-          <FieldHint className="hidden sm:block">
+          <span className="field-hint vob-d">
             Customers in these regional cities will see your kitchen listing in search results.
-          </FieldHint>
+          </span>
           <FieldError>{errors.serviceCities}</FieldError>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-4">
-          <div>
-            <FormLabel htmlFor="d-google-rating">Google Rating</FormLabel>
+        {/* Google Reviews & Reputation */}
+        <div
+          className="form-grid-2"
+          style={{ marginTop: 10, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}
+        >
+          <div className="form-group">
+            <label className="form-label" htmlFor="d-google-rating">
+              Google Rating
+            </label>
             <input
               id="d-google-rating"
               type="number"
@@ -309,23 +431,25 @@ export default function Step1IdentityOps({
               step="0.1"
               min="1"
               max="5"
+              className="form-input"
               value={data.googleRating ?? ""}
               onChange={(e) => onChange({ googleRating: e.target.value ? Number(e.target.value) : undefined })}
               placeholder="e.g. 4.8"
-              className={inputCls}
             />
           </div>
-          <div>
-            <FormLabel htmlFor="d-google-reviews">Total Google Reviews Count</FormLabel>
+          <div className="form-group">
+            <label className="form-label" htmlFor="d-google-reviews">
+              Total Google Reviews Count
+            </label>
             <input
               id="d-google-reviews"
               type="number"
               inputMode="numeric"
               min="0"
+              className="form-input"
               value={data.googleReviews ?? ""}
               onChange={(e) => onChange({ googleReviews: e.target.value ? Number(e.target.value) : undefined })}
               placeholder="e.g. 142"
-              className={inputCls}
             />
           </div>
         </div>
@@ -336,70 +460,66 @@ export default function Step1IdentityOps({
   );
 }
 
-function AccountField({
-  id,
-  label,
-  mLabel,
-  value,
-  editable,
-  onEdit,
-  placeholder,
-  prefix,
-  type = "text",
-  error,
-}: {
-  id?: string;
-  label: string;
-  mLabel: string;
-  value: string;
-  editable?: boolean;
-  onEdit?: (v: string) => void;
-  placeholder?: string;
-  prefix?: string;
-  type?: string;
-  error?: string;
-}) {
-  // Values carried over from signup render read-only. A value the signup did
-  // not capture (business name / mobile) is asked here once, inline.
-  const [editing, setEditing] = useState(editable && !value);
+function AccountItem({ label, value, labelFor }: { label: string; value: ReactNode; labelFor?: string }) {
   return (
-    <div id={id} className="rounded-control border border-cream/60 bg-cream/10 px-3 py-2">
-      <dt className="text-[11px] font-semibold text-ink/50">
-        <R d={label} m={mLabel} />
-      </dt>
-      <dd className="mt-0.5 text-sm font-bold text-ink">
-        {editing && onEdit ? (
-          <div className="flex items-center gap-2">
-            {prefix && <span className="text-xs font-semibold text-ink/60">{prefix}</span>}
-            <input
-              type={type}
-              value={value}
-              autoComplete="off"
-              onChange={(e) => onEdit(e.target.value)}
-              placeholder={placeholder}
-              aria-label={label}
-              className="min-h-[40px] w-full rounded-control border border-cream bg-white px-2.5 text-sm font-normal text-ink outline-none focus:border-maroon"
-            />
-          </div>
-        ) : (
-          <span className="flex items-center justify-between gap-2">
-            <span className="truncate">
-              {prefix && value ? `${prefix} ` : ""}
-              {value || "—"}
-            </span>
-            {editable && (
+    <div className="account-field-item">
+      {labelFor ? (
+        <label className="account-field-label" htmlFor={labelFor}>
+          {label}
+        </label>
+      ) : (
+        <span className="account-field-label">{label}</span>
+      )}
+      <span className="account-field-val">{value}</span>
+    </div>
+  );
+}
+
+function MobileRow({
+  label,
+  value,
+  labelFor,
+  editing,
+  input,
+  onEdit,
+}: {
+  label: string;
+  value: string;
+  labelFor?: string;
+  editing?: boolean;
+  input?: ReactNode;
+  onEdit?: () => void;
+}) {
+  return (
+    <div className="mobile-account-row" style={{ gap: 8 }}>
+      {labelFor ? (
+        <label className="account-field-label" htmlFor={labelFor}>
+          {label}
+        </label>
+      ) : (
+        <span className="account-field-label">{label}</span>
+      )}
+      {editing && input ? (
+        input
+      ) : (
+        <strong className="account-field-val" style={{ textAlign: "right" }}>
+          {value || "—"}
+          {onEdit && (
+            <>
+              {" "}
               <button
                 type="button"
-                onClick={() => setEditing(true)}
-                className="min-h-[32px] shrink-0 px-1 text-[11px] font-bold text-maroon"
+                className="btn-badge-toggle-req"
+                onClick={onEdit}
+                aria-label={`Edit ${label.replace(":", "")}`}
+                style={{ fontSize: 11, minHeight: 24 }}
               >
-                Edit ✎
+                ✎
               </button>
-            )}
-          </span>
-        )}
-        <FieldError>{error}</FieldError>
-      </dd>
+            </>
+          )}
+        </strong>
+      )}
     </div>
   );
 }
