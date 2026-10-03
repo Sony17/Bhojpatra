@@ -23,6 +23,13 @@ import {
   siteBaseUrl,
 } from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
+import { ADVANCE_RATE, MAX_GUESTS, MIN_GUESTS } from "@/lib/bookingPricing";
+import { customerPercentFor } from "@/lib/referralRates";
+import {
+  expectedStallTotal,
+  parseStallPricingClaim,
+  readReferralRates,
+} from "@/lib/stallOrderPricing";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
 // admin booking console — never prerender or cache this.
@@ -101,9 +108,13 @@ export interface StoredOrder {
   review?: { rating: number; comment: string; createdAt: string };
   /** Set when the customer reopened a Completed booking (stops auto-complete). */
   reopened?: boolean;
-  /** Vendor workflow extras */
+  /** Vendor Portal response. Never moves `status` — Pending/Confirmed track
+   *  payment, so a vendor's accept/decline is recorded alongside it. */
   vendorAcknowledged?: boolean;
   acknowledgedAt?: string;
+  /** Vendor declined the booking; admin follows up (refund / reassignment). */
+  vendorDeclined?: boolean;
+  declinedAt?: string;
   vendorNotes?: string;
 }
 
@@ -207,6 +218,7 @@ export async function POST(request: Request) {
     invoice,
     vendors,
     service,
+    pricing,
   } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof id !== "string" || !/^BHJ-/.test(id)) {
@@ -301,14 +313,16 @@ export async function POST(request: Request) {
   // the account that's signed in, so it misses a person who signs up a *second*
   // account to refer themselves. Resolve the code to its partner and drop the
   // credit when that partner's registered phone matches this booking's phone.
-  let phoneSelfReferral = false;
-  if (code && !sameAccountSelfReferral) {
-    const referrer = await partnerStore.get(code.toUpperCase());
-    phoneSelfReferral =
-      !!referrer &&
-      !referrer.deleted &&
-      isPhoneSelfReferral(typeof phone === "string" ? phone : "", referrer);
-  }
+  // (The referrer is also what fixes the customer-side discount re-priced below.)
+  const storedReferrer = code
+    ? await partnerStore.get(code.toUpperCase())
+    : undefined;
+  const referrer =
+    storedReferrer && !storedReferrer.deleted ? storedReferrer : undefined;
+  const phoneSelfReferral =
+    !!referrer &&
+    !sameAccountSelfReferral &&
+    isPhoneSelfReferral(typeof phone === "string" ? phone : "", referrer);
 
   const selfReferral = sameAccountSelfReferral || phoneSelfReferral;
 
@@ -329,6 +343,65 @@ export async function POST(request: Request) {
     vegN + nonVegN === guestCount
       ? { vegGuests: vegN, nonVegGuests: nonVegN }
       : null;
+
+  // Price integrity (Single Stall): the claimed `amount` must match what our
+  // own menu, extras, service and coupon data say this order costs — the
+  // wizard sends its pricing inputs alongside, and we re-run the same ladder.
+  // A doctored total (or a stall whose prices moved under the guest) is turned
+  // away rather than booked at the wrong figure.
+  if (packageId === "custom") {
+    const claim = parseStallPricingClaim(pricing);
+    if (!claim) {
+      return Response.json(
+        { error: "Missing order details. Please refresh and try again." },
+        { status: 400 },
+      );
+    }
+    if (guestCount < MIN_GUESTS || guestCount > MAX_GUESTS) {
+      return Response.json({ error: "Invalid guest count." }, { status: 400 });
+    }
+    const referralPercent =
+      !selfReferral && referrer
+        ? customerPercentFor(await readReferralRates(), referrer.type)
+        : 0;
+    let expected: number | null;
+    try {
+      expected = await expectedStallTotal(claim, guestCount, referralPercent);
+    } catch (err) {
+      console.error("Failed to re-price stall order", err);
+      return Response.json(
+        { error: "Couldn't verify the order total. Please try again." },
+        { status: 500 },
+      );
+    }
+    if (expected === null) {
+      return Response.json(
+        { error: "This stall isn't available to book right now." },
+        { status: 400 },
+      );
+    }
+    if (Math.abs(Math.round(expected) - Math.round(amt)) > 1) {
+      return Response.json(
+        {
+          error:
+            "The price of this order has changed. Please review your order again before confirming.",
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  // The advance is what confirms a paid booking. When less than the 10% has
+  // actually been recorded (a short or doctored checkout), the order lands as
+  // Pending for the team to settle, never as Confirmed on someone's say-so.
+  const advanceDue = Math.round(Math.round(amt) * ADVANCE_RATE);
+  const claimedStatus: BookingStatus = isBookingStatus(status)
+    ? status
+    : "Confirmed";
+  const effectiveStatus: BookingStatus =
+    paidVerified > 0 && paidVerified < advanceDue && claimedStatus === "Confirmed"
+      ? "Pending"
+      : claimedStatus;
 
   const order: StoredOrder = {
     id,
@@ -372,7 +445,7 @@ export async function POST(request: Request) {
       ? { paymentRef: paymentRef.trim() }
       : {}),
     ...(isEmiPlan(emiPlan) ? { emiPlan } : {}),
-    status: isBookingStatus(status) ? status : "Confirmed",
+    status: effectiveStatus,
     createdAt: new Date().toISOString(),
     ...(!selfReferral && typeof referralCode === "string" && referralCode.trim()
       ? {
@@ -398,6 +471,18 @@ export async function POST(request: Request) {
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a
   // network blip) updates the existing record rather than duplicating it.
   const existing = await store.get(order.id);
+  // …but only the booking's own customer may update it. A different account
+  // landing on an existing id must never overwrite (or inherit the payments
+  // of) someone else's order. Legacy rows without an owner stay updatable.
+  if (existing?.userId && existing.userId !== user.id) {
+    return Response.json(
+      {
+        error:
+          "This booking reference is already in use. Please refresh the page and try again.",
+      },
+      { status: 409 },
+    );
+  }
   const merged = existing ? { ...existing, ...order } : order;
   try {
     await store.upsert(merged);

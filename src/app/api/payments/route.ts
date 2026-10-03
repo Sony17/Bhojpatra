@@ -11,12 +11,17 @@ export const dynamic = "force-dynamic";
 
 export type StoredPaymentMethod = "UPI" | "QR" | "Razorpay";
 // A payment starts life as an advance and can later be settled or refunded by
-// the admin payment tracker (`/api/payments/[id]`).
+// the admin payment tracker (`/api/payments/[id]`). "Failed" rows are written
+// only by the Razorpay webhook (payment.failed) as a record of an attempt that
+// moved no money — they never count toward what a booking has paid, and the
+// admin can't set or change them (they're absent from the settable list below).
 export type StoredPaymentStatus =
   | "Advance Received"
   | "Settled"
   | "Pending"
-  | "Refunded";
+  | "Refunded"
+  | "Failed";
+/** Statuses an admin may set through PATCH /api/payments/[id]. */
 export const STORED_PAYMENT_STATUSES: StoredPaymentStatus[] = [
   "Advance Received",
   "Settled",
@@ -45,6 +50,11 @@ export interface StoredPayment {
   razorpayPaymentId?: string;
   // Set when this payment was refunded through the Razorpay Refund API.
   razorpayRefundId?: string;
+  // Rupees refunded so far, from Razorpay's cumulative `amount_refunded`
+  // (set by the refund.processed webhook; less than `amount` for a partial).
+  refundedAmount?: number;
+  // Gateway's reason for a "Failed" attempt (payment.failed webhook).
+  failureReason?: string;
   status: StoredPaymentStatus;
   createdAt: string;
 }

@@ -104,6 +104,7 @@ async function runQuery(
 const TABLES = [
   "bookings",
   "payments",
+  "payment_events",
   "refunds",
   "settlements",
   "leads",

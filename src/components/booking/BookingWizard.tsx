@@ -113,9 +113,11 @@ import {
   GST_RATE,
   ADVANCE_RATE,
   daysUntil,
+  deriveBookingId,
   formatEventDate,
   isoAfterDays,
 } from "@/lib/bookingPricing";
+import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 // Package (1) · Menu (2) · Live Stall (3) · Add-ons + details (4) · Essentials /
@@ -243,6 +245,8 @@ function packageAvailable(packageId: string, eventDate: string): boolean {
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function BookingWizard() {
+  // Per-browser booking salt — see lib/bookingSalt.ts.
+  const [bookingSalt] = useState(getBookingSalt);
   // Language is driven by the shared, site-wide context (Header toggle).
   const { lang, t } = useLang();
 
@@ -1641,15 +1645,13 @@ export default function BookingWizard() {
   const gst = taxable * GST_RATE;
   const grandTotal = taxable + gst;
 
-  // Deterministic booking id derived from state (no random / time).
+  // Booking id: this browser's booking salt + the order's shape — stable for
+  // the same order (retries upsert one record) but unique across customers.
   const totalItems = Object.values(categoryItems).reduce(
     (n, arr) => n + arr.length,
     0,
   );
-  const bookingId = `BHJ-${(
-    ((guests * 7 + Math.round(grandTotal) + totalItems * 13) % 90000) +
-    10000
-  ).toString()}`;
+  const bookingId = deriveBookingId(bookingSalt, guests, grandTotal, totalItems);
 
   /* ─── Validation per step ──────────────────────────────────────────── */
   const stepValid = (s: number): boolean => {
@@ -2313,6 +2315,8 @@ export default function BookingWizard() {
     // Order placed — drop the saved draft so a later visit starts fresh rather
     // than resurrecting this (now-booked) menu.
     clearBookingDraft();
+    // …and the next booking from this browser gets a fresh id.
+    rotateBookingSalt();
     // Bring the success screen into view — a paid-and-confirmed booking often
     // triggers from the advance button lower down, so jump back to the top.
     if (typeof window !== "undefined") {

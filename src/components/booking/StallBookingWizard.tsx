@@ -16,6 +16,7 @@ import {
   type ReferralRates,
 } from "@/lib/referralRates";
 import LoginGate from "@/components/auth/LoginGate";
+import StallTypePicker from "@/components/booking/StallTypePicker";
 import StepDone from "@/components/booking/shared/StepDone";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
@@ -55,6 +56,7 @@ import {
   type Coupon,
   type BookingStatus,
   type VendorListing,
+  listingOfferings,
 } from "@/lib/data";
 import { slugifyName } from "@/lib/bookings";
 import {
@@ -64,6 +66,8 @@ import {
   type StallItemMap as ItemMap,
 } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
+import { useAllVendors } from "@/lib/useAllVendors";
+import { stallTypeCounts, isStallTypeId } from "@/lib/stallTypes";
 import {
   readStoredLocation,
   markManualLocation,
@@ -84,11 +88,16 @@ import {
   MAX_GUESTS,
   ADVANCE_RATE,
   computeOrderTotals,
-  deriveBookingId,
+  bookingRef,
   daysUntil,
   formatEventDate,
   isoAfterDays,
 } from "@/lib/bookingPricing";
+import {
+  getBookingSalt,
+  bookingSaltFor,
+  rotateBookingSalt,
+} from "@/lib/bookingSalt";
 import {
   PREF_BOTH,
   dishAllowed,
@@ -106,7 +115,8 @@ import {
 // step either — that choice happens on the Brands page, which already lists
 // every stall with its photos, ratings, filters and full menu; the wizard is
 // entered from a brand's "Book Now" and opens straight on that stall's menu.
-const TOTAL_STEPS = 3;
+// Menu → Extras → Essentials → Review.
+const TOTAL_STEPS = 4;
 
 // Where a guest picks their stall: the Brands catalogue, lensed to the Single
 // Stall category. Every entry point into this flow that doesn't already name a
@@ -131,6 +141,17 @@ function prettifyVendorId(id: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
   return words.length ? words.join(" ") : id;
 }
+
+/** A brand name reduced to a slug, tolerating the catalog listing's trailing
+ *  "Caterers" — how a catalogue id with no booking-menu record under it is
+ *  bridged to its wizard counterpart ("Awadhi Royal Caterers" ↔ "Awadhi Royal"). */
+function brandKey(name: string): string {
+  return slugifyName(name).replace(/-caterers$/, "");
+}
+
+/** Curated seed listings — city-agnostic in every roster (they stand in for
+ *  the platform's own network); only live vendors cook locally. */
+const SEED_LISTING_IDS = new Set(vendorListings.map((v) => v.id));
 
 /** One course a stall publishes, with that stall's dishes for it. */
 interface StallCourse {
@@ -205,9 +226,15 @@ function coursePrice(course: StallCourse, picks: string[]): number {
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function StallBookingWizard() {
+  // Per-browser booking salt — see lib/bookingSalt.ts. Re-keyed to the account
+  // once the session is known (below), so two people on one browser never
+  // share a booking id.
+  const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
+
+  const brandsBaseHref = BRANDS_HREF;
 
   const [step, setStep] = useState<number>(1);
 
@@ -216,6 +243,16 @@ export default function StallBookingWizard() {
   // A `?vendor=` hand-off from a brand page, held until the live roster loads.
   const [pendingVendorId, setPendingVendorId] = useState<string>("");
   const [missingBrand, setMissingBrand] = useState<string>("");
+  // The stall TYPE (a counter id) the guest picked on the way in. Purely a
+  // browsing lens — it narrows the Brands catalog, never the stall's own menu.
+  const [counterType, setCounterType] = useState<string>("");
+
+  // Every "back to the Brands page" link keeps the stall type in hand, so a
+  // guest who changes their mind about the caterer stays inside the type they
+  // chose instead of being dropped back into the whole catalogue.
+  const brandsHref = counterType
+    ? `${brandsBaseHref}&counter=${encodeURIComponent(counterType)}`
+    : brandsBaseHref;
 
   // Step 2 — the stall's own menu.
   const [activeCat, setActiveCat] = useState<number>(0);
@@ -360,6 +397,10 @@ export default function StallBookingWizard() {
     // drop the guest straight onto the menu builder for that stall.
     const vendorParam = sp.get("vendor")?.trim();
     if (vendorParam) setPendingVendorId(vendorParam);
+    // Returning from the Brands catalog keeps the stall type, so a guest who
+    // backs out of a stall lands on the type they were browsing, not step one.
+    const counterParam = sp.get("counter")?.trim() ?? "";
+    if (isStallTypeId(counterParam)) setCounterType(counterParam);
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
@@ -503,6 +544,16 @@ export default function StallBookingWizard() {
     if (sessionStatus.email) setCustomerEmail((e) => e || sessionStatus.email!);
   }, [sessionStatus]);
 
+  // Tie the booking id to the account: a different account signing in on this
+  // browser gets a fresh salt. Never once money has moved — the id a payment
+  // was recorded against is final.
+  useEffect(() => {
+    const owner = sessionStatus?.email;
+    if (!owner || paidAmount > 0) return;
+    const salt = bookingSaltFor(owner);
+    if (salt !== bookingSalt) setBookingSalt(salt);
+  }, [sessionStatus?.email, paidAmount, bookingSalt]);
+
   const [lastBookingPhone, setLastBookingPhone] = useState<string>("");
   useEffect(() => {
     if (!sessionStatus) return;
@@ -560,7 +611,35 @@ export default function StallBookingWizard() {
     };
   }, []);
 
-  const cityName = resolveCity(cityId)?.name.toLowerCase();
+  const cityDisplayName = resolveCity(cityId)?.name ?? "";
+  const cityName = cityDisplayName.toLowerCase();
+  // The city as the Brands catalog knows it. A typed-in "Other" city isn't a
+  // catalog option — filtering on it would only ever show an empty page — so
+  // the catalog links and the stall-type counts leave the city open then.
+  const catalogCity =
+    cityId && cityId !== OTHER_LOCATION_ID ? cityDisplayName : "";
+
+  // Catalog listings (curated seeds + live vendors) — the only source that
+  // knows which counters a vendor runs, so the stall-type grid counts against
+  // them rather than the menu roster, which carries no offerings.
+  const catalogVendors = useAllVendors();
+
+  // A stall type hands off to the Brands catalog pre-filtered to that counter;
+  // the catalog's "Book" then comes back here with `?vendor=`, and the guest's
+  // date / guests / occasion survive the round trip in the persisted draft.
+  const stallTypeHref = (typeId: string) => {
+    const sp = new URLSearchParams({
+      category: "single-stall",
+      counter: typeId,
+    });
+    if (catalogCity) sp.set("city", catalogCity);
+    return `/vendors?${sp.toString()}`;
+  };
+  // Deliberately the UNfiltered lens — this is the escape hatch for a guest who
+  // doesn't want to commit to a stall type at all.
+  const browseAllStallsHref = catalogCity
+    ? `${brandsBaseHref}&city=${encodeURIComponent(catalogCity)}`
+    : brandsBaseHref;
 
   // Every stall a guest can book, collapsed from the per-course roster into one
   // card per vendor. NO tier gate — that is the whole point of this flow: a
@@ -579,7 +658,8 @@ export default function StallBookingWizard() {
           v.live &&
           cityName &&
           v.city?.toLowerCase() !== cityName &&
-          v.id !== stallId
+          v.id !== stallId &&
+          v.id !== pendingVendorId
         )
           continue;
         if (!v.items.length) continue;
@@ -632,7 +712,24 @@ export default function StallBookingWizard() {
       (a, b) =>
         Number(b.pinned) - Number(a.pinned) || b.rating - a.rating,
     );
-  }, [liveMenuCategories, cityName, stallId]);
+  }, [liveMenuCategories, cityName, stallId, pendingVendorId]);
+
+  // Which catalog listings can actually be booked here — by id, or by brand
+  // name for a curated listing bridged to its wizard record. The stall-type
+  // tiles count only these, so a tile never leads to "we couldn't find it".
+  const bookableStallKeys = useMemo(
+    () => new Set(stalls.flatMap((s) => [s.id, brandKey(s.name)])),
+    [stalls],
+  );
+  const stallTypeCount = useMemo(
+    () =>
+      stallTypeCounts(
+        catalogVendors,
+        catalogCity,
+        (v) => bookableStallKeys.has(v.id) || bookableStallKeys.has(brandKey(v.name)),
+      ),
+    [catalogVendors, catalogCity, bookableStallKeys],
+  );
 
   const rawStall = useMemo<StallOption | undefined>(
     () => stalls.find((s) => s.id === stallId),
@@ -684,17 +781,13 @@ export default function StallBookingWizard() {
   // "Caterers" ("Awadhi Royal Caterers" ↔ "Awadhi Royal").
   useEffect(() => {
     if (!pendingVendorId) return;
-    const nameKey = (name: string) =>
-      slugifyName(name).replace(/-caterers$/, "");
-    let targetId = pendingVendorId;
-    if (!stalls.some((s) => s.id === pendingVendorId)) {
+    let target = stalls.find((s) => s.id === pendingVendorId);
+    if (!target) {
       const listing = vendorListings.find((l) => l.id === pendingVendorId);
-      const hit = listing
-        ? stalls.find((s) => nameKey(s.name) === nameKey(listing.name))
-        : undefined;
-      if (hit) targetId = hit.id;
+      if (listing)
+        target = stalls.find((s) => brandKey(s.name) === brandKey(listing.name));
     }
-    if (!stalls.some((s) => s.id === targetId)) {
+    if (!target) {
       // While the live roster is in flight this only means "not loaded yet".
       if (!menuSettled) return;
       const listing = vendorListings.find((l) => l.id === pendingVendorId);
@@ -705,26 +798,37 @@ export default function StallBookingWizard() {
     setMissingBrand("");
     // A different stall than the draft held invalidates every dish pick — item
     // ids are vendor-scoped.
-    setStallId((prev) => {
-      if (prev !== targetId) setCategoryItems({});
-      return targetId;
-    });
+    if (stallId !== target.id) setCategoryItems({});
+    setStallId(target.id);
+    // The guest's own event city always wins; only when they have none yet
+    // does the stall's home city stand in (a live vendor cooks locally).
+    if (!cityId && target.city) {
+      const home = target.city.toLowerCase();
+      const loc = locations.find((c) => c.name.toLowerCase() === home);
+      if (loc) setCityId(loc.id);
+    }
     setActiveCat(0);
     setStep(1);
     setPendingVendorId("");
-  }, [stalls, pendingVendorId, menuSettled]);
+  }, [stalls, pendingVendorId, menuSettled, stallId, cityId, locations]);
 
-  // Nobody books a stall they haven't seen. Landing here without one — a bare
-  // /book/stall, a cleared draft — means the guest hasn't chosen yet, so send
-  // them to the Brands page, which lists every stall with its photos, filters
-  // and full menu. They come back through a brand's "Book Now" with `?vendor=`,
-  // and the draft (event brief and all) is still in session storage. A hand-off
-  // we couldn't resolve keeps them here instead, so the notice is read first.
+  // A draft whose stall has since left the roster (vendor unpublished, menu
+  // hidden) must not resume as a half-built order with a "—" stall that could
+  // still be paid for on extras alone. Once the live roster has answered, drop
+  // the stall, say which one went missing, and start from the menu step.
   useEffect(() => {
-    if (!menuSettled || stallId || pendingVendorId || missingBrand) return;
-    if (typeof window === "undefined") return;
-    window.location.replace(BRANDS_HREF);
-  }, [menuSettled, stallId, pendingVendorId, missingBrand]);
+    if (!menuSettled || !stallId || rawStall || pendingVendorId) return;
+    const listing = vendorListings.find((l) => l.id === stallId);
+    setMissingBrand(listing?.name ?? prettifyVendorId(stallId));
+    setStallId("");
+    setCategoryItems({});
+    setStep(1);
+  }, [menuSettled, stallId, rawStall, pendingVendorId]);
+
+  // Landing here without a stall — a bare /book/stall, a cleared draft — shows
+  // the stall-type grid (step 1 below). A type leads to the Brands page filtered
+  // to it, whose "Book Now" comes back with `?vendor=`; the draft (event brief
+  // and all) survives the round trip in session storage.
 
   // Keep the active course tab in range when the stall (and its course list)
   // changes.
@@ -822,20 +926,34 @@ export default function StallBookingWizard() {
       : selectedService.priceMin
     : 0;
 
-  // Counter vendors: the whole catalogue (no tier narrowing on Single Stall),
-  // STRICTLY minus meat-only kitchens when the plate is pure veg.
+  // Counter vendors: the whole catalogue (curated seeds + live vendors, no tier
+  // narrowing on Single Stall), live ones in the event city only — the same
+  // rule as the stall roster — and STRICTLY minus meat-only kitchens when the
+  // plate is pure veg.
   const counterVendors = useMemo(
-    () => vendorListings.filter((v) => kitchenFitsSplit(v.diet, nonVegGuests)),
-    [nonVegGuests],
+    () =>
+      catalogVendors.filter(
+        (v) =>
+          kitchenFitsSplit(v.diet, nonVegGuests) &&
+          (SEED_LISTING_IDS.has(v.id) ||
+            !cityName ||
+            v.city?.toLowerCase() === cityName),
+      ),
+    [catalogVendors, nonVegGuests, cityName],
   );
+  // …and per counter, only the vendors who actually run it — a chaat counter
+  // can't be handed to a caterer who never declared one.
+  const vendorsForCounter = (addOnId: string): VendorListing[] =>
+    counterVendors.filter((v) => listingOfferings(v).includes(addOnId));
 
-  // A counter's vendor: the guest's pick when it's still valid (and still
-  // serves the plate), else the first eligible one so a selected counter is
-  // never vendorless.
+  // A counter's vendor: the guest's pick when it's still valid (runs the
+  // counter, in reach, serves the plate), else the first eligible one so a
+  // selected counter is never vendorless while someone can run it.
   const addOnVendorId = (addOnId: string): string => {
+    const pool = vendorsForCounter(addOnId);
     const chosen = addOnVendor[addOnId];
-    if (chosen && counterVendors.some((v) => v.id === chosen)) return chosen;
-    return counterVendors[0]?.id ?? "";
+    if (chosen && pool.some((v) => v.id === chosen)) return chosen;
+    return pool[0]?.id ?? "";
   };
   const addOnVendorName = (addOnId: string): string =>
     counterVendors.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
@@ -900,11 +1018,12 @@ export default function StallBookingWizard() {
     [sessionStatus, lastBookingPhone],
   );
 
-  const totalItems = Object.values(categoryItems).reduce(
-    (n, arr) => n + arr.length,
-    0,
-  );
-  const bookingId = deriveBookingId(guests, grandTotal, totalItems);
+  // The booking id is the browser's (account-keyed) salt alone — NOT the
+  // order's shape. The event brief stays editable on Review, so a shape-based
+  // id would change under a payment the moment the guest fixed a date or a
+  // coupon, and the server could then neither match the money nor stop a
+  // second charge. One visit, one id; the salt rotates once the order is saved.
+  const bookingId = bookingRef(bookingSalt, STALL_PACKAGE_ID);
 
   /* ─── Advance-booking lead time ────────────────────────────────────── */
   // "As per vendor specification": the longest lead among the stall and any
@@ -949,6 +1068,8 @@ export default function StallBookingWizard() {
         return (
           occasionId !== "" &&
           (occasionId !== OTHER_OCCASION_ID || customOccasion.trim() !== "") &&
+          cityId !== "" &&
+          (cityId !== OTHER_LOCATION_ID || customCity.trim() !== "") &&
           guests >= MIN_GUESTS &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
@@ -960,9 +1081,9 @@ export default function StallBookingWizard() {
   };
   const canNext = stepValid(step);
 
-  const nextBlockers = ((): string[] => {
-    if (canNext) return [];
-    if (step === 1) {
+  const blockersFor = (s: number): string[] => {
+    if (stepValid(s)) return [];
+    if (s === 1) {
       if (!stall) return [t("Choose a stall", "एक स्टॉल चुनें")];
       if (stall.courses.length === 0)
         return [
@@ -983,7 +1104,7 @@ export default function StallBookingWizard() {
             ),
       ];
     }
-    if (step === 2) {
+    if (s === 2) {
       const out: string[] = [];
       if (occasionId === "") out.push(t("Choose an occasion", "अवसर चुनें"));
       else if (
@@ -991,6 +1112,9 @@ export default function StallBookingWizard() {
         customOccasion.trim() === ""
       )
         out.push(t("Name your occasion", "अपने अवसर का नाम लिखें"));
+      if (cityId === "") out.push(t("Choose your city", "अपना शहर चुनें"));
+      else if (cityId === OTHER_LOCATION_ID && customCity.trim() === "")
+        out.push(t("Name your city", "अपने शहर का नाम लिखें"));
       if (eventDate === "")
         out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
@@ -1004,17 +1128,26 @@ export default function StallBookingWizard() {
       return out;
     }
     return [];
-  })();
+  };
+  const nextBlockers = blockersFor(step);
+  // Review re-checks every earlier rule: the event brief is still editable
+  // there, so a date pulled inside the notice window or a plate switched to
+  // pure veg (emptying a set-menu stall) must block payment — otherwise the
+  // advance is taken and the booking POST then rejects the order.
+  const reviewBlocker =
+    step === TOTAL_STEPS
+      ? [...blockersFor(1), ...blockersFor(2)].join(" • ")
+      : "";
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   // Start over drops every pick — including the stall — so it lands back where
-  // the flow begins: the Brands page.
+  // the flow begins: the stall-type grid.
   const startOver = () => {
     clearStallDraft();
-    if (typeof window !== "undefined") window.location.assign(BRANDS_HREF);
+    if (typeof window !== "undefined") window.location.assign("/book/stall");
   };
 
   const applyCouponCode = (raw: string) => {
@@ -1266,6 +1399,10 @@ export default function StallBookingWizard() {
 
   const handleConfirm = async (paidOverride?: number, refOverride?: string) => {
     setConfirmError("");
+    if (reviewBlocker) {
+      setConfirmError(reviewBlocker);
+      return;
+    }
     if (!customerName.trim()) {
       setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
       return;
@@ -1294,7 +1431,7 @@ export default function StallBookingWizard() {
         [
           ...(stall ? [{ id: stall.id, name: stall.name }] : []),
           ...selectedAddOns.flatMap((id) => {
-            const v = vendorListings.find((x) => x.id === addOnVendorId(id));
+            const v = counterVendors.find((x) => x.id === addOnVendorId(id));
             return v ? [{ id: v.id, name: v.name }] : [];
           }),
         ].map((v) => [v.id, v] as const),
@@ -1359,6 +1496,20 @@ export default function StallBookingWizard() {
           receipt: buildReceipt(),
           invoice: invoiceData,
           invoiceToken: encodeInvoice(invoiceData),
+          // What this total was built from — the server re-prices the order
+          // from its own data and refuses a total that doesn't match.
+          pricing: {
+            stallId: stall?.id ?? stallId,
+            picks: Object.fromEntries(
+              (stall?.courses ?? [])
+                .map((c) => [c.id, itemsFor(c.id)] as const)
+                .filter(([, ids]) => ids.length > 0),
+            ),
+            addOnIds: selectedAddOns,
+            serviceId: selectedService?.id ?? "",
+            venueFee,
+            couponCode: appliedCoupon?.code ?? "",
+          },
         }),
       });
       if (!res.ok) {
@@ -1389,6 +1540,7 @@ export default function StallBookingWizard() {
     setConfirmed(true);
     setConfirming(false);
     clearStallDraft();
+    rotateBookingSalt();
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1397,7 +1549,8 @@ export default function StallBookingWizard() {
   /* ─── Render ───────────────────────────────────────────────────────── */
   const stepLabels = [
     t("Menu", "मेन्यू"),
-    t("Details", "विवरण"),
+    t("Extras", "एक्स्ट्रा"),
+    t("Essentials", "ज़रूरी सामान"),
     t("Review", "समीक्षा"),
   ];
 
@@ -1438,6 +1591,7 @@ export default function StallBookingWizard() {
       showGuests={step !== TOTAL_STEPS}
       collapsible={mobileCollapse}
       collapseAt="sm"
+      chipSummary
     />
   );
 
@@ -1463,9 +1617,19 @@ export default function StallBookingWizard() {
     );
   }
 
-  // Details (2) and Review (3) run beside the live order summary; the menu
-  // builder (1) takes the full width.
-  const showSummary = step === 2 || step === 3;
+  // Extras (2), Essentials (3) and Review (4) run beside the live order
+  // summary; the menu builder (1) takes the full width.
+  const showSummary = step >= 2;
+  // The stall-type grid owns the whole screen: it carries its own way onward
+  // (a tile) and its own way out ("See all stalls"), so the wizard's step nav —
+  // a disabled Continue over a duplicate back-link — would only be noise.
+  // A stall named by the draft or the URL that the live roster hasn't answered
+  // for yet — show a hold, not the stall-type grid (which would flash and then
+  // vanish) and not the hand-off panel.
+  const stallLoading =
+    !menuSettled && !stall && Boolean(stallId || pendingVendorId);
+  const showTypePicker =
+    step === 1 && !stall && !stallLoading && !pendingVendorId && !missingBrand;
 
   return (
     <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
@@ -1500,6 +1664,7 @@ export default function StallBookingWizard() {
         totalSteps={TOTAL_STEPS}
         stepLabels={stepLabels}
         onStartOver={startOver}
+        compact
       />
 
       {/* Event brief — up top on every step, collapsed to one editable line on
@@ -1509,13 +1674,15 @@ export default function StallBookingWizard() {
       <div
         className={
           showSummary
-            ? "mt-7 grid gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "mt-7"
+            ? "mt-3 grid gap-7 sm:mt-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : "mt-3 sm:mt-7"
         }
       >
         <div className="min-w-0">
-          {/* Step 1 · the chosen stall's menu. Without a stall this is a hand-off
-              back to the Brands page — the only place stalls are picked. */}
+          {/* Step 1 · the chosen stall's menu. Without a stall the guest picks a
+              stall TYPE first, then the caterer who runs it on the Brands page
+              — the only place stalls themselves are picked. A broken brand
+              link skips the grid and shows live alternatives straight away. */}
           {step === 1 &&
             (stall ? (
               <StepStallMenu
@@ -1530,21 +1697,36 @@ export default function StallBookingWizard() {
                 perPlate={perPlate}
                 pickedCount={pickedCount}
                 guests={guests}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
                 nonVegGuests={nonVegGuests}
                 hiddenDishes={dietView.hiddenDishes}
                 blockedCourses={dietView.blockedCourses}
+              />
+            ) : stallLoading ? (
+              <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
+            ) : showTypePicker ? (
+              <StallTypePicker
+                t={t}
+                lang={lang}
+                cityLabel={catalogCity}
+                counts={stallTypeCount}
+                selectedId={counterType}
+                hrefFor={stallTypeHref}
+                browseAllHref={browseAllStallsHref}
               />
             ) : (
               <StallHandoff
                 t={t}
                 missingBrand={missingBrand}
-                brandsHref={BRANDS_HREF}
+                brandsHref={brandsHref}
               />
             ))}
 
-          {step === 2 && (
+          {(step === 2 || step === 3) && (
             <StepStallDetails
+              part={step === 2 ? "extras" : "essentials"}
+              onSkip={goNext}
+              skipDisabled={!canNext}
               t={t}
               lang={lang}
               guests={guests}
@@ -1556,11 +1738,12 @@ export default function StallBookingWizard() {
               serviceId={serviceId}
               setServiceId={setServiceId}
               counterVendors={counterVendors}
+              vendorsForCounter={vendorsForCounter}
               nonVegGuests={nonVegGuests}
             />
           )}
 
-          {step === 3 &&
+          {step === TOTAL_STEPS &&
             (sessionStatus === undefined ? (
               <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
             ) : sessionStatus === null ? (
@@ -1622,9 +1805,12 @@ export default function StallBookingWizard() {
                 confirmError={confirmError}
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
-                onEditExtras={() => setStep(2)}
-                brandsHref={BRANDS_HREF}
+                onEditExtras={() =>
+                  setStep(selectedAddOns.length > 0 || !selectedService ? 2 : 3)
+                }
+                brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
+                blocker={reviewBlocker}
               />
             ))}
         </div>
@@ -1653,7 +1839,7 @@ export default function StallBookingWizard() {
           cream notice, Back / Continue on desktop, and a sticky checkout bar on
           phones carrying the running estimate. Review carries its own actions,
           so the nav stops before it. */}
-      {step < TOTAL_STEPS && (
+      {step < TOTAL_STEPS && !showTypePicker && (
         <div className="mt-8 sm:mt-10">
           {nextBlockers.length > 0 && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-maroon/30 bg-cream/40 px-3 py-2.5 text-[13px] text-ink/70 sm:rounded-card sm:px-4 sm:py-3 sm:text-sm sm:text-ink-soft">
@@ -1681,14 +1867,18 @@ export default function StallBookingWizard() {
               </Button>
             ) : (
               <a
-                href={BRANDS_HREF}
+                href={brandsHref}
                 className="text-sm font-semibold text-ink-soft underline underline-offset-4 transition hover:text-maroon"
               >
                 ← {t("Back to all stalls", "सभी स्टॉल पर वापस")}
               </a>
             )}
             <Button onClick={goNext} disabled={!canNext}>
-              {`${t("Continue", "आगे")} · ${stepLabels[step]} →`}
+              {`${
+                step === 2 && selectedAddOns.length === 0
+                  ? t("Skip", "छोड़ें")
+                  : t("Continue", "आगे")
+              } · ${stepLabels[step]} →`}
             </Button>
           </div>
           {/* Mobile sticky checkout chrome. The estimate only appears once the
@@ -1696,27 +1886,9 @@ export default function StallBookingWizard() {
               not an order, and pricing one they never assembled reads as a quote
               they're on the hook for. */}
           <div className="app-sticky-cta md:hidden">
-            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
-              {pickedCount > 0 ? (
-                <div className="mb-2 flex items-end justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                      {t("Per plate", "प्रति प्लेट")}
-                    </span>
-                    <span className="block truncate font-sans text-base font-bold leading-tight text-maroon">
-                      {money(perPlate)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right text-[11px] leading-tight text-ink-soft">
-                    {money(grandTotal)} ·{" "}
-                    {t(
-                      `${inr.format(guests)} guests`,
-                      `${inr.format(guests)} मेहमान`,
-                    )}
-                  </span>
-                </div>
-              ) : (
-                <div className="mb-2 text-[11px] leading-tight text-ink-soft">
+            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2 shadow-pop-up backdrop-blur-xl">
+              {pickedCount > 0 ? null : (
+                <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
                   {t(
                     "Your total appears once you add courses — nothing is booked yet.",
                     "कोर्स जोड़ते ही आपका कुल दिखेगा — अभी कुछ भी बुक नहीं हुआ है।",
@@ -1724,13 +1896,32 @@ export default function StallBookingWizard() {
                 </div>
               )}
               <div className="flex items-center gap-2">
+                {/* One row: the running estimate beside the actions, so the
+                    bar costs one line of screen instead of two. */}
+                {pickedCount > 0 && (
+                  <span className="mr-auto min-w-0 shrink pr-1">
+                    <span className="block truncate font-sans text-[15px] font-bold leading-tight text-maroon">
+                      {money(perPlate)}
+                      <span className="text-[11px] font-semibold text-ink-soft">
+                        {" "}/ {t("plate", "प्लेट")}
+                      </span>
+                    </span>
+                    <span className="block truncate text-[11px] leading-tight text-ink-soft">
+                      {money(grandTotal)} ·{" "}
+                      {t(
+                        `${inr.format(guests)} guests`,
+                        `${inr.format(guests)} मेहमान`,
+                      )}
+                    </span>
+                  </span>
+                )}
                 {step > 1 && (
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={goBack}
                     aria-label={t("Back", "पीछे")}
-                    className="min-h-11 px-4"
+                    className="min-h-10 shrink-0 px-3"
                   >
                     ←
                   </Button>
@@ -1738,10 +1929,14 @@ export default function StallBookingWizard() {
                 <Button
                   onClick={goNext}
                   disabled={!canNext}
-                  fullWidth
-                  className="min-h-11"
+                  fullWidth={pickedCount === 0}
+                  className="min-h-10 shrink-0 px-3.5 text-[13px]"
                 >
-                  {`${t("Continue", "आगे")} · ${stepLabels[step]}`}
+                  {`${
+                    step === 2 && selectedAddOns.length === 0
+                      ? t("Skip", "छोड़ें")
+                      : t("Continue", "आगे")
+                  } · ${stepLabels[step]}`}
                 </Button>
               </div>
             </div>
@@ -1903,7 +2098,12 @@ function StepStallMenu({
 
   return (
     <div>
+      {/* Phones: the step rail already names this step, so the heading gives
+          its room to the dishes. */}
+      <div className="hidden sm:block">
       <SectionHead
+        compact
+        phoneMinimal
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
         title={
           stall.allFixed
@@ -1922,12 +2122,13 @@ function StepStallMenu({
               )
         }
       />
+      </div>
 
       {/* Whose stall this is — the counterpart to the tiered flow's package
           rail. The guest picked this brand on the Brands page, so its identity
           rides along here, with the way back to change it. */}
-      <div className="mb-6 flex items-center gap-3 rounded-[1.5rem] border border-cream bg-white p-3 shadow-card sm:gap-4 sm:p-4">
-        <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-cream bg-cream/40 sm:h-16 sm:w-16">
+      <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-cream bg-white px-2 py-1.5 shadow-soft sm:mb-6 sm:gap-4 sm:rounded-[1.5rem] sm:p-4 sm:shadow-card">
+        <span className="relative block h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-cream bg-cream/40 sm:h-16 sm:w-16 sm:rounded-2xl">
           <Image
             src={stall.image}
             alt={stall.name}
@@ -1937,13 +2138,13 @@ function StepStallMenu({
           />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="eyebrow text-[10px] font-bold text-maroon">
+          <p className="eyebrow hidden text-[10px] font-bold text-maroon sm:block">
             {t("YOUR STALL", "आपका स्टॉल")}
           </p>
-          <p className="truncate font-sans text-base font-semibold text-ink sm:text-lg">
+          <p className="truncate font-sans text-sm font-semibold text-ink sm:text-lg">
             {stall.name}
           </p>
-          <p className="mt-0.5 truncate text-xs text-ink-soft">
+          <p className="truncate text-[11px] text-ink-soft sm:mt-0.5 sm:text-xs">
             ★ {stall.rating.toFixed(1)}
             {stall.city ? ` · ${stall.city}` : ""}
             {stall.allFixed ? ` · ${t("set menu", "तय मेन्यू")}` : ""}
@@ -1951,14 +2152,21 @@ function StepStallMenu({
         </div>
         <a
           href={brandsHref}
-          className="shrink-0 rounded-full border border-maroon px-3 py-1.5 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:text-xs"
+          className="shrink-0 rounded-full border border-maroon px-3 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:py-1.5 sm:text-xs"
         >
           {t("Change stall", "स्टॉल बदलें")}
         </a>
       </div>
 
       {/* Course tabs — only the courses this stall actually publishes. */}
-      <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:flex-wrap">
+      <div
+        className={
+          "flex-nowrap gap-2 overflow-x-auto no-scrollbar sm:mt-5 sm:flex sm:flex-wrap " +
+          // One course is nothing to switch between — on phones the bold
+          // course heading below already names it.
+          (stall.courses.length > 1 ? "flex" : "hidden")
+        }
+      >
         {stall.courses.map((c, i) => {
           const active = i === activeCat;
           const n = itemsFor(c.id).length;
@@ -1969,7 +2177,7 @@ function StepStallMenu({
               aria-pressed={active}
               onClick={() => setActiveCat(i)}
               className={
-                "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition " +
+                "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 " +
                 (active
                   ? "border-maroon bg-maroon text-cream"
                   : "border-cream-3 bg-white text-ink hover:bg-cream-2")
@@ -1994,7 +2202,7 @@ function StepStallMenu({
       {/* What the craft-my-plate filter is doing here, so a shorter menu never
           reads as the stall having lost dishes. */}
       {filterNote && (
-        <p className="mt-4 rounded-xl border border-maroon/30 bg-cream/35 px-4 py-2.5 text-xs text-ink">
+        <p className="mt-2 rounded-xl border border-maroon/30 bg-cream/35 px-3 py-1.5 text-xs text-ink sm:mt-4 sm:px-4 sm:py-2.5">
           <span className="font-bold uppercase tracking-[0.06em] text-maroon">
             {t("Pure veg plate", "शुद्ध शाकाहारी थाली")}
           </span>
@@ -2004,7 +2212,7 @@ function StepStallMenu({
       )}
 
       {course.live && (
-        <p className="mt-4 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-xs text-ink-soft">
+        <p className="mt-2 rounded-xl border border-cream-3 bg-cream-2/40 px-3 py-1.5 text-xs text-ink-soft sm:mt-4 sm:px-4 sm:py-2.5">
           {t(
             "Live station — cooked fresh in front of your guests.",
             "लाइव स्टेशन — आपके मेहमानों के सामने ताज़ा बनता है।",
@@ -2015,24 +2223,38 @@ function StepStallMenu({
       {/* A set-menu course: one control for the whole spread, and the dishes
           below listed rather than offered. Taking it adds every dish at the
           course's own per-plate rate. */}
+      {/* Phones: the course named in bold beside its set-menu bar. */}
+      <div className="mt-2 flex items-center gap-2.5 sm:block">
+      <h3 className="shrink-0 font-sans text-lg font-bold leading-tight text-ink sm:hidden">
+        {lang === "hi" ? course.nameHi : course.name}
+      </h3>
       {course.fixed && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream bg-cream/35 px-4 py-3">
-          <span className="min-w-0 text-sm text-ink">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-cream bg-cream/35 px-2.5 py-1.5 sm:mt-4 sm:flex-wrap sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3">
+          <span className="min-w-0 text-[11px] leading-tight text-ink sm:text-sm">
             <span className="font-semibold">
               {t("Set menu", "तय मेन्यू")}
             </span>
-            {" — "}
-            {t(
-              `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
-              `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
-            )}
+            {/* Phones: the facts in one line; the full sentence from tablet up. */}
+            <span className="block sm:hidden">
+              {t(
+                `${course.items.length} dishes · ${money(course.perPlate)} / plate`,
+                `${course.items.length} डिश · ${money(course.perPlate)} / प्लेट`,
+              )}
+            </span>
+            <span className="hidden sm:inline">
+              {" — "}
+              {t(
+                `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
+                `नीचे की सभी ${course.items.length} डिश, ${money(course.perPlate)} प्रति प्लेट। कुछ चुनना नहीं है।`,
+              )}
+            </span>
           </span>
           <button
             type="button"
             aria-pressed={courseTaken}
             onClick={() => toggleCourse(course.id)}
             className={
-              "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition " +
+              "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:px-4 sm:py-2 sm:text-xs " +
               (courseTaken
                 ? "border-maroon bg-cream text-maroon shadow-soft"
                 : "border-maroon bg-white text-maroon hover:bg-cream")
@@ -2044,8 +2266,9 @@ function StepStallMenu({
           </button>
         </div>
       )}
+      </div>
 
-      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+      <ul className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
         {course.items.map((it) => {
           const active = picks.includes(it.id);
           const price = dishPrice(it, course);
@@ -2054,7 +2277,9 @@ function StepStallMenu({
           // turns it into a control.
           const body = (
             <>
-              <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-2">
+              <span
+                className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-cream-2 sm:h-14 sm:w-14 sm:rounded-xl"
+              >
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
                   alt={it.name}
@@ -2066,17 +2291,19 @@ function StepStallMenu({
                     card prints it — not floating out in the row. */}
                 <span
                   aria-hidden="true"
-                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
+                  className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border-[1.5px] bg-white sm:left-1 sm:top-1 sm:h-4 sm:w-4 sm:rounded-[4px]"
                   style={{ borderColor: mark }}
                 >
                   <span
-                    className="block h-2 w-2 rounded-full"
+                    className="block h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2"
                     style={{ backgroundColor: mark }}
                   />
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-ink">
+                <span
+                  className="block truncate text-sm font-semibold text-ink"
+                >
                   <span className="sr-only">
                     {it.diet === "veg"
                       ? t("Veg", "शाकाहारी")
@@ -2126,23 +2353,102 @@ function StepStallMenu({
             </>
           );
           const rowClass =
-            "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
+            "w-full items-center gap-2.5 rounded-xl border px-2 py-1.5 text-left transition sm:gap-3 sm:rounded-2xl sm:p-3 " +
             (active
               ? "border-maroon/40 bg-cream/35 shadow-soft"
               : "border-cream-3 bg-white" + (course.fixed ? "" : " hover:bg-cream/25"));
+          // Phones: a photo-led card (Swiggy/Zomato style) carrying the same
+          // facts and the same control as the row — status pill on a set menu,
+          // price + Add on a varied course. No new per-dish choices.
+          const card = (
+            <>
+              <span className="relative block h-full min-h-0 w-full overflow-hidden rounded-lg bg-cream-2">
+                <Image
+                  src={it.photo || dummyDishPhoto(it.id)}
+                  alt={it.name}
+                  fill
+                  sizes="50vw"
+                  className="object-cover"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
+                  style={{ borderColor: mark }}
+                >
+                  <span
+                    className="block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: mark }}
+                  />
+                </span>
+              </span>
+              <span
+                className={
+                  "flex min-h-0 flex-col justify-center px-1 " +
+                  (course.fixed ? "py-1" : "pt-0.5")
+                }
+              >
+                <span className="block truncate text-[13px] font-bold leading-tight text-ink">
+                  {it.name}
+                </span>
+                {/* Set menus need no per-dish status — the bar above says it
+                    all, and the card tint shows once the course is added. */}
+                {!course.fixed && (
+                  <span className="mt-0.5 flex items-center justify-between gap-1">
+                    <span className="min-w-0 truncate text-[11px] text-ink-soft">
+                      <span className="font-semibold text-ink">{money(price)}</span>
+                      /{t("plate", "प्लेट")}
+                    </span>
+                    <span
+                      className={
+                        "shrink-0 rounded-full border px-2 py-px text-[10px] font-semibold " +
+                        (active
+                          ? "border-maroon/40 bg-cream text-maroon"
+                          : "border-cream-3 text-ink-soft")
+                      }
+                    >
+                      {active ? t("Added", "जोड़ा") : t("Add", "जोड़ें")}
+                    </span>
+                  </span>
+                )}
+              </span>
+            </>
+          );
+          // Fixed height, split 70% photo / 30% name + status. A set-menu card
+          // keeps the same photo and just loses the status line, so it's shorter.
+          const cardClass =
+            "grid w-full rounded-xl border p-1 text-left transition " +
+            (course.fixed
+              ? "h-[7.75rem] grid-rows-[1fr_auto] "
+              : "h-[8.75rem] grid-rows-[7fr_3fr] ") +
+            (active
+              ? "border-maroon/40 bg-cream/35 shadow-soft"
+              : "border-cream-3 bg-white");
           return (
             <li key={it.id}>
               {course.fixed ? (
-                <div className={rowClass}>{body}</div>
+                <>
+                  <div className={cardClass + " sm:hidden"}>{card}</div>
+                  <div className={rowClass + " hidden sm:flex"}>{body}</div>
+                </>
               ) : (
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleItem(course.id, it.id)}
-                  className={rowClass}
-                >
-                  {body}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleItem(course.id, it.id)}
+                    className={cardClass + " sm:hidden"}
+                  >
+                    {card}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleItem(course.id, it.id)}
+                    className={rowClass + " hidden sm:flex"}
+                  >
+                    {body}
+                  </button>
+                </>
               )}
             </li>
           );
@@ -2150,7 +2456,7 @@ function StepStallMenu({
       </ul>
 
       {/* Running per-plate — the number a Single Stall guest actually shops on. */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3">
+      <div className="mt-6 hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3 sm:flex">
         <span className="text-sm text-ink-soft">
           {inr.format(pickedCount)}{" "}
           {stall.allFixed
@@ -2190,6 +2496,9 @@ function StepStallMenu({
  * above it and the optional service package below.
  */
 function StepStallDetails({
+  part,
+  onSkip,
+  skipDisabled,
   t,
   lang,
   guests,
@@ -2201,8 +2510,14 @@ function StepStallDetails({
   serviceId,
   setServiceId,
   counterVendors,
+  vendorsForCounter,
   nonVegGuests,
 }: {
+  /** Which step this is: the extras list (2) or the service package (3). */
+  part: "extras" | "essentials";
+  /** Extras are optional — move on without adding any. */
+  onSkip: () => void;
+  skipDisabled: boolean;
   t: (en: string, hi: string) => string;
   lang: Lang;
   guests: number;
@@ -2217,6 +2532,8 @@ function StepStallDetails({
   setServiceId: (v: string) => void;
   /** Catalogue vendors already narrowed to kitchens that fit the plate. */
   counterVendors: VendorListing[];
+  /** …and, per counter, to the ones who actually run it. */
+  vendorsForCounter: (addOnId: string) => VendorListing[];
   nonVegGuests: NonVegCount;
 }) {
   return (
@@ -2228,7 +2545,12 @@ function StepStallDetails({
           The tiered wizard's own extras step, verbatim. Single Stall opens the
           whole catalogue (no tier narrowing) and holds one vendor per counter,
           so the multi-vendor toggle is off and the id list is a single pick. */}
+      {part === "extras" && (
       <StepExtras
+        pageSize={5}
+        compact
+        onSkip={onSkip}
+        skipDisabled={skipDisabled}
         lang={lang}
         t={t}
         guests={guests}
@@ -2237,6 +2559,7 @@ function StepStallDetails({
         packageName={t("Single Stall", "सिंगल स्टॉल")}
         multiVendor={false}
         eligibleVendors={counterVendors}
+        eligibleVendorsFor={vendorsForCounter}
         vendorIdsFor={(id) => [addOnVendorId(id)].filter(Boolean)}
         onVendorToggle={(addOnId, vendorId) =>
           setAddOnVendor((m) => ({ ...m, [addOnId]: vendorId }))
@@ -2244,6 +2567,7 @@ function StepStallDetails({
         fullFilter
         nonVegGuests={nonVegGuests}
       />
+      )}
 
 
       {/* Service package — the same tiered Essentials comparison the feast
@@ -2252,9 +2576,14 @@ function StepStallDetails({
           list). Optional here, unlike the tiered feast flow where a
           full-service crew is part of the package promise — hence the skip
           control, and re-tapping the chosen tier also clears it. */}
-      {services.length > 0 && (
+      {part === "essentials" && services.length === 0 && (
+        <p className="text-sm text-ink-soft">
+          {t("No service needed", "कोई सर्विस नहीं चाहिए")}
+        </p>
+      )}
+      {part === "essentials" && services.length > 0 && (
         <>
-          <h3 className="mt-9 text-lg font-semibold text-ink">
+          <h3 className="text-lg font-semibold text-ink">
             {t("Serving & essentials", "सर्विस और ज़रूरी सामान")}
             <span className="ml-2 text-sm font-normal text-ink-soft">
               {t("optional", "वैकल्पिक")}
@@ -2372,6 +2701,7 @@ function StepStallConfirm({
   onEditExtras,
   brandsHref,
   whatsappHref,
+  blocker,
 }: {
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
@@ -2430,6 +2760,8 @@ function StepStallConfirm({
   /** The Brands page — where a different stall is chosen. */
   brandsHref: string;
   whatsappHref: string;
+  /** An earlier step's rule the Review-time edits broke — blocks payment. */
+  blocker: string;
 }) {
   return (
     // A form, like the tiered wizard's review: the shared checkout panel's
@@ -2616,6 +2948,7 @@ function StepStallConfirm({
         confirming={confirming}
         confirmError={confirmError}
         whatsappHref={whatsappHref}
+        blocker={blocker}
       />
 
       <div className="mt-6">

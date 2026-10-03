@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { upiTxnRef } from "@/lib/upi";
-import { receivedPayments } from "@/lib/bookingPaymentSync";
+import { bookingOwner, receivedPayments } from "@/lib/bookingPaymentSync";
 import {
   createRazorpayOrder,
   isRazorpayConfigured,
@@ -53,6 +53,23 @@ export async function POST(request: Request) {
   const amt = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(amt) || amt <= 0 || amt > MAX_AMOUNT) {
     return Response.json({ error: "Invalid amount." }, { status: 400 });
+  }
+
+  // Someone else's booking — never charge against it, and never report its
+  // payments as this customer's ("already paid" would confirm a free booking).
+  try {
+    const owner = await bookingOwner(bookingId);
+    if (owner && owner !== guard.id) {
+      return Response.json(
+        {
+          error:
+            "This booking reference is already in use. Please refresh the page and try again.",
+        },
+        { status: 409 },
+      );
+    }
+  } catch (err) {
+    console.error("Failed to check booking owner before order", err);
   }
 
   // Double-charge guard: when the ledger already holds enough received money

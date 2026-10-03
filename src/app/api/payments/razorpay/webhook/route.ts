@@ -1,16 +1,86 @@
-import { verifyWebhookSignature } from "@/lib/razorpay";
-import { recordRazorpayPayment } from "@/lib/razorpayPayments";
+import { createHash } from "crypto";
+import { fetchRazorpayOrder, verifyWebhookSignature } from "@/lib/razorpay";
+import {
+  applyRazorpayRefund,
+  recordFailedRazorpayPayment,
+  recordRazorpayPayment,
+} from "@/lib/razorpayPayments";
+import {
+  logPaymentEvent,
+  summarize,
+  wasWebhookProcessed,
+} from "@/lib/paymentEvents";
 
 // Signature-verified server-to-server events — never prerender or cache.
 export const dynamic = "force-dynamic";
 
-// Razorpay webhook — the safety net behind the checkout verify route. If the
-// customer pays but their tab dies before /verify lands, `payment.captured`
-// still records the advance here. Idempotent on the order id, so the same
-// event delivered twice (or after verify already recorded it) is a no-op.
+// Razorpay webhook — the safety net behind the checkout verify route, and the
+// only source for failures and refund completions. Handled events:
+//
+//   payment.captured / order.paid → record the advance (if the customer's tab
+//                                   died before /verify landed)
+//   payment.failed                → record a "Failed" attempt for the admin
+//   refund.processed              → mark the ledger row Refunded and settle
+//                                   the matching refund request
+//
+// Anything else is acknowledged so Razorpay stops retrying. Idempotent twice
+// over: each event id is remembered in payment_events (a redelivery returns
+// early), and every handler is itself idempotent on Razorpay ids.
 //
 // Auth is the webhook signature, not a session: the raw body is HMAC'd with
 // RAZORPAY_WEBHOOK_SECRET (set both on the dashboard webhook and in the env).
+// All four events must be ticked on the dashboard webhook to arrive here.
+
+interface PaymentEntity {
+  id?: string;
+  order_id?: string;
+  amount?: number;
+  amount_refunded?: number;
+  status?: string;
+  notes?: Record<string, string> | unknown[];
+  error_description?: string;
+  error_reason?: string;
+}
+
+interface RefundEntity {
+  id?: string;
+  payment_id?: string;
+  amount?: number;
+  status?: string;
+}
+
+interface WebhookEvent {
+  event?: string;
+  payload?: {
+    payment?: { entity?: PaymentEntity };
+    refund?: { entity?: RefundEntity };
+  };
+}
+
+const BOOKING_REF = /^BHJ-/;
+
+// Razorpay sends `notes` as [] when empty — normalise to a plain object.
+function notesOf(p: PaymentEntity | undefined): Record<string, string> {
+  return p?.notes && !Array.isArray(p.notes)
+    ? (p.notes as Record<string, string>)
+    : {};
+}
+
+/** The booking ref travels on the checkout/order notes. Payment notes carry
+ *  it in practice; fall back to the order's own notes when they don't. */
+async function bookingRefFor(p: PaymentEntity): Promise<string> {
+  const fromPayment = notesOf(p).bookingId ?? "";
+  if (BOOKING_REF.test(fromPayment)) return fromPayment;
+  if (!p.order_id) return "";
+  try {
+    const order = await fetchRazorpayOrder(p.order_id);
+    const fromOrder = order.notes?.bookingId ?? "";
+    return BOOKING_REF.test(fromOrder) ? fromOrder : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function POST(request: Request) {
   // Signature is computed over the exact raw bytes — read text, parse after.
   const rawBody = await request.text();
@@ -20,58 +90,117 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid signature." }, { status: 401 });
   }
 
-  let event: {
-    event?: string;
-    payload?: {
-      payment?: {
-        entity?: {
-          id?: string;
-          order_id?: string;
-          amount?: number;
-          notes?: Record<string, string>;
-        };
-      };
-    };
-  };
+  let event: WebhookEvent;
   try {
-    event = JSON.parse(rawBody) as typeof event;
+    event = JSON.parse(rawBody) as WebhookEvent;
   } catch {
     return Response.json({ error: "Invalid payload." }, { status: 400 });
   }
 
-  // Only captured payments move money; everything else (failed, authorized,
-  // refund events, …) is acknowledged so Razorpay stops retrying.
-  if (event.event !== "payment.captured") {
-    return Response.json({ ok: true, skipped: event.event ?? "unknown" });
+  // Razorpay's unique id per event (same across redeliveries). Fall back to a
+  // body hash so even a header-less delivery dedupes.
+  const eventId =
+    request.headers.get("x-razorpay-event-id") ||
+    createHash("sha256").update(rawBody).digest("hex").slice(0, 32);
+  const name = event.event ?? "unknown";
+
+  if (await wasWebhookProcessed(eventId)) {
+    console.info(`[razorpay] webhook ${name} (${eventId}) → duplicate, ignored`);
+    return Response.json({ ok: true, duplicate: true });
   }
 
   const payment = event.payload?.payment?.entity;
-  const bookingId = payment?.notes?.bookingId ?? "";
-  if (
-    !payment?.id ||
-    !payment.order_id ||
-    !Number.isFinite(payment.amount) ||
-    !/^BHJ-/.test(bookingId)
-  ) {
-    // A capture we can't tie to a booking — acknowledge (retries won't fix it)
-    // but leave a trace for reconciliation.
-    console.error("Razorpay capture without a usable booking ref", payment?.id);
-    return Response.json({ ok: true, skipped: "no-booking-ref" });
-  }
+  const refund = event.payload?.refund?.entity;
+  const log = (outcome: string, bookingId?: string) =>
+    logPaymentEvent({
+      id: `EVT-${eventId}`,
+      kind: "webhook",
+      createdAt: new Date().toISOString(),
+      event: name,
+      eventId,
+      outcome,
+      ...(bookingId ? { bookingId } : {}),
+      summary: summarize(refund ?? payment),
+    });
 
   try {
-    await recordRazorpayPayment({
-      bookingId,
-      amountRupees: (payment.amount as number) / 100,
-      orderId: payment.order_id,
-      paymentId: payment.id,
-      customer: payment.notes?.customer,
-    });
+    switch (name) {
+      case "payment.captured":
+      case "order.paid": {
+        if (!payment?.id || !payment.order_id || !Number.isFinite(payment.amount)) {
+          await log("skipped:no-payment-entity");
+          return Response.json({ ok: true, skipped: "no-payment-entity" });
+        }
+        const bookingId = await bookingRefFor(payment);
+        if (!bookingId) {
+          // A capture we can't tie to a booking — acknowledge (retries won't
+          // fix it) but leave a trace for reconciliation.
+          await log("skipped:no-booking-ref");
+          return Response.json({ ok: true, skipped: "no-booking-ref" });
+        }
+        await recordRazorpayPayment({
+          bookingId,
+          amountRupees: (payment.amount as number) / 100,
+          orderId: payment.order_id,
+          paymentId: payment.id,
+          customer: notesOf(payment).customer,
+        });
+        await log("recorded", bookingId);
+        return Response.json({ ok: true });
+      }
+
+      case "payment.failed": {
+        if (!payment?.id || !payment.order_id) {
+          await log("skipped:no-payment-entity");
+          return Response.json({ ok: true, skipped: "no-payment-entity" });
+        }
+        const bookingId = await bookingRefFor(payment);
+        if (!bookingId) {
+          await log("skipped:no-booking-ref");
+          return Response.json({ ok: true, skipped: "no-booking-ref" });
+        }
+        await recordFailedRazorpayPayment({
+          bookingId,
+          amountRupees: (payment.amount ?? 0) / 100,
+          orderId: payment.order_id,
+          paymentId: payment.id,
+          customer: notesOf(payment).customer,
+          reason: payment.error_description ?? payment.error_reason,
+        });
+        await log("recorded-failed", bookingId);
+        return Response.json({ ok: true });
+      }
+
+      case "refund.processed": {
+        if (!refund?.id || !refund.payment_id || !Number.isFinite(refund.amount)) {
+          await log("skipped:no-refund-entity");
+          return Response.json({ ok: true, skipped: "no-refund-entity" });
+        }
+        const applied = await applyRazorpayRefund({
+          refundId: refund.id,
+          paymentId: refund.payment_id,
+          refundAmountPaise: refund.amount as number,
+          totalRefundedPaise: Number.isFinite(payment?.amount_refunded)
+            ? payment?.amount_refunded
+            : undefined,
+        });
+        if (!applied) {
+          await log("skipped:no-ledger-row");
+          return Response.json({ ok: true, skipped: "no-ledger-row" });
+        }
+        await log("refund-applied", applied.bookingId);
+        return Response.json({ ok: true });
+      }
+
+      default:
+        await log(`skipped:${name}`);
+        return Response.json({ ok: true, skipped: name });
+    }
   } catch (err) {
-    // Storage failed — return 5xx so Razorpay redelivers the event.
-    console.error("Failed to record webhook payment", err);
+    // Storage failed — return 5xx so Razorpay redelivers the event. The
+    // "error" outcome doesn't count as processed, so the retry runs fully.
+    console.error(`Failed to handle Razorpay webhook ${name}`, err);
+    await log("error");
     return Response.json({ error: "Storage failed." }, { status: 500 });
   }
-
-  return Response.json({ ok: true });
 }

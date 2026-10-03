@@ -228,6 +228,10 @@ export interface SingleStallConfig {
   equipment?: string[];
   /** Cutlery setup / tier for the stall (e.g. "Biodegradable Bagasse", "Melamine", "Standard Chinaware"). */
   cutlery?: string;
+  /** Per-stall dish lists keyed by stall category (V2 handover: every stall —
+   *  predefined or custom — keeps its own dishes). Categories that are also
+   *  platform menu categories are mirrored into `menu[]` for the booking flow. */
+  menus?: Record<string, VendorMenuItem[]>;
 }
 
 /** Packaging presentation styles for Baina gift boxes. */

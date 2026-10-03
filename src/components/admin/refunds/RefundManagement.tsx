@@ -17,7 +17,7 @@ import StatusBadge from "@/components/admin/shared/StatusBadge";
 import Pagination from "@/components/admin/shared/Pagination";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import Modal from "@/components/admin/shared/Modal";
-import { Field } from "@/components/admin/shared/FormControls";
+import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Refund, Wallet, ShieldCheck } from "@/components/admin/shared/icons";
 import { Button } from "@/components/ui";
@@ -44,6 +44,7 @@ export default function RefundManagement() {
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [raiseOpen, setRaiseOpen] = useState(false);
 
   // Pull the real, persisted refund requests and surface them ahead of the demo
   // seed so genuine customer requests show up first. Same live-merge pattern the
@@ -192,7 +193,12 @@ export default function RefundManagement() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Refunds"
-        subtitle="Review, approve and process customer refund requests."
+        subtitle="Review, approve and process customer refund requests, or raise one for any paid booking."
+        actions={
+          <Button type="button" variant="primary" onClick={() => setRaiseOpen(true)}>
+            Raise Refund
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -233,6 +239,18 @@ export default function RefundManagement() {
           {toast}
         </p>
       )}
+
+      <RaiseRefundModal
+        open={raiseOpen}
+        onClose={() => setRaiseOpen(false)}
+        onCreated={(refund) => {
+          setRows((prev) => [refund, ...prev.filter((r) => r.id !== refund.id)]);
+          setLiveIds((prev) => new Set(prev).add(refund.id));
+          setRaiseOpen(false);
+          setSelectedId(refund.id);
+          setToast(`Refund ${refund.id} raised and approved. Click Process Refund to pay it out.`);
+        }}
+      />
 
       <Modal
         open={!!selected}
@@ -286,5 +304,143 @@ export default function RefundManagement() {
         )}
       </Modal>
     </div>
+  );
+}
+
+/* ── Raise refund ────────────────────────────────────────────────────────── */
+
+/**
+ * Admin-initiated refund, full or partial. Posts to the same endpoint
+ * customers use; the server derives the customer and caps the amount at what
+ * the booking actually paid. The new refund starts Approved, so the admin's
+ * next step is Process Refund — which executes the Razorpay refund for
+ * gateway-paid bookings.
+ */
+function RaiseRefundModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (refund: AdminRefund) => void;
+}) {
+  const [bookingId, setBookingId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const reset = () => {
+    setBookingId("");
+    setAmount("");
+    setReason("");
+    setError("");
+  };
+
+  const close = () => {
+    if (submitting) return;
+    reset();
+    onClose();
+  };
+
+  const submit = async () => {
+    const id = bookingId.trim().toUpperCase();
+    if (!/^BHJ-/.test(id)) {
+      setError("Enter the booking ID, for example BHJ-…");
+      return;
+    }
+    const amt = amount.trim() ? Number(amount) : undefined;
+    if (amt !== undefined && (!Number.isFinite(amt) || amt <= 0)) {
+      setError("Enter a refund amount above zero, or leave it blank for the full paid amount.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("Add a reason for the refund.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/refunds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: id, amount: amt, reason: reason.trim() }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { refund?: AdminRefund; error?: string }
+        | null;
+      if (!res.ok || !data?.refund) {
+        setError(data?.error ?? "Couldn't raise the refund. Please try again.");
+        return;
+      }
+      reset();
+      onCreated(data.refund);
+    } catch {
+      setError("Couldn't raise the refund. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title="Raise Refund"
+      footer={
+        <>
+          <Button variant="primary" onClick={submit} loading={submitting} disabled={submitting}>
+            Raise Refund
+          </Button>
+          <Button variant="secondary" onClick={close} disabled={submitting}>
+            Cancel
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Booking ID" required htmlFor="raise-refund-booking">
+          <input
+            id="raise-refund-booking"
+            className={inputClass}
+            value={bookingId}
+            onChange={(e) => setBookingId(e.target.value)}
+            placeholder="BHJ-…"
+            autoComplete="off"
+          />
+        </Field>
+        <Field
+          label="Amount (₹)"
+          hint="Leave blank to refund the full paid amount. Anything above what was paid is capped."
+          htmlFor="raise-refund-amount"
+        >
+          <input
+            id="raise-refund-amount"
+            className={inputClass}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ""))}
+            inputMode="numeric"
+            placeholder="Full paid amount"
+          />
+        </Field>
+        <Field label="Reason" required htmlFor="raise-refund-reason">
+          <textarea
+            id="raise-refund-reason"
+            className={inputClass + " min-h-24"}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={1000}
+            placeholder="Why is this booking being refunded?"
+          />
+        </Field>
+        {error && (
+          <p role="alert" className="text-sm font-medium text-maroon">
+            {error}
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }

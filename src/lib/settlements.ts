@@ -92,11 +92,9 @@ export function periodKeyOfId(id: string): string {
  * Derive the current settlement rows from the persisted bookings and merge the
  * persisted Settled statuses on top. Newest period first, then vendor A→Z.
  */
-export async function deriveSettlements(): Promise<VendorSettlement[]> {
-  const orders = await bookingStore.list();
-
-  // Money already returned to customers, per booking — a processed refund comes
-  // out of what we'd otherwise owe the vendor.
+/** Money already returned to customers, per booking — a processed refund
+ *  comes out of what we'd otherwise owe the vendor. */
+async function processedRefundsByBooking(): Promise<Map<string, number>> {
   const refundedByBooking = new Map<string, number>();
   try {
     for (const r of await refundStore.list()) {
@@ -109,6 +107,45 @@ export async function deriveSettlements(): Promise<VendorSettlement[]> {
   } catch {
     // No refunds table / transient failure — derive without the deduction.
   }
+  return refundedByBooking;
+}
+
+/** Ids of settlement rows an admin has marked Settled. Before the
+ *  `settlements` table exists, nothing is settled. */
+async function settledSettlementIds(): Promise<Set<string>> {
+  const settledIds = new Set<string>();
+  try {
+    for (const s of await settlementStore.list()) settledIds.add(s.id);
+  } catch {
+    // Table missing / transient failure — show all rows as Pending.
+  }
+  return settledIds;
+}
+
+/**
+ * What Bhojpatra still owes a vendor across the given bookings, by the same
+ * rules as `deriveSettlements`: Completed bookings' collected money minus
+ * processed refunds, excluding months an admin has already marked Settled.
+ */
+export async function pendingPayoutFor(orders: StoredOrder[]): Promise<number> {
+  const [refunded, settledIds] = await Promise.all([
+    processedRefundsByBooking(),
+    settledSettlementIds(),
+  ]);
+  let total = 0;
+  for (const order of orders) {
+    if (order.status !== "Completed" || !order.vendor) continue;
+    const period = periodOf(order);
+    if (!period || settledIds.has(settlementId(order.vendor, period.key))) continue;
+    const net = (Number(order.paid) || 0) - (refunded.get(order.id) ?? 0);
+    if (net > 0) total += net;
+  }
+  return total;
+}
+
+export async function deriveSettlements(): Promise<VendorSettlement[]> {
+  const orders = await bookingStore.list();
+  const refundedByBooking = await processedRefundsByBooking();
 
   const groups = new Map<
     string,
@@ -137,14 +174,8 @@ export async function deriveSettlements(): Promise<VendorSettlement[]> {
     groups.set(id, group);
   }
 
-  // Persisted Settled rows re-attach by id. Before the `settlements` table has
-  // been created in the database, everything simply reads as Pending.
-  const settledIds = new Set<string>();
-  try {
-    for (const s of await settlementStore.list()) settledIds.add(s.id);
-  } catch {
-    // Table missing / transient failure — show all rows as Pending.
-  }
+  // Persisted Settled rows re-attach by id.
+  const settledIds = await settledSettlementIds();
 
   return [...groups.values()]
     .sort((a, b) =>

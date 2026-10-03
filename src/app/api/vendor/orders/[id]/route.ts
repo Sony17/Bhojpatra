@@ -13,7 +13,8 @@ const bookingStore = createStore<StoredOrder>({
 
 /**
  * PATCH /api/vendor/orders/[id]
- * Supports vendor actions: acknowledge, accept, decline.
+ * Vendor actions: accept (alias acknowledge) and decline. Records the vendor's
+ * response only — never changes the booking's payment-driven `status`.
  * Strict cross-vendor authorization prevents modifying another vendor's booking.
  */
 export async function PATCH(
@@ -51,49 +52,42 @@ export async function PATCH(
 
     const now = new Date().toISOString();
     const next: StoredOrder = { ...order };
-
     const action = typeof body.action === "string" ? body.action.trim().toLowerCase() : "";
-    const requestedStatus = typeof body.status === "string" ? body.status.trim() : "";
 
-    if (action === "accept" || requestedStatus === "Confirmed") {
-      if (order.status !== "Pending") {
+    // Accept / decline are recorded as the vendor's response; `status` is left
+    // alone because Pending vs Confirmed tracks payment (balance due vs paid).
+    const open = order.status === "Pending" || order.status === "Confirmed";
+    if (action === "accept" || action === "acknowledge") {
+      if (!open || order.vendorDeclined) {
         return Response.json(
-          { error: `Cannot accept a booking that is currently ${order.status}.` },
-          { status: 409 },
-        );
-      }
-      next.status = "Confirmed";
-      next.vendorAcknowledged = true;
-      next.acknowledgedAt = now;
-    } else if (action === "decline" || requestedStatus === "Cancelled") {
-      if (order.status !== "Pending") {
-        return Response.json(
-          { error: `Cannot decline a booking that is currently ${order.status}.` },
-          { status: 409 },
-        );
-      }
-      next.status = "Cancelled";
-      if (typeof body.reason === "string" && body.reason.trim()) {
-        next.vendorNotes = body.reason.trim().slice(0, 500);
-      }
-    } else if (action === "acknowledge") {
-      if (order.status !== "Pending" && order.status !== "Confirmed") {
-        return Response.json(
-          { error: `Cannot acknowledge an order with status ${order.status}.` },
+          { error: `This booking can no longer be accepted.` },
           { status: 409 },
         );
       }
       next.vendorAcknowledged = true;
-      next.acknowledgedAt = now;
+      next.acknowledgedAt = order.acknowledgedAt ?? now;
       if (typeof body.notes === "string" && body.notes.trim()) {
         next.vendorNotes = body.notes.trim().slice(0, 500);
       }
+    } else if (action === "decline") {
+      if (!open || order.vendorAcknowledged || order.vendorDeclined) {
+        return Response.json(
+          {
+            error: order.vendorAcknowledged
+              ? "You've already accepted this booking — contact Bhojpatra support to cancel."
+              : "This booking can no longer be declined.",
+          },
+          { status: 409 },
+        );
+      }
+      next.vendorDeclined = true;
+      next.declinedAt = now;
+      if (typeof body.reason === "string" && body.reason.trim()) {
+        next.vendorNotes = body.reason.trim().slice(0, 500);
+      }
     } else {
       return Response.json(
-        {
-          error:
-            "Invalid action. Supported actions are: 'acknowledge', 'accept', 'decline'.",
-        },
+        { error: "Invalid action. Supported actions are: 'accept', 'decline'." },
         { status: 400 },
       );
     }

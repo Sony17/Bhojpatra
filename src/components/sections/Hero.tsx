@@ -127,15 +127,18 @@ export default function Hero() {
   bookParams.set("guests", guests);
   const bookHref = `/book?${bookParams.toString()}`;
 
-  // Browse path — same location, straight into the Single Stall brands
-  // (Zomato-style discover → convert). The category chip stays clearable, so a
-  // visitor can widen back out to the full catalog from there.
-  const cityDisplayName = isOtherCity
-    ? customCity.trim()
-    : (locations.find((l) => l.id === cityId)?.name ?? "");
-  const vendorsParams = new URLSearchParams({ category: "single-stall" });
-  if (cityDisplayName) vendorsParams.set("city", cityDisplayName);
-  const vendorsHref = `/vendors?${vendorsParams.toString()}`;
+  // Browse path — the Single Stall funnel's own front door: pick the KIND of
+  // stall first (an image grid), then the caterer who runs it on the Brands
+  // page, then that stall's menu. Carries the same event context the booking
+  // bar collected, so nothing is asked twice further down.
+  const stallParams = new URLSearchParams({ city: cityId });
+  if (isOtherCity && customCity.trim()) stallParams.set("loc", customCity.trim());
+  if (occasionId) stallParams.set("occasion", occasionId);
+  if (isOtherOccasion && customOccasion.trim())
+    stallParams.set("occName", customOccasion.trim());
+  if (date) stallParams.set("date", toYmd(date));
+  stallParams.set("guests", guests);
+  const vendorsHref = `/book/stall?${stallParams.toString()}`;
 
   const ctaLabel = lang === "hi" ? hero.ctaHi : hero.cta;
   const browseLabel = t("Explore stalls", "स्टॉल देखें");

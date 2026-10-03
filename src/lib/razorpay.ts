@@ -10,6 +10,7 @@
 // the manual UPI flow.
 
 import { createHmac, timingSafeEqual } from "crypto";
+import { logPaymentEvent, newApiEventId, summarize } from "@/lib/paymentEvents";
 
 const API_BASE = "https://api.razorpay.com/v1";
 
@@ -44,6 +45,7 @@ export interface RazorpayOrder {
   currency: string;
   receipt?: string;
   status: string;
+  notes?: Record<string, string>;
 }
 
 export interface RazorpayPayment {
@@ -54,23 +56,64 @@ export interface RazorpayPayment {
   currency: string;
   status: string;
   method?: string;
+  /** Paise refunded so far (cumulative across partial refunds). */
+  amount_refunded?: number;
+  notes?: Record<string, string>;
 }
 
+// Every call is logged (server log + payment_events table) with its status,
+// duration and a PII-free summary of the response — success and failure alike.
 async function razorpayRequest<T>(
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: init?.method ?? "GET",
-    headers: {
-      Authorization: authHeader(),
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(init?.body ? { body: JSON.stringify(init.body) } : {}),
-  });
+  const method = init?.method ?? "GET";
+  const started = Date.now();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        Authorization: authHeader(),
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(init?.body ? { body: JSON.stringify(init.body) } : {}),
+      // A hung gateway must not hang checkout — fail after 20s.
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    // Network failure or timeout — no HTTP response at all.
+    await logPaymentEvent({
+      id: newApiEventId(),
+      kind: "api",
+      createdAt: new Date().toISOString(),
+      method,
+      path,
+      durationMs: Date.now() - started,
+      ok: false,
+      summary: {
+        error_description:
+          err instanceof Error ? `${err.name}: ${err.message}` : "network error",
+      },
+    });
+    throw new Error("Couldn't reach Razorpay. Please try again.");
+  }
+
   const data = (await res.json().catch(() => null)) as
     | (T & { error?: { description?: string } })
     | null;
+  await logPaymentEvent({
+    id: newApiEventId(),
+    kind: "api",
+    createdAt: new Date().toISOString(),
+    method,
+    path,
+    httpStatus: res.status,
+    durationMs: Date.now() - started,
+    ok: res.ok && Boolean(data),
+    summary: summarize(data),
+  });
+
   if (!res.ok || !data) {
     const description =
       data?.error?.description ?? `Razorpay request failed (${res.status})`;
@@ -138,6 +181,16 @@ export async function fetchRazorpayPayment(
 ): Promise<RazorpayPayment> {
   return razorpayRequest<RazorpayPayment>(
     `/payments/${encodeURIComponent(paymentId)}`,
+  );
+}
+
+/** Fetch an order — used to recover the booking ref from the order's notes
+ *  when a webhook's payment entity doesn't carry it. */
+export async function fetchRazorpayOrder(
+  orderId: string,
+): Promise<RazorpayOrder> {
+  return razorpayRequest<RazorpayOrder>(
+    `/orders/${encodeURIComponent(orderId)}`,
   );
 }
 

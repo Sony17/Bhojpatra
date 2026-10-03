@@ -42,6 +42,8 @@ export interface StoredRefund {
   processedAt?: string;
   /** Optional note the admin left when actioning it. */
   adminNote?: string;
+  /** Who opened it — absent on older rows, which were all customer-raised. */
+  raisedBy?: "customer" | "admin";
   /** Razorpay refund id (`rfnd_…`) when Processing executed a real gateway
    *  refund; absent for refunds settled manually outside the gateway. */
   gatewayRefundId?: string;

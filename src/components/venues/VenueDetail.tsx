@@ -55,6 +55,8 @@ import {
 } from "@/components/ui";
 import { controlClass } from "@/components/ui/Input";
 import { money } from "@/lib/money";
+import { bookingRef } from "@/lib/bookingPricing";
+import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
 
 /** How a guest asked to be followed up on — mirrors the leads API's whitelist. */
 type VenueEnquiryTopic = "Chat" | "Call" | "Site visit";
@@ -71,10 +73,12 @@ function formatEventDate(dateStr: string): string {
   return `${String(d).padStart(2, "0")} ${MONTHS[m - 1]} ${y}`;
 }
 
-/** Deterministic BHJ- booking id from the venue + date + guests + the spaces
- *  booked (no random). The spaces are part of the seed so booking the hall and
- *  then the lawn for the same date lands as two orders, not one overwrite. */
+/** BHJ- booking id from this browser's booking salt + the venue, date, guests
+ *  and spaces booked. The spaces are part of the seed so booking the hall and
+ *  then the lawn for the same date lands as two orders, not one overwrite; the
+ *  salt keeps two customers booking the same thing from sharing an id. */
 function venueBookingId(
+  salt: string,
   venueId: string,
   eventDate: string,
   guests: number,
@@ -82,9 +86,7 @@ function venueBookingId(
   roomCount: number,
 ): string {
   const seed = `${venueId}|${eventDate}|${guests}|${[...spaceIds].sort().join(",")}|${roomCount}`;
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return `BHJ-${((h % 90000) + 10000).toString()}`;
+  return bookingRef(salt, seed);
 }
 
 /** Local calendar date → `YYYY-MM-DD` (never UTC — `toISOString` shifts days). */
@@ -275,9 +277,11 @@ function VenueBooking({
   const shownRating = stat?.rating ?? venue.rating;
   const shownCount = stat?.count ?? venue.reviews;
 
+  const [bookingSalt] = useState(getBookingSalt);
   const bookingId = useMemo(
-    () => venueBookingId(venue.id, eventDate, guests, pickedIds, roomCount),
-    [venue.id, eventDate, guests, pickedIds, roomCount],
+    () =>
+      venueBookingId(bookingSalt, venue.id, eventDate, guests, pickedIds, roomCount),
+    [bookingSalt, venue.id, eventDate, guests, pickedIds, roomCount],
   );
 
   const cityLabel = venueCityName(venue.city);
@@ -480,6 +484,7 @@ function VenueBooking({
 
     setConfirming(false);
     setStep("done");
+    rotateBookingSalt();
   };
 
   /** Name + phone are what every path here needs — paying, and equally the

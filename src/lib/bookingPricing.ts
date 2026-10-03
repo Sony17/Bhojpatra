@@ -117,15 +117,50 @@ export function computeOrderTotals({
   };
 }
 
-/** Deterministic booking id derived from the order itself (no random / clock),
- *  so re-rendering the confirm step never renumbers a booking mid-flow. */
+/** A fresh random salt for one booking session — create it ONCE per visit
+ *  (lazy `useState`) and pass it to `bookingRef`. It is what keeps two
+ *  customers placing an identical order from landing on the same booking id
+ *  (which used to merge their bookings and let the second one ride on the
+ *  first one's payment). */
+export function newBookingSalt(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** cyrb53 — a fast 53-bit string hash (plenty of room against collisions). */
+function hash53(str: string): number {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
+/** Booking reference (`BHJ-` + 10 base-36 chars) derived from the session
+ *  salt plus the order's content. Stable for the same order within one visit,
+ *  so a double-tap or retry upserts the same record instead of duplicating it,
+ *  and a changed order gets a new id — but unique across customers/visits. */
+export function bookingRef(salt: string, seed: string, prefix = "BHJ-"): string {
+  return (
+    prefix +
+    hash53(`${salt}|${seed}`).toString(36).toUpperCase().padStart(10, "0").slice(-10)
+  );
+}
+
+/** Wizard booking id: the session salt + the order's shape. */
 export function deriveBookingId(
+  salt: string,
   guests: number,
   grandTotal: number,
   itemCount: number,
 ): string {
-  return `BHJ-${(
-    ((guests * 7 + Math.round(grandTotal) + itemCount * 13) % 90000) +
-    10000
-  ).toString()}`;
+  return bookingRef(salt, `${guests}|${Math.round(grandTotal)}|${itemCount}`);
 }
