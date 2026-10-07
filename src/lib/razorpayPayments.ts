@@ -21,6 +21,8 @@ export async function recordRazorpayPayment(opts: {
   amountRupees: number;
   orderId: string;
   paymentId: string;
+  /** The payer's account, from the order's server-set notes. */
+  userId?: string;
   customer?: string;
 }): Promise<StoredPayment> {
   const payments = await store.list();
@@ -44,6 +46,7 @@ export async function recordRazorpayPayment(opts: {
     // primary key — one row, never a duplicate (unlike a counter-derived id).
     id: `PMT-${opts.orderId.replace(/^order_/, "R")}`,
     bookingId: opts.bookingId,
+    ...(opts.userId ? { userId: opts.userId } : {}),
     customer: opts.customer?.trim() || "Online Booking",
     method: "Razorpay",
     type: "Advance",

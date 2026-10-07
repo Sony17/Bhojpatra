@@ -137,11 +137,19 @@ export async function readPhotoFile(
   photo: VendorPhoto,
 ): Promise<BodyInit | null> {
   if (photo.blobUrl) {
-    const result = await get(photo.blobUrl, {
-      access: "private",
-      token: BLOB_TOKEN,
-    });
-    return result ? result.stream : null;
+    // A suspended / unreachable Blob store throws rather than returning null —
+    // treat that as "bytes unavailable" so the serving route can fall back to
+    // the default image instead of answering 500 on every storefront photo.
+    try {
+      const result = await get(photo.blobUrl, {
+        access: "private",
+        token: BLOB_TOKEN,
+      });
+      return result ? result.stream : null;
+    } catch (err) {
+      console.error("Vendor photo blob read failed", photo.id, err);
+      return null;
+    }
   }
   try {
     // `basename` defends against path traversal via a tampered store record.

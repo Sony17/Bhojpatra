@@ -4,13 +4,14 @@ import { useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import Image from "next/image";
 import BuilderNav from "../common/BuilderNav";
 import StallDishModal from "./StallDishModal";
-import type { VendorMenuSection, VendorMenuItem, SingleStallConfig } from "@/lib/vendorMenus";
+import type { VendorMenuSection, VendorMenuItem, SingleStallConfig, VendorDietaryOffering } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
 import { FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
 
 interface Step6AStallWorkspaceProps {
   stallConfig?: SingleStallConfig;
   menu: VendorMenuSection[];
+  dietaryOffering?: VendorDietaryOffering;
   onChangeStallConfig: (config: SingleStallConfig) => void;
   onChangeMenu: (menu: VendorMenuSection[]) => void;
   onBack: () => void;
@@ -23,18 +24,18 @@ interface Step6AStallWorkspaceProps {
  *  stall's dishes are mirrored into for the customer stall-booking flow. */
 export const PLATFORM_STALL_CATEGORIES: { id: string; name: string; icon: string; desc: string; menuId?: string }[] = [
   { id: "chaat", name: "Chaat", icon: "🥘", desc: "Live pani puri, aloo tikki, dahi bhalla & papdi", menuId: "chaat" },
-  { id: "juices", name: "Juices & Shakes", icon: "🥤", desc: "Freshly squeezed fruit juices, shakes & coolers" },
-  { id: "beverages", name: "Beverages & Chai", icon: "☕", desc: "Kulhad chai, filter coffee, artisan mocktails" },
+  { id: "juices", name: "Juices & Shakes", icon: "🥤", desc: "Freshly squeezed fruit juices, shakes & coolers", menuId: "juices" },
+  { id: "beverages", name: "Beverages & Chai", icon: "☕", desc: "Kulhad chai, filter coffee, artisan mocktails", menuId: "beverages" },
   { id: "south-indian", name: "South Indian", icon: "🥥", desc: "Crispy dosas, idlis, vadas with sambar & chutneys", menuId: "south-indian" },
-  { id: "north-indian", name: "North Indian & Mughlai", icon: "🍛", desc: "Curries, rolls, kebabs, tandoor specials & naans" },
+  { id: "north-indian", name: "North Indian & Mughlai", icon: "🍛", desc: "Curries, rolls, kebabs, tandoor specials & naans", menuId: "north-indian" },
   { id: "chinese", name: "Chinese & Pan-Asian", icon: "🍜", desc: "Hakka noodles, dim sums, momos & Manchurian", menuId: "chinese" },
-  { id: "snacks", name: "Snacks & Fast Food", icon: "🥪", desc: "Sandwiches, burgers, fries, kathi rolls" },
-  { id: "desserts", name: "Desserts & Sweets", icon: "🍬", desc: "Hot jalebi, gulab jamun, rabri, kulfi" },
-  { id: "ice-cream", name: "Ice Cream & Kulfi", icon: "🍨", desc: "Artisanal rolled scoops, matka kulfi & sundaes" },
-  { id: "street-food", name: "Street Food Specials", icon: "🍢", desc: "Pav bhaji, chole bhature, dabeli, momos" },
+  { id: "snacks", name: "Snacks & Fast Food", icon: "🥪", desc: "Sandwiches, burgers, fries, kathi rolls", menuId: "snacks" },
+  { id: "desserts", name: "Desserts & Sweets", icon: "🍬", desc: "Hot jalebi, gulab jamun, rabri, kulfi", menuId: "desserts" },
+  { id: "ice-cream", name: "Ice Cream & Kulfi", icon: "🍨", desc: "Artisanal rolled scoops, matka kulfi & sundaes", menuId: "ice-cream" },
+  { id: "street-food", name: "Street Food Specials", icon: "🍢", desc: "Pav bhaji, chole bhature, dabeli, momos", menuId: "street-food" },
   { id: "live-grills", name: "Live Grills & Barbecue", icon: "🔥", desc: "Smoked paneer skewers, tikkas & charcoal kebabs", menuId: "live" },
-  { id: "breakfast", name: "Breakfast Counter", icon: "🥞", desc: "Poori sabzi, parathas, poha, upma & chole kulche" },
-  { id: "regional", name: "Regional / Specialty", icon: "🏺", desc: "Awadhi, Rajasthani, Gujarati or hyperlocal specials" },
+  { id: "breakfast", name: "Breakfast Counter", icon: "🥞", desc: "Poori sabzi, parathas, poha, upma & chole kulche", menuId: "breakfast" },
+  { id: "regional", name: "Regional / Specialty", icon: "🏺", desc: "Awadhi, Rajasthani, Gujarati or hyperlocal specials", menuId: "regional" },
 ];
 
 /** Older stall ids saved before the V2 category list. */
@@ -55,8 +56,49 @@ const LEGACY_MENU_IDS = new Set(["live", "pizza", "pasta"]);
 export function stallCategoryName(id: string) {
   return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.name ?? LEGACY_NAMES[id] ?? id;
 }
+/** The platform menu category a stall's dishes publish into, so customers can
+ *  book it. A vendor's own custom category (and any older id without a match)
+ *  publishes under "Regional Specialties" rather than staying invisible. */
 export function stallMenuId(id: string) {
-  return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : undefined);
+  return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : "regional");
+}
+
+/**
+ * Rebuild the customer-facing `menu[]` sections the stall builder owns from the
+ * stall config. Several stalls can publish into one platform category (two
+ * custom categories both land in "regional"), so each section carries the
+ * UNION of its selected stalls' dishes — writing one stall can't wipe another —
+ * and a section left with no selected stall is dropped.
+ */
+export function mirrorStallMenu(cfg: SingleStallConfig, menu: VendorMenuSection[]): VendorMenuSection[] {
+  const selectedCats = cfg.categories || [];
+  const touched = new Set(
+    [...selectedCats, ...Object.keys(cfg.menus || {})].map((c) => stallMenuId(c)),
+  );
+  let next = [...menu];
+  for (const mid of touched) {
+    const cats = selectedCats.filter((c) => stallMenuId(c) === mid);
+    const seen = new Set<string>();
+    const items = cats
+      .flatMap((c) => cfg.menus?.[c] ?? [])
+      .filter((it) => {
+        const k = it.name.trim().toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    const perPlate =
+      cats.map((c) => cfg.categoryPricing?.[c]?.fixedPerPlate || 0).find((p) => p > 0) || 0;
+    const idx = next.findIndex((s) => s.categoryId === mid);
+    if (!items.length) {
+      if (idx !== -1) next = next.filter((_, i) => i !== idx);
+    } else if (idx === -1) {
+      next = [...next, { categoryId: mid, perPlate, items }];
+    } else {
+      next = next.map((s, i) => (i === idx ? { ...s, items, perPlate: perPlate || s.perPlate } : s));
+    }
+  }
+  return next;
 }
 /** Dishes of one stall: V2 `stallConfig.menus`, else the mirrored `menu[]` section. */
 export function stallDishes(cfg: SingleStallConfig | undefined, menu: VendorMenuSection[], id: string) {
@@ -86,6 +128,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export default function Step6AStallWorkspace({
   stallConfig = { categories: [] },
   menu,
+  dietaryOffering,
   onChangeStallConfig,
   onChangeMenu,
   onBack,
@@ -112,24 +155,24 @@ export default function Step6AStallWorkspace({
   ];
   const isPhone = useIsPhone();
 
-  /** Write a stall's dishes to stallConfig.menus and mirror platform ones into menu[]. */
+  /** Apply a stall-config change and keep the published menu[] in step with it. */
+  const commit = (cfg: SingleStallConfig) => {
+    onChangeStallConfig(cfg);
+    onChangeMenu(mirrorStallMenu(cfg, menu));
+  };
+
+  /** Write a stall's dishes to stallConfig.menus (and the published menu). */
   const writeDishes = (catId: string, items: VendorMenuItem[], cfg: SingleStallConfig = stallConfig) => {
-    onChangeStallConfig({ ...cfg, menus: { ...(cfg.menus || {}), [catId]: items } });
-    const mid = stallMenuId(catId);
-    if (!mid) return;
-    const perPlate = (cfg.categoryPricing || {})[catId]?.fixedPerPlate || 0;
-    const idx = menu.findIndex((s) => s.categoryId === mid);
-    if (idx === -1) onChangeMenu([...menu, { categoryId: mid, perPlate, items }]);
-    else onChangeMenu(menu.map((s, i) => (i === idx ? { ...s, items, perPlate: perPlate || s.perPlate } : s)));
+    commit({ ...cfg, menus: { ...(cfg.menus || {}), [catId]: items } });
   };
 
   const toggleCategory = (id: string) => {
     if (selected.includes(id)) {
       const next = selected.filter((c) => c !== id);
-      onChangeStallConfig({ ...stallConfig, categories: next });
+      commit({ ...stallConfig, categories: next });
       if (current === id) setActiveCat(next[0] || "");
     } else {
-      onChangeStallConfig({
+      commit({
         ...stallConfig,
         categories: [...selected, id],
         categoryPricing: { ...pricingMap, [id]: pricingMap[id] || { fixedPerPlate: 0, minPaxGuarantee: 50 } },
@@ -162,11 +205,7 @@ export default function Step6AStallWorkspace({
       ...stallConfig,
       categoryPricing: { ...pricingMap, [current]: { ...pricing, [field]: Math.max(0, val || 0) } },
     };
-    onChangeStallConfig(nextCfg);
-    const mid = stallMenuId(current);
-    if (field === "fixedPerPlate" && mid) {
-      onChangeMenu(menu.map((s) => (s.categoryId === mid ? { ...s, perPlate: Math.max(0, val || 0) } : s)));
-    }
+    commit(nextCfg);
   };
 
   const saveDish = (item: VendorMenuItem, index?: number) => {
@@ -641,6 +680,8 @@ export default function Step6AStallWorkspace({
         isOpen={modal !== null}
         categoryName={currentName}
         delicacyToEdit={modal === "new" ? null : modal}
+        vegOnly={dietaryOffering === "veg"}
+        existingNames={dishes.map((d) => d.name)}
         onClose={() => setModal(null)}
         onSave={saveDish}
       />

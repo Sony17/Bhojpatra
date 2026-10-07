@@ -589,7 +589,9 @@ test("V2 stall: per-category menus are sanitized and kept for custom categories"
       juices: [
         { name: "  Fresh Mosambi  ", diet: "veg", price: 80, desc: "Cold pressed", photo: "/api/vendor/photo/abc-123" },
         { name: "", price: 10 },
-        { name: "Bad Photo", diet: "non-veg", price: 0, photo: "https://evil.example/x.png" },
+        { name: "Linked Photo", diet: "non-veg", price: 0, photo: "https://cdn.example.com/x.png" },
+        { name: "Http Photo", photo: "http://cdn.example.com/x.png" },
+        { name: "Script Photo", photo: "javascript:alert(1)" },
       ],
       "Mocktail Bar": [{ name: "Virgin Mojito", price: 120 }],
       empty: [],
@@ -599,7 +601,11 @@ test("V2 stall: per-category menus are sanitized and kept for custom categories"
   assert.ok(cleaned?.menus);
   assert.deepEqual(cleaned.menus.juices, [
     { name: "Fresh Mosambi", diet: "veg", price: 80, desc: "Cold pressed", photo: "/api/vendor/photo/abc-123" },
-    { name: "Bad Photo", diet: "non-veg" },
+    // Pasted https image links are kept (vendors may link food photos)…
+    { name: "Linked Photo", diet: "non-veg", photo: "https://cdn.example.com/x.png" },
+    // …but anything that isn't https is dropped.
+    { name: "Http Photo", diet: "veg" },
+    { name: "Script Photo", diet: "veg" },
   ]);
   assert.deepEqual(cleaned.menus["Mocktail Bar"], [{ name: "Virgin Mojito", diet: "veg", price: 120 }]);
   assert.equal(cleaned.menus.empty, undefined);

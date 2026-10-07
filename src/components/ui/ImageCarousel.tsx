@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { cn } from "./cn";
 
@@ -64,6 +65,8 @@ export default function ImageCarousel({
             <Image
               src={slide.src}
               alt={slide.alt}
+              // Vendor-linked cover photos can live on any https host.
+              unoptimized={photoNeedsUnoptimized(slide.src)}
               fill
               priority={priorityFirst && i === 0}
               loading={i === 0 ? undefined : "lazy"}

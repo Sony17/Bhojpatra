@@ -1,16 +1,19 @@
 /**
  * Vendor application storage.
  *
- * When a caterer completes the public registration wizard
- * (`VendorRegister`), their submission is persisted to Postgres (Neon), or to a
- * JSON file locally — via the shared `createStore` helper. The admin "Vendor
- * Approvals" console reads these back and flips their status (Pending →
- * Verified / Rejected). The uploaded KYC files themselves live in the separate
+ * When a signed-in vendor submits the onboarding wizard (`/vendor/register` →
+ * POST /api/vendor/application) ONE application is upserted for their account
+ * (keyed by `ownerUserId`; legacy rows by email) and persisted to Postgres via
+ * the shared `createStore` helper. The admin "Vendor Approvals" console reads
+ * these back and records its decision (Pending → Verified / Rejected, or
+ * Rejected with `changesRequested`). A resubmission after a rejection moves the
+ * same record back to Pending. The uploaded KYC files live in the separate
  * `kyc` store and are referenced here by id.
  */
 import { createStore } from "@/lib/store";
 import type {
   VendorApplication,
+  VendorApplicationEvent,
   VendorDocKind,
   VendorTier,
   VerificationStatus,
@@ -44,6 +47,9 @@ export interface VendorApplicationDoc {
  *  returned by {@link toAdminApplication}. */
 export interface VendorApplicationRecord {
   id: string;
+  /** The vendor account that submitted it. Absent on legacy public-form rows,
+   *  which are matched by `email` instead. */
+  ownerUserId?: string;
   business: string;
   owner: string;
   email: string;
@@ -97,10 +103,29 @@ export interface VendorApplicationRecord {
   cateringComponents?: import("@/lib/vendorMenus").CateringComponentsSelection;
 
   status: VerificationStatus;
+  /** Set with status "Rejected" when the admin asked for fixes (the vendor can
+   *  edit and resubmit) rather than turning the vendor down. */
+  changesRequested?: boolean;
+  /** The admin's note to the vendor on the last reject / changes request. */
+  reviewReason?: string;
   /** Display date (YYYY-MM-DD) shown in the approvals table. */
   submitted: string;
   submittedAt: string;
   reviewedAt?: string;
+  /** Email of the admin who made the last decision. */
+  reviewedBy?: string;
+  /** Audit trail, newest last (capped at {@link MAX_HISTORY}). */
+  history?: VendorApplicationEvent[];
+}
+
+export const MAX_HISTORY = 30;
+
+/** Append an audit event, keeping only the most recent {@link MAX_HISTORY}. */
+export function withHistory(
+  r: VendorApplicationRecord,
+  event: VendorApplicationEvent,
+): VendorApplicationEvent[] {
+  return [...(r.history ?? []), event].slice(-MAX_HISTORY);
 }
 const store = createStore<VendorApplicationRecord>({
   table: "vendor_applications",
@@ -109,6 +134,46 @@ const store = createStore<VendorApplicationRecord>({
 
 export function readVendorApplications(): Promise<VendorApplicationRecord[]> {
   return store.list();
+}
+
+/** One application by id (single-row read). */
+export function getVendorApplication(
+  id: string,
+): Promise<VendorApplicationRecord | null> {
+  return store.get(id);
+}
+
+/** Insert or replace ONE application — never rewrite the whole table (a
+ *  read-all/write-all round trip loses concurrent reviews). */
+export function saveVendorApplication(
+  record: VendorApplicationRecord,
+): Promise<void> {
+  return store.upsert(record);
+}
+
+/** The application belonging to a vendor account: matched by `ownerUserId`,
+ *  falling back to the login email for legacy rows that predate the field
+ *  (only when that row isn't bound to a different account). */
+export function applicationForOwner(
+  apps: VendorApplicationRecord[],
+  owner: { id: string; email: string },
+): VendorApplicationRecord | null {
+  const byOwner = apps.find((a) => a.ownerUserId === owner.id);
+  if (byOwner) return byOwner;
+  const email = owner.email.trim().toLowerCase();
+  return (
+    apps.find(
+      (a) => !a.ownerUserId && a.email.trim().toLowerCase() === email,
+    ) ?? null
+  );
+}
+
+/** Store-backed {@link applicationForOwner}. */
+export async function findApplicationForOwner(owner: {
+  id: string;
+  email: string;
+}): Promise<VendorApplicationRecord | null> {
+  return applicationForOwner(await readVendorApplications(), owner);
 }
 
 // Callers mutate the array in place then write it back; upsertMany replays
@@ -146,6 +211,12 @@ export function toAdminApplication(
       kind: d.kind,
       number: d.number,
       status: d.status,
+      ...(d.docId ? { fileUrl: `/api/vendors/kyc/${d.docId}` } : {}),
     })),
+    ...(r.changesRequested ? { changesRequested: true } : {}),
+    ...(r.reviewReason ? { reviewReason: r.reviewReason } : {}),
+    ...(r.reviewedBy ? { reviewedBy: r.reviewedBy } : {}),
+    ...(r.reviewedAt ? { reviewedAt: r.reviewedAt } : {}),
+    ...(r.history?.length ? { history: r.history } : {}),
   };
 }

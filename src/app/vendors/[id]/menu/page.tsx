@@ -2,26 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PublicShell from "@/components/app/PublicShell";
 import VendorFullMenu from "@/components/vendors/VendorFullMenu";
-import { vendorListings } from "@/lib/data";
-import {
-  findVendorById,
-  readVendorItemLimits,
-  toPublicVendorProfile,
-  type PublicVendorProfile,
-} from "@/lib/vendorMenus";
-import { listPhotosByOwner, photoUrl } from "@/lib/vendorPhotos";
+import { loadStorefront } from "../storefront";
 
 export const dynamic = "force-dynamic";
-
-async function loadProfile(id: string): Promise<PublicVendorProfile | null> {
-  const record = await findVendorById(id);
-  if (!record?.ownerUserId) return null;
-  const gallery = (await listPhotosByOwner(record.ownerUserId, "gallery")).map(
-    photoUrl,
-  );
-  const limits = await readVendorItemLimits();
-  return toPublicVendorProfile(record, gallery, limits[record.id]);
-}
 
 export async function generateMetadata({
   params,
@@ -29,22 +12,16 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const profile = await loadProfile(id);
-  if (profile) {
+  const store = await loadStorefront(id);
+  if (store) {
+    const name =
+      store.kind === "live" ? store.profile.business : store.listing.name;
+    const city = store.kind === "live" ? store.profile.city : store.listing.city;
     return {
-      title: `Full Menu — ${profile.business} | Bhojpatra`,
-      description: `Browse the complete menu and dishes of ${profile.business} in ${profile.city} on Bhojpatra.`,
+      title: `Full Menu — ${name} | Bhojpatra`,
+      description: `Browse the menu of ${name} in ${city} on Bhojpatra.`,
     };
   }
-
-  const listing = vendorListings.find((v) => v.id === id);
-  if (listing) {
-    return {
-      title: `Full Menu — ${listing.name} | Bhojpatra`,
-      description: `Browse the complete menu of ${listing.name} in ${listing.city} on Bhojpatra.`,
-    };
-  }
-
   return {
     title: "Caterer Full Menu — Bhojpatra",
     description: "Browse caterer menus on Bhojpatra.",
@@ -57,24 +34,17 @@ export default async function VendorFullMenuPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const profile = await loadProfile(id);
+  const store = await loadStorefront(id);
+  if (!store) notFound();
 
-  if (profile) {
-    return (
-      <PublicShell detail footer={false}>
-        <VendorFullMenu vendorId={id} profile={profile} listing={null} />
-      </PublicShell>
-    );
-  }
-
-  const listing = vendorListings.find((v) => v.id === id);
-  if (listing) {
-    return (
-      <PublicShell detail footer={false}>
-        <VendorFullMenu vendorId={id} profile={null} listing={listing} />
-      </PublicShell>
-    );
-  }
-
-  notFound();
+  return (
+    <PublicShell detail footer={false}>
+      <VendorFullMenu
+        vendorId={id}
+        profile={store.kind === "live" ? store.profile : null}
+        listing={store.kind === "sample" ? store.listing : null}
+        stall={store.stall}
+      />
+    </PublicShell>
+  );
 }

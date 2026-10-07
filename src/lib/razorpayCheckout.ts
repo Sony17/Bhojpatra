@@ -106,6 +106,9 @@ export async function startRazorpayCheckout(opts: {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  /** "advance" when the caller is collecting the booking advance — the server
+   *  then answers "already paid" instead of charging the balance. */
+  purpose?: "advance";
 }): Promise<RazorpayCheckoutResult> {
   await loadCheckoutScript();
   if (!window.Razorpay) {
@@ -122,6 +125,7 @@ export async function startRazorpayCheckout(opts: {
       bookingId: opts.bookingId,
       amount: opts.amount,
       customer: opts.customerName,
+      ...(opts.purpose ? { purpose: opts.purpose } : {}),
     }),
   });
   const order = (await orderRes.json().catch(() => null)) as {

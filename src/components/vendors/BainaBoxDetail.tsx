@@ -12,6 +12,8 @@ import { openCompareTable } from "@/lib/compareTray";
 import { useLang } from "@/lib/i18n";
 import { AppBar } from "@/components/ui";
 import type { BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { vendorListings } from "@/lib/data";
+import { stallBookHref } from "@/lib/vendorStorefront";
 
 export default function BainaBoxDetail({
   data,
@@ -24,7 +26,14 @@ export default function BainaBoxDetail({
   const inCompare = has(data.vendorId);
   const compareDisabled = !inCompare && isFull;
 
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(data.vendorId)}`;
+  // These curated storefronts are the sample listings (vl-13…15): book with
+  // the listing's city, and never claim a Verified badge for a demo brand.
+  const sampleListing = vendorListings.find((v) => v.id === data.vendorId);
+  const bookHref = stallBookHref({
+    vendorId: data.vendorId,
+    city: sampleListing?.city,
+  });
+  const showVerified = Boolean(data.verified) && !sampleListing?.sample;
 
   const photos = useMemo(
     () => [data.heroImage, ...(data.gallery ?? []).filter((g) => g !== data.heroImage)],
@@ -71,7 +80,7 @@ export default function BainaBoxDetail({
               />
 
               {/* Verified badge top-left */}
-              {data.verified && (
+              {showVerified && (
                 <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-md bg-maroon px-2.5 py-1 text-[11px] font-bold text-white shadow-sm sm:left-4 sm:top-4 sm:px-3 sm:text-xs">
                   <span aria-hidden="true">✓</span> {t("VERIFIED", "वेरिफाइड")}
                 </span>

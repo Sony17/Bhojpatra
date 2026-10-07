@@ -1,18 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { vendorListings, cities, type VendorListing } from "@/lib/data";
+import {
+  vendorListings,
+  listingCateringCategories,
+  type VendorListing,
+} from "@/lib/data";
 import {
   slugifyName,
   fetchMyBookings,
   onStoredBookingsChange,
   type StoredBooking,
 } from "@/lib/bookings";
-import { useVendorRatings, statFor } from "@/lib/vendorRatings";
+import { useVendorRatings, storefrontStat } from "@/lib/vendorRatings";
+import {
+  ctaLabel,
+  leadTimeLabel,
+  storefrontCta,
+  type BookableStall,
+} from "@/lib/vendorStorefront";
+import { useVendorReviews } from "@/components/vendors/useVendorReviews";
 import { useCompare } from "@/lib/compare";
 import { openCompareTable } from "@/lib/compareTray";
 import CompareTray from "@/components/vendors/CompareTray";
@@ -23,22 +35,6 @@ import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
 import { Button, AppBar } from "@/components/ui";
 import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
-
-/** One customer review as returned by `GET /api/reviews`. */
-interface StoredReview {
-  /** The booking this review is for — matches one of the signed-in customer's
-   *  own orders when it's their review (so it becomes editable). */
-  bookingId: string;
-  vendorId: string;
-  vendor: string;
-  name: string;
-  occasion: string;
-  city: string;
-  rating: number;
-  comment: string;
-  images?: string[];
-  createdAt: string;
-}
 
 /** A small cream disc with a red check — the trust marker in the summary. */
 function CheckBadge() {
@@ -149,124 +145,6 @@ const FAMOUS_FOR: Record<
   ],
 };
 
-/**
- * Sample menu sections keyed by cuisine — merged across all of the vendor's
- * cuisines. Placeholder content, same as the seed listings themselves.
- */
-const SAMPLE_MENU: Record<
-  string,
-  { name: string; nameHi: string; icon: string; items: string[] }[]
-> = {
-  Chaat: [
-    {
-      name: "Chaat Counter", nameHi: "चाट काउंटर", icon: "🥟",
-      items: ["Gol Gappe", "Aloo Tikki Chaat", "Dahi Bhalla", "Papdi Chaat", "Raj Kachori", "Basket Chaat"],
-    },
-    {
-      name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍽️",
-      items: ["Pav Bhaji", "Matra Chaat", "Kulle Chaat", "Fruit Chaat"],
-    },
-  ],
-  Mughlai: [
-    {
-      name: "Starters", nameHi: "स्टार्टर", icon: "🍢",
-      items: ["Galouti Kebab", "Shami Kebab", "Seekh Kebab", "Chicken Malai Tikka", "Veg Shammi"],
-    },
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
-      items: ["Dum Biryani", "Mutton Korma", "Nihari", "Awadhi Pulao", "Sheermal", "Butter Naan"],
-    },
-  ],
-  "North Indian": [
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍲",
-      items: ["Dal Makhani", "Paneer Lababdar", "Shahi Paneer", "Mix Veg", "Butter Naan", "Jeera Rice"],
-    },
-    {
-      name: "Desserts", nameHi: "मिठाई", icon: "🍮",
-      items: ["Gulab Jamun", "Moong Dal Halwa", "Kheer", "Jalebi"],
-    },
-  ],
-  Punjabi: [
-    {
-      name: "Starters", nameHi: "स्टार्टर", icon: "🍢",
-      items: ["Paneer Tikka", "Tandoori Chicken", "Hara Bhara Kebab", "Amritsari Fish"],
-    },
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
-      items: ["Chole Bhature", "Butter Chicken", "Sarson da Saag", "Makki di Roti", "Rajma Chawal", "Lassi"],
-    },
-  ],
-  "South Indian": [
-    {
-      name: "Tiffin", nameHi: "टिफ़िन", icon: "🥞",
-      items: ["Masala Dosa", "Idli Sambar", "Medu Vada", "Uttapam", "Pongal"],
-    },
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍛",
-      items: ["Chettinad Curry", "Sambar Rice", "Lemon Rice", "Curd Rice", "Filter Coffee"],
-    },
-  ],
-  Bengali: [
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍲",
-      items: ["Kosha Mangsho", "Fish Curry", "Luchi Aloor Dom", "Basanti Pulao"],
-    },
-    {
-      name: "Desserts", nameHi: "मिठाई", icon: "🍡",
-      items: ["Rosogolla", "Mishti Doi", "Sandesh", "Payesh"],
-    },
-  ],
-  Chinese: [
-    {
-      name: "Starters", nameHi: "स्टार्टर", icon: "🥠",
-      items: ["Spring Rolls", "Chilli Paneer", "Honey Chilli Potato", "Manchow Soup"],
-    },
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍜",
-      items: ["Hakka Noodles", "Veg Manchurian", "Fried Rice", "Chilli Chicken"],
-    },
-  ],
-  Continental: [
-    {
-      name: "Live Counters", nameHi: "लाइव काउंटर", icon: "🍕",
-      items: ["Wood-fired Pizza", "Pasta Station", "Grilled Sizzlers", "Salad Bar"],
-    },
-    {
-      name: "Main Course", nameHi: "मुख्य व्यंजन", icon: "🍝",
-      items: ["Mushroom Stroganoff", "Herb Rice", "Roast Veggies", "Garlic Bread"],
-    },
-  ],
-  "Baina Boxes": [
-    {
-      name: "Signature Boxes", nameHi: "सिग्नेचर बॉक्स", icon: "🎁",
-      items: ["Motichoor Ladoo", "Kaju Katli", "Gujiya", "Dry Fruit Box", "Milk Cake", "Besan Barfi"],
-    },
-  ],
-  Sweets: [
-    {
-      name: "Mithai Counter", nameHi: "मिठाई काउंटर", icon: "🍬",
-      items: ["Rasmalai", "Rabri", "Kulfi Falooda", "Gajar Halwa", "Jalebi", "Kheer"],
-    },
-  ],
-  Beverages: [
-    {
-      name: "Welcome Drinks", nameHi: "वेलकम ड्रिंक्स", icon: "🥤",
-      items: ["Masala Shikanji", "Aam Panna", "Rose Sharbat", "Thandai", "Nimbu Pani"],
-    },
-    {
-      name: "Mocktail Counter", nameHi: "मॉकटेल काउंटर", icon: "🍹",
-      items: ["Virgin Mojito", "Blue Lagoon", "Fruit Punch", "Fresh Juices"],
-    },
-  ],
-  Decor: [
-    {
-      name: "Decor Packages", nameHi: "सजावट पैकेज", icon: "🏵️",
-      items: ["Mandap Styling", "Floral Themes", "Stage Backdrops", "Festive Lighting", "Entrance Arch", "Table Centrepieces"],
-    },
-  ],
-};
-
 /** Shared shell for the maroon line icons used across the detail sections. */
 function LineIcon({
   className,
@@ -367,7 +245,15 @@ function ClockIcon({ className }: { className?: string }) {
   );
 }
 
-export default function VendorDetail({ id }: { id: string }) {
+export default function VendorDetail({
+  id,
+  stall = null,
+}: {
+  id: string;
+  /** The booking-roster stall this curated sample is bridged to (by brand
+   *  name, as the stall wizard bridges it), or null when it has none. */
+  stall?: BookableStall | null;
+}) {
   const { t } = useLang();
   const vendor = useMemo(
     () => vendorListings.find((v) => v.id === id) ?? null,
@@ -393,18 +279,24 @@ export default function VendorDetail({ id }: { id: string }) {
     );
   }
 
-  return <VendorProfile vendor={vendor} t={t} />;
+  return <VendorProfile vendor={vendor} stall={stall} t={t} />;
 }
 
 function VendorProfile({
   vendor,
+  stall,
   t,
 }: {
   vendor: VendorListing;
+  stall: BookableStall | null;
   t: (en: string, hi: string) => string;
 }) {
   const ratings = useVendorRatings();
-  const stats = statFor(ratings, vendor);
+  // Sample listing: the seed bridge (catalogue id → bridged stall id → name).
+  const stats = storefrontStat(ratings, {
+    ...vendor,
+    stall: stall ? { stallId: stall.stallId } : null,
+  });
 
   const { has, toggle, isFull, count: compareCount } = useCompare();
   const inCompare = has(vendor.id);
@@ -424,49 +316,33 @@ function VendorProfile({
     });
   };
 
-  const famousFor = vendor.cuisines.map((c) => FAMOUS_FOR[c]).find(Boolean);
+  // "Famous for" — the bookable stall's REAL dishes when there is one (what
+  // the wizard will actually serve); otherwise a cuisine-generic strip that is
+  // clearly labelled as an indicative sample.
+  const stallDishes = useMemo(
+    () =>
+      stall
+        ? stall.courses
+            .flatMap((c) =>
+              c.items.map((it) => ({ name: it.name, nameHi: it.name, icon: c.icon })),
+            )
+            .slice(0, 4)
+        : [],
+    [stall],
+  );
+  const famousFor = stallDishes.length
+    ? stallDishes
+    : vendor.cuisines.map((c) => FAMOUS_FOR[c]).find(Boolean);
+  const famousIsSample = stallDishes.length === 0;
 
-  // Menu sections merged across the vendor's cuisines — same-named courses
-  // (e.g. two cuisines both offering "Main Course") collapse into one.
-  const menu = useMemo(() => {
-    const sections: { name: string; nameHi: string; icon: string; items: string[] }[] = [];
-    for (const c of vendor.cuisines) {
-      for (const sec of SAMPLE_MENU[c] ?? []) {
-        const existing = sections.find((s) => s.name === sec.name);
-        if (existing) {
-          for (const it of sec.items)
-            if (!existing.items.includes(it)) existing.items.push(it);
-        } else {
-          sections.push({ ...sec, items: [...sec.items] });
-        }
-      }
-    }
-    return sections;
-  }, [vendor.cuisines]);
-
-  // Real, customer-submitted reviews for this vendor. Best-effort — falls back
-  // to an empty list (and the "no reviews yet" state) on any failure. Exposed as
-  // a callback so the review panel can re-pull the list after a fresh submit.
-  const [reviews, setReviews] = useState<StoredReview[]>([]);
-  const loadReviews = useCallback(() => {
-    const slug = slugifyName(vendor.name);
-    fetch("/api/reviews")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { reviews?: StoredReview[] } | null) => {
-        if (!d?.reviews) return;
-        setReviews(
-          d.reviews.filter(
-            (r) =>
-              (r.vendorId && r.vendorId === vendor.id) ||
-              slugifyName(r.vendor ?? "") === slug,
-          ),
-        );
-      })
-      .catch(() => {});
-  }, [vendor.id, vendor.name]);
-  useEffect(() => {
-    loadReviews();
-  }, [loadReviews]);
+  // Real, customer-submitted reviews for this vendor — filtered server-side
+  // (`?vendorId=`, plus the bridged stall id and the seed name bridge), so the
+  // page never downloads every review on the platform. `loadReviews` re-pulls
+  // after a fresh submit from the panel below.
+  const { reviews, reload: loadReviews, stat: liveStat } = useVendorReviews({
+    ids: [vendor.id, stall?.stallId ?? ""],
+    name: vendor.name,
+  });
 
   const session = useSession();
 
@@ -525,33 +401,30 @@ function VendorProfile({
     }
   };
 
-  // "Book this caterer" starts a Single Stall with this vendor pre-selected
-  // (still changeable in the wizard). City is stored by name here but the wizard
-  // keys off the city id, so bridge through the `cities` table. Live vendors
-  // resolve by id; a curated seed id absent from the booking menu falls back to
-  // the tier picker.
-  const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
-    cityId ? `&city=${cityId}` : ""
-  }`;
+  // "Book" starts a Single Stall with this listing pre-selected (the wizard
+  // bridges it to its roster stall by brand name, exactly as `stall` was
+  // resolved here) and its city carried along. Only when there IS a bookable
+  // stall — a decor / service listing gets an enquiry instead of a Book button
+  // that would dead-end on "brand unavailable".
+  const cta = storefrontCta({
+    id: vendor.id,
+    city: vendor.city,
+    categories: listingCateringCategories(vendor),
+    stall,
+  });
+  const bookHref = cta.href;
+  const bookText =
+    cta.kind === "stall" ? t("Book this stall", "यह स्टॉल बुक करें") : ctaLabel(cta.kind, t);
+  // The price beside the CTA is what the wizard charges for that stall.
+  const ctaPrice =
+    cta.kind === "stall" && stall && stall.fromPerPlate > 0 ? stall.fromPerPlate : null;
+  const leadText = leadTimeLabel(stall?.leadHours, t);
 
-  // A live aggregate from the reviews just loaded for this vendor, so a rating
-  // submitted from the panel below is reflected immediately (the shared
-  // `useVendorRatings` summary only fetches once on mount).
-  const liveStat = reviews.length
-    ? {
-        rating:
-          Math.round(
-            (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length) *
-              10,
-          ) / 10,
-        count: reviews.length,
-      }
-    : undefined;
-  // Prefer the live count, then the shared aggregate, then the static seed.
+  // Real ratings only — the live list just loaded, else the shared aggregate.
+  // A sample listing's seed rating is a placeholder and is never shown.
   const verified = liveStat ?? stats;
-  const shownRating = verified?.rating ?? vendor.rating;
-  const shownCount = verified?.count ?? vendor.reviews;
+  const shownRating = verified?.rating ?? 0;
+  const shownCount = verified?.count ?? 0;
 
   // Star breakdown for the ratings summary, built from the written reviews we
   // actually loaded. The headline count equals this list's length whenever any
@@ -584,7 +457,7 @@ function VendorProfile({
         {/* ── Hero ──────────────────────────────────────────────────── */}
         <div className="relative -mx-4 aspect-[16/9.5] w-[calc(100%+2rem)] overflow-hidden bg-cream sm:mx-0 sm:aspect-[16/9] sm:w-full sm:rounded-hero sm:border sm:border-maroon/6 sm:shadow-card">
           <Image
-            src={vendor.image}
+            src={vendor.image} unoptimized={photoNeedsUnoptimized(vendor.image)}
             alt={vendor.name}
             fill
             priority
@@ -608,24 +481,25 @@ function VendorProfile({
               </span>
             ))}
           </span>
-          {vendor.verified && (
-            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-maroon shadow-sm backdrop-blur-sm sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
-              <span aria-hidden="true">✓</span> {t("Verified", "वेरिफाइड")}
-            </span>
+          {/* Curated demo listing — never a Verified badge. */}
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-maroon shadow-sm backdrop-blur-sm sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
+            {t("Sample listing", "नमूना लिस्टिंग")}
+          </span>
+          {/* Rating pill — only real, published reviews. */}
+          {verified && (
+            <a
+              href="#reviews"
+              className="absolute bottom-3 left-3 flex overflow-hidden rounded-full shadow-sm sm:bottom-4 sm:left-4"
+            >
+              <span className="flex items-center gap-1 bg-maroon px-2.5 py-1.5 text-xs font-bold text-white">
+                <StarIcon className="h-3.5 w-3.5 text-cream" />
+                {shownRating}
+              </span>
+              <span className="flex items-center bg-white px-2.5 py-1.5 text-xs font-medium text-ink">
+                ({shownCount.toLocaleString("en-IN")} {t("Reviews", "समीक्षाएँ")})
+              </span>
+            </a>
           )}
-          {/* Rating pill — maroon score segment + white review-count segment. */}
-          <a
-            href="#reviews"
-            className="absolute bottom-3 left-3 flex overflow-hidden rounded-full shadow-sm sm:bottom-4 sm:left-4"
-          >
-            <span className="flex items-center gap-1 bg-maroon px-2.5 py-1.5 text-xs font-bold text-white">
-              <StarIcon className="h-3.5 w-3.5 text-cream" />
-              {shownRating}
-            </span>
-            <span className="flex items-center bg-white px-2.5 py-1.5 text-xs font-medium text-ink">
-              ({shownCount.toLocaleString("en-IN")} {t("Reviews", "समीक्षाएँ")})
-            </span>
-          </a>
         </div>
 
         {/* ── Header Info + Right-Aligned Price Card ────────────────── */}
@@ -664,20 +538,36 @@ function VendorProfile({
           {/* Right-aligned Price Card Box */}
           <div className="shrink-0 self-start">
             <div className="rounded-xl border border-cream-3 bg-white p-2.5 text-right shadow-xs min-w-[125px] sm:min-w-[210px] sm:rounded-2xl sm:p-4 sm:shadow-sm">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-ink-soft sm:text-[11px]">
-                {t("Fixed Price", "फिक्स्ड प्राइस")}
-              </p>
-              <p className="mt-0.5 font-display text-xl font-bold leading-tight text-maroon sm:text-3xl">
-                ₹{vendor.priceFrom.toLocaleString("en-IN")}{" "}
-                <span className="text-[10px] font-normal text-ink-soft sm:text-sm">
-                  / {t("plate", "प्लेट")}
-                </span>
-              </p>
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-cream-2 px-1.5 py-0.5 text-[9px] font-medium text-ink sm:mt-2 sm:gap-1.5 sm:px-3 sm:py-1 sm:text-[11px]">
-                <span aria-hidden="true" className="font-bold text-maroon">₹</span>
-                <span className="hidden sm:inline">{t("All inclusive · No hidden charges", "सब कुछ शामिल · कोई छिपा शुल्क नहीं")}</span>
-                <span className="sm:hidden">{t("All inclusive", "सब शामिल")}</span>
-              </div>
+              {ctaPrice != null ? (
+                <>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-ink-soft sm:text-[11px]">
+                    {t("Single stall from", "सिंगल स्टॉल")}
+                  </p>
+                  <p className="mt-0.5 font-display text-xl font-bold leading-tight text-maroon sm:text-3xl">
+                    ₹{ctaPrice.toLocaleString("en-IN")}{" "}
+                    <span className="text-[10px] font-normal text-ink-soft sm:text-sm">
+                      / {t("plate", "प्लेट")}
+                    </span>
+                  </p>
+                  {(stall?.minGuests || leadText) && (
+                    <div className="mt-1 flex flex-col items-end gap-0.5 text-[9px] font-medium text-ink sm:mt-2 sm:text-[11px]">
+                      {stall?.minGuests ? (
+                        <span>{t(`Min ${stall.minGuests} guests`, `न्यूनतम ${stall.minGuests} मेहमान`)}</span>
+                      ) : null}
+                      {leadText && <span>{leadText}</span>}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-ink-soft sm:text-[11px]">
+                    {t("Pricing", "कीमत")}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold leading-tight text-ink sm:text-base">
+                    {t("On enquiry", "पूछताछ पर")}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -687,7 +577,9 @@ function VendorProfile({
           <div className="mt-3 rounded-xl border border-cream-3 bg-cream/40 p-3 sm:mt-6 sm:rounded-2xl sm:p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-maroon sm:text-base">
-                {t("Famous For", "इनकी खासियत")}
+                {famousIsSample
+                  ? t("Indicative sample menu", "सांकेतिक नमूना मेन्यू")
+                  : t("On the stall menu", "स्टॉल मेन्यू में")}
               </p>
               <Link
                 href={`/vendors/${vendor.id}/menu`}
@@ -752,9 +644,10 @@ function VendorProfile({
         <div className="mt-3 sm:mt-6">
           <VendorActionRow
             bookHref={bookHref}
+            bookLabel={cta.kind === "stall" ? undefined : bookText}
             vendorName={vendor.name}
             vendorCity={vendor.city}
-            priceFrom={vendor.priceFrom}
+            priceFrom={ctaPrice ?? undefined}
             inCompare={inCompare}
             compareDisabled={compareDisabled}
             onToggleCompare={() => toggle(vendor.id)}
@@ -831,26 +724,34 @@ function VendorProfile({
         <div className="mt-6 overflow-hidden rounded-3xl border border-cream-3 bg-white shadow-sm">
           <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[minmax(0,auto)_1fr] md:gap-10">
             <div className="flex flex-col items-center justify-center text-center md:min-w-52 md:border-r md:border-cream-3 md:pr-10">
-              <p className="font-display text-6xl leading-none text-ink">
-                {shownRating}
-                <span className="align-top text-2xl text-ink-soft">/5</span>
-              </p>
-              <div className="mt-3">
-                <Stars
-                  rating={shownRating}
-                  size={22}
-                  label={t(
-                    `${shownRating} out of 5 stars`,
-                    `5 में से ${shownRating} स्टार`,
-                  )}
-                />
-              </div>
-              <p className="mt-3 text-sm text-ink-soft">
-                {t(
-                  `Rated by ${shownCount} ${shownCount === 1 ? "guest" : "guests"}`,
-                  `${shownCount} मेहमानों द्वारा रेट किया गया`,
-                )}
-              </p>
+              {verified ? (
+                <>
+                  <p className="font-display text-6xl leading-none text-ink">
+                    {shownRating}
+                    <span className="align-top text-2xl text-ink-soft">/5</span>
+                  </p>
+                  <div className="mt-3">
+                    <Stars
+                      rating={shownRating}
+                      size={22}
+                      label={t(
+                        `${shownRating} out of 5 stars`,
+                        `5 में से ${shownRating} स्टार`,
+                      )}
+                    />
+                  </div>
+                  <p className="mt-3 text-sm text-ink-soft">
+                    {t(
+                      `Rated by ${shownCount} ${shownCount === 1 ? "guest" : "guests"}`,
+                      `${shownCount} मेहमानों द्वारा रेट किया गया`,
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="font-display text-xl text-ink">
+                  {t("No ratings yet", "अभी कोई रेटिंग नहीं")}
+                </p>
+              )}
             </div>
 
             {hasWritten ? (
@@ -952,8 +853,8 @@ function VendorProfile({
             </p>
             <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
               {t(
-                "This rating comes from verified bookings. Written reviews from recent guests will show up here.",
-                "यह रेटिंग सत्यापित बुकिंग से है। हाल के मेहमानों की लिखित समीक्षाएँ यहाँ दिखेंगी।",
+                "Written reviews from guests of completed bookings will show up here.",
+                "पूर्ण बुकिंग के मेहमानों की लिखित समीक्षाएँ यहाँ दिखेंगी।",
               )}
             </p>
           </div>
@@ -964,9 +865,13 @@ function VendorProfile({
 
       {/* Mobile sticky booking bar — steps aside for the compare tray. */}
       <StickyBookingBar
-        price={`₹${vendor.priceFrom.toLocaleString("en-IN")}`}
-        priceNote={t("per plate", "प्रति प्लेट")}
-        cta={t("Book this caterer", "यह कैटरर बुक करें")}
+        price={
+          ctaPrice != null
+            ? `₹${ctaPrice.toLocaleString("en-IN")}`
+            : t("On enquiry", "पूछताछ पर")
+        }
+        priceNote={ctaPrice != null ? t("per plate · single stall", "प्रति प्लेट · सिंगल स्टॉल") : ""}
+        cta={bookText}
         href={bookHref}
       />
     </section>

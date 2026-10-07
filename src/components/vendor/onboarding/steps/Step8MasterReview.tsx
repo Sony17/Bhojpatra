@@ -537,7 +537,7 @@ export default function Step8MasterReview({ data, onEdit, onBack, onSubmit, onPr
         </div>
       </div>
 
-      <FlowFooter onBack={onBack} onContinue={onSubmit} saving={saving} />
+      <FlowFooter onBack={onBack} onContinue={onSubmit} saving={saving} continueLabel="Submit for Approval →" mContinueLabel="Submit →" />
     </div>
   );
 }

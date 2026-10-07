@@ -10,6 +10,7 @@ import { useLang } from "@/lib/i18n";
  */
 export default function VendorActionRow({
   bookHref,
+  bookLabel,
   vendorName,
   vendorCity,
   priceFrom,
@@ -19,6 +20,9 @@ export default function VendorActionRow({
   className = "",
 }: {
   bookHref: string;
+  /** Primary CTA text — defaults to "Book Now"; an enquiry / order CTA
+   *  passes its own. */
+  bookLabel?: string;
   vendorName: string;
   vendorCity?: string;
   priceFrom?: number;
@@ -32,7 +36,7 @@ export default function VendorActionRow({
 
   const handleWhatsApp = () => {
     const pageUrl = typeof window !== "undefined" ? window.location.href : "";
-    const msg = `Check out ${vendorName} on Bhojpatra — a verified caterer in ${vendorCity || "India"}${priceFrom ? ` from ₹${priceFrom.toLocaleString("en-IN")}/plate` : ""}: ${pageUrl}`;
+    const msg = `Check out ${vendorName} on Bhojpatra — a caterer in ${vendorCity || "India"}${priceFrom ? ` from ₹${priceFrom.toLocaleString("en-IN")}/plate` : ""}: ${pageUrl}`;
     const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, "_blank", "noopener,noreferrer");
   };
@@ -82,7 +86,7 @@ export default function VendorActionRow({
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
-        <span className="truncate">{t("Book Now", "अभी बुक करें")}</span>
+        <span className="truncate">{bookLabel ?? t("Book Now", "अभी बुक करें")}</span>
       </Link>
 
       {/* 2. WhatsApp */}

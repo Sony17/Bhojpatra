@@ -4,6 +4,7 @@ import type { BookingStatus } from "@/lib/data";
 import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import type { StoredOrder } from "../route";
+import { bookingStatusFor } from "@/lib/bookingRules";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +23,24 @@ const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   Cancelled: ["Cancelled"],
 };
 
-// What a booking's own customer may do to it from My Bookings: pay off a
-// pending EMI order's balance to confirm it, cancel a pending or confirmed
-// order, mark a confirmed event complete, or reopen a completed one. They still
-// can't set the paid amount directly — settling the balance is recorded
-// server-side on Pending → Confirmed (see below) — and a cancelled order is
-// terminal.
+// What a booking's own customer may do to it from My Bookings: cancel a
+// pending or confirmed order, mark a confirmed event complete, or reopen a
+// completed one. They can NEVER confirm a booking — Pending → Confirmed happens
+// only when the payments ledger holds the advance (bookingPaymentSync), so a
+// customer pays (My Bookings → Pay) rather than flipping a status. A cancelled
+// order is terminal.
 const CUSTOMER_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  Pending: ["Confirmed", "Cancelled"],
+  Pending: ["Cancelled"],
   Confirmed: ["Completed", "Cancelled"],
   Completed: ["Confirmed"],
   Cancelled: [],
 };
+
+// The only content a customer may change after booking: their notes and their
+// review of the vendors. Guests, date, vendors, invoice and money are fixed
+// once the order is placed (they were priced and paid against); changes go
+// through the team.
+const CUSTOMER_FIELDS = new Set(["status", "note", "reopened", "reviews", "review"]);
 
 function isBookingStatus(v: unknown): v is BookingStatus {
   return (
@@ -46,18 +53,21 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole();
+  if (guard instanceof Response) return guard;
   const { id } = await ctx.params;
   const order = await store.get(decodeURIComponent(id));
-  if (!order) {
+  // Someone else's booking reads as missing, so ids can't be probed.
+  if (!order || (guard.role !== "admin" && order.userId !== guard.id)) {
     return Response.json({ error: "Booking not found." }, { status: 404 });
   }
   return Response.json({ order });
 }
 
-// PATCH /api/bookings/[id] → { status?, paid? } — validated status transition.
-// Admins may run any transition and adjust `paid`; a booking's own customer may
-// only complete/reopen their event (see CUSTOMER_TRANSITIONS) and never touch
-// the money.
+// PATCH /api/bookings/[id] → { status?, paid?, …content } — validated status
+// transition. Admins may run any transition, adjust `paid` and edit the order;
+// a booking's own customer may only cancel / complete / reopen (see
+// CUSTOMER_TRANSITIONS) and edit their notes + review (CUSTOMER_FIELDS).
 export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -84,6 +94,27 @@ export async function PATCH(
     return Response.json({ error: "Not allowed." }, { status: 403 });
   }
 
+  if (!isAdmin) {
+    const forbidden = Object.keys(body).filter((k) => !CUSTOMER_FIELDS.has(k));
+    if (forbidden.length) {
+      return Response.json(
+        {
+          error:
+            "These booking details can't be changed online — please contact us to change them.",
+        },
+        { status: 403 },
+      );
+    }
+    // A Completed reopen may only move a booking that really was paid for.
+    if (
+      body.status === "Confirmed" &&
+      order.status === "Completed" &&
+      bookingStatusFor(order.amount, order.paid) !== "Confirmed"
+    ) {
+      return Response.json({ error: "Not allowed." }, { status: 403 });
+    }
+  }
+
   const next: StoredOrder = { ...order };
 
   if (body.status !== undefined) {
@@ -100,13 +131,6 @@ export async function PATCH(
       );
     }
     next.status = body.status;
-
-    // A pending order is an EMI booking (advance paid, balance financed). When a
-    // customer confirms it they're settling that outstanding balance in full, so
-    // record it here — the client never sends `paid`, keeping money server-side.
-    if (!isAdmin && order.status === "Pending" && next.status === "Confirmed") {
-      next.paid = order.amount;
-    }
   }
 
   if (body.paid !== undefined) {
@@ -121,10 +145,9 @@ export async function PATCH(
     next.paid = Math.round(paid);
   }
 
-  // Content fields a booking's own customer (or an admin) may edit from My
-  // Bookings: the editable logistics, notes and the per-vendor review mirror.
-  // These carry no money or status semantics, so the owner check above is the
-  // only gate they need. Each is applied only when present in the body.
+  // Content fields. The logistics / invoice / vendors are admin-only (the
+  // customer whitelist above already refused them); notes and the per-vendor
+  // review mirror are the customer's own. Each is applied only when present.
   if (typeof body.occasion === "string" && body.occasion.trim()) {
     next.occasion = body.occasion.trim();
   }

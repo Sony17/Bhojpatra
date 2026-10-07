@@ -11,6 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent } from "@/lib/homeContent";
 import {
@@ -4039,7 +4040,7 @@ function StepMenu({
                 <div className="flex items-center gap-2.5 border-b border-cream-3 p-2.5 sm:gap-3 sm:p-3">
                   <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2 sm:h-14 sm:w-14">
                     <Image
-                      src={vendor.image}
+                      src={vendor.image} unoptimized={photoNeedsUnoptimized(vendor.image)}
                       alt={vendor.name}
                       fill
                       sizes="(min-width: 640px) 56px, 44px"
@@ -4135,6 +4136,7 @@ function StepMenu({
                           <Image
                             src={it.photo ?? dummyDishPhoto(it.id)}
                             alt=""
+                            unoptimized={photoNeedsUnoptimized(it.photo)}
                             fill
                             sizes="(min-width: 640px) 64px, 51px"
                             className="object-cover"
@@ -4234,7 +4236,7 @@ function StepMenu({
                 key={v.id}
                 className="relative block h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-cream-2"
               >
-                <Image src={v.image} alt="" fill sizes="32px" className="object-cover" />
+                <Image src={v.image} unoptimized={photoNeedsUnoptimized(v.image)} alt="" fill sizes="32px" className="object-cover" />
               </span>
             ))}
           </span>
@@ -4363,7 +4365,7 @@ function StepMenu({
                     {/* Thumbnail */}
                     <span className="relative block h-[54px] w-[54px] shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
                       <Image
-                        src={v.image}
+                        src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                         alt={v.name}
                         fill
                         sizes="54px"
@@ -4484,7 +4486,7 @@ function StepMenu({
             >
               <div className="relative aspect-[16/10] w-full overflow-hidden">
                 <Image
-                  src={v.image}
+                  src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                   alt={v.name}
                   fill
                   sizes="(min-width: 640px) 202px, 144px"

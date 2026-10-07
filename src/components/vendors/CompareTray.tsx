@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { useCompare, COMPARE_MAX } from "@/lib/compare";
@@ -120,7 +121,7 @@ export default function CompareTray() {
                 >
                   <span className="relative h-7 w-7 overflow-hidden rounded-full bg-cream-2">
                     <Image
-                      src={v.image}
+                      src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                       alt={v.name}
                       fill
                       sizes="28px"

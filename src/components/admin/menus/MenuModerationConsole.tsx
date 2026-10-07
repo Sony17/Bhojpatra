@@ -2,14 +2,17 @@
 
 /**
  * Menu Moderation console — the takedown-model review queue for live vendor
- * content. Vendor menus go live the moment they're published (as "Pending");
- * this console lets admins Approve them (cleared until their next edit) or
- * Hide them (removed from the /book wizard, /vendors catalog and their public
- * detail page until restored).
+ * content. A vendor's menu is published only once an admin Approves it here —
+ * which the API allows only after their KYC application is Verified. A live
+ * vendor's later edit waits here as "Pending" while their last approved
+ * content stays live. Hide removes them from the /book wizard, /vendors
+ * catalog and their public detail page until restored. Recognition badges
+ * are granted here too (vendors can only apply).
  */
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -21,7 +24,13 @@ import Modal from "@/components/admin/shared/Modal";
 import { Badge, Button } from "@/components/ui";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { menuCategories } from "@/lib/data";
-import type { ModerationStatus, VendorMenuSection } from "@/lib/vendorMenus";
+import type {
+  BadgeDecision,
+  ModerationStatus,
+  RecognitionBadgeKey,
+  VendorBadgesState,
+  VendorMenuSection,
+} from "@/lib/vendorMenus";
 
 const PAGE_SIZE = 8;
 
@@ -39,7 +48,18 @@ interface ModerationVendor {
   updatedAt: string;
   menu: VendorMenuSection[];
   gallery: string[];
+  /** KYC application status (null = not submitted). */
+  applicationStatus: string | null;
+  /** True while a live vendor's previous approved content is still shown. */
+  liveSnapshot: boolean;
+  badges: VendorBadgesState | null;
 }
+
+const BADGE_LABEL: Record<RecognitionBadgeKey, string> = {
+  verified: "Verified",
+  icon: "Icon",
+  heritage: "Heritage",
+};
 
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "All" },
@@ -74,7 +94,11 @@ export default function MenuModerationConsole() {
     fetch("/api/vendors/moderation", { cache: "no-store" })
       .then((res) => res.json())
       .then((data: { vendors?: ModerationVendor[] }) => {
-        if (active) setVendors(data.vendors ?? []);
+        if (!active) return;
+        setVendors(data.vendors ?? []);
+        // Deep link from Vendor Approvals: /admin/menus?vendor=<id>.
+        const wanted = new URLSearchParams(window.location.search).get("vendor");
+        if (wanted && data.vendors?.some((v) => v.id === wanted)) setSelectedId(wanted);
       })
       .catch(() => {
         if (active) setToast("Couldn't load vendors. Please refresh.");
@@ -118,6 +142,52 @@ export default function MenuModerationConsole() {
     ? vendors.find((v) => v.id === selectedId) ?? null
     : null;
 
+  // Platform seed stalls (demo vendors with no owner account) — one switch
+  // hides or restores all of them; the SAMPLE catalog cards follow it.
+  const [seeds, setSeeds] = useState<{ total: number; hidden: number } | null>(null);
+  const [seedsBusy, setSeedsBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/vendors/moderation/seeds")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { total: number; hidden: number } | null) => {
+        if (alive && d) setSeeds(d);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const seedsHidden = Boolean(seeds && seeds.total > 0 && seeds.hidden === seeds.total);
+  const toggleSeeds = async () => {
+    if (!seeds) return;
+    const hide = !seedsHidden;
+    const ok = window.confirm(
+      hide
+        ? `Hide all ${seeds.total} platform seed stalls and the SAMPLE catalog cards from customers? Only approved real vendors will remain visible. You can undo this with the same button.`
+        : `Show the ${seeds.total} platform seed stalls and SAMPLE catalog cards to customers again?`,
+    );
+    if (!ok) return;
+    setSeedsBusy(true);
+    try {
+      const res = await fetch("/api/vendors/moderation/seeds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hidden: hide }),
+      });
+      const d = (await res.json().catch(() => null)) as
+        | { total?: number; hidden?: number; error?: string }
+        | null;
+      if (!res.ok) throw new Error(d?.error || "Couldn't save. Please try again.");
+      setSeeds({ total: d?.total ?? seeds.total, hidden: d?.hidden ?? 0 });
+      setToast(hide ? "Seed stalls hidden from customers" : "Seed stalls shown to customers");
+    } catch (err) {
+      setToast((err as Error).message || "Couldn't save. Please try again.");
+    } finally {
+      setSeedsBusy(false);
+    }
+  };
+
   // Optimistic status change, rolled back if the request fails.
   const setModeration = (id: string, next: ModerationStatus) => {
     const snapshot = vendors;
@@ -136,13 +206,34 @@ export default function MenuModerationConsole() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("request failed");
+      .then(async (res) => {
+        if (res.ok) return;
+        // Surface the server's reason (e.g. KYC not yet verified).
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error || "Couldn't save. Please try again.");
       })
-      .catch(() => {
+      .catch((err: Error) => {
         setVendors(snapshot);
-        setToast("Couldn't save. Please try again.");
+        setToast(err.message || "Couldn't save. Please try again.");
       });
+  };
+
+  // Grant / reject / revoke a recognition badge (admin-only path).
+  const decideBadge = (id: string, key: RecognitionBadgeKey, decision: BadgeDecision) => {
+    fetch(`/api/vendors/moderation/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ badge: { key, decision } }),
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as
+          | { badges?: VendorBadgesState; error?: string }
+          | null;
+        if (!res.ok || !data?.badges) throw new Error(data?.error || "Couldn't save. Please try again.");
+        setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, badges: data.badges! } : v)));
+        setToast(`${BADGE_LABEL[key]} badge ${decision === "grant" ? "granted" : decision === "reject" ? "rejected" : "revoked"}`);
+      })
+      .catch((err: Error) => setToast(err.message));
   };
 
   const dishCount = (v: ModerationVendor) =>
@@ -155,7 +246,7 @@ export default function MenuModerationConsole() {
       cell: (v) => (
         <div className="flex min-w-0 items-center gap-3">
           <span className="relative block h-10 w-14 shrink-0 overflow-hidden rounded-lg border border-cream-3 bg-cream-2">
-            <Image src={v.image} alt="" fill sizes="56px" className="object-cover" />
+            <Image src={v.image} unoptimized={photoNeedsUnoptimized(v.image)} alt="" fill sizes="56px" className="object-cover" />
           </span>
           <div className="min-w-0">
             <p className="truncate font-medium text-ink">{v.business}</p>
@@ -209,6 +300,30 @@ export default function MenuModerationConsole() {
         <StatCard icon={ShieldCheck} label="Approved" value={String(counts.approved)} />
         <StatCard icon={Close} label="Hidden" value={String(counts.hidden)} />
       </div>
+
+      {seeds && seeds.total > 0 && (
+        <div className="flex flex-col gap-3 rounded-card border border-cream-3 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-ink">Platform seed stalls (demo data)</p>
+            <p className="text-xs text-ink/60">
+              {seeds.total} demo stalls and the SAMPLE catalog cards are{" "}
+              {seedsHidden ? (
+                <strong>hidden from customers</strong>
+              ) : (
+                <strong>visible to customers</strong>
+              )}
+              . Hide them for launch so only approved real vendors show; the rows stay in the database and can be shown again.
+            </p>
+          </div>
+          <Button
+            variant={seedsHidden ? "secondary" : "primary"}
+            onClick={toggleSeeds}
+            disabled={seedsBusy}
+          >
+            {seedsBusy ? "Saving…" : seedsHidden ? "Show seed stalls" : "Hide all seed stalls"}
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <SearchBar
@@ -282,7 +397,7 @@ export default function MenuModerationConsole() {
               <Button
                 variant="primary"
                 onClick={() => setModeration(selected.id, "Approved")}
-                disabled={selected.moderation === "Approved"}
+                disabled={selected.moderation === "Approved" || selected.applicationStatus !== "Verified"}
               >
                 Approve Menu
               </Button>
@@ -301,6 +416,58 @@ export default function MenuModerationConsole() {
               )}
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
+
+            {selected.applicationStatus !== "Verified" && (
+              <p className="rounded-control border border-maroon/30 bg-maroon/5 px-3 py-2 text-sm text-ink">
+                {selected.applicationStatus
+                  ? `KYC application is ${selected.applicationStatus}. Approve it in Vendor Approvals before publishing this menu.`
+                  : "This vendor hasn't submitted their KYC application yet — their menu can't be published."}
+              </p>
+            )}
+            {selected.liveSnapshot && selected.moderation === "Pending" && (
+              <p className="text-sm text-ink-soft">
+                Customers currently see this vendor&apos;s last approved listing; approving publishes the edits below.
+              </p>
+            )}
+
+            {/* Recognition badges — vendors apply, only admins grant. */}
+            {(selected.badges?.applied.length || selected.badges?.granted.length) ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  Recognition Badges
+                </p>
+                <ul className="space-y-2">
+                  {(Object.keys(BADGE_LABEL) as RecognitionBadgeKey[])
+                    .filter((k) => selected.badges?.applied.includes(k) || selected.badges?.granted.includes(k))
+                    .map((k) => {
+                      const granted = Boolean(selected.badges?.granted.includes(k));
+                      return (
+                        <li key={k} className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-cream-3 px-3 py-2">
+                          <span className="text-sm font-medium text-ink">
+                            {BADGE_LABEL[k]} · {granted ? "Granted" : "Applied"}
+                          </span>
+                          <span className="flex gap-2">
+                            {granted ? (
+                              <Button size="sm" variant="secondary" onClick={() => decideBadge(selected.id, k, "revoke")}>
+                                Revoke
+                              </Button>
+                            ) : (
+                              <>
+                                <Button size="sm" variant="secondary" onClick={() => decideBadge(selected.id, k, "reject")}>
+                                  Reject
+                                </Button>
+                                <Button size="sm" onClick={() => decideBadge(selected.id, k, "grant")}>
+                                  Grant
+                                </Button>
+                              </>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
+            ) : null}
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <Detail label="City" value={`${selected.city}${selected.state ? `, ${selected.state}` : ""}`} />
@@ -348,7 +515,7 @@ export default function MenuModerationConsole() {
                         >
                           {it.photo ? (
                             <span className="relative block h-6 w-6 shrink-0 overflow-hidden rounded-full border border-cream-3">
-                              <Image src={it.photo} alt="" fill sizes="24px" className="object-cover" />
+                              <Image src={it.photo} alt="" unoptimized={photoNeedsUnoptimized(it.photo)} fill sizes="24px" className="object-cover" />
                             </span>
                           ) : (
                             <span className="w-1" />

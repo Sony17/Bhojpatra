@@ -15,6 +15,7 @@ import CreamLogo from "@/components/CreamLogo";
 import MenuBuilder from "@/components/vendor/MenuBuilder";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import type { LiveVendorRecord } from "@/lib/vendorMenus";
+import type { VendorApplicationStage } from "@/lib/vendorOnboarding";
 import type { VendorOrderSummary } from "@/lib/vendorOrders";
 import { sortTiers } from "@/lib/admin/types";
 import { cn } from "@/components/ui/cn";
@@ -111,8 +112,10 @@ const SOON: { label: string; icon: IconName; toast: string }[] = [
   { label: "Calendar", icon: "calendar", toast: "Calendar scheduling module — Coming Soon" },
   { label: "Finances", icon: "wallet", toast: "Partner finances & payouts — Coming Soon" },
   { label: "Reviews", icon: "star", toast: "Customer reviews & ratings — Coming Soon" },
-  { label: "Profile & KYC", icon: "shield", toast: "Statutory profile & compliance — Coming Soon" },
 ];
+/** Business profile + statutory KYC live in the onboarding wizard (steps 1–2),
+ *  which reopens pre-filled for a registered vendor. */
+const PROFILE_HREF = "/vendor/register";
 const TIER_LABEL: Record<string, string> = { Silver: "Silver / Bhoj City", Gold: "Gold / Bhoj Signature", Platinum: "Platinum / Bhoj Royale" };
 const BREADCRUMB: Record<Tab, string> = { dashboard: "Dashboard Home", services: "My Services", orders: "Orders" };
 
@@ -132,6 +135,23 @@ export default function VendorDashboard() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [now] = useState(() => Date.now());
+  /** The vendor's own KYC application (undefined while loading, null if none). */
+  const [application, setApplication] = useState<VendorApplicationView | null | undefined>(undefined);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/vendor/application")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (active) setApplication(d?.application ?? null);
+      })
+      .catch(() => {
+        if (active) setApplication(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -164,22 +184,34 @@ export default function VendorDashboard() {
     };
   }, [loadOrders]);
 
-  const act = async (o: VendorOrderSummary, action: "accept" | "decline") => {
+  const act = async (o: VendorOrderSummary, action: "accept" | "decline", reason?: string): Promise<boolean> => {
     const r = await fetch(`/api/vendor/orders/${encodeURIComponent(o.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...(reason ? { reason } : {}) }),
     }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
-    flash(r?.ok ? (action === "accept" ? "Booking accepted & capacity confirmed." : "Booking declined — the Bhojpatra team will follow up with the customer.") : d?.error || "Could not update booking.");
-    setReview(null);
+    flash(r?.ok ? (action === "accept" ? "Booking accepted & capacity confirmed." : "Booking declined — the customer has been told and the Bhojpatra team will follow up.") : d?.error || "Could not update booking.");
+    if (r?.ok) {
+      setReview(null);
+      setDeclining(null);
+    }
     await loadOrders();
+    return Boolean(r?.ok);
   };
+  // Decline is never one tap: it opens a confirm sheet asking for the reason
+  // the customer will be told.
+  const [declining, setDeclining] = useState<VendorOrderSummary | null>(null);
 
   const name = vendor?.business || fallbackName || "Your Business";
   const tier = vendor?.tiers?.length ? sortTiers(vendor.tiers).slice(-1)[0] : undefined;
   const diet = vendor?.dietaryOffering ? DIET_NAMES[vendor.dietaryOffering] : undefined;
-  const live = vendor?.moderation === "Approved";
+  // Live = approved, or a live vendor's edit pending review while their last
+  // approved listing stays up (same rule as `publishedView` on the server).
+  const live =
+    vendor?.moderation === "Approved" ||
+    (vendor?.moderation === "Pending" && Boolean(vendor?.approvedSnapshot) && Boolean(vendor?.verified));
+  const status = vendorStatus(vendor, live, application);
   const services = useMemo(() => buildServices(vendor), [vendor]);
   const configured = services.filter((s) => s.configured);
   const initials = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -227,8 +259,9 @@ export default function VendorDashboard() {
     pending,
     services,
     galleryCount: gallery.length,
+    status,
     onReview: setReview,
-    onDecline: (o) => act(o, "decline"),
+    onDecline: (o) => setDeclining(o),
     onPrep: setPrep,
     go,
     flash,
@@ -249,7 +282,7 @@ export default function VendorDashboard() {
             <div className="truncate text-sm font-bold text-white">{name}</div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-cream">
               <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-cream shadow-[0_0_0_2px_rgba(240,208,158,0.4)]" />
-              {vendor?.verified ? "Active Partner" : "Pending Verification"}
+              {live ? "Active Partner" : status.label}
             </div>
             {(diet || tier) && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -305,6 +338,13 @@ export default function VendorDashboard() {
               <span className="rounded-[3px] bg-ink/25 px-[5px] py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-cream/80">Soon</span>
             </button>
           ))}
+          <Link
+            href={PROFILE_HREF}
+            className="flex items-center gap-3 rounded-control px-3 py-[9px] text-left text-[13.5px] font-semibold text-cream/90 hover:bg-white/10 hover:text-white"
+          >
+            <Icon name="shield" />
+            <span className="flex-1">Profile & KYC</span>
+          </Link>
         </nav>
 
         <div className="flex flex-col gap-1.5 border-t border-cream/15 px-3 py-3.5">
@@ -316,6 +356,10 @@ export default function VendorDashboard() {
             <Icon name="edit" size={16} />
             Edit Menu & Services
           </button>
+          <Link href={PROFILE_HREF} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
+            <Icon name="note" size={16} />
+            Edit Business Profile
+          </Link>
           <button type="button" onClick={signOut} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
             <Icon name="logout" size={16} />
             Sign out
@@ -378,7 +422,7 @@ export default function VendorDashboard() {
           ) : tab === "services" ? (
             <ServicesHub services={services} onEdit={editServices} />
           ) : (
-            <OrdersPipeline orders={orders} upcoming={upcoming} onReview={setReview} onDecline={(o) => act(o, "decline")} onPrep={setPrep} />
+            <OrdersPipeline orders={orders} upcoming={upcoming} onReview={setReview} onDecline={(o) => setDeclining(o)} onPrep={setPrep} />
           )}
         </main>
       </div>
@@ -415,7 +459,8 @@ export default function VendorDashboard() {
       </nav>
 
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} onSoon={(m) => (setMoreOpen(false), flash(m))} onEdit={editServices} onSignOut={signOut} />
-      <BookingReviewModal order={review} onClose={() => setReview(null)} onAccept={(o) => act(o, "accept")} onDecline={(o) => act(o, "decline")} />
+      <BookingReviewModal order={review} onClose={() => setReview(null)} onAccept={(o) => void act(o, "accept")} onDecline={(o) => setDeclining(o)} />
+      <DeclineOrderSheet order={declining} onClose={() => setDeclining(null)} onConfirm={(o, reason) => act(o, "decline", reason)} />
       <PrepSheetModal order={prep} onClose={() => setPrep(null)} />
     </div>
   );
@@ -462,6 +507,10 @@ function MoreSheet({
           <span className="rounded-[3px] bg-cream/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-ink/70">Soon</span>
         </button>
       ))}
+      <Link href={PROFILE_HREF} className={row}>
+        <Icon name="shield" className="text-maroon" />
+        Profile & KYC
+      </Link>
       <a href="/contact" className={row}>
         <Icon name="help" className="text-maroon" />
         Partner Helpdesk
@@ -470,6 +519,10 @@ function MoreSheet({
         <Icon name="edit" className="text-maroon" />
         Edit Menu & Services
       </button>
+      <Link href={PROFILE_HREF} className={row}>
+        <Icon name="note" className="text-maroon" />
+        Edit Business Profile
+      </Link>
       <button type="button" onClick={onSignOut} className={cn(row, "border-b-0 text-maroon")}>
         Sign out
       </button>
@@ -500,7 +553,10 @@ function buildServices(v: LiveVendorRecord | null): ServiceCard[] {
   const extras = v?.customOfferings || [];
 
   const feast = Boolean(v && (cats.includes("full-catering") || dishes));
-  const stall = Boolean(cats.includes("single-stall") || stallCats.length);
+  // The declared offering decides — a leftover stall config on a vendor who
+  // never picked Single Stall must not show it as Active. Records saved before
+  // categories existed fall back to having stall categories configured.
+  const stall = cats.length ? cats.includes("single-stall") : stallCats.length > 0;
   const baina = Boolean(cats.includes("baina-box") || v?.bainaBoxes?.length);
   const hasCounters = comps.counters !== false && counters.length > 0;
   const hasExtras = Boolean(comps.extras && extras.length);
@@ -525,6 +581,12 @@ function buildServices(v: LiveVendorRecord | null): ServiceCard[] {
 }
 
 /* ── Dashboard Home ───────────────────────────────────────────────────────── */
+/** GET /api/vendor/application's vendor-facing view. */
+interface VendorApplicationView {
+  stage: VendorApplicationStage;
+  reviewReason?: string;
+}
+
 interface HomeCtx {
   vendor: LiveVendorRecord | null;
   tier?: string;
@@ -537,6 +599,8 @@ interface HomeCtx {
   pending?: VendorOrderSummary;
   services: ServiceCard[];
   galleryCount: number;
+  /** Application / listing status shown in the banner. */
+  status: { label: string; note: string };
   onReview: (o: VendorOrderSummary) => void;
   onDecline: (o: VendorOrderSummary) => void;
   onPrep: (o: VendorOrderSummary) => void;
@@ -577,12 +641,57 @@ function menuSpread(o: VendorOrderSummary, vendor: LiveVendorRecord | null) {
   return { dishes, counters };
 }
 
-function StatusPills({ live, tier, diet }: { live: boolean; tier?: string; diet?: string }) {
+/** The vendor's real onboarding outcome (not a perpetual "under review"). */
+function vendorStatus(
+  vendor: LiveVendorRecord | null,
+  live: boolean,
+  app: VendorApplicationView | null | undefined,
+): { label: string; note: string } {
+  const city = vendor?.city || "your city";
+  const reason = app?.reviewReason ? ` Reviewer note: “${app.reviewReason}”` : "";
+  if (live) {
+    return vendor?.moderation === "Pending"
+      ? {
+          label: "Live · Edits in Review",
+          note: `Your approved listing stays live in ${city} while your latest changes are reviewed.`,
+        }
+      : {
+          label: "Live on Marketplace",
+          note: `Your kitchen profile is active and discoverable for feast & stall bookings in ${city}.`,
+        };
+  }
+  if (vendor?.moderation === "Hidden") {
+    return { label: "Hidden by Admin", note: "Your listing has been taken down. Please contact the Bhojpatra team." };
+  }
+  switch (app?.stage) {
+    case "changes-requested":
+      return {
+        label: "Changes Requested",
+        note: `Our team needs a few updates before you can go live.${reason} Edit your registration and resubmit.`,
+      };
+    case "rejected":
+      return { label: "Application Not Approved", note: `Your application was not approved.${reason}` };
+    case "verified":
+      return { label: "Verified · Menu in Review", note: "Your KYC is verified. Your menu goes live once it's approved." };
+    case "pending":
+      return {
+        label: "Pending Review",
+        note: "Your application is under review (12–24h). You'll go live once KYC and menus are verified.",
+      };
+    default:
+      return {
+        label: "Registration Incomplete",
+        note: "Finish and submit your registration to be reviewed and listed on Bhojpatra.",
+      };
+  }
+}
+
+function StatusPills({ label, tier, diet }: { label: string; tier?: string; diet?: string }) {
   return (
     <>
       <span className={cn(PILL, "border border-maroon bg-white text-maroon")}>
         <span className="h-[7px] w-[7px] rounded-full bg-maroon" />
-        {live ? "Live on Marketplace" : "Pending Review"}
+        {label}
       </span>
       {tier && <span className={cn(PILL, "bg-maroon text-cream")}>{TIER_LABEL[tier] ?? tier}</span>}
       {diet && (
@@ -596,7 +705,7 @@ function StatusPills({ live, tier, diet }: { live: boolean; tier?: string; diet?
 }
 
 function DesktopHome(ctx: HomeCtx) {
-  const { vendor, tier, diet, live, orders, upcoming, next, days, pending, services, onReview, onDecline, onPrep, go, flash } = ctx;
+  const { vendor, tier, diet, live, orders, upcoming, next, days, pending, services, onReview, onDecline, onPrep, go } = ctx;
   const { payout, rating, reviews, checklist, completeness } = useHomeStats(ctx);
 
   return (
@@ -604,20 +713,17 @@ function DesktopHome(ctx: HomeCtx) {
       {/* 1. Operational status banner */}
       <section className={cn(CARD, "px-[18px] py-3")}>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPills live={live} tier={tier} diet={diet} />
+          <StatusPills label={ctx.status.label} tier={tier} diet={diet} />
         </div>
-        <p className="mt-2 text-[12.5px] text-ink/65">
-          {live
-            ? `Your kitchen profile is active and discoverable for feast & stall bookings in ${vendor?.city || "your city"}.`
-            : "Your profile is under express review (12–24h). You'll go live once KYC and menus are verified."}
-        </p>
-        <button
-          type="button"
-          onClick={() => flash(vendor?.verified ? "Compliance documents are verified and on record" : "Statutory profile & compliance — Coming Soon")}
-          className="mt-2 text-[12.5px] font-bold text-maroon hover:underline"
-        >
-          Compliance Settings →
-        </button>
+        <p className="mt-2 text-[12.5px] text-ink/65">{ctx.status.note}</p>
+        {!live && ctx.status.label !== "Pending Review" && ctx.status.label !== "Hidden by Admin" && (
+          <Link href="/vendor/register" className="mt-1 inline-block text-[12.5px] font-bold text-maroon hover:underline">
+            Open registration →
+          </Link>
+        )}
+        <Link href={PROFILE_HREF} className="mt-2 inline-block text-[12.5px] font-bold text-maroon hover:underline">
+          {vendor?.verified ? "Profile & Compliance →" : "Complete Profile & KYC →"}
+        </Link>
       </section>
 
       {/* 2. Action required */}
@@ -851,7 +957,7 @@ function NextEventSpotlight({
 }
 
 function MobileHome(ctx: HomeCtx) {
-  const { tier, diet, live, orders, upcoming, next, days, pending, onReview, onPrep } = ctx;
+  const { tier, diet, orders, upcoming, next, days, pending, onReview, onPrep } = ctx;
   const { payout, rating, reviews } = useHomeStats(ctx);
   const line = "flex items-start gap-1.5";
 
@@ -861,7 +967,7 @@ function MobileHome(ctx: HomeCtx) {
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cream/30 bg-white px-2.5 py-2 text-[11px] font-bold">
         <span className="flex items-center gap-1 text-maroon">
           <span className="h-[7px] w-[7px] rounded-full bg-maroon" />
-          {live ? "Live on Bhojpatra" : "Pending Review"}
+          {ctx.status.label}
         </span>
         {diet && (
           <span className="flex items-center gap-1">
@@ -1119,6 +1225,67 @@ function OrdersPipeline({
 }
 
 /* ── Modals ───────────────────────────────────────────────────────────────── */
+/** Confirm a decline and capture the reason the customer is emailed. */
+function DeclineOrderSheet({
+  order,
+  onClose,
+  onConfirm,
+}: {
+  order: VendorOrderSummary | null;
+  onClose: () => void;
+  onConfirm: (o: VendorOrderSummary, reason: string) => Promise<boolean>;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!order) return null;
+  const ok = reason.trim().length >= 3;
+  const close = () => {
+    setReason("");
+    onClose();
+  };
+  return (
+    <Sheet
+      open
+      onClose={close}
+      eyebrow="Decline booking"
+      title={`Decline ${order.id}?`}
+      footer={
+        <>
+          <BtnBack onClick={close}>Keep booking</BtnBack>
+          <BtnNext
+            onClick={async () => {
+              if (!ok || busy) return;
+              setBusy(true);
+              const done = await onConfirm(order, reason.trim());
+              setBusy(false);
+              if (done) setReason("");
+            }}
+          >
+            {busy ? "Declining…" : "Yes, decline"}
+          </BtnNext>
+        </>
+      }
+    >
+      <p className="text-sm text-ink">
+        {order.customer} · {fmtDate(order)} · {order.guests} guests. The customer will be emailed that you can&apos;t take
+        this booking, with your reason, and the Bhojpatra team will arrange another vendor or a refund. This can&apos;t be undone.
+      </p>
+      <label className="mt-4 block text-sm font-semibold text-ink">
+        Reason for the customer
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder="e.g. Already booked for another event that day"
+          className="mt-1.5 w-full resize-none rounded-control border border-cream-3 bg-white p-3 text-sm font-normal text-ink focus:border-maroon focus:outline-none"
+        />
+      </label>
+      {!ok && <p className="mt-1 text-xs text-ink-soft">A short reason is required.</p>}
+    </Sheet>
+  );
+}
+
 function BookingReviewModal({
   order,
   onClose,

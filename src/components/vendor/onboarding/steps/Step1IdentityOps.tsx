@@ -2,9 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { indianStates } from "@/lib/data";
+import { normalizePhone, PHONE_RE } from "@/lib/validate";
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
 import DietaryOfferingSelector from "../components/DietaryOfferingSelector";
 import { ChipAddInput, ChoiceChip, ContentCard, FieldError, FlowFooter, R, StepHeading } from "../ui";
+import PhotoUploadButton from "../builders/common/PhotoUploadButton";
 
 export interface Step1Data {
   ownerName: string;
@@ -19,13 +21,14 @@ export interface Step1Data {
   googleRating?: number;
   googleReviews?: number;
   accountId?: string;
+  /** Storefront cover photo (catalog card + detail hero). Upload or https link. */
+  image?: string;
 }
 
 interface Step1IdentityOpsProps {
   data: Step1Data;
   onChange: (updated: Partial<Step1Data>) => void;
   onContinue: () => void;
-  onSignIn: () => void;
   saving?: boolean;
 }
 
@@ -57,7 +60,6 @@ export default function Step1IdentityOps({
   data,
   onChange,
   onContinue,
-  onSignIn,
   saving = false,
 }: Step1IdentityOpsProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -86,6 +88,7 @@ export default function Step1IdentityOps({
     const e: Record<string, string> = {};
     if (!data.dietaryOffering) e.dietaryOffering = "Please select your kitchen's dietary offering before proceeding.";
     if (!data.businessName.trim()) e.businessName = "Registered Business Name is required.";
+    if (!PHONE_RE.test(normalizePhone(data.phone || ""))) e.phone = "Enter a valid 10-digit WhatsApp mobile number.";
     if (!data.city.trim()) e.city = "Primary Kitchen City is required.";
     if (!data.state.trim()) e.state = "State is required.";
     if (!data.serviceCities?.length) e.serviceCities = "Select at least one serviceable coverage city.";
@@ -94,6 +97,7 @@ export default function Step1IdentityOps({
     const first = Object.keys(e)[0];
     if (first) {
       if (first === "businessName") setEditingBiz(true);
+      if (first === "phone") setEditingPhone(true);
       document.getElementById(`field-${first}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -104,7 +108,10 @@ export default function Step1IdentityOps({
     onChange({ businessName: v });
     if (errors.businessName) setErrors((p) => ({ ...p, businessName: "" }));
   };
-  const editPhone = (v: string) => onChange({ phone: v });
+  const editPhone = (v: string) => {
+    onChange({ phone: v });
+    if (errors.phone) setErrors((p) => ({ ...p, phone: "" }));
+  };
 
   const cityOptions = withExtras(KITCHEN_CITIES, data.city ? [data.city] : []);
   const cuisineChips = withExtras(CUISINE_CHIPS, data.cuisines || []);
@@ -159,7 +166,7 @@ export default function Step1IdentityOps({
     <div className="animate-in fade-in duration-200">
       <StepHeading
         eyebrow="Vendor Identity & Operations"
-        heading="Your catering business identity"
+        heading="Your business identity"
         subtext="Enter your business identity once. It will be reused across all your feast packages, stalls, and gifting storefronts."
         mEyebrow="Vendor Identity"
         mHeading="Business details"
@@ -167,24 +174,6 @@ export default function Step1IdentityOps({
       />
 
       <ContentCard>
-        {/* Existing Vendor Direct Sign In Banner */}
-        <div className="existing-vendor-signin-banner">
-          <div className="signin-banner-text">
-            <strong>
-              <R d="Already registered as a Bhojpatra Vendor?" m="Registered Vendor?" />
-            </strong>
-            <span>
-              <R
-                d="Directly sign in to access your vendor dashboard, active pipeline, and kitchen orders."
-                m="Sign in directly to your vendor dashboard."
-              />
-            </span>
-          </div>
-          <button type="button" className="btn-banner-signin" onClick={onSignIn}>
-            <R d="Sign In to Dashboard →" m="Sign In →" />
-          </button>
-        </div>
-
         {/* Mandatory Dietary Offering */}
         <DietaryOfferingSelector
           id="field-dietaryOffering"
@@ -242,6 +231,7 @@ export default function Step1IdentityOps({
               <AccountItem label="Registered Account Email" value={data.email || "—"} />
             </div>
             <FieldError>{errors.businessName}</FieldError>
+            <FieldError>{errors.phone}</FieldError>
             <div className="account-reused-hint">
               ℹ️ Linked directly to your active Bhojpatra vendor login. These credentials are automatically preserved
               and never requested again.
@@ -283,6 +273,7 @@ export default function Step1IdentityOps({
               <MobileRow label="Email:" value={data.email || "—"} />
             </div>
             <FieldError>{errors.businessName}</FieldError>
+            <FieldError>{errors.phone}</FieldError>
             <div className="account-reused-hint" style={{ fontSize: 11 }}>
               ℹ️ Reused from active signup account. No re-entry required.
             </div>
@@ -449,6 +440,22 @@ export default function Step1IdentityOps({
               placeholder="e.g. 142"
             />
           </div>
+        </div>
+
+        <div style={{ marginTop: 10, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}>
+          <label className="form-label" style={{ marginBottom: 8, display: "block" }}>
+            <R d="Storefront Cover Photo" m="Cover Photo" />
+          </label>
+          <PhotoUploadButton
+            currentPhoto={data.image}
+            kind="card"
+            allowLink
+            aspectRatio="landscape"
+            label="Change Photo 📷"
+            helperText="Shown on your catalog card and storefront. Upload a photo of your food or stall, or paste an image link. Without one, a stock photo is used."
+            onPhotoUploaded={(url) => onChange({ image: url })}
+            onPhotoRemoved={() => onChange({ image: undefined })}
+          />
         </div>
       </ContentCard>
 

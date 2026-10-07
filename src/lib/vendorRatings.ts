@@ -61,7 +61,31 @@ export function useVendorRatings(): VendorRatings {
 export function statFor(
   ratings: VendorRatings,
   vendor: { id?: string; name: string },
+  { nameBridge = true }: { nameBridge?: boolean } = {},
 ): VendorRatingSummary | undefined {
   if (vendor.id && ratings.byId[vendor.id]) return ratings.byId[vendor.id];
+  if (!nameBridge) return undefined;
   return ratings.byName[slugifyName(vendor.name)];
+}
+
+/** The real rating for a /vendors storefront listing. Real (live) vendors
+ *  match by their own id ONLY — two businesses that happen to share a name
+ *  must never borrow each other's ratings. Curated sample listings keep the
+ *  seed bridge: their catalogue id, then the booking-roster stall they bridge
+ *  to, then the name slug. */
+export function storefrontStat(
+  ratings: VendorRatings,
+  listing: {
+    id: string;
+    name: string;
+    sample?: boolean;
+    stall?: { stallId: string } | null;
+  },
+): VendorRatingSummary | undefined {
+  if (!listing.sample) return ratings.byId[listing.id];
+  return (
+    ratings.byId[listing.id] ??
+    (listing.stall ? ratings.byId[listing.stall.stallId] : undefined) ??
+    ratings.byName[slugifyName(listing.name)]
+  );
 }

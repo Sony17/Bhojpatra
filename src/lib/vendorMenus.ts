@@ -16,6 +16,7 @@
  * item ids are minted as `${vendorId}-${index}` because the wizard relies on
  * that prefix to drop a de-selected vendor's items (multi-vendor tiers).
  */
+import { DEFAULT_VENDOR_IMAGE, isLinkedPhotoUrl } from "@/lib/photoLinks";
 import { randomUUID } from "crypto";
 import { createStore, readSingleton } from "@/lib/store";
 import {
@@ -35,6 +36,7 @@ import {
   type AddOnMenuItem,
   type DietType,
   type MenuCategory,
+  type StallTerms,
   type VendorListing,
 } from "@/lib/data";
 import {
@@ -292,6 +294,28 @@ export interface VendorBadgesState {
   applications?: VendorBadgeApplication[];
 }
 
+/** KYC documents the V2 onboarding wizard uploads (Step 2). */
+export type OnboardingDocKey = "gst" | "fssai";
+
+/** The vendor's private onboarding progress, saved with every draft so a
+ *  refresh (or a new device) resumes where they left off. Holds identity / KYC
+ *  details that never reach a customer surface — every public projection picks
+ *  its fields explicitly, so nothing here leaks. The submitted copy lives on
+ *  the vendor application. */
+export interface VendorOnboardingDraft {
+  ownerName?: string;
+  phone?: string;
+  gstNumber?: string;
+  fssaiNumber?: string;
+  /** Uploaded KYC files (ids in the KYC store) + their display names. */
+  docs?: Partial<Record<OnboardingDocKey, { id: string; fileName: string }>>;
+  /** Wizard position: step 1–6 and the furthest phase reached (0–5). */
+  step?: number;
+  maxPhase?: number;
+  /** Gold-tier per-plate rate shown on the feast builder. */
+  goldRate?: number;
+}
+
 export interface LiveVendorRecord {
   id: string;
   /** Auth user (role "vendor") who owns this profile. Absent on platform seeds. */
@@ -370,7 +394,35 @@ export interface LiveVendorRecord {
   badges?: VendorBadgesState;
   /** Feast Booking sub-components enabled for this vendor (Live Counters, Extras, Essentials, Add-ons). */
   cateringComponents?: CateringComponentsSelection;
+
+  /** Private onboarding progress (identity, KYC numbers, wizard step). */
+  onboarding?: VendorOnboardingDraft;
+  /** The last admin-approved public content, kept while a newer edit waits in
+   *  moderation (`moderation: "Pending"`) so a live vendor never drops off the
+   *  marketplace just because they edited their menu. Read it through
+   *  {@link publishedView}; cleared when the edit is approved or hidden. */
+  approvedSnapshot?: VendorPublishedSnapshot;
 }
+
+/** The public-facing slice of a vendor record captured at approval time —
+ *  everything except identity/bookkeeping fields that always come from the
+ *  live record (id, owner, ratings, verified, tiers, moderation). */
+export type VendorPublishedSnapshot = Omit<
+  LiveVendorRecord,
+  | "id"
+  | "ownerUserId"
+  | "ownerEmail"
+  | "rating"
+  | "reviews"
+  | "verified"
+  | "tiers"
+  | "moderation"
+  | "createdAt"
+  | "updatedAt"
+  | "onboarding"
+  | "approvedSnapshot"
+  | "badges"
+>;
 
 const store = createStore<LiveVendorRecord>({
   table: "vendors",
@@ -381,9 +433,8 @@ export function newVendorId(): string {
   return `VEN-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-/** Default card photo for live vendors (same curated Unsplash set as data.ts). */
-export const DEFAULT_VENDOR_IMAGE =
-  "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=500&q=70";
+/** Default card photo for live vendors — defined in `photoLinks` (client-safe). */
+export { DEFAULT_VENDOR_IMAGE } from "@/lib/photoLinks";
 
 /* ── Seeding ─────────────────────────────────────────────────────────────── */
 
@@ -578,6 +629,23 @@ export function saveVendor(record: LiveVendorRecord): Promise<void> {
   return store.upsert(record);
 }
 
+/** Platform seed stalls — the demo records with no owner account. */
+export async function listSeedVendorRecords(): Promise<LiveVendorRecord[]> {
+  const rows = await ensureSeededVendors();
+  return rows.filter((r) => !r.ownerUserId);
+}
+
+/**
+ * True once the admin has hidden the platform's seed stalls (Menu Moderation →
+ * "Hide all seed stalls"). The curated SAMPLE catalog listings in `data.ts`
+ * follow the same switch, so one button clears every demo vendor from the
+ * customer surfaces for launch.
+ */
+export async function seedStallsHidden(): Promise<boolean> {
+  const seeds = await listSeedVendorRecords();
+  return seeds.length > 0 && seeds.every((r) => r.moderation === "Hidden");
+}
+
 /** The admin's per-vendor dish-quota overrides (Vendor Management → vendor →
  *  Menu tab), shape-checked. A missing or broken settings row reads as "no
  *  overrides" — it must never take the menu (or a profile page) down. */
@@ -602,7 +670,12 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
     readVendorItemLimits(),
   ]);
   const { pins } = reconcileTopVendors(storedPins);
-  const visible = rows.filter((r) => r.moderation === "Approved");
+  // What customers may see: Approved records, plus a live vendor's last
+  // approved content while a newer edit waits in moderation.
+  const visible = rows.flatMap((r) => {
+    const view = publishedView(r);
+    return view ? [view] : [];
+  });
   return menuCategories.map((cat) => ({
     ...cat,
     vendors: orderByPins(
@@ -662,11 +735,34 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             ...(it.tiers?.length ? { tiers: it.tiers } : {}),
           })),
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
+          // The vendor's own Single Stall terms for this course, so the
+          // booking flow can enforce them (additive; absent when none set).
+          ...stallTermsFor(r, cat.id),
         },
       ];
       }),
     ),
   }));
+}
+
+/** `{ stallTerms }` for one course of a vendor's `/api/menu` entry — the
+ *  per-course `stallConfig.categoryPricing` (fixed per-plate rate, minimum
+ *  guest guarantee) plus the vendor-wide `minPax` / `leadHours`. Empty object
+ *  when the vendor declared none, so the payload is unchanged for them. */
+export function stallTermsFor(
+  r: Pick<LiveVendorRecord, "stallConfig" | "minPax" | "leadHours">,
+  categoryId: string,
+): { stallTerms?: StallTerms } {
+  const pricing = r.stallConfig?.categoryPricing?.[categoryId];
+  const terms: StallTerms = {
+    ...(pricing?.fixedPerPlate ? { fixedPerPlate: pricing.fixedPerPlate } : {}),
+    ...(pricing?.minPaxGuarantee
+      ? { minPaxGuarantee: pricing.minPaxGuarantee }
+      : {}),
+    ...(r.minPax ? { minPax: r.minPax } : {}),
+    ...(r.leadHours ? { leadHours: r.leadHours } : {}),
+  };
+  return Object.keys(terms).length ? { stallTerms: terms } : {};
 }
 
 /** Move admin-pinned brands to the front of a roster (pin order, `pinned`
@@ -709,6 +805,42 @@ const tiersFor = tiersForPrice;
 /** Project a live vendor record onto the catalog listing shape. Only records
  *  owned by a real vendor account with a published dish are listed — the
  *  platform seeds stay wizard-only (the static catalog already covers them). */
+/** Stall-builder category → the platform stall type (`addOns` counter id)
+ *  the /book/stall tiles and the catalog's counter filter use. Custom
+ *  categories and anything unmapped read as a generic live station. */
+const STALL_CATEGORY_TYPE: Record<string, string> = {
+  chaat: "chaat",
+  "street-food": "chaat",
+  juices: "mocktail",
+  mocktail: "mocktail",
+  beverages: "coffee",
+  coffee: "coffee",
+  "south-indian": "live",
+  "north-indian": "live",
+  "live-grills": "live",
+  live: "live",
+  breakfast: "live",
+  regional: "live",
+  pasta: "live",
+  chinese: "noodle",
+  snacks: "hi-tea",
+  "hi-tea": "hi-tea",
+  desserts: "dessert",
+  "ice-cream": "dessert",
+  dessert: "dessert",
+  pizza: "pizza",
+  momo: "momo",
+  waffle: "waffle",
+  pan: "pan",
+};
+
+/** Stall type ids a vendor's selected stall categories advertise. */
+export function stallTypeIdsFor(cfg: SingleStallConfig | undefined): string[] {
+  const out = new Set<string>();
+  for (const cat of cfg?.categories ?? []) out.add(STALL_CATEGORY_TYPE[cat] ?? "live");
+  return [...out];
+}
+
 export function toVendorListing(r: LiveVendorRecord): VendorListing {
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
   const diets = new Set(visible.flatMap((s) => s.items.map((i) => i.diet)));
@@ -735,6 +867,30 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
         : []),
     ]),
   );
+  // A vendor that sells only Baina Boxes / an Essential Service has no dish
+  // course to derive meals or categories from — declare what they DO sell so
+  // the catalog's CTA routes to the right flow instead of a stall booking.
+  const offeringCats = [
+    ...(r.bainaBoxes?.length ? ["baina-box"] : []),
+    ...(r.essentialService ? ["essential"] : []),
+  ];
+  const serviceCategories = r.serviceCategories?.length
+    ? r.serviceCategories
+    : visible.length === 0 && offeringCats.length
+      ? offeringCats
+      : undefined;
+  // Counters & services the catalog can filter on. A Feast vendor declares
+  // them on the Live Counters step; a Single Stall vendor only picks stall
+  // categories, so those are mapped onto the platform's stall types too —
+  // otherwise the /book/stall "What stall do you want?" tiles never count
+  // them and a counter-filtered catalog comes up empty.
+  const offeringIds = Array.from(
+    new Set([
+      ...(r.counters ?? []).map((c) => c.id),
+      ...stallTypeIdsFor(r.stallConfig),
+    ]),
+  );
+
   return {
     id: r.id,
     name: r.business,
@@ -748,26 +904,30 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     city: r.city,
     state: r.state,
     cuisines: r.cuisines,
-    mealTypes: mealTypes.length ? mealTypes : ["Main Course"],
+    mealTypes: mealTypes.length
+      ? mealTypes
+      : visible.length
+        ? ["Main Course"]
+        : r.bainaBoxes?.length
+          ? ["Desserts"]
+          : [],
     diet,
     priceFrom: r.priceFrom,
     verified: r.verified,
     image: r.image,
     ...(r.leadHours ? { leadDays: Math.ceil(r.leadHours / 24) } : {}),
-    ...(r.serviceCategories?.length
-      ? { serviceCategories: r.serviceCategories }
-      : {}),
+    ...(serviceCategories ? { serviceCategories } : {}),
     // Declared counters & services drive the catalog's "Add-ons" lens, and the
     // per-counter spread travels with them so the /book wizard lists this
     // vendor's own items rather than the untrimmed platform set menu. Only
     // counters the vendor actually edited carry a list.
-    ...(r.counters?.length
+    ...(offeringIds.length
       ? {
-          offerings: r.counters.map((c) => c.id),
-          ...(r.counters.some((c) => c.items || c.extras?.length)
+          offerings: offeringIds,
+          ...(r.counters?.some((c) => c.items || c.extras?.length)
             ? {
                 offeringItems: Object.fromEntries(
-                  r.counters
+                  (r.counters ?? [])
                     .filter((c) => c.items || c.extras?.length)
                     .map((c) => [c.id, counterItems(c)]),
                 ),
@@ -788,17 +948,29 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
   };
 }
 
-/** Live (account-owned) vendors that have published at least one dish. */
+/** Does a (published view of a) vendor have anything a customer can order —
+ *  a visible dish course, a Baina Box, or an Essential Service offer? A
+ *  boxes-only mithai house or a service-only crew is a real vendor too. */
+export function hasPublicOffering(
+  r: Pick<LiveVendorRecord, "menu" | "bainaBoxes" | "essentialService">,
+): boolean {
+  return (
+    (r.menu ?? []).some((s) => !s.hidden && s.items.length > 0) ||
+    Boolean(r.bainaBoxes?.length) ||
+    Boolean(r.essentialService)
+  );
+}
+
+/** Live (account-owned) vendors with something published — the customer-
+ *  visible view (`publishedView`), so an edit pending review keeps the last
+ *  approved listing up rather than dropping the vendor. */
 export async function listLiveVendorListings(): Promise<VendorListing[]> {
   const rows = await ensureSeededVendors();
-  return rows
-    .filter(
-      (r) =>
-        r.ownerUserId &&
-        r.moderation === "Approved" &&
-        r.menu.some((s) => !s.hidden && s.items.length > 0),
-    )
-    .map(toVendorListing);
+  return rows.flatMap((row) => {
+    if (!row.ownerUserId) return [];
+    const r = publishedView(row);
+    return r && hasPublicOffering(r) ? [toVendorListing(r)] : [];
+  });
 }
 
 /** Public profile for the /vendors/[id] detail page — a live vendor's visible
@@ -882,9 +1054,20 @@ export interface PublicVendorProfile {
   goldSpecialization?: string;
   cutleryTier?: CutleryTierOption;
   customOfferings?: VendorCustomOffering[];
-  stallConfig?: SingleStallConfig;
+  /** Display-only stall slice (see `publicStallConfig`). */
+  stallConfig?: PublicStallConfig;
   bainaDetails?: VendorBainaDetails;
-  badges?: VendorBadgesState;
+  /** Only badges an admin granted — never the application audit trail. */
+  badges?: { granted: RecognitionBadgeKey[] };
+}
+
+/** What a storefront may show of a vendor's Single Stall config. */
+export interface PublicStallConfig {
+  categories: string[];
+  equipment?: string[];
+  cutlery?: string;
+  /** Per stall course: the vendor's public terms. */
+  terms?: Record<string, { fixedPerPlate?: number; minPaxGuarantee?: number }>;
 }
 
 /** Resolve a vendor's declared counter ids into display rows (name/icon/price),
@@ -974,13 +1157,16 @@ export function counterItems(c: VendorCounter): AddOnMenuItem[] {
  *  over the caterer's own `tierItems` so the page shows the numbers the /book
  *  wizard will actually enforce. */
 export function toPublicVendorProfile(
-  r: LiveVendorRecord,
+  record: LiveVendorRecord,
   gallery: string[],
   adminQuotas?: VendorCourseLimits,
 ): PublicVendorProfile | null {
-  if (!r.ownerUserId || r.moderation !== "Approved") return null;
+  if (!record.ownerUserId) return null;
+  // The customer-visible view: Approved, or the last approved content while
+  // a newer edit waits in moderation.
+  const r = publishedView(record);
+  if (!r || !hasPublicOffering(r)) return null;
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
-  if (visible.length === 0) return null;
   return {
     id: r.id,
     business: r.business,
@@ -1036,10 +1222,41 @@ export function toPublicVendorProfile(
     ...(r.goldSpecialization ? { goldSpecialization: r.goldSpecialization } : {}),
     ...(r.cutleryTier ? { cutleryTier: r.cutleryTier } : {}),
     ...(r.customOfferings?.length ? { customOfferings: r.customOfferings } : {}),
-    ...(r.stallConfig ? { stallConfig: r.stallConfig } : {}),
+    // Whitelisted, display-only slices: the stall's categories / equipment /
+    // cutlery and per-course public terms — never the raw config — and only
+    // badges an admin actually GRANTED (no application details/criteria).
+    ...publicStallConfig(r.stallConfig),
     ...(r.bainaDetails ? { bainaDetails: r.bainaDetails } : {}),
-    ...(r.badges ? { badges: r.badges } : {}),
+    ...(r.badges?.granted?.length
+      ? { badges: { granted: [...r.badges.granted] } }
+      : {}),
   };
+}
+
+/** The storefront-safe slice of a vendor's Single Stall config (see
+ *  `PublicVendorProfile.stallConfig`). Empty object when nothing to show. */
+export function publicStallConfig(
+  c: SingleStallConfig | undefined,
+): { stallConfig?: PublicStallConfig } {
+  if (!c) return {};
+  const terms: PublicStallConfig["terms"] = {};
+  for (const [key, p] of Object.entries(c.categoryPricing ?? {})) {
+    if (p.fixedPerPlate || p.minPaxGuarantee) {
+      terms[key] = {
+        ...(p.fixedPerPlate ? { fixedPerPlate: p.fixedPerPlate } : {}),
+        ...(p.minPaxGuarantee ? { minPaxGuarantee: p.minPaxGuarantee } : {}),
+      };
+    }
+  }
+  const out: PublicStallConfig = {
+    categories: [...(c.categories ?? [])],
+    ...(c.equipment?.length ? { equipment: [...c.equipment] } : {}),
+    ...(c.cutlery ? { cutlery: c.cutlery } : {}),
+    ...(Object.keys(terms).length ? { terms } : {}),
+  };
+  return out.categories.length || out.equipment || out.cutlery || out.terms
+    ? { stallConfig: out }
+    : {};
 }
 
 /* ── Validation (PUT /api/vendor/menu) ───────────────────────────────────── */
@@ -1095,8 +1312,13 @@ const cleanMoney = (v: unknown, max: number): number | null => {
 /** Allow-list of live-counter / service ids a vendor may declare. */
 const OFFERING_IDS = new Set(vendorOfferingIds);
 
-/** Only our own photo-serving route is a valid dish-photo URL. */
+/** Our own photo-serving route — the uploaded-photo half of a dish photo. */
 const PHOTO_URL_RE = /^\/api\/vendor\/photo\/[A-Za-z0-9-]{1,64}$/;
+
+/** A valid dish / box photo: the vendor's own upload or a pasted https link. */
+function isDishPhotoUrl(v: unknown): v is string {
+  return typeof v === "string" && (PHOTO_URL_RE.test(v) || isLinkedPhotoUrl(v));
+}
 
 /** The photo id inside a `/api/vendor/photo/<id>` URL, or null. */
 export function photoIdFromUrl(url: string): string | null {
@@ -1138,6 +1360,8 @@ export interface VendorMenuInput {
   bainaDetails?: VendorBainaDetails;
   badges?: VendorBadgesState;
   cateringComponents?: CateringComponentsSelection;
+  /** Private wizard progress (identity, KYC numbers, step) — never public. */
+  onboarding?: VendorOnboardingDraft;
 }
 
 type BainaBoxesCheck =
@@ -1195,7 +1419,7 @@ export function cleanBainaBoxes(v: unknown): BainaBoxesCheck {
       customSizes.push({ label, price: sizePrice });
     }
     const photo =
-      typeof b.photo === "string" && PHOTO_URL_RE.test(b.photo)
+      isDishPhotoUrl(b.photo)
         ? b.photo
         : undefined;
     boxes.push({
@@ -1395,7 +1619,7 @@ export function cleanStallConfig(v: unknown): SingleStallConfig | undefined {
         if (!name) continue;
         const price = cleanMoney(it.price, 100000);
         const desc = cleanString(it.desc, 300);
-        const photo = typeof it.photo === "string" && PHOTO_URL_RE.test(it.photo) ? it.photo : undefined;
+        const photo = isDishPhotoUrl(it.photo) ? it.photo : undefined;
         items.push({
           name,
           diet: it.diet === "non-veg" ? "non-veg" : "veg",
@@ -1698,7 +1922,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       // Dish photos must be our own photo URLs; ownership is verified by the
       // route (it strips references to photos the vendor doesn't own).
       const photo =
-        typeof it.photo === "string" && PHOTO_URL_RE.test(it.photo)
+        isDishPhotoUrl(it.photo)
           ? it.photo
           : undefined;
       // Per-delicacy price — kept only when a positive amount is supplied; the
@@ -1855,12 +2079,10 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
   const essentialService = cleanEssentialService(body.essentialService);
 
   // Catering categories — the customer-facing offering types the vendor
-  // serves. Unknown ids are dropped, and a category whose builder has content
-  // is always declared (the declaration and the menu can't drift apart).
-  // Order follows the platform list.
+  // serves, exactly as they declared them (unknown ids dropped, platform
+  // order). Never inferred from builder content: a leftover box list or crew
+  // offer must not quietly enlist the vendor in a service they didn't pick.
   const declared = new Set(cleanCateringCategories(body.serviceCategories));
-  if (bainaBoxes.length) declared.add("baina-box");
-  if (essentialService) declared.add("essential");
   const serviceCategories = cateringCategoryIds.filter((id) =>
     declared.has(id),
   );
@@ -1876,7 +2098,9 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
   const customOfferings = cleanCustomOfferings(body.customOfferings);
   const stallConfig = cleanStallConfig(body.stallConfig);
   const bainaDetails = cleanBainaDetails(body.bainaDetails);
-  const badges = cleanBadges(body.badges);
+  // Vendors may apply for badges but never grant them — see stripBadgeGrants.
+  const badges = stripBadgeGrants(cleanBadges(body.badges));
+  const onboarding = cleanOnboardingDraft(body.onboarding);
   const cateringComponents = cleanCateringComponents(body.cateringComponents);
 
   return {
@@ -1912,6 +2136,232 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(bainaDetails ? { bainaDetails } : {}),
       ...(badges ? { badges } : {}),
       ...(cateringComponents ? { cateringComponents } : {}),
+      ...(onboarding ? { onboarding } : {}),
     },
+  };
+}
+
+/* ── Onboarding draft, badges & moderation (vendor saves / admin review) ──── */
+
+const KYC_ID_RE = /^KYC-[A-Z0-9]{1,16}$/;
+const ONBOARDING_DOC_KEYS: OnboardingDocKey[] = ["gst", "fssai"];
+
+/** Shape-check the wizard's private progress block. Lenient by design (drafts
+ *  save half-filled forms) — the strict checks run on Submit. */
+export function cleanOnboardingDraft(
+  v: unknown,
+): VendorOnboardingDraft | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const raw = v as Record<string, unknown>;
+  const ownerName = cleanString(raw.ownerName, 80);
+  const phone = cleanString(raw.phone, 20).replace(/[^\d+]/g, "");
+  const gstNumber = cleanString(raw.gstNumber, 20)
+    .replace(/\s/g, "")
+    .toUpperCase()
+    .slice(0, 15);
+  const fssaiNumber = cleanString(raw.fssaiNumber, 20)
+    .replace(/\D/g, "")
+    .slice(0, 14);
+  const docs: VendorOnboardingDraft["docs"] = {};
+  const rawDocs = (raw.docs ?? {}) as Record<string, unknown>;
+  for (const key of ONBOARDING_DOC_KEYS) {
+    const d = (rawDocs[key] ?? null) as Record<string, unknown> | null;
+    const id = d ? cleanString(d.id, 24) : "";
+    if (!KYC_ID_RE.test(id)) continue;
+    docs[key] = { id, fileName: cleanString(d?.fileName, 120) || key };
+  }
+  const intIn = (n: unknown, lo: number, hi: number) =>
+    typeof n === "number" && Number.isInteger(n) && n >= lo && n <= hi
+      ? n
+      : undefined;
+  const step = intIn(raw.step, 1, 6);
+  const maxPhase = intIn(raw.maxPhase, 0, 5);
+  const goldRate = cleanMoney(raw.goldRate, 100000);
+
+  const out: VendorOnboardingDraft = {
+    ...(ownerName ? { ownerName } : {}),
+    ...(phone ? { phone } : {}),
+    ...(gstNumber ? { gstNumber } : {}),
+    ...(fssaiNumber ? { fssaiNumber } : {}),
+    ...(Object.keys(docs).length ? { docs } : {}),
+    ...(step !== undefined ? { step } : {}),
+    ...(maxPhase !== undefined ? { maxPhase } : {}),
+    ...(goldRate ? { goldRate } : {}),
+  };
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Vendor-supplied badge state with every admin-only decision removed: nothing
+ *  is granted and every application reads "applied". Grants only ever come
+ *  from the admin moderation route ({@link applyBadgeDecision}). */
+export function stripBadgeGrants(
+  b: VendorBadgesState | undefined,
+): VendorBadgesState | undefined {
+  if (!b) return undefined;
+  const applications = (b.applications ?? []).map((a) => ({
+    ...a,
+    status: "applied" as const,
+  }));
+  if (!b.applied.length && !applications.length) return undefined;
+  return {
+    applied: b.applied,
+    granted: [],
+    ...(applications.length ? { applications } : {}),
+  };
+}
+
+export type BadgeDecision = "grant" | "reject" | "revoke";
+
+/** Admin decision on one recognition badge. Granting / rejecting settles the
+ *  vendor's open application for it; revoking removes a past grant. */
+export function applyBadgeDecision(
+  current: VendorBadgesState | undefined,
+  key: RecognitionBadgeKey,
+  decision: BadgeDecision,
+): VendorBadgesState {
+  const base: VendorBadgesState = current ?? { applied: [], granted: [] };
+  const granted = new Set(base.granted);
+  if (decision === "grant") granted.add(key);
+  else granted.delete(key);
+  const settled =
+    decision === "grant" ? "approved" : decision === "reject" ? "rejected" : null;
+  const applications = (base.applications ?? []).map((a) =>
+    settled && a.badgeKey === key && a.status === "applied"
+      ? { ...a, status: settled as VendorBadgeApplication["status"] }
+      : a,
+  );
+  return {
+    applied:
+      decision === "reject"
+        ? base.applied.filter((k) => k !== key)
+        : base.applied,
+    granted: [...VALID_BADGE_KEYS].filter((k) => granted.has(k)),
+    ...(applications.length ? { applications } : {}),
+  };
+}
+
+/** The public-facing content of a record (see {@link VendorPublishedSnapshot}). */
+export function toPublishedSnapshot(
+  r: LiveVendorRecord,
+): VendorPublishedSnapshot {
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const {
+    id,
+    ownerUserId,
+    ownerEmail,
+    rating,
+    reviews,
+    verified,
+    tiers,
+    moderation,
+    createdAt,
+    updatedAt,
+    onboarding,
+    approvedSnapshot,
+    badges,
+    ...content
+  } = r;
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+  return content;
+}
+
+/** JSON with object keys sorted at every level — records read back from
+ *  Postgres `jsonb` come with their keys reordered, so plain JSON.stringify
+ *  can't tell "unchanged" from "changed". */
+function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v as Record<string, unknown>)
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson((v as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v) ?? "null";
+}
+
+/** Does `next` change anything customers can see compared with `prev`? */
+export function publicContentChanged(
+  prev: LiveVendorRecord,
+  next: LiveVendorRecord,
+): boolean {
+  return (
+    stableJson(toPublishedSnapshot(prev)) !==
+    stableJson(toPublishedSnapshot(next))
+  );
+}
+
+/**
+ * Moderation state for a vendor-side save (menu PUT, card photo upload).
+ *
+ *   • First save: live at once when the vendor's KYC application is already
+ *     Verified, otherwise Pending.
+ *   • An admin takedown (Hidden) sticks until an admin restores it.
+ *   • A save that changes nothing customers see (wizard progress, KYC numbers,
+ *     identical content) keeps the current state.
+ *   • A real edit to an Approved vendor re-queues it as Pending but keeps the
+ *     approved content live via `approvedSnapshot`; further edits while still
+ *     Pending keep that same snapshot.
+ */
+export function nextModerationState(
+  existing: LiveVendorRecord | null,
+  next: LiveVendorRecord,
+  verified: boolean,
+): Pick<LiveVendorRecord, "moderation" | "approvedSnapshot"> {
+  if (!existing) {
+    return { moderation: verified ? "Approved" : "Pending" };
+  }
+  if (existing.moderation === "Hidden") return { moderation: "Hidden" };
+  if (!publicContentChanged(existing, next)) {
+    return {
+      moderation: existing.moderation ?? "Pending",
+      ...(existing.approvedSnapshot
+        ? { approvedSnapshot: existing.approvedSnapshot }
+        : {}),
+    };
+  }
+  if (existing.moderation === "Approved") {
+    return {
+      moderation: "Pending",
+      approvedSnapshot: toPublishedSnapshot(existing),
+    };
+  }
+  return {
+    moderation: "Pending",
+    ...(existing.approvedSnapshot
+      ? { approvedSnapshot: existing.approvedSnapshot }
+      : {}),
+  };
+}
+
+/**
+ * What customers should see for a vendor record, or `null` when it must not
+ * appear anywhere. EVERY customer-facing reader (catalog listing, public
+ * profile, /book wizard feed) should project through this:
+ *
+ *   • Approved → the record itself.
+ *   • Pending with an `approvedSnapshot` (a live vendor's edit awaiting
+ *     review) → the last approved content, with live identity / rating /
+ *     verified / tier fields, presented as Approved.
+ *   • Anything else (new vendor awaiting review, Hidden) → null.
+ */
+export function publishedView(r: LiveVendorRecord): LiveVendorRecord | null {
+  if (r.moderation === "Approved") return r;
+  if (r.moderation !== "Pending" || !r.approvedSnapshot || !r.verified) {
+    return null;
+  }
+  return {
+    ...r.approvedSnapshot,
+    id: r.id,
+    ...(r.ownerUserId ? { ownerUserId: r.ownerUserId } : {}),
+    ...(r.ownerEmail ? { ownerEmail: r.ownerEmail } : {}),
+    rating: r.rating,
+    reviews: r.reviews,
+    verified: r.verified,
+    ...(r.tiers ? { tiers: r.tiers } : {}),
+    ...(r.badges ? { badges: r.badges } : {}),
+    moderation: "Approved",
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
   };
 }

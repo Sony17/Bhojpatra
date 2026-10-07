@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import { randomUUID } from "crypto";
 import {
   KYC_ALLOWED_TYPES,
@@ -16,6 +17,8 @@ export const dynamic = "force-dynamic";
 
 // List uploaded documents, newest first (for the admin KYC review console).
 export async function GET() {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   const docs = await readKycDocuments();
   return Response.json({
     documents: docs.slice().reverse().map(publicKycShape),
@@ -23,6 +26,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Only a signed-in vendor uploads KYC, and the file is bound to that account
+  // — a stranger can neither plant documents nor attach them to someone else.
+  const user = await requireRole("vendor");
+  if (user instanceof Response) return user;
   let form: FormData;
   try {
     form = await request.formData();
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   const business = strField(form.get("business"));
-  const email = strField(form.get("email"));
+  const email = user.email;
 
   const id = `KYC-${randomUUID().slice(0, 8).toUpperCase()}`;
   const storedName = `${id}.${ext}`;
@@ -74,6 +81,7 @@ export async function POST(request: Request) {
       docKey,
       business,
       email,
+      ownerUserId: user.id,
       originalName: file.name || `${docKey}.${ext}`,
       storedName,
       ...(blobUrl ? { blobUrl } : {}),

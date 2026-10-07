@@ -19,6 +19,10 @@ async function readLocations(): Promise<LocationOption[]> {
  *
  * Best-effort city guess from the visitor's IP — no browser permission needed.
  * On Vercel this uses the built-in geo headers; no API key required.
+ *
+ * "No hint" is a normal outcome (always the case locally, and for any visitor
+ * whose IP city doesn't match a served location), so it answers 204 rather than
+ * a 404 the browser would log as a failed request on every page load.
  */
 export async function GET(request: Request) {
   const cityName =
@@ -30,21 +34,11 @@ export async function GET(request: Request) {
     request.headers.get("cf-region")?.trim() ||
     undefined;
 
-  if (!cityName) {
-    return Response.json(
-      { error: "No IP-based location hint available." },
-      { status: 404 },
-    );
-  }
+  if (!cityName) return new Response(null, { status: 204 });
 
   const locations = await readLocations();
   const matched = matchCityToLocation({ cityName, state }, locations);
-  if (!matched) {
-    return Response.json(
-      { error: "Could not match IP location hint." },
-      { status: 404 },
-    );
-  }
+  if (!matched) return new Response(null, { status: 204 });
 
   const response: MatchedLocation & { source: "ip" } = {
     ...matched,

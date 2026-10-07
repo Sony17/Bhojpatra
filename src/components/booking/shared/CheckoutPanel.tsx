@@ -52,6 +52,8 @@ export default function CheckoutPanel({
   emiCount,
   setEmiCount,
   onPaid,
+  onBeforePay,
+  couponList = coupons,
   confirming,
   confirmError,
   whatsappHref,
@@ -96,7 +98,12 @@ export default function CheckoutPanel({
   setPayMethod: (m: OrderPaymentMethod) => void;
   emiCount: number;
   setEmiCount: (n: number) => void;
-  onPaid: (amount: number, ref: string) => void;
+  onPaid: (amount: number, ref: string, verified?: boolean) => void;
+  /** Runs right before any money is taken (see PaymentBox). */
+  onBeforePay?: () => Promise<boolean>;
+  /** The offer tickets to show — the live coupon list where the flow has it
+   *  (Single Stall), else the static seed list. */
+  couponList?: Coupon[];
   confirming: boolean;
   confirmError: string;
   whatsappHref: string;
@@ -212,7 +219,7 @@ export default function CheckoutPanel({
             {t("Tap to apply", "लगाने के लिए टैप करें")}
           </p>
           <div className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {coupons.map((c) => {
+            {couponList.map((c) => {
               const save = Math.min((preDiscount * c.percent) / 100, c.cap);
               return (
                 <button
@@ -500,6 +507,7 @@ export default function CheckoutPanel({
       grandTotal={grandTotal}
       paidAmount={paidAmount}
       onPaid={onPaid}
+      onBeforePay={onBeforePay}
       customerName={customerName}
       customerPhone={customerPhone}
       customerEmail={customerEmail}

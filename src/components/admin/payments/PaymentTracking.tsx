@@ -34,8 +34,10 @@ interface LivePayment {
   refundedAmount?: number;
 }
 
-/** A failed gateway attempt moved no money — keep it out of every total. */
-const countsAsCollected = (p: AdminPayment) => p.status !== "Failed";
+/** A failed gateway attempt moved no money, and an unverified manual
+ *  transfer (Pending) isn't money yet — keep both out of every total. */
+const countsAsCollected = (p: AdminPayment) =>
+  p.status !== "Failed" && p.status !== "Pending";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -96,6 +98,27 @@ export default function PaymentTracking() {
     };
   }, []);
 
+  // Verify a manual UPI/QR transfer once its UTR is matched on the bank
+  // statement → "Advance Received". The server then re-syncs the booking from
+  // the ledger, which is what confirms a Pending booking.
+  const [verifyError, setVerifyError] = useState("");
+  const verify = async (p: AdminPayment) => {
+    setVerifyError("");
+    const res = await fetch(`/api/payments/${encodeURIComponent(p.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Advance Received" }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      const d = (await res?.json().catch(() => null)) as { error?: string } | null;
+      setVerifyError(d?.error ?? `Couldn't verify ${p.id}.`);
+      return;
+    }
+    setLive((prev) =>
+      prev.map((x) => (x.id === p.id ? { ...x, status: "Advance Received" } : x)),
+    );
+  };
+
   const liveCollected = live
     .filter(countsAsCollected)
     .reduce((sum, p) => sum + p.amount, 0);
@@ -113,14 +136,24 @@ export default function PaymentTracking() {
         <StatCard icon={Wallet} label="Advance" value={money(paymentsSummary.advance + liveCollected)} />
       </div>
 
-      <TransactionsTab live={live} />
+      {verifyError && (
+        <p role="alert" className="text-sm font-medium text-maroon">{verifyError}</p>
+      )}
+      <TransactionsTab live={live} onVerify={verify} />
     </div>
   );
 }
 
 /* ── Transactions ─────────────────────────────────────────────────────────── */
 
-function TransactionsTab({ live }: { live: AdminPayment[] }) {
+function TransactionsTab({
+  live,
+  onVerify,
+}: {
+  live: AdminPayment[];
+  onVerify: (p: AdminPayment) => Promise<void>;
+}) {
+  const liveIds = useMemo(() => new Set(live.map((p) => p.id)), [live]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [method, setMethod] = useState("All");
@@ -211,7 +244,30 @@ function TransactionsTab({ live }: { live: AdminPayment[] }) {
       className: "text-right",
       headerClassName: "text-right",
     },
-    { key: "status", header: "Status", cell: (p) => <StatusBadge status={p.status} /> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (p) =>
+        // An unverified manual transfer: the customer's UTR must be matched
+        // against the bank statement before it counts toward the booking.
+        p.status === "Pending" && liveIds.has(p.id) && p.method !== "Razorpay" ? (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={p.status} />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Mark ${p.id} (${money(p.amount)}, UTR ${p.ref ?? "—"}) as received?`)) void onVerify(p);
+              }}
+              className="text-xs font-semibold text-maroon underline underline-offset-2"
+            >
+              Verify received
+            </button>
+          </div>
+        ) : (
+          <StatusBadge status={p.status} />
+        ),
+    },
   ];
 
   return (

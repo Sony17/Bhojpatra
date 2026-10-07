@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { upiTxnRef } from "@/lib/upi";
-import { bookingOwner, receivedPayments } from "@/lib/bookingPaymentSync";
+import { getBooking, receivedPayments } from "@/lib/bookingPaymentSync";
+import { advanceDue, amountDueNow } from "@/lib/bookingRules";
 import {
   createRazorpayOrder,
   isRazorpayConfigured,
@@ -14,11 +15,18 @@ export const dynamic = "force-dynamic";
 // abuse, not a booking.
 const MAX_AMOUNT = 10_000_000;
 
-// Create a Razorpay Order for the booking advance. The client then opens
+// Create a Razorpay Order for what a booking owes next. The client then opens
 // Razorpay Checkout against the returned order id; the amount is bound to the
-// order, so checkout cannot settle a different figure. The booking record
-// itself is only created after payment (the wizard derives the id up front),
-// so the booking ref travels on the order's notes for the webhook to read.
+// order, so checkout cannot settle a different figure.
+//
+// When the booking exists (the Single Stall wizard creates it, server-priced,
+// before payment; My Bookings pays a balance) the amount comes from the
+// booking — the rest of the 10% advance, then the balance — and the client's
+// figure is ignored. Only the feast wizard still pays before its booking
+// exists; that charge is taken as asked, and the booking it later creates is
+// confirmed only if the ledger holds its full advance. The booking ref and the
+// payer's account travel on the order's (server-set) notes, which is what the
+// verify route and the webhook bind the payment to.
 export async function POST(request: Request) {
   // Same gate as recording a payment — checkout sits behind login.
   const guard = await requireRole();
@@ -38,7 +46,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { bookingId, amount, customer } = (body ?? {}) as Record<
+  const { bookingId, amount, customer, purpose } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -50,55 +58,86 @@ export async function POST(request: Request) {
     );
   }
 
-  const amt = typeof amount === "number" ? amount : Number(amount);
-  if (!Number.isFinite(amt) || amt <= 0 || amt > MAX_AMOUNT) {
-    return Response.json({ error: "Invalid amount." }, { status: 400 });
-  }
-
   // Someone else's booking — never charge against it, and never report its
   // payments as this customer's ("already paid" would confirm a free booking).
+  let booking: Awaited<ReturnType<typeof getBooking>>;
   try {
-    const owner = await bookingOwner(bookingId);
-    if (owner && owner !== guard.id) {
-      return Response.json(
-        {
-          error:
-            "This booking reference is already in use. Please refresh the page and try again.",
-        },
-        { status: 409 },
-      );
-    }
+    booking = await getBooking(bookingId);
   } catch (err) {
-    console.error("Failed to check booking owner before order", err);
+    console.error("Failed to read booking before order", err);
+    return Response.json(
+      { error: "Couldn't start the payment. Please try again." },
+      { status: 502 },
+    );
+  }
+  if (booking?.userId && booking.userId !== guard.id) {
+    return Response.json(
+      {
+        error:
+          "This booking reference is already in use. Please refresh the page and try again.",
+      },
+      { status: 409 },
+    );
+  }
+  if (booking?.status === "Cancelled") {
+    return Response.json(
+      { error: "This booking was cancelled — please don't pay for it." },
+      { status: 409 },
+    );
   }
 
-  // Double-charge guard: when the ledger already holds enough received money
-  // for this booking to cover the requested charge, refuse to open another
-  // checkout — a retry after "nothing updated" was how customers paid the same
-  // advance four times over. The recorded total travels back so the client can
-  // treat this as a payment that already succeeded and go straight to confirm.
+  // Only THIS account's received payments ever count (receivedPayments'
+  // owner filter) — so a 409 "already paid" below can never hand customer B
+  // the money customer A paid against the same id.
+  let rows: Awaited<ReturnType<typeof receivedPayments>> = [];
   try {
-    const rows = await receivedPayments(bookingId);
-    const recorded = rows.reduce((sum, p) => sum + p.amount, 0);
-    if (recorded >= Math.round(amt)) {
-      const last = rows[rows.length - 1];
-      return Response.json(
-        {
-          error:
-            "This payment is already recorded against your booking — you don't need to pay again.",
-          alreadyPaid: {
-            amount: recorded,
-            paymentId:
-              last?.razorpayPaymentId ?? last?.customerTxnId ?? last?.txnRef ?? "",
-          },
-        },
-        { status: 409 },
-      );
-    }
+    rows = await receivedPayments(bookingId, guard.id);
   } catch (err) {
     // The guard is protective, not load-bearing — if the ledger read fails,
     // fall through and let the payment proceed rather than blocking checkout.
     console.error("Failed to check recorded payments before order", err);
+  }
+  const recorded = rows.reduce((sum, p) => sum + p.amount, 0);
+  const alreadyPaid = () => {
+    const last = rows[rows.length - 1];
+    return Response.json(
+      {
+        error:
+          "This payment is already recorded against your booking — you don't need to pay again.",
+        alreadyPaid: {
+          amount: recorded,
+          paymentId:
+            last?.razorpayPaymentId ?? last?.customerTxnId ?? last?.txnRef ?? "",
+        },
+      },
+      { status: 409 },
+    );
+  };
+
+  let amt: number;
+  if (booking) {
+    // Server-derived: what this booking owes next. The ledger can be ahead of
+    // the booking row (a sync that hasn't landed), so take the larger paid.
+    const paidSoFar = Math.max(booking.paid ?? 0, recorded);
+    amt = amountDueNow(booking.amount, paidSoFar);
+    if (amt <= 0) return alreadyPaid();
+    // A checkout opened to pay the ADVANCE (the booking wizard) must never
+    // quietly turn into a balance charge because the advance already landed
+    // (e.g. a retry after a verify that didn't reach the browser).
+    if (purpose === "advance" && paidSoFar >= advanceDue(booking.amount)) {
+      return alreadyPaid();
+    }
+  } else {
+    amt = typeof amount === "number" ? amount : Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0 || amt > MAX_AMOUNT) {
+      return Response.json({ error: "Invalid amount." }, { status: 400 });
+    }
+    // Double-charge guard: a retry after "nothing updated" was how customers
+    // paid the same advance four times over.
+    if (recorded >= Math.round(amt)) return alreadyPaid();
+  }
+  if (amt > MAX_AMOUNT) {
+    return Response.json({ error: "Invalid amount." }, { status: 400 });
   }
 
   try {
@@ -107,6 +146,7 @@ export async function POST(request: Request) {
       receipt: upiTxnRef(bookingId, "ADVANCE"),
       notes: {
         bookingId,
+        userId: guard.id,
         ...(typeof customer === "string" && customer.trim()
           ? { customer: customer.trim().slice(0, 100) }
           : {}),

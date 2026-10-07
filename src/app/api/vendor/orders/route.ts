@@ -35,11 +35,15 @@ export async function GET() {
     }
 
     const allBookings = (await bookingStore.list()).slice().reverse();
-    const vendorBookings = allBookings.filter((b) => orderMatchesVendor(b, vendor));
+    // An order that's only an open checkout (nothing paid or reported yet)
+    // isn't the vendor's business until the customer actually places it.
+    const vendorBookings = allBookings.filter(
+      (b) => !b.awaitingPayment && orderMatchesVendor(b, vendor),
+    );
     const mapped = vendorBookings.map(toVendorOrderSummary);
 
     // Buckets follow the vendor's response, not `status` (which tracks payment:
-    // Pending = advance paid, balance due).
+    // Pending = advance not yet in, Confirmed = advance received).
     const active = (o: (typeof mapped)[number]) =>
       (o.status === "Pending" || o.status === "Confirmed") && !o.vendorDeclined;
     const pending = mapped.filter((o) => active(o) && !o.vendorAcknowledged);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import {
   addOns,
@@ -471,7 +472,7 @@ export default function StepExtras({
                             <div className="flex items-center gap-2.5 border-b border-cream-3 p-2.5 sm:gap-3 sm:p-3">
                               <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-cream-3 bg-cream-2">
                                 <Image
-                                  src={v.image}
+                                  src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                                   alt={v.name}
                                   fill
                                   sizes="44px"
@@ -629,7 +630,7 @@ export default function StepExtras({
                                 className="relative block h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-cream-2"
                               >
                                 <Image
-                                  src={v.image}
+                                  src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                                   alt=""
                                   fill
                                   sizes="32px"
@@ -696,7 +697,7 @@ export default function StepExtras({
                               >
                                 <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-cream-2">
                                   <Image
-                                    src={v.image}
+                                    src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                                     alt={v.name}
                                     fill
                                     sizes="44px"

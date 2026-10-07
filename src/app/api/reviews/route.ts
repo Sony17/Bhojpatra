@@ -1,4 +1,6 @@
 import { createStore } from "@/lib/store";
+import { requireRole } from "@/lib/auth";
+import type { StoredOrder } from "../bookings/route";
 
 // Reviews are written at request time to Postgres (Neon) — never prerender or
 // cache this handler.
@@ -36,6 +38,12 @@ export interface StoredReview {
 // booking; re-submitting updates in place.
 const store = createStore<StoredReview>({
   table: "reviews",
+  idField: "id",
+});
+
+// Read-only here: a review must hang off a booking the reviewer owns.
+const bookingStore = createStore<StoredOrder>({
+  table: "bookings",
   idField: "id",
 });
 
@@ -109,6 +117,10 @@ function buildReview(
 }
 
 export async function POST(request: Request) {
+  // Only the booking's own customer may rate it — otherwise anyone could post,
+  // overwrite or un-hide reviews for any vendor.
+  const user = await requireRole();
+  if (user instanceof Response) return user;
   let body: unknown;
   try {
     body = await request.json();
@@ -122,6 +134,14 @@ export async function POST(request: Request) {
     return Response.json(
       { error: "A booking is required to leave a review." },
       { status: 400 },
+    );
+  }
+
+  const booking = await bookingStore.get(bookingId);
+  if (!booking || booking.userId !== user.id) {
+    return Response.json(
+      { error: "You can only review your own bookings." },
+      { status: 403 },
     );
   }
 
@@ -154,6 +174,16 @@ export async function POST(request: Request) {
     reviews.push(built);
   }
 
+  // An edit keeps the admin's moderation and the original posting date — a
+  // resubmission must never un-hide a review the team unpublished.
+  for (const r of reviews) {
+    const prior = await store.get(r.id);
+    if (prior) {
+      r.createdAt = prior.createdAt;
+      if (prior.hidden) r.hidden = true;
+    }
+  }
+
   try {
     await store.upsertMany(reviews);
   } catch (err) {
@@ -169,8 +199,38 @@ export async function POST(request: Request) {
 
 // The home testimonials feed reads published reviews here, newest first.
 // Admin-hidden reviews are unpublished, so they never reach any public surface.
-export async function GET() {
-  const reviews = (await store.list()).filter((r) => !r.hidden);
+// Optional filters (a storefront needs only its own vendor's reviews):
+//   ?vendorId=<id>   — reviews rated against that catalogue / vendor id
+//                      (repeatable: a seed storefront also passes the id of
+//                      the booking-roster stall it bridges to).
+//   &name=<name>     — ALSO match by vendor-name slug. Only the curated static
+//                      seed storefronts pass this (their reviews may have been
+//                      stored under a wizard id + name); live vendors filter by
+//                      id alone so same-named businesses never share reviews.
+// No filter → the full public feed, as before.
+export async function GET(request: Request) {
+  const sp = new URL(request.url).searchParams;
+  const vendorIds = new Set(
+    sp.getAll("vendorId").map((v) => v.trim()).filter(Boolean),
+  );
+  const nameSlug = reviewNameSlug(sp.get("name") ?? "");
+  let reviews = (await store.list()).filter((r) => !r.hidden);
+  if (vendorIds.size) {
+    reviews = reviews.filter(
+      (r) =>
+        vendorIds.has(r.vendorId) ||
+        (nameSlug !== "" && reviewNameSlug(r.vendor ?? "") === nameSlug),
+    );
+  }
   reviews.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return Response.json({ reviews });
+}
+
+/** Vendor-name slug — same shape as `slugifyName` in `@/lib/bookings`. */
+function reviewNameSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

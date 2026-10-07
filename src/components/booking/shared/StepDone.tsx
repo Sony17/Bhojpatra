@@ -27,6 +27,8 @@ export default function StepDone({
   referrerName,
   onDownload,
   whatsappHref,
+  status,
+  verifying = false,
 }: {
   t: (en: string, hi: string) => string;
   bookingId: string;
@@ -43,7 +45,13 @@ export default function StepDone({
   referrerName: string;
   onDownload: () => void;
   whatsappHref: string;
+  /** The order's server-decided status, when the flow knows it. A Pending
+   *  order is "received", never "confirmed". Omitted → the legacy copy. */
+  status?: "Pending" | "Confirmed";
+  /** A manual UPI/QR transfer was reported and awaits the team's check. */
+  verifying?: boolean;
 }) {
+  const pending = status === "Pending";
   const total = Math.round(grandTotal);
   const balance = Math.max(0, total - paidAmount);
   const fullyPaid = paidAmount >= total;
@@ -71,7 +79,9 @@ export default function StepDone({
         ✓
       </div>
       <h1 className="mt-5 text-3xl text-ink sm:text-4xl">
-        {t("Booking Confirmed!", "बुकिंग पक्की!")}
+        {pending
+          ? t("Booking Received!", "बुकिंग मिल गई!")
+          : t("Booking Confirmed!", "बुकिंग पक्की!")}
       </h1>
       <p className="font-script mt-3 text-xl text-ink-soft">
         {t("your feast is on its way", "आपका भोज तैयार है")}
@@ -161,7 +171,17 @@ export default function StepDone({
       </div>
 
       <p className="mt-4 text-sm text-ink-soft">
-        {paidAmount > 0
+        {pending
+          ? verifying
+            ? t(
+                "We've noted your UPI payment and are matching it with our bank statement. Your booking is Pending until then — we'll email you as soon as it's confirmed.",
+                "हमने आपका UPI भुगतान दर्ज कर लिया है और बैंक स्टेटमेंट से मिला रहे हैं। तब तक आपकी बुकिंग लंबित है — पुष्टि होते ही हम आपको ईमेल करेंगे।",
+              )
+            : t(
+                "Your booking is Pending. Our team will call you to arrange the 10% advance, which confirms your date.",
+                "आपकी बुकिंग लंबित है। हमारी टीम 10% एडवांस की व्यवस्था के लिए आपको कॉल करेगी, जिससे आपकी तारीख पक्की होगी।",
+              )
+          : paidAmount > 0
           ? fullyPaid
             ? t(
                 "Payment received in full and a confirmation has been sent via WhatsApp and email. Our team will reach out to finalise the arrangements.",

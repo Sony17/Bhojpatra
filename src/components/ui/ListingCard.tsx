@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
@@ -53,7 +54,7 @@ export default function ListingCard({
           tappable. `pointer-events-none` lets taps fall through to the link. */}
       <div className="pointer-events-none relative aspect-[4/3] overflow-hidden bg-cream">
         <Image
-          src={image}
+          src={image} unoptimized={photoNeedsUnoptimized(image)}
           alt={imageAlt}
           fill
           priority={priority}

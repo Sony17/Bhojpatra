@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import {
   addOnMenu,
   cateringCategories,
@@ -1185,6 +1186,7 @@ export default function MenuBuilder() {
                   <Image
                     src={b.photo}
                     alt=""
+                    unoptimized={photoNeedsUnoptimized(b.photo)}
                     fill
                     sizes="104px"
                     className="object-cover"
@@ -2929,7 +2931,7 @@ function CategorySection({
                       className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-cream-3 bg-white text-xs transition hover:border-maroon disabled:cursor-not-allowed"
                     >
                       {it.photo ? (
-                        <Image src={it.photo} alt="" fill sizes="28px" className="object-cover" />
+                        <Image src={it.photo} alt="" unoptimized={photoNeedsUnoptimized(it.photo)} fill sizes="28px" className="object-cover" />
                       ) : (
                         <span aria-hidden="true">
                           {uploadingDish && photoTarget === i ? "…" : "📷"}

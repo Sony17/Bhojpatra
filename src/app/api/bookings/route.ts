@@ -9,27 +9,33 @@ import {
   DEFAULT_OCCASION_LEAD_DAYS,
   type BookingStatus,
 } from "@/lib/data";
-import type { EmiPlan } from "@/lib/emi";
+import { buildEmiPlan, emiOptionsForEvent, type EmiPlan } from "@/lib/emi";
 import type { InvoiceData } from "@/lib/invoice";
 import type { BookedVendor, BookingVendorReview } from "@/lib/bookings";
 import { createStore, readSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import type { PartnerRecord } from "@/app/api/partners/route";
-import type { StoredPayment } from "@/app/api/payments/route";
-import {
-  sendBookingConfirmation,
-  sendOrderAlert,
-  siteBaseUrl,
-} from "@/lib/email";
 import { parseListQuery } from "@/lib/validate";
-import { ADVANCE_RATE, MAX_GUESTS, MIN_GUESTS } from "@/lib/bookingPricing";
+import { MAX_GUESTS, MIN_GUESTS } from "@/lib/bookingPricing";
 import { customerPercentFor } from "@/lib/referralRates";
 import {
   expectedStallTotal,
   parseStallPricingClaim,
   readReferralRates,
+  resolveCoupon,
 } from "@/lib/stallOrderPricing";
+import {
+  advanceDue,
+  bookingStatusFor,
+  daysUntilIST,
+  hoursUntilEventIST,
+  slotConflict,
+  vendorMinGuests,
+} from "@/lib/bookingRules";
+import { paymentActivity, receivedPayments } from "@/lib/bookingPaymentSync";
+import { notifyOrderPlaced } from "@/lib/bookingNotify";
+import { findVendorById } from "@/lib/vendorMenus";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
 // admin booking console — never prerender or cache this.
@@ -108,6 +114,11 @@ export interface StoredOrder {
   review?: { rating: number; comment: string; createdAt: string };
   /** Set when the customer reopened a Completed booking (stops auto-complete). */
   reopened?: boolean;
+  /** Set while a Single Stall order exists only because checkout was opened
+   *  (created server-priced BEFORE payment, so the payment always has an order
+   *  to land on). Hidden from the vendor and announced to nobody until money
+   *  — or a manual transfer claim — lands (see bookingPaymentSync). */
+  awaitingPayment?: boolean;
   /** Vendor Portal response. Never moves `status` — Pending/Confirmed track
    *  payment, so a vendor's accept/decline is recorded alongside it. */
   vendorAcknowledged?: boolean;
@@ -132,20 +143,22 @@ const partnerStore = createStore<PartnerRecord>({
   idField: "code",
 });
 
-// The payments ledger — the authority on what has actually been paid. Both
-// online flows (Razorpay verify, manual UPI) record the payment BEFORE the
-// booking is confirmed, so at confirm time any genuine advance is already here.
-const paymentStore = createStore<StoredPayment>({
-  table: "payments",
-  idField: "id",
-});
-
 // List recorded orders, newest first (used by the admin booking console).
 // Backward-compatible: always returns `{ orders }` (the full newest-first list).
 // When any filter/pagination param is present it ALSO returns a `Paginated`
 // envelope (`data/page/pageSize/total`) over the filtered set.
 export async function GET(request: Request) {
-  const orders = (await store.list()).slice().reverse();
+  const guard = await requireRole("admin", "partner");
+  if (guard instanceof Response) return guard;
+  let orders = (await store.list()).slice().reverse();
+  // A partner only ever sees the orders booked with their own referral code
+  // (the Partner dashboard) — never anyone else's customer data.
+  if (guard.role !== "admin") {
+    const codes = new Set(
+      (guard.partnerRoles ?? []).map((m) => m.referralCode).filter(Boolean),
+    );
+    orders = orders.filter((o) => o.referralCode && codes.has(o.referralCode));
+  }
   const { q, status, city, page, pageSize, hasQuery } = parseListQuery(
     request.url,
   );
@@ -172,6 +185,21 @@ export async function GET(request: Request) {
   });
 }
 
+/**
+ * POST /api/bookings — place (or, before any payment, update) an order.
+ *
+ * Money and status are the server's alone: `amount` is re-priced from our own
+ * data for a Single Stall order, `paid` is whatever this customer's verified
+ * payments in the ledger add up to, and `status` follows from those two —
+ * Confirmed only once the 10% advance is in, otherwise Pending. A client's
+ * `status` / `paid` / `paymentRef` are ignored.
+ *
+ * `intent: "pay"` is the Single Stall wizard opening checkout: the order is
+ * stored Pending with `awaitingPayment` BEFORE any money moves, so the payment
+ * (verify / webhook / manual transfer) always lands on an order that exists,
+ * and the ledger sync confirms it. Anything else places the order outright
+ * (pay-later "Connect", Baina Box, venue, the feast wizard after it paid).
+ */
 export async function POST(request: Request) {
   // A booking may only be placed by a signed-in guest — reject anonymous posts
   // (the booking UI asks the visitor to log in before reaching this step).
@@ -205,15 +233,13 @@ export async function POST(request: Request) {
     city,
     venue,
     amount,
-    paid,
     paymentMethod,
-    paymentRef,
     emiPlan,
-    status,
+    emiCount,
+    intent,
     referralCode,
     referrerName,
     referrerType,
-    invoiceToken,
     receipt,
     invoice,
     vendors,
@@ -221,7 +247,7 @@ export async function POST(request: Request) {
     pricing,
   } = (body ?? {}) as Record<string, unknown>;
 
-  if (typeof id !== "string" || !/^BHJ-/.test(id)) {
+  if (typeof id !== "string" || !/^BHJ-[A-Za-z0-9-]{1,60}$/.test(id)) {
     return Response.json({ error: "Missing booking reference." }, { status: 400 });
   }
 
@@ -230,23 +256,65 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid amount." }, { status: 400 });
   }
 
-  // Advance-booking rule (server-side backstop for the wizard's date gate). The
-  // required notice is computed entirely from our own data — the client's
-  // claimed `leadDays` is never trusted. Fixed tiers (Silver/Gold/Platinum) use
-  // their authoritative package lead; Single-Stall / Custom (and any unknown
-  // package) re-derive it from the vendors actually on the order, so a tampered
-  // same-day payload can't slip past a standard stall's 2-day floor. A missing
-  // ISO date skips the check (legacy clients) rather than blocking the booking.
-  const iso = typeof eventDateISO === "string" ? eventDateISO : "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+  if (!isOrderPaymentMethod(paymentMethod)) {
+    return Response.json({ error: "Invalid payment method." }, { status: 400 });
+  }
+
+  // Only the booking's own customer may update it. A different account
+  // landing on an existing id must never overwrite (or inherit the payments
+  // of) someone else's order. Legacy rows without an owner stay updatable.
+  const existing = await store.get(id);
+  if (existing?.userId && existing.userId !== user.id) {
+    return Response.json(
+      {
+        error:
+          "This booking reference is already in use. Please refresh the page and try again.",
+      },
+      { status: 409 },
+    );
+  }
+  if (existing && existing.status !== "Pending" && existing.status !== "Confirmed") {
+    return Response.json(
+      {
+        error: `This booking is already ${existing.status.toLowerCase()}. Please start a new booking.`,
+        code: "BOOKING_CLOSED",
+      },
+      { status: 409 },
+    );
+  }
+
+  const occasionName = typeof occasion === "string" ? occasion : "";
+  const iso =
+    typeof eventDateISO === "string" && /^\d{4}-\d{2}-\d{2}$/.test(eventDateISO)
+      ? eventDateISO
+      : "";
+  const vendorIds = Array.isArray(vendors)
+    ? (vendors as BookedVendor[])
+        .map((v) => (v && typeof v.id === "string" ? v.id : ""))
+        .filter(Boolean)
+    : [];
+
+  // Baina Box orders ride the "custom" plan too but are priced per box (the
+  // panel posts no Single Stall pricing claim) and are always pay-later.
+  const isBainaBox =
+    packageId === "custom" &&
+    occasionName.trim().toLowerCase() === "baina box" &&
+    !pricing;
+  const isStall = packageId === "custom" && !isBainaBox;
+
+  // Advance-booking rule (server-side backstop for the wizard's date gate),
+  // counted in IST calendar days. The required notice is computed entirely
+  // from our own data — the client's claimed `leadDays` is never trusted.
+  // Fixed tiers (Silver/Gold/Platinum) use their authoritative package lead;
+  // Single-Stall / Custom (and any unknown package) re-derive it from the
+  // vendors actually on the order. A missing ISO date skips the check for
+  // legacy clients — but a Single Stall order must carry one.
+  if (isStall && !iso) {
+    return Response.json({ error: "Please pick an event date." }, { status: 400 });
+  }
+  if (iso && !isBainaBox) {
     const fixedLead =
       typeof packageId === "string" ? packageLeadDays[packageId] : undefined;
-    // Vendor ids on the order, used to re-derive the single-stall notice.
-    const vendorIds = Array.isArray(vendors)
-      ? (vendors as BookedVendor[])
-          .map((v) => (v && typeof v.id === "string" ? v.id : ""))
-          .filter(Boolean)
-      : [];
     const packageOrVendorLead =
       fixedLead !== undefined && packageId !== "custom"
         ? fixedLead
@@ -255,9 +323,9 @@ export async function POST(request: Request) {
     // mirrors the wizard's `max(packageLead, occasionLead)`.
     const requiredLead = Math.max(
       packageOrVendorLead,
-      await occasionLeadFromName(typeof occasion === "string" ? occasion : ""),
+      await occasionLeadFromName(occasionName),
     );
-    const days = daysUntilISO(iso);
+    const days = daysUntilIST(iso);
     if (days !== null && days < requiredLead) {
       return Response.json(
         {
@@ -268,37 +336,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-  }
-
-  if (!isOrderPaymentMethod(paymentMethod)) {
-    return Response.json({ error: "Invalid payment method." }, { status: 400 });
-  }
-
-  const paidAmt = typeof paid === "number" ? paid : Number(paid);
-
-  // Money integrity: the claimed `paid` must be backed by the payments ledger —
-  // a booking can claim at most what checkout actually recorded against its id,
-  // so a forged request can't invent a paid-and-confirmed order. Zero-paid
-  // bookings (Connect / pay-later) skip the lookup entirely.
-  let paidVerified = 0;
-  if (Number.isFinite(paidAmt) && paidAmt > 0) {
-    const recordedSum = (await paymentStore.list())
-      .filter(
-        (p) =>
-          p.bookingId === id &&
-          (p.status === "Advance Received" || p.status === "Settled"),
-      )
-      .reduce((sum, p) => sum + p.amount, 0);
-    if (recordedSum <= 0) {
-      return Response.json(
-        {
-          error:
-            "We couldn't verify your payment. If money left your account, don't pay again — contact us with your booking ID and we'll match it.",
-        },
-        { status: 400 },
-      );
-    }
-    paidVerified = Math.min(Math.round(paidAmt), recordedSum);
   }
 
   // Self-referral guard (authoritative): an Individual Referrer / Event Planner
@@ -344,65 +381,89 @@ export async function POST(request: Request) {
       ? { vegGuests: vegN, nonVegGuests: nonVegN }
       : null;
 
-  // Price integrity (Single Stall): the claimed `amount` must match what our
-  // own menu, extras, service and coupon data say this order costs — the
-  // wizard sends its pricing inputs alongside, and we re-run the same ladder.
-  // A doctored total (or a stall whose prices moved under the guest) is turned
-  // away rather than booked at the wrong figure.
-  if (packageId === "custom") {
-    const claim = parseStallPricingClaim(pricing);
-    if (!claim) {
-      return Response.json(
-        { error: "Missing order details. Please refresh and try again." },
-        { status: 400 },
-      );
-    }
-    if (guestCount < MIN_GUESTS || guestCount > MAX_GUESTS) {
-      return Response.json({ error: "Invalid guest count." }, { status: 400 });
-    }
-    const referralPercent =
-      !selfReferral && referrer
-        ? customerPercentFor(await readReferralRates(), referrer.type)
-        : 0;
-    let expected: number | null;
-    try {
-      expected = await expectedStallTotal(claim, guestCount, referralPercent);
-    } catch (err) {
-      console.error("Failed to re-price stall order", err);
-      return Response.json(
-        { error: "Couldn't verify the order total. Please try again." },
-        { status: 500 },
-      );
-    }
-    if (expected === null) {
-      return Response.json(
-        { error: "This stall isn't available to book right now." },
-        { status: 400 },
-      );
-    }
-    if (Math.abs(Math.round(expected) - Math.round(amt)) > 1) {
-      return Response.json(
-        {
-          error:
-            "The price of this order has changed. Please review your order again before confirming.",
-        },
-        { status: 409 },
-      );
-    }
+  // What this customer has already paid against this id, from the ledger —
+  // their own verified rows only. And whether any payment has started at all
+  // (incl. an unverified manual transfer): once it has, the price is frozen.
+  let ledgerPaid = 0;
+  let paymentStarted = false;
+  try {
+    ledgerPaid = (await receivedPayments(id, user.id)).reduce(
+      (sum, p) => sum + p.amount,
+      0,
+    );
+    paymentStarted = (await paymentActivity(id, user.id)).length > 0;
+  } catch (err) {
+    console.error("Failed to read the payments ledger", err);
+    return Response.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
   }
 
-  // The advance is what confirms a paid booking. When less than the 10% has
-  // actually been recorded (a short or doctored checkout), the order lands as
-  // Pending for the team to settle, never as Confirmed on someone's say-so.
-  const advanceDue = Math.round(Math.round(amt) * ADVANCE_RATE);
-  const claimedStatus: BookingStatus = isBookingStatus(status)
-    ? status
-    : "Confirmed";
-  const effectiveStatus: BookingStatus =
-    paidVerified > 0 && paidVerified < advanceDue && claimedStatus === "Confirmed"
-      ? "Pending"
-      : claimedStatus;
+  if (isStall) {
+    const rejected = await checkStallOrder({
+      id,
+      pricing,
+      guestCount,
+      amount: amt,
+      occasion: occasionName,
+      iso,
+      mealTime: typeof mealTime === "string" ? mealTime.trim() : "",
+      eventTime: typeof eventTime === "string" ? eventTime.trim() : "",
+      userId: user.id,
+      referralPercent:
+        !selfReferral && referrer
+          ? customerPercentFor(await readReferralRates(), referrer.type)
+          : 0,
+    });
+    if (rejected) return rejected;
+  }
 
+  // A payment was taken against this order — its price and contents are
+  // frozen. A repeat of the same order (retry, double-tap) is fine; a changed
+  // one must start over as a new booking rather than ride on that payment.
+  if (existing && paymentStarted && Math.round(amt) !== existing.amount) {
+    return Response.json(
+      {
+        error:
+          "A payment has already been made for this booking, so it can't be changed here. See it in My Bookings, or start a new booking.",
+        code: "BOOKING_LOCKED",
+      },
+      { status: 409 },
+    );
+  }
+
+  const total = Math.round(amt);
+  const paid = Math.min(total, Math.max(existing?.paid ?? 0, ledgerPaid));
+  // A Confirmed order (ledger- or admin-confirmed) never drops back on a
+  // repeat confirm.
+  const status =
+    existing?.status === "Confirmed" ? "Confirmed" : bookingStatusFor(total, paid);
+  // Still just an open checkout: nothing paid or reported yet, and this order
+  // was never placed outright before.
+  const awaitingPayment =
+    intent === "pay" &&
+    paid === 0 &&
+    !paymentStarted &&
+    (!existing || existing.awaitingPayment === true);
+
+  // EMI plan for the balance after the advance — rebuilt here from the chosen
+  // instalment count (never the client's schedule), and only where the event
+  // is far enough out for that many instalments.
+  const emiN = Math.round(
+    Number(
+      emiCount ??
+        (emiPlan && typeof emiPlan === "object"
+          ? (emiPlan as { count?: unknown }).count
+          : undefined),
+    ),
+  );
+  const plan: EmiPlan | undefined =
+    iso && emiN > 1 && emiOptionsForEvent(iso).includes(emiN)
+      ? buildEmiPlan(total - advanceDue(total), emiN, iso)
+      : undefined;
+
+  const nowIso = new Date().toISOString();
   const order: StoredOrder = {
     id,
     // Owner is taken from the session, not the request body, so it can't be
@@ -416,11 +477,9 @@ export async function POST(request: Request) {
     ...(typeof email === "string" && email.trim()
       ? { email: email.trim() }
       : {}),
-    occasion: typeof occasion === "string" ? occasion : "Feast",
+    occasion: occasionName || "Feast",
     date: typeof date === "string" ? date : "",
-    ...(typeof eventDateISO === "string" && /^\d{4}-\d{2}-\d{2}$/.test(eventDateISO)
-      ? { eventDateISO }
-      : {}),
+    ...(iso ? { eventDateISO: iso } : {}),
     ...(typeof mealTime === "string" && mealTime.trim()
       ? { mealTime: mealTime.trim() }
       : {}),
@@ -438,18 +497,20 @@ export async function POST(request: Request) {
     ...(typeof venue === "string" && venue.trim()
       ? { venue: venue.trim() }
       : {}),
-    amount: Math.round(amt),
-    paid: paidVerified,
+    amount: total,
+    paid,
     paymentMethod,
-    ...(typeof paymentRef === "string" && paymentRef.trim()
-      ? { paymentRef: paymentRef.trim() }
-      : {}),
-    ...(isEmiPlan(emiPlan) ? { emiPlan } : {}),
-    status: effectiveStatus,
-    createdAt: new Date().toISOString(),
-    ...(!selfReferral && typeof referralCode === "string" && referralCode.trim()
+    ...(existing?.paymentRef ? { paymentRef: existing.paymentRef } : {}),
+    ...(plan ? { emiPlan: plan } : {}),
+    status,
+    // A checkout that's re-opened keeps a fresh hold on the vendor's slot; a
+    // placed order keeps when it was first placed.
+    createdAt:
+      existing && !existing.awaitingPayment ? existing.createdAt : nowIso,
+    ...(awaitingPayment ? { awaitingPayment: true } : {}),
+    ...(!selfReferral && code
       ? {
-          referralCode: referralCode.trim(),
+          referralCode: code,
           referrerName:
             typeof referrerName === "string" && referrerName.trim()
               ? referrerName.trim()
@@ -459,31 +520,22 @@ export async function POST(request: Request) {
         }
       : {}),
     // Customer-facing extras carried from the booking flow (replace the old
-    // localStorage copy). Stored verbatim; the client built + validated them.
+    // localStorage copy). Stored verbatim; the client built them — the money
+    // fields above are what the server stands behind.
     ...(typeof receipt === "string" && receipt ? { receipt } : {}),
     ...(invoice && typeof invoice === "object"
-      ? { invoice: invoice as InvoiceData }
+      ? { invoice: { ...(invoice as InvoiceData), paid } }
       : {}),
     ...(Array.isArray(vendors) ? { vendors: vendors as BookedVendor[] } : {}),
     ...(isServiceSelection(service) ? { service } : {}),
   };
 
   // Idempotent on the booking id so a repeat confirm (double-tap, retry after a
-  // network blip) updates the existing record rather than duplicating it.
-  const existing = await store.get(order.id);
-  // …but only the booking's own customer may update it. A different account
-  // landing on an existing id must never overwrite (or inherit the payments
-  // of) someone else's order. Legacy rows without an owner stay updatable.
-  if (existing?.userId && existing.userId !== user.id) {
-    return Response.json(
-      {
-        error:
-          "This booking reference is already in use. Please refresh the page and try again.",
-      },
-      { status: 409 },
-    );
-  }
-  const merged = existing ? { ...existing, ...order } : order;
+  // network blip) updates the existing record rather than duplicating it. The
+  // vendor's response, notes and reviews already on it are kept.
+  const merged: StoredOrder = existing ? { ...existing, ...order } : order;
+  if (!awaitingPayment) delete merged.awaitingPayment;
+  if (!plan) delete merged.emiPlan;
   try {
     await store.upsert(merged);
   } catch (err) {
@@ -494,47 +546,169 @@ export async function POST(request: Request) {
     );
   }
 
-  // Email on a brand-new order (not on idempotent repeat confirms):
-  // owners get an alert, the signed-in customer gets a confirmation.
-  // The client sends only the invoice token; we rebuild the URL from our own
-  // trusted origin so this public endpoint can't inject an arbitrary link.
-  if (!existing) {
-    const token =
-      typeof invoiceToken === "string" &&
-      invoiceToken.length <= 8192 &&
-      /^[A-Za-z0-9_-]+$/.test(invoiceToken)
-        ? invoiceToken
-        : "";
-    const base = siteBaseUrl();
-    const invoiceUrl = token && base ? `${base}/bookings/invoice?d=${token}` : null;
-    await Promise.all([
-      sendOrderAlert(merged, invoiceUrl),
-      sendBookingConfirmation(merged, user.email, invoiceUrl),
-    ]);
+  // Announce the order once, the moment it's real — never for a checkout
+  // that's merely been opened, never again on a repeat confirm.
+  const wasPlaced = existing ? !existing.awaitingPayment : false;
+  if (!merged.awaitingPayment && !wasPlaced) {
+    await notifyOrderPlaced(merged, user.email);
   }
 
   return Response.json({ ok: true, order: merged }, { status: existing ? 200 : 201 });
 }
 
-function isBookingStatus(v: unknown): v is BookingStatus {
-  return (
-    v === "Pending" ||
-    v === "Confirmed" ||
-    v === "Completed" ||
-    v === "Cancelled"
-  );
-}
+/**
+ * Every server-side rule a Single Stall order must pass, in order: the menu
+ * re-prices to the claimed total (with a coupon validated against the live
+ * coupon table and the referral discount), the vendor is moderation-Approved,
+ * the head-count meets the platform's and the vendor's own minimum, the event
+ * is outside the vendor's lead time, and the vendor's slot is free. Returns
+ * the rejection response, or null when the order may be stored.
+ */
+async function checkStallOrder(req: {
+  id: string;
+  pricing: unknown;
+  guestCount: number;
+  amount: number;
+  occasion: string;
+  iso: string;
+  mealTime: string;
+  eventTime: string;
+  userId: string;
+  referralPercent: number;
+}): Promise<Response | null> {
+  const claim = parseStallPricingClaim(req.pricing);
+  if (!claim) {
+    return Response.json(
+      { error: "Missing order details. Please refresh and try again." },
+      { status: 400 },
+    );
+  }
+  if (req.guestCount < MIN_GUESTS || req.guestCount > MAX_GUESTS) {
+    return Response.json(
+      {
+        error: `Guests must be between ${MIN_GUESTS} and ${MAX_GUESTS.toLocaleString("en-IN")}.`,
+      },
+      { status: 400 },
+    );
+  }
 
-/** Whole days from today (UTC midnight) until a `YYYY-MM-DD` date. Null for an
- *  unparseable date. UTC keeps the backstop stable regardless of server TZ; the
- *  client already enforces the exact local-day gate. */
-function daysUntilISO(dateStr: string): number | null {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  const target = Date.UTC(y, m - 1, d);
-  const now = new Date();
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return Math.round((target - today) / 86_400_000);
+  const all = await store.list();
+
+  // Coupons come from the admin Coupon Manager table, validated here (active,
+  // in date, eligible) — never the client's copy of the list.
+  const isFirstBooking = !all.some(
+    (o) =>
+      o.userId === req.userId &&
+      o.id !== req.id &&
+      o.status !== "Cancelled" &&
+      !o.awaitingPayment,
+  );
+  const { coupon, error: couponError } = await resolveCoupon(claim.couponCode, {
+    occasion: req.occasion,
+    isFirstBooking,
+  });
+  if (couponError) {
+    return Response.json(
+      { error: couponError, code: "COUPON_INVALID" },
+      { status: 400 },
+    );
+  }
+
+  let quote: Awaited<ReturnType<typeof expectedStallTotal>>;
+  let vendorRecord: Awaited<ReturnType<typeof findVendorById>>;
+  try {
+    [quote, vendorRecord] = await Promise.all([
+      expectedStallTotal(claim, req.guestCount, req.referralPercent, coupon),
+      findVendorById(claim.stallId),
+    ]);
+  } catch (err) {
+    console.error("Failed to re-price stall order", err);
+    return Response.json(
+      { error: "Couldn't verify the order total. Please try again." },
+      { status: 500 },
+    );
+  }
+  // Off the roster (unknown, hidden, or not moderation-Approved).
+  if (
+    quote === null ||
+    !vendorRecord ||
+    (vendorRecord.moderation ?? "Approved") !== "Approved"
+  ) {
+    return Response.json(
+      { error: "This stall isn't available to book right now." },
+      { status: 400 },
+    );
+  }
+  if (quote.perPlate <= 0) {
+    return Response.json(
+      { error: "Pick at least one dish from this stall's menu." },
+      { status: 400 },
+    );
+  }
+  if (Math.abs(Math.round(quote.grandTotal) - Math.round(req.amount)) > 1) {
+    return Response.json(
+      {
+        error:
+          "The price of this order has changed. Please review your order again before confirming.",
+        code: "PRICE_CHANGED",
+      },
+      { status: 409 },
+    );
+  }
+
+  // The vendor's own stall terms (Vendor Portal → onboarding).
+  const minGuests = Math.max(
+    MIN_GUESTS,
+    vendorMinGuests(vendorRecord, quote.categoryIds),
+  );
+  if (req.guestCount < minGuests) {
+    return Response.json(
+      {
+        error: `${vendorRecord.business} takes orders of at least ${minGuests} guests. Please raise the guest count.`,
+        code: "MIN_GUESTS",
+      },
+      { status: 400 },
+    );
+  }
+  const leadHours = Number(vendorRecord.leadHours);
+  if (Number.isFinite(leadHours) && leadHours > 0) {
+    const hours = hoursUntilEventIST(req.iso, {
+      eventTime: req.eventTime,
+      mealTime: req.mealTime,
+    });
+    if (hours !== null && hours < leadHours) {
+      return Response.json(
+        {
+          error: `${vendorRecord.business} needs at least ${leadHours} hours' notice. Please pick a later date.`,
+          code: "LEAD_TIME",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Double-booking: one event per meal slot per vendor (and the vendor's
+  // per-day cap, when set). See `slotConflict` for which orders hold a slot.
+  const conflict = slotConflict(all, {
+    id: req.id,
+    vendorId: claim.stallId,
+    eventDateISO: req.iso,
+    mealTime: req.mealTime,
+    maxEventsPerDay: vendorRecord.maxEventsPerDay,
+  });
+  if (conflict) {
+    return Response.json(
+      {
+        error:
+          conflict === "slot"
+            ? `${vendorRecord.business} is already booked for ${req.mealTime ? req.mealTime.toLowerCase() : "that day"} on this date. Please pick another date or meal time, or another stall.`
+            : `${vendorRecord.business} is fully booked on this date. Please pick another date or another stall.`,
+        code: "SLOT_TAKEN",
+      },
+      { status: 409 },
+    );
+  }
+  return null;
 }
 
 /** The occasion's minimum advance notice (days), matched by name against the
@@ -567,16 +741,5 @@ function isServiceSelection(
     typeof s.name === "string" &&
     typeof s.price === "number" &&
     Number.isFinite(s.price)
-  );
-}
-
-/** Shallow shape-check for an EMI plan posted from the booking wizard. */
-function isEmiPlan(v: unknown): v is EmiPlan {
-  if (!v || typeof v !== "object") return false;
-  const p = v as Record<string, unknown>;
-  return (
-    typeof p.count === "number" &&
-    typeof p.balance === "number" &&
-    Array.isArray(p.installments)
   );
 }

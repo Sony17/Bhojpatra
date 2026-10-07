@@ -3,15 +3,21 @@ import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { parseListQuery } from "@/lib/validate";
 import { sendPaymentAlert } from "@/lib/email";
-import { syncBookingWithLedger } from "@/lib/bookingPaymentSync";
+import { getBooking, syncBookingWithLedger } from "@/lib/bookingPaymentSync";
+import { amountDueNow } from "@/lib/bookingRules";
 
 // Payments are recorded at request time to Postgres (Neon) — never prerender or
 // cache this handler.
 export const dynamic = "force-dynamic";
 
 export type StoredPaymentMethod = "UPI" | "QR" | "Razorpay";
-// A payment starts life as an advance and can later be settled or refunded by
-// the admin payment tracker (`/api/payments/[id]`). "Failed" rows are written
+// A gateway (Razorpay) payment starts life as "Advance Received" — the gateway
+// vouches for it. A manual UPI/QR transfer starts as "Pending": it is only the
+// customer's word (a UTR they typed) until the team matches it against the
+// bank statement and marks it received from the admin payment tracker
+// (`/api/payments/[id]`). Pending rows never count toward what a booking has
+// paid, so a made-up transaction id confirms nothing. Payments can later be
+// settled or refunded from the same tracker. "Failed" rows are written
 // only by the Razorpay webhook (payment.failed) as a record of an attempt that
 // moved no money — they never count toward what a booking has paid, and the
 // admin can't set or change them (they're absent from the settable list below).
@@ -32,6 +38,11 @@ export const STORED_PAYMENT_STATUSES: StoredPaymentStatus[] = [
 export interface StoredPayment {
   id: string;
   bookingId: string;
+  /** The signed-in account that made (or reported) the payment, from the
+   *  session. A booking only counts payments from its own owner, so money paid
+   *  against an id can never be claimed by another account. Absent on rows
+   *  recorded before payer tracking. */
+  userId?: string;
   customer: string;
   method: StoredPaymentMethod;
   type: "Advance";
@@ -67,6 +78,8 @@ const store = createStore<StoredPayment>({
 // List recorded payments, newest first (used by the admin payment tracker).
 // Backward-compatible `{ payments }`; adds a `Paginated` envelope when filtered.
 export async function GET(request: Request) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   const payments = (await store.list()).slice().reverse();
   const { q, status, method, page, pageSize, hasQuery } = parseListQuery(
     request.url,
@@ -114,9 +127,33 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing booking reference." }, { status: 400 });
   }
 
-  const amt = typeof amount === "number" ? amount : Number(amount);
+  // Only the booking's own customer may report a payment against it. When the
+  // booking already exists (the Single Stall flow creates it before payment),
+  // the amount is what it actually owes next — never the client's figure.
+  // A booking that doesn't exist yet (the feast wizard still pays first) is
+  // tagged with this account, so only this account's booking can count it.
+  const booking = await getBooking(bookingId);
+  if (booking && booking.userId !== guard.id && guard.role !== "admin") {
+    return Response.json({ error: "Booking not found." }, { status: 404 });
+  }
+  if (booking?.status === "Cancelled") {
+    return Response.json(
+      { error: "This booking was cancelled — please don't pay for it." },
+      { status: 409 },
+    );
+  }
+
+  const claimed = typeof amount === "number" ? amount : Number(amount);
+  const amt = booking ? amountDueNow(booking.amount, booking.paid) : claimed;
   if (!Number.isFinite(amt) || amt <= 0) {
-    return Response.json({ error: "Invalid amount." }, { status: 400 });
+    return Response.json(
+      {
+        error: booking
+          ? "Nothing is due on this booking right now."
+          : "Invalid amount.",
+      },
+      { status: booking ? 409 : 400 },
+    );
   }
 
   if (typeof vpa !== "string" || !isValidVpa(vpa)) {
@@ -140,15 +177,23 @@ export async function POST(request: Request) {
   const payments = await store.list();
 
   // Idempotent on the transaction reference so a repeat confirmation (e.g. the
-  // customer double-taps "I've paid") doesn't create a duplicate record.
+  // customer double-taps "I've paid") doesn't create a duplicate record — but
+  // only for the same payer; someone else's reference is never echoed back.
   const existing = payments.find((p) => p.txnRef === ref);
   if (existing) {
+    if (existing.userId && existing.userId !== guard.id) {
+      return Response.json(
+        { error: "This payment reference is already in use." },
+        { status: 409 },
+      );
+    }
     return Response.json({ ok: true, payment: existing }, { status: 200 });
   }
 
   const payment: StoredPayment = {
     id: `PMT-W${(payments.length + 1).toString().padStart(4, "0")}`,
     bookingId,
+    userId: guard.id,
     customer:
       typeof customer === "string" && customer.trim()
         ? customer.trim()
@@ -159,7 +204,8 @@ export async function POST(request: Request) {
     vpa: vpa.trim(),
     txnRef: ref,
     customerTxnId: customerRef,
-    status: "Advance Received",
+    // Unverified until the team matches the UTR (Payments → Verify).
+    status: "Pending",
     createdAt: new Date().toISOString(),
   };
 
@@ -173,17 +219,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // Mirror the ledger onto the booking row when it already exists (paid /
-  // status), so a payment recorded against a live order is never stranded in
-  // the tracker alone. Best-effort — the ledger row above is already safe.
+  // The order is now submitted (no longer a checkout in progress) but stays
+  // Pending — an unverified transfer moves no money on the booking. Best-effort:
+  // the ledger row above is already safe.
   try {
-    await syncBookingWithLedger(bookingId, { paymentRef: customerRef });
+    await syncBookingWithLedger(bookingId, {
+      paymentRef: customerRef,
+      submitted: true,
+    });
   } catch (err) {
     console.error(`Failed to sync booking ${bookingId} after payment`, err);
   }
 
   // A duplicate txnRef already returned above, so reaching here means a new
-  // payment — alert the owners (best-effort; never blocks the response).
+  // payment — ask the owners to verify it (best-effort; never blocks).
   await sendPaymentAlert(payment);
 
   return Response.json({ ok: true, payment }, { status: 201 });

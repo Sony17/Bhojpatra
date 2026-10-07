@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import { readKycDocuments, readKycFile } from "@/lib/kyc";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +10,14 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  // Admins review every file; a vendor may re-open only their own uploads.
+  const user = await requireRole("admin", "vendor");
+  if (user instanceof Response) return user;
   const { id } = await ctx.params;
 
   const docs = await readKycDocuments();
   const doc = docs.find((d) => d.id === id);
-  if (!doc) {
+  if (!doc || (user.role !== "admin" && doc.ownerUserId !== user.id)) {
     return Response.json({ error: "Document not found." }, { status: 404 });
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { refreshSession, useSessionStatus } from "@/lib/session";
+import { logout, refreshSession, useSessionStatus } from "@/lib/session";
 import VendorOnboarding from "./VendorOnboarding";
+import { writeDraft } from "./draft";
 import PublicShell from "@/components/app/PublicShell";
 import { Button } from "@/components/ui";
 
@@ -11,6 +12,8 @@ export default function RegistrationGateway() {
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
+  /** Customer → vendor conversion needs an explicit second click. */
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
 
   // Form states for signup / login
   const [fullName, setFullName] = useState("");
@@ -40,6 +43,11 @@ export default function RegistrationGateway() {
         setAuthError(data.error || "Failed to create vendor account.");
         return;
       }
+
+      // Accounts don't store a phone — hand the number to the onboarding
+      // wizard so Step 1's WhatsApp field arrives filled.
+      const digits = phone.replace(/\D/g, "").slice(-10);
+      if (digits) writeDraft(email, { phone: digits });
 
       await refreshSession();
     } catch {
@@ -86,12 +94,13 @@ export default function RegistrationGateway() {
       const res = await fetch("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "vendor" }),
+        body: JSON.stringify({ role: "vendor", confirm: true }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAuthError(data.error || "Failed to upgrade account.");
+        setConfirmUpgrade(false);
         return;
       }
 
@@ -122,7 +131,41 @@ export default function RegistrationGateway() {
     );
   }
 
-  // 3. Authenticated as a Customer
+  // Sign out (the logout route only accepts POST) and return to the signup form.
+  const useDifferentEmail = async () => {
+    setSubmitting(true);
+    await logout();
+    setSubmitting(false);
+    setConfirmUpgrade(false);
+    setAuthError("");
+  };
+
+  // 3. Authenticated as a referral partner — one email holds one role.
+  if (session && session.type === "partner") {
+    return (
+      <PublicShell>
+        <div className="mx-auto max-w-xl py-12 px-4 sm:px-6">
+          <div className="rounded-card border border-cream-3 bg-white p-6 sm:p-8 shadow-md text-center">
+            <h2 className="text-xl sm:text-2xl font-bold text-ink">Register a Catering Kitchen</h2>
+            <p className="mt-2 text-sm text-ink-soft leading-relaxed">
+              You&apos;re signed in as <strong className="text-ink">{session.email}</strong>, a Bhojpatra partner
+              account. Each email holds one account type, so a vendor account needs a different email address.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <Button type="button" size="lg" fullWidth disabled={submitting} onClick={useDifferentEmail}>
+                Sign out &amp; register with another email
+              </Button>
+              <Button href="/partner/dashboard" variant="secondary" size="sm" fullWidth>
+                Back to Partner Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PublicShell>
+    );
+  }
+
+  // 4. Authenticated as a Customer
   if (session && session.type === "customer") {
     return (
       <PublicShell>
@@ -148,6 +191,16 @@ export default function RegistrationGateway() {
               </ul>
             </div>
   
+            {confirmUpgrade && (
+              <div className="mt-4 rounded-control border border-maroon/30 bg-maroon/5 p-4 text-left text-xs text-ink">
+                <p className="font-semibold text-maroon">This converts your account to a vendor account.</p>
+                <p className="mt-1 leading-relaxed">
+                  One email holds one account type: your customer dashboard will be replaced by the vendor portal.
+                  Accounts with bookings can&apos;t be converted — use a different email for your kitchen instead.
+                </p>
+              </div>
+            )}
+
             {authError && (
               <p className="mt-4 text-xs text-maroon font-medium">{authError}</p>
             )}
@@ -157,16 +210,22 @@ export default function RegistrationGateway() {
                 type="button"
                 size="lg"
                 disabled={submitting}
-                onClick={handleUpgradeCustomerToVendor}
+                onClick={confirmUpgrade ? handleUpgradeCustomerToVendor : () => setConfirmUpgrade(true)}
                 fullWidth
               >
-                {submitting ? "Setting up vendor account..." : "Continue with this Account →"}
+                {submitting
+                  ? "Setting up vendor account..."
+                  : confirmUpgrade
+                    ? "Yes, convert to a vendor account"
+                    : "Continue with this Account →"}
               </Button>
               <Button
-                href="/api/auth/logout"
+                type="button"
                 variant="secondary"
                 size="sm"
                 fullWidth
+                disabled={submitting}
+                onClick={useDifferentEmail}
               >
                 Use a different email
               </Button>
@@ -177,7 +236,7 @@ export default function RegistrationGateway() {
     );
   }
 
-  // 4. Signed-out visitor -> Render the Vendor Registration Gateway
+  // 5. Signed-out visitor -> Render the Vendor Registration Gateway
   return (
     <PublicShell>
       <div className="mx-auto max-w-4xl py-8 px-4 sm:px-6 animate-in fade-in duration-200">

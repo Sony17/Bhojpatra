@@ -3,7 +3,8 @@
  * manages them.
  *
  * Each row is assembled live from a vendor's catalog record (`vendorMenus`) plus
- * the linked KYC application (`vendorApplications`, matched by login email), so a
+ * the linked KYC application (`vendorApplications`, matched by owning account,
+ * legacy rows by login email), so a
  * caterer who was just verified/approved shows up immediately. These are appended
  * to the curated platform catalog (`adminVendors`) so the console is never empty
  * while real registrations are still trickling in.
@@ -17,7 +18,10 @@ import {
   readVendorItemLimits,
   toVendorListing,
 } from "@/lib/vendorMenus";
-import { readVendorApplications } from "@/lib/vendorApplications";
+import {
+  applicationForOwner,
+  readVendorApplications,
+} from "@/lib/vendorApplications";
 import { adminVendors } from "@/lib/admin/mockData";
 import { menuCategories } from "@/lib/data";
 import { dishOnTier, effectiveTiers } from "@/lib/tiers";
@@ -46,16 +50,16 @@ async function realAdminVendors(): Promise<AdminVendor[]> {
     listLiveVendorRecords(),
     readVendorApplications(),
   ]);
-  const appByEmail = new Map(
-    apps.map((a) => [a.email.trim().toLowerCase(), a] as const),
-  );
 
   return [...records]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((r) => {
       const listing = toVendorListing(r);
-      const app = r.ownerEmail
-        ? appByEmail.get(r.ownerEmail.trim().toLowerCase())
+      const app = r.ownerUserId
+        ? (applicationForOwner(apps, {
+            id: r.ownerUserId,
+            email: r.ownerEmail ?? "",
+          }) ?? undefined)
         : undefined;
       const status: VerificationStatus =
         app?.status ?? (r.verified ? "Verified" : "Pending");

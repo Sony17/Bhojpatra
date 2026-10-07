@@ -24,6 +24,9 @@ interface Step2KycComplianceProps {
   businessName: string;
   email: string;
   onChange: (updated: Partial<Step2Data>) => void;
+  /** Set one document against the LATEST documents map — uploads finish out of
+   *  order, so a map captured when one started would drop the other's result. */
+  onDocChange: (key: string, doc: KycDocState) => void;
   onBack: () => void;
   onContinue: () => void;
   saving?: boolean;
@@ -40,13 +43,14 @@ export default function Step2KycCompliance({
   businessName,
   email,
   onChange,
+  onDocChange,
   onBack,
   onContinue,
   saving = false,
 }: Step2KycComplianceProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const setDoc = (key: string, doc: KycDocState) => onChange({ documents: { ...data.documents, [key]: doc } });
+  const setDoc = onDocChange;
 
   const upload = async (key: string, file: File) => {
     setDoc(key, { fileName: file.name, status: "uploading" });
@@ -76,6 +80,9 @@ export default function Step2KycCompliance({
     else if (!isValidGst(gst)) e.gstNumber = "Invalid GSTIN format (must be 15 alphanumeric characters).";
     if (!fssai) e.fssaiNumber = "FSSAI Licence is required.";
     else if (!/^\d{14}$/.test(fssai)) e.fssaiNumber = "FSSAI licence must be exactly 14 digits.";
+    if (Object.values(data.documents).some((d) => d.status === "uploading")) {
+      e.documents = "Please wait for your document uploads to finish.";
+    }
     setErrors(e);
     if (Object.keys(e).length) return;
     onContinue();
@@ -192,6 +199,7 @@ export default function Step2KycCompliance({
               );
             })}
           </div>
+          <FieldError>{errors.documents}</FieldError>
         </div>
       </ContentCard>
 

@@ -101,7 +101,8 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
 async function fetchIpHint(): Promise<MatchedLocation | null> {
   try {
     const res = await fetch("/api/geo/hint");
-    if (!res.ok) return null;
+    // 204 = no IP hint for this visitor.
+    if (!res.ok || res.status === 204) return null;
     return (await res.json()) as MatchedLocation;
   } catch {
     return null;

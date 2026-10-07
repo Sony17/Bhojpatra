@@ -25,6 +25,7 @@ const STATUS_OPTIONS = [
   { label: "Pending", value: "Pending" },
   { label: "Completed", value: "Completed" },
   { label: "Cancelled", value: "Cancelled" },
+  { label: "Declined by vendor", value: "Declined" },
 ];
 
 const STATUS_SET: BookingStatus[] = ["Pending", "Confirmed", "Completed", "Cancelled"];
@@ -61,7 +62,25 @@ function toAdminBooking(o: Record<string, unknown>): AdminBooking {
     ...(typeof o.referralCode === "string" ? { referralCode: o.referralCode } : {}),
     ...(typeof o.referrerName === "string" ? { referrerName: o.referrerName } : {}),
     ...(typeof o.referrerType === "string" ? { referrerType: o.referrerType } : {}),
+    ...(o.vendorDeclined === true
+      ? {
+          vendorDeclined: true,
+          ...(typeof o.vendorNotes === "string" && o.vendorNotes
+            ? { declineReason: o.vendorNotes }
+            : {}),
+        }
+      : {}),
+    ...(o.awaitingPayment === true ? { awaitingPayment: true } : {}),
   };
+}
+
+/** Small brand-toned flag next to a booking (declined / checkout open). */
+function Flag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-maroon px-2 py-0.5 text-[10px] font-semibold text-maroon">
+      {children}
+    </span>
+  );
 }
 
 export default function BookingManagement() {
@@ -71,6 +90,7 @@ export default function BookingManagement() {
   const [city, setCity] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState("");
 
   // Pull the real, persisted bookings from the API and surface them ahead of the
   // demo rows so genuine customer bookings show up in the console. Local status
@@ -114,15 +134,33 @@ export default function BookingManagement() {
 
   // Reuse the shared selector against live rows so locally-updated statuses are
   // respected (no duplicated filter logic).
-  const result = useMemo(
-    () => queryBookings({ q, status: status as never, city: city as never, page, pageSize: PAGE_SIZE }, rows),
-    [q, status, city, page, rows],
-  );
+  // "Declined by vendor" is a lens over the vendor's response, not a status.
+  const result = useMemo(() => {
+    if (status !== "Declined") {
+      return queryBookings({ q, status: status as never, city: city as never, page, pageSize: PAGE_SIZE }, rows);
+    }
+    const declined = rows.filter((b) => b.vendorDeclined && b.status !== "Cancelled");
+    return queryBookings({ q, status: "All", city: city as never, page, pageSize: PAGE_SIZE }, declined);
+  }, [q, status, city, page, rows]);
 
   const selected = selectedId ? rows.find((b) => b.id === selectedId) ?? null : null;
 
-  const setBookingStatus = (id: string, next: BookingStatus) =>
+  // Persisted through the admin PATCH (validated transitions). Demo rows that
+  // aren't in the database only change locally.
+  const setBookingStatus = async (id: string, next: BookingStatus) => {
+    setStatusError("");
+    const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    }).catch(() => null);
+    if (res && !res.ok && res.status !== 404) {
+      const d = (await res.json().catch(() => null)) as { error?: string } | null;
+      setStatusError(d?.error ?? "Couldn't update the booking.");
+      return;
+    }
     setRows((prev) => prev.map((b) => (b.id === id ? { ...b, status: next } : b)));
+  };
 
   const cityOptions = useMemo(
     () => [{ label: "All Cities", value: "All" }, ...bookingCities.map((c) => ({ label: c, value: c }))],
@@ -137,6 +175,8 @@ export default function BookingManagement() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium text-ink">{b.customer}</p>
+            {b.vendorDeclined && b.status !== "Cancelled" && <Flag>Declined by vendor</Flag>}
+            {b.awaitingPayment && <Flag>Checkout open</Flag>}
             {b.referralCode && (
               <span className="inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-[10px] font-semibold text-cream">
                 <span aria-hidden="true">★</span>
@@ -209,8 +249,20 @@ export default function BookingManagement() {
           <div className="space-y-5">
             <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <StatusBadge status={selected.status} />
+              {selected.vendorDeclined && <Flag>Declined by vendor</Flag>}
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
+
+            {selected.vendorDeclined && selected.status !== "Cancelled" && (
+              <div className="rounded-card border border-maroon bg-cream-2 p-4 text-sm text-ink">
+                <p className="font-semibold text-maroon">The vendor declined this booking.</p>
+                {selected.declineReason && <p className="mt-1">Reason: {selected.declineReason}</p>}
+                <p className="mt-1 text-ink-soft">
+                  Reassign the order, or set its status to Cancelled below and refund anything paid from{" "}
+                  <a href="/admin/refunds" className="font-semibold text-maroon underline underline-offset-2">Refunds</a>.
+                </p>
+              </div>
+            )}
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <Field label="Customer"><p className="text-sm text-ink">{selected.customer}</p></Field>
@@ -274,9 +326,10 @@ export default function BookingManagement() {
                   label="Update Status"
                   value={selected.status}
                   options={STATUS_SET.map((s) => ({ label: s, value: s }))}
-                  onChange={(v) => setBookingStatus(selected.id, v as BookingStatus)}
+                  onChange={(v) => void setBookingStatus(selected.id, v as BookingStatus)}
                 />
               </Field>
+              {statusError && <p className="mt-2 text-xs font-medium text-maroon">{statusError}</p>}
             </div>
           </div>
         )}

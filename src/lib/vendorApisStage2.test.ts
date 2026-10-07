@@ -20,6 +20,7 @@ import {
 } from "@/lib/vendorMenus";
 import {
   readVendorApplications,
+  removeVendorApplication,
   writeVendorApplications,
   type VendorApplicationRecord,
 } from "@/lib/vendorApplications";
@@ -29,20 +30,12 @@ import {
 } from "@/lib/vendorOrders";
 import type { StoredOrder } from "@/app/api/bookings/route";
 
-import { existsSync, readFileSync } from "node:fs";
-
-// Load .env.local if DATABASE_URL is not set in the environment
-if (!process.env.DATABASE_URL && existsSync(".env.local")) {
-  try {
-    const envContent = readFileSync(".env.local", "utf-8");
-    const match = envContent.match(/^DATABASE_URL=(.*)$/m);
-    if (match) {
-      process.env.DATABASE_URL = match[1].trim();
-    }
-  } catch {
-    // Ignore read errors
-  }
-}
+// The round-trip tests below write to the store, and the only store is the
+// LIVE Neon database (no file fallback). They therefore run only on explicit
+// opt-in against a scratch database:
+//   VENDOR_DB_TESTS=1 DATABASE_URL=<scratch db> npm test
+// `npm test` on its own never touches the database.
+const DB_TESTS = process.env.VENDOR_DB_TESTS === "1" && !!process.env.DATABASE_URL;
 
 /* ── 1. Vendor Menu: V2 Persistence & Cycle ─────────────────────────────── */
 
@@ -118,8 +111,8 @@ test("vendor menu: V2 fields survive request validation, persistence, and retrie
     ...check.value,
   };
 
-  // 2. Persistence & Retrieval (runs when DATABASE_URL is available)
-  if (!process.env.DATABASE_URL) {
+  // 2. Persistence & Retrieval (opt-in only — see DB_TESTS above)
+  if (!DB_TESTS) {
     return;
   }
 
@@ -260,13 +253,12 @@ test("applications: V2 onboarding payload persists correctly without losing fiel
     submittedAt: now,
   };
 
-  if (!process.env.DATABASE_URL) {
+  if (!DB_TESTS) {
     return;
   }
 
-  const apps = await readVendorApplications();
-  apps.push(newApp);
-  await writeVendorApplications(apps);
+  // Insert just this one record (never rewrite the whole table).
+  await writeVendorApplications([newApp]);
 
   const reloaded = await readVendorApplications();
   const found = reloaded.find((a) => a.id === appId);
@@ -282,8 +274,8 @@ test("applications: V2 onboarding payload persists correctly without losing fiel
   assert.deepEqual(found.badges?.applied, ["verified"]);
   assert.deepEqual(found.serviceCities, ["Lucknow", "Kanpur", "Varanasi"]);
 
-  // Cleanup test app
-  await writeVendorApplications(reloaded.filter((a) => a.id !== appId));
+  // Cleanup test app (upsertMany never deletes — remove it explicitly).
+  await removeVendorApplication(appId);
 });
 
 /* ── 3. Orders: Vendor Matching, Isolation & Status Transitions ─────────── */

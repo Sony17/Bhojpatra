@@ -4,6 +4,7 @@ import {
   getVendorPhoto,
   readPhotoFile,
 } from "@/lib/vendorPhotos";
+import { DEFAULT_VENDOR_IMAGE } from "@/lib/vendorMenus";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +19,30 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
 
-  const photo = await getVendorPhoto(id);
-  if (!photo) {
-    return Response.json({ error: "Photo not found." }, { status: 404 });
+  // Any failure to produce the bytes (unknown id, metadata DB hiccup, missing
+  // or unreadable Blob) degrades to the platform's default vendor image, so a
+  // storefront never renders a broken photo. The redirect is NOT cached — the
+  // photo may come back once the store recovers.
+  const fallback = () =>
+    new Response(null, {
+      status: 307,
+      headers: {
+        Location: DEFAULT_VENDOR_IMAGE,
+        "Cache-Control": "no-store",
+      },
+    });
+
+  let photo: Awaited<ReturnType<typeof getVendorPhoto>>;
+  try {
+    photo = await getVendorPhoto(id);
+  } catch (err) {
+    console.error("Failed to load vendor photo record", id, err);
+    return fallback();
   }
+  if (!photo) return fallback();
 
   const file = await readPhotoFile(photo);
-  if (!file) {
-    return Response.json(
-      { error: "Photo is no longer available." },
-      { status: 404 },
-    );
-  }
+  if (!file) return fallback();
 
   return new Response(file as BodyInit, {
     status: 200,

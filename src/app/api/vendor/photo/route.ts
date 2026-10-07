@@ -1,5 +1,10 @@
 import { requireRole } from "@/lib/auth";
-import { findVendorByOwner, saveVendor } from "@/lib/vendorMenus";
+import {
+  findVendorByOwner,
+  nextModerationState,
+  saveVendor,
+} from "@/lib/vendorMenus";
+import { findApplicationForOwner } from "@/lib/vendorApplications";
 import {
   DISH_MAX_PHOTOS,
   GALLERY_MAX_PHOTOS,
@@ -17,7 +22,8 @@ export const dynamic = "force-dynamic";
 // multipart/form-data: "file" (JPG/PNG/WebP, ≤5 MB) + optional "kind"
 // ("card" default | "dish" | "gallery").
 //   card    — replaces the previous card photo; if the vendor already saved a
-//             profile, its card image is updated immediately.
+//             profile, its card image is updated (re-queued for moderation
+//             like any public edit — see nextModerationState).
 //   dish    — appended; referenced from a menu item on the next menu save
 //             (orphans are pruned then).
 //   gallery — appended, capped at GALLERY_MAX_PHOTOS.
@@ -85,10 +91,14 @@ export async function POST(request: Request) {
     if (kind === "card") {
       const vendor = await findVendorByOwner(guard.id);
       if (vendor) {
+        // The card photo is public content: same moderation rule as a menu
+        // save (a live vendor stays live on their approved photo meanwhile).
+        const next = { ...vendor, image: url, updatedAt: new Date().toISOString() };
+        const app = await findApplicationForOwner(guard);
         await saveVendor({
-          ...vendor,
-          image: url,
-          updatedAt: new Date().toISOString(),
+          ...next,
+          approvedSnapshot: undefined,
+          ...nextModerationState(vendor, next, app?.status === "Verified"),
         });
       }
     }

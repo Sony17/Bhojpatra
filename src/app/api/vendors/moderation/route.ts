@@ -1,5 +1,9 @@
 import { requireRole } from "@/lib/auth";
 import { listLiveVendorRecords } from "@/lib/vendorMenus";
+import {
+  applicationForOwner,
+  readVendorApplications,
+} from "@/lib/vendorApplications";
 import { listPhotosByOwner, photoUrl } from "@/lib/vendorPhotos";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +16,10 @@ export async function GET() {
   if (guard instanceof Response) return guard;
 
   try {
-    const records = await listLiveVendorRecords();
+    const [records, apps] = await Promise.all([
+      listLiveVendorRecords(),
+      readVendorApplications(),
+    ]);
     const vendors = await Promise.all(
       records.map(async (r) => ({
         id: r.id,
@@ -25,6 +32,16 @@ export async function GET() {
         image: r.image,
         verified: r.verified,
         moderation: r.moderation ?? "Pending",
+        // KYC application status — menu approval requires "Verified".
+        applicationStatus: r.ownerUserId
+          ? (applicationForOwner(apps, {
+              id: r.ownerUserId,
+              email: r.ownerEmail ?? "",
+            })?.status ?? null)
+          : null,
+        // A live vendor's last approved content is still what customers see.
+        liveSnapshot: Boolean(r.approvedSnapshot),
+        badges: r.badges ?? null,
         updatedAt: r.updatedAt,
         menu: r.menu,
         gallery: r.ownerUserId

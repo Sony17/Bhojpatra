@@ -1,5 +1,6 @@
+import { isLinkedPhotoUrl } from "@/lib/photoLinks";
 import { requireRole } from "@/lib/auth";
-import { readVendorApplications } from "@/lib/vendorApplications";
+import { findApplicationForOwner } from "@/lib/vendorApplications";
 import {
   findPhotoByOwner,
   listPhotosByOwner,
@@ -11,24 +12,22 @@ import {
   DEFAULT_VENDOR_IMAGE,
   findVendorByOwner,
   newVendorId,
+  nextModerationState,
   photoIdFromUrl,
   pruneMenuBands,
   saveVendor,
   validateVendorMenuInput,
   type LiveVendorRecord,
-  type ModerationStatus,
   type VendorBainaBox,
 } from "@/lib/vendorMenus";
 import { effectiveTiers } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
-/** The signed-in vendor's approved/pending application, matched by email —
+/** The signed-in vendor's application (by account, legacy rows by email) —
  *  used to prefill a first-time menu and to grant the verified badge. */
-async function applicationFor(email: string) {
-  const apps = await readVendorApplications();
-  const key = email.trim().toLowerCase();
-  return apps.find((a) => a.email.trim().toLowerCase() === key) ?? null;
+function applicationFor(user: { id: string; email: string }) {
+  return findApplicationForOwner(user);
 }
 
 // GET /api/vendor/menu → { vendor: LiveVendorRecord | null, prefill? }
@@ -47,7 +46,7 @@ export async function GET() {
     const vendor = await findVendorByOwner(guard.id);
     if (vendor) return Response.json({ vendor, gallery });
 
-    const app = await applicationFor(guard.email);
+    const app = await applicationFor(guard);
     return Response.json({
       vendor: null,
       gallery,
@@ -86,10 +85,11 @@ export async function GET() {
             customOfferings: app.customOfferings ?? [],
             stallConfig: app.stallConfig,
             bainaDetails: app.bainaDetails,
-            badges: app.badges,
             cateringComponents: app.cateringComponents,
           }
-        : { business: guard.name ?? "" },
+        // No application yet: the wizard asks for the business name rather
+        // than guessing it from the account holder's own name.
+        : {},
     });
   } catch (err) {
     console.error("Failed to load vendor menu", err);
@@ -119,18 +119,23 @@ export async function PUT(request: Request) {
 
   try {
     const existing = await findVendorByOwner(guard.id);
-    const app = await applicationFor(guard.email);
+    const app = await applicationFor(guard);
     const now = new Date().toISOString();
 
     // Card image: their uploaded photo wins (covers a photo uploaded before
     // the first menu save), then whatever the record already had, then stock.
+    // A pasted https link (Step 1 cover photo) takes precedence over both.
     const photo = await findPhotoByOwner(guard.id);
-    const image = photo
-      ? photoUrl(photo)
-      : (existing?.image ?? DEFAULT_VENDOR_IMAGE);
+    const image = isLinkedPhotoUrl(body.image)
+      ? body.image
+      : photo
+        ? photoUrl(photo)
+        : body.image === null
+          ? DEFAULT_VENDOR_IMAGE
+          : (existing?.image ?? DEFAULT_VENDOR_IMAGE);
 
-    // Dish photos may only reference this vendor's own uploads — strip any
-    // reference to a photo they don't own (or that no longer exists).
+    // Dish photos are this vendor's own uploads or pasted https image links —
+    // strip any upload reference they don't own (or that no longer exists).
     const ownedDishPhotoIds = new Set(
       (await listPhotosByOwner(guard.id, "dish")).map((p) => p.id),
     );
@@ -141,7 +146,7 @@ export async function PUT(request: Request) {
         const photoId = photoIdFromUrl(it.photo);
         // Strip only the disallowed photo — keep the dish's name, diet, any
         // per-delicacy price and the bands it's served on.
-        return photoId && ownedDishPhotoIds.has(photoId)
+        return isLinkedPhotoUrl(it.photo) || (photoId && ownedDishPhotoIds.has(photoId))
           ? it
           : {
               name: it.name,
@@ -170,7 +175,7 @@ export async function PUT(request: Request) {
     const bainaBoxes: VendorBainaBox[] = (check.value.bainaBoxes ?? []).map((b) => {
       if (!b.photo) return b;
       const photoId = photoIdFromUrl(b.photo);
-      return photoId && ownedDishPhotoIds.has(photoId)
+      return isLinkedPhotoUrl(b.photo) || (photoId && ownedDishPhotoIds.has(photoId))
         ? b
         : {
             name: b.name,
@@ -191,7 +196,7 @@ export async function PUT(request: Request) {
               items.map((it) => {
                 if (!it.photo) return it;
                 const photoId = photoIdFromUrl(it.photo);
-                if (photoId && ownedDishPhotoIds.has(photoId)) return it;
+                if (isLinkedPhotoUrl(it.photo) || (photoId && ownedDishPhotoIds.has(photoId))) return it;
                 return {
                   name: it.name,
                   diet: it.diet,
@@ -206,18 +211,7 @@ export async function PUT(request: Request) {
 
     const verified = app?.status === "Verified";
 
-    // Content moderation: a Hidden vendor stays hidden until an admin restores
-    // them. An already-verified vendor's first published menu goes live at once
-    // (their KYC is cleared), but any later edit re-queues as Pending so the
-    // changed content gets re-reviewed.
-    const moderation: ModerationStatus =
-      existing?.moderation === "Hidden"
-        ? "Hidden"
-        : !existing && verified
-          ? "Approved"
-          : "Pending";
-
-    const record: LiveVendorRecord = {
+    const candidate: LiveVendorRecord = {
       ...(existing ?? {}),
       id: existing?.id ?? newVendorId(),
       ownerUserId: guard.id,
@@ -229,13 +223,28 @@ export async function PUT(request: Request) {
       // Resolved above (the menu's band data is pruned against it); price-derived
       // bands still fill in on the catalog when none is set.
       tiers,
-      moderation,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       ...check.value,
       menu,
       ...(check.value.bainaBoxes ? { bainaBoxes } : {}),
       ...(stallConfig ? { stallConfig } : {}),
+      // Badges are managed by /api/vendor/badges (apply) and the admin
+      // moderation route (grant) — a menu save never changes them.
+      badges: existing ? existing.badges : check.value.badges,
+      // Wizard progress: keep what's stored when this save didn't send any
+      // (the dashboard menu builder doesn't).
+      onboarding: check.value.onboarding ?? existing?.onboarding,
+    };
+
+    // Content moderation (see nextModerationState): a Hidden vendor stays
+    // hidden; a verified vendor's first save goes live; a save that changes
+    // nothing public keeps its state; a real edit to a live vendor re-queues as
+    // Pending while the last approved content stays live (approvedSnapshot).
+    const record: LiveVendorRecord = {
+      ...candidate,
+      approvedSnapshot: undefined,
+      ...nextModerationState(existing, candidate, verified),
     };
 
     await saveVendor(record);

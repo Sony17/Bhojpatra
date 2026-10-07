@@ -262,20 +262,34 @@ export async function sendOrderAlert(
   });
 }
 
-/** Confirmation email to the signed-in customer after a new booking is created. */
+/** Email to the customer when an order is placed, and again when it becomes
+ *  Confirmed. The wording follows the order's real status: only a Confirmed
+ *  order (advance received) is ever called "confirmed" — a Pending one says
+ *  it's received and what happens next. Returns whether Resend accepted it. */
 export async function sendBookingConfirmation(
   order: StoredOrder,
   customerEmail: string,
   invoiceUrl: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const email = customerEmail.trim().toLowerCase();
-  if (!email) return;
+  if (!email) return false;
 
   const base = siteBaseUrl();
-  await sendAlert({
+  const confirmed = order.status === "Confirmed";
+  const intro = confirmed
+    ? undefined
+    : order.paymentMethod === "Connect"
+      ? "Thanks for booking with Bhojpatra. Your order is Pending — our team will call you shortly to arrange the advance payment, which confirms your date."
+      : "Thanks for booking with Bhojpatra. Your order is Pending while we verify your payment — we'll email you again as soon as it's confirmed.";
+  return sendAlert({
     to: email,
-    subject: `Your Bhojpatra booking is confirmed — ${order.id}`,
-    heading: `Booking confirmed — ${order.id}`,
+    subject: confirmed
+      ? `Your Bhojpatra booking is confirmed — ${order.id}`
+      : `We've received your Bhojpatra booking — ${order.id}`,
+    heading: confirmed
+      ? `Booking confirmed — ${order.id}`
+      : `Booking received — ${order.id}`,
+    ...(intro ? { intro } : {}),
     fields: [
       { label: "Name", value: order.customer },
       ...orderSummaryFields(order).filter((f) => f.label !== "Booking"),
@@ -289,11 +303,98 @@ export async function sendBookingConfirmation(
   });
 }
 
+/** Tell a vendor a new order has come in for them (Vendor Portal → Orders). */
+export async function sendVendorNewOrderEmail(
+  order: StoredOrder,
+  vendorEmail: string,
+  vendorName: string,
+): Promise<boolean> {
+  const to = vendorEmail.trim().toLowerCase();
+  if (!to) return false;
+  const base = siteBaseUrl();
+  return sendAlert({
+    to,
+    subject: `New booking request — ${order.id}`,
+    heading: `New booking for ${vendorName}`,
+    intro:
+      "A customer has booked you on Bhojpatra. Please review the order in your Vendor Portal and accept or decline it.",
+    fields: [
+      { label: "Customer", value: order.customer },
+      { label: "Occasion", value: order.occasion },
+      { label: "Date", value: order.date || "—" },
+      ...(order.mealTime ? [{ label: "Serving", value: order.mealTime }] : []),
+      { label: "Guests", value: String(order.guests) },
+      { label: "City", value: order.city },
+      ...(order.venue ? [{ label: "Venue", value: order.venue }] : []),
+      { label: "Payment", value: order.status === "Confirmed" ? "Advance received" : "Awaiting advance" },
+    ],
+    link: base ? { label: "Open Vendor Portal", url: `${base}/vendor/dashboard` } : null,
+  });
+}
+
+/** Tell the customer their vendor declined the order, and that the Bhojpatra
+ *  team will follow up (reassign or refund). */
+export async function sendVendorDeclinedToCustomer(
+  order: StoredOrder,
+  customerEmail: string,
+  vendorName: string,
+  reason: string,
+): Promise<boolean> {
+  const to = customerEmail.trim().toLowerCase();
+  if (!to) return false;
+  const base = siteBaseUrl();
+  return sendAlert({
+    to,
+    subject: `Update on your Bhojpatra booking — ${order.id}`,
+    heading: `${vendorName} can't take your booking`,
+    intro:
+      "We're sorry — the vendor has declined this booking. Our team will contact you to arrange another vendor or refund anything you've paid.",
+    fields: [
+      { label: "Booking", value: order.id },
+      { label: "Date", value: order.date || "—" },
+      { label: "Guests", value: String(order.guests) },
+      { label: "Reason", value: reason || "—" },
+      { label: "Paid so far", value: inr(order.paid) },
+    ],
+    link: base ? { label: "View my bookings", url: `${base}/bookings` } : null,
+  });
+}
+
+/** Owner alert: a vendor declined an order — admin follows up (cancel +
+ *  refund from the booking / refund consoles). */
+export async function sendVendorDeclinedAlert(
+  order: StoredOrder,
+  vendorName: string,
+  reason: string,
+): Promise<boolean> {
+  if (!ALERT_ENABLED.order) return false;
+  const base = siteBaseUrl();
+  return sendAlert({
+    subject: `Vendor declined — ${order.id}`,
+    heading: `${vendorName} declined ${order.id}`,
+    fields: [
+      { label: "Customer", value: order.customer },
+      { label: "Phone", value: order.phone || "—" },
+      { label: "Email", value: order.email || "—" },
+      { label: "Reason", value: reason || "—" },
+      ...orderSummaryFields(order).filter((f) => f.label !== "Booking"),
+    ],
+    link: base ? { label: "Open Bookings", url: `${base}/admin/bookings` } : null,
+  });
+}
+
 export async function sendPaymentAlert(payment: StoredPayment): Promise<void> {
   if (!ALERT_ENABLED.payment) return;
+  // A manual UPI/QR transfer is only the customer's word until the team
+  // matches it against the bank statement (Payments → Verify).
+  const unverified = payment.status === "Pending";
   await sendAlert({
-    subject: `Payment received — ${payment.bookingId}`,
-    heading: `Payment received for ${payment.bookingId}`,
+    subject: unverified
+      ? `Payment to verify — ${payment.bookingId}`
+      : `Payment received — ${payment.bookingId}`,
+    heading: unverified
+      ? `Verify payment for ${payment.bookingId}`
+      : `Payment received for ${payment.bookingId}`,
     fields: [
       { label: "Booking", value: payment.bookingId },
       { label: "Customer", value: payment.customer },
@@ -301,6 +402,10 @@ export async function sendPaymentAlert(payment: StoredPayment): Promise<void> {
       { label: "Method", value: payment.method },
       { label: "Type", value: payment.type },
       { label: "Txn ref", value: payment.txnRef },
+      ...(payment.customerTxnId
+        ? [{ label: "Customer UTR", value: payment.customerTxnId }]
+        : []),
+      ...(unverified ? [{ label: "Status", value: "Unverified" }] : []),
     ],
   });
 }
@@ -449,4 +554,64 @@ export async function sendVenueAlert(venue: VenueRecord): Promise<void> {
       { label: "Phone", value: venue.phone || "—" },
     ],
   });
+}
+
+/* ── Vendor application decisions (to the vendor) ────────────────────────── */
+
+/**
+ * Tell a vendor the outcome of their application review. Best-effort like
+ * every send, but a failure is logged with console.error here because the
+ * vendor otherwise never learns the outcome (the dashboard still shows it).
+ */
+export async function sendVendorDecisionEmail(
+  record: VendorApplicationRecord,
+  decision: "verified" | "rejected" | "changes-requested",
+): Promise<void> {
+  const to = record.email.trim().toLowerCase();
+  if (!to) return;
+  const base = siteBaseUrl();
+  const copy = {
+    verified: {
+      subject: `You're approved on Bhojpatra — ${record.business}`,
+      heading: "Your vendor application is approved",
+      intro:
+        "Your KYC and listing have been verified. Your kitchen is now live on the Bhojpatra marketplace and can receive bookings.",
+      link: { label: "Open vendor dashboard", url: `${base}/vendor/dashboard` },
+    },
+    "changes-requested": {
+      subject: `Changes needed on your Bhojpatra application — ${record.business}`,
+      heading: "A few changes are needed",
+      intro:
+        "Our team reviewed your application and needs a few updates before you can go live. Please make the changes below and resubmit.",
+      link: { label: "Update & resubmit", url: `${base}/vendor/register` },
+    },
+    rejected: {
+      subject: `Update on your Bhojpatra application — ${record.business}`,
+      heading: "Your vendor application was not approved",
+      intro:
+        "Thank you for applying to Bhojpatra. After review we're unable to approve your application at this time.",
+      link: { label: "View details", url: `${base}/vendor/dashboard` },
+    },
+  }[decision];
+  try {
+    const sent = await sendAlert({
+      to,
+      subject: copy.subject,
+      heading: copy.heading,
+      intro: copy.intro,
+      fields: [
+        { label: "Business", value: record.business },
+        { label: "Application", value: record.id },
+        ...(decision !== "verified" && record.reviewReason
+          ? [{ label: "Reviewer note", value: record.reviewReason }]
+          : []),
+      ],
+      link: copy.link,
+    });
+    if (!sent && isEmailConfigured()) {
+      console.error(`Vendor decision email not delivered (${record.id} → ${decision})`);
+    }
+  } catch (err) {
+    console.error(`Vendor decision email failed (${record.id} → ${decision})`, err);
+  }
 }

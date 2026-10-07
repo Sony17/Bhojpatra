@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import DatePicker from "@/components/DatePicker";
 import LoginGate from "@/components/auth/LoginGate";
@@ -286,6 +287,7 @@ export default function BainaBoxOrderPanel({
                     <Image
                       src={prod.image}
                       alt={prod.name}
+                      unoptimized={photoNeedsUnoptimized(prod.image)}
                       fill
                       sizes="(min-width: 640px) 250px, 180px"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSession } from "@/lib/session";
 import type {
   LiveVendorRecord,
@@ -16,7 +15,9 @@ import type {
   VendorBainaDetails,
   VendorBainaBox,
   CateringComponentsSelection,
+  VendorOnboardingDraft,
 } from "@/lib/vendorMenus";
+import type { VendorApplicationStage } from "@/lib/vendorOnboarding";
 import VendorContextHeader from "./VendorContextHeader";
 import Step1IdentityOps from "./steps/Step1IdentityOps";
 import Step2KycCompliance from "./steps/Step2KycCompliance";
@@ -31,6 +32,8 @@ import Step9Complete from "./steps/Step9Complete";
 import StorefrontPreviewModal from "./components/StorefrontPreviewModal";
 import { PhaseStepper } from "./OnboardingChrome";
 import { ShellSlots } from "./ui";
+import { readDraft } from "./draft";
+import { isStockVendorImage } from "@/lib/photoLinks";
 import "./onboarding.css";
 
 export interface OnboardingState {
@@ -91,77 +94,18 @@ export interface OnboardingState {
   existingVendorId?: string;
 }
 
-const DEFAULT_MENU_SECTIONS: VendorMenuSection[] = [
-  {
-    categoryId: "welcome",
-    perPlate: 40,
-    items: [
-      { name: "Masala Jaljeera Cooler", diet: "veg", desc: "Refreshing cumin and mint cooler" },
-      { name: "Aam Panna", diet: "veg", desc: "Tangy raw mango roasted aperitif" },
-      { name: "Rose Sharbat", diet: "veg", desc: "Fragrant rose petal nectar with basil seeds" },
-    ],
-    tierItems: { Silver: 1, Gold: 2 },
-  },
-  {
-    categoryId: "starters",
-    perPlate: 70,
-    items: [
-      { name: "Paneer Malai Tikka", diet: "veg", desc: "Charcoal grilled cottage cheese in rich cream" },
-      { name: "Hara Bhara Kebab", diet: "veg", desc: "Crispy spinach and green pea patties with spiced dip" },
-      { name: "Tandoori Stuffed Mushroom", diet: "veg", desc: "Button mushrooms filled with spiced paneer" },
-      { name: "Crispy Corn Fritters", diet: "veg", desc: "Sweet golden corn tossed in lemon pepper" },
-    ],
-    tierItems: { Silver: 2, Gold: 5 },
-  },
-  {
-    categoryId: "main",
-    perPlate: 120,
-    items: [
-      { name: "Paneer Butter Masala", diet: "veg", desc: "Silky tomato butter gravy with soft paneer cubes" },
-      { name: "Dal Makhani Handi", diet: "veg", desc: "Black lentils slow-simmered overnight with white butter" },
-      { name: "Awadhi Veg Dum Biryani", diet: "veg", desc: "Aromatic long-grain basmati with saffron and vegetables" },
-      { name: "Mix Veg Handi", diet: "veg", desc: "Seasonal garden vegetables in whole ground masala" },
-    ],
-    tierItems: { Silver: 3, Gold: 5 },
-  },
-  {
-    categoryId: "breads",
-    perPlate: 35,
-    items: [
-      { name: "Butter Naan", diet: "veg", desc: "Layered tandoori bread brushed with melted butter" },
-      { name: "Tandoori Roti", diet: "veg", desc: "Traditional whole wheat roti baked crisp in clay oven" },
-      { name: "Lachha Parantha", diet: "veg", desc: "Multi-layered flaky spiral whole wheat bread" },
-    ],
-    tierItems: { Silver: 1, Gold: 2 },
-  },
-  {
-    categoryId: "sweets",
-    perPlate: 80,
-    items: [
-      { name: "Hot Gulab Jamun", diet: "veg", desc: "Soft khoya dumplings soaked in warm cardamom syrup" },
-      { name: "Live Jalebi with Rabri", diet: "veg", desc: "Crisp golden jalebis paired with thick chilled rabri" },
-      { name: "Kesar Rasmalai", diet: "veg", desc: "Chilled cottage cheese discs steeped in saffron milk" },
-    ],
-    tierItems: { Silver: 1, Gold: 3 },
-  },
-];
+/** The vendor's own application, as GET/POST /api/vendor/application report it. */
+interface ApplicationInfo {
+  id: string;
+  status: string;
+  stage: VendorApplicationStage;
+  reviewReason?: string;
+}
 
-const DEFAULT_BAINA_BOXES: VendorBainaBox[] = [
-  {
-    name: "Royal Heritage Mithai Box",
-    contents: "Kaju Katli, Kesar Peda, Motichoor Laddu & Roasted Cashews",
-    price: 450,
-    price1kg: 850,
-  },
-  {
-    name: "Artisan Dry Fruit & Sweets Casket",
-    contents: "Mamra Almonds, Kashmiri Walnuts, Pistachios & Anjeer Barfi",
-    price: 650,
-    price1kg: 1200,
-  },
-];
-
-
+/** Empty builder defaults — a new vendor starts with NO sample content, so
+ *  nothing fake can be saved as their real menu. Only operational settings
+ *  (component toggles, quota counts, packaging style) carry a default. */
+const EMPTY_STALL: SingleStallConfig = { categories: [], categoryPricing: {}, equipment: [] };
 
 export default function VendorOnboarding() {
   const session = useSession();
@@ -176,20 +120,26 @@ export default function VendorOnboarding() {
   const [catSection, setCatSection] = useState<string>("5A");
   const [stallSection, setStallSection] = useState<string>("6A");
   const [bainaSection, setBainaSection] = useState<string>("7A");
-  const router = useRouter();
   const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
   const [subnavSlot, setSubnavSlot] = useState<HTMLElement | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  /** The vendor's submitted application (null until they submit). */
+  const [application, setApplication] = useState<ApplicationInfo | null>(null);
+  /** A verified vendor's live listing — they're offered the dashboard first. */
+  const [isLive, setIsLive] = useState(false);
+  const [editingLive, setEditingLive] = useState(false);
+  const loadedRef = useRef(false);
 
   const [formData, setFormData] = useState<OnboardingState>({
     ownerName: session?.name || "",
     businessName: "",
     email: session?.email || "",
     phone: "",
-    city: "Lucknow",
-    state: "Uttar Pradesh",
-    serviceCities: ["Lucknow"],
-    cuisines: ["North Indian", "Mughlai"],
+    city: "",
+    state: "",
+    serviceCities: [],
+    cuisines: [],
     dietaryOffering: undefined,
     googleRating: undefined,
     googleReviews: undefined,
@@ -197,42 +147,29 @@ export default function VendorOnboarding() {
     fssaiNumber: "",
     documents: {},
     badges: { applied: [], granted: [], applications: [] },
-    serviceCategories: ["full-catering"],
+    serviceCategories: [],
     customOfferings: [],
     cateringComponents: { counters: true, extras: true, essentials: true, addons: true },
     // Catering
-    packageName: "Royal Awadhi Feast",
+    packageName: "",
     about: "",
-    bestFor: ["Weddings", "Receptions"],
+    bestFor: [],
     minPax: 50,
-    maxCapacity: 1000,
+    maxCapacity: 0,
     leadHours: 48,
     image: undefined,
-    priceFrom: 799,
-    goldRate: 1199,
-    goldSpecialization: "Dum Pukht Specialist",
+    priceFrom: 0,
+    goldRate: 0,
+    goldSpecialization: "",
     silverQuotas: { welcome: 1, starters: 2, main: 3, breads: 1, sweets: 1 },
     goldQuotas: { welcome: 1, starters: 5, main: 5, breads: 2, sweets: 3 },
-    menu: DEFAULT_MENU_SECTIONS,
-    featured: ["Paneer Malai Tikka", "Paneer Butter Masala", "Awadhi Veg Dum Biryani", "Live Jalebi with Rabri"],
-    counters: [
-      { id: "chaat", price: 60, items: ["Golgappa / Pani Puri", "Aloo Tikki Chaat", "Papdi Chaat"] },
-      { id: "pan", price: 40, items: ["Banarasi Meetha Paan", "Saada Paan"] },
-    ],
-    essentialService: {
-      perGuest: 0,
-      includes: ["Uniformed Stewards", "Buffet Tables & Linens", "Acrylic Food Labels", "Waste Bins"],
-    },
+    menu: [],
+    featured: [],
+    counters: [],
+    essentialService: { perGuest: 0, includes: [] },
     cutleryTier: "essential",
     // Single Stall
-    stallConfig: {
-      categories: ["chaat"],
-      categoryPricing: {
-        chaat: { fixedPerPlate: 60, minPaxGuarantee: 50 },
-      },
-      equipment: ["Charcoal Sigdi", "Buffet Warmers"],
-      cutlery: "Biodegradable Bagasse",
-    },
+    stallConfig: EMPTY_STALL,
     // Baina Box
     bainaDetails: {
       studioName: "",
@@ -241,7 +178,7 @@ export default function VendorOnboarding() {
       leadDays: 3,
       packaging: "velvet",
     },
-    bainaBoxes: DEFAULT_BAINA_BOXES,
+    bainaBoxes: [],
     existingVendorId: undefined,
   });
 
@@ -257,21 +194,40 @@ export default function VendorOnboarding() {
   const activeBranches = getActiveBranches(formData.serviceCategories);
   const currentBranch = activeBranches[branchIndex] || activeBranches[0] || "catering";
 
-  // Load existing vendor data or application prefill
+  // Load the saved draft (or application prefill) ONCE. A later session
+  // refresh must never re-run this and overwrite unsaved edits.
   useEffect(() => {
-    let active = true;
+    if (loadedRef.current || !session) return;
+    loadedRef.current = true;
     async function fetchInitial() {
       try {
-        const res = await fetch("/api/vendor/menu");
-        if (!res.ok) {
-          if (active) setLoading(false);
-          return;
-        }
+        const [res, appRes] = await Promise.all([
+          fetch("/api/vendor/menu"),
+          fetch("/api/vendor/application").catch(() => null),
+        ]);
+        const appData = appRes?.ok ? await appRes.json().catch(() => null) : null;
+        const app = (appData?.application ?? null) as ApplicationInfo | null;
+        setApplication(app);
+        if (!res.ok) return;
         const data = await res.json();
-        if (!active) return;
 
         const record = data.vendor as LiveVendorRecord | null;
         const prefill = data.prefill || {};
+        const draft: VendorOnboardingDraft = record?.onboarding ?? {};
+
+        // Live vendors are offered their dashboard before re-entering the wizard.
+        setIsLive(
+          app?.stage === "verified" &&
+            (record?.moderation === "Approved" || Boolean(record?.approvedSnapshot)),
+        );
+
+        // Resume where they left off. A submitted (pending) application lands
+        // on the confirmation; otherwise the saved step, capped at Review.
+        const savedStep = draft.step ?? 1;
+        const resumeStep =
+          app?.stage === "pending" ? 6 : Math.min(Math.max(savedStep, 1), 5);
+        setCurrentStep(resumeStep);
+        setMaxPhase(Math.max(draft.maxPhase ?? 0, Math.min(resumeStep, 5) - 1));
 
         setFormData((prev) => {
           // Extract quotas from existing menu sections if present
@@ -290,10 +246,20 @@ export default function VendorOnboarding() {
 
           return {
             ...prev,
-            ownerName: session?.name || prev.ownerName,
+            ownerName: draft.ownerName || session?.name || prev.ownerName,
             businessName: record?.business || prefill.business || prev.businessName,
             email: record?.ownerEmail || session?.email || prev.email,
-            phone: prev.phone || prefill.phone || "",
+            // Accounts don't store a phone; signup hands it over via the browser draft.
+            phone: draft.phone || prefill.phone || readDraft(session?.email).phone || prev.phone,
+            gstNumber: draft.gstNumber || prev.gstNumber,
+            fssaiNumber: draft.fssaiNumber || prev.fssaiNumber,
+            documents: Object.fromEntries(
+              Object.entries(draft.docs ?? {}).map(([k, d]) => [
+                k,
+                { fileName: d!.fileName, status: "done" as const, id: d!.id },
+              ]),
+            ),
+            goldRate: draft.goldRate || prev.goldRate,
             city: record?.city || prefill.city || prev.city,
             state: record?.state || prefill.state || prev.state,
             serviceCities: record?.serviceCities?.length
@@ -303,7 +269,7 @@ export default function VendorOnboarding() {
             dietaryOffering: record?.dietaryOffering || prefill.dietaryOffering || prev.dietaryOffering,
             googleRating: record?.googleRating || prefill.googleRating || prev.googleRating,
             googleReviews: record?.googleReviews || prefill.googleReviews || prev.googleReviews,
-            badges: record?.badges || prefill.badges || prev.badges,
+            badges: record?.badges || prev.badges,
             serviceCategories: record?.serviceCategories?.length
               ? record.serviceCategories
               : (prefill.serviceCategories?.length ? prefill.serviceCategories : prev.serviceCategories),
@@ -323,7 +289,8 @@ export default function VendorOnboarding() {
             minPax: record?.minPax || prev.minPax,
             maxCapacity: record?.maxCapacity || prefill.maxCapacity || prev.maxCapacity,
             leadHours: record?.leadHours || prev.leadHours,
-            image: record?.image || prev.image,
+            // The stock placeholder isn't the vendor's photo — leave the field empty.
+            image: record?.image && !isStockVendorImage(record.image) ? record.image : prev.image,
             priceFrom: record?.priceFrom || prev.priceFrom,
             goldSpecialization: record?.goldSpecialization || prev.goldSpecialization,
             silverQuotas: existingSilverQuotas,
@@ -351,20 +318,21 @@ export default function VendorOnboarding() {
       } catch (err) {
         console.error("Failed to load initial vendor data", err);
       } finally {
-        if (active) setLoading(false);
+        setLoading(false);
       }
     }
 
     fetchInitial();
-    return () => {
-      active = false;
-    };
   }, [session]);
 
   // Persist draft to PUT /api/vendor/menu
   const persistDraft = useCallback(
-    async (overrideData?: Partial<OnboardingState>): Promise<boolean> => {
+    async (
+      overrideData?: Partial<OnboardingState>,
+      nav?: { step: number },
+    ): Promise<boolean> => {
       const target = { ...formData, ...overrideData };
+      const step = nav?.step ?? currentStep;
       setSaving(true);
       setSaveError("");
 
@@ -390,35 +358,65 @@ export default function VendorOnboarding() {
         const allDishNames = new Set(reconciledMenu.flatMap((s) => s.items.map((i) => i.name)));
         const validFeatured = (target.featured || []).filter((name) => allDishNames.has(name)).slice(0, 4);
 
+        // Only a SELECTED service's builder data is sent — anything filled in
+        // for a service the vendor later dropped never reaches their listing.
+        const has = (id: string) => target.serviceCategories.includes(id);
+        const catering = has("full-catering");
+        const docs = Object.fromEntries(
+          Object.entries(target.documents)
+            .filter(([, d]) => d.status === "done" && d.id)
+            .map(([k, d]) => [k, { id: d.id, fileName: d.fileName }]),
+        );
         const payload = {
-          business: target.businessName || "New Catering Vendor",
-          city: target.city || "Lucknow",
-          state: target.state || "Uttar Pradesh",
-          cuisines: target.cuisines.length ? target.cuisines : ["North Indian"],
+          business: target.businessName,
+          city: target.city,
+          state: target.state,
+          cuisines: target.cuisines,
           about: target.about,
-          priceFrom: target.priceFrom || 799,
+          priceFrom: catering ? target.priceFrom || 0 : 0,
           maxCapacity: target.maxCapacity,
           leadHours: target.leadHours,
           minPax: target.minPax,
-          bestFor: target.bestFor,
-          packageName: target.packageName,
-          goldSpecialization: target.goldSpecialization,
-          cutleryTier: target.cutleryTier,
           serviceCities: target.serviceCities,
           dietaryOffering: target.dietaryOffering,
           googleRating: target.googleRating,
           googleReviews: target.googleReviews,
           serviceCategories: target.serviceCategories,
+          // Cover photo: an own upload URL or a pasted https link; null clears a
+          // previously pasted link (the server then falls back to an upload / stock).
+          image: target.image ?? null,
           customOfferings: target.customOfferings,
-          badges: target.badges,
-          featured: validFeatured,
-          counters: target.counters,
-          essentialService: target.essentialService,
-          stallConfig: target.stallConfig,
-          bainaDetails: target.bainaDetails,
-          bainaBoxes: target.bainaBoxes,
           cateringComponents: target.cateringComponents,
-          menu: reconciledMenu,
+          // The stall builder mirrors its platform dishes into menu[], so the
+          // menu travels whenever either service is on.
+          menu: catering || has("single-stall") ? reconciledMenu : [],
+          ...(catering
+            ? {
+                bestFor: target.bestFor,
+                packageName: target.packageName,
+                goldSpecialization: target.goldSpecialization,
+                cutleryTier: target.cutleryTier,
+                featured: validFeatured,
+                counters: target.counters,
+                essentialService: target.essentialService,
+              }
+            : {}),
+          ...(has("single-stall") ? { stallConfig: target.stallConfig } : {}),
+          ...(has("baina-box")
+            ? { bainaDetails: target.bainaDetails, bainaBoxes: target.bainaBoxes }
+            : {}),
+          // Private wizard progress — restores identity/KYC and the step on
+          // refresh. Never shown to customers.
+          onboarding: {
+            ownerName: target.ownerName,
+            phone: target.phone,
+            gstNumber: target.gstNumber,
+            fssaiNumber: target.fssaiNumber,
+            docs,
+            step: Math.min(step, 5),
+            maxPhase: Math.max(maxPhase, Math.min(step, 5) - 1),
+            goldRate: target.goldRate,
+          },
         };
 
         const res = await fetch("/api/vendor/menu", {
@@ -447,7 +445,7 @@ export default function VendorOnboarding() {
         setSaving(false);
       }
     },
-    [formData],
+    [formData, currentStep, maxPhase],
   );
 
   const top = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -458,12 +456,13 @@ export default function VendorOnboarding() {
     top();
   };
 
-  const saveThen = async (next: () => void) => {
-    if (await persistDraft()) next();
+  /** Save the draft (recording where the vendor is headed), then navigate. */
+  const saveThen = async (next: () => void, step?: number) => {
+    if (await persistDraft(undefined, step ? { step } : undefined)) next();
   };
 
-  const handleStep1Continue = () => saveThen(() => goStep(2));
-  const handleStep2Continue = () => saveThen(() => goStep(3));
+  const handleStep1Continue = () => saveThen(() => goStep(2), 2);
+  const handleStep2Continue = () => saveThen(() => goStep(3), 3);
 
   const handleStep3Finish = () =>
     saveThen(() => {
@@ -473,7 +472,7 @@ export default function VendorOnboarding() {
       setStallSection("6A");
       setBainaSection("7A");
       goStep(branches.length > 0 ? 4 : 5);
-    });
+    }, getActiveBranches(formData.serviceCategories).length > 0 ? 4 : 5);
 
   const handleFinishBranch = () =>
     saveThen(() => {
@@ -527,7 +526,41 @@ export default function VendorOnboarding() {
     goStep(4);
   };
 
-  const handleSubmit = () => saveThen(() => goStep(6));
+  // Final submit: save the draft, then create / resubmit the ONE application
+  // bound to this account. The server re-validates the saved listing.
+  const handleSubmit = async () => {
+    if (!(await persistDraft(undefined, { step: 5 }))) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const res = await fetch("/api/vendor/application", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerName: formData.ownerName || session?.name || "",
+          phone: formData.phone,
+          gstNumber: formData.gstNumber,
+          fssaiNumber: formData.fssaiNumber,
+          docIds: Object.fromEntries(
+            Object.entries(formData.documents)
+              .filter(([, d]) => d.status === "done" && d.id)
+              .map(([k, d]) => [k, d.id]),
+          ),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setSaveError(data?.error || "Couldn't submit your application. Please try again.");
+        return;
+      }
+      setApplication(data?.application ?? null);
+      goStep(6);
+    } catch {
+      setSaveError("Network error while submitting. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const jumpToPhase = (idx: number) => {
     // 0 Identity · 1 KYC · 2 Offerings · 3 Service Setup · 4 Review · 5 Go Live
@@ -544,6 +577,33 @@ export default function VendorOnboarding() {
       <div className="vob vob-shell">
         <div className="wizard-body" style={{ justifyContent: "center" }}>
           <p className="step-subtext">Loading your vendor registration workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // A live vendor re-entering the wizard: offer the dashboard first.
+  if (isLive && !editingLive) {
+    return (
+      <div className="vob vob-shell">
+        <div className="wizard-body" style={{ justifyContent: "center" }}>
+          <div className="content-card" style={{ textAlign: "center", padding: "40px 20px", maxWidth: 560, margin: "0 auto" }}>
+            <h1 className="step-heading" style={{ fontSize: 24 }}>
+              You&apos;re live on Bhojpatra
+            </h1>
+            <p className="step-subtext" style={{ margin: "8px auto 20px auto" }}>
+              Your kitchen is verified and visible to customers. Manage bookings and menus from your dashboard. If you
+              edit your listing here, your current listing stays live while the changes are reviewed.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+              <a href="/vendor/dashboard" className="btn-next" style={{ textDecoration: "none" }}>
+                Go to Vendor Dashboard →
+              </a>
+              <button type="button" className="btn-back" onClick={() => setEditingLive(true)}>
+                Edit my listing
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -603,6 +663,18 @@ export default function VendorOnboarding() {
         </div>
       )}
 
+      {(application?.stage === "changes-requested" || application?.stage === "rejected") && currentStep < 6 && (
+        <div role="status" className="vob-save-error">
+          <span>
+            {application.stage === "changes-requested"
+              ? "Changes requested by our review team"
+              : "Your application was not approved"}
+            {application.reviewReason ? `: ${application.reviewReason}` : "."}
+            {application.stage === "changes-requested" ? " Update your details and submit again." : ""}
+          </span>
+        </div>
+      )}
+
       {currentStep === 1 && (
         <Step1IdentityOps
           data={{
@@ -617,13 +689,13 @@ export default function VendorOnboarding() {
             dietaryOffering: formData.dietaryOffering,
             googleRating: formData.googleRating,
             googleReviews: formData.googleReviews,
+            image: formData.image,
             accountId: formData.existingVendorId
               ? `VND-${formData.existingVendorId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
               : undefined,
           }}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onContinue={handleStep1Continue}
-          onSignIn={() => router.push("/vendor/dashboard")}
           saving={saving}
         />
       )}
@@ -639,6 +711,9 @@ export default function VendorOnboarding() {
           businessName={formData.businessName}
           email={formData.email}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          onDocChange={(key, doc) =>
+            setFormData((prev) => ({ ...prev, documents: { ...prev.documents, [key]: doc } }))
+          }
           onBack={() => goStep(1)}
           onContinue={handleStep2Continue}
           saving={saving}
@@ -695,6 +770,7 @@ export default function VendorOnboarding() {
       {currentStep === 4 && currentBranch === "stall" && (
         <SingleStallBuilder
           data={{ stallConfig: formData.stallConfig, menu: formData.menu }}
+          dietaryOffering={formData.dietaryOffering}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onBackToPreviousService={handleBackFromBranch}
           onFinishStall={handleFinishBranch}
@@ -716,6 +792,13 @@ export default function VendorOnboarding() {
           section={bainaSection}
           onSectionChange={setBainaSection}
         />
+      )}
+
+      {currentStep === 5 && isLive && (
+        <p className="step-subtext" role="note" style={{ marginBottom: 12 }}>
+          ℹ️ You&apos;re live. Submitting sends these changes for review — customers keep seeing your current approved
+          listing until they&apos;re approved.
+        </p>
       )}
 
       {currentStep === 5 && (

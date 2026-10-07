@@ -3,6 +3,8 @@
  * Sourced from the brand mockup — swap with API/CMS data later.
  */
 
+import type { StallBrief } from "@/lib/vendorStorefront";
+
 export interface Stat {
   value: string;
   label: string;
@@ -1526,6 +1528,23 @@ export interface CategoryVendor {
    *  the "as per vendor specification" rule for the Custom single-stall flow.
    *  Omitted → `DEFAULT_VENDOR_LEAD_DAYS` (2). `0` = same-day orders accepted. */
   leadDays?: number;
+  /** The vendor's own Single Stall terms for THIS course, carried from their
+   *  dashboard (`stallConfig.categoryPricing[courseId]`, `minPax`,
+   *  `leadHours`) so the booking flow can enforce them. Absent on curated seeds
+   *  and on vendors that declared none; every field is individually optional. */
+  stallTerms?: StallTerms;
+}
+
+/** A live vendor's Single Stall terms as published in `/api/menu`. */
+export interface StallTerms {
+  /** Vendor's fixed per-plate price for this stall course (₹). */
+  fixedPerPlate?: number;
+  /** Minimum guests the vendor guarantees / requires for this stall course. */
+  minPaxGuarantee?: number;
+  /** Vendor-wide minimum guest count. */
+  minPax?: number;
+  /** Minimum booking lead time the vendor needs (hours). */
+  leadHours?: number;
 }
 
 export interface MenuCategory {
@@ -1794,6 +1813,91 @@ export const menuCategories: MenuCategory[] = [
         items: mkItems("sw-kesar", [["Kesar Peda"], ["Soan Papdi"], ["Gulab Jamun"], ["Rasmalai"], ["Moong Halwa"], ["Jalebi Rabri"]]) },
     ],
   },
+  // ── Single-Stall-only categories ─────────────────────────────────────
+  // Vendor stalls from the onboarding wizard publish into these. They are in
+  // no feast package (`packageCategories`), so they only surface in the
+  // Single Stall flow, which rosters every category a vendor has dishes in.
+  {
+    id: "juices",
+    name: "Juices & Shakes",
+    nameHi: "जूस और शेक",
+    icon: "🥤",
+    blurb: "Fresh fruit juices, shakes and coolers.",
+    blurbHi: "ताज़ा फलों के जूस, शेक और कूलर।",
+    vendors: [],
+  },
+  {
+    id: "beverages",
+    name: "Beverages & Chai",
+    nameHi: "पेय और चाय",
+    icon: "☕",
+    blurb: "Kulhad chai, coffee and hot beverages.",
+    blurbHi: "कुल्हड़ चाय, कॉफ़ी और गर्म पेय।",
+    vendors: [],
+  },
+  {
+    id: "north-indian",
+    name: "North Indian & Mughlai",
+    nameHi: "उत्तर भारतीय और मुग़लई",
+    icon: "🍛",
+    blurb: "Curries, rolls, kebabs and tandoor specials.",
+    blurbHi: "करी, रोल, कबाब और तंदूरी व्यंजन।",
+    vendors: [],
+  },
+  {
+    id: "snacks",
+    name: "Snacks & Fast Food",
+    nameHi: "स्नैक्स और फ़ास्ट फ़ूड",
+    icon: "🥪",
+    blurb: "Sandwiches, burgers, fries and kathi rolls.",
+    blurbHi: "सैंडविच, बर्गर, फ्राइज़ और काठी रोल।",
+    vendors: [],
+  },
+  {
+    id: "desserts",
+    name: "Desserts & Sweets",
+    nameHi: "मिठाइयाँ और डेज़र्ट",
+    icon: "🍬",
+    blurb: "Hot jalebi, gulab jamun, rabri and more.",
+    blurbHi: "गरम जलेबी, गुलाब जामुन, रबड़ी और भी बहुत कुछ।",
+    vendors: [],
+  },
+  {
+    id: "ice-cream",
+    name: "Ice Cream & Kulfi",
+    nameHi: "आइसक्रीम और कुल्फ़ी",
+    icon: "🍨",
+    blurb: "Rolled scoops, matka kulfi and sundaes.",
+    blurbHi: "रोल्ड स्कूप, मटका कुल्फ़ी और संडे।",
+    vendors: [],
+  },
+  {
+    id: "street-food",
+    name: "Street Food Specials",
+    nameHi: "स्ट्रीट फ़ूड स्पेशल",
+    icon: "🍢",
+    blurb: "Pav bhaji, chole bhature, dabeli and momos.",
+    blurbHi: "पाव भाजी, छोले भटूरे, दाबेली और मोमोज़।",
+    vendors: [],
+  },
+  {
+    id: "breakfast",
+    name: "Breakfast Counter",
+    nameHi: "नाश्ता काउंटर",
+    icon: "🥞",
+    blurb: "Poori sabzi, parathas, poha and upma.",
+    blurbHi: "पूरी सब्ज़ी, पराठे, पोहा और उपमा।",
+    vendors: [],
+  },
+  {
+    id: "regional",
+    name: "Regional Specialties",
+    nameHi: "क्षेत्रीय विशेष",
+    icon: "🏺",
+    blurb: "Awadhi, Rajasthani, Gujarati and local specials.",
+    blurbHi: "अवधी, राजस्थानी, गुजराती और स्थानीय व्यंजन।",
+    vendors: [],
+  },
 ];
 
 /**
@@ -1928,6 +2032,15 @@ export interface VendorListing {
    *  as what they're famous for, shown as tags on the catalog card. Absent /
    *  empty when the vendor hasn't chosen four. */
   featured?: string[];
+  /** Curated demo listing (the static `vendorListings` below) rather than a
+   *  real onboarded business — storefronts label it "Sample listing", never
+   *  show it a Verified badge or its placeholder rating, and sort it after
+   *  real vendors. */
+  sample?: boolean;
+  /** The Single Stall a "Book" button on this listing sells, resolved
+   *  server-side against the booking roster (`/api/vendors` → `stalls`).
+   *  `undefined` = not resolved yet; `null` = not bookable as a stall. */
+  stall?: StallBrief | null;
 }
 
 /** Meal / course offerings used for the "Serves" filter on the catalog.
@@ -2040,7 +2153,13 @@ export const indianStates: string[] = [
   "Uttarakhand", "West Bengal",
 ];
 
-export const vendorListings: VendorListing[] = [
+/** Curated DEMO listings — placeholder brands that keep the catalog, the home
+ *  page's category cards and the booking demo populated until real vendors
+ *  fill each category. Every one is flagged `sample: true`: customer surfaces
+ *  label it "Sample listing", suppress its Verified badge and placeholder
+ *  rating/review count, and rank it below real approved vendors. The raw
+ *  `verified` / `rating` / `reviews` values stay for the admin mock data. */
+export const vendorListings: VendorListing[] = ([
   { id: "vl-1", name: "Awadhi Royal Caterers", tiers: ["Gold", "Platinum"], rating: 4.9, reviews: 412, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["Mughlai", "North Indian"], mealTypes: ["Lunch", "Dinner", "Main Course", "Live Counters", "Desserts"], diet: "Veg & Non-Veg", priceFrom: 1349, verified: true, image: img("photo-1555939594-58d7cb561ad1", 500) },
   { id: "vl-2", name: "Nawabi Dawat", tiers: ["Silver", "Gold"], rating: 4.8, reviews: 287, city: "Lucknow", state: "Uttar Pradesh", cuisines: ["North Indian", "Punjabi"], mealTypes: ["Dinner", "Main Course", "Starters", "Desserts"], diet: "Veg & Non-Veg", priceFrom: 1199, verified: true, image: img("photo-1556910103-1c02745aae4d", 500) },
   { id: "vl-3", name: "Dilli Darbar Caterers", tiers: ["Gold", "Platinum"], rating: 4.7, reviews: 233, city: "Delhi", state: "Delhi", cuisines: ["Mughlai", "Chinese"], mealTypes: ["Lunch", "Dinner", "Main Course", "Live Counters"], diet: "Veg & Non-Veg", priceFrom: 1250, verified: true, image: img("photo-1633945274405-b6c8069047b0", 500) },
@@ -2069,7 +2188,7 @@ export const vendorListings: VendorListing[] = [
   { id: "vl-20", name: "MojoBar Live Beverages", tiers: ["Silver", "Gold"], rating: 4.5, reviews: 64, city: "Bengaluru", state: "Karnataka", cuisines: ["Beverages"], mealTypes: ["Live Counters"], diet: "Veg", priceFrom: 249, verified: true, image: img("photo-1437418747212-8d9709afab22", 500) },
   { id: "vl-21", name: "Utsav Decor & Events", tiers: ["Silver", "Gold"], rating: 4.7, reviews: 112, city: "Jaipur", state: "Rajasthan", cuisines: ["Decor"], mealTypes: [], diet: "Veg", priceFrom: 299, verified: true, image: img("photo-1519225421980-715cb0215aed", 500) },
   { id: "vl-22", name: "Bandhan Mandap Decor", tiers: ["Gold", "Platinum"], rating: 4.8, reviews: 143, city: "Delhi", state: "Delhi", cuisines: ["Decor"], mealTypes: [], diet: "Veg", priceFrom: 349, verified: true, image: img("photo-1519225421980-715cb0215aed", 500) },
-];
+] as VendorListing[]).map((v) => ({ ...v, sample: true }));
 
 /**
  * Server-authoritative advance notice (in days) for a Single-Stall / Custom

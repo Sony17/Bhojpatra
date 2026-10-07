@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { PartnerRole } from "@/lib/session";
 import { createStore } from "@/lib/store";
 import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
@@ -44,9 +45,21 @@ export async function GET(request: Request) {
   const all = await store.list();
   const live = all.filter((p) => !p.deleted);
   if (code) {
-    const partner = live.find((p) => p.code === code) ?? null;
+    // Public: the booking wizard only needs the label for a referral code —
+    // never the partner's phone, email or GST.
+    const found = live.find((p) => p.code === code);
+    const partner = found
+      ? {
+          code: found.code,
+          name: found.name,
+          type: found.type,
+          ...(found.businessName ? { businessName: found.businessName } : {}),
+        }
+      : null;
     return Response.json({ partner });
   }
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   const partners = live.slice().reverse();
   const { q, type, page, pageSize, hasQuery } = parseListQuery(request.url);
   if (!hasQuery) return Response.json({ partners });

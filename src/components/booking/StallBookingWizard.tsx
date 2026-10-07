@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
 import {
   useSessionStatus,
@@ -29,7 +30,7 @@ import {
 } from "@/components/booking/shared/WizardChrome";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { fetchVenueById } from "@/lib/venues";
-import { downloadInvoice, encodeInvoice, type InvoiceData } from "@/lib/invoice";
+import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
   ORDER_PAYMENT_LABELS,
   type OrderPaymentMethod,
@@ -54,8 +55,8 @@ import {
   type CategoryItem,
   type DietType,
   type Coupon,
-  type BookingStatus,
   type VendorListing,
+  type StallTerms,
   listingOfferings,
 } from "@/lib/data";
 import { slugifyName } from "@/lib/bookings";
@@ -170,6 +171,9 @@ interface StallCourse {
    *  bills at `perPlate`. `"varied"` — the guest picks delicacies and pays for
    *  each. Anything the vendor never answered reads as fixed. */
   fixed: boolean;
+  /** The vendor's own Single Stall terms for this course (minimum guests,
+   *  notice), straight from `/api/menu`. Absent when the vendor set none. */
+  terms?: StallTerms;
 }
 
 /** A bookable stall — one vendor, collapsed across every course they publish. */
@@ -296,6 +300,18 @@ export default function StallBookingWizard() {
   const [confirming, setConfirming] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string>("");
   const [confirmed, setConfirmed] = useState<boolean>(false);
+  // What the server decided about the order (never assumed client-side).
+  const [orderStatus, setOrderStatus] = useState<"Pending" | "Confirmed">(
+    "Pending",
+  );
+  // A manual UPI/QR transfer was reported — Pending until the team checks it.
+  const [paymentVerifying, setPaymentVerifying] = useState<boolean>(false);
+  // Set once the order exists server-side (checkout opened / order placed):
+  // from then on the booking id is frozen — the payment is bound to it.
+  const [orderPlaced, setOrderPlaced] = useState<boolean>(false);
+  // Coupon offers from the admin Coupon Manager (the server re-validates any
+  // code at order time); the static seed list renders until it answers.
+  const [liveCoupons, setLiveCoupons] = useState<Coupon[]>(coupons);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentRef, setPaymentRef] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
@@ -545,14 +561,27 @@ export default function StallBookingWizard() {
   }, [sessionStatus]);
 
   // Tie the booking id to the account: a different account signing in on this
-  // browser gets a fresh salt. Never once money has moved — the id a payment
-  // was recorded against is final.
+  // browser gets a fresh salt. Never once the order exists server-side or
+  // money has moved — the id a payment is bound to is final.
   useEffect(() => {
     const owner = sessionStatus?.email;
-    if (!owner || paidAmount > 0) return;
+    if (!owner || paidAmount > 0 || orderPlaced) return;
     const salt = bookingSaltFor(owner);
     if (salt !== bookingSalt) setBookingSalt(salt);
-  }, [sessionStatus?.email, paidAmount, bookingSalt]);
+  }, [sessionStatus?.email, paidAmount, orderPlaced, bookingSalt]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/coupons/public")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { coupons?: Coupon[] } | null) => {
+        if (active && Array.isArray(d?.coupons)) setLiveCoupons(d.coupons);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [lastBookingPhone, setLastBookingPhone] = useState<string>("");
   useEffect(() => {
@@ -674,6 +703,7 @@ export default function StallBookingWizard() {
           // Anything the vendor never answered is a set menu — the platform
           // default, and what an older record with no `menuType` means.
           fixed: v.menuType !== "varied",
+          ...(v.stallTerms ? { terms: v.stallTerms } : {}),
         };
         const existing = byId.get(v.id);
         if (existing) {
@@ -896,6 +926,20 @@ export default function StallBookingWizard() {
     [stall, categoryItems],
   );
 
+  // The stall's own minimum head-count: the vendor-wide minimum, raised by the
+  // guarantee on any course actually ordered — the same rule the server
+  // enforces (`vendorMinGuests`), so the guest stepper never allows a count
+  // the booking API would then refuse.
+  const minGuests = useMemo<number>(() => {
+    let min = MIN_GUESTS;
+    for (const c of stall?.courses ?? []) {
+      if (!itemsFor(c.id).some((id) => id.startsWith(`${stall!.id}-`))) continue;
+      min = Math.max(min, c.terms?.minPax ?? 0, c.terms?.minPaxGuarantee ?? 0);
+    }
+    return Math.min(min, MAX_GUESTS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stall, categoryItems]);
+
   /* ─── Derived pricing ──────────────────────────────────────────────── */
   // Per-plate is what the chosen courses add up to — a set menu at its own
   // rate, a varied one dish by dish. There is no package base under a Single
@@ -1037,7 +1081,16 @@ export default function StallBookingWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stallId, selectedAddOns, addOnVendor],
   );
-  const vendorLead = customOrderLeadDays(orderVendorIds);
+  // A live vendor's own notice (`leadHours`) rounds up to whole days so the
+  // calendar matches the server, which rejects anything inside that window.
+  const stallLeadHours = Math.max(
+    0,
+    ...(stall?.courses ?? []).map((c) => c.terms?.leadHours ?? 0),
+  );
+  const vendorLead = Math.max(
+    customOrderLeadDays(orderVendorIds),
+    Math.ceil(stallLeadHours / 24),
+  );
   const occasionLead = occasionLeadFor(occasionId, occasionList);
   const effectiveLeadDays = Math.max(vendorLead, occasionLead);
 
@@ -1070,7 +1123,7 @@ export default function StallBookingWizard() {
           (occasionId !== OTHER_OCCASION_ID || customOccasion.trim() !== "") &&
           cityId !== "" &&
           (cityId !== OTHER_LOCATION_ID || customCity.trim() !== "") &&
-          guests >= MIN_GUESTS &&
+          guests >= minGuests &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
           dateMeetsLead
@@ -1118,12 +1171,17 @@ export default function StallBookingWizard() {
       if (eventDate === "")
         out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
       else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
-      if (guests < MIN_GUESTS || guests > MAX_GUESTS)
+      if (guests < minGuests || guests > MAX_GUESTS)
         out.push(
-          t(
-            `Set guests between ${inr.format(MIN_GUESTS)} and ${inr.format(MAX_GUESTS)}`,
-            `मेहमानों की संख्या ${inr.format(MIN_GUESTS)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
-          ),
+          minGuests > MIN_GUESTS && guests < minGuests
+            ? t(
+                `${stall?.name ?? "This stall"} serves a minimum of ${inr.format(minGuests)} guests`,
+                `${stall?.name ?? "यह स्टॉल"} कम से कम ${inr.format(minGuests)} मेहमानों के लिए है`,
+              )
+            : t(
+                `Set guests between ${inr.format(minGuests)} and ${inr.format(MAX_GUESTS)}`,
+                `मेहमानों की संख्या ${inr.format(minGuests)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
+              ),
         );
       return out;
     }
@@ -1139,6 +1197,22 @@ export default function StallBookingWizard() {
       ? [...blockersFor(1), ...blockersFor(2)].join(" • ")
       : "";
 
+  // A resumed draft is re-checked once the live roster has answered: its date
+  // may now sit inside the notice window, the stall's menu may have changed.
+  // Land the guest on the first step that no longer holds rather than on a
+  // Review that would only block at payment.
+  const draftChecked = useRef(false);
+  useEffect(() => {
+    if (draftChecked.current || !hydrated.current || !menuSettled) return;
+    if (pendingVendorId || (stallId && !stall)) return;
+    draftChecked.current = true;
+    const target =
+      step > 1 && !stepValid(1) ? 1 : step > 2 && !stepValid(2) ? 2 : step;
+    // Deferred a tick so the step change isn't a cascading in-effect render.
+    if (target !== step) queueMicrotask(() => setStep(target));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuSettled, pendingVendorId, stallId, stall, step]);
+
   /* ─── Handlers ─────────────────────────────────────────────────────── */
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
@@ -1147,12 +1221,14 @@ export default function StallBookingWizard() {
   // the flow begins: the stall-type grid.
   const startOver = () => {
     clearStallDraft();
+    // A new order gets a new id — never the one an earlier checkout used.
+    rotateBookingSalt();
     if (typeof window !== "undefined") window.location.assign("/book/stall");
   };
 
   const applyCouponCode = (raw: string) => {
     const code = raw.trim().toUpperCase();
-    const found = coupons.find((c) => c.code.toUpperCase() === code);
+    const found = liveCoupons.find((c) => c.code.toUpperCase() === code);
     if (found) {
       setAppliedCoupon(found);
       setCouponInput(found.code);
@@ -1397,30 +1473,37 @@ export default function StallBookingWizard() {
     buildWhatsAppMessage(),
   )}`;
 
-  const handleConfirm = async (paidOverride?: number, refOverride?: string) => {
-    setConfirmError("");
-    if (reviewBlocker) {
-      setConfirmError(reviewBlocker);
-      return;
-    }
-    if (!customerName.trim()) {
-      setConfirmError(t("Please enter your name.", "कृपया अपना नाम दर्ज करें।"));
-      return;
-    }
-    if (customerPhone.replace(/\D/g, "").length < 10) {
-      setConfirmError(
-        t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।"),
-      );
-      return;
-    }
-    if (!isValidEmail(customerEmail)) {
-      setConfirmError(
-        t("Please enter a valid email address.", "कृपया सही ईमेल पता दर्ज करें।"),
-      );
-      return;
-    }
+  /** The checks every order submission repeats (the event brief is still
+   *  editable on Review, so the earlier steps are re-validated here too).
+   *  Returns the first problem, or "" when the order may go to the server. */
+  const orderProblem = (): string => {
+    if (reviewBlocker) return reviewBlocker;
+    if (!customerName.trim())
+      return t("Please enter your name.", "कृपया अपना नाम दर्ज करें।");
+    if (customerPhone.replace(/\D/g, "").length < 10)
+      return t("Please enter a valid phone number.", "कृपया सही फ़ोन नंबर दर्ज करें।");
+    if (!isValidEmail(customerEmail))
+      return t("Please enter a valid email address.", "कृपया सही ईमेल पता दर्ज करें।");
+    return "";
+  };
 
-    setConfirming(true);
+  /**
+   * Send the order to the server. The server re-prices it from its own data,
+   * validates the coupon, the vendor's terms and calendar, and decides `paid`
+   * and `status` itself — this sends only what was ordered.
+   *
+   *  • "pay"   — checkout is about to open: the order is stored Pending (and
+   *              hidden from the vendor) BEFORE any money moves, so the payment
+   *              always lands on an order that exists; the payment itself then
+   *              confirms it server-side.
+   *  • "place" — pay-later (Connect), or a retry once a payment is in.
+   *
+   * The id is the frozen session id (`bookingId`), so a retry or a re-opened
+   * checkout updates the same order instead of creating another.
+   */
+  const placeOrder = async (
+    intent: "pay" | "place",
+  ): Promise<{ ok: true; status: "Pending" | "Confirmed" } | { ok: false; error: string }> => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
 
@@ -1440,18 +1523,13 @@ export default function StallBookingWizard() {
     const vendorLabel =
       bookedVendors.map((v) => v.name).join(", ") || "Bhojpatra";
 
-    const orderPaid = paidOverride ?? paidAmount;
-    const orderPaymentRef = refOverride ?? paymentRef;
-    const emiPlan = buildEmiPlanForOrder(orderPaid);
-    const orderStatus: BookingStatus = emiPlan ? "Pending" : "Confirmed";
-    const invoiceData = buildInvoice(orderPaid);
-
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: bookingId,
+          intent,
           customer: customerName.trim(),
           phone: customerPhone.trim(),
           email: customerEmail.trim(),
@@ -1462,7 +1540,6 @@ export default function StallBookingWizard() {
           ...(eventTime ? { eventTime } : {}),
           ...(foodPreference ? { foodPreference } : {}),
           packageId: STALL_PACKAGE_ID,
-          leadDays: effectiveLeadDays,
           guests,
           // Craft-my-plate split — structured, so admin / vendors see exactly
           // how many veg vs non-veg plates to cook.
@@ -1473,11 +1550,9 @@ export default function StallBookingWizard() {
           city: cityObj?.name ?? "—",
           venue: venue.trim() || undefined,
           amount: Math.round(grandTotal),
-          paid: orderPaid,
           paymentMethod: payMethod,
-          paymentRef: orderPaymentRef || undefined,
-          emiPlan: emiPlan ?? undefined,
-          status: orderStatus,
+          // The server builds the EMI schedule itself from the count.
+          ...(emiCount > 1 ? { emiCount } : {}),
           referralCode: selfReferral
             ? undefined
             : referralCode.trim() || undefined,
@@ -1494,8 +1569,7 @@ export default function StallBookingWizard() {
               }
             : {}),
           receipt: buildReceipt(),
-          invoice: invoiceData,
-          invoiceToken: encodeInvoice(invoiceData),
+          invoice: buildInvoice(0),
           // What this total was built from — the server re-prices the order
           // from its own data and refuses a total that doesn't match.
           pricing: {
@@ -1512,31 +1586,47 @@ export default function StallBookingWizard() {
           },
         }),
       });
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+        code?: string;
+        order?: { status?: string };
+      } | null;
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        setConfirmError(
-          data?.error ??
+        // A coupon the server won't honour comes off the order, so the guest
+        // sees the corrected total before trying again.
+        if (data?.code === "COUPON_INVALID") {
+          setAppliedCoupon(null);
+          setCouponError(data.error ?? "");
+        }
+        return {
+          ok: false,
+          error:
+            data?.error ??
             t(
-              "Couldn't confirm your booking. Please try again.",
-              "आपकी बुकिंग कन्फर्म नहीं हो सकी। कृपया पुनः प्रयास करें।",
+              "Couldn't place your booking. Please try again.",
+              "आपकी बुकिंग नहीं हो सकी। कृपया पुनः प्रयास करें।",
             ),
-        );
-        setConfirming(false);
-        return;
+        };
       }
+      setOrderPlaced(true);
+      return {
+        ok: true,
+        status: data?.order?.status === "Confirmed" ? "Confirmed" : "Pending",
+      };
     } catch {
-      setConfirmError(
-        t(
+      return {
+        ok: false,
+        error: t(
           "Network error. Please check your connection and try again.",
           "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जाँचें और पुनः प्रयास करें।",
         ),
-      );
-      setConfirming(false);
-      return;
+      };
     }
+  };
 
+  /** Land on the success screen with what the server says about the order. */
+  const finishOrder = (status: "Pending" | "Confirmed") => {
+    setOrderStatus(status);
     setConfirmed(true);
     setConfirming(false);
     clearStallDraft();
@@ -1544,6 +1634,67 @@ export default function StallBookingWizard() {
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+  };
+
+  // Right before checkout takes money: create (or refresh) the order on the
+  // server, Pending and server-priced. Any rule it breaks — price changed,
+  // slot taken, coupon expired, too-short notice — stops the payment here.
+  const beforePay = async (): Promise<boolean> => {
+    setConfirmError("");
+    const problem = orderProblem();
+    if (problem) {
+      setConfirmError(problem);
+      return false;
+    }
+    const result = await placeOrder("pay");
+    if (!result.ok) {
+      setConfirmError(result.error);
+      return false;
+    }
+    return true;
+  };
+
+  // The payment is in (gateway-verified) or reported (manual UPI). The server
+  // has already synced the order from the ledger — read its real status back.
+  const afterPaid = async (amount: number, ref: string, verified = true) => {
+    setPaymentRef(ref);
+    if (verified) setPaidAmount(amount);
+    else setPaymentVerifying(true);
+    setConfirming(true);
+    let status: "Pending" | "Confirmed" = "Pending";
+    try {
+      const res = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => null)) as {
+        order?: { status?: string; paid?: number };
+      } | null;
+      if (data?.order?.status === "Confirmed") status = "Confirmed";
+      if (typeof data?.order?.paid === "number" && data.order.paid > 0) {
+        setPaidAmount(data.order.paid);
+      }
+    } catch {
+      // The payment is safe either way; the screen just says Pending.
+    }
+    finishOrder(status);
+  };
+
+  // The pay-later (Connect) submit, or a retry once a payment is in.
+  const handleConfirm = async () => {
+    setConfirmError("");
+    const problem = orderProblem();
+    if (problem) {
+      setConfirmError(problem);
+      return;
+    }
+    setConfirming(true);
+    const result = await placeOrder("place");
+    if (!result.ok) {
+      setConfirmError(result.error);
+      setConfirming(false);
+      return;
+    }
+    finishOrder(result.status);
   };
 
   /* ─── Render ───────────────────────────────────────────────────────── */
@@ -1583,7 +1734,7 @@ export default function StallBookingWizard() {
       locations={locations}
       guests={guests}
       setGuests={setGuests}
-      paxMin={MIN_GUESTS}
+      paxMin={minGuests}
       paxMax={MAX_GUESTS}
       leadWarning={leadWarning}
       // Review locks the headcount and echoes it in the order summary, so the
@@ -1612,6 +1763,8 @@ export default function StallBookingWizard() {
           referrerName={selfReferral ? "" : referrerName}
           onDownload={downloadMenu}
           whatsappHref={whatsappHref}
+          status={orderStatus}
+          verifying={paymentVerifying}
         />
       </div>
     );
@@ -1796,11 +1949,11 @@ export default function StallBookingWizard() {
                 setPayMethod={setPayMethod}
                 emiCount={emiCount}
                 setEmiCount={setEmiCount}
-                onPaid={(amount, ref) => {
-                  setPaidAmount(amount);
-                  setPaymentRef(ref);
-                  void handleConfirm(amount, ref);
+                onPaid={(amount, ref, verified) => {
+                  void afterPaid(amount, ref, verified);
                 }}
+                onBeforePay={beforePay}
+                couponList={liveCoupons}
                 confirming={confirming}
                 confirmError={confirmError}
                 onConfirm={() => void handleConfirm()}
@@ -2130,7 +2283,7 @@ function StepStallMenu({
       <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-cream bg-white px-2 py-1.5 shadow-soft sm:mb-6 sm:gap-4 sm:rounded-[1.5rem] sm:p-4 sm:shadow-card">
         <span className="relative block h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-cream bg-cream/40 sm:h-16 sm:w-16 sm:rounded-2xl">
           <Image
-            src={stall.image}
+            src={stall.image} unoptimized={photoNeedsUnoptimized(stall.image)}
             alt={stall.name}
             fill
             sizes="(min-width: 640px) 64px, 56px"
@@ -2283,6 +2436,7 @@ function StepStallMenu({
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
                   alt={it.name}
+                  unoptimized={photoNeedsUnoptimized(it.photo)}
                   fill
                   sizes="56px"
                   className="object-cover"
@@ -2366,6 +2520,7 @@ function StepStallMenu({
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
                   alt={it.name}
+                  unoptimized={photoNeedsUnoptimized(it.photo)}
                   fill
                   sizes="50vw"
                   className="object-cover"
@@ -2694,6 +2849,8 @@ function StepStallConfirm({
   emiCount,
   setEmiCount,
   onPaid,
+  onBeforePay,
+  couponList,
   confirming,
   confirmError,
   onConfirm,
@@ -2749,7 +2906,9 @@ function StepStallConfirm({
   setPayMethod: (m: OrderPaymentMethod) => void;
   emiCount: number;
   setEmiCount: (n: number) => void;
-  onPaid: (amount: number, ref: string) => void;
+  onPaid: (amount: number, ref: string, verified?: boolean) => void;
+  onBeforePay: () => Promise<boolean>;
+  couponList: Coupon[];
   confirming: boolean;
   confirmError: string;
   onConfirm: () => void;
@@ -2945,6 +3104,8 @@ function StepStallConfirm({
         emiCount={emiCount}
         setEmiCount={setEmiCount}
         onPaid={onPaid}
+        onBeforePay={onBeforePay}
+        couponList={couponList}
         confirming={confirming}
         confirmError={confirmError}
         whatsappHref={whatsappHref}

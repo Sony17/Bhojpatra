@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import {
   captureRazorpayPayment,
+  fetchRazorpayOrder,
   fetchRazorpayPayment,
   isRazorpayConfigured,
   verifyCheckoutSignature,
@@ -14,8 +15,11 @@ export const dynamic = "force-dynamic";
 // checks before anything is stored: the checkout signature proves the callback
 // came from Razorpay, and the payment is re-fetched from Razorpay's API so the
 // recorded amount/order come from the gateway — the client's word is never
-// trusted for money. Idempotent on the order id (the webhook records the same
-// payment if this call never arrives).
+// trusted for money. The payment is then bound to the booking and payer the
+// ORDER was created for (its server-set notes) — a valid payment for one
+// booking can't be replayed to credit another, or another customer's.
+// Idempotent on the order id (the webhook records the same payment if this
+// call never arrives).
 export async function POST(request: Request) {
   const guard = await requireRole();
   if (guard instanceof Response) return guard;
@@ -79,6 +83,17 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // Bind to the order's own notes (set server-side at order creation), not
+    // the client's bookingId or the checkout's (client-set) payment notes.
+    const order = await fetchRazorpayOrder(orderId);
+    const notedBooking = order.notes?.bookingId ?? "";
+    const notedUser = order.notes?.userId ?? "";
+    if (notedBooking !== bookingId || (notedUser && notedUser !== guard.id)) {
+      return Response.json(
+        { error: "Payment verification failed." },
+        { status: 400 },
+      );
+    }
     if (payment.status !== "captured" && payment.status !== "authorized") {
       return Response.json(
         { error: "Payment was not completed." },
@@ -103,6 +118,7 @@ export async function POST(request: Request) {
       amountRupees: payment.amount / 100,
       orderId,
       paymentId,
+      userId: notedUser || guard.id,
       customer: typeof customer === "string" ? customer : undefined,
     });
     return Response.json({ ok: true, payment: recorded }, { status: 201 });

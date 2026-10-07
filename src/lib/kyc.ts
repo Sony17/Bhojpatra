@@ -56,6 +56,9 @@ export interface KycDocument {
   /** Vendor context captured at upload time (registration Step 1). */
   business: string;
   email: string;
+  /** The vendor account that uploaded the file. Absent on legacy uploads made
+   *  before KYC required a session. */
+  ownerUserId?: string;
   originalName: string;
   /** File name in the store (never exposed to clients). */
   storedName: string;
@@ -86,6 +89,16 @@ export function readKycDocuments(): Promise<KycDocument[]> {
 // deleted, so this stays faithful to the old whole-array rewrite.
 export function writeKycDocuments(docs: KycDocument[]): Promise<void> {
   return store.upsertMany(docs);
+}
+
+/** One document's metadata by id (single-row read). */
+export function getKycDocument(id: string): Promise<KycDocument | null> {
+  return store.get(id);
+}
+
+/** Insert or replace ONE document's metadata. */
+export function saveKycDocument(doc: KycDocument): Promise<void> {
+  return store.upsert(doc);
 }
 
 /**

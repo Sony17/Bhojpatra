@@ -2,6 +2,7 @@
 
 import { useState, useRef, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
+import { isLinkedPhotoUrl } from "@/lib/photoLinks";
 
 interface PhotoUploadButtonProps {
   currentPhoto?: string;
@@ -16,6 +17,9 @@ interface PhotoUploadButtonProps {
   helperText?: string;
   /** Optional `.photo-upload-title` line (mockup: "Feast Cover Photography"). */
   title?: ReactNode;
+  /** Offer "paste an image link" next to upload. Defaults to on for dish photos
+   *  (the only kind the menu stores as a URL; card/gallery are upload-only). */
+  allowLink?: boolean;
 }
 
 /** Thumb sizes per aspect — landscape is the mockup's default 90×70. */
@@ -39,10 +43,36 @@ export default function PhotoUploadButton({
   className = "",
   helperText = "JPG, PNG or WebP · Max 5 MB",
   title,
+  allowLink = kind === "dish",
 }: PhotoUploadButtonProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [link, setLink] = useState("");
+  const [checkingLink, setCheckingLink] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Use a pasted https image link — confirmed to actually load as an image
+  // before it's accepted, so a broken link never reaches the storefront.
+  const applyLink = () => {
+    const url = link.trim();
+    if (!isLinkedPhotoUrl(url)) {
+      setError("Paste a full image link starting with https://");
+      return;
+    }
+    setError("");
+    setCheckingLink(true);
+    const img = new window.Image();
+    img.onload = () => {
+      setCheckingLink(false);
+      setLink("");
+      onPhotoUploaded(url);
+    };
+    img.onerror = () => {
+      setCheckingLink(false);
+      setError("Couldn't load an image from that link. Check it opens an image directly.");
+    };
+    img.src = url;
+  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -158,6 +188,35 @@ export default function PhotoUploadButton({
             </button>
           )}
         </div>
+        {allowLink && (
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <input
+              type="url"
+              inputMode="url"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyLink();
+                }
+              }}
+              placeholder="or paste image link (https://…)"
+              aria-label="Image link"
+              className="form-input"
+              style={{ flex: 1, minWidth: 0, height: 34, fontSize: 12.5 }}
+              disabled={uploading || checkingLink}
+            />
+            <button
+              type="button"
+              className="btn-upload-photo"
+              onClick={applyLink}
+              disabled={uploading || checkingLink || !link.trim()}
+            >
+              {checkingLink ? "Checking…" : "Use Link"}
+            </button>
+          </div>
+        )}
         {error && (
           <span className="vob-field-error" role="alert">
             ⚠️ {error}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import { AppBar, Button, Card, CategoryChip, CategoryChips } from "@/components/ui";
@@ -11,6 +12,13 @@ import { packageCategoryItems, type VendorListing } from "@/lib/data";
 import type { VendorTier } from "@/lib/admin/types";
 import { dishOnTier, tierRate } from "@/lib/tiers";
 import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
+import {
+  ctaLabel,
+  leadTimeLabel,
+  listingCta,
+  profileCta,
+  type BookableStall,
+} from "@/lib/vendorStorefront";
 
 export interface FullMenuItem {
   name: string;
@@ -21,6 +29,8 @@ export interface FullMenuItem {
   /** Feast bands this dish is served on — absent means every band the caterer
    *  sells, which is the norm, so the marks only appear where they inform. */
   tiers?: VendorTier[];
+  /** Own price of a pick-your-dishes stall dish (₹). */
+  price?: number;
 }
 
 /** What one feast band buys from a course, already resolved the way the /book
@@ -43,6 +53,11 @@ export interface FullMenuCategory {
    *  published menu to break down. */
   bands?: CourseBand[];
   items: FullMenuItem[];
+  /** Cuisine-generic placeholder content (a sample listing with no bookable
+   *  stall) — rendered with an "Indicative sample" label, never as a menu. */
+  sample?: boolean;
+  /** Stall course billing: a set menu at `perPlate`, or pick-your-dishes. */
+  stallMode?: "fixed" | "varied";
 }
 
 /** Signature dishes for static vendors keyed by cuisine */
@@ -122,10 +137,13 @@ export default function VendorFullMenu({
   vendorId,
   profile,
   listing,
+  stall = null,
 }: {
   vendorId: string;
   profile: PublicVendorProfile | null;
   listing: VendorListing | null;
+  /** The booking-roster stall this vendor's Book button sells, or null. */
+  stall?: BookableStall | null;
 }) {
   const { t, lang } = useLang();
   const [selectedCat, setSelectedCat] = useState<string>("all");
@@ -133,12 +151,29 @@ export default function VendorFullMenu({
   const vendorName = profile?.business ?? listing?.name ?? "";
   const city = profile?.city ?? listing?.city ?? "";
   const state = profile?.state ?? listing?.state ?? "";
-  const priceFrom = profile?.priceFrom ?? listing?.priceFrom ?? 0;
-  const rating = profile?.rating ?? listing?.rating ?? 4.8;
-  const reviews = profile?.reviews ?? listing?.reviews ?? 100;
-  const verified = profile?.verified ?? listing?.verified ?? false;
+  // Ratings: a live vendor's own record only; a curated sample's seed rating
+  // is a placeholder and never shown. No Verified badge on samples either.
+  const rating = profile?.rating ?? 0;
+  const reviews = profile?.reviews ?? 0;
+  const verified = profile?.verified ?? false;
   const cuisines = profile?.cuisines ?? listing?.cuisines ?? [];
-  const bookHref = `/book/stall?vendor=${encodeURIComponent(vendorId)}`;
+  // Same CTA (gate, href with city, price) as the storefront page.
+  const cta = profile
+    ? profileCta(profile, stall, { bainaHref: `/vendors/${vendorId}#baina-order` })
+    : listing
+      ? listingCta({ ...listing, stall: stall ? { stallId: stall.stallId, fromPerPlate: stall.fromPerPlate } : null })
+      : null;
+  const bookHref = cta?.href ?? "/contact";
+  const bookText =
+    cta?.kind === "stall" ? t("Book Now", "अभी बुक करें") : ctaLabel(cta?.kind ?? "enquire", t);
+  const ctaPrice =
+    cta?.kind === "stall" && stall && stall.fromPerPlate > 0
+      ? { amount: stall.fromPerPlate, label: t("Single stall from", "सिंगल स्टॉल") }
+      : cta?.kind === "feast" && profile
+        ? { amount: profile.priceFrom, label: t("Feast from", "भोज") }
+        : null;
+  const leadText = leadTimeLabel(stall?.leadHours ?? profile?.leadHours, t);
+  const minGuests = stall?.minGuests ?? profile?.minPax;
 
   // Assemble full menu categories
   const categories: FullMenuCategory[] = [];
@@ -174,6 +209,25 @@ export default function VendorFullMenu({
         })),
       });
     }
+  } else if (listing && stall) {
+    // A curated sample bridged to a bookable stall: show exactly what the
+    // stall wizard sells — the roster stall's own courses, dishes and rates.
+    for (const c of stall.courses) {
+      categories.push({
+        id: c.categoryId,
+        name: c.name,
+        nameHi: c.nameHi,
+        icon: c.icon,
+        perPlate: c.fixed ? c.perPlate : undefined,
+        stallMode: c.fixed ? "fixed" : "varied",
+        items: c.items.map((it) => ({
+          name: it.name,
+          diet: it.diet,
+          photo: it.photo,
+          ...(!c.fixed ? { price: it.price ?? c.perPlate } : {}),
+        })),
+      });
+    }
   } else if (listing) {
     // Check Baina Box data
     const bainaVendor = getBainaBoxVendorByVendorId(listing.id);
@@ -199,6 +253,7 @@ export default function VendorFullMenu({
           id: c.toLowerCase().replace(/\s+/g, "-"),
           name: c,
           nameHi: c,
+          sample: true,
           items: famous.map((f) => ({
             name: f.name,
             nameHi: f.nameHi,
@@ -261,16 +316,44 @@ export default function VendorFullMenu({
 
             {/* Price & Rating */}
             <div className="shrink-0 text-right">
-              <p className="font-display text-lg font-bold text-maroon sm:text-2xl">
-                ₹{priceFrom.toLocaleString("en-IN")}
-                <span className="text-xs font-normal text-ink-soft">
-                  {" "}/ {t("plate", "प्लेट")}
-                </span>
-              </p>
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-xs font-bold text-white">
-                <StarIcon className="h-3 w-3 text-cream" />
-                {rating} ({reviews})
-              </div>
+              {ctaPrice ? (
+                <>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                    {ctaPrice.label}
+                  </p>
+                  <p className="font-display text-lg font-bold text-maroon sm:text-2xl">
+                    ₹{ctaPrice.amount.toLocaleString("en-IN")}
+                    <span className="text-xs font-normal text-ink-soft">
+                      {" "}/ {t("plate", "प्लेट")}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm font-semibold text-ink-soft">
+                  {t("Price on enquiry", "कीमत पूछताछ पर")}
+                </p>
+              )}
+              {(minGuests || leadText) && (
+                <p className="mt-1 text-[11px] text-ink-soft">
+                  {[
+                    minGuests ? t(`Min ${minGuests} guests`, `न्यूनतम ${minGuests} मेहमान`) : "",
+                    leadText ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+              {reviews > 0 && (
+                <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-maroon px-2 py-0.5 text-xs font-bold text-white">
+                  <StarIcon className="h-3 w-3 text-cream" />
+                  {rating} ({reviews})
+                </div>
+              )}
+              {listing && (
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                  {t("Sample listing", "नमूना लिस्टिंग")}
+                </p>
+              )}
             </div>
           </div>
         </Card>
@@ -315,14 +398,25 @@ export default function VendorFullMenu({
                       {lang === "hi" ? cat.nameHi ?? cat.name : cat.name}
                     </h2>
                     <p className="text-xs text-ink-soft">
-                      {cat.items.length}{" "}
-                      {t("items available", "डिश उपलब्ध")}
+                      {cat.sample
+                        ? t(
+                            "Indicative sample — not this vendor's bookable menu",
+                            "सांकेतिक नमूना — बुक करने योग्य मेन्यू नहीं",
+                          )
+                        : cat.stallMode === "fixed"
+                          ? t(
+                              `Set stall menu · all ${cat.items.length} items served`,
+                              `सेट स्टॉल मेन्यू · सभी ${cat.items.length} डिश`,
+                            )
+                          : cat.stallMode === "varied"
+                            ? t("Pick your dishes · priced per dish", "अपनी डिश चुनें · प्रति डिश कीमत")
+                            : `${cat.items.length} ${t("items available", "डिश उपलब्ध")}`}
                     </p>
                   </div>
                 </div>
                 {cat.perPlate !== undefined && cat.perPlate > 0 && (
                   <span className="rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-maroon">
-                    +₹{cat.perPlate}/{t("plate", "प्लेट")}
+                    {cat.stallMode ? "" : "+"}₹{cat.perPlate}/{t("plate", "प्लेट")}
                   </span>
                 )}
               </div>
@@ -386,6 +480,7 @@ export default function VendorFullMenu({
                           <Image
                             src={item.photo}
                             alt={item.name}
+                            unoptimized={photoNeedsUnoptimized(item.photo)}
                             fill
                             sizes="48px"
                             className="object-cover"
@@ -414,6 +509,11 @@ export default function VendorFullMenu({
                           <p className="truncate text-sm font-semibold text-ink sm:text-base">
                             {lang === "hi" && item.nameHi ? item.nameHi : item.name}
                           </p>
+                          {item.price != null && (
+                            <span className="ml-auto shrink-0 text-xs font-semibold text-maroon">
+                              ₹{item.price.toLocaleString("en-IN")}
+                            </span>
+                          )}
                         </div>
                         {/* A dish the caterer keeps off some bands says so —
                             otherwise a Silver guest reads the full spread and
@@ -512,15 +612,23 @@ export default function VendorFullMenu({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-maroon/10 bg-white/95 p-3.5 shadow-pop-up backdrop-blur-md">
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
             <div>
-              <p className="text-xs text-ink-soft">{t("Base Price", "बेस प्राइस")}</p>
-              <p className="font-display text-lg font-bold text-maroon">
-                ₹{priceFrom.toLocaleString("en-IN")}
-                <span className="text-xs font-normal text-ink-soft"> / {t("plate", "प्लेट")}</span>
-              </p>
+              {ctaPrice ? (
+                <>
+                  <p className="text-xs text-ink-soft">{ctaPrice.label}</p>
+                  <p className="font-display text-lg font-bold text-maroon">
+                    ₹{ctaPrice.amount.toLocaleString("en-IN")}
+                    <span className="text-xs font-normal text-ink-soft"> / {t("plate", "प्लेट")}</span>
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm font-semibold text-ink-soft">
+                  {t("Price on enquiry", "कीमत पूछताछ पर")}
+                </p>
+              )}
             </div>
 
             <Button href={bookHref} variant="primary" size="lg" className="px-6">
-              {t("Book Now", "अभी बुक करें")}
+              {bookText}
             </Button>
           </div>
         </div>

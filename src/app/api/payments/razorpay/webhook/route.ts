@@ -66,19 +66,26 @@ function notesOf(p: PaymentEntity | undefined): Record<string, string> {
     : {};
 }
 
-/** The booking ref travels on the checkout/order notes. Payment notes carry
- *  it in practice; fall back to the order's own notes when they don't. */
-async function bookingRefFor(p: PaymentEntity): Promise<string> {
-  const fromPayment = notesOf(p).bookingId ?? "";
-  if (BOOKING_REF.test(fromPayment)) return fromPayment;
-  if (!p.order_id) return "";
-  try {
-    const order = await fetchRazorpayOrder(p.order_id);
-    const fromOrder = order.notes?.bookingId ?? "";
-    return BOOKING_REF.test(fromOrder) ? fromOrder : "";
-  } catch {
-    return "";
+/** The booking ref (and payer) the payment belongs to. The ORDER's notes are
+ *  set server-side when we create it, so they are the authority; the
+ *  payment's own notes come from the checkout options (client-set) and are
+ *  only a fallback when the order can't be fetched. */
+async function bookingRefFor(
+  p: PaymentEntity,
+): Promise<{ bookingId: string; userId?: string }> {
+  if (p.order_id) {
+    try {
+      const order = await fetchRazorpayOrder(p.order_id);
+      const fromOrder = order.notes?.bookingId ?? "";
+      if (BOOKING_REF.test(fromOrder)) {
+        return { bookingId: fromOrder, userId: order.notes?.userId || undefined };
+      }
+    } catch {
+      // fall through to the payment's notes
+    }
   }
+  const fromPayment = notesOf(p).bookingId ?? "";
+  return { bookingId: BOOKING_REF.test(fromPayment) ? fromPayment : "" };
 }
 
 export async function POST(request: Request) {
@@ -131,7 +138,7 @@ export async function POST(request: Request) {
           await log("skipped:no-payment-entity");
           return Response.json({ ok: true, skipped: "no-payment-entity" });
         }
-        const bookingId = await bookingRefFor(payment);
+        const { bookingId, userId } = await bookingRefFor(payment);
         if (!bookingId) {
           // A capture we can't tie to a booking — acknowledge (retries won't
           // fix it) but leave a trace for reconciliation.
@@ -140,6 +147,7 @@ export async function POST(request: Request) {
         }
         await recordRazorpayPayment({
           bookingId,
+          userId,
           amountRupees: (payment.amount as number) / 100,
           orderId: payment.order_id,
           paymentId: payment.id,
@@ -154,7 +162,7 @@ export async function POST(request: Request) {
           await log("skipped:no-payment-entity");
           return Response.json({ ok: true, skipped: "no-payment-entity" });
         }
-        const bookingId = await bookingRefFor(payment);
+        const { bookingId } = await bookingRefFor(payment);
         if (!bookingId) {
           await log("skipped:no-booking-ref");
           return Response.json({ ok: true, skipped: "no-booking-ref" });

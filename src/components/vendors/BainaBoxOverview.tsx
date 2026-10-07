@@ -8,6 +8,10 @@ import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { useLang } from "@/lib/i18n";
 import { Button, Badge } from "@/components/ui";
 import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
+import { vendorListings } from "@/lib/data";
+
+/** Curated demo brands (sample listings) never show a Verified badge. */
+const SAMPLE_IDS = new Set(vendorListings.filter((v) => v.sample).map((v) => v.id));
 
 export default function BainaBoxOverview() {
   const { t } = useLang();
@@ -61,7 +65,7 @@ export default function BainaBoxOverview() {
                 />
 
                 {/* Verified Badge */}
-                {vendor.verified && (
+                {vendor.verified && !SAMPLE_IDS.has(vendor.vendorId) && (
                   <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-md bg-maroon px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
                     <span aria-hidden="true">✓</span> {t("VERIFIED", "वेरिफाइड")}
                   </span>

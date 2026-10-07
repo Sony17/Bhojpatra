@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   bookingTimeSlots,
   cateringCategoryIds,
+  cities,
   formatClockTime,
   listingCateringCategories,
   listingOfferings,
@@ -16,11 +18,12 @@ import {
 } from "@/lib/data";
 import {
   useVendorRatings,
-  statFor,
+  storefrontStat,
   type VendorRatingSummary,
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import { useAllVendors } from "@/lib/useAllVendors";
+import { ctaLabel, listingCta } from "@/lib/vendorStorefront";
 import { isStallTypeId, stallTypeById } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
 import { useLocations } from "@/lib/locations";
@@ -265,7 +268,17 @@ export default function VendorCatalog() {
     const c = searchParams.get("category") ?? "";
     return cateringCategoryIds.includes(c) ? c : "";
   });
-  const [city, setCity] = useState<string>(() => searchParams.get("city") ?? ALL);
+  // Listings carry the city's display name ("Lucknow"); links from the booking
+  // flows carry its id ("lucknow"). Accept either, so a hand-off never lands on
+  // an empty "0 caterers in lucknow".
+  const [city, setCity] = useState<string>(() => {
+    const raw = searchParams.get("city")?.trim();
+    if (!raw) return ALL;
+    const known = cities.find(
+      (c) => c.id === raw.toLowerCase() || c.name.toLowerCase() === raw.toLowerCase(),
+    );
+    return known ? known.name : raw;
+  });
   const [state, setState] = useState<string>(() => searchParams.get("state") ?? ALL);
   const [cuisine, setCuisine] = useState<string>(
     () => searchParams.get("cuisine") ?? ALL,
@@ -533,12 +546,15 @@ export default function VendorCatalog() {
     });
 
     const sorted = [...filtered];
+    // Price sorts follow the price the card shows: a bookable stall's own
+    // per-plate rate, else the listing's indicative price.
+    const shownPrice = (v: VendorListing) => v.stall?.fromPerPlate ?? v.priceFrom;
     switch (sort) {
       case "price-asc":
-        sorted.sort((a, b) => a.priceFrom - b.priceFrom);
+        sorted.sort((a, b) => shownPrice(a) - shownPrice(b));
         break;
       case "price-desc":
-        sorted.sort((a, b) => b.priceFrom - a.priceFrom);
+        sorted.sort((a, b) => shownPrice(b) - shownPrice(a));
         break;
       case "rating":
         sorted.sort((a, b) => b.rating - a.rating);
@@ -551,7 +567,7 @@ export default function VendorCatalog() {
           const topTier = (v: VendorListing) =>
             Math.max(...v.tiers.map((t) => tierRank[t]));
           const score = (v: VendorListing) =>
-            (v.verified ? 1000 : 0) +
+            (v.verified && !v.sample ? 1000 : 0) +
             topTier(v) * 100 +
             v.rating * 10 +
             v.reviews / 1000;
@@ -559,6 +575,9 @@ export default function VendorCatalog() {
         });
         break;
     }
+    // Real, approved vendors always lead; curated sample listings follow
+    // (stable sort keeps the chosen order within each group).
+    sorted.sort((a, b) => Number(Boolean(a.sample)) - Number(Boolean(b.sample)));
     return sorted;
   }, [
     allVendors,
@@ -1154,7 +1173,7 @@ export default function VendorCatalog() {
             <VendorCard
               key={vendor.id}
               vendor={vendor}
-              stats={statFor(ratings, vendor)}
+              stats={storefrontStat(ratings, vendor)}
               // Whether the card sends the visitor into the Baina Box flow —
               // the lens, not the search text, so the "Baina Box" chip routes
               // exactly like typing "baina" does.
@@ -1294,13 +1313,34 @@ function VendorCard({
   // Curated brands have a storefront; a live vendor's boxes are ordered from
   // the same panel on their profile (the anchor is simply absent, landing them
   // on the profile, if they declared the category but published no boxes).
-  const bookHref = bainaVendorData
-    ? `/baina-box/${bainaVendorData.slug}#baina-order`
-    : bainaMode
-      ? `/vendors/${vendor.id}#baina-order`
-      : `/book/stall?vendor=${encodeURIComponent(vendor.id)}${
-          counter ? `&counter=${encodeURIComponent(counter)}` : ""
-        }`;
+  //
+  // The CTA is gated on what the vendor can actually be booked for: a Single
+  // Stall only when the booking roster has their stall (curated samples are
+  // bridged to it by brand name, like the wizard does), and the price beside
+  // it is that stall's own per-plate rate — the number the wizard charges, not
+  // the card's indicative feast price. The vendor's city now rides along: the
+  // wizard keeps a `?vendor=` pick in its roster whatever the event city.
+  // Everything else routes to the flow that sells it, or an enquiry.
+  const cta = listingCta(vendor, {
+    counter,
+    bainaHref: bainaVendorData
+      ? `/baina-box/${bainaVendorData.slug}#baina-order`
+      : bainaMode
+        ? `/vendors/${vendor.id}#baina-order`
+        : undefined,
+  });
+  const bookHref = cta.href;
+  const ctaText = ctaLabel(cta.kind, t);
+  // The price that sits next to the CTA — always the thing the CTA sells.
+  const ctaPrice =
+    cta.kind === "stall"
+      ? (cta.price ?? (vendor.stall === undefined ? vendor.priceFrom : null))
+      : cta.kind === "enquire" || cta.kind === "service"
+        ? null
+        : vendor.priceFrom;
+  const ctaUnit =
+    cta.kind === "baina" ? t("/ box", "/ बॉक्स") : t("/ plate", "/ प्लेट");
+  const isSample = Boolean(vendor.sample);
 
   const tierBadgeLabel = (tier: Tier): string => {
     switch (tier) {
@@ -1394,7 +1434,7 @@ function VendorCard({
         }
       >
         <Image
-          src={vendor.image}
+          src={vendor.image} unoptimized={photoNeedsUnoptimized(vendor.image)}
           alt={vendor.name}
           fill
           sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
@@ -1408,7 +1448,7 @@ function VendorCard({
           }
         />
 
-        {vendor.verified && (
+        {vendor.verified && !isSample && (
           <span
             className={
               (compact ? "hidden sm:inline-flex " : "inline-flex ") +
@@ -1455,7 +1495,7 @@ function VendorCard({
             (compact ? "left-1.5 top-1.5" : "bottom-2.5 left-2.5")
           }
         >
-          {vendor.reviews > 0 || stats ? (
+          {stats || (vendor.reviews > 0 && !isSample) ? (
             <Link
               href={
                 bainaVendorData ? vendorHref : `/vendors/${vendor.id}#reviews`
@@ -1478,7 +1518,7 @@ function VendorCard({
             </span>
           ) : (
             <span className="rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
-              {t("New", "नया")}
+              {isSample ? t("Sample", "नमूना") : t("New", "नया")}
             </span>
           )}
           {badge && (
@@ -1499,14 +1539,22 @@ function VendorCard({
         {compact && (
           <div className="absolute inset-x-1.5 bottom-1.5 z-10 flex items-end justify-between gap-1.5 sm:hidden">
             <p className="min-w-0 truncate font-sans text-[13px] font-bold leading-tight text-white">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}
-              <span className="text-[10px] font-semibold"> {t("/ plate", "/ प्लेट")}</span>
+              {ctaPrice != null ? (
+                <>
+                  ₹{ctaPrice.toLocaleString("en-IN")}
+                  <span className="text-[10px] font-semibold"> {ctaUnit}</span>
+                </>
+              ) : (
+                <span className="text-[11px] font-semibold">
+                  {t("On enquiry", "पूछताछ पर")}
+                </span>
+              )}
             </p>
             <Link
               href={bookHref}
               className="shrink-0 rounded-full bg-maroon px-3 py-1 text-[11px] font-semibold text-cream shadow-sm transition active:scale-95"
             >
-              {t("Book", "बुक")}
+              {ctaText}
             </Link>
           </div>
         )}
@@ -1598,13 +1646,23 @@ function VendorCard({
               (compact ? "text-[12px]" : "text-[13px]")
             }
           >
-            <span className="text-maroon">
-              ₹{vendor.priceFrom.toLocaleString("en-IN")}
-            </span>
-            <span className="font-normal text-ink/45">
-              {" "}
-              {t("/ plate", "/ प्लेट")}
-            </span>
+            {ctaPrice != null ? (
+              <>
+                {cta.kind === "stall" && (
+                  <span className="font-normal text-ink/45">
+                    {t("Stall from ", "स्टॉल ")}
+                  </span>
+                )}
+                <span className="text-maroon">
+                  ₹{ctaPrice.toLocaleString("en-IN")}
+                </span>
+                <span className="font-normal text-ink/45"> {ctaUnit}</span>
+              </>
+            ) : (
+              <span className="font-normal text-ink/45">
+                {t("Price on enquiry", "कीमत पूछताछ पर")}
+              </span>
+            )}
           </p>
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
             {/* Compact phones: the whole card already opens the caterer. */}
@@ -1627,10 +1685,20 @@ function VendorCard({
                 (compact ? "max-sm:min-h-7 max-sm:px-3 max-sm:py-1" : "")
               }
             >
-              {t("Book", "बुक")}
+              {ctaText}
             </Button>
           </div>
         </div>
+        {isSample && (
+          <p
+            className={
+              "mt-1.5 text-[10px] font-medium uppercase tracking-wide text-ink/45 " +
+              (compact ? "hidden sm:block" : "")
+            }
+          >
+            {t("Sample listing", "नमूना लिस्टिंग")}
+          </p>
+        )}
       </div>
 
       <Link

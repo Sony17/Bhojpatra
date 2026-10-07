@@ -89,6 +89,9 @@ export interface VendorDocument {
   kind: VendorDocKind;
   number: string;
   status: VerificationStatus;
+  /** Admin-only link to the uploaded file (`/api/vendors/kyc/<id>`), when one
+   *  was uploaded. */
+  fileUrl?: string;
 }
 
 /** A vendor as the admin manages it. Overlapping fields (business/tier/city/…)
@@ -146,6 +149,45 @@ export interface VendorApplication extends PendingVendorApproval {
    *  admin decides — the console then defaults the editor to `requestedTiers`
    *  (the price-derived baseline). Once set, this drives the public catalog. */
   assignedTiers?: VendorTier[];
+  /** Rejected with a request to fix and resubmit (vs. a final rejection). */
+  changesRequested?: boolean;
+  /** The admin's note to the vendor on the last reject / changes request. */
+  reviewReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  history?: VendorApplicationEvent[];
+  /** What the vendor is offering, for review (from their saved listing). */
+  offerSummary?: VendorOfferSummary;
+}
+
+/** One entry in an application's audit trail. */
+export interface VendorApplicationEvent {
+  at: string;
+  /** "vendor" or the reviewing admin's email. */
+  by: string;
+  action:
+    | "submitted"
+    | "resubmitted"
+    | "verified"
+    | "rejected"
+    | "changes-requested"
+    | "reopened"
+    | "document";
+  note?: string;
+}
+
+/** Compact review summary of a vendor's saved listing. */
+export interface VendorOfferSummary {
+  vendorId: string;
+  services: string[];
+  priceFrom: number;
+  dietaryOffering?: string;
+  serviceCities: string[];
+  courses: { name: string; dishes: number; perPlate: number }[];
+  stalls: { name: string; perPlate?: number; minPax?: number }[];
+  bainaBoxes: { name: string; price: number }[];
+  counters: number;
+  moderation: string;
 }
 
 /** Query params for the approvals queue. */
@@ -190,6 +232,12 @@ export interface AdminBooking {
   referralCode?: string;
   referrerName?: string;
   referrerType?: string;
+  /** The booked vendor declined it from the Vendor Portal (with their reason)
+   *  — the team follows up: reassign, or cancel + refund. */
+  vendorDeclined?: boolean;
+  declineReason?: string;
+  /** Only an open checkout so far (created before payment, nothing paid). */
+  awaitingPayment?: boolean;
 }
 
 export interface BookingQuery {

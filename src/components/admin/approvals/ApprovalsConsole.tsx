@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Textarea } from "@/components/ui";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import StatCard from "@/components/admin/shared/StatCard";
 import SearchBar from "@/components/admin/shared/SearchBar";
@@ -52,6 +52,8 @@ export default function ApprovalsConsole() {
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** Note to the vendor, required to reject / request changes. */
+  const [reason, setReason] = useState("");
 
   // Load submitted applications from the file-backed store on mount.
   useEffect(() => {
@@ -104,7 +106,20 @@ export default function ApprovalsConsole() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) return;
+      if (res.ok) {
+        // Adopt the stored record (history, reviewer, doc states) — keeping
+        // the offer summary, which only the list endpoint computes.
+        const data = (await res.json().catch(() => null)) as
+          | { application?: VendorApplication }
+          | null;
+        const saved = data?.application;
+        if (saved) {
+          setApps((prev) =>
+            prev.map((a) => (a.id === id ? { ...saved, offerSummary: a.offerSummary } : a)),
+          );
+        }
+        return;
+      }
       // The store rejected the change — undo the optimistic update.
       setApps(snapshot);
       // A 401/403 means the admin session isn't valid for the API even though
@@ -127,9 +142,22 @@ export default function ApprovalsConsole() {
     }
   };
 
-  const setAppStatus = (id: string, next: VerificationStatus) => {
+  const setAppStatus = (
+    id: string,
+    next: VerificationStatus,
+    opts: { changesRequested?: boolean } = {},
+  ) => {
     const snapshot = apps;
     const current = apps.find((a) => a.id === id);
+    const note = reason.trim();
+    if (next === "Rejected" && note.length < 3) {
+      setToast("Add a short note for the vendor first.");
+      return;
+    }
+    if (next === "Verified" && current?.documents.some((d) => d.status === "Rejected")) {
+      setToast("A document is marked Rejected — verify it or request changes before approving.");
+      return;
+    }
     // Lock in the tier selection at the moment of approval so the vendor's
     // catalog badges match what the admin sees here (even if untouched → the
     // price-derived default).
@@ -141,17 +169,38 @@ export default function ApprovalsConsole() {
           ? {
               ...a,
               status: next,
+              changesRequested: next === "Rejected" ? opts.changesRequested : undefined,
+              reviewReason: next === "Rejected" ? note : a.reviewReason,
               assignedTiers: tiers ?? a.assignedTiers,
               documents:
                 next === "Verified"
-                  ? a.documents.map((d) => ({ ...d, status: "Verified" as const }))
+                  ? a.documents.map((d) =>
+                      d.status === "Pending" ? { ...d, status: "Verified" as const } : d,
+                    )
                   : a.documents,
             }
           : a,
       ),
     );
-    setToast(`Application ${next === "Verified" ? "approved" : "rejected"}`);
-    void persist(id, tiers ? { status: next, tiers } : { status: next }, snapshot);
+    setToast(
+      next === "Verified"
+        ? "Application approved"
+        : opts.changesRequested
+          ? "Changes requested from vendor"
+          : "Application rejected",
+    );
+    setReason("");
+    void persist(
+      id,
+      {
+        status: next,
+        ...(tiers ? { tiers } : {}),
+        ...(next === "Rejected"
+          ? { reason: note, changesRequested: Boolean(opts.changesRequested) }
+          : {}),
+      },
+      snapshot,
+    );
   };
 
   // Set the vendor's assigned tiers (multi-select). A vendor must sit in at
@@ -217,7 +266,7 @@ export default function ApprovalsConsole() {
     { key: "city", header: "City", cell: (a) => <span className="text-ink-soft">{a.city}</span> },
     { key: "tier", header: "Requested", cell: (a) => <TierBadges tiers={a.requestedTiers} /> },
     { key: "submitted", header: "Submitted", cell: (a) => <span className="text-ink-soft">{a.submitted}</span> },
-    { key: "status", header: "Status", cell: (a) => <StatusBadge status={a.status} /> },
+    { key: "status", header: "Status", cell: (a) => <AppStatus app={a} /> },
     {
       key: "action",
       header: "",
@@ -293,7 +342,10 @@ export default function ApprovalsConsole() {
       {/* KYC review modal */}
       <Modal
         open={!!selected}
-        onClose={() => setSelectedId(null)}
+        onClose={() => {
+          setSelectedId(null);
+          setReason("");
+        }}
         title={selected ? selected.business : "Review application"}
         size="lg"
         footer={
@@ -303,9 +355,17 @@ export default function ApprovalsConsole() {
                 type="button"
                 variant="secondary"
                 onClick={() => setAppStatus(selected.id, "Rejected")}
-                disabled={selected.status === "Rejected"}
+                disabled={selected.status === "Rejected" && !selected.changesRequested}
               >
                 Reject
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setAppStatus(selected.id, "Rejected", { changesRequested: true })}
+                disabled={selected.status === "Rejected" && selected.changesRequested}
+              >
+                Request Changes
               </Button>
               <Button
                 type="button"
@@ -323,7 +383,7 @@ export default function ApprovalsConsole() {
           <div className="space-y-5">
             <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <TierBadges tiers={effectiveTiers(selected)} />
-              <StatusBadge status={selected.status} />
+              <AppStatus app={selected} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
 
@@ -385,6 +445,18 @@ export default function ApprovalsConsole() {
                         <StatusBadge status={d.status} />
                       </div>
                       <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
+                      {d.fileUrl ? (
+                        <a
+                          href={d.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-sm font-semibold text-maroon hover:underline"
+                        >
+                          View uploaded file ↗
+                        </a>
+                      ) : (
+                        <p className="mt-1 text-xs text-ink-soft">No file uploaded</p>
+                      )}
                     </div>
                     <div className="flex shrink-0 gap-2.5">
                       <Button
@@ -410,6 +482,50 @@ export default function ApprovalsConsole() {
                 ))}
               </ul>
             </div>
+
+            <OfferSummary app={selected} />
+
+            {/* Decision note — required to reject or request changes; shown
+                to the vendor on their dashboard and in the decision email. */}
+            <div>
+              <label
+                htmlFor="review-reason"
+                className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft"
+              >
+                Note to vendor
+              </label>
+              {selected.reviewReason && (
+                <p className="mb-2 text-sm text-ink-soft">
+                  Last note: <span className="text-ink">{selected.reviewReason}</span>
+                </p>
+              )}
+              <Textarea
+                id="review-reason"
+                rows={3}
+                maxLength={500}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. FSSAI licence number doesn't match the uploaded certificate."
+              />
+            </div>
+
+            {selected.history && selected.history.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  History
+                </p>
+                <ol className="space-y-1.5 text-sm text-ink">
+                  {[...selected.history].reverse().map((h, i) => (
+                    <li key={`${h.at}-${i}`} className="flex flex-wrap gap-x-2">
+                      <span className="tabular-nums text-ink-soft">{h.at.slice(0, 16).replace("T", " ")}</span>
+                      <span className="font-medium">{HISTORY_LABEL[h.action] ?? h.action}</span>
+                      <span className="text-ink-soft">by {h.by}</span>
+                      {h.note && <span className="w-full text-ink-soft">“{h.note}”</span>}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -424,6 +540,84 @@ function Detail({ label, value }: { label: string; value: string }) {
         {label}
       </dt>
       <dd className="mt-0.5 text-sm text-ink">{value}</dd>
+    </div>
+  );
+}
+
+const HISTORY_LABEL: Record<string, string> = {
+  submitted: "Submitted",
+  resubmitted: "Resubmitted",
+  verified: "Approved",
+  rejected: "Rejected",
+  "changes-requested": "Changes requested",
+  reopened: "Reopened",
+  document: "Document reviewed",
+};
+
+/** Status pill that tells a changes request apart from a final rejection. */
+function AppStatus({ app }: { app: VendorApplication }) {
+  return (
+    <StatusBadge
+      status={app.status === "Rejected" && app.changesRequested ? "Changes requested" : app.status}
+    />
+  );
+}
+
+/** What the vendor is offering, from their saved listing, plus a link to the
+ *  full menu in the moderation console. */
+function OfferSummary({ app }: { app: VendorApplication }) {
+  const s = app.offerSummary;
+  if (!s) {
+    return (
+      <p className="text-sm text-ink-soft">
+        This vendor hasn&apos;t saved a listing yet — there is no menu to review.
+      </p>
+    );
+  }
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Offerings</p>
+        <a
+          href={`/admin/menus?vendor=${encodeURIComponent(s.vendorId)}`}
+          className="text-sm font-semibold text-maroon hover:underline"
+        >
+          Open full menu in Menu Moderation →
+        </a>
+      </div>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <Detail label="Services" value={s.services.join(", ") || "—"} />
+        <Detail label="Dietary" value={s.dietaryOffering ?? "—"} />
+        <Detail label="Feast from" value={s.priceFrom ? `₹${s.priceFrom} / plate` : "—"} />
+        <Detail label="Serves" value={s.serviceCities.join(", ") || "—"} />
+        <Detail
+          label="Feast menu"
+          value={
+            s.courses.length
+              ? s.courses.map((c) => `${c.name} (${c.dishes}, +₹${c.perPlate})`).join(" · ")
+              : "—"
+          }
+        />
+        <Detail
+          label="Stalls"
+          value={
+            s.stalls.length
+              ? s.stalls
+                  .map((t) =>
+                    [t.name, t.perPlate ? `₹${t.perPlate}/plate` : null, t.minPax ? `min ${t.minPax}` : null]
+                      .filter(Boolean)
+                      .join(" "),
+                  )
+                  .join(" · ")
+              : "—"
+          }
+        />
+        <Detail
+          label="Baina boxes"
+          value={s.bainaBoxes.length ? s.bainaBoxes.map((b) => `${b.name} ₹${b.price}`).join(" · ") : "—"}
+        />
+        <Detail label="Listing status" value={`${s.moderation}${s.counters ? ` · ${s.counters} counters` : ""}`} />
+      </dl>
     </div>
   );
 }

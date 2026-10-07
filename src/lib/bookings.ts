@@ -42,6 +42,13 @@ export interface StoredBooking extends Booking {
    *  Confirmed (un-complete). Stops the auto-complete sweep for past events
    *  from immediately re-completing it, so the un-complete sticks. */
   reopened?: boolean;
+  /** Contact captured at booking time (the server returns the whole order) —
+   *  prefills the payment window when paying the advance / balance. */
+  customer?: string;
+  email?: string;
+  phone?: string;
+  /** Set while the order is only an open checkout (nothing paid yet). */
+  awaitingPayment?: boolean;
 }
 
 /** A vendor chosen for an order — the catalogue id (empty for legacy orders that

@@ -13,6 +13,7 @@ import {
   fetchMyBookings,
   onStoredBookingsChange,
   patchMyBooking,
+  emitBookingsChanged,
   downloadReceipt,
   bookingInvoice,
   bookingVendors,
@@ -37,6 +38,11 @@ import {
 import InvoicePreview from "./InvoicePreview";
 import StarInput from "@/components/reviews/StarInput";
 import { money, perPlateCost } from "@/lib/money";
+import { advanceDue, amountDueNow } from "@/lib/bookingRules";
+import {
+  startRazorpayCheckout,
+  RazorpayCheckoutError,
+} from "@/lib/razorpayCheckout";
 
 const ALL = "All" as const;
 type Filter = typeof ALL | BookingStatus;
@@ -73,13 +79,6 @@ function labelToISO(label: string): string {
   const m = MONTHS.indexOf(mon);
   if (!d || m < 0 || !y) return "";
   return `${y}-${String(m + 1).padStart(2, "0")}-${d.padStart(2, "0")}`;
-}
-
-/** "2026-12-12" → "12 Dec 2026"; falls back to the input if unparseable. */
-function isoToLabel(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${String(d).padStart(2, "0")} ${MONTHS[m - 1]} ${y}`;
 }
 
 /** Whole days from today until a booking's event date; null if unparseable. */
@@ -533,28 +532,61 @@ function ConfirmAction({
 }
 
 /**
- * "Pay Balance" — settles a Pending EMI order's outstanding balance in one go,
- * which confirms it (Pending → Confirmed). The server records the full payment
- * against `paid` on that transition (the client never sends money), so the
- * balance clears on refetch.
+ * "Pay" — pays what the booking owes next through Razorpay Checkout: the rest
+ * of the 10% advance while it's short (which is what confirms a Pending
+ * booking), then the remaining balance. The amount is decided server-side
+ * from the booking; the booking only changes once the gateway-verified payment
+ * lands in the ledger. Without the gateway the team collects it instead.
  */
 function PayBalanceButton({ booking }: { booking: StoredBooking }) {
   const { t } = useLang();
-  const balance = Math.max(0, booking.amount - booking.paid);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const due = amountDueNow(booking.amount, booking.paid);
+  if (due <= 0) return null;
+  const advanceShort = booking.paid < advanceDue(booking.amount);
+
+  const pay = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await startRazorpayCheckout({
+        bookingId: booking.id,
+        amount: due,
+        note: `Bhojpatra ${booking.id}`,
+        customerName: booking.customer ?? "",
+        customerEmail: booking.email ?? "",
+        customerPhone: booking.phone ?? "",
+      });
+      emitBookingsChanged();
+    } catch (err) {
+      if (err instanceof RazorpayCheckoutError && err.code === "dismissed") return;
+      setError(
+        err instanceof RazorpayCheckoutError && err.code === "verify"
+          ? t(
+              "Your payment went through but we couldn't confirm it here. Don't pay again — it will be recorded automatically.",
+              "आपका भुगतान हो गया लेकिन हम यहाँ पुष्टि नहीं कर सके। दोबारा भुगतान न करें — यह अपने आप दर्ज हो जाएगा।",
+            )
+          : err instanceof Error && err.message
+            ? err.message
+            : t("Couldn't start the payment. Try again.", "भुगतान शुरू नहीं हो सका। फिर कोशिश करें।"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <ConfirmAction
-      tone="solid"
-      triggerLabel={t(
-        `Pay Balance · ${money(balance)}`,
-        `शेष भुगतान · ${money(balance)}`,
-      )}
-      prompt={t(
-        `Settle the ${money(balance)} balance now to confirm this booking?`,
-        `इस बुकिंग की पुष्टि के लिए अभी ${money(balance)} शेष राशि चुकाएँ?`,
-      )}
-      confirmLabel={t("Yes, pay balance", "हाँ, भुगतान करें")}
-      run={() => patchMyBooking(booking.id, { status: "Confirmed" })}
-    />
+    <div className="flex shrink-0 flex-col items-start gap-1.5">
+      <Button variant="primary" onClick={() => void pay()} disabled={busy} className="shrink-0">
+        {busy
+          ? t("Opening payment…", "भुगतान खुल रहा है…")
+          : advanceShort
+            ? t(`Pay Advance · ${money(due)}`, `एडवांस भुगतान · ${money(due)}`)
+            : t(`Pay Balance · ${money(due)}`, `शेष भुगतान · ${money(due)}`)}
+      </Button>
+      {error && <p className="text-xs font-medium text-maroon">{error}</p>}
+    </div>
   );
 }
 
@@ -1035,13 +1067,16 @@ function BookingCard({
       </div>
 
       {/* Instalment plan, for a Pending EMI order. */}
-      {booking.status === "Pending" && booking.emiPlan && (
+      {(booking.status === "Pending" || booking.status === "Confirmed") &&
+        booking.emiPlan && (
         <EmiSchedule plan={booking.emiPlan} />
       )}
 
       {/* Actions */}
       <div className="mt-5 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar border-t border-cream-3 pt-4 md:flex-wrap md:overflow-visible">
-        {booking.status === "Pending" && <PayBalanceButton booking={booking} />}
+        {(booking.status === "Pending" || booking.status === "Confirmed") && (
+          <PayBalanceButton booking={booking} />
+        )}
         <Button variant="secondary" onClick={onView} className="shrink-0">
           {t("View Details", "विवरण देखें")}
         </Button>
@@ -1350,7 +1385,8 @@ function BookingDetailsModal({
                   {t("Edit Booking", "बुकिंग संपादित करें")}
                 </Button>
               )}
-              {booking.status === "Pending" && (
+              {(booking.status === "Pending" ||
+                booking.status === "Confirmed") && (
                 <PayBalanceButton booking={booking} />
               )}
               {(booking.status === "Pending" ||
@@ -1380,42 +1416,30 @@ function EditBookingForm({
   onDone: () => void;
 }) {
   const { t } = useLang();
-  const invoice = bookingInvoice(booking);
-  const [occasion, setOccasion] = useState(booking.occasion);
-  const [dateISO, setDateISO] = useState(labelToISO(booking.date));
-  const [guests, setGuests] = useState(String(booking.guests));
-  const [city, setCity] = useState(booking.city);
-  const [venue, setVenue] = useState(invoice.venue === "-" ? "" : invoice.venue);
   const [note, setNote] = useState(booking.note ?? "");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const save = () => {
-    const guestCount = Math.round(Number(guests));
-    if (!occasion.trim()) {
-      setError(t("Please enter an occasion.", "कृपया अवसर दर्ज करें।"));
-      return;
-    }
-    if (!Number.isFinite(guestCount) || guestCount <= 0) {
-      setError(t("Please check the number of guests.", "कृपया मेहमानों की संख्या जाँच लें।"));
-      return;
-    }
-    const dateLabel = dateISO ? isoToLabel(dateISO) : booking.date;
-    void patchMyBooking(booking.id, {
-      occasion: occasion.trim(),
-      date: dateLabel,
-      guests: guestCount,
-      city: city.trim(),
+  // Only the special-requests note is the customer's to edit — the date,
+  // guests, venue and menu were priced (and paid) as booked, so changing them
+  // goes through our team (the server refuses them from here).
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    const result = await patchMyBooking(booking.id, {
       note: note.trim() || undefined,
-      // Keep the invoice's mirrored fields in step so downloads/shares match.
-      invoice: {
-        ...invoice,
-        occasion: occasion.trim(),
-        eventDate: dateLabel,
-        guests: guestCount,
-        city: city.trim(),
-        venue: venue.trim() || "-",
-      },
     });
+    setSaving(false);
+    if (!result.ok) {
+      setError(
+        result.error ??
+          t(
+            "Couldn't save your note. Please try again.",
+            "आपका नोट सहेजा नहीं जा सका। कृपया पुनः प्रयास करें।",
+          ),
+      );
+      return;
+    }
     onDone();
   };
 
@@ -1427,82 +1451,34 @@ function EditBookingForm({
       <p className={labelCls}>{t("Edit Booking", "बुकिंग संपादित करें")}</p>
       <span className="mt-1 block h-0.5 w-8 rounded bg-maroon" />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className={labelCls}>{t("Occasion", "अवसर")}</span>
-          <Input
-            type="text"
-            value={occasion}
-            onChange={(e) => setOccasion(e.target.value)}
-            className="mt-1"
-          />
-        </label>
-        <label className="block">
-          <span className={labelCls}>{t("Event Date", "इवेंट तिथि")}</span>
-          <Input
-            type="date"
-            value={dateISO}
-            onChange={(e) => setDateISO(e.target.value)}
-            className="mt-1"
-          />
-        </label>
-        <label className="block">
-          <span className={labelCls}>{t("Guests", "मेहमान")}</span>
-          <Input
-            type="number"
-            min={1}
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-            className="mt-1"
-          />
-        </label>
-        <label className="block">
-          <span className={labelCls}>{t("City", "शहर")}</span>
-          <Input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="mt-1"
-          />
-        </label>
-        <label className="block sm:col-span-2">
-          <span className={labelCls}>{t("Venue", "वेन्यू")}</span>
-          <Input
-            type="text"
-            value={venue}
-            onChange={(e) => setVenue(e.target.value)}
-            className="mt-1"
-          />
-        </label>
-        <label className="block sm:col-span-2">
-          <span className={labelCls}>
-            {t("Special Requests", "विशेष अनुरोध")}
-          </span>
-          <Textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={3}
-            placeholder={t(
-              "Dietary notes, timing, decor preferences…",
-              "आहार संबंधी नोट्स, समय, सजावट प्राथमिकताएँ…",
-            )}
-            className="mt-1 resize-none"
-          />
-        </label>
-      </div>
+      <label className="mt-4 block">
+        <span className={labelCls}>
+          {t("Special Requests", "विशेष अनुरोध")}
+        </span>
+        <Textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          placeholder={t(
+            "Dietary notes, timing, decor preferences…",
+            "आहार संबंधी नोट्स, समय, सजावट प्राथमिकताएँ…",
+          )}
+          className="mt-1 resize-none"
+        />
+      </label>
 
       <p className="mt-3 text-xs text-ink-soft">
         {t(
-          "Changes to date, venue or guest count may affect final pricing — our team will confirm.",
-          "तिथि, वेन्यू या मेहमान संख्या में बदलाव से अंतिम मूल्य प्रभावित हो सकता है — हमारी टीम पुष्टि करेगी।",
+          "To change the date, venue, menu or guest count, use Get Help — our team will re-quote and update the booking for you.",
+          "तिथि, वेन्यू, मेन्यू या मेहमान संख्या बदलने के लिए 'मदद लें' का उपयोग करें — हमारी टीम नया कोट देकर बुकिंग अपडेट करेगी।",
         )}
       </p>
 
       {error && <p className="mt-2 text-sm font-medium text-maroon">{error}</p>}
 
       <div className="mt-5 flex flex-nowrap gap-3 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
-        <Button variant="primary" onClick={save} className="shrink-0">
-          {t("Save Changes", "बदलाव सहेजें")}
+        <Button variant="primary" onClick={() => void save()} disabled={saving} className="shrink-0">
+          {saving ? t("Saving…", "सहेज रहे हैं…") : t("Save Changes", "बदलाव सहेजें")}
         </Button>
         <Button variant="secondary" onClick={onDone} className="shrink-0">
           {t("Cancel", "रद्द करें")}

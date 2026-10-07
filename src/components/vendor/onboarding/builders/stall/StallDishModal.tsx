@@ -9,6 +9,10 @@ interface StallDishModalProps {
   isOpen: boolean;
   categoryName: string;
   delicacyToEdit?: { item: VendorMenuItem; index: number } | null;
+  /** Pure-veg kitchen: only vegetarian dishes may be added. */
+  vegOnly?: boolean;
+  /** Names already on this stall's menu — a dish can't be added twice. */
+  existingNames?: string[];
   onClose: () => void;
   onSave: (item: VendorMenuItem, index?: number) => void;
 }
@@ -24,9 +28,9 @@ export default function StallDishModal(props: StallDishModalProps) {
 }
 
 /** Handover: "Configure Stall Menu Item". */
-function StallDishModalInner({ delicacyToEdit, onClose, onSave }: StallDishModalProps) {
+function StallDishModalInner({ delicacyToEdit, vegOnly = false, existingNames = [], onClose, onSave }: StallDishModalProps) {
   const [name, setName] = useState(delicacyToEdit?.item.name || "");
-  const [diet, setDiet] = useState<"veg" | "non-veg">(delicacyToEdit?.item.diet || "veg");
+  const [diet, setDiet] = useState<"veg" | "non-veg">(vegOnly ? "veg" : delicacyToEdit?.item.diet || "veg");
   const [price, setPrice] = useState<number | undefined>(delicacyToEdit?.item.price);
   const [desc, setDesc] = useState(delicacyToEdit?.item.desc || "");
   const [photo, setPhoto] = useState<string | undefined>(delicacyToEdit?.item.photo);
@@ -34,6 +38,12 @@ function StallDishModalInner({ delicacyToEdit, onClose, onSave }: StallDishModal
 
   const save = () => {
     if (!name.trim()) return setError("Dish Name is required.");
+    const key = name.trim().toLowerCase();
+    const clash = existingNames.some(
+      (n, i) => i !== delicacyToEdit?.index && n.trim().toLowerCase() === key,
+    );
+    if (clash) return setError(`"${name.trim()}" is already on this stall's menu.`);
+    if (vegOnly && diet !== "veg") return setError("Your kitchen is Pure Vegetarian — only veg dishes can be added.");
     if (!price || price <= 0) return setError("Dish Cost (₹ / plate) is required.");
     onSave(
       {
@@ -85,7 +95,7 @@ function StallDishModalInner({ delicacyToEdit, onClose, onSave }: StallDishModal
             className="form-select"
           >
             <option value="veg">Vegetarian</option>
-            <option value="non-veg">Non-Vegetarian</option>
+            {!vegOnly && <option value="non-veg">Non-Vegetarian</option>}
           </select>
         </div>
         <div className="form-group">

@@ -1,8 +1,11 @@
+import { requireRole } from "@/lib/auth";
 import { randomUUID } from "crypto";
 import {
+  applicationForOwner,
   readVendorApplications,
+  saveVendorApplication,
   toAdminApplication,
-  writeVendorApplications,
+  withHistory,
   type VendorApplicationDoc,
   type VendorApplicationRecord,
   type VendorPackageInput,
@@ -15,6 +18,8 @@ import {
   type VendorTier,
 } from "@/lib/admin/types";
 import {
+  listLiveVendorRecords,
+  stripBadgeGrants,
   cleanBadges,
   cleanBainaBoxes,
   cleanBainaDetails,
@@ -31,6 +36,9 @@ import {
 } from "@/lib/vendorMenus";
 import { isValidGst, normalizeGst, parseListQuery } from "@/lib/validate";
 import { sendVendorApplicationAlert } from "@/lib/email";
+import type { VendorOfferSummary } from "@/lib/admin/types";
+import type { LiveVendorRecord } from "@/lib/vendorMenus";
+import { cateringCategories, menuCategories } from "@/lib/data";
 
 // Applications are submitted at request time and appended to a JSON store on
 // disk — never prerender or cache this handler.
@@ -71,7 +79,15 @@ const DOC_FIELDS: { kind: VendorDocKind; key: string }[] = [
   { kind: "Business Proof", key: "businessProof" },
 ];
 
+// Legacy single-form registration (the orphaned `VendorRegister`). The V2
+// wizard submits through POST /api/vendor/application. Both now require a
+// signed-in vendor: the application is bound to that account (one per
+// account — a repeat submission updates it) and the email comes from the
+// session, never the body.
 export async function POST(request: Request) {
+  const user = await requireRole("vendor");
+  if (user instanceof Response) return user;
+
   let body: Record<string, unknown>;
   try {
     body = ((await request.json()) ?? {}) as Record<string, unknown>;
@@ -81,7 +97,7 @@ export async function POST(request: Request) {
 
   const business = str(body.business);
   const owner = str(body.owner);
-  const email = str(body.email).toLowerCase();
+  const email = user.email.trim().toLowerCase();
   const phone = normalizePhone(str(body.phone));
 
   if (!business || !owner) {
@@ -152,7 +168,8 @@ export async function POST(request: Request) {
   const customOfferings = cleanCustomOfferings(body.customOfferings);
   const stallConfig = cleanStallConfig(body.stallConfig);
   const bainaDetails = cleanBainaDetails(body.bainaDetails);
-  const badges = cleanBadges(body.badges);
+  // Vendors can apply for badges but never grant themselves one.
+  const badges = stripBadgeGrants(cleanBadges(body.badges));
 
   const rawPackages = Array.isArray(body.packages) ? body.packages : [];
   const packages: VendorPackageInput[] = rawPackages.map((p) => {
@@ -172,8 +189,21 @@ export async function POST(request: Request) {
     : deriveTiers(packages);
 
   const now = new Date();
+  let existing: VendorApplicationRecord | null;
+  try {
+    existing = applicationForOwner(await readVendorApplications(), user);
+  } catch (err) {
+    console.error("Failed to read vendor applications", err);
+    return Response.json(
+      { error: "Something went wrong. Please try again." },
+      { status: 500 },
+    );
+  }
   const record: VendorApplicationRecord = {
-    id: `VND-${randomUUID().slice(0, 6).toUpperCase()}`,
+    // Admin decisions (assigned tiers, review trail) carry over on resubmit.
+    ...(existing ?? {}),
+    id: existing?.id ?? `VND-${randomUUID().slice(0, 6).toUpperCase()}`,
+    ownerUserId: user.id,
     business,
     owner,
     email,
@@ -194,14 +224,9 @@ export async function POST(request: Request) {
     maxEventsPerDay: str(body.maxEventsPerDay),
     serviceCities: serviceCities.length ? serviceCities : strList(body.serviceCities),
     counters: strList(body.counters),
-    // A category whose builder has content is always declared (same invariant
-    // as the dashboard menu save).
-    cateringCategories: cleanCateringCategories([
-      ...cleanCateringCategories(body.cateringCategories),
-      ...(bainaBoxes.length || bainaDetails ? ["baina-box"] : []),
-      ...(stallConfig ? ["single-stall"] : []),
-      ...(essentialService ? ["essential"] : []),
-    ]),
+    // Exactly the categories the vendor declared — never inferred from
+    // whatever builder data happened to be sent along.
+    cateringCategories: cleanCateringCategories(body.cateringCategories),
     ...(bainaBoxes.length ? { bainaBoxes } : {}),
     ...(essentialService ? { essentialService } : {}),
     /* ── V2 Extensions ── */
@@ -216,15 +241,17 @@ export async function POST(request: Request) {
     ...(stallConfig ? { stallConfig } : {}),
     ...(bainaDetails ? { bainaDetails } : {}),
     ...(badges ? { badges } : {}),
-    status: "Pending",
+    status: existing?.status === "Verified" ? "Verified" : "Pending",
+    changesRequested: undefined,
     submitted: now.toISOString().slice(0, 10),
     submittedAt: now.toISOString(),
   };
+  record.history = existing
+    ? withHistory(existing, { at: now.toISOString(), by: "vendor", action: "resubmitted" })
+    : [{ at: now.toISOString(), by: "vendor", action: "submitted" }];
 
   try {
-    const records = await readVendorApplications();
-    records.push(record);
-    await writeVendorApplications(records);
+    await saveVendorApplication(record);
   } catch (err) {
     console.error("Failed to persist vendor application", err);
     return Response.json(
@@ -233,8 +260,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Every submission is a new application — alert the owners (best-effort).
-  await sendVendorApplicationAlert(record);
+  // New / back-in-queue applications alert the owners (best-effort).
+  if (record.status === "Pending") await sendVendorApplicationAlert(record);
 
   return Response.json({ ok: true, id: record.id }, { status: 201 });
 }
@@ -243,9 +270,27 @@ export async function POST(request: Request) {
 // Backward-compatible `{ applications }`; adds a `Paginated` envelope (over
 // `data`) when a filter/pagination param is present.
 export async function GET(request: Request) {
-  const records = await readVendorApplications();
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
+  const [records, vendors] = await Promise.all([
+    readVendorApplications(),
+    listLiveVendorRecords().catch((err) => {
+      // The summary is a review aid — never fail the queue over it.
+      console.error("Failed to load vendors for application summaries", err);
+      return [] as LiveVendorRecord[];
+    }),
+  ]);
   records.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  const applications = records.map(toAdminApplication);
+  const applications = records.map((r) => {
+    const email = r.email.trim().toLowerCase();
+    const vendor =
+      (r.ownerUserId && vendors.find((v) => v.ownerUserId === r.ownerUserId)) ||
+      (!r.ownerUserId &&
+        vendors.find((v) => v.ownerEmail?.trim().toLowerCase() === email)) ||
+      null;
+    const summary = vendor ? offerSummary(vendor) : null;
+    return { ...toAdminApplication(r), ...(summary ? { offerSummary: summary } : {}) };
+  });
 
   const { q, status, page, pageSize, hasQuery } = parseListQuery(request.url);
   if (!hasQuery) return Response.json({ applications });
@@ -268,4 +313,38 @@ export async function GET(request: Request) {
     pageSize,
     total: filtered.length,
   });
+}
+
+const SERVICE_NAME = new Map(cateringCategories.map((c) => [c.id, c.name]));
+const COURSE_NAME = new Map(menuCategories.map((c) => [c.id, c.name]));
+
+/** Compact review summary of a vendor's saved (current, possibly pending)
+ *  listing for the approvals console. */
+function offerSummary(v: LiveVendorRecord): VendorOfferSummary {
+  return {
+    vendorId: v.id,
+    services: (v.serviceCategories ?? []).map((id) => SERVICE_NAME.get(id) ?? id),
+    priceFrom: v.priceFrom,
+    ...(v.dietaryOffering ? { dietaryOffering: v.dietaryOffering } : {}),
+    serviceCities: v.serviceCities ?? [],
+    courses: v.menu
+      .filter((s) => !s.hidden && s.items.length)
+      .map((s) => ({
+        name: COURSE_NAME.get(s.categoryId) ?? s.categoryId,
+        dishes: s.items.length,
+        perPlate: s.perPlate,
+      })),
+    stalls: (v.stallConfig?.categories ?? []).map((c) => ({
+      name: c,
+      ...(v.stallConfig?.categoryPricing?.[c]?.fixedPerPlate
+        ? { perPlate: v.stallConfig.categoryPricing[c].fixedPerPlate }
+        : {}),
+      ...(v.stallConfig?.categoryPricing?.[c]?.minPaxGuarantee
+        ? { minPax: v.stallConfig.categoryPricing[c].minPaxGuarantee }
+        : {}),
+    })),
+    bainaBoxes: (v.bainaBoxes ?? []).map((b) => ({ name: b.name, price: b.price })),
+    counters: v.counters?.length ?? 0,
+    moderation: v.moderation ?? "Pending",
+  };
 }

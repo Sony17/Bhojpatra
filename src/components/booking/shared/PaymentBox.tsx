@@ -50,6 +50,7 @@ export default function PaymentBox({
   grandTotal,
   paidAmount,
   onPaid,
+  onBeforePay,
   customerName,
   customerPhone,
   customerEmail,
@@ -64,7 +65,14 @@ export default function PaymentBox({
   bookingId: string;
   grandTotal: number;
   paidAmount: number;
-  onPaid: (amount: number, txnRef: string) => void;
+  /** `verified` is false for a manual UPI/QR transfer — recorded, but only
+   *  counted once the team matches it (the order stays Pending until then). */
+  onPaid: (amount: number, txnRef: string, verified?: boolean) => void;
+  /** Called right before any money is taken. The Single Stall wizard uses it
+   *  to create its order (server-priced, Pending) first, so a payment always
+   *  lands on an order that exists. Resolving false aborts the payment — the
+   *  caller shows its own error. */
+  onBeforePay?: () => Promise<boolean>;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -186,6 +194,7 @@ export default function PaymentBox({
     setSubmitting(true);
     setError("");
     try {
+      if (onBeforePay && !(await onBeforePay())) return;
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,6 +210,7 @@ export default function PaymentBox({
       });
       const data = (await res.json().catch(() => null)) as {
         error?: string;
+        payment?: { amount?: number; status?: string };
       } | null;
       if (!res.ok) {
         setError(
@@ -209,7 +219,12 @@ export default function PaymentBox({
         );
         return;
       }
-      onPaid(amount, customerTxnId);
+      onPaid(
+        data?.payment?.amount ?? amount,
+        customerTxnId,
+        data?.payment?.status === "Advance Received" ||
+          data?.payment?.status === "Settled",
+      );
     } catch {
       setError(
         t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
@@ -228,6 +243,7 @@ export default function PaymentBox({
     setNotice("");
     setFailedPayment(false);
     try {
+      if (onBeforePay && !(await onBeforePay())) return;
       const result = await startRazorpayCheckout({
         bookingId,
         amount,
@@ -235,8 +251,9 @@ export default function PaymentBox({
         customerName: customerName.trim(),
         customerEmail,
         customerPhone,
+        purpose: "advance",
       });
-      onPaid(result.amountPaid, result.paymentId);
+      onPaid(result.amountPaid, result.paymentId, true);
     } catch (err) {
       if (err instanceof RazorpayCheckoutError && err.code === "dismissed") {
         // Closing the modal without attempting a payment isn't an error — a
@@ -386,8 +403,8 @@ export default function PaymentBox({
           </span>
           <span className="mt-0.5 text-xs text-ink-soft">
             {t(
-              "Confirm now — our team calls to arrange payment",
-              "अभी पुष्टि करें — भुगतान के लिए हमारी टीम कॉल करेगी",
+              "Book now — our team calls to arrange the advance",
+              "अभी बुक करें — एडवांस के लिए हमारी टीम कॉल करेगी",
             )}
           </span>
         </button>

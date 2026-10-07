@@ -85,6 +85,10 @@ export default function Step5BPricingQuotas({
   };
 
   const saveSilver = () => {
+    if (!(data.priceFrom > 0)) {
+      setError("Enter your Silver per-plate rate.");
+      return;
+    }
     if (!COURSES.some((c) => data.silverQuotas[c.key] > 0)) {
       setError("Silver must include at least one dish allowance.");
       return;
@@ -96,6 +100,10 @@ export default function Step5BPricingQuotas({
   };
 
   const saveGold = () => {
+    if (!(data.goldRate > 0)) {
+      setError("Enter your Gold per-plate rate.");
+      return;
+    }
     if (!data.goldSpecialization?.trim()) {
       setError("Please select a culinary specialization for the Gold tier.");
       return;
@@ -188,7 +196,14 @@ export default function Step5BPricingQuotas({
                   </div>
                 </div>
                 <div className="tier-price-row">
-                  <span className="tier-price">{fmt(data.priceFrom)}</span>
+                  <RateInput
+                    label="Silver per-plate rate"
+                    value={data.priceFrom}
+                    onChange={(priceFrom) => {
+                      onChange({ priceFrom });
+                      if (error) setError("");
+                    }}
+                  />
                   <span className="tier-unit">
                     <R d="/ plate" m="/ p" />
                   </span>
@@ -235,9 +250,14 @@ export default function Step5BPricingQuotas({
                   </div>
                 </div>
                 <div className="tier-price-row">
-                  <span className="tier-price" style={{ color: "var(--color-red)" }}>
-                    {fmt(data.goldRate)}
-                  </span>
+                  <RateInput
+                    label="Gold per-plate rate"
+                    value={data.goldRate}
+                    onChange={(goldRate) => {
+                      onChange({ goldRate });
+                      if (error) setError("");
+                    }}
+                  />
                   <span className="tier-unit">
                     <R d="/ plate" m="/ p" />
                   </span>
@@ -385,5 +405,33 @@ export default function Step5BPricingQuotas({
         saving={saving}
       />
     </div>
+  );
+}
+
+/** Editable ₹/plate rate in a tier header (starts blank — no sample price). */
+function RateInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <span className="tier-price">
+      ₹
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={100000}
+        className="tier-price-input"
+        aria-label={label}
+        placeholder="0"
+        value={value > 0 ? value : ""}
+        onChange={(e) => onChange(Math.max(0, Math.min(100000, Math.round(Number(e.target.value) || 0))))}
+      />
+    </span>
   );
 }

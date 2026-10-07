@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SubnavPills } from "../../ui";
 import Step6AStallWorkspace from "./Step6AStallWorkspace";
 import Step6BStallSetup from "./Step6BStallSetup";
-import type { SingleStallConfig, VendorMenuSection } from "@/lib/vendorMenus";
+import type { SingleStallConfig, VendorDietaryOffering, VendorMenuSection } from "@/lib/vendorMenus";
 
 export interface SingleStallBuilderData {
   stallConfig: SingleStallConfig;
@@ -13,6 +13,8 @@ export interface SingleStallBuilderData {
 
 interface SingleStallBuilderProps {
   data: SingleStallBuilderData;
+  /** The kitchen's dietary offering — a pure-veg kitchen can only add veg dishes. */
+  dietaryOffering?: VendorDietaryOffering;
   onChange: (patch: Partial<SingleStallBuilderData>) => void;
   onBackToPreviousService: () => void;
   onFinishStall: () => void;
@@ -30,6 +32,7 @@ export const STALL_SECTIONS = [
 
 export default function SingleStallBuilder({
   data,
+  dietaryOffering,
   onChange,
   onBackToPreviousService,
   onFinishStall,
@@ -80,6 +83,7 @@ export default function SingleStallBuilder({
         <Step6AStallWorkspace
           stallConfig={data.stallConfig}
           menu={data.menu}
+          dietaryOffering={dietaryOffering}
           onChangeStallConfig={(stallConfig) => onChange({ stallConfig })}
           onChangeMenu={(menu) => onChange({ menu })}
           onBack={handlePrevSection}

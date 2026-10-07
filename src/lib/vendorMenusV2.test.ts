@@ -387,3 +387,26 @@ test("toPublicVendorProfile passes through V2 extensions", () => {
   assert.equal(profile.leadHours, 48);
   assert.equal(profile.menu[0].items[0].desc, "Melt in mouth smoked kebabs");
 });
+
+test("toVendorListing: stall categories advertise the matching stall types", () => {
+  const base = {
+    id: "VEN-STALL", business: "Stall Co", city: "Lucknow", state: "UP",
+    cuisines: ["Chaat"], priceFrom: 0, rating: 0, reviews: 0, verified: true,
+    image: "", menu: [], createdAt: "", updatedAt: "",
+  } as unknown as Parameters<typeof toVendorListing>[0];
+  const listing = toVendorListing({
+    ...base,
+    serviceCategories: ["single-stall"],
+    stallConfig: { categories: ["chaat", "juices", "ice-cream", "My Custom Stall"] },
+  });
+  assert.deepEqual(listing.offerings?.slice().sort(), ["chaat", "dessert", "live", "mocktail"]);
+  // Feast counters and stall categories merge, without duplicates.
+  const both = toVendorListing({
+    ...base,
+    counters: [{ id: "chaat" }, { id: "pan" }] as never,
+    stallConfig: { categories: ["chaat"] },
+  });
+  assert.deepEqual(both.offerings?.slice().sort(), ["chaat", "pan"]);
+  // No counters and no stall → no offerings key at all.
+  assert.equal(toVendorListing(base).offerings, undefined);
+});

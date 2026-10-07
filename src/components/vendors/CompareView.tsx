@@ -1,16 +1,18 @@
 "use client";
 
 import Image from "next/image";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
-import { cities, type VendorListing } from "@/lib/data";
+import { type VendorListing } from "@/lib/data";
 import { useCompare } from "@/lib/compare";
 import { useAllVendors } from "@/lib/useAllVendors";
 import {
   useVendorRatings,
-  statFor,
+  storefrontStat,
   type VendorRatings,
 } from "@/lib/vendorRatings";
+import { ctaLabel, listingCta, type ListingCta } from "@/lib/vendorStorefront";
 import { Button, EmptyState } from "@/components/ui";
 
 /** Localise the small fixed vocabularies (diet / tier / meal) for display. */
@@ -52,10 +54,21 @@ function useLocalize() {
   };
 }
 
-/** Deep-link into the booking wizard's vendor step, pre-filtered to the city. */
-function bookHref(vendor: VendorListing): string {
-  const cityId = cities.find((c) => c.name === vendor.city)?.id;
-  return `/book?${cityId ? `city=${cityId}&` : ""}step=menu`;
+/** The compare table's CTA for a vendor — the same gate and hand-off the
+ *  catalog card uses: a Single Stall booking pre-selecting THIS vendor (with
+ *  its city) when it has a bookable stall, else the flow that sells what they
+ *  offer, else an enquiry. */
+function ctaFor(vendor: VendorListing): ListingCta {
+  return listingCta(vendor);
+}
+
+/** The price the CTA sells at — a bookable stall's own per-plate rate. */
+function ctaPrice(vendor: VendorListing, cta: ListingCta): number | null {
+  if (cta.kind === "stall")
+    return cta.price ?? (vendor.stall === undefined ? vendor.priceFrom : null);
+  return cta.kind === "enquire" || cta.kind === "service"
+    ? null
+    : vendor.priceFrom;
 }
 
 export default function CompareView({
@@ -229,7 +242,7 @@ export default function CompareView({
                     {/* Fixed box — table cells ignore aspect-ratio otherwise */}
                     <span className="relative block h-24 w-full overflow-hidden rounded-xl bg-cream sm:h-32">
                       <Image
-                        src={v.image}
+                        src={v.image} unoptimized={photoNeedsUnoptimized(v.image)}
                         alt={v.name}
                         fill
                         sizes="(min-width: 640px) 208px, 40vw"
@@ -252,11 +265,22 @@ export default function CompareView({
             <Row
               label={t("Price / plate", "कीमत / प्लेट")}
               vendors={vendors}
-              render={(v) => (
-                <span className="font-display text-base font-semibold text-maroon">
-                  ₹{v.priceFrom.toLocaleString("en-IN")}
-                </span>
-              )}
+              render={(v) => {
+                const cta = ctaFor(v);
+                const price = ctaPrice(v, cta);
+                return price != null ? (
+                  <span className="font-display text-base font-semibold text-maroon">
+                    ₹{price.toLocaleString("en-IN")}
+                    {cta.kind === "stall" && (
+                      <span className="block font-sans text-[11px] font-normal text-ink-soft">
+                        {t("single stall, from", "सिंगल स्टॉल, से")}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-ink-soft">{t("On enquiry", "पूछताछ पर")}</span>
+                );
+              }}
             />
             <Row
               label={t("Rating", "रेटिंग")}
@@ -306,12 +330,14 @@ export default function CompareView({
               label={t("Verified", "वेरिफाइड")}
               vendors={vendors}
               render={(v) =>
-                v.verified ? (
+                v.verified && !v.sample ? (
                   <span className="font-semibold text-maroon">
                     ✓ {t("Verified", "वेरिफाइड")}
                   </span>
                 ) : (
-                  <span className="text-ink-soft">—</span>
+                  <span className="text-ink-soft">
+                    {v.sample ? t("Sample listing", "नमूना लिस्टिंग") : "—"}
+                  </span>
                 )
               }
             />
@@ -322,17 +348,19 @@ export default function CompareView({
                   {t("Book", "बुक करें")}
                 </span>
               </th>
-              {vendors.map((v) => (
+              {vendors.map((v) => {
+                const cta = ctaFor(v);
+                return (
                 <td key={v.id} className="bg-cream-2/40 p-2.5 align-top sm:p-4">
                   <div className="flex flex-col gap-2">
                     <Button
-                      href={bookHref(v)}
+                      href={cta.href}
                       variant="primary"
                       size="sm"
                       fullWidth
                       onClick={onClose}
                     >
-                      {t("Book", "बुक करें")}
+                      {ctaLabel(cta.kind, t)}
                     </Button>
                     <Button
                       href={`/vendors/${v.id}`}
@@ -345,7 +373,8 @@ export default function CompareView({
                     </Button>
                   </div>
                 </td>
-              ))}
+                );
+              })}
             </tr>
           </tbody>
         </table>
@@ -393,7 +422,12 @@ function RatingCell({
   ratings: VendorRatings;
 }) {
   const { t } = useLang();
-  const stats = statFor(ratings, vendor);
+  const stats = storefrontStat(ratings, vendor);
+  // A sample listing's seed rating is a placeholder — show it only once real
+  // reviews exist.
+  if (!stats && vendor.sample) {
+    return <span className="text-ink-soft">{t("No reviews yet", "अभी कोई समीक्षा नहीं")}</span>;
+  }
   const rating = stats?.rating ?? vendor.rating;
   const count = stats?.count ?? vendor.reviews;
   return (

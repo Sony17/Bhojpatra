@@ -1,6 +1,7 @@
 import { createStore } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 import { refundRazorpayPayment } from "@/lib/razorpay";
+import { syncBookingWithLedger } from "@/lib/bookingPaymentSync";
 import {
   STORED_PAYMENT_STATUSES,
   type StoredPayment,
@@ -26,6 +27,8 @@ export async function GET(
   _request: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const guard = await requireRole("admin");
+  if (guard instanceof Response) return guard;
   const { id } = await ctx.params;
   const payment = await store.get(decodeURIComponent(id));
   if (!payment) {
@@ -34,7 +37,9 @@ export async function GET(
   return Response.json({ payment });
 }
 
-// PATCH /api/payments/[id] → { status } — settle / mark pending / refund.
+// PATCH /api/payments/[id] → { status } — verify / settle / mark pending /
+// refund. Verifying a manual UPI/QR transfer is Pending → "Advance Received";
+// the booking is then re-synced from the ledger, which is what confirms it.
 // No DELETE: the payment ledger is immutable.
 export async function PATCH(
   request: Request,
@@ -105,6 +110,16 @@ export async function PATCH(
       { error: "Something went wrong. Please try again." },
       { status: 500 },
     );
+  }
+
+  // Mirror the ledger onto the booking (a verified transfer confirms it).
+  // Best-effort — the payment row above is already saved.
+  try {
+    await syncBookingWithLedger(next.bookingId, {
+      paymentRef: next.razorpayPaymentId ?? next.customerTxnId,
+    });
+  } catch (err) {
+    console.error(`Failed to sync booking ${next.bookingId} after payment update`, err);
   }
 
   return Response.json({ payment: next });

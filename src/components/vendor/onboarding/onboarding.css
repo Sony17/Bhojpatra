@@ -1188,6 +1188,23 @@
   color: var(--color-red);
 }
 
+.vob .tier-price-input {
+  width: 5.5ch;
+  margin-left: 2px;
+  border: 0;
+  border-bottom: 2px solid var(--color-red-25);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.vob .tier-price-input:focus {
+  border-bottom-color: var(--color-red);
+}
+
 .vob .tier-unit {
   font-size: 12px;
   color: var(--color-black-60);
