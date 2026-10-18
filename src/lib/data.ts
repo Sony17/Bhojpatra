@@ -1533,6 +1533,11 @@ export interface CategoryVendor {
    *  `leadHours`) so the booking flow can enforce them. Absent on curated seeds
    *  and on vendors that declared none; every field is individually optional. */
   stallTerms?: StallTerms;
+  /** True when this course is one of the stalls the vendor set up in their
+   *  Single Stall builder (`stallConfig.categories`) — as opposed to a feast
+   *  course (welcome drinks, starters, main…). The Single Stall flow sells
+   *  only these when a vendor has any. Absent on seeds and legacy vendors. */
+  stallCourse?: boolean;
 }
 
 /** A live vendor's Single Stall terms as published in `/api/menu`. */

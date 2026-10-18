@@ -37,6 +37,9 @@ export type StallDraft = {
   selectedAddOns: string[];
   addOnVendor: Record<string, string>;
   serviceId: string;
+  /** The stall type the guest came in through (Chaat Station…) — narrows the
+   *  stall's menu to that one stall. Empty = the stall's whole spread. */
+  counter?: string;
 };
 
 /** v2 drops the v1 drafts, whose `step` numbers belong to the retired 4-step

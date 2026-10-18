@@ -68,7 +68,17 @@ import {
 } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
 import { useAllVendors } from "@/lib/useAllVendors";
-import { stallTypeCounts, isStallTypeId } from "@/lib/stallTypes";
+import {
+  sellsOnSingleStall,
+  stallTypesOfCourses,
+  vendorsWithStallCourses,
+} from "@/lib/vendorStorefront";
+import {
+  stallTypeCounts,
+  isStallTypeId,
+  stallTypeById,
+  stallTypeOfCategory,
+} from "@/lib/stallTypes";
 import {
   readStoredLocation,
   markManualLocation,
@@ -379,6 +389,7 @@ export default function StallBookingWizard() {
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
       if (d.addOnVendor) setAddOnVendor(d.addOnVendor);
       if (d.serviceId) setServiceId(d.serviceId);
+      if (d.counter && isStallTypeId(d.counter)) setCounterType(d.counter);
     }
     hydrated.current = true;
   }, []);
@@ -415,8 +426,11 @@ export default function StallBookingWizard() {
     if (vendorParam) setPendingVendorId(vendorParam);
     // Returning from the Brands catalog keeps the stall type, so a guest who
     // backs out of a stall lands on the type they were browsing, not step one.
+    // It also narrows the stall's menu to that stall — so a new `?vendor=`
+    // hand-off with no type (a brand page's Book Now) clears a stale one.
     const counterParam = sp.get("counter")?.trim() ?? "";
     if (isStallTypeId(counterParam)) setCounterType(counterParam);
+    else if (vendorParam) setCounterType("");
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
@@ -442,6 +456,7 @@ export default function StallBookingWizard() {
       selectedAddOns,
       addOnVendor,
       serviceId,
+      counter: counterType,
     });
   }, [
     step,
@@ -461,6 +476,7 @@ export default function StallBookingWizard() {
     selectedAddOns,
     addOnVendor,
     serviceId,
+    counterType,
   ]);
 
   // When the URL didn't pass a city, reuse the detected / persisted one.
@@ -681,8 +697,12 @@ export default function StallBookingWizard() {
   // menu they built on it) vanish underneath them.
   const stalls = useMemo<StallOption[]>(() => {
     const byId = new Map<string, StallOption>();
+    const stallVendors = vendorsWithStallCourses(liveMenuCategories);
     for (const cat of liveMenuCategories) {
       for (const v of cat.vendors) {
+        // A vendor's feast courses (welcome drinks, starters…) aren't stalls —
+        // once they've set up stalls, only those are sold here.
+        if (!sellsOnSingleStall(v, stallVendors)) continue;
         if (
           v.live &&
           cityName &&
@@ -745,26 +765,48 @@ export default function StallBookingWizard() {
   }, [liveMenuCategories, cityName, stallId, pendingVendorId]);
 
   // Which catalog listings can actually be booked here — by id, or by brand
-  // name for a curated listing bridged to its wizard record. The stall-type
-  // tiles count only these, so a tile never leads to "we couldn't find it".
-  const bookableStallKeys = useMemo(
-    () => new Set(stalls.flatMap((s) => [s.id, brandKey(s.name)])),
-    [stalls],
-  );
+  // name for a curated listing bridged to its wizard record — and which stall
+  // types each has a menu for. The tiles count only those, so a tile never
+  // leads to "we couldn't find it" or to a stall with no menu for that type.
+  const stallTypesByKey = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const s of stalls) {
+      const types = stallTypesOfCourses(s.courses.map((c) => c.id));
+      m.set(s.id, types);
+      if (!m.has(brandKey(s.name))) m.set(brandKey(s.name), types);
+    }
+    return m;
+  }, [stalls]);
   const stallTypeCount = useMemo(
     () =>
       stallTypeCounts(
         catalogVendors,
         catalogCity,
-        (v) => bookableStallKeys.has(v.id) || bookableStallKeys.has(brandKey(v.name)),
+        (v) => stallTypesByKey.get(v.id) ?? stallTypesByKey.get(brandKey(v.name)) ?? null,
       ),
-    [catalogVendors, catalogCity, bookableStallKeys],
+    [catalogVendors, catalogCity, stallTypesByKey],
   );
 
-  const rawStall = useMemo<StallOption | undefined>(
-    () => stalls.find((s) => s.id === stallId),
-    [stalls, stallId],
-  );
+  // The chosen stall, narrowed to the stall type the guest came in through.
+  // A caterer publishes every course they run — welcome drinks, starters, a
+  // chaat stall, a dosa stall — but a guest who picked "Chaat Station" is
+  // booking that one stall, not the caterer's whole feast — and only that
+  // stall, even when this vendor has no menu for it (then the menu step says
+  // so instead of quietly offering their other stalls). No type = every stall.
+  const rawStall = useMemo<StallOption | undefined>(() => {
+    const s = stalls.find((x) => x.id === stallId);
+    if (!s || !counterType) return s;
+    return {
+      ...s,
+      courses: s.courses.filter(
+        (c) => stallTypeOfCategory(c.id) === counterType,
+      ),
+    };
+  }, [stalls, stallId, counterType]);
+  const missingStallType =
+    rawStall && counterType && rawStall.courses.length === 0
+      ? stallTypeById(counterType)
+      : undefined;
 
   // STRICT craft-my-plate view of the chosen stall. With a pure-veg plate a
   // varied course loses its non-veg dishes and a fixed (set-menu) course that
@@ -1852,6 +1894,13 @@ export default function StallBookingWizard() {
                 guests={guests}
                 brandsHref={brandsHref}
                 nonVegGuests={nonVegGuests}
+                missingStallType={
+                  missingStallType
+                    ? lang === "hi"
+                      ? missingStallType.nameHi
+                      : missingStallType.name
+                    : ""
+                }
                 hiddenDishes={dietView.hiddenDishes}
                 blockedCourses={dietView.blockedCourses}
               />
@@ -2173,6 +2222,7 @@ function StepStallMenu({
   guests,
   brandsHref,
   nonVegGuests,
+  missingStallType,
   hiddenDishes,
   blockedCourses,
 }: {
@@ -2195,6 +2245,8 @@ function StepStallMenu({
   /** The craft-my-plate split, plus what its strict filter took off this
    *  stall's menu — surfaced so the guest knows WHY dishes are missing. */
   nonVegGuests: NonVegCount;
+  /** The stall type the guest picked, when this vendor has no menu for it. */
+  missingStallType: string;
   hiddenDishes: number;
   blockedCourses: StallCourse[];
 }) {
@@ -2221,6 +2273,32 @@ function StepStallMenu({
           .join(" · ")
       : "";
   const course = stall.courses[activeCat] ?? stall.courses[0];
+
+  // The guest picked a stall type this vendor has no menu for. Say so, rather
+  // than offering a stall they didn't ask for.
+  if (!course && missingStallType) {
+    return (
+      <div>
+        <SectionHead
+          eyebrow={t("Single Stall", "सिंगल स्टॉल")}
+          title={t(
+            `No ${missingStallType} menu yet`,
+            `अभी ${missingStallType} मेन्यू नहीं है`,
+          )}
+          sub={t(
+            `${stall.name} hasn't published a ${missingStallType} menu. Pick another brand for this stall.`,
+            `${stall.name} ने ${missingStallType} का मेन्यू नहीं डाला है। इस स्टॉल के लिए कोई और ब्रांड चुनें।`,
+          )}
+        />
+        <a
+          href={brandsHref}
+          className="inline-flex items-center gap-2 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-soft transition hover:opacity-90"
+        >
+          {t(`See ${missingStallType} brands`, `${missingStallType} ब्रांड देखें`)}
+        </a>
+      </div>
+    );
+  }
 
   // Nothing on this stall survives a pure-veg plate (an all-non-veg kitchen).
   // Say so and route to veg-friendly brands rather than rendering a bare menu.
@@ -2570,8 +2648,10 @@ function StepStallMenu({
           );
           // Fixed height, split 70% photo / 30% name + status. A set-menu card
           // keeps the same photo and just loses the status line, so it's shorter.
+          // The column is pinned to the card: an implicit `auto` one sizes to
+          // a long nowrap dish name and pushes the card out of its grid cell.
           const cardClass =
-            "grid w-full rounded-xl border p-1 text-left transition " +
+            "grid w-full grid-cols-[minmax(0,1fr)] rounded-xl border p-1 text-left transition " +
             (course.fixed
               ? "h-[7.75rem] grid-rows-[1fr_auto] "
               : "h-[8.75rem] grid-rows-[7fr_3fr] ") +

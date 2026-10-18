@@ -17,6 +17,7 @@
  * that prefix to drop a de-selected vendor's items (multi-vendor tiers).
  */
 import { DEFAULT_VENDOR_IMAGE, isLinkedPhotoUrl } from "@/lib/photoLinks";
+import { stallMenuId, stallTypeOfCategory } from "@/lib/stallTypes";
 import { randomUUID } from "crypto";
 import { createStore, readSingleton } from "@/lib/store";
 import {
@@ -738,6 +739,11 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           // The vendor's own Single Stall terms for this course, so the
           // booking flow can enforce them (additive; absent when none set).
           ...stallTermsFor(r, cat.id),
+          // A course the vendor's Single Stall builder publishes into, so the
+          // stall flow can leave their feast courses out.
+          ...((r.stallConfig?.categories ?? []).some((c) => stallMenuId(c) === cat.id)
+            ? { stallCourse: true }
+            : {}),
         },
       ];
       }),
@@ -802,45 +808,16 @@ const CATEGORY_MEAL_TYPES: Record<string, string[]> = {
  *  asked to configure are exactly the ones customers browse them in. */
 const tiersFor = tiersForPrice;
 
-/** Project a live vendor record onto the catalog listing shape. Only records
- *  owned by a real vendor account with a published dish are listed — the
- *  platform seeds stay wizard-only (the static catalog already covers them). */
-/** Stall-builder category → the platform stall type (`addOns` counter id)
- *  the /book/stall tiles and the catalog's counter filter use. Custom
- *  categories and anything unmapped read as a generic live station. */
-const STALL_CATEGORY_TYPE: Record<string, string> = {
-  chaat: "chaat",
-  "street-food": "chaat",
-  juices: "mocktail",
-  mocktail: "mocktail",
-  beverages: "coffee",
-  coffee: "coffee",
-  "south-indian": "live",
-  "north-indian": "live",
-  "live-grills": "live",
-  live: "live",
-  breakfast: "live",
-  regional: "live",
-  pasta: "live",
-  chinese: "noodle",
-  snacks: "hi-tea",
-  "hi-tea": "hi-tea",
-  desserts: "dessert",
-  "ice-cream": "dessert",
-  dessert: "dessert",
-  pizza: "pizza",
-  momo: "momo",
-  waffle: "waffle",
-  pan: "pan",
-};
-
 /** Stall type ids a vendor's selected stall categories advertise. */
 export function stallTypeIdsFor(cfg: SingleStallConfig | undefined): string[] {
   const out = new Set<string>();
-  for (const cat of cfg?.categories ?? []) out.add(STALL_CATEGORY_TYPE[cat] ?? "live");
+  for (const cat of cfg?.categories ?? []) out.add(stallTypeOfCategory(cat) ?? "live");
   return [...out];
 }
 
+/** Project a live vendor record onto the catalog listing shape. Only records
+ *  owned by a real vendor account with a published dish are listed — the
+ *  platform seeds stay wizard-only (the static catalog already covers them). */
 export function toVendorListing(r: LiveVendorRecord): VendorListing {
   const visible = r.menu.filter((s) => !s.hidden && s.items.length > 0);
   const diets = new Set(visible.flatMap((s) => s.items.map((i) => i.diet)));

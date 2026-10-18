@@ -513,8 +513,12 @@ export default function VendorCatalog() {
       // service. Live vendors declare theirs, curated seeds derive them.
       const matchesAddOns = !addOnsOnly || listingOfferings(v).length > 0;
 
-      // The stall-type lens: this exact counter, declared or derived.
-      const matchesCounter = counter === "" || listingOfferings(v).includes(counter);
+      // The stall-type lens: this exact counter. A bookable stall must have a
+      // menu for it (a "Pan Counter" ticked as an add-on, with no pan menu,
+      // would book into an empty stall); anyone else by declared offering.
+      const matchesCounter =
+        counter === "" ||
+        (v.stall?.stallTypes ?? listingOfferings(v)).includes(counter);
 
       const matchesMeals =
         !visibleFilters.has("meals") ||
@@ -1232,6 +1236,23 @@ function FilterGlyph() {
   );
 }
 
+function InfoGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M12 11v6M12 7.5v.01" />
+    </svg>
+  );
+}
+
 function FilterSelect({
   id,
   label,
@@ -1421,8 +1442,10 @@ function VendorCard({
         "group relative overflow-hidden " +
         // Compact phones: a fixed-height card split 70% photo / 30% text, the
         // Swiggy/Zomato shape — price, rating and Book ride on the photo.
+        // The column is pinned to the card width: an implicit `auto` column
+        // sizes to the nowrap cuisine line and pushed Book off the card.
         (compact
-          ? "grid h-[11.25rem] grid-rows-[7fr_3fr] sm:flex sm:h-auto sm:flex-col"
+          ? "grid h-[11.25rem] grid-cols-[minmax(0,1fr)] grid-rows-[7fr_3fr] sm:flex sm:h-auto sm:flex-col"
           : "flex flex-col")
       }
     >
@@ -1615,6 +1638,19 @@ function VendorCard({
               {vendor.mealTypes.slice(0, 2).map(mealBadgeLabel).join(", ")}
             </p>
           </div>
+          {/* The card itself books; the caterer's full profile sits behind
+              this info button instead. */}
+          <Link
+            href={vendorHref}
+            aria-label={t(`About ${vendor.name}`, `${vendor.name} के बारे में`)}
+            title={t("Vendor info", "वेंडर जानकारी")}
+            className={
+              "relative z-10 flex shrink-0 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-cream sm:h-7 sm:w-7 " +
+              (compact ? "h-6 w-6" : "h-7 w-7")
+            }
+          >
+            <InfoGlyph />
+          </Link>
         </div>
 
         {/* Signature dishes — the vendor's four "famous for" tags. */}
@@ -1665,17 +1701,6 @@ function VendorCard({
             )}
           </p>
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
-            {/* Compact phones: the whole card already opens the caterer. */}
-            <span className={compact ? "hidden sm:contents" : "contents"}>
-              <Button
-                href={vendorHref}
-                variant="ghost"
-                size="sm"
-                className="min-h-8 px-2.5 text-[11px]"
-              >
-                {t("View", "देखें")}
-              </Button>
-            </span>
             <Button
               href={bookHref}
               variant="primary"
@@ -1701,15 +1726,15 @@ function VendorCard({
         )}
       </div>
 
+      {/* Tapping the card starts the booking — the same place its Book
+          button goes. Vendor details live behind the info button. */}
       <Link
-        href={vendorHref}
-        aria-label={t(`View ${vendor.name}`, `${vendor.name} देखें`)}
+        href={bookHref}
+        aria-label={`${ctaText} ${vendor.name}`}
         className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
         tabIndex={-1}
       >
-        <span className="sr-only">
-          {t(`View ${vendor.name}`, `${vendor.name} देखें`)}
-        </span>
+        <span className="sr-only">{`${ctaText} ${vendor.name}`}</span>
       </Link>
     </Card>
   );

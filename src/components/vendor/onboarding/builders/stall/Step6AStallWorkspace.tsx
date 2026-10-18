@@ -6,6 +6,10 @@ import BuilderNav from "../common/BuilderNav";
 import StallDishModal from "./StallDishModal";
 import type { VendorMenuSection, VendorMenuItem, SingleStallConfig, VendorDietaryOffering } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
+import { PLATFORM_STALL_CATEGORIES, stallMenuId } from "@/lib/stallTypes";
+
+// Shared with the booking side (which stall courses a vendor publishes).
+export { PLATFORM_STALL_CATEGORIES, stallMenuId };
 import { FieldHint, FormLabel, R, StepHeading, inputCls } from "../../ui";
 
 interface Step6AStallWorkspaceProps {
@@ -20,24 +24,6 @@ interface Step6AStallWorkspaceProps {
   saving?: boolean;
 }
 
-/** Handover: PREDEFINED_STALL_CATEGORIES. `menuId` = the platform menu category the
- *  stall's dishes are mirrored into for the customer stall-booking flow. */
-export const PLATFORM_STALL_CATEGORIES: { id: string; name: string; icon: string; desc: string; menuId?: string }[] = [
-  { id: "chaat", name: "Chaat", icon: "🥘", desc: "Live pani puri, aloo tikki, dahi bhalla & papdi", menuId: "chaat" },
-  { id: "juices", name: "Juices & Shakes", icon: "🥤", desc: "Freshly squeezed fruit juices, shakes & coolers", menuId: "juices" },
-  { id: "beverages", name: "Beverages & Chai", icon: "☕", desc: "Kulhad chai, filter coffee, artisan mocktails", menuId: "beverages" },
-  { id: "south-indian", name: "South Indian", icon: "🥥", desc: "Crispy dosas, idlis, vadas with sambar & chutneys", menuId: "south-indian" },
-  { id: "north-indian", name: "North Indian & Mughlai", icon: "🍛", desc: "Curries, rolls, kebabs, tandoor specials & naans", menuId: "north-indian" },
-  { id: "chinese", name: "Chinese & Pan-Asian", icon: "🍜", desc: "Hakka noodles, dim sums, momos & Manchurian", menuId: "chinese" },
-  { id: "snacks", name: "Snacks & Fast Food", icon: "🥪", desc: "Sandwiches, burgers, fries, kathi rolls", menuId: "snacks" },
-  { id: "desserts", name: "Desserts & Sweets", icon: "🍬", desc: "Hot jalebi, gulab jamun, rabri, kulfi", menuId: "desserts" },
-  { id: "ice-cream", name: "Ice Cream & Kulfi", icon: "🍨", desc: "Artisanal rolled scoops, matka kulfi & sundaes", menuId: "ice-cream" },
-  { id: "street-food", name: "Street Food Specials", icon: "🍢", desc: "Pav bhaji, chole bhature, dabeli, momos", menuId: "street-food" },
-  { id: "live-grills", name: "Live Grills & Barbecue", icon: "🔥", desc: "Smoked paneer skewers, tikkas & charcoal kebabs", menuId: "live" },
-  { id: "breakfast", name: "Breakfast Counter", icon: "🥞", desc: "Poori sabzi, parathas, poha, upma & chole kulche", menuId: "breakfast" },
-  { id: "regional", name: "Regional / Specialty", icon: "🏺", desc: "Awadhi, Rajasthani, Gujarati or hyperlocal specials", menuId: "regional" },
-];
-
 /** Older stall ids saved before the V2 category list. */
 const LEGACY_NAMES: Record<string, string> = {
   live: "Live Tandoor & Grill",
@@ -51,18 +37,10 @@ const LEGACY_NAMES: Record<string, string> = {
   coffee: "Barista Coffee & Chai",
   mocktail: "Mocktail & Juice Bar",
 };
-const LEGACY_MENU_IDS = new Set(["live", "pizza", "pasta"]);
 
 export function stallCategoryName(id: string) {
   return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.name ?? LEGACY_NAMES[id] ?? id;
 }
-/** The platform menu category a stall's dishes publish into, so customers can
- *  book it. A vendor's own custom category (and any older id without a match)
- *  publishes under "Regional Specialties" rather than staying invisible. */
-export function stallMenuId(id: string) {
-  return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : "regional");
-}
-
 /**
  * Rebuild the customer-facing `menu[]` sections the stall builder owns from the
  * stall config. Several stalls can publish into one platform category (two

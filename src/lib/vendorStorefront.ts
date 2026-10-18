@@ -23,6 +23,7 @@ import {
   type StallTerms,
   type VendorListing,
 } from "@/lib/data";
+import { stallTypeOfCategory } from "@/lib/stallTypes";
 
 /** A vendor-name slug ("Awadhi Royal Caterers" → "awadhi-royal-caterers"). */
 function slugify(name: string): string {
@@ -73,12 +74,28 @@ export interface BookableStall {
 export type StallBrief = Pick<
   BookableStall,
   "stallId" | "fromPerPlate" | "minGuests" | "leadHours"
->;
+> & {
+  /** Stall types (`?counter=` ids) this stall has a menu for — what a
+   *  stall-type lens may list it under. A declared counter with no menu
+   *  behind it ("Pan Counter" ticked as an add-on) doesn't count. */
+  stallTypes?: string[];
+};
+
+/** Stall types a set of booking courses covers (feast courses cover none). */
+export function stallTypesOfCourses(courseIds: string[]): string[] {
+  const out = new Set<string>();
+  for (const id of courseIds) {
+    const type = stallTypeOfCategory(id);
+    if (type) out.add(type);
+  }
+  return [...out];
+}
 
 export function briefOf(s: BookableStall): StallBrief {
   return {
     stallId: s.stallId,
     fromPerPlate: s.fromPerPlate,
+    stallTypes: stallTypesOfCourses(s.courses.map((c) => c.categoryId)),
     ...(s.minGuests ? { minGuests: s.minGuests } : {}),
     ...(s.leadHours ? { leadHours: s.leadHours } : {}),
   };
@@ -89,15 +106,36 @@ interface Collected extends BookableStall {
   pinned: boolean;
 }
 
+/** Vendors who set up stalls in their Single Stall builder. For them a Single
+ *  Stall order sells only those stall courses — their feast courses (welcome
+ *  drinks, starters, main…) belong to the Silver/Gold/Platinum feasts. A vendor
+ *  with no stall setup (curated seeds, legacy records) keeps every course. */
+export function vendorsWithStallCourses(categories: MenuCategory[]): Set<string> {
+  const out = new Set<string>();
+  for (const cat of categories)
+    for (const v of cat.vendors) if (v.stallCourse && v.items.length) out.add(v.id);
+  return out;
+}
+
+/** Whether one vendor's course belongs on their Single Stall menu. */
+export function sellsOnSingleStall(
+  v: { id: string; stallCourse?: boolean },
+  stallVendors: Set<string>,
+): boolean {
+  return !stallVendors.has(v.id) || Boolean(v.stallCourse);
+}
+
 /** Collapse the per-course `/api/menu` roster into one stall per vendor — the
  *  same fold `StallBookingWizard` performs (no city filter: the storefront
  *  link always carries the vendor's own city). Ordered like the wizard's list
  *  (pinned first, then best rated) so a name bridge picks the same stall. */
 export function collectStalls(categories: MenuCategory[]): BookableStall[] {
   const byId = new Map<string, Collected>();
+  const stallVendors = vendorsWithStallCourses(categories);
   for (const cat of categories) {
     for (const v of cat.vendors) {
       if (!v.items.length) continue;
+      if (!sellsOnSingleStall(v, stallVendors)) continue;
       const course: StallCourseSummary = {
         categoryId: cat.id,
         name: cat.name,
