@@ -2089,6 +2089,17 @@ export default function StallBookingWizard() {
               they're on the hook for. */}
           <div className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2 shadow-pop-up backdrop-blur-xl">
+              {/* Why the button is greyed out, right above it — on phones the
+                  full notice sits below the order summary, out of sight, so a
+                  disabled Skip / Continue otherwise reads as broken. */}
+              {nextBlockers.length > 0 && (
+                <p
+                  role="status"
+                  className="mb-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-maroon"
+                >
+                  {nextBlockers.join(" • ")}
+                </p>
+              )}
               {pickedCount > 0 ? null : (
                 <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
                   {t(
