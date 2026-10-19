@@ -1,21 +1,25 @@
 import {
-  addOns,
   listingCateringCategories,
+  menuCategories,
   listingOfferings,
   type VendorListing,
 } from "@/lib/data";
 
 /**
- * STALL TYPES — the image tiles a guest picks from before browsing stalls.
+ * STALL TYPES — the image tiles a guest picks from before browsing stalls
+ * (Single Stall only), and the `?counter=` value the catalog lens and the stall
+ * wizard narrow on.
  *
- * Deliberately the SAME vocabulary as the wizard's Extras step (`addOns`), not
- * a parallel list: a "stall type" is exactly one of the platform's live
- * counters, and a vendor declares which ones they run via `offerings`. One
- * source of truth means a counter can never exist as a browsable type but not
- * as something a vendor can claim.
+ * One stall type = one stall category a vendor builds in their Single Stall
+ * builder (`PLATFORM_STALL_CATEGORIES`), identified by the booking-menu course
+ * it publishes into (`menuId`). So a tile, a vendor's stall and a menu course
+ * are the same thing: picking "South Indian" shows exactly that stall's menu,
+ * never the vendor's other stalls folded under a broader label.
  *
- * Services (staff, tableware, decor) are excluded — you cannot book a stall of
- * waiters, and decor isn't a food stall at all.
+ * Deliberately NOT the Extras step's add-on counters (`addOns`): those are paid
+ * extras for any booking (Pan, Pizza, Momo…), sold platform-wide. Old links and
+ * drafts that still carry an add-on counter id are translated by
+ * `toStallTypeId` (`mocktail` → Juices, `dessert` → Desserts…).
  */
 export interface StallType {
   id: string;
@@ -26,28 +30,6 @@ export interface StallType {
   image: string;
 }
 
-export const stallTypes: StallType[] = addOns
-  .filter((a) => (a.category ?? "counter") === "counter")
-  .map((a) => ({
-    id: a.id,
-    name: a.name,
-    nameHi: a.nameHi,
-    description: a.description,
-    icon: a.icon,
-    image: a.image,
-  }));
-
-const STALL_TYPE_IDS = new Set(stallTypes.map((s) => s.id));
-
-/** Guards the `?counter=` deep-link so a stray value can't wedge the catalog. */
-export function isStallTypeId(id: string): boolean {
-  return STALL_TYPE_IDS.has(id);
-}
-
-export function stallTypeById(id: string): StallType | undefined {
-  return stallTypes.find((s) => s.id === id);
-}
-
 /** City display names are what listings carry ("Lucknow"). An EXACT match, on
  *  purpose: the Brands catalog filters `v.city === city`, and the counts here
  *  must agree with what a tile's link then shows — a looser match would
@@ -56,7 +38,13 @@ function inCity(v: VendorListing, city: string): boolean {
   return !city || v.city === city;
 }
 
-/** Single-stall listings running a given counter type, optionally in one city. */
+/** A listing's declared counters, read as stall types (for listings with no
+ *  booking menu to go on). */
+function offeredStallTypes(v: VendorListing): string[] {
+  return [...new Set(listingOfferings(v).map(toStallTypeId).filter(Boolean))];
+}
+
+/** Single-stall listings running a given stall type, optionally in one city. */
 export function stallsForType(
   vendors: VendorListing[],
   typeId: string,
@@ -66,7 +54,7 @@ export function stallsForType(
     (v) =>
       inCity(v, city) &&
       listingCateringCategories(v).includes("single-stall") &&
-      listingOfferings(v).includes(typeId),
+      offeredStallTypes(v).includes(typeId),
   );
 }
 
@@ -84,7 +72,7 @@ export function stallsForType(
 export function stallTypeCounts(
   vendors: VendorListing[],
   city = "",
-  menuTypes: (v: VendorListing) => string[] | null = listingOfferings,
+  menuTypes: (v: VendorListing) => string[] | null = offeredStallTypes,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const s of stallTypes) counts[s.id] = 0;
@@ -163,4 +151,77 @@ const LEGACY_MENU_IDS = new Set(["live", "pizza", "pasta"]);
  *  publishes under "Regional Specialties" rather than staying invisible. */
 export function stallMenuId(id: string) {
   return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : "regional");
+}
+
+const unsplash = (id: string) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=600&q=70`;
+
+/** Tile photo per stall type (course id). */
+const STALL_TYPE_IMAGE: Record<string, string> = {
+  chaat: unsplash("photo-1601050690597-df0568f70950"),
+  juices: unsplash("photo-1544145945-f90425340c7e"),
+  beverages: unsplash("photo-1437418747212-8d9709afab22"),
+  "south-indian": unsplash("photo-1630383249896-424e482df921"),
+  "north-indian": unsplash("photo-1585937421612-70a008356fbe"),
+  chinese: unsplash("photo-1585032226651-759b368d7246"),
+  snacks: unsplash("photo-1565895405227-31cffbe0cf86"),
+  desserts: unsplash("photo-1631452180519-c014fe946bc7"),
+  "ice-cream": unsplash("photo-1578985545062-69928b1d9587"),
+  "street-food": unsplash("photo-1490645935967-10de6ba17061"),
+  live: unsplash("photo-1567188040759-fb8a883dc6d8"),
+  breakfast: unsplash("photo-1556910103-1c02745aae4d"),
+  regional: unsplash("photo-1555939594-58d7cb561ad1"),
+  pizza: unsplash("photo-1513104890138-7c749659a591"),
+  pasta: unsplash("photo-1473093295043-cdd812d0e601"),
+};
+
+/** Older stall categories a vendor may still have a menu under. */
+const LEGACY_STALL_TYPES: Omit<StallType, "nameHi" | "image">[] = [
+  { id: "pizza", name: "Wood-Fired Pizza", description: "Pizzas tossed & baked live", icon: "🍕" },
+  { id: "pasta", name: "Live Pasta", description: "Pasta tossed to order", icon: "🍝" },
+];
+
+export const stallTypes: StallType[] = [
+  ...PLATFORM_STALL_CATEGORIES.map((c) => ({
+    id: c.menuId ?? c.id,
+    name: c.name,
+    description: c.desc,
+    icon: c.icon,
+  })),
+  ...LEGACY_STALL_TYPES,
+].map((s) => ({
+  ...s,
+  // The course's own Hindi name — the stall builder list is English-only.
+  nameHi: menuCategories.find((c) => c.id === s.id)?.nameHi ?? s.name,
+  image: STALL_TYPE_IMAGE[s.id] ?? STALL_TYPE_IMAGE.regional,
+}));
+
+const STALL_TYPE_IDS = new Set(stallTypes.map((s) => s.id));
+
+/** Whether a value is a current stall type id (a stall course). */
+export function isStallTypeId(id: string): boolean {
+  return STALL_TYPE_IDS.has(id);
+}
+
+/** Add-on counter ids old links / drafts / declared offerings still carry →
+ *  the stall type that now stands for them. Pan, Momo and Waffle have no stall
+ *  category, so they map to nothing. */
+const LEGACY_COUNTER_TYPE: Record<string, string> = {
+  mocktail: "juices",
+  coffee: "beverages",
+  noodle: "chinese",
+  dessert: "desserts",
+  "hi-tea": "snacks",
+};
+
+/** Normalise a `?counter=` / draft / offering value to a stall type id, or ""
+ *  when it names nothing bookable — so a stray value can't wedge the catalog. */
+export function toStallTypeId(raw: string): string {
+  if (STALL_TYPE_IDS.has(raw)) return raw;
+  const mapped = LEGACY_COUNTER_TYPE[raw];
+  return mapped && STALL_TYPE_IDS.has(mapped) ? mapped : "";
+}
+
+export function stallTypeById(id: string): StallType | undefined {
+  return stallTypes.find((s) => s.id === id);
 }

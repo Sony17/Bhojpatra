@@ -17,7 +17,11 @@
  * that prefix to drop a de-selected vendor's items (multi-vendor tiers).
  */
 import { DEFAULT_VENDOR_IMAGE, isLinkedPhotoUrl } from "@/lib/photoLinks";
-import { stallMenuId, stallTypeOfCategory } from "@/lib/stallTypes";
+import {
+  PLATFORM_STALL_CATEGORIES,
+  stallMenuId,
+  stallTypeOfCategory,
+} from "@/lib/stallTypes";
 import { randomUUID } from "crypto";
 import { createStore, readSingleton } from "@/lib/store";
 import {
@@ -744,6 +748,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           ...((r.stallConfig?.categories ?? []).some((c) => stallMenuId(c) === cat.id)
             ? { stallCourse: true }
             : {}),
+          ...customStallName(r.stallConfig, cat.id),
         },
       ];
       }),
@@ -769,6 +774,26 @@ export function stallTermsFor(
     ...(r.leadHours ? { leadHours: r.leadHours } : {}),
   };
   return Object.keys(terms).length ? { stallTerms: terms } : {};
+}
+
+/** `{ stallName }` — what the vendor called the stall(s) they publish into a
+ *  course, from their builder: a stall they named themselves ("Royal Festive
+ *  Main Course Spread", filed under "regional") or a builder category whose
+ *  name differs from the course it lands in ("Live Grills & Barbecue" → the
+ *  "live" course, otherwise labelled "Live Counters"). Several stalls sharing
+ *  a course are joined. Empty when they picked the generic "Regional" itself,
+ *  or when the names already match the course. */
+function customStallName(
+  cfg: SingleStallConfig | undefined,
+  courseId: string,
+): { stallName?: string } {
+  const here = (cfg?.categories ?? []).filter((c) => stallMenuId(c) === courseId);
+  if (!here.length || here.includes("regional")) return {};
+  const names = here
+    .map((c) => PLATFORM_STALL_CATEGORIES.find((p) => p.id === c)?.name ?? c.trim())
+    .filter(Boolean);
+  const name = [...new Set(names)].join(" & ").slice(0, 80);
+  return name ? { stallName: name } : {};
 }
 
 /** Move admin-pinned brands to the front of a roster (pin order, `pinned`

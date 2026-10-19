@@ -75,9 +75,8 @@ import {
 } from "@/lib/vendorStorefront";
 import {
   stallTypeCounts,
-  isStallTypeId,
   stallTypeById,
-  stallTypeOfCategory,
+  toStallTypeId,
 } from "@/lib/stallTypes";
 import {
   readStoredLocation,
@@ -389,7 +388,7 @@ export default function StallBookingWizard() {
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
       if (d.addOnVendor) setAddOnVendor(d.addOnVendor);
       if (d.serviceId) setServiceId(d.serviceId);
-      if (d.counter && isStallTypeId(d.counter)) setCounterType(d.counter);
+      if (d.counter && toStallTypeId(d.counter)) setCounterType(toStallTypeId(d.counter));
     }
     hydrated.current = true;
   }, []);
@@ -428,8 +427,8 @@ export default function StallBookingWizard() {
     // backs out of a stall lands on the type they were browsing, not step one.
     // It also narrows the stall's menu to that stall — so a new `?vendor=`
     // hand-off with no type (a brand page's Book Now) clears a stale one.
-    const counterParam = sp.get("counter")?.trim() ?? "";
-    if (isStallTypeId(counterParam)) setCounterType(counterParam);
+    const counterParam = toStallTypeId(sp.get("counter")?.trim() ?? "");
+    if (counterParam) setCounterType(counterParam);
     else if (vendorParam) setCounterType("");
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref.trim().toUpperCase());
@@ -714,8 +713,9 @@ export default function StallBookingWizard() {
         if (!v.items.length) continue;
         const course: StallCourse = {
           id: cat.id,
-          name: cat.name,
-          nameHi: cat.nameHi,
+          // A stall the vendor named themselves keeps that name.
+          name: v.stallName ?? cat.name,
+          nameHi: v.stallName ?? cat.nameHi,
           icon: cat.icon,
           perPlate: v.perPlate,
           items: v.items,
@@ -798,9 +798,8 @@ export default function StallBookingWizard() {
     if (!s || !counterType) return s;
     return {
       ...s,
-      courses: s.courses.filter(
-        (c) => stallTypeOfCategory(c.id) === counterType,
-      ),
+      // A stall type is its course id: the one stall the guest picked.
+      courses: s.courses.filter((c) => c.id === counterType),
     };
   }, [stalls, stallId, counterType]);
   const missingStallType =

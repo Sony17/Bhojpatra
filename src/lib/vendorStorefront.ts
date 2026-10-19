@@ -23,7 +23,7 @@ import {
   type StallTerms,
   type VendorListing,
 } from "@/lib/data";
-import { stallTypeOfCategory } from "@/lib/stallTypes";
+import { isStallTypeId } from "@/lib/stallTypes";
 
 /** A vendor-name slug ("Awadhi Royal Caterers" → "awadhi-royal-caterers"). */
 function slugify(name: string): string {
@@ -81,14 +81,10 @@ export type StallBrief = Pick<
   stallTypes?: string[];
 };
 
-/** Stall types a set of booking courses covers (feast courses cover none). */
+/** Stall types a set of booking courses covers — a stall type IS its course
+ *  id, so this is just the stall courses (feast courses cover none). */
 export function stallTypesOfCourses(courseIds: string[]): string[] {
-  const out = new Set<string>();
-  for (const id of courseIds) {
-    const type = stallTypeOfCategory(id);
-    if (type) out.add(type);
-  }
-  return [...out];
+  return [...new Set(courseIds.filter(isStallTypeId))];
 }
 
 export function briefOf(s: BookableStall): StallBrief {
@@ -138,8 +134,8 @@ export function collectStalls(categories: MenuCategory[]): BookableStall[] {
       if (!sellsOnSingleStall(v, stallVendors)) continue;
       const course: StallCourseSummary = {
         categoryId: cat.id,
-        name: cat.name,
-        nameHi: cat.nameHi,
+        name: v.stallName ?? cat.name,
+        nameHi: v.stallName ?? cat.nameHi,
         icon: cat.icon,
         perPlate: v.perPlate,
         fixed: v.menuType !== "varied",

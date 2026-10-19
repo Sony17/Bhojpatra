@@ -24,7 +24,7 @@ import {
 import { useCompare } from "@/lib/compare";
 import { useAllVendors } from "@/lib/useAllVendors";
 import { ctaLabel, listingCta } from "@/lib/vendorStorefront";
-import { isStallTypeId, stallTypeById } from "@/lib/stallTypes";
+import { stallTypeById, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
 import { useLocations } from "@/lib/locations";
 import {
@@ -299,10 +299,9 @@ export default function VendorCatalog() {
   // One specific counter, handed over by the stall-type grid at /book/stall
   // ("show me the chaat stalls"). Narrower than the Add-ons lens, which only
   // asks whether a caterer runs any counter at all. Clearable like any chip.
-  const [counter, setCounter] = useState<string>(() => {
-    const c = searchParams.get("counter") ?? "";
-    return isStallTypeId(c) ? c : "";
-  });
+  const [counter, setCounter] = useState<string>(() =>
+    toStallTypeId(searchParams.get("counter") ?? ""),
+  );
   const [price, setPrice] = useState<PriceRange>(() => {
     const p = searchParams.get("price");
     if (PRICE_RANGES.some((r) => r.value === p)) return p as PriceRange;
@@ -371,7 +370,7 @@ export default function VendorCatalog() {
   const [fromStallPicker] = useState<boolean>(
     () =>
       searchParams.get("category") === "single-stall" &&
-      isStallTypeId(searchParams.get("counter") ?? ""),
+      toStallTypeId(searchParams.get("counter") ?? "") !== "",
   );
   const [refineOpen, setRefineOpen] = useState(false);
 
@@ -518,7 +517,7 @@ export default function VendorCatalog() {
       // would book into an empty stall); anyone else by declared offering.
       const matchesCounter =
         counter === "" ||
-        (v.stall?.stallTypes ?? listingOfferings(v)).includes(counter);
+        (v.stall?.stallTypes ?? listingOfferings(v).map(toStallTypeId)).includes(counter);
 
       const matchesMeals =
         !visibleFilters.has("meals") ||

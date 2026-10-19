@@ -1538,6 +1538,11 @@ export interface CategoryVendor {
    *  course (welcome drinks, starters, main…). The Single Stall flow sells
    *  only these when a vendor has any. Absent on seeds and legacy vendors. */
   stallCourse?: boolean;
+  /** The vendor's own name for this stall, when it's a stall they named
+   *  themselves in the builder ("Royal Festive Main Course Spread") — such
+   *  stalls publish under the generic "Regional Specialties" course, and this
+   *  is what the Single Stall flow should call them instead. */
+  stallName?: string;
 }
 
 /** A live vendor's Single Stall terms as published in `/api/menu`. */
