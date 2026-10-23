@@ -11,9 +11,13 @@
  * content row is rewritten. Any mismatch aborts with the row untouched.
  * Undo: copy the backup row's data back over `<key>`.
  */
-import { loadEnvConfig } from "@next/env";
-
-loadEnvConfig(process.cwd());
+// Node's built-in .env loader — no dependency (pnpm on Vercel won't resolve
+// transitive packages like @next/env, and Next type-checks this folder).
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  /* no .env.local — rely on the environment */
+}
 
 const KEYS = ["home-content", "site-content"];
 const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,/i;
