@@ -15,13 +15,12 @@
 import { createHash } from "node:crypto";
 import { readSingleton, writeSingleton } from "@/lib/store";
 
-export type MediaScope = "home" | "site" | "stalls";
+export type MediaScope = "home" | "site";
 
 /** Settings-store key holding each scope's content. */
 export const MEDIA_SCOPE_KEYS: Record<MediaScope, string> = {
   home: "home-content",
   site: "site-content",
-  stalls: "stall-tile-images",
 };
 
 const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,/i;

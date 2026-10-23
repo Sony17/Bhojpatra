@@ -1,7 +1,7 @@
 import { revalidateTag } from "next/cache";
 import { readSingleton, writeSingleton, deleteSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
-import { externalizeImages, internalizeImages } from "@/lib/contentMedia";
+import { extractInlineImages } from "@/lib/contentMedia";
 import { stallTypes } from "@/lib/stallTypes";
 import {
   STALL_TILE_IMAGES_KEY,
@@ -27,7 +27,7 @@ export async function GET() {
   if (guard instanceof Response) return guard;
   const stored = await readStored();
   return Response.json({
-    images: externalizeImages(resolveStallTileImages(stored), "stalls"),
+    images: resolveStallTileImages(stored),
     // false → still the starting photos; nothing has been saved yet.
     custom: !!stored,
   });
@@ -48,12 +48,8 @@ export async function PUT(request: Request) {
     return Response.json({ error: "Provide an images map." }, { status: 400 });
   }
 
-  // The editor holds media URLs for inline uploads (see GET); map them back to
-  // the stored data URIs so re-saving never drops one.
-  const previous = await readStored();
-  const incoming = internalizeImages(raw as Record<string, unknown>, previous, "stalls");
-
-  const images: StallTileImages = {};
+  const incoming = raw as Record<string, unknown>;
+  let images: StallTileImages = {};
   for (const { id, name } of stallTypes) {
     const src = typeof incoming[id] === "string" ? (incoming[id] as string).trim() : "";
     if (!src) continue;
@@ -67,6 +63,9 @@ export async function PUT(request: Request) {
   }
 
   try {
+    // Uploads (data URIs) become their own media rows; the tile row keeps
+    // only short `/api/content/media/m/<hash>` URLs.
+    images = await extractInlineImages(images);
     await writeSingleton<Stored>(STALL_TILE_IMAGES_KEY, { images });
     revalidateTag(STALL_TILE_IMAGES_TAG, { expire: 0 });
   } catch (err) {
@@ -78,7 +77,7 @@ export async function PUT(request: Request) {
   }
   return Response.json({
     ok: true,
-    images: externalizeImages(images, "stalls"),
+    images,
     custom: true,
   });
 }
