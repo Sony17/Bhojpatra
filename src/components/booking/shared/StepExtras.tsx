@@ -41,7 +41,12 @@ export default function StepExtras({
   compact = false,
   onSkip,
   skipDisabled = false,
+  collapsible = false,
 }: {
+  /** Fold the list behind one "Browse" row until the guest opens it, and keep
+   *  each picked counter's caterer + set menu folded behind its own toggle.
+   *  Used by the Single Stall flow, where extras are a side-dish to the stall. */
+  collapsible?: boolean;
   /** Offer a "Skip" link beside the heading while nothing is added — extras
    *  are optional, so the guest can move straight on. */
   onSkip?: () => void;
@@ -87,6 +92,15 @@ export default function StepExtras({
   const [searchOpen, setSearchOpen] = useState(false);
   // How many pages of extras are showing (with `pageSize`).
   const [pages, setPages] = useState(1);
+  // `collapsible`: the list starts folded, unless the guest is coming back to
+  // extras they already added.
+  const [listOpen, setListOpen] = useState(
+    !collapsible || selectedAddOns.length > 0,
+  );
+  // `collapsible`: which picked counters have their caterer + set menu open.
+  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
+  const toggleDetails = (addOnId: string) =>
+    setOpenDetails((m) => ({ ...m, [addOnId]: !m[addOnId] }));
   // Category filter — only the full-filter tiers (Gold/Platinum) can narrow the
   // roster to live counters vs whole-event services. We derive the effective
   // category from `fullFilter` (rather than resetting stored state in an effect)
@@ -202,8 +216,54 @@ export default function StepExtras({
             )}
           </span>
         )}
+        {collapsible && listOpen && (
+          <button
+            type="button"
+            onClick={() => setListOpen(false)}
+            aria-expanded
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-maroon"
+          >
+            {t("Hide", "छुपाएँ")}
+            <span aria-hidden="true">▴</span>
+          </button>
+        )}
       </div>
 
+      {!listOpen && (
+        <button
+          type="button"
+          onClick={() => setListOpen(true)}
+          aria-expanded={false}
+          className="mt-1 flex w-full items-center gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3 text-left shadow-sm transition hover:border-maroon sm:mt-0"
+        >
+          <span
+            aria-hidden="true"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cream-2 text-base font-semibold text-maroon"
+          >
+            +
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">
+              {t("Browse extras & counters", "एक्स्ट्रा और काउंटर देखें")}
+            </span>
+            <span className="block text-xs text-ink-soft">
+              {t(
+                `Optional · ${addOns.length} available`,
+                `वैकल्पिक · ${addOns.length} उपलब्ध`,
+              )}
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-base font-semibold leading-none text-maroon"
+          >
+            ▾
+          </span>
+        </button>
+      )}
+
+      {listOpen && (
+      <>
       <div
         className={
           "relative " +
@@ -436,7 +496,33 @@ export default function StepExtras({
                   underneath (the menu step's vendor → dishes pairing), and the
                   rest of the roster folds behind a single row — so the counter
                   below stays within reach instead of being pushed off-screen. */}
-              {active && (
+              {/* `collapsible`: a picked counter shows just its caterer here,
+                  with the full roster + set menu one tap away. */}
+              {active && collapsible && (
+                <button
+                  type="button"
+                  onClick={() => toggleDetails(a.id)}
+                  aria-expanded={Boolean(openDetails[a.id])}
+                  className="flex w-full items-center gap-2 border-t border-cream-3 px-4 py-2 text-left"
+                >
+                  <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">
+                    {pickedVendors[0]
+                      ? pickedVendors.map((v) => v.name).join(", ")
+                      : t("Choose a caterer", "कैटरर चुनें")}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-maroon">
+                    {openDetails[a.id]
+                      ? t("Hide", "छुपाएँ")
+                      : isService
+                        ? t("View details", "विवरण देखें")
+                        : t("View menu", "मेन्यू देखें")}
+                    <span aria-hidden="true" className="ml-1">
+                      {openDetails[a.id] ? "▴" : "▾"}
+                    </span>
+                  </span>
+                </button>
+              )}
+              {active && (!collapsible || openDetails[a.id]) && (
                 <div className="border-t border-cream-3 px-4 pb-4 pt-3">
                   {counterVendors.length === 0 ? (
                     <>
@@ -765,6 +851,8 @@ export default function StepExtras({
                 "यहाँ अभी कुछ नहीं है।",
               )}
         </p>
+      )}
+      </>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   bookingTimeSlots,
   cateringCategoryIds,
@@ -14,6 +14,7 @@ import {
   listingOfferings,
   mealPeriodForTime,
   mealTypeOptions,
+  type DietType,
   type VendorListing,
 } from "@/lib/data";
 import {
@@ -66,15 +67,49 @@ const PRICE_RANGES: { value: PriceRange; min: number; max: number }[] = [
   { value: "luxury", min: 1251, max: Infinity },
 ];
 
-const matchesPrice = (vendor: VendorListing, range: PriceRange): boolean => {
-  const band = PRICE_RANGES.find((r) => r.value === range);
+/** Single Stall bands — a stall plate runs ₹50–₹300, so the feast bands above
+ *  would put every stall in "Under ₹1,000". Same ids, stall-sized ranges. */
+const STALL_PRICE_RANGES: { value: PriceRange; min: number; max: number }[] = [
+  { value: "all", min: 0, max: Infinity },
+  { value: "budget", min: 0, max: 99 },
+  { value: "premium", min: 100, max: 200 },
+  { value: "luxury", min: 201, max: Infinity },
+];
+
+/** The per-plate price a card shows: a bookable stall's own rate, else the
+ *  listing's indicative price. Price filters and sorts both go by it. */
+const shownPrice = (v: VendorListing) => v.stall?.fromPerPlate ?? v.priceFrom;
+
+const matchesPrice = (
+  vendor: VendorListing,
+  range: PriceRange,
+  bands: typeof PRICE_RANGES,
+): boolean => {
+  const band = bands.find((r) => r.value === range);
   if (!band) return true;
-  return vendor.priceFrom >= band.min && vendor.priceFrom <= band.max;
+  const p = shownPrice(vendor);
+  return p >= band.min && p <= band.max;
 };
+
+/** Guest counts offered by the Single Stall "Guests" filter. */
+const GUEST_OPTIONS = [25, 50, 100, 200, 500];
+/** "Short notice" = the stall can be booked within a day. */
+const SHORT_NOTICE_HOURS = 24;
+/** "Top rated" floor. */
+const MIN_TOP_RATING = 4;
 
 /** The individual filter controls the catalog offers beyond the always-on
  *  city / state / search. */
-type FilterKey = "cuisine" | "tier" | "diet" | "price" | "meals" | "time";
+type FilterKey =
+  | "cuisine"
+  | "tier"
+  | "diet"
+  | "price"
+  | "meals"
+  | "time"
+  | "rating"
+  | "guests"
+  | "notice";
 
 const ALL_FILTERS: ReadonlySet<FilterKey> = new Set([
   "cuisine",
@@ -94,7 +129,10 @@ const ALL_FILTERS: ReadonlySet<FilterKey> = new Set([
  */
 const FILTERS_BY_CATEGORY: Record<string, ReadonlySet<FilterKey>> = {
   "full-catering": ALL_FILTERS,
-  "single-stall": new Set(["cuisine", "diet", "price", "meals"]),
+  // The stall type and city are already picked, so cuisine / meal-slot
+  // filters only repeat them; a stall is chosen by price, rating, whether it
+  // fits the guest count and how soon it can be booked.
+  "single-stall": new Set(["diet", "price", "rating", "guests", "notice"]),
   "live-stall": new Set(["cuisine", "diet", "price"]),
   "hi-tea": new Set(["diet", "price"]),
   "baina-box": new Set(["price"]),
@@ -218,6 +256,15 @@ export default function VendorCatalog() {
   };
 
   const priceLabel = (value: PriceRange): string => {
+    if (category === "single-stall")
+      switch (value) {
+        case "budget":
+          return t("Under ₹100", "₹100 से कम");
+        case "premium":
+          return t("₹100 – ₹200", "₹100 – ₹200");
+        case "luxury":
+          return t("₹200+", "₹200+");
+      }
     switch (value) {
       case "budget":
         return t("Under ₹1,000", "₹1,000 से कम");
@@ -332,6 +379,18 @@ export default function VendorCatalog() {
     const tm = searchParams.get("time");
     return tm && Object.values(bookingTimeSlots).flat().includes(tm) ? tm : "";
   });
+  // Single Stall refinements: rated 4★+, fits a guest count (stall's minimum
+  // order ≤ guests; 0 = any) and bookable within a day.
+  const [topRated, setTopRated] = useState<boolean>(
+    () => searchParams.get("rating") === String(MIN_TOP_RATING),
+  );
+  const [guests, setGuests] = useState<number>(() => {
+    const g = Number(searchParams.get("guests"));
+    return Number.isFinite(g) && g > 0 ? g : 0;
+  });
+  const [shortNotice, setShortNotice] = useState<boolean>(
+    () => searchParams.get("notice") === "1",
+  );
   const [sort, setSort] = useState<SortKey>(() => {
     const s = searchParams.get("sort");
     if (
@@ -372,6 +431,26 @@ export default function VendorCatalog() {
       toStallTypeId(searchParams.get("counter") ?? "") !== "",
   );
   const [refineOpen, setRefineOpen] = useState(false);
+  const router = useRouter();
+  // "Change" returns to the stall picker (type outlined, city kept by the
+  // wizard's draft). Arriving straight from it, step back in history instead
+  // of pushing, so Back doesn't bounce picker ⇄ catalog.
+  const backToStallPicker = () => {
+    try {
+      const ref = document.referrer ? new URL(document.referrer) : null;
+      if (
+        ref?.origin === window.location.origin &&
+        ref.pathname === "/book/stall" &&
+        window.history.length > 1
+      ) {
+        router.back();
+        return;
+      }
+    } catch {
+      // Malformed referrer — fall through to a fresh navigation.
+    }
+    router.push(`/book/stall?counter=${encodeURIComponent(counter)}`);
+  };
 
   // Real customer ratings, matched to these listings by name (best-effort).
   const ratings = useVendorRatings();
@@ -431,16 +510,53 @@ export default function VendorCatalog() {
   // The filter controls that make sense for the current lens; anything hidden
   // is also neutralised in the result filter so a stale value can't silently
   // constrain the grid.
-  const visibleFilters: ReadonlySet<FilterKey> = useMemo(
-    () =>
-      bainaMode
-        ? FILTERS_BY_CATEGORY["baina-box"]
-        : category
-          ? (FILTERS_BY_CATEGORY[category] ?? ALL_FILTERS)
-          : ALL_FILTERS,
-    [bainaMode, category],
+  const stallMode = category === "single-stall" && !bainaMode;
+  // Landed from the stall picker and still on that stall type: category,
+  // stall type and city are settled, so search, the lens row and the city /
+  // state pickers step aside and "Clear" only clears the refinements.
+  const stallView = fromStallPicker && stallMode && counter !== "";
+  const priceRanges = stallMode ? STALL_PRICE_RANGES : PRICE_RANGES;
+
+  /** Diets of the stall a listing would sell under the current lens — the
+   *  picked stall type's dishes, else every stall type's. Empty when the
+   *  listing has no bookable stall menu to judge by. */
+  const stallDiets = useCallback(
+    (v: VendorListing): DietType[] => {
+      const byType = v.stall?.dietsByType;
+      if (!byType) return [];
+      return counter ? (byType[counter] ?? []) : [...new Set(Object.values(byType).flat())];
+    },
+    [counter],
   );
+  // A veg / non-veg choice only means something when some stall on offer
+  // actually serves non-veg — never for chaat, pan or sweets.
+  const stallNonVegOnOffer = useMemo(
+    () =>
+      stallMode &&
+      allVendors.some(
+        (v) =>
+          (counter === "" || (v.stall?.stallTypes ?? []).includes(counter)) &&
+          stallDiets(v).includes("non-veg"),
+      ),
+    [stallMode, allVendors, counter, stallDiets],
+  );
+
+  const visibleFilters: ReadonlySet<FilterKey> = useMemo(() => {
+    const base = bainaMode
+      ? FILTERS_BY_CATEGORY["baina-box"]
+      : category
+        ? (FILTERS_BY_CATEGORY[category] ?? ALL_FILTERS)
+        : ALL_FILTERS;
+    if (!stallMode || stallNonVegOnOffer) return base;
+    return new Set([...base].filter((f) => f !== "diet"));
+  }, [bainaMode, category, stallMode, stallNonVegOnOffer]);
   const showFilter = (f: FilterKey) => visibleFilters.has(f);
+
+  /** The rating a card shows — real customer reviews when there are any. */
+  const ratingOf = useCallback(
+    (v: VendorListing) => storefrontStat(ratings, v)?.rating ?? v.rating,
+    [ratings],
+  );
 
   // Distinct cities, in first-seen order.
   const cityOptions = useMemo(
@@ -457,9 +573,10 @@ export default function VendorCatalog() {
     [allVendors],
   );
 
+  // The header's location picker drives the city. A `?city=` link wins on
+  // landing, but a later change in the header still applies — the stall view
+  // has no city control of its own.
   useEffect(() => {
-    if (searchParams.get("city")) return;
-
     function applyStored(stored: StoredLocation | null) {
       if (!stored?.cityId) return;
       const name = resolveLocationDisplayName(
@@ -471,7 +588,7 @@ export default function VendorCatalog() {
       setCity(name);
     }
 
-    applyStored(readStoredLocation());
+    if (!searchParams.get("city")) applyStored(readStoredLocation());
 
     function onChanged(e: Event) {
       applyStored((e as CustomEvent<StoredLocation>).detail);
@@ -531,6 +648,15 @@ export default function VendorCatalog() {
         servingTime === "" ||
         v.mealTypes.includes(mealPeriodForTime(servingTime));
 
+      // In a stall lens the veg / non-veg choice judges the stall's own dishes;
+      // a listing with no stall menu falls back to the caterer's diet.
+      const dietOk = () => {
+        if (!visibleFilters.has("diet") || diet === ALL) return true;
+        const diets = stallMode ? stallDiets(v) : [];
+        if (diets.length === 0) return matchesDiet(v, diet);
+        return diets.includes(diet === "Veg" ? "veg" : "non-veg");
+      };
+
       return (
         matchesQuery &&
         matchesCategory &&
@@ -539,18 +665,22 @@ export default function VendorCatalog() {
         (city === ALL || v.city === city) &&
         (state === ALL || v.state === state) &&
         (!visibleFilters.has("cuisine") || cuisine === ALL || v.cuisines.includes(cuisine)) &&
-        (!visibleFilters.has("diet") || matchesDiet(v, diet)) &&
+        dietOk() &&
         (!visibleFilters.has("tier") || tier === ALL || v.tiers.includes(tier)) &&
-        (!visibleFilters.has("price") || matchesPrice(v, price)) &&
+        (!visibleFilters.has("price") || matchesPrice(v, price, priceRanges)) &&
+        (!visibleFilters.has("rating") || !topRated || ratingOf(v) >= MIN_TOP_RATING) &&
+        (!visibleFilters.has("guests") ||
+          guests === 0 ||
+          (v.stall?.minGuests ?? 0) <= guests) &&
+        (!visibleFilters.has("notice") ||
+          !shortNotice ||
+          (v.stall?.leadHours ?? 0) <= SHORT_NOTICE_HOURS) &&
         matchesMeals &&
         matchesServingTime
       );
     });
 
     const sorted = [...filtered];
-    // Price sorts follow the price the card shows: a bookable stall's own
-    // per-plate rate, else the listing's indicative price.
-    const shownPrice = (v: VendorListing) => v.stall?.fromPerPlate ?? v.priceFrom;
     switch (sort) {
       case "price-asc":
         sorted.sort((a, b) => shownPrice(a) - shownPrice(b));
@@ -559,7 +689,7 @@ export default function VendorCatalog() {
         sorted.sort((a, b) => shownPrice(b) - shownPrice(a));
         break;
       case "rating":
-        sorted.sort((a, b) => b.rating - a.rating);
+        sorted.sort((a, b) => ratingOf(b) - ratingOf(a));
         break;
       default:
         // Relevance: verified & higher-tier first, then rating, then reviews.
@@ -595,6 +725,13 @@ export default function VendorCatalog() {
     diet,
     tier,
     price,
+    priceRanges,
+    stallMode,
+    stallDiets,
+    ratingOf,
+    topRated,
+    guests,
+    shortNotice,
     meals,
     servingTime,
     sort,
@@ -618,8 +755,9 @@ export default function VendorCatalog() {
     return counts;
   }, [allVendors, query, city, state]);
 
-  const hasActiveFilters =
-    query !== "" ||
+  const hasActiveFilters = stallView
+    ? stallRefinementsActive()
+    : query !== "" ||
     category !== "" ||
     addOnsOnly ||
     counter !== "" ||
@@ -630,35 +768,60 @@ export default function VendorCatalog() {
     tier !== ALL ||
     price !== ALL ||
     meals.length > 0 ||
-    servingTime !== "";
+    servingTime !== "" ||
+    topRated ||
+    guests > 0 ||
+    shortNotice;
 
   /** Count of sheet filters (excludes search) — drives the Filters chip badge.
    *  Only counts controls the current category lens shows; hidden filters are
    *  neutralised, so they'd inflate the badge without affecting results. */
   const activeFilterCount = [
-    city !== ALL,
-    state !== ALL,
+    !stallMode && city !== ALL,
+    !stallMode && state !== ALL,
     showFilter("cuisine") && cuisine !== ALL,
     showFilter("diet") && diet !== ALL,
     showFilter("tier") && tier !== ALL,
     showFilter("price") && price !== ALL,
     showFilter("meals") && meals.length > 0,
     showFilter("time") && servingTime !== "",
+    showFilter("rating") && topRated,
+    showFilter("guests") && guests > 0,
+    showFilter("notice") && shortNotice,
   ].filter(Boolean).length;
 
+  /** Whether anything the stall view's Clear would undo is set. */
+  function stallRefinementsActive() {
+    return (
+      sort !== "relevance" ||
+      diet !== ALL ||
+      price !== ALL ||
+      topRated ||
+      guests > 0 ||
+      shortNotice
+    );
+  }
+
   const resetFilters = () => {
-    setQuery("");
-    setCategory("");
-    setAddOnsOnly(false);
-    setCounter("");
-    setCity(ALL);
-    setState(ALL);
+    // The stall view keeps what the picker settled (category, stall type,
+    // city) and clears only the refinements on top of it.
+    if (!stallView) {
+      setQuery("");
+      setCategory("");
+      setAddOnsOnly(false);
+      setCounter("");
+      setCity(ALL);
+      setState(ALL);
+    }
     setCuisine(ALL);
     setDiet(ALL);
     setTier(ALL);
     setPrice(ALL);
     setMeals([]);
     setServingTime("");
+    setTopRated(false);
+    setGuests(0);
+    setShortNotice(false);
     setSort("relevance");
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("bhoj_vendor_sort");
@@ -757,15 +920,33 @@ export default function VendorCatalog() {
               type="button"
               onClick={() => setRefineOpen(true)}
               aria-expanded={false}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-maroon px-3 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95"
+              aria-label={t("Filters", "फ़िल्टर")}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-cream text-maroon transition hover:bg-cream-2 active:scale-95"
             >
               <FilterGlyph />
+            </button>
+            <button
+              type="button"
+              onClick={backToStallPicker}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-maroon px-3 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95"
+            >
+              <span aria-hidden="true">←</span>
               {t("Change", "बदलें")}
             </button>
           </div>
         </div>
       ) : (
       <>
+      {fromStallPicker && counter !== "" && (
+        <button
+          type="button"
+          onClick={backToStallPicker}
+          className="mt-3 px-1 text-sm font-semibold text-maroon underline underline-offset-4"
+        >
+          ← {t("Back to stall types", "स्टॉल प्रकार पर वापस")}
+        </button>
+      )}
+      {!stallView && (
       <CategoryChips className="mt-4 px-1" label={t("Browse by", "इसके अनुसार देखें")}>
         <CategoryChip selected={lens === ""} onClick={() => selectLens("")}>
           {t("All", "सभी")}
@@ -784,11 +965,13 @@ export default function VendorCatalog() {
           </CategoryChip>
         ))}
       </CategoryChips>
+      )}
 
       {/* Sticky app chrome — search + chip row */}
       <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">
         <div className="mx-auto max-w-7xl">
           <div className="lg:flex lg:items-center lg:gap-3">
+            {!stallView && (
             <AppSearchBar
               id="vendor-search"
               value={query}
@@ -800,9 +983,12 @@ export default function VendorCatalog() {
               )}
               className="lg:w-96 lg:shrink-0"
             />
+            )}
 
             <CategoryChips
-              className="mt-3 lg:mt-0 lg:min-w-0 lg:flex-1"
+              className={
+                (stallView ? "" : "mt-3 lg:mt-0 ") + "lg:min-w-0 lg:flex-1"
+              }
               label={t("Filters", "फ़िल्टर")}
             >
               <CategoryChip
@@ -832,7 +1018,22 @@ export default function VendorCatalog() {
                 </CategoryChip>
               )}
 
-              {showFilter("price") && (
+              {stallMode ? (
+                <ThemedSelect
+                  id="vendor-sort-select"
+                  value={sort}
+                  onChange={(v) => setSort(v as SortKey)}
+                  ariaLabel={t("Sort", "क्रम")}
+                  className="w-auto max-w-[11rem] shrink-0"
+                  buttonClassName={selectChipClass(sort !== "relevance")}
+                  options={[
+                    { value: "relevance", label: t("Sort: Recommended", "क्रम: सुझाए गए") },
+                    { value: "price-asc", label: t("Price: Low to High", "कीमत: कम से ज्यादा") },
+                    { value: "price-desc", label: t("Price: High to Low", "कीमत: ज्यादा से कम") },
+                    { value: "rating", label: t("Top rated", "सबसे अच्छी रेटिंग") },
+                  ]}
+                />
+              ) : showFilter("price") && (
                 <CategoryChip
                   id="vendor-sort-chip"
                   selected={sort === "price-asc" || sort === "price-desc"}
@@ -850,6 +1051,7 @@ export default function VendorCatalog() {
                 </CategoryChip>
               )}
 
+              {!stallMode && (
               <ThemedSelect
                 id="vendor-city-chip"
                 value={city}
@@ -862,8 +1064,11 @@ export default function VendorCatalog() {
                   ...cityOptions.map((c) => ({ value: c, label: c })),
                 ]}
               />
+              )}
 
-              {showFilter("price") && (
+              {/* Stall price bands live in the Filters sheet — beside the Sort
+                  select a second price chip only confused. */}
+              {showFilter("price") && !stallMode && (
                 <CategoryChip
                   id="vendor-price-chip"
                   selected={price !== ALL}
@@ -908,18 +1113,21 @@ export default function VendorCatalog() {
             className={
               "mt-3 hidden gap-2 lg:grid " +
               ({
+                1: "lg:grid-cols-4",
                 2: "lg:grid-cols-2",
                 3: "lg:grid-cols-3",
                 4: "lg:grid-cols-4",
                 5: "lg:grid-cols-5",
               }[
-                2 +
+                (stallMode ? 0 : 2) +
                   (showFilter("cuisine") ? 1 : 0) +
                   (showFilter("tier") ? 1 : 0) +
                   (showFilter("price") ? 1 : 0)
               ] ?? "lg:grid-cols-5")
             }
           >
+            {!stallMode && (
+            <>
             <FilterSelect
               id="vendor-city"
               label={t("City", "शहर")}
@@ -940,6 +1148,8 @@ export default function VendorCatalog() {
                 ...stateOptions.map((s) => ({ value: s, label: s })),
               ]}
             />
+            </>
+            )}
             {showFilter("cuisine") && (
               <FilterSelect
                 id="vendor-cuisine"
@@ -974,7 +1184,7 @@ export default function VendorCatalog() {
                 }
                 value={price}
                 onChange={(v) => setPrice(v as PriceRange)}
-                options={PRICE_RANGES.map((r) => ({
+                options={priceRanges.map((r) => ({
                   value: r.value,
                   label: priceLabel(r.value),
                 }))}
@@ -994,6 +1204,8 @@ export default function VendorCatalog() {
         title={t("Filters", "फ़िल्टर")}
       >
         <div className="space-y-5">
+          {!stallMode && (
+          <>
           <FilterSelect
             id="sheet-city"
             label={t("City", "शहर")}
@@ -1014,6 +1226,8 @@ export default function VendorCatalog() {
               ...stateOptions.map((s) => ({ value: s, label: s })),
             ]}
           />
+          </>
+          )}
           {showFilter("cuisine") && (
             <FilterSelect
               id="sheet-cuisine"
@@ -1048,7 +1262,7 @@ export default function VendorCatalog() {
               }
               value={price}
               onChange={(v) => setPrice(v as PriceRange)}
-              options={PRICE_RANGES.map((r) => ({
+              options={priceRanges.map((r) => ({
                 value: r.value,
                 label: priceLabel(r.value),
               }))}
@@ -1092,6 +1306,66 @@ export default function VendorCatalog() {
                     {mealLabel(meal)}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+          {showFilter("rating") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Rating", "रेटिंग")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTopRated((v) => !v)}
+                  aria-pressed={topRated}
+                  className={chipClass(topRated)}
+                >
+                  {t(`${MIN_TOP_RATING}★ & above`, `${MIN_TOP_RATING}★ और ऊपर`)}
+                </button>
+              </div>
+            </div>
+          )}
+          {showFilter("guests") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Guests", "मेहमान")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {GUEST_OPTIONS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGuests((prev) => (prev === g ? 0 : g))}
+                    aria-pressed={guests === g}
+                    className={chipClass(guests === g)}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[12px] text-ink/55">
+                {t(
+                  "Hides stalls whose minimum order is above this.",
+                  "जिन स्टॉल का न्यूनतम ऑर्डर इससे ज़्यादा है, वे छिप जाएँगे।",
+                )}
+              </p>
+            </div>
+          )}
+          {showFilter("notice") && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Booking notice", "बुकिंग सूचना")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShortNotice((v) => !v)}
+                  aria-pressed={shortNotice}
+                  className={chipClass(shortNotice)}
+                >
+                  {t("Can serve within 24 hrs", "24 घंटे में सेवा")}
+                </button>
               </div>
             </div>
           )}

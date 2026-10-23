@@ -44,10 +44,6 @@ export default function StallTypePicker({
         compact
         eyebrow={t("One Bhojpatra Experience", "एक भोजपत्र अनुभव")}
         title={t("Curated Mini Stalls", "चुनिंदा मिनी स्टॉल")}
-        sub={t(
-          "Check availability to reserve your experience • Same-day & Advance booking available.",
-          "अपना अनुभव आरक्षित करने के लिए उपलब्धता देखें • उसी दिन और अग्रिम बुकिंग उपलब्ध।",
-        )}
       />
 
       {loading ? (

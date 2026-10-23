@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
@@ -20,7 +20,9 @@ import LoginGate from "@/components/auth/LoginGate";
 import StallTypePicker from "@/components/booking/StallTypePicker";
 import StepDone from "@/components/booking/shared/StepDone";
 import SectionHead from "@/components/booking/shared/SectionHead";
-import EventBar from "@/components/booking/shared/EventBar";
+import EventBar, {
+  type EventField,
+} from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
 import EssentialsPicker from "@/components/booking/EssentialsPicker";
@@ -286,6 +288,13 @@ export default function StallBookingWizard({
   const [customOccasion, setCustomOccasion] = useState<string>("");
   const [guests, setGuests] = useState<number>(100);
   const [eventDate, setEventDate] = useState<string>("");
+  // A tapped "Before you continue" blocker — EventBar scrolls to that field.
+  const [briefFocus, setBriefFocus] = useState<{
+    field: EventField;
+    nonce: number;
+  } | null>(null);
+  const focusBrief = (field: EventField) =>
+    setBriefFocus((prev) => ({ field, nonce: (prev?.nonce ?? 0) + 1 }));
   const [mealTime, setMealTime] = useState<string>("");
   const [eventTime, setEventTime] = useState<string>("");
   const [foodPreference, setFoodPreference] = useState<string>("");
@@ -1178,58 +1187,69 @@ export default function StallBookingWizard({
   };
   const canNext = stepValid(step);
 
-  const blockersFor = (s: number): string[] => {
+  const blockersFor = (s: number): Blocker[] => {
     if (stepValid(s)) return [];
-    if (s === 1) {
-      if (!stall) return [t("Choose a stall", "एक स्टॉल चुनें")];
-      if (stall.courses.length === 0)
-        return [
-          t(
-            "This stall has nothing your pure-veg plate can take — pick another brand, or adjust the plate in your event brief.",
-            "इस स्टॉल में आपकी शुद्ध शाकाहारी थाली के लिए कुछ नहीं है — कोई और ब्रांड चुनें, या इवेंट ब्रीफ़ में थाली बदलें।",
-          ),
-        ];
-      return [
-        stall.allFixed
-          ? t(
-              "Add at least one course from this stall.",
-              "इस स्टॉल से कम से कम एक कोर्स जोड़ें।",
-            )
-          : t(
-              "Pick at least one dish from this stall's menu.",
-              "इस स्टॉल के मेन्यू से कम से कम एक व्यंजन चुनें।",
-            ),
-      ];
-    }
+    if (s === 1) return [{ text: menuBlockerText() }];
     if (s === 2) {
-      const out: string[] = [];
-      if (occasionId === "") out.push(t("Choose an occasion", "अवसर चुनें"));
+      const out: Blocker[] = [];
+      if (occasionId === "")
+        out.push({ text: t("Choose an occasion", "अवसर चुनें"), field: "occasion" });
       else if (
         occasionId === OTHER_OCCASION_ID &&
         customOccasion.trim() === ""
       )
-        out.push(t("Name your occasion", "अपने अवसर का नाम लिखें"));
-      if (cityId === "") out.push(t("Choose your city", "अपना शहर चुनें"));
+        out.push({
+          text: t("Name your occasion", "अपने अवसर का नाम लिखें"),
+          field: "occasion",
+        });
+      if (cityId === "")
+        out.push({ text: t("Choose your city", "अपना शहर चुनें"), field: "city" });
       else if (cityId === OTHER_LOCATION_ID && customCity.trim() === "")
-        out.push(t("Name your city", "अपने शहर का नाम लिखें"));
+        out.push({
+          text: t("Name your city", "अपने शहर का नाम लिखें"),
+          field: "city",
+        });
       if (eventDate === "")
-        out.push(t("Pick an event date", "इवेंट की तारीख़ चुनें"));
-      else if (!dateMeetsLead && leadWarning) out.push(leadWarning);
+        out.push({
+          text: t("Pick an event date", "इवेंट की तारीख़ चुनें"),
+          field: "date",
+        });
+      else if (!dateMeetsLead && leadWarning)
+        out.push({ text: leadWarning, field: "date" });
       if (guests < minGuests || guests > MAX_GUESTS)
-        out.push(
-          minGuests > MIN_GUESTS && guests < minGuests
-            ? t(
-                `${stall?.name ?? "This stall"} serves a minimum of ${inr.format(minGuests)} guests`,
-                `${stall?.name ?? "यह स्टॉल"} कम से कम ${inr.format(minGuests)} मेहमानों के लिए है`,
-              )
-            : t(
-                `Set guests between ${inr.format(minGuests)} and ${inr.format(MAX_GUESTS)}`,
-                `मेहमानों की संख्या ${inr.format(minGuests)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
-              ),
-        );
+        out.push({
+          text:
+            minGuests > MIN_GUESTS && guests < minGuests
+              ? t(
+                  `${stall?.name ?? "This stall"} serves a minimum of ${inr.format(minGuests)} guests`,
+                  `${stall?.name ?? "यह स्टॉल"} कम से कम ${inr.format(minGuests)} मेहमानों के लिए है`,
+                )
+              : t(
+                  `Set guests between ${inr.format(minGuests)} and ${inr.format(MAX_GUESTS)}`,
+                  `मेहमानों की संख्या ${inr.format(minGuests)} से ${inr.format(MAX_GUESTS)} के बीच रखें`,
+                ),
+          field: "guests",
+        });
       return out;
     }
     return [];
+  };
+  const menuBlockerText = (): string => {
+    if (!stall) return t("Choose a stall", "एक स्टॉल चुनें");
+    if (stall.courses.length === 0)
+      return t(
+        "This stall has nothing your pure-veg plate can take — pick another brand, or adjust the plate in your event brief.",
+        "इस स्टॉल में आपकी शुद्ध शाकाहारी थाली के लिए कुछ नहीं है — कोई और ब्रांड चुनें, या इवेंट ब्रीफ़ में थाली बदलें।",
+      );
+    return stall.allFixed
+      ? t(
+          "Add at least one course from this stall.",
+          "इस स्टॉल से कम से कम एक कोर्स जोड़ें।",
+        )
+      : t(
+          "Pick at least one dish from this stall's menu.",
+          "इस स्टॉल के मेन्यू से कम से कम एक व्यंजन चुनें।",
+        );
   };
   const nextBlockers = blockersFor(step);
   // Review re-checks every earlier rule: the event brief is still editable
@@ -1238,7 +1258,7 @@ export default function StallBookingWizard({
   // advance is taken and the booking POST then rejects the order.
   const reviewBlocker =
     step === TOTAL_STEPS
-      ? [...blockersFor(1), ...blockersFor(2)].join(" • ")
+      ? [...blockersFor(1), ...blockersFor(2)].map((b) => b.text).join(" • ")
       : "";
 
   // A resumed draft is re-checked once the live roster has answered: its date
@@ -1787,6 +1807,7 @@ export default function StallBookingWizard({
       collapsible={mobileCollapse}
       collapseAt="sm"
       chipSummary
+      focusRequest={briefFocus}
     />
   );
 
@@ -2056,7 +2077,7 @@ export default function StallBookingWizard({
               <span>
                 {t("Before you continue:", "जारी रखने से पहले:")}{" "}
                 <span className="font-semibold text-maroon">
-                  {nextBlockers.join(" • ")}
+                  <BlockerList blockers={nextBlockers} onPick={focusBrief} />
                 </span>
               </span>
             </div>
@@ -2102,7 +2123,7 @@ export default function StallBookingWizard({
                   role="status"
                   className="mb-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-maroon"
                 >
-                  {nextBlockers.join(" • ")}
+                  <BlockerList blockers={nextBlockers} onPick={focusBrief} />
                 </p>
               )}
               {pickedCount > 0 ? null : (
@@ -2172,6 +2193,36 @@ export default function StallBookingWizard({
  * panel is what they see on the way (and what a `?vendor=` we couldn't resolve
  * lands on, with the brand named).
  */
+/** What still stops Continue. Each names the brief field that fixes it (when
+ *  there is one), so the notice can jump the guest straight there. */
+type Blocker = { text: string; field?: EventField };
+
+/** The blockers joined by " • ", each one with a field a tap-to-fix link. */
+function BlockerList({
+  blockers,
+  onPick,
+}: {
+  blockers: Blocker[];
+  onPick: (field: EventField) => void;
+}) {
+  return blockers.map((b, i) => (
+    <Fragment key={b.text}>
+      {i > 0 && " • "}
+      {b.field ? (
+        <button
+          type="button"
+          onClick={() => onPick(b.field!)}
+          className="font-semibold text-maroon underline decoration-maroon/40 underline-offset-2 transition hover:decoration-maroon"
+        >
+          {b.text}
+        </button>
+      ) : (
+        b.text
+      )}
+    </Fragment>
+  ));
+}
+
 function StallHandoff({
   t,
   missingBrand,
@@ -2800,6 +2851,7 @@ function StepStallDetails({
       <StepExtras
         pageSize={5}
         compact
+        collapsible
         onSkip={onSkip}
         skipDisabled={skipDisabled}
         lang={lang}
@@ -2833,13 +2885,13 @@ function StepStallDetails({
       )}
       {part === "essentials" && services.length > 0 && (
         <>
-          <h3 className="text-lg font-semibold text-ink">
+          <h3 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl leading-tight text-ink sm:text-3xl">
             {t("Serving & essentials", "सर्विस और ज़रूरी सामान")}
-            <span className="ml-2 text-sm font-normal text-ink-soft">
+            <span className="rounded-full bg-cream/60 px-3 py-1 font-sans text-xs font-medium capitalize text-ink sm:text-sm">
               {t("optional", "वैकल्पिक")}
             </span>
           </h3>
-          <p className="mt-1 text-sm text-ink-soft">
+          <p className="mt-1.5 text-sm text-ink-soft">
             {t(
               "Add serving crew, buffet setup and crockery — or skip it if your venue already covers this.",
               "सर्विस स्टाफ, बुफे सेटअप और क्रॉकरी जोड़ें — या छोड़ दें अगर वेन्यू पहले से दे रहा है।",
@@ -3225,31 +3277,31 @@ function StallSummary({
   pickedCount: number;
 }) {
   return (
-    <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wider text-maroon">
+    <div className="rounded-2xl border border-cream-3 bg-white p-4 shadow-soft sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-maroon">
         {t("Your order", "आपका ऑर्डर")}
       </p>
-      <p className="mt-1 font-semibold text-ink">{stall?.name ?? "—"}</p>
-      <p className="text-xs text-ink-soft">
+      <p className="mt-1.5 text-lg font-semibold leading-tight text-ink">{stall?.name ?? "—"}</p>
+      <p className="mt-0.5 text-sm text-ink-soft">
         {inr.format(pickedCount)} {t("dishes", "व्यंजन")} ·{" "}
         {inr.format(guests)} {t("guests", "मेहमान")}
       </p>
 
       {/* Per-plate leads; the total is the smaller sub-line. */}
-      <div className="mt-4 rounded-xl bg-cream-2/50 p-3 text-center">
-        <p className="text-2xl font-semibold text-maroon">
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-cream/40 px-4 py-3">
+        <p className="whitespace-nowrap text-2xl font-semibold text-maroon">
           {money(perPlate)}
-          <span className="text-sm font-normal text-ink-soft">
+          <span className="text-sm font-normal text-ink">
             {" "}
             / {t("plate", "प्लेट")}
           </span>
         </p>
-        <p className="mt-0.5 text-xs text-ink-soft">
+        <p className="max-w-[9rem] text-right text-xs leading-snug text-ink-soft">
           {t("menu price before extras & tax", "एक्स्ट्रा और टैक्स से पहले")}
         </p>
       </div>
 
-      <div className="mt-4 divide-y divide-cream-3 border-t border-cream-3">
+      <div className="mt-3">
         <SummaryRow label={t("Menu subtotal", "मेन्यू उप-योग")} value={money(subtotal)} />
         {addOnsTotal > 0 && (
           <SummaryRow label={t("Extra counters", "अतिरिक्त काउंटर")} value={money(addOnsTotal)} />
@@ -3265,10 +3317,10 @@ function StallSummary({
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-cream-3 pt-3">
-        <span className="text-sm font-semibold text-ink">
+        <span className="text-base font-semibold text-ink">
           {t("Grand total", "कुल राशि")}
         </span>
-        <span className="text-lg font-semibold text-maroon">
+        <span className="text-xl font-bold text-maroon">
           {money(grandTotal)}
         </span>
       </div>

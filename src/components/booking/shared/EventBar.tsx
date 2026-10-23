@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ThemedSelect from "@/components/ThemedSelect";
 import DatePicker from "@/components/DatePicker";
 import {
@@ -115,6 +115,9 @@ function OtherField({
   );
 }
 
+/** A brief field a "Before you continue" blocker can jump the guest to. */
+export type EventField = "occasion" | "date" | "city" | "guests";
+
 /* ─── Event brief ─────────────────────────────────────────────────────────
  * Occasion / date / city / guests / serving time / food preference, editable on
  * every step of either booking wizard. Shared by /book and /book/stall so the
@@ -154,6 +157,7 @@ export default function EventBar({
   collapseAt = "lg",
   embedded = false,
   chipSummary = false,
+  focusRequest = null,
 }: {
   lang: Lang;
   t: (en: string, hi: string) => string;
@@ -210,6 +214,9 @@ export default function EventBar({
    *  "YOUR EVENT" label stacked over the summary, tinted card. Same content
    *  and the same tap-to-expand editor; used by the Single Stall flow. */
   chipSummary?: boolean;
+  /** Bump `nonce` to expand the brief, scroll `field` into view and open its
+   *  picker — how a tapped blocker takes the guest straight to the fix. */
+  focusRequest?: { field: EventField; nonce: number } | null;
 }) {
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
@@ -283,6 +290,36 @@ export default function EventBar({
   // Collapsed one-line summary (mobile only) — every set value is shown inline
   // so the guest sees their whole event brief without expanding the card.
   const [open, setOpen] = useState(false);
+  // A new focus request expands the collapsed brief during render, so the
+  // effect below finds the field already laid out.
+  const [seenFocus, setSeenFocus] = useState(0);
+  if (focusRequest && focusRequest.nonce !== seenFocus) {
+    setSeenFocus(focusRequest.nonce);
+    setOpen(true);
+  }
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusRequest) return;
+    const box = rootRef.current?.querySelector<HTMLElement>(
+      `[data-event-field="${focusRequest.field}"]`,
+    );
+    if (!box) return;
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+    // The control sits under the label row (which can carry its own action,
+    // like City's "Locate"), so search from the field's second child.
+    const sel = focusRequest.field === "guests" ? "input" : "button, input";
+    const wrap = box.querySelector<HTMLElement>(":scope > :nth-child(2)");
+    const control = wrap?.matches(sel)
+      ? wrap
+      : wrap?.querySelector<HTMLElement>(sel);
+    // Open the picker once the scroll settles — the date popup dismisses
+    // itself while its trigger is still off-screen.
+    const id = window.setTimeout(() => {
+      control?.focus({ preventScroll: true });
+      if (control instanceof HTMLButtonElement) control.click();
+    }, 450);
+    return () => window.clearTimeout(id);
+  }, [focusRequest]);
   const occasionName =
     occasionId === OTHER_OCCASION_ID
       ? customOccasion.trim()
@@ -330,6 +367,7 @@ export default function EventBar({
 
   return (
     <div
+      ref={rootRef}
       className={
         embedded
           ? "relative"
@@ -468,7 +506,7 @@ export default function EventBar({
               : "")
         }
       >
-        <label className="block min-w-0">
+        <label className="block min-w-0" data-event-field="occasion">
           <span className={labelRowClass}>
             <span className={labelClass}>{t("Occasion", "अवसर")}</span>
           </span>
@@ -502,7 +540,7 @@ export default function EventBar({
           )}
         </label>
 
-        <div className="block min-w-0">
+        <div className="block min-w-0" data-event-field="date">
           <span className={labelRowClass}>
             <span className={labelClass}>{t("Date", "तारीख")}</span>
           </span>
@@ -537,7 +575,7 @@ export default function EventBar({
           )}
         </div>
 
-        <div className="block min-w-0">
+        <div className="block min-w-0" data-event-field="city">
           <span className={labelRowClass}>
             <span className={labelClass}>{t("City", "शहर")}</span>
             <button
@@ -600,7 +638,7 @@ export default function EventBar({
         </div>
 
         {showGuests && (
-          <div className="block min-w-0">
+          <div className="block min-w-0" data-event-field="guests">
             <span className={labelRowClass}>
               <span className={labelClass}>{t("Guests", "मेहमान")}</span>
               <span className="shrink-0 text-[10px] tabular-nums text-ink/40">

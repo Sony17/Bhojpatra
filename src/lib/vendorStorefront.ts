@@ -19,6 +19,7 @@ import {
   cities,
   listingCateringCategories,
   type CategoryItem,
+  type DietType,
   type MenuCategory,
   type StallTerms,
   type VendorListing,
@@ -79,6 +80,9 @@ export type StallBrief = Pick<
    *  stall-type lens may list it under. A declared counter with no menu
    *  behind it ("Pan Counter" ticked as an add-on) doesn't count. */
   stallTypes?: string[];
+  /** Stall type → the diets its dishes cover, so a veg / non-veg filter can
+   *  judge the stall the guest is booking rather than the whole caterer. */
+  dietsByType?: Record<string, DietType[]>;
 };
 
 /** Stall types a set of booking courses covers — a stall type IS its course
@@ -88,10 +92,20 @@ export function stallTypesOfCourses(courseIds: string[]): string[] {
 }
 
 export function briefOf(s: BookableStall): StallBrief {
+  const stallTypes = stallTypesOfCourses(s.courses.map((c) => c.categoryId));
+  const dietsByType: Record<string, DietType[]> = {};
+  for (const id of stallTypes) {
+    const diets = new Set<DietType>();
+    for (const c of s.courses)
+      if (c.categoryId === id)
+        for (const it of c.items) diets.add(it.diet === "non-veg" ? "non-veg" : "veg");
+    dietsByType[id] = [...diets];
+  }
   return {
     stallId: s.stallId,
     fromPerPlate: s.fromPerPlate,
-    stallTypes: stallTypesOfCourses(s.courses.map((c) => c.categoryId)),
+    stallTypes,
+    ...(stallTypes.length ? { dietsByType } : {}),
     ...(s.minGuests ? { minGuests: s.minGuests } : {}),
     ...(s.leadHours ? { leadHours: s.leadHours } : {}),
   };
