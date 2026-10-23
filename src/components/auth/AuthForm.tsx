@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import {
   DASHBOARD_PATH,
@@ -52,7 +51,6 @@ function EyeIcon({ off }: { off: boolean }) {
 
 export default function AuthForm({ mode }: { mode: Mode }) {
   const { t } = useLang();
-  const router = useRouter();
   const isSignup = mode === "signup";
   const isForgot = mode === "forgot";
   const isReset = mode === "reset";
@@ -307,9 +305,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
       const user = json.user;
+      // Full page load, NOT router.push: while signed out, <Link> prefetches of
+      // gated pages (/vendors, dashboards) were answered by the proxy with a
+      // redirect to /login, and the client router cache replays that stale
+      // redirect after login — leaving the user stuck on /login. A hard
+      // navigation drops the cache and re-requests with the new cookie.
       if (user.role === "admin") {
         setAdminSession({ email });
-        router.push("/admin/dashboard");
+        window.location.assign("/admin/dashboard");
         return;
       }
       await refreshSession();
@@ -317,11 +320,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       // Same-origin paths only, so `next` can't become an open redirect.
       const next = new URLSearchParams(window.location.search).get("next");
       if (next && next.startsWith("/") && !next.startsWith("//")) {
-        router.push(next);
+        window.location.assign(next);
         return;
       }
       // One email ↔ one role — land directly on that role's dashboard.
-      router.push(DASHBOARD_PATH[user.role]);
+      window.location.assign(DASHBOARD_PATH[user.role]);
     } catch {
       setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));
     } finally {
