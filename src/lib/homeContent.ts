@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 /**
  * Editable content + imagery for the public **home page** (client hook).
@@ -58,6 +65,30 @@ function ensureLoaded(): void {
     });
 }
 
+/* ── Server seed (no defaults → stored-content flash) ─────────────────────── */
+
+/** Stored content read on the server by the root layout. Rendered on the server
+ *  and the first client paint, so the page never shows the seed defaults and
+ *  then swaps to the admin-edited copy once the API answers. */
+const SeedContext = createContext<HomeContent | null>(null);
+
+export function HomeContentSeed({
+  initial,
+  children,
+}: {
+  initial: HomeContent;
+  children: ReactNode;
+}) {
+  // Client only: prime the shared cache once so later subscribers (and any
+  // section mounted after navigation) skip the refetch. Never touched on the
+  // server, where module state would be shared across requests.
+  if (typeof window !== "undefined" && !loaded) {
+    cache = initial;
+    loaded = true;
+  }
+  return createElement(SeedContext.Provider, { value: initial }, children);
+}
+
 /** Persist the next content (admin) and notify every subscriber. Optimistic:
  *  the cache updates immediately so the live page reflects the edit at once. */
 export async function saveHomeContent(next: HomeContent): Promise<void> {
@@ -91,6 +122,7 @@ export async function resetHomeContent(): Promise<void> {
 
 /** Read the live home content. Re-renders when the API loads or an admin saves. */
 export function useHomeContent(): HomeContent {
+  const seed = useContext(SeedContext);
   const [, force] = useState(0);
   useEffect(() => {
     const rerender = () => force((n) => n + 1);
@@ -100,13 +132,14 @@ export function useHomeContent(): HomeContent {
       listeners.delete(rerender);
     };
   }, []);
-  return cache;
+  return loaded ? cache : (seed ?? cache);
 }
 
 /** Whether the live content has resolved from the API yet (vs. the seed default
  *  snapshot shown on first paint). Guards writes that would otherwise persist
  *  the defaults over stored content before the fetch lands. */
 export function useHomeContentLoaded(): boolean {
+  const seed = useContext(SeedContext);
   const [, force] = useState(0);
   useEffect(() => {
     const rerender = () => force((n) => n + 1);
@@ -116,5 +149,5 @@ export function useHomeContentLoaded(): boolean {
       listeners.delete(rerender);
     };
   }, []);
-  return loaded;
+  return loaded || seed !== null;
 }

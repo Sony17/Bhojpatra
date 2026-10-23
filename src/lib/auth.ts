@@ -107,6 +107,16 @@ export async function createSession(user: UserRecord): Promise<void> {
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   });
+  // The account's saved language becomes this device's language cookie, so
+  // the very next server render (root layout) is already in it. Readable by
+  // the client, which rewrites it when the user toggles.
+  if (user.lang === "en" || user.lang === "hi") {
+    store.set("bhojpatra-lang", user.lang, {
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 }
 
 /** Clear the current session (delete the row + cookie). */

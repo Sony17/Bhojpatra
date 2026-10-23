@@ -8,9 +8,9 @@ import { inputClass } from "./FormControls";
 /**
  * Admin image picker. Shows a live thumbnail of the current image and lets the
  * editor either paste a URL or upload a file. Uploads are downscaled and
- * re-encoded to a compact data URL on the client so they stay small when saved
- * with the rest of the content (persisted to the database) and render via
- * next/image.
+ * re-encoded on the client, then stored as their own image row
+ * (`/api/content/media`) — the content keeps only the short URL, which renders
+ * via next/image.
  *
  * The default profile (1280px JPEG) suits thumbnails and logos. Pass
  * `highQuality` for images shown large — e.g. the full-width promotional banner
@@ -72,6 +72,22 @@ function fileToDataUrl(
   });
 }
 
+/** Store the image server-side and return its short media URL. If the upload
+ *  fails, keep the data URL — the content save moves it out server-side. */
+async function uploadImage(dataUrl: string): Promise<string> {
+  try {
+    const res = await fetch("/api/content/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    const json = (await res.json().catch(() => null)) as { url?: string } | null;
+    return res.ok && json?.url ? json.url : dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
 export default function ImageField({
   label = "Image",
   value,
@@ -97,12 +113,11 @@ export default function ImageField({
     setBusy(true);
     setError(null);
     try {
-      onChange(
-        await fileToDataUrl(file, {
-          maxDim: highQuality ? HQ_MAX_DIM : MAX_DIM,
-          highQuality,
-        }),
-      );
+      const dataUrl = await fileToDataUrl(file, {
+        maxDim: highQuality ? HQ_MAX_DIM : MAX_DIM,
+        highQuality,
+      });
+      onChange(await uploadImage(dataUrl));
     } catch {
       setError("Couldn't process that image. Try a JPG or PNG.");
     } finally {

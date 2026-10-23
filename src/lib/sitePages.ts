@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 /**
  * Editable "Company" pages (About Us, Careers, Terms & Privacy, Refund Policy)
@@ -60,6 +67,30 @@ function ensureLoaded(): void {
     });
 }
 
+/* ── Server seed (no defaults → stored-content flash) ─────────────────────── */
+
+/** Stored content read on the server by the root layout. Rendered on the server
+ *  and the first client paint, so the page never shows the seed defaults and
+ *  then swaps to the admin-edited copy once the API answers. */
+const SeedContext = createContext<SiteContent | null>(null);
+
+export function SiteContentSeed({
+  initial,
+  children,
+}: {
+  initial: SiteContent;
+  children: ReactNode;
+}) {
+  // Client only: prime the shared cache once so later subscribers (and any
+  // section mounted after navigation) skip the refetch. Never touched on the
+  // server, where module state would be shared across requests.
+  if (typeof window !== "undefined" && !loaded) {
+    cache = initial;
+    loaded = true;
+  }
+  return createElement(SeedContext.Provider, { value: initial }, children);
+}
+
 /** Persist the next content (admin) and notify every subscriber. Optimistic:
  *  the cache updates immediately so the live site reflects the edit at once. */
 export async function saveSiteContent(next: SiteContent): Promise<void> {
@@ -93,6 +124,7 @@ export async function resetSiteContent(): Promise<void> {
 
 /** Read the live site content. Re-renders when the API loads or an admin saves. */
 export function useSiteContent(): SiteContent {
+  const seed = useContext(SeedContext);
   const [, force] = useState(0);
   useEffect(() => {
     const rerender = () => force((n) => n + 1);
@@ -102,7 +134,7 @@ export function useSiteContent(): SiteContent {
       listeners.delete(rerender);
     };
   }, []);
-  return cache;
+  return loaded ? cache : (seed ?? cache);
 }
 
 /** Convenience: a single page by slug (undefined if not found). */

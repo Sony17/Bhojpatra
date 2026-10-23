@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { subscribeSession } from "@/lib/session";
 
 export type Lang = "en" | "hi";
 
@@ -30,13 +31,6 @@ export type Translate = (en: string, hi: string) => string;
 
 const COOKIE_KEY = "bhojpatra-lang";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
-
-/** Read the language cookie (anonymous / SSR-friendly device default). */
-function readLangCookie(): Lang | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)bhojpatra-lang=(en|hi)\b/);
-  return match ? (match[1] as Lang) : null;
-}
 
 /** Mirror the choice into a cookie so it survives a reload while signed out. */
 function writeLangCookie(l: Lang): void {
@@ -53,40 +47,54 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Server + first client render are always "en" so hydration matches; the
-  // saved preference is applied in an effect right after mount.
-  const [lang, setLangState] = useState<Lang>("en");
-  // Whether a signed-in user's preference should be persisted to the DB. Set
-  // once the session resolves so an anonymous toggle only touches the cookie.
-  const signedInRef = useRef(false);
-
+export function LanguageProvider({
+  children,
+  initialLang = "en",
+  signedIn = false,
+}: {
+  children: ReactNode;
+  /** Resolved on the server from the language cookie (which login/signup set
+   *  from the account's saved preference), so the first paint is already in
+   *  the right language — nothing is fetched or swapped after hydration. */
+  initialLang?: Lang;
+  /** Whether a session cookie is present — a toggle is then also saved to the
+   *  account so it follows the user across devices. */
+  signedIn?: boolean;
+}) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+  // Follow the server when it changes its answer (e.g. `router.refresh()`
+  // after login picks up the account's language). Adjusting state during
+  // render — React's documented pattern for syncing from props.
+  const [serverLang, setServerLang] = useState<Lang>(initialLang);
+  if (serverLang !== initialLang) {
+    setServerLang(initialLang);
+    setLangState(initialLang);
+  }
+  const signedInRef = useRef(signedIn);
   useEffect(() => {
-    // 1) Device default from the cookie (covers anonymous visitors).
-    const cookieLang = readLangCookie();
-    if (cookieLang) setLangState(cookieLang);
+    signedInRef.current = signedIn;
+  }, [signedIn]);
 
-    // 2) The signed-in user's saved preference is the source of truth — it
-    //    overrides the cookie once the session resolves.
-    let active = true;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json: { user?: { lang?: Lang } | null } | null) => {
-        if (!active) return;
-        const user = json?.user ?? null;
-        signedInRef.current = !!user;
-        if (user?.lang === "en" || user?.lang === "hi") {
-          setLangState(user.lang);
-          writeLangCookie(user.lang);
+  // When the signed-in account changes in this tab (login / signup / logout —
+  // all go through the shared session store), adopt that account's saved
+  // language. Keyed on the account so a later session refresh can't undo a
+  // toggle whose save is still in flight.
+  const accountRef = useRef<string | null | undefined>(undefined);
+  useEffect(
+    () =>
+      subscribeSession((session) => {
+        if (session === undefined) return;
+        const account = session?.email ?? null;
+        signedInRef.current = !!session;
+        if (account === accountRef.current) return;
+        accountRef.current = account;
+        if (session?.lang === "en" || session?.lang === "hi") {
+          setLangState(session.lang);
+          writeLangCookie(session.lang);
         }
-      })
-      .catch(() => {
-        /* offline — keep the cookie/default choice */
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+      }),
+    [],
+  );
 
   useEffect(() => {
     document.documentElement.lang = lang;

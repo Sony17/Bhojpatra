@@ -53,6 +53,8 @@ export interface MockSession {
   referralCode?: string;
   /** The partner membership, as a one-entry array (legacy shape). */
   partnerRoles?: PartnerMembership[];
+  /** The account's saved UI language (drives LanguageProvider on login). */
+  lang?: "en" | "hi";
 }
 
 /** The client-safe user shape returned by `/api/auth/session`. */
@@ -63,6 +65,7 @@ interface SessionUser {
   role: AccountType | "admin";
   accounts?: AccountType[];
   partnerRoles?: PartnerMembership[];
+  lang?: "en" | "hi";
 }
 
 /** The dashboard router — forwards each signed-in user to the one dashboard
@@ -102,6 +105,7 @@ function toSession(user: SessionUser | null): MockSession | null {
     partnerType: membership?.type,
     referralCode: membership?.referralCode,
     partnerRoles: membership ? [membership] : undefined,
+    lang: user.lang,
   };
 }
 
@@ -143,6 +147,18 @@ function ensureLoaded(): void {
   inflight = load().finally(() => {
     inflight = null;
   });
+}
+
+/** Non-React subscription to session changes (login / logout / first load).
+ *  Returns the unsubscribe function. Used by LanguageProvider. */
+export function subscribeSession(
+  listener: (session: MockSession | null | undefined) => void,
+): () => void {
+  const l = () => listener(cache);
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
 }
 
 /** Re-fetch the session from the server (after login / signup / role change)

@@ -17,6 +17,13 @@ import {
   type HomeContent,
 } from "@/lib/homeContentData";
 import { requireRole } from "@/lib/auth";
+import { revalidateTag } from "next/cache";
+import { CONTENT_TAG } from "@/lib/initialContent";
+import {
+  externalizeImages,
+  extractInlineImages,
+  internalizeImages,
+} from "@/lib/contentMedia";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +32,10 @@ const KEY = "home-content";
 // GET /api/content/home → { content } — the reconciled live home content.
 export async function GET() {
   const stored = await readSingleton<HomeContent>(KEY);
-  return Response.json({ content: reconcile(stored) });
+  // Inline images go out as cacheable URLs, not megabytes of base64.
+  return Response.json({
+    content: externalizeImages(reconcile(stored), "home"),
+  });
 }
 
 // PUT /api/content/home { ...HomeContent } → persist the admin's edits.
@@ -45,9 +55,18 @@ export async function PUT(request: Request) {
 
   // Reconcile before persisting so the stored row is always a complete,
   // well-formed HomeContent regardless of which fields the client sent.
-  const content = reconcile(body as Partial<HomeContent>);
+  // The editor holds media URLs (see GET); map them back to the stored
+  // inline images so saving never drops one.
+  const previous = await readSingleton<HomeContent>(KEY);
+  let content = reconcile(
+    internalizeImages(body as Partial<HomeContent>, previous, "home"),
+  );
   try {
+    // Images live in their own rows; the content keeps only their URLs.
+    content = await extractInlineImages(content);
     await writeSingleton(KEY, content);
+    // Purge the layout's cached copy (shared across instances on Vercel).
+    revalidateTag(CONTENT_TAG, { expire: 0 });
   } catch (err) {
     console.error("Failed to save home content", err);
     return Response.json(
@@ -55,7 +74,10 @@ export async function PUT(request: Request) {
       { status: 500 },
     );
   }
-  return Response.json({ ok: true, content });
+  return Response.json({
+    ok: true,
+    content: externalizeImages(content, "home"),
+  });
 }
 
 // DELETE /api/content/home → reset the home page back to the seed content.
@@ -64,6 +86,8 @@ export async function DELETE() {
   if (guard instanceof Response) return guard;
   try {
     await deleteSingleton(KEY);
+    // Purge the layout's cached copy (shared across instances on Vercel).
+    revalidateTag(CONTENT_TAG, { expire: 0 });
   } catch (err) {
     console.error("Failed to reset home content", err);
     return Response.json(

@@ -19,6 +19,15 @@ import type { StallBrief } from "@/lib/vendorStorefront";
  * Pass `refreshToken` (increment on pull-to-refresh) to re-fetch live vendors.
  */
 export function useAllVendors(refreshToken = 0): VendorListing[] {
+  return useAllVendorsStatus(refreshToken).vendors;
+}
+
+/** `useAllVendors` plus whether `/api/vendors` has answered yet — so a page
+ *  can show a loading state instead of a premature "no vendors" message. */
+export function useAllVendorsStatus(refreshToken = 0): {
+  vendors: VendorListing[];
+  loaded: boolean;
+} {
   const [liveVendors, setLiveVendors] = useState<VendorListing[]>([]);
   const [stalls, setStalls] = useState<Record<string, StallBrief | null> | null>(
     null,
@@ -43,16 +52,20 @@ export function useAllVendors(refreshToken = 0): VendorListing[] {
           if (d) setSamplesHidden(Boolean(d.samplesHidden));
         },
       )
-      .catch(() => {});
+      .catch(() => {
+        // Offline — stop "loading" so the page can settle on what it has.
+        if (alive) setSamplesHidden((prev) => prev ?? false);
+      });
     return () => {
       alive = false;
     };
   }, [refreshToken]);
 
-  return useMemo(() => {
+  const vendors = useMemo(() => {
     const withStall = (v: VendorListing): VendorListing =>
       stalls ? { ...v, stall: stalls[v.id] ?? null } : v;
     const samples = samplesHidden === false ? vendorListings : [];
     return [...liveVendors, ...samples].map(withStall);
   }, [liveVendors, stalls, samplesHidden]);
+  return { vendors, loaded: samplesHidden !== null };
 }

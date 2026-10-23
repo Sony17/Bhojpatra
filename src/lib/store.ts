@@ -203,6 +203,17 @@ export async function readSingleton<T>(
   return rows.length ? (rows[0].data as Partial<T>) : null;
 }
 
+/** Several singletons in one round trip, keyed by key (missing keys absent). */
+export async function readSingletons(
+  keys: string[],
+): Promise<Record<string, unknown>> {
+  const rows = await runQuery(
+    `select key, data from settings where key = any($1)`,
+    [keys],
+  );
+  return Object.fromEntries(rows.map((r) => [r.key as string, r.data]));
+}
+
 export async function writeSingleton<T>(key: string, value: T): Promise<void> {
   await runQuery(
     `insert into settings (key, data) values ($1, $2::jsonb)

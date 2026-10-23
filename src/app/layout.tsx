@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Open_Sans } from "next/font/google";
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui";
@@ -10,6 +11,10 @@ import SiteLoader from "@/components/SiteLoader";
 import PwaRegister from "@/components/PwaRegister";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
 import { brand } from "@/lib/design-tokens";
+import { HomeContentSeed } from "@/lib/homeContent";
+import { SiteContentSeed } from "@/lib/sitePages";
+import { loadInitialContent } from "@/lib/initialContent";
+import { SESSION_COOKIE } from "@/lib/cookieSign";
 
 /* The Bhojpatra brand uses exactly two typefaces (per the brand guidelines):
    - Open Sans          → primary UI / body font
@@ -67,14 +72,27 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Render the first paint in the visitor's saved language (mirrored to this
+  // cookie by LanguageProvider) so pages don't flash English then Hindi.
+  const cookieStore = await cookies();
+  const cookieLang = cookieStore.get("bhojpatra-lang")?.value;
+  const signedIn = cookieStore.has(SESSION_COOKIE);
+  const initialLang = cookieLang === "hi" ? "hi" : "en";
+  // Admin-edited CMS copy, so sections don't paint the seed defaults first and
+  // swap to the stored text a second later. Null (DB down) → client refetches.
+  const { home, site } = await loadInitialContent();
+  let content = <>{children}</>;
+  if (home) content = <HomeContentSeed initial={home}>{content}</HomeContentSeed>;
+  if (site) content = <SiteContentSeed initial={site}>{content}</SiteContentSeed>;
+
   return (
     <html
-      lang="en"
+      lang={initialLang}
       className={`${openSans.variable} ${anandaNeptouch.variable} h-full antialiased`}
     >
       <head>
@@ -89,10 +107,10 @@ export default function RootLayout({
         />
       </head>
       <body className="flex min-h-full flex-col overflow-x-hidden bg-bg text-ink">
-        <LanguageProvider>
+        <LanguageProvider initialLang={initialLang} signedIn={signedIn}>
           <ToastProvider>
             <ScrollToTop />
-            {children}
+            {content}
             <ScrollWatermark />
           </ToastProvider>
           {/* Inside the provider — the prompt is bilingual. */}
