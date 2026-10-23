@@ -17,12 +17,21 @@ export function Stepper({
   className?: string;
 }) {
   return (
-    <ol className={cn("flex w-full items-center gap-2", className)}>
+    <ol className={cn("flex w-full items-center gap-3", className)}>
       {steps.map((label, i) => {
         const done = i < current;
         const active = i === current;
+        const last = i === steps.length - 1;
         return (
-          <li key={label} className="relative flex min-w-0 flex-1 items-center gap-2">
+          // The last step hugs its content so the connectors — not dead space
+          // after "Review" — absorb the spare width, keeping the rail balanced.
+          <li
+            key={label}
+            className={cn(
+              "relative flex min-w-0 items-center gap-2.5",
+              last ? "flex-none" : "flex-1",
+            )}
+          >
             {/* The number doubles as a tap/hover target: on mobile the step
                 label is hidden to save width, so pressing (or hovering) the
                 number peeks its name via the tooltip below. On sm+ the label
@@ -63,16 +72,16 @@ export function Stepper({
             </span>
             <span
               className={cn(
-                "hidden truncate text-caption font-semibold sm:block",
+                "hidden shrink-0 whitespace-nowrap text-caption font-semibold sm:block",
                 active ? "text-maroon" : done ? "text-ink" : "text-ink-soft",
               )}
             >
               {label}
             </span>
-            {i < steps.length - 1 && (
+            {!last && (
               <span
                 className={cn(
-                  "h-0.5 flex-1 rounded-full transition-colors duration-300",
+                  "ml-1 h-0.5 min-w-6 flex-1 rounded-full transition-colors duration-300",
                   done ? "bg-maroon" : "bg-cream-2",
                 )}
               />

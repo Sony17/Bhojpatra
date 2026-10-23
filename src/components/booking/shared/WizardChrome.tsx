@@ -96,8 +96,8 @@ export function ProgressRail({
   compact = false,
 }: {
   t: (en: string, hi: string) => string;
-  /** Phones only: a flat, card-less rail with "Start over" folded into the
-   *  step line — the denser, app-style header the Single Stall flow uses.
+  /** Phones only: a numbered stepper (circles + labels) with "Start over"
+   *  under it — the app-style header the Single Stall flow uses.
    *  Tablet / desktop are unchanged. */
   compact?: boolean;
   /** 1-based current step. */
@@ -112,40 +112,86 @@ export function ProgressRail({
   return (
     <>
       {compact && (
-        <div className="-mt-1 px-1 sm:hidden">
-          <div className="flex items-baseline justify-between gap-3 text-[12px] font-semibold">
-            <span className="min-w-0 truncate text-maroon">
-              {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
-              {" · "}
-              <span className="text-ink">{stepLabels[step - 1]}</span>
-            </span>
-            <span className="flex shrink-0 items-baseline gap-2 text-[11px] font-medium text-ink/45">
-              {nextStepLabel && (
-                <span>
-                  {t("Next: ", "आगे: ")}
-                  {nextStepLabel}
-                </span>
-              )}
-              {onStartOver && (
-                <>
-                  {nextStepLabel && <span aria-hidden="true">·</span>}
-                  <button
-                    type="button"
-                    onClick={onStartOver}
-                    className="font-semibold text-ink/50 underline underline-offset-2 transition-colors hover:text-maroon"
+        <div className="-mt-1 flex items-center gap-1.5 sm:hidden">
+          {/* Step cards — one tile per step, the same shape as the Essentials
+              package tiles: the current step gets the red border and cream
+              fill; done steps carry a ✓, the ones ahead their number. */}
+          <ol
+            className="grid min-w-0 flex-1 gap-1.5"
+            // The current step's card gets a little more room so its name
+            // never truncates.
+            style={{
+              gridTemplateColumns: Array.from({ length: totalSteps }, (_, i) =>
+                i + 1 === step ? "minmax(0, 1.4fr)" : "minmax(0, 1fr)",
+              ).join(" "),
+            }}
+            aria-label={t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
+          >
+            {stepLabels.slice(0, totalSteps).map((label, i) => {
+              const n = i + 1;
+              const done = n < step;
+              const active = n === step;
+              return (
+                <li
+                  key={label}
+                  aria-current={active ? "step" : undefined}
+                  className={
+                    "flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1 py-1 " +
+                    (active
+                      ? "border-[1.5px] border-maroon bg-cream/20"
+                      : "border-cream-3/70 bg-white")
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className={
+                      "grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold leading-none " +
+                      (active
+                        ? "bg-maroon text-white"
+                        : done
+                          ? "bg-cream text-maroon"
+                          : "bg-cream/50 text-ink/50")
+                    }
                   >
-                    {t("Start over", "फिर से शुरू करें")}
-                  </button>
-                </>
-              )}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-cream">
-            <div
-              className="h-full rounded-full bg-maroon transition-all duration-300"
-              style={{ width: `${(step / totalSteps) * 100}%` }}
-            />
-          </div>
+                    {done ? "✓" : n}
+                  </span>
+                  <span
+                    className={
+                      "min-w-0 truncate text-[10.5px] font-semibold leading-none " +
+                      (active ? "text-maroon" : done ? "text-ink" : "text-ink/55")
+                    }
+                  >
+                    {label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          {/* Start over — a restart icon at the rail's end, same height as
+              the stepper, so it costs no row of its own. */}
+          {onStartOver && (
+            <button
+              type="button"
+              onClick={onStartOver}
+              aria-label={t("Start over", "फिर से शुरू करें")}
+              title={t("Start over", "फिर से शुरू करें")}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-cream text-ink/55 transition-colors hover:border-maroon hover:text-maroon active:scale-95"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 12a9 9 0 1 0 3-6.7" />
+                <path d="M3 3v5h5" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
       {/* Phones — a slim, non-sticky progress bar + "Step X of Y · Label".

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
+import { isUnoptimized } from "@/lib/homeContentData";
+import type { StallTileImages } from "@/lib/stallTileImages";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -24,8 +26,8 @@ import {
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import { useAllVendorsStatus } from "@/lib/useAllVendors";
-import { ctaLabel, listingCta } from "@/lib/vendorStorefront";
-import { stallTypeById, toStallTypeId } from "@/lib/stallTypes";
+import { ctaLabel, listingCta, type StallDishesBrief } from "@/lib/vendorStorefront";
+import { stallTypeById, stallTypes, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
 import { useLocations } from "@/lib/locations";
 import {
@@ -43,6 +45,7 @@ import {
   Card,
   CategoryChip,
   CategoryChips,
+  DietMark,
   Drawer,
   EmptyState,
   PullToRefresh,
@@ -212,7 +215,12 @@ const LENSES: Lens[] = [
 
 const LENS_BY_ID = new Map<string, Lens>(LENSES.map((l) => [l.id, l]));
 
-export default function VendorCatalog() {
+export default function VendorCatalog({
+  tileImages = {},
+}: {
+  /** Admin-set stall-tile photos, keyed by stall type id. */
+  tileImages?: StallTileImages;
+} = {}) {
   const { t, lang } = useLang();
   const locations = useLocations();
 
@@ -452,6 +460,17 @@ export default function VendorCatalog() {
     }
     router.push(`/book/stall?counter=${encodeURIComponent(counter)}`);
   };
+  // "Change" swaps the stall type in place, from a sheet of the types that
+  // have stalls in this city; the URL follows so a reload / share keeps it.
+  const [typeSheetOpen, setTypeSheetOpen] = useState(false);
+  const pickStallType = (id: string) => {
+    setCounter(id);
+    setTypeSheetOpen(false);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("counter", id);
+    router.replace(`/vendors?${params.toString()}`, { scroll: false });
+    window.scrollTo({ top: 0 });
+  };
 
   // Real customer ratings, matched to these listings by name (best-effort).
   const ratings = useVendorRatings();
@@ -517,6 +536,24 @@ export default function VendorCatalog() {
   // stall type and city are settled, so search, the lens row and the city /
   // state pickers step aside and "Clear" only clears the refinements.
   const stallView = fromStallPicker && stallMode && counter !== "";
+  // Stall types with at least one bookable stall in the current city, for the
+  // "Change" sheet — the same match the grid applies for a counter.
+  const stallTypeOptions = useMemo(() => {
+    if (!fromStallPicker) return [];
+    const stalls = allVendors.filter(
+      (v) =>
+        listingCateringCategories(v).includes("single-stall") &&
+        (city === ALL || v.city === city),
+    );
+    return stallTypes
+      .map((s) => ({
+        type: s,
+        count: stalls.filter((v) =>
+          (v.stall?.stallTypes ?? listingOfferings(v).map(toStallTypeId)).includes(s.id),
+        ).length,
+      }))
+      .filter((o) => o.count > 0);
+  }, [fromStallPicker, allVendors, city]);
   const priceRanges = stallMode ? STALL_PRICE_RANGES : PRICE_RANGES;
 
   /** Diets of the stall a listing would sell under the current lens — the
@@ -527,6 +564,20 @@ export default function VendorCatalog() {
       const byType = v.stall?.dietsByType;
       if (!byType) return [];
       return counter ? (byType[counter] ?? []) : [...new Set(Object.values(byType).flat())];
+    },
+    [counter],
+  );
+  /** The dishes a listing's stall card shows under the current lens — the
+   *  picked stall type's, else every stall type's. */
+  const stallMenu = useCallback(
+    (v: VendorListing): StallDishesBrief | undefined => {
+      const byType = v.stall?.dishesByType;
+      if (!byType) return undefined;
+      if (counter) return byType[counter];
+      const all = Object.values(byType);
+      return all.length
+        ? { dishes: all.flatMap((m) => m.dishes), total: all.reduce((n, m) => n + m.total, 0) }
+        : undefined;
     },
     [counter],
   );
@@ -904,10 +955,22 @@ export default function VendorCatalog() {
         <div className="app-sticky-chrome -mx-4 mt-3 px-4 py-2 sm:-mx-5 sm:px-5">
           <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft">
             <span
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cream-2 text-base"
+              className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-cream-2 text-base"
               aria-hidden="true"
             >
-              {stallTypeById(counter)?.icon}
+              {/* The tile's own photo when the admin set one, else its icon. */}
+              {tileImages[counter] ? (
+                <Image
+                  src={tileImages[counter]}
+                  alt=""
+                  fill
+                  sizes="36px"
+                  unoptimized={isUnoptimized(tileImages[counter])}
+                  className="object-cover"
+                />
+              ) : (
+                stallTypeById(counter)?.icon
+              )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="eyebrow block text-[10px] font-bold text-maroon">
@@ -945,11 +1008,14 @@ export default function VendorCatalog() {
             </button>
             <button
               type="button"
-              onClick={backToStallPicker}
+              onClick={() => setTypeSheetOpen(true)}
+              aria-haspopup="dialog"
               className="inline-flex shrink-0 items-center gap-1 rounded-full border border-maroon px-3 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95"
             >
-              <span aria-hidden="true">←</span>
               {t("Change", "बदलें")}
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1201,6 +1267,76 @@ export default function VendorCatalog() {
       )}
 
       {/* Mobile filter sheet */}
+      {/* Stall-type switcher — opened by "Change" in the stall view. */}
+      <Drawer
+        open={typeSheetOpen}
+        onClose={() => setTypeSheetOpen(false)}
+        title={t("Change stall type", "स्टॉल का प्रकार बदलें")}
+      >
+        <ul className="grid grid-cols-3 gap-2.5">
+          {stallTypeOptions.map(({ type, count }) => {
+            const on = type.id === counter;
+            const img = tileImages[type.id];
+            return (
+              <li key={type.id}>
+                <button
+                  type="button"
+                  onClick={() => pickStallType(type.id)}
+                  aria-pressed={on}
+                  className={
+                    "w-full overflow-hidden rounded-xl border bg-white text-left transition active:scale-[0.98] " +
+                    (on ? "border-maroon ring-1 ring-maroon" : "border-cream hover:border-maroon")
+                  }
+                >
+                  <span className="relative block aspect-[4/3] w-full bg-cream-2">
+                    {img ? (
+                      <Image
+                        src={img}
+                        alt=""
+                        fill
+                        sizes="33vw"
+                        unoptimized={isUnoptimized(img)}
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="grid h-full w-full place-items-center text-3xl" aria-hidden="true">
+                        {type.icon}
+                      </span>
+                    )}
+                  </span>
+                  <span className="block px-2 py-1.5">
+                    <span
+                      className={
+                        "block truncate text-[12px] font-semibold leading-tight " +
+                        (on ? "text-maroon" : "text-ink")
+                      }
+                    >
+                      {lang === "hi" ? type.nameHi : type.name}
+                    </span>
+                    <span className="block text-[10.5px] text-ink/55">
+                      {t(
+                        `${count} ${count === 1 ? "caterer" : "caterers"}`,
+                        `${count} कैटरर`,
+                      )}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <button
+          type="button"
+          onClick={() => {
+            setTypeSheetOpen(false);
+            backToStallPicker();
+          }}
+          className="mt-4 w-full text-center text-[13px] font-semibold text-maroon underline underline-offset-2"
+        >
+          {t("See all stall types", "सभी स्टॉल प्रकार देखें")}
+        </button>
+      </Drawer>
+
       <Drawer
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -1504,6 +1640,9 @@ export default function VendorCatalog() {
               // Carried into the wizard so backing out of a stall returns to
               // the stall type the guest was browsing, not a blank grid.
               counter={counter}
+              stallDiets={stallMode ? stallDiets(vendor) : undefined}
+              stallMenu={stallMode ? stallMenu(vendor) : undefined}
+              leadDiet={diet === "Non-Veg" ? "non-veg" : diet === "Veg" ? "veg" : undefined}
               compact={fromStallPicker}
             />
           ))}
@@ -1607,6 +1746,9 @@ function VendorCard({
   bainaMode,
   lens,
   counter = "",
+  stallDiets,
+  stallMenu,
+  leadDiet,
   compact = false,
 }: {
   /** Phones: a half-width card for the two-column stall-picker grid — short
@@ -1617,6 +1759,15 @@ function VendorCard({
   stats?: VendorRatingSummary;
   /** The stall type the catalog is filtered to, passed on to the wizard. */
   counter?: string;
+  /** In a stall lens, the diets of the stall's own dishes — the card's diet
+   *  tag follows these over the caterer's overall diet (a mixed caterer's
+   *  chaat stall is still pure veg). */
+  stallDiets?: DietType[];
+  /** In a stall lens, the stall's dishes — the card then renders as the
+   *  photo-led stall card with a veg / non-veg dish strip. */
+  stallMenu?: StallDishesBrief;
+  /** The diet the guest filtered to; its dishes lead the strip. */
+  leadDiet?: DietType;
   /** Browsing the Baina Box lens (chip or "baina" search) — "Order" then
    *  lands on the vendor's Baina Box panel instead of the stall wizard. */
   bainaMode?: boolean;
@@ -1703,14 +1854,23 @@ function VendorCard({
         }
       : undefined;
 
+  const shownDiet: VendorListing["diet"] =
+    stallDiets && stallDiets.length > 0
+      ? stallDiets.includes("non-veg")
+        ? stallDiets.includes("veg")
+          ? "Veg & Non-Veg"
+          : "Non-Veg"
+        : "Veg"
+      : vendor.diet;
+
   const dietBadgeLabel = (value: VendorListing["diet"]): string => {
     switch (value) {
       case "Veg":
-        return t("Veg", "वेज");
+        return t("Pure Veg", "शुद्ध वेज");
       case "Non-Veg":
         return t("Non-Veg", "नॉन-वेज");
       case "Veg & Non-Veg":
-        return t("Veg & Non-Veg", "वेज और नॉन-वेज");
+        return t("Veg + Non-Veg", "वेज + नॉन-वेज");
       default:
         return value;
     }
@@ -1739,6 +1899,188 @@ function VendorCard({
     }
   };
 
+  // Stall lens: a photo-led card. Name, diet and price sit on the photo; the
+  // strip under it lists the stall's own dishes with their veg / non-veg
+  // marks, the guest's filtered diet first.
+  if (stallMenu && stallMenu.dishes.length > 0) {
+    const dishes = leadDiet
+      ? [
+          ...stallMenu.dishes.filter((d) => d.diet === leadDiet),
+          ...stallMenu.dishes.filter((d) => d.diet !== leadDiet),
+        ]
+      : stallMenu.dishes;
+    const shown = dishes.slice(0, compact ? 2 : 4);
+    const more = stallMenu.total - shown.length;
+    const rating =
+      stats || (vendor.reviews > 0 && !isSample)
+        ? (stats?.rating ?? vendor.rating).toFixed(1)
+        : vendor.googleRating
+          ? String(vendor.googleRating)
+          : null;
+
+    return (
+      <Card
+        as="li"
+        interactive
+        padding="none"
+        className="group relative flex flex-col overflow-hidden ring-1 ring-cream"
+      >
+        <div
+          className={
+            "relative w-full overflow-hidden bg-cream sm:aspect-[16/10] " +
+            (compact ? "aspect-[4/5]" : "aspect-[16/10]")
+          }
+        >
+          <Image
+            src={vendor.image}
+            unoptimized={photoNeedsUnoptimized(vendor.image)}
+            alt={vendor.name}
+            fill
+            sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 50vw"
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          />
+          {/* Near-solid at the foot so text baked into a photo (logos,
+              banners) can't bleed through the name and price. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 from-10% via-black/45 via-45% to-black/10"
+          />
+
+          <div className="absolute inset-x-2.5 top-2.5 z-10 flex items-start justify-between gap-2 sm:inset-x-3 sm:top-3">
+            {rating ? (
+              <Link
+                href={`/vendors/${vendor.id}#reviews`}
+                className="relative inline-flex items-center gap-0.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-ink shadow-sm"
+                aria-label={t(`Rated ${rating}`, `रेटिंग ${rating}`)}
+              >
+                {rating}
+                <span aria-hidden="true" className="text-maroon">★</span>
+              </Link>
+            ) : (
+              <span className="rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
+                {isSample ? t("Sample", "नमूना") : t("New", "नया")}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => toggle(vendor.id)}
+              disabled={compareDisabled}
+              aria-pressed={inCompare}
+              aria-label={
+                inCompare
+                  ? t("Remove from compare", "तुलना से हटाएँ")
+                  : t("Add to compare", "तुलना में जोड़ें")
+              }
+              title={
+                compareDisabled
+                  ? t("Compare list is full", "तुलना सूची भर गई है")
+                  : undefined
+              }
+              className={
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-white/40 backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8 " +
+                (inCompare ? "bg-maroon text-cream" : "bg-black/35 text-white hover:bg-white hover:text-maroon")
+              }
+            >
+              <span aria-hidden="true" className="text-sm font-bold leading-none">
+                {inCompare ? "✓" : "+"}
+              </span>
+            </button>
+          </div>
+
+          <div className="absolute inset-x-2.5 bottom-2.5 z-10 sm:inset-x-3.5 sm:bottom-3">
+            <span
+              className={
+                "inline-block rounded-full px-1.5 py-px text-[9px] font-bold uppercase leading-tight tracking-[0.08em] sm:px-2 sm:text-[10px] " +
+                (shownDiet === "Non-Veg"
+                  ? "bg-maroon text-white"
+                  : shownDiet === "Veg"
+                    ? "bg-cream text-maroon"
+                    : "bg-white text-ink")
+              }
+            >
+              {dietBadgeLabel(shownDiet)}
+            </span>
+            <h3 className="mt-1 line-clamp-2 break-words font-sans text-[14px] font-bold leading-[1.15] tracking-tight text-white sm:mt-1.5 sm:text-[18px]">
+              {vendor.name}
+              {vendor.verified && !isSample && (
+                <span
+                  aria-label={t("Verified", "वेरिफाइड")}
+                  title={t("Verified", "वेरिफाइड")}
+                  className="ml-1 inline-grid h-3.5 w-3.5 translate-y-[-1px] place-items-center rounded-full bg-maroon align-middle text-[8px] text-white sm:h-4 sm:w-4 sm:text-[9px]"
+                >
+                  ✓
+                </span>
+              )}
+            </h3>
+            <p className="mt-1 font-sans leading-none text-white">
+              {ctaPrice != null ? (
+                <>
+                  <span className="mr-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-cream sm:text-[10px]">
+                    {t("Stall from", "स्टॉल")}
+                  </span>
+                  <span className="text-[15px] font-bold sm:text-[17px]">
+                    ₹{ctaPrice.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-[10px] font-semibold sm:text-[11px]"> {ctaUnit}</span>
+                </>
+              ) : (
+                <span className="text-[11px] font-semibold">
+                  {t("Price on enquiry", "कीमत पूछताछ पर")}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* The stall's dishes, each with its veg / non-veg mark. */}
+        <div className="flex flex-1 items-start gap-2 px-2.5 pb-2.5 pt-2 sm:px-3.5 sm:pb-3.5 sm:pt-3">
+          <ul
+            className="min-w-0 flex-1 space-y-1 sm:space-y-1.5"
+            aria-label={t("Dishes on this stall", "इस स्टॉल के व्यंजन")}
+          >
+            {shown.map((d) => (
+              <li
+                key={d.name}
+                className="flex min-w-0 items-center gap-1.5 text-[11.5px] leading-tight text-ink sm:text-[13px]"
+              >
+                <DietMark
+                  diet={d.diet}
+                  label={d.diet === "veg" ? t("Veg", "वेज") : t("Non-veg", "नॉन-वेज")}
+                  className="h-3 w-3 sm:h-3.5 sm:w-3.5"
+                />
+                <span className="truncate">{d.name}</span>
+              </li>
+            ))}
+            {more > 0 && (
+              <li className="pl-[18px] text-[10.5px] font-semibold text-maroon sm:pl-5 sm:text-[12px]">
+                {t(`+${more} more`, `+${more} और`)}
+              </li>
+            )}
+          </ul>
+          {/* The card itself books; the caterer's full profile sits behind
+              this info button instead. */}
+          <Link
+            href={vendorHref}
+            aria-label={t(`About ${vendor.name}`, `${vendor.name} के बारे में`)}
+            title={t("Vendor info", "वेंडर जानकारी")}
+            className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-cream sm:h-7 sm:w-7"
+          >
+            <InfoGlyph />
+          </Link>
+        </div>
+
+        <Link
+          href={bookHref}
+          aria-label={`${ctaText} ${vendor.name}`}
+          className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+          tabIndex={-1}
+        >
+          <span className="sr-only">{`${ctaText} ${vendor.name}`}</span>
+        </Link>
+      </Card>
+    );
+  }
+
   return (
     <Card
       as="li"
@@ -1751,7 +2093,7 @@ function VendorCard({
         // The column is pinned to the card width: an implicit `auto` column
         // sizes to the nowrap cuisine line and pushed Book off the card.
         (compact
-          ? "grid h-[11.25rem] grid-cols-[minmax(0,1fr)] grid-rows-[7fr_3fr] sm:flex sm:h-auto sm:flex-col"
+          ? "grid h-[13.5rem] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_4.25rem] rounded-[1.25rem] border-cream shadow-soft sm:flex sm:h-auto sm:flex-col sm:rounded-hero sm:border-maroon/6 sm:shadow-card"
           : "flex flex-col")
       }
     >
@@ -1773,7 +2115,11 @@ function VendorCard({
           aria-hidden
           className={
             "pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent sm:h-1/2 sm:from-black/55 sm:via-black/15 " +
-            (compact ? "h-3/4 from-black/75 via-black/30" : "h-1/2 from-black/55 via-black/15")
+            // Compact: near-solid under the price so text baked into a photo
+            // (logos, banners) can't bleed through it.
+            (compact
+              ? "h-3/4 from-black/95 from-15% via-black/70 via-45% sm:from-0% sm:via-50%"
+              : "h-1/2 from-black/55 via-black/15")
           }
         />
 
@@ -1806,10 +2152,12 @@ function VendorCard({
           }
           className={
             "absolute z-10 flex items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:right-2.5 sm:top-2.5 sm:h-8 sm:w-8 " +
-            (compact ? "right-1.5 top-1.5 h-7 w-7 " : "right-2.5 top-2.5 h-8 w-8 ") +
+            (compact ? "right-2 top-2 h-7 w-7 ring-1 ring-white/40 " : "right-2.5 top-2.5 h-8 w-8 ") +
             (inCompare
               ? "bg-maroon text-cream"
-              : "bg-white/95 text-ink hover:text-maroon")
+              : compact
+                ? "bg-black/35 text-white hover:text-cream sm:bg-white/95 sm:text-ink sm:ring-0"
+                : "bg-white/95 text-ink hover:text-maroon")
           }
         >
           <span aria-hidden="true" className="text-sm font-bold leading-none">
@@ -1821,25 +2169,37 @@ function VendorCard({
         <div
           className={
             "absolute z-10 flex items-center gap-1.5 sm:bottom-2.5 sm:left-2.5 sm:top-auto " +
-            (compact ? "left-1.5 top-1.5" : "bottom-2.5 left-2.5")
+            (compact ? "left-2 top-2" : "bottom-2.5 left-2.5")
           }
         >
           {stats || (vendor.reviews > 0 && !isSample) ? (
             <Link
               href={`/vendors/${vendor.id}#reviews`}
-              className="relative z-10 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm"
+              className={
+                "relative z-10 inline-flex items-center gap-0.5 font-bold shadow-sm " +
+                (compact
+                  ? "rounded-full bg-black/40 px-2 py-0.5 text-[11px] text-white ring-1 ring-white/30 backdrop-blur-md sm:rounded sm:bg-maroon sm:px-1.5 sm:text-cream sm:ring-0"
+                  : "rounded bg-maroon px-1.5 py-0.5 text-[11px] text-cream")
+              }
               aria-label={t(
                 `Rated ${stats?.rating ?? vendor.rating}`,
                 `रेटिंग ${stats?.rating ?? vendor.rating}`,
               )}
             >
               {(stats?.rating ?? vendor.rating).toFixed(1)}
-              <span aria-hidden="true">★</span>
+              <span aria-hidden="true" className={compact ? "text-cream" : ""}>★</span>
             </Link>
           ) : vendor.googleRating ? (
-            <span className="inline-flex items-center gap-0.5 rounded bg-white/95 px-1.5 py-0.5 text-[11px] font-bold text-ink shadow-sm">
+            <span
+              className={
+                "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-bold shadow-sm " +
+                (compact
+                  ? "rounded-full bg-black/40 px-2 text-white ring-1 ring-white/30 backdrop-blur-md sm:rounded sm:bg-white/95 sm:px-1.5 sm:text-ink sm:ring-0"
+                  : "rounded bg-white/95 text-ink")
+              }
+            >
               {vendor.googleRating}
-              <span aria-hidden="true" className="text-maroon">
+              <span aria-hidden="true" className={compact ? "text-cream sm:text-maroon" : "text-maroon"}>
                 ★
               </span>
             </span>
@@ -1861,15 +2221,21 @@ function VendorCard({
           )}
         </div>
 
-        {/* Compact phones: price + Book on the photo's gradient, Swiggy-style,
-            so the text strip below can give the brand name room to breathe. */}
+        {/* Compact phones: the price on the photo's gradient, Swiggy-style, so
+            the text strip below can give the brand name room to breathe. No
+            Book button — tapping the card itself books. */}
         {compact && (
-          <div className="absolute inset-x-1.5 bottom-1.5 z-10 flex items-end justify-between gap-1.5 sm:hidden">
-            <p className="min-w-0 truncate font-sans text-[13px] font-bold leading-tight text-white">
+          <div className="absolute inset-x-2.5 bottom-2 z-10 sm:hidden">
+            <p className="min-w-0 truncate font-sans font-bold leading-none text-white text-shadow-sm text-shadow-black/60">
               {ctaPrice != null ? (
                 <>
-                  ₹{ctaPrice.toLocaleString("en-IN")}
-                  <span className="text-[10px] font-semibold"> {ctaUnit}</span>
+                  {cta.kind === "stall" && (
+                    <span className="mb-1 block text-[9px] font-semibold uppercase tracking-[0.14em] text-cream">
+                      {t("Stall from", "स्टॉल")}
+                    </span>
+                  )}
+                  <span className="text-[17px]">₹{ctaPrice.toLocaleString("en-IN")}</span>
+                  <span className="text-[10px] font-semibold text-white"> {ctaUnit}</span>
                 </>
               ) : (
                 <span className="text-[11px] font-semibold">
@@ -1877,12 +2243,6 @@ function VendorCard({
                 </span>
               )}
             </p>
-            <Link
-              href={bookHref}
-              className="shrink-0 rounded-full bg-maroon px-3 py-1 text-[11px] font-semibold text-cream shadow-sm transition active:scale-95"
-            >
-              {ctaText}
-            </Link>
           </div>
         )}
       </div>
@@ -1891,43 +2251,54 @@ function VendorCard({
       <div
         className={
           "flex flex-1 flex-col sm:justify-start sm:px-3.5 sm:pb-3.5 sm:pt-3 " +
-          (compact ? "min-h-0 justify-center px-2 py-1" : "px-3.5 pb-3.5 pt-3")
+          (compact ? "min-h-0 justify-center px-2.5 pb-2.5 pt-2" : "px-3.5 pb-3.5 pt-3")
         }
       >
         <div className={"flex items-start sm:gap-2 " + (compact ? "gap-1.5" : "gap-2")}>
-          {/* Diet mark — brand-only semantic square */}
-          <span
-            aria-label={dietBadgeLabel(vendor.diet)}
-            title={dietBadgeLabel(vendor.diet)}
-            className={
-              "shrink-0 rounded-[2px] border-2 sm:mt-1 sm:h-3.5 sm:w-3.5 " +
-              (compact ? "mt-0.5 h-3 w-3 " : "mt-1 h-3.5 w-3.5 ") +
-              (vendor.diet === "Non-Veg"
-                ? "border-maroon bg-maroon"
-                : vendor.diet === "Veg"
-                  ? "border-maroon bg-cream"
-                  : "border-maroon bg-white")
-            }
-          />
           <div className="min-w-0 flex-1">
             <h3
               className={
                 "font-sans font-bold tracking-tight text-ink sm:truncate sm:text-[15px] sm:leading-snug " +
                 (compact
-                  ? "line-clamp-2 break-words text-[12.5px] leading-[1.2]"
+                  ? "line-clamp-2 break-words text-[13.5px] leading-[1.2]"
                   : "truncate text-[15px] leading-snug")
               }
             >
               {vendor.name}
+              {compact && vendor.verified && !isSample && (
+                <span
+                  aria-label={t("Verified", "वेरिफाइड")}
+                  title={t("Verified", "वेरिफाइड")}
+                  className="ml-1 inline-grid h-3.5 w-3.5 translate-y-[1px] place-items-center rounded-full bg-maroon align-baseline text-[8px] text-white sm:hidden"
+                >
+                  ✓
+                </span>
+              )}
             </h3>
             <p
               className={
-                "truncate text-ink/55 sm:mt-0.5 sm:text-[12px] sm:leading-snug " +
-                (compact ? "text-[10.5px] leading-tight" : "mt-0.5 text-[12px] leading-snug")
+                "flex min-w-0 items-center gap-1.5 text-ink/55 sm:mt-0.5 sm:text-[12px] sm:leading-snug " +
+                (compact ? "mt-0.5 text-[11px] leading-tight" : "mt-0.5 text-[12px] leading-snug")
               }
             >
-              {vendor.cuisines.slice(0, 3).join(" · ")}
-              {vendor.cuisines.length > 3 ? "…" : ""}
+              {/* Diet tag — spelled out, since a brand-colored square
+                  can't borrow the familiar green/red veg marks. */}
+              <span
+                className={
+                  "shrink-0 rounded-full border px-1.5 py-px text-[9.5px] font-bold uppercase leading-tight tracking-wide " +
+                  (shownDiet === "Non-Veg"
+                    ? "border-maroon bg-maroon text-white"
+                    : shownDiet === "Veg"
+                      ? "border-maroon/20 bg-cream text-maroon"
+                      : "border-ink/20 bg-white text-ink")
+                }
+              >
+                {dietBadgeLabel(shownDiet)}
+              </span>
+              <span className="min-w-0 truncate">
+                {vendor.cuisines.slice(0, 3).join(" · ")}
+                {vendor.cuisines.length > 3 ? "…" : ""}
+              </span>
             </p>
             <p
               className={
@@ -1949,8 +2320,8 @@ function VendorCard({
             aria-label={t(`About ${vendor.name}`, `${vendor.name} के बारे में`)}
             title={t("Vendor info", "वेंडर जानकारी")}
             className={
-              "relative z-10 flex shrink-0 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-cream sm:h-7 sm:w-7 " +
-              (compact ? "h-6 w-6" : "h-7 w-7")
+              "relative z-10 flex shrink-0 items-center justify-center rounded-full text-maroon transition-colors hover:bg-maroon hover:text-cream sm:h-7 sm:w-7 sm:border sm:border-maroon/30 sm:bg-white " +
+              (compact ? "h-6 w-6 bg-cream/50" : "h-7 w-7 border border-maroon/30 bg-white")
             }
           >
             <InfoGlyph />
@@ -2004,6 +2375,8 @@ function VendorCard({
               </span>
             )}
           </p>
+          {/* The stall-picker grid books from the card tap alone. */}
+          {!compact && (
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
             <Button
               href={bookHref}
@@ -2017,6 +2390,7 @@ function VendorCard({
               {ctaText}
             </Button>
           </div>
+          )}
         </div>
         {isSample && (
           <p

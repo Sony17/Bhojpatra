@@ -30,13 +30,14 @@ export default function SettingsView() {
         <NameListTab
           dataKey="occasions"
           title="Occasions"
-          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Hindi is optional — it defaults to the English name. Lead (days) is the minimum advance notice to book that occasion (weddings need more than a birthday); it’s combined with the package’s own lead — leave blank to use the default (7 days)."
+          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Tick “Single Stall only” for small functions (kitty party, pooja…) shown only in the Single Stall booking flow. Hindi is optional — it defaults to the English name. Lead (days) is the minimum advance notice to book that occasion (weddings need more than a birthday); it’s combined with the package’s own lead — leave blank to use the default (7 days)."
           endpoint="/api/admin/occasions"
           addLabel="+ Add occasion"
           namePlaceholder="e.g. Anniversary"
           nameHiPlaceholder="e.g. सालगिरह"
           emptyError="Add at least one occasion."
           withLead
+          withStallOnly
           leadPlaceholder="e.g. 30"
         />
       )}
@@ -158,7 +159,13 @@ function ChangePasswordTab() {
   );
 }
 
-type NameRow = { id: string; name: string; nameHi: string; leadDays?: number };
+type NameRow = {
+  id: string;
+  name: string;
+  nameHi: string;
+  leadDays?: number;
+  singleStallOnly?: boolean;
+};
 
 /**
  * Reusable editor for a simple admin-managed name list (Occasions, Locations).
@@ -177,6 +184,7 @@ function NameListTab({
   nameHiPlaceholder,
   emptyError,
   withLead = false,
+  withStallOnly = false,
   leadPlaceholder = "e.g. 7",
 }: {
   dataKey: "occasions" | "locations";
@@ -188,6 +196,8 @@ function NameListTab({
   nameHiPlaceholder: string;
   emptyError: string;
   withLead?: boolean;
+  /** Occasions: a "Single Stall only" tick per row. */
+  withStallOnly?: boolean;
   leadPlaceholder?: string;
 }) {
   const [rows, setRows] = useState<NameRow[]>([]);
@@ -229,6 +239,15 @@ function NameListTab({
     setSaved(false);
     setError("");
   };
+  const updateStallOnly = (i: number, on: boolean) => {
+    setRows((rs) =>
+      rs.map((r, idx) =>
+        idx === i ? { ...r, singleStallOnly: on || undefined } : r,
+      ),
+    );
+    setSaved(false);
+    setError("");
+  };
   const addRow = () => {
     setRows((rs) => [...rs, { id: "", name: "", nameHi: "" }]);
     setSaved(false);
@@ -265,9 +284,11 @@ function NameListTab({
   };
 
   // Occasions carry an extra numeric lead column; locations keep two columns.
-  const gridCols = withLead
-    ? "sm:grid-cols-[1fr_1fr_7rem_auto]"
-    : "sm:grid-cols-[1fr_1fr_auto]";
+  const gridCols = withStallOnly
+    ? "sm:grid-cols-[1fr_1fr_7rem_8rem_auto]"
+    : withLead
+      ? "sm:grid-cols-[1fr_1fr_7rem_auto]"
+      : "sm:grid-cols-[1fr_1fr_auto]";
 
   return (
     <WidgetCard title={title}>
@@ -281,6 +302,9 @@ function NameListTab({
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Name (Hindi)</span>
             {withLead && (
               <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Lead (days)</span>
+            )}
+            {withStallOnly && (
+              <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Single Stall only</span>
             )}
             <span className="sr-only">Actions</span>
           </div>
@@ -311,6 +335,17 @@ function NameListTab({
                   aria-label={`Lead time in days for ${row.name || "occasion"}`}
                   onChange={(e) => updateLead(i, e.target.value)}
                 />
+              )}
+              {withStallOnly && (
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-maroon"
+                    checked={Boolean(row.singleStallOnly)}
+                    onChange={(e) => updateStallOnly(i, e.target.checked)}
+                  />
+                  <span className="sm:sr-only">Single Stall only</span>
+                </label>
               )}
               <Button
                 type="button"

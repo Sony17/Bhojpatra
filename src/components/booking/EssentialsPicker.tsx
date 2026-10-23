@@ -17,7 +17,8 @@ import {
  *
  * Every option prices itself for THIS order: the admin's guest-band rate for
  * the current head-count leads (per-plate first), the total is the sub-line.
- * The first tile is "No service needed", so skipping is a choice like any other.
+ * The wizard preselects Essential Service (Package A); tapping the picked tile
+ * again drops the service.
  */
 export default function EssentialsPicker({
   packages,
@@ -36,37 +37,27 @@ export default function EssentialsPicker({
   t: (en: string, hi: string) => string;
 }) {
   const selected = packages.find((p) => p.id === selectedId);
-  const noneTitle = t("No service needed", "कोई सर्विस नहीं चाहिए");
-  const noneSub = t(
-    "Just the stall — your venue covers serving",
-    "सिर्फ़ स्टॉल — सर्विस वेन्यू देगा",
-  );
-  const count = packages.length + 1;
+  const count = packages.length;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-2">
       <div
         role="radiogroup"
         aria-label={t("Service package", "सर्विस पैकेज")}
-        // One row, like a tier strip: on phones it swipes once the options
-        // outgrow four tiles; from sm up every tile shares the width.
+        // One row, like a tier strip: four tiles fill the width and any more
+        // swipe in from the right. Top padding leaves room for the ✓ badge.
         className={
-          "-mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 " +
-          (count <= 4 ? "[&>*]:flex-1" : "[&>*]:w-[6.75rem] [&>*]:shrink-0 sm:[&>*]:w-auto sm:[&>*]:flex-1")
+          "-mx-3 flex snap-x gap-1.5 overflow-x-auto px-3 pb-0.5 pt-1.5 [scrollbar-width:none] sm:mx-0 sm:gap-2.5 sm:px-0 " +
+          (count <= 4
+            ? "[&>*]:flex-1"
+            : "[&>*]:shrink-0 [&>*]:basis-[calc((100%-1.125rem)/4)] sm:[&>*]:basis-0 sm:[&>*]:grow")
         }
       >
-        <Tile
-          selected={selectedId === ""}
-          onSelect={() => onSelect("")}
-          icon={<NoneIcon />}
-          title={noneTitle}
-          subtitle={noneSub}
-        />
         {packages.map((pkg) => (
           <Tile
             key={pkg.id}
             selected={pkg.id === selectedId}
-            onSelect={() => onSelect(pkg.id)}
+            onSelect={() => onSelect(pkg.id === selectedId ? "" : pkg.id)}
             icon={pkg.icon}
             title={lang === "hi" ? pkg.nameHi : pkg.name}
             subtitle={lang === "hi" ? pkg.subtitleHi : pkg.subtitle}
@@ -74,21 +65,13 @@ export default function EssentialsPicker({
         ))}
       </div>
 
-      {selected ? (
+      {selected && (
         <PackageDetail
           key={selected.id}
           pkg={selected}
           guests={guests}
           lang={lang}
           t={t}
-        />
-      ) : (
-        <DetailCard
-          icon={<NoneIcon />}
-          title={noneTitle}
-          subtitle={noneSub}
-          price={money(0)}
-          priceNote={t("no extra charge", "कोई अतिरिक्त शुल्क नहीं")}
         />
       )}
     </div>
@@ -116,38 +99,38 @@ function Tile({
       aria-checked={selected}
       onClick={onSelect}
       className={
-        "relative flex min-w-0 snap-start flex-col items-center rounded-xl border px-1.5 pb-2.5 pt-3 text-center transition sm:rounded-2xl sm:px-3 sm:pb-4 sm:pt-5 " +
+        "relative flex min-w-0 snap-start flex-col items-center rounded-xl border px-1 pb-1.5 pt-2 text-center transition sm:px-2 sm:pb-2.5 sm:pt-3 " +
         (selected
-          ? "border-maroon bg-cream/30 shadow-soft"
-          : "border-cream-3 bg-white hover:bg-cream/15")
+          ? "border-[1.5px] border-maroon bg-cream/20"
+          : "border-cream-3/70 bg-white hover:bg-cream/15")
       }
     >
       {selected && (
         <span
           aria-hidden="true"
-          className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-maroon text-white sm:right-2 sm:top-2"
+          className="absolute -right-1 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-maroon text-white ring-2 ring-white"
         >
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m5 12 5 5 9-10" />
           </svg>
         </span>
       )}
       <span
         aria-hidden="true"
-        className="flex h-8 items-center justify-center text-2xl leading-none sm:h-10 sm:text-3xl"
+        className="flex h-6 items-center justify-center text-[1.35rem] leading-none sm:h-7 sm:text-2xl"
       >
         {icon}
       </span>
       <span
         className={
-          "mt-1.5 line-clamp-2 text-[12px] font-semibold leading-tight [overflow-wrap:anywhere] sm:mt-2 sm:text-sm " +
+          "mt-1 line-clamp-2 text-[12px] font-semibold leading-tight [overflow-wrap:anywhere] sm:text-sm " +
           (selected ? "text-maroon" : "text-ink")
         }
       >
         {title}
       </span>
       {subtitle && (
-        <span className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-ink-soft sm:text-xs">
+        <span className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-ink/70 sm:text-[11px]">
           {subtitle}
         </span>
       )}
@@ -180,6 +163,7 @@ function PackageDetail({
       subtitle={lang === "hi" ? pkg.subtitleHi : pkg.subtitle}
       price={money(rate)}
       priceUnit={pkg.perPlate ? t("/ guest", "/ मेहमान") : undefined}
+      free={total <= 0}
       priceNote={
         total > 0
           ? pkg.perPlate
@@ -192,14 +176,14 @@ function PackageDetail({
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-cream/60 px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-cream"
+          className="mt-1 inline-flex items-center gap-1 rounded-full bg-cream/50 px-2.5 py-0.5 text-[11.5px] text-ink transition hover:bg-cream"
         >
           {open
             ? t("Hide details", "विवरण छिपाएं")
             : t("What's included", "क्या शामिल है")}
           <svg
             viewBox="0 0 24 24"
-            className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
@@ -213,38 +197,58 @@ function PackageDetail({
       }
       details={
         open && (
-          <div className="grid gap-4 text-sm sm:grid-cols-2">
-            <ul className="space-y-1.5">
-              {pkg.includes.map((line) => (
-                <li key={line} className="flex items-start gap-2 text-ink">
-                  <span aria-hidden="true" className="mt-0.5 text-xs font-bold text-maroon">
-                    ✓
-                  </span>
-                  {line}
-                </li>
-              ))}
-              {pkg.notIncluded.map((line) => (
-                <li key={line} className="flex items-start gap-2 text-ink-soft">
-                  <span aria-hidden="true" className="mt-0.5 text-xs font-bold">
-                    ✕
-                  </span>
-                  {line}
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-3 text-sm">
+            {/* Included — the bulk of the list, two columns from tablet up. */}
+            {pkg.includes.length > 0 && (
+              <section>
+                <DetailHeading>{t("Included", "शामिल")}</DetailHeading>
+                <ul className="mt-1.5 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                  {pkg.includes.map((line) => (
+                    <li key={line} className="flex items-start gap-2 text-ink">
+                      <span
+                        aria-hidden="true"
+                        className="mt-[3px] flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-maroon text-[8px] font-bold text-white"
+                      >
+                        ✓
+                      </span>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Not included — short, so it reads as one row of chips. */}
+            {pkg.notIncluded.length > 0 && (
+              <section>
+                <DetailHeading>{t("Not included", "शामिल नहीं")}</DetailHeading>
+                <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                  {pkg.notIncluded.map((line) => (
+                    <li
+                      key={line}
+                      className="inline-flex items-center gap-1 rounded-full border border-cream-3 bg-white px-2.5 py-0.5 text-xs text-ink/70"
+                    >
+                      <span aria-hidden="true" className="text-[10px] font-bold">
+                        ✕
+                      </span>
+                      {line.replace(/^No\s+/i, "")}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {tiers.length > 0 && (
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-maroon">
-                  {t("Price by guests", "मेहमानों के हिसाब से कीमत")}
-                </p>
-                <table className="mt-2 w-full text-left text-sm">
+              <section>
+                <DetailHeading>{t("Price by guests", "मेहमानों के हिसाब से कीमत")}</DetailHeading>
+                <table className="mt-1.5 w-full text-left text-sm sm:max-w-sm">
                   <tbody>
                     {tiers.map((tier) => {
                       const on = tier === activeTier;
                       return (
                         <tr
                           key={tier.minGuests}
-                          className={on ? "bg-white font-semibold text-ink" : "text-ink-soft"}
+                          className={on ? "bg-white font-semibold text-ink" : "text-ink/70"}
                         >
                           <td className="rounded-l-md px-2 py-1">
                             {tierRangeLabel(tier)} {t("guests", "मेहमान")}
@@ -258,7 +262,7 @@ function PackageDetail({
                     })}
                   </tbody>
                 </table>
-              </div>
+              </section>
             )}
           </div>
         )
@@ -267,7 +271,16 @@ function PackageDetail({
   );
 }
 
-/** The picked option opened up: big icon, display name, its price for this order. */
+/** Small uppercase label over each block of the details panel. */
+function DetailHeading({ children }: { children: ReactNode }) {
+  return (
+    <h4 className="font-sans text-[11px] font-bold uppercase tracking-wider text-maroon">
+      {children}
+    </h4>
+  );
+}
+
+/** The picked option opened up: big icon, its name, its price for this order. */
 function DetailCard({
   icon,
   badge,
@@ -276,6 +289,7 @@ function DetailCard({
   price,
   priceUnit,
   priceNote,
+  free,
   toggle,
   details,
 }: {
@@ -286,64 +300,55 @@ function DetailCard({
   price: string;
   priceUnit?: string;
   priceNote: string;
+  /** Nothing to pay — the note ("no extra charge") is the price. */
+  free?: boolean;
   toggle?: ReactNode;
   details?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-cream-3 bg-cream/25 p-3.5 sm:p-5">
-      <div className="flex items-center gap-3 sm:gap-4">
+    <div className="rounded-xl border border-cream-3 bg-cream/20 px-2.5 py-2 sm:px-3.5 sm:py-3">
+      <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cream text-3xl sm:h-20 sm:w-20 sm:text-4xl"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream/80 text-2xl sm:h-12 sm:w-12 sm:text-[1.75rem]"
         >
           {icon}
         </span>
         <div className="min-w-0 flex-1">
           {badge && (
-            <span className="block text-[0.65rem] font-bold uppercase tracking-wider text-maroon">
+            <span className="block text-[9px] font-bold uppercase leading-tight tracking-wider text-maroon">
               {badge}
             </span>
           )}
-          <p className="font-display text-lg leading-tight text-maroon sm:text-2xl">
+          <p className="text-[15px] font-semibold leading-tight text-ink sm:text-lg">
             {title}
           </p>
           {subtitle && (
-            <p className="mt-0.5 text-xs text-ink-soft sm:text-sm">{subtitle}</p>
+            <p className="truncate text-[11.5px] leading-snug text-ink/70 sm:text-[13px]">{subtitle}</p>
           )}
           {toggle}
         </div>
-        <div className="shrink-0 self-stretch border-l border-cream-3 pl-3 text-right sm:pl-5">
-          <div className="flex h-full flex-col justify-center">
-            <span className="block whitespace-nowrap text-base font-bold text-maroon sm:text-xl">
-              {price}
-              {priceUnit && (
-                <span className="ml-1 text-xs font-normal text-ink-soft">{priceUnit}</span>
-              )}
+        <div className="flex w-[5.5rem] shrink-0 flex-col justify-center self-stretch border-l border-cream-3 pl-2.5 text-center sm:w-32">
+          {free ? (
+            <span className="text-[13px] font-semibold leading-tight text-maroon first-letter:uppercase sm:text-base">
+              {priceNote}
             </span>
-            <span className="block whitespace-nowrap text-xs text-ink-soft">{priceNote}</span>
-          </div>
+          ) : (
+            <>
+              <span className="whitespace-nowrap text-[15px] font-bold text-maroon sm:text-lg">
+                {price}
+                {priceUnit && (
+                  <span className="ml-0.5 text-[11px] font-normal text-ink/70">{priceUnit}</span>
+                )}
+              </span>
+              <span className="text-[10.5px] leading-tight text-ink/70">{priceNote}</span>
+            </>
+          )}
         </div>
       </div>
       {details && (
-        <div className="mt-3 border-t border-cream-3 pt-3">{details}</div>
+        <div className="mt-2 border-t border-cream-3 pt-2">{details}</div>
       )}
     </div>
-  );
-}
-
-/** "No service" mark — a plain prohibition sign in ink. */
-function NoneIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-[1em] w-[1em] text-ink"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="m5.6 5.6 12.8 12.8" />
-    </svg>
   );
 }

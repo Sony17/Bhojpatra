@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Button, Drawer } from "@/components/ui";
 import ThemedSelect from "@/components/ThemedSelect";
 import DatePicker from "@/components/DatePicker";
 import {
@@ -290,17 +292,22 @@ export default function EventBar({
   // Collapsed one-line summary (mobile only) — every set value is shown inline
   // so the guest sees their whole event brief without expanding the card.
   const [open, setOpen] = useState(false);
+  // The chip summary edits in a bottom-sheet popup on phones rather than
+  // expanding in place; tablet and up keep the full inline card.
+  const popup = chipSummary && collapsible && !embedded && collapseAt === "sm";
   // A new focus request expands the collapsed brief during render, so the
-  // effect below finds the field already laid out.
+  // effect below finds the field already laid out. In popup mode only phones
+  // open the sheet — wider screens already show the fields inline.
   const [seenFocus, setSeenFocus] = useState(0);
   if (focusRequest && focusRequest.nonce !== seenFocus) {
     setSeenFocus(focusRequest.nonce);
-    setOpen(true);
+    setOpen(!popup || window.matchMedia("(max-width: 639px)").matches);
   }
   const rootRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!focusRequest) return;
-    const box = rootRef.current?.querySelector<HTMLElement>(
+    const box = (sheetRef.current ?? rootRef.current)?.querySelector<HTMLElement>(
       `[data-event-field="${focusRequest.field}"]`,
     );
     if (!box) return;
@@ -365,150 +372,44 @@ export default function EventBar({
       ? summaryParts.join(" · ")
       : t("Add your event details", "अपने इवेंट की जानकारी जोड़ें");
 
-  return (
-    <div
-      ref={rootRef}
-      className={
-        embedded
-          ? "relative"
-          : (chipSummary
-              ? "relative rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft sm:rounded-[1.5rem] sm:p-6 sm:shadow-card "
-              : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 ") +
-            (flush ? "" : chipSummary ? "mt-2.5 sm:mt-7" : "mt-5 sm:mt-7")
-      }
-    >
-      {Boolean(leadWarning) && !embedded && (
-        <span
-          className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
-          aria-hidden="true"
-        />
+  // The must-have fields still empty. The chip flow (Single Stall) calls them
+  // out — a red chip naming what to add, and each field flagged in the editor —
+  // so a missing occasion / date / city is seen before Continue, not after.
+  type Missing = { field: EventField; label: string };
+  const missingCandidates: (Missing | null)[] = [
+    occasionId === "" ||
+    (occasionId === OTHER_OCCASION_ID && customOccasion.trim() === "")
+      ? { field: "occasion", label: t("occasion", "अवसर") }
+      : null,
+    eventDate === "" ? { field: "date", label: t("date", "तारीख") } : null,
+    cityId === "" || (cityId === OTHER_LOCATION_ID && customCity.trim() === "")
+      ? { field: "city", label: t("city", "शहर") }
+      : null,
+  ];
+  const missing: Missing[] = chipSummary
+    ? missingCandidates.filter((m): m is Missing => m !== null)
+    : [];
+  const isMissing = (f: EventField) => missing.some((m) => m.field === f);
+  /** A field label, turned red with a "Required" note while it's empty. */
+  const fieldLabel = (f: EventField, text: string) => (
+    <span className={labelClass + (isMissing(f) ? " !text-maroon" : "")}>
+      {text}
+      {isMissing(f) && (
+        <span className="ml-1.5 normal-case tracking-normal">
+          · {t("Required", "ज़रूरी")}
+        </span>
       )}
-      {/* Mobile collapsed summary — the whole brief on one tappable line; hidden
-          on desktop, where the full card is always shown. Embedded rows keep it
-          at every width and swap the chevron for a pencil edit cue. */}
-      {(collapsible || embedded) && (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className={
-            "flex w-full items-center justify-between gap-3 text-left " +
-            (embedded ? "" : collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
-          }
-        >
-          {chipSummary && !embedded ? (
-            <span className="flex min-w-0 items-center gap-3">
-              <span
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cream-2 text-maroon"
-                aria-hidden="true"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
-                  <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
-                </svg>
-              </span>
-              <span className="min-w-0">
-                <span className="eyebrow block text-[10px] font-bold text-maroon">
-                  {t("YOUR EVENT", "आपका इवेंट")}
-                </span>
-                <span className="block truncate text-[13px] font-semibold leading-snug text-ink">
-                  {summaryLine}
-                </span>
-              </span>
-            </span>
-          ) : (
-            <span className="flex min-w-0 items-baseline gap-2">
-              <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
-                {t("YOUR EVENT", "आपका इवेंट")}
-              </span>
-              <span className="min-w-0 text-xs text-ink/70 line-clamp-2 sm:line-clamp-none break-words">
-                {summaryLine}
-              </span>
-            </span>
-          )}
-          {embedded ? (
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4 shrink-0 text-maroon"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-            </svg>
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              className={
-                "h-4 w-4 shrink-0 text-maroon transition-transform " +
-                (open ? "rotate-180" : "")
-              }
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          )}
-        </button>
-      )}
-      <div
-        className={
-          "flex items-baseline gap-3 " +
-          (embedded
-            ? "hidden"
-            : collapsible
-              ? collapseAt === "sm"
-                ? "hidden sm:flex"
-                : "hidden lg:flex"
-              : "")
-        }
-      >
-        <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
-          {t("YOUR EVENT", "आपका इवेंट")}
-        </p>
-        <span className="h-px flex-1 self-center bg-cream" aria-hidden="true" />
-        <p className="shrink-0 text-caption text-ink/50">
-          {t("Editable anytime", "कभी भी बदलें")}
-        </p>
-      </div>
-      <div
-        className={
-          "mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
-          // One aligned row on wide screens: every field is a label line over a
-          // 48px control, so the boxes share a baseline and a height. Guests is
-          // a compact inline stepper (no slider) so it fits a single column.
-          (showGuests
-            ? "lg:grid-cols-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.4fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] "
-            : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
-          (embedded
-            ? open
-              ? ""
-              : "hidden"
-            : collapsible && !open
-              ? collapseAt === "sm"
-                ? "hidden sm:grid"
-                : "hidden lg:grid"
-              : "")
-        }
-      >
+    </span>
+  );
+  const missingSelectClass = selectButtonClass.replace("border-cream", "border-maroon");
+
+  // The editable fields — inline in the card, or (phones, Single Stall) in a
+  // bottom-sheet popup opened from the summary chip.
+  const renderFields = (className: string) => (
+    <div className={className}>
         <label className="block min-w-0" data-event-field="occasion">
           <span className={labelRowClass}>
-            <span className={labelClass}>{t("Occasion", "अवसर")}</span>
+            {fieldLabel("occasion", t("Occasion", "अवसर"))}
           </span>
           {occasionId === OTHER_OCCASION_ID ? (
             <OtherField
@@ -528,7 +429,7 @@ export default function EventBar({
               ariaLabel={t("Occasion", "अवसर")}
               placeholder={t("Choose occasion", "अवसर चुनें")}
               className="mt-1.5"
-              buttonClassName={selectButtonClass}
+              buttonClassName={isMissing("occasion") ? missingSelectClass : selectButtonClass}
               options={[
                 ...occasionList.map((o) => ({
                   value: o.id,
@@ -542,7 +443,7 @@ export default function EventBar({
 
         <div className="block min-w-0" data-event-field="date">
           <span className={labelRowClass}>
-            <span className={labelClass}>{t("Date", "तारीख")}</span>
+            {fieldLabel("date", t("Date", "तारीख"))}
           </span>
           {/* Branded calendar (same on-brand popup as the Hero booking bar).
               The floor is just today (`minDaysAhead={0}`) — the lead-time
@@ -550,7 +451,7 @@ export default function EventBar({
           <DatePicker
             className={
               "mt-1.5 h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
-              (leadWarning ? "border-maroon" : "border-cream focus-within:border-maroon")
+              (leadWarning || isMissing("date") ? "border-maroon" : "border-cream focus-within:border-maroon")
             }
             buttonClassName="h-12 w-full px-3.5 pr-11 text-sm"
             iconClassName="right-3.5"
@@ -577,7 +478,7 @@ export default function EventBar({
 
         <div className="block min-w-0" data-event-field="city">
           <span className={labelRowClass}>
-            <span className={labelClass}>{t("City", "शहर")}</span>
+            {fieldLabel("city", t("City", "शहर"))}
             <button
               type="button"
               onClick={() => void detectLocation()}
@@ -620,7 +521,7 @@ export default function EventBar({
               ariaLabel={t("City / Location", "शहर / लोकेशन")}
               placeholder={t("Choose city", "शहर चुनें")}
               className="mt-1.5"
-              buttonClassName={selectButtonClass}
+              buttonClassName={isMissing("city") ? missingSelectClass : selectButtonClass}
               options={[
                 ...locations.map((c) => ({
                   value: c.id,
@@ -832,7 +733,199 @@ export default function EventBar({
             }))}
           />
         </div>
+    </div>
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      className={
+        embedded
+          ? "relative"
+          : (chipSummary
+              ? "relative rounded-2xl border bg-white px-3 py-2 sm:rounded-[1.5rem] sm:border-cream sm:p-6 sm:shadow-card " +
+                (missing.length > 0 ? "border-maroon shadow-soft " : "border-cream ")
+              : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 ") +
+            (flush ? "" : chipSummary ? "mt-2.5 sm:mt-7" : "mt-5 sm:mt-7")
+      }
+    >
+      {Boolean(leadWarning) && !embedded && (
+        <span
+          className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
+          aria-hidden="true"
+        />
+      )}
+      {/* Mobile collapsed summary — the whole brief on one tappable line; hidden
+          on desktop, where the full card is always shown. Embedded rows keep it
+          at every width and swap the chevron for a pencil edit cue. */}
+      {(collapsible || embedded) && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup={popup ? "dialog" : undefined}
+          className={
+            "flex w-full items-center justify-between gap-3 text-left " +
+            (embedded ? "" : collapseAt === "sm" ? "sm:hidden" : "lg:hidden")
+          }
+        >
+          {chipSummary && !embedded ? (
+            <span className="flex min-w-0 items-center gap-3">
+              <span
+                className={
+                  "grid h-8 w-8 shrink-0 place-items-center " +
+                  (missing.length > 0 ? "rounded-lg bg-cream/60 text-maroon" : "text-ink/55")
+                }
+                aria-hidden="true"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
+                  <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+                </svg>
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={
+                    "eyebrow block text-[10px] font-bold " +
+                    (missing.length > 0 ? "text-maroon" : "text-ink/50")
+                  }
+                >
+                  {missing.length > 0
+                    ? t("COMPLETE YOUR EVENT", "इवेंट पूरा करें")
+                    : t("YOUR EVENT", "आपका इवेंट")}
+                </span>
+                <span className="block truncate text-[13px] font-medium leading-snug text-ink">
+                  {missing.length > 0 ? (
+                    <>
+                      <span className="font-semibold text-maroon">
+                        {t("Add ", "जोड़ें: ")}
+                        {missing.map((m) => m.label).join(", ")}
+                      </span>
+                      {summaryParts.length > 0 && (
+                        <span className="text-ink/60"> · {summaryParts.join(" · ")}</span>
+                      )}
+                    </>
+                  ) : (
+                    summaryLine
+                  )}
+                </span>
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="eyebrow shrink-0 text-[10px] font-bold text-maroon">
+                {t("YOUR EVENT", "आपका इवेंट")}
+              </span>
+              <span className="min-w-0 text-xs text-ink/70 line-clamp-2 sm:line-clamp-none break-words">
+                {summaryLine}
+              </span>
+            </span>
+          )}
+          {embedded ? (
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4 shrink-0 text-maroon"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
+          ) : missing.length > 0 && chipSummary ? (
+            <span className="shrink-0 rounded-full bg-maroon px-3 py-1 text-[11px] font-semibold text-white">
+              {t("Add", "जोड़ें")}
+            </span>
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              className={
+                "h-4 w-4 shrink-0 text-maroon transition-transform " +
+                (open && !popup ? "rotate-180" : "")
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          )}
+        </button>
+      )}
+      <div
+        className={
+          "flex items-baseline gap-3 " +
+          (embedded
+            ? "hidden"
+            : collapsible
+              ? collapseAt === "sm"
+                ? "hidden sm:flex"
+                : "hidden lg:flex"
+              : "")
+        }
+      >
+        <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
+          {t("YOUR EVENT", "आपका इवेंट")}
+        </p>
+        <span className="h-px flex-1 self-center bg-cream" aria-hidden="true" />
+        <p className="shrink-0 text-caption text-ink/50">
+          {t("Editable anytime", "कभी भी बदलें")}
+        </p>
       </div>
+      {renderFields(
+          "mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
+          // One aligned row on wide screens: every field is a label line over a
+          // 48px control, so the boxes share a baseline and a height. Guests is
+          // a compact inline stepper (no slider) so it fits a single column.
+          (showGuests
+            ? "lg:grid-cols-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.4fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] "
+            : "lg:grid-cols-[1fr_1fr_1fr_0.85fr_0.85fr_0.85fr] ") +
+          (embedded
+            ? open
+              ? ""
+              : "hidden"
+            : collapsible && (popup || !open)
+              ? collapseAt === "sm"
+                ? "hidden sm:grid"
+                : "hidden lg:grid"
+              : "")
+      )}
+      {popup &&
+        open &&
+        createPortal(
+          <div className="sm:hidden">
+            <Drawer
+              open
+              onClose={() => setOpen(false)}
+              title={t("Your event", "आपका इवेंट")}
+            >
+              <div ref={sheetRef}>
+                {renderFields("grid gap-3")}
+                <Button
+                  fullWidth
+                  className="mt-5"
+                  onClick={() => setOpen(false)}
+                >
+                  {t("Done", "हो गया")}
+                </Button>
+              </div>
+            </Drawer>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

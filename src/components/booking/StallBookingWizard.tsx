@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
@@ -55,7 +56,6 @@ import {
   dummyDishPhoto,
   type MenuCategory,
   type CategoryItem,
-  type DietType,
   type Coupon,
   type VendorListing,
   type StallTerms,
@@ -98,7 +98,7 @@ import {
   serviceRate,
   serviceTotal as serviceChargeFor,
 } from "@/lib/servicePricing";
-import { Button } from "@/components/ui";
+import { Button, DietMark, useToast } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
   MIN_GUESTS,
@@ -132,8 +132,8 @@ import {
 // step either — that choice happens on the Brands page, which already lists
 // every stall with its photos, ratings, filters and full menu; the wizard is
 // entered from a brand's "Book Now" and opens straight on that stall's menu.
-// Menu → Extras → Essentials → Review.
-const TOTAL_STEPS = 4;
+// Menu → Extras & Essentials (one page, both optional) → Review.
+const TOTAL_STEPS = 3;
 
 // Where a guest picks their stall: the Brands catalogue, lensed to the Single
 // Stall category. Every entry point into this flow that doesn't already name a
@@ -226,11 +226,6 @@ function dishPrice(item: CategoryItem, course: StallCourse): number {
  *  gives way: in India the green-dot / red-dot square is a statutory FSSAI food
  *  label, and guests read it as a symbol rather than as brand colour. Non-veg
  *  keeps brand red. */
-const DIET_MARK: Record<DietType, string> = {
-  veg: "#008000",
-  "non-veg": "#B92025",
-};
-
 /** What one course adds to the per-plate, given the guest's picks. A fixed
  *  course is all-or-nothing at its own rate; a varied one bills dish by dish. */
 function coursePrice(course: StallCourse, picks: string[]): number {
@@ -326,6 +321,7 @@ export default function StallBookingWizard({
   // share a booking id.
   const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
+  const { toast } = useToast();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
 
@@ -401,9 +397,11 @@ export default function StallBookingWizard({
   // Optional feast-wide service package (crew, buffet setup). Unlike the tiered
   // flow this is not mandatory — a single stall often needs nothing extra.
   const services = useServices();
-  const [serviceId, setServiceId] = useState<string>("");
+  // Essentials open on Package A (pitched "For Single Stall & Small
+  // Functions"); "" = the guest dropped the service.
+  const [serviceId, setServiceId] = useState<string>("essential");
 
-  // Step 4 — confirm.
+  // Step 3 — confirm.
   const [couponInput, setCouponInput] = useState<string>("");
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string>("");
@@ -439,7 +437,9 @@ export default function StallBookingWizard({
     DEFAULT_REFERRAL_RATES,
   );
 
-  const occasionList = useOccasions();
+  // A single stall suits small functions too — kitty parties, poojas… — so
+  // this flow also gets the admin's Single-Stall-only occasions.
+  const occasionList = useOccasions({ singleStall: true });
   const locations = useLocations();
 
   const resolveOccasion = (id: string): OccasionOption | undefined => {
@@ -472,7 +472,9 @@ export default function StallBookingWizard({
   useEffect(() => {
     const d = readStallDraft();
     if (d) {
-      if (typeof d.step === "number") setStep(d.step);
+      // Clamped: drafts saved under the old four-step flow may say step 4.
+      if (typeof d.step === "number")
+        setStep(Math.min(TOTAL_STEPS, Math.max(1, d.step)));
       if (d.stallId) setStallId(d.stallId);
       if (typeof d.activeCat === "number") setActiveCat(d.activeCat);
       if (d.categoryItems) setCategoryItems(d.categoryItems);
@@ -488,7 +490,8 @@ export default function StallBookingWizard({
       if (typeof d.venueFee === "number") setVenueFee(d.venueFee);
       if (d.selectedAddOns) setSelectedAddOns(d.selectedAddOns);
       if (d.addOnVendor) setAddOnVendor(d.addOnVendor);
-      if (d.serviceId) setServiceId(d.serviceId);
+      // A saved "" is a deliberate "no service" — keep it, don't re-default.
+      if (typeof d.serviceId === "string") setServiceId(d.serviceId);
       if (d.counter && toStallTypeId(d.counter)) setCounterType(toStallTypeId(d.counter));
     }
     hydrated.current = true;
@@ -1010,7 +1013,18 @@ export default function StallBookingWizard({
 
   const toggleItem = (catId: string, itemId: string) => {
     // Nothing to toggle on a set menu — the whole course goes in or out.
-    if (courseById(catId)?.fixed) return;
+    const course = courseById(catId);
+    if (course?.fixed) return;
+    const dish = course?.items.find((it) => it.id === itemId)?.name;
+    if (dish) {
+      const adding = !(categoryItems[catId] ?? []).includes(itemId);
+      toast(
+        lang === "hi"
+          ? `${dish} ${adding ? "जोड़ा गया" : "हटाया गया"}`
+          : `${dish} ${adding ? "added" : "removed"}`,
+        { tone: adding ? "success" : "default" },
+      );
+    }
     setCategoryItems((m) => {
       const current = m[catId] ?? [];
       return {
@@ -1027,6 +1041,14 @@ export default function StallBookingWizard({
   const toggleCourse = (catId: string) => {
     const course = courseById(catId);
     if (!course) return;
+    const adding = !(categoryItems[catId] ?? []).length;
+    const label = lang === "hi" ? course.nameHi : course.name;
+    toast(
+      lang === "hi"
+        ? `${label} ${adding ? "जोड़ा गया" : "हटाया गया"}`
+        : `${label} ${adding ? "added" : "removed"}`,
+      { tone: adding ? "success" : "default" },
+    );
     setCategoryItems((m) => ({
       ...m,
       [catId]: (m[catId] ?? []).length ? [] : course.items.map((it) => it.id),
@@ -1118,6 +1140,17 @@ export default function StallBookingWizard({
     counterVendors.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
 
   const toggleAddOn = (id: string) => {
+    const addOn = addOns.find((a) => a.id === id);
+    if (addOn) {
+      const adding = !selectedAddOns.includes(id);
+      const label = lang === "hi" ? addOn.nameHi : addOn.name;
+      toast(
+        lang === "hi"
+          ? `${label} ${adding ? "जोड़ा गया" : "हटाया गया"}`
+          : `${label} ${adding ? "added" : "removed"}`,
+        { tone: adding ? "success" : "default" },
+      );
+    }
     if (selectedAddOns.includes(id)) {
       setSelectedAddOns(selectedAddOns.filter((x) => x !== id));
       setAddOnVendor((m) => {
@@ -1305,8 +1338,8 @@ export default function StallBookingWizard({
       );
     return stall.allFixed
       ? t(
-          "Add at least one course from this stall.",
-          "इस स्टॉल से कम से कम एक कोर्स जोड़ें।",
+          "Add course",
+          "कोर्स जोड़ें",
         )
       : t(
           "Pick at least one dish from this stall's menu.",
@@ -1341,6 +1374,10 @@ export default function StallBookingWizard({
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
+  // Continue never greys out: a tap with something still missing opens the
+  // "Before you continue" popup instead of moving on.
+  const [blockersOpen, setBlockersOpen] = useState(false);
+  const tryNext = () => (canNext ? goNext() : setBlockersOpen(true));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   // Start over drops every pick — including the stall — so it lands back where
@@ -1826,8 +1863,7 @@ export default function StallBookingWizard({
   /* ─── Render ───────────────────────────────────────────────────────── */
   const stepLabels = [
     t("Menu", "मेन्यू"),
-    t("Extras", "एक्स्ट्रा"),
-    t("Essentials", "ज़रूरी सामान"),
+    t("Extras & Essentials", "एक्स्ट्रा और ज़रूरी सामान"),
     t("Review", "समीक्षा"),
   ];
 
@@ -1897,9 +1933,9 @@ export default function StallBookingWizard({
     );
   }
 
-  // Extras (2), Essentials (3) and Review (4) run beside the live order
-  // summary; the menu builder (1) takes the full width.
-  const showSummary = step >= 2;
+  // Only Review runs beside the order summary; every earlier step takes the
+  // full width (the sticky bar already carries the running estimate).
+  const showSummary = step === TOTAL_STEPS;
   // The stall-type grid owns the whole screen: it carries its own way onward
   // (a tile), so the wizard's step nav —
   // a disabled Continue over a duplicate back-link — would only be noise.
@@ -1911,8 +1947,22 @@ export default function StallBookingWizard({
   const showTypePicker =
     step === 1 && !stall && !stallLoading && !pendingVendorId && !missingBrand;
 
+  // Phones: the steps as sticky tabs. On the menu step they sit under the
+  // stall card; elsewhere they lead the step.
+  const stepTabs = (
+    <StepTabs
+      t={t}
+      step={step}
+      labels={stepLabels}
+      onPick={(n) => (n === step + 1 ? tryNext() : setStep(n))}
+      onStartOver={startOver}
+    />
+  );
+
   return (
-    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+    // overflow-x-clip, not -hidden: hidden would make this a scroll container
+    // and pin the sticky step tabs to it instead of the page.
+    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-clip px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
       {/* Same editorial opening the tiered flow leads with, so the Single Stall
           plan reads as a first-class plan rather than a stripped-down one.
           Phones drop it for a minimal, low-scroll flow. */}
@@ -1938,27 +1988,35 @@ export default function StallBookingWizard({
         }
       />
 
-      <ProgressRail
-        t={t}
-        step={step}
-        totalSteps={TOTAL_STEPS}
-        stepLabels={stepLabels}
-        onStartOver={startOver}
-        compact
-      />
-
-      {/* Event brief — up top on every step, collapsed to one editable line on
-          phones so the step content leads. */}
-      {renderEventBar(true)}
+      {/* Phones: the step content (led by the sticky step tabs), then the
+          event brief chip (flex order). From sm on, the stepper card and the
+          brief sit up top. */}
+      <div className="flex flex-col">
+      <div className="mb-1 hidden sm:block">
+        <ProgressRail
+          t={t}
+          step={step}
+          totalSteps={TOTAL_STEPS}
+          stepLabels={stepLabels}
+          onStartOver={startOver}
+          compact
+        />
+      </div>
+      {/* The brief sits after the step on phones; while it's incomplete the
+          chip itself turns red and names what to add. */}
+      <div className="order-2 sm:order-1">{renderEventBar(true)}</div>
 
       <div
         className={
-          showSummary
-            ? "mt-3 grid gap-7 sm:mt-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "mt-3 sm:mt-7"
+          "order-1 sm:order-2 " +
+          (showSummary
+            ? "mt-3 grid gap-3 sm:mt-7 sm:gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : "mt-3 sm:mt-7")
         }
       >
         <div className="min-w-0">
+          {/* The stall-type grid is a picker, not a step — no tabs over it. */}
+          {!(step === 1 && (stall || showTypePicker)) && stepTabs}
           {/* Step 1 · the chosen stall's menu. Without a stall the guest picks a
               stall TYPE first, then the caterer who runs it on the Brands page
               — the only place stalls themselves are picked. A broken brand
@@ -1988,6 +2046,7 @@ export default function StallBookingWizard({
                 }
                 hiddenDishes={dietView.hiddenDishes}
                 blockedCourses={dietView.blockedCourses}
+                stepTabs={stepTabs}
               />
             ) : stallLoading ? (
               <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
@@ -2012,11 +2071,8 @@ export default function StallBookingWizard({
               />
             ))}
 
-          {(step === 2 || step === 3) && (
+          {step === 2 && (
             <StepStallDetails
-              part={step === 2 ? "extras" : "essentials"}
-              onSkip={goNext}
-              skipDisabled={!canNext}
               t={t}
               lang={lang}
               guests={guests}
@@ -2095,9 +2151,7 @@ export default function StallBookingWizard({
                 confirmError={confirmError}
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
-                onEditExtras={() =>
-                  setStep(selectedAddOns.length > 0 || !selectedService ? 2 : 3)
-                }
+                onEditExtras={() => setStep(2)}
                 brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
                 blocker={reviewBlocker}
@@ -2120,29 +2174,29 @@ export default function StallBookingWizard({
               gst={gst}
               grandTotal={grandTotal}
               pickedCount={pickedCount}
+              onEditMenu={() => setStep(1)}
             />
           </aside>
         )}
       </div>
+      </div>
 
-      {/* Step nav — same shape as the tiered wizard: blockers spelled out in a
-          cream notice, Back / Continue on desktop, and a sticky checkout bar on
-          phones carrying the running estimate. Review carries its own actions,
-          so the nav stops before it. */}
+      {/* Step nav — Back / Continue on desktop, and a sticky checkout bar on
+          phones carrying the running estimate. What still blocks Continue opens
+          as a popup on tap. Review carries its own actions, so the nav stops
+          before it. */}
       {step < TOTAL_STEPS && !showTypePicker && (
         <div className="mt-8 sm:mt-10">
-          {nextBlockers.length > 0 && (
-            <div className="mb-4 flex items-start gap-2 rounded-xl border border-maroon/30 bg-cream/40 px-3 py-2.5 text-[13px] text-ink/70 sm:rounded-card sm:px-4 sm:py-3 sm:text-sm sm:text-ink-soft">
-              <span aria-hidden="true" className="text-maroon">
-                ★
-              </span>
-              <span>
-                {t("Before you continue:", "जारी रखने से पहले:")}{" "}
-                <span className="font-semibold text-maroon">
-                  <BlockerList blockers={nextBlockers} onPick={focusBrief} />
-                </span>
-              </span>
-            </div>
+          {blockersOpen && nextBlockers.length > 0 && (
+            <BlockerPopup
+              t={t}
+              blockers={nextBlockers}
+              onClose={() => setBlockersOpen(false)}
+              onPick={(field) => {
+                setBlockersOpen(false);
+                focusBrief(field);
+              }}
+            />
           )}
           {/* Desktop nav — Back only once there's a step behind this one; the
               menu step's own way back is to the Brands page, in its header. */}
@@ -2163,9 +2217,13 @@ export default function StallBookingWizard({
                 ← {t("Back to all stalls", "सभी स्टॉल पर वापस")}
               </a>
             )}
-            <Button onClick={goNext} disabled={!canNext}>
+            <Button
+              onClick={tryNext}
+              aria-disabled={!canNext}
+              className={canNext ? undefined : "opacity-50"}
+            >
               {`${
-                step === 2 && selectedAddOns.length === 0
+                step === 2 && selectedAddOns.length === 0 && !selectedService
                   ? t("Skip", "छोड़ें")
                   : t("Continue", "आगे")
               } · ${stepLabels[step]} →`}
@@ -2176,18 +2234,7 @@ export default function StallBookingWizard({
               not an order, and pricing one they never assembled reads as a quote
               they're on the hook for. */}
           <div className="app-sticky-cta md:hidden">
-            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2 shadow-pop-up backdrop-blur-xl">
-              {/* Why the button is greyed out, right above it — on phones the
-                  full notice sits below the order summary, out of sight, so a
-                  disabled Skip / Continue otherwise reads as broken. */}
-              {nextBlockers.length > 0 && (
-                <p
-                  role="status"
-                  className="mb-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-maroon"
-                >
-                  <BlockerList blockers={nextBlockers} onPick={focusBrief} />
-                </p>
-              )}
+            <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
               {pickedCount > 0 ? null : (
                 <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
                   {t(
@@ -2201,17 +2248,16 @@ export default function StallBookingWizard({
                     bar costs one line of screen instead of two. */}
                 {pickedCount > 0 && (
                   <span className="mr-auto min-w-0 shrink pr-1">
-                    <span className="block truncate font-sans text-[15px] font-bold leading-tight text-maroon">
-                      {money(perPlate)}
-                      <span className="text-[11px] font-semibold text-ink-soft">
-                        {" "}/ {t("plate", "प्लेट")}
-                      </span>
+                    <span className="block truncate text-[11px] leading-tight text-ink/70">
+                      {t("Total Amount", "कुल राशि")}
                     </span>
-                    <span className="block truncate text-[11px] leading-tight text-ink-soft">
-                      {money(grandTotal)} ·{" "}
+                    <span className="block truncate text-[22px] font-bold leading-tight text-maroon">
+                      {money(grandTotal)}
+                    </span>
+                    <span className="block whitespace-nowrap text-[10.5px] leading-tight text-ink/70">
                       {t(
-                        `${inr.format(guests)} guests`,
-                        `${inr.format(guests)} मेहमान`,
+                        `${inr.format(guests)} guests · ${inr.format(pickedCount)} dishes`,
+                        `${inr.format(guests)} मेहमान · ${inr.format(pickedCount)} व्यंजन`,
                       )}
                     </span>
                   </span>
@@ -2222,22 +2268,25 @@ export default function StallBookingWizard({
                     size="sm"
                     onClick={goBack}
                     aria-label={t("Back", "पीछे")}
-                    className="min-h-10 shrink-0 px-3"
+                    className="min-h-12 w-10 shrink-0 rounded-xl px-0"
                   >
                     ←
                   </Button>
                 )}
                 <Button
-                  onClick={goNext}
-                  disabled={!canNext}
+                  onClick={tryNext}
+                  aria-disabled={!canNext}
                   fullWidth={pickedCount === 0}
-                  className="min-h-10 shrink-0 px-3.5 text-[13px]"
+                  className={
+                    "min-h-12 shrink-0 rounded-xl px-3 text-[14px]" +
+                    (canNext ? "" : " opacity-50")
+                  }
                 >
                   {`${
-                    step === 2 && selectedAddOns.length === 0
+                    step === 2 && selectedAddOns.length === 0 && !selectedService
                       ? t("Skip", "छोड़ें")
                       : t("Continue", "आगे")
-                  } · ${stepLabels[step]}`}
+                  } · ${stepLabels[step]} →`}
                 </Button>
               </div>
             </div>
@@ -2259,30 +2308,183 @@ export default function StallBookingWizard({
  *  there is one), so the notice can jump the guest straight there. */
 type Blocker = { text: string; field?: EventField };
 
-/** The blockers joined by " • ", each one with a field a tap-to-fix link. */
-function BlockerList({
+/** "Before you continue" — what still blocks Continue, as a centred popup.
+ *  A blocker tied to a brief field closes it and jumps to that field. */
+function BlockerPopup({
+  t,
   blockers,
+  onClose,
   onPick,
 }: {
+  t: (en: string, hi: string) => string;
   blockers: Blocker[];
+  onClose: () => void;
   onPick: (field: EventField) => void;
 }) {
-  return blockers.map((b, i) => (
-    <Fragment key={b.text}>
-      {i > 0 && " • "}
-      {b.field ? (
-        <button
-          type="button"
-          onClick={() => onPick(b.field!)}
-          className="font-semibold text-maroon underline decoration-maroon/40 underline-offset-2 transition hover:decoration-maroon"
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="blocker-popup-title"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-5"
+    >
+      <button
+        type="button"
+        aria-label={t("Close", "बंद करें")}
+        onClick={onClose}
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+      />
+      <div className="animate-rise relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-pop">
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden="true"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream text-maroon"
+          >
+            ★
+          </span>
+          <div className="min-w-0 flex-1">
+            <p id="blocker-popup-title" className="text-base font-semibold text-ink">
+              {t("Before you continue:", "जारी रखने से पहले:")}
+            </p>
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {blockers.map((b) => (
+                <li key={b.text} className="text-maroon">
+                  {b.field ? (
+                    <button
+                      type="button"
+                      onClick={() => onPick(b.field!)}
+                      className="text-left font-semibold underline decoration-maroon/40 underline-offset-2 transition hover:decoration-maroon"
+                    >
+                      {b.text}
+                    </button>
+                  ) : (
+                    <span className="font-semibold">{b.text}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <Button fullWidth className="mt-5" onClick={onClose} autoFocus>
+          {t("OK", "ठीक है")}
+        </Button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/* ─── Phone step tabs ──────────────────────────────────────────────────
+ * Sticky, horizontally scrollable step tabs with an underline under the
+ * current one. Steps behind are tappable (go back); the next one behaves like
+ * Continue; anything further ahead waits its turn.
+ */
+function StepTabs({
+  t,
+  step,
+  labels,
+  onPick,
+  onStartOver,
+}: {
+  t: (en: string, hi: string) => string;
+  /** 1-based current step. */
+  step: number;
+  labels: string[];
+  onPick: (n: number) => void;
+  onStartOver: () => void;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // Keep the current tab in view as the guest moves through the steps.
+  useEffect(() => {
+    const rail = railRef.current;
+    const tab = rail?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!rail || !tab) return;
+    rail.scrollTo({
+      left: tab.offsetLeft - (rail.clientWidth - tab.offsetWidth) / 2,
+      behavior: "smooth",
+    });
+  }, [step]);
+
+  return (
+    <nav
+      aria-label={t(`Step ${step} of ${labels.length}`, `चरण ${step} / ${labels.length}`)}
+      className="app-sticky-chrome -mx-3 mb-2 flex items-center gap-2 pl-1 pr-3 sm:hidden"
+    >
+      <div ref={railRef} className="no-scrollbar flex min-w-0 flex-1 overflow-x-auto">
+        {labels.map((label, i) => {
+          const n = i + 1;
+          const done = n < step;
+          const active = n === step;
+          const reachable = n <= step + 1;
+          return (
+            <button
+              key={label}
+              type="button"
+              aria-current={active ? "step" : undefined}
+              disabled={!reachable}
+              onClick={() => !active && onPick(n)}
+              className={
+                "relative flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-3 text-[13px] font-semibold transition-colors disabled:cursor-default " +
+                (active ? "text-maroon" : done ? "text-ink" : "text-ink/45")
+              }
+            >
+              <span
+                aria-hidden="true"
+                className={
+                  "grid h-[18px] w-[18px] place-items-center rounded-full text-[10px] font-bold leading-none " +
+                  (active
+                    ? "bg-maroon text-white"
+                    : done
+                      ? "bg-cream text-maroon"
+                      : "bg-cream/50 text-ink/50")
+                }
+              >
+                {done ? "✓" : n}
+              </span>
+              {label}
+              {/* Active underline indicator. */}
+              <span
+                aria-hidden="true"
+                className={
+                  "absolute inset-x-1.5 bottom-0 h-[3px] rounded-t-full bg-maroon transition-opacity duration-200 " +
+                  (active ? "opacity-100" : "opacity-0")
+                }
+              />
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onStartOver}
+        aria-label={t("Start over", "फिर से शुरू करें")}
+        title={t("Start over", "फिर से शुरू करें")}
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-cream text-ink/55 transition-colors hover:border-maroon hover:text-maroon active:scale-95"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
         >
-          {b.text}
-        </button>
-      ) : (
-        b.text
-      )}
-    </Fragment>
-  ));
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 3v5h5" />
+        </svg>
+      </button>
+    </nav>
+  );
 }
 
 function StallHandoff({
@@ -2354,10 +2556,13 @@ function StepStallMenu({
   missingStallType,
   hiddenDishes,
   blockedCourses,
+  stepTabs,
 }: {
   t: (en: string, hi: string) => string;
   lang: Lang;
   stall: StallOption;
+  /** Phones: the sticky step tabs, placed under the stall card. */
+  stepTabs: ReactNode;
   activeCat: number;
   setActiveCat: (n: number) => void;
   itemsFor: (catId: string) => string[];
@@ -2408,6 +2613,7 @@ function StepStallMenu({
   if (!course && missingStallType) {
     return (
       <div>
+        {stepTabs}
         <SectionHead
           eyebrow={t("Single Stall", "सिंगल स्टॉल")}
           title={t(
@@ -2434,6 +2640,7 @@ function StepStallMenu({
   if (!course) {
     return (
       <div>
+        {stepTabs}
         <SectionHead
           eyebrow={t("Single Stall", "सिंगल स्टॉल")}
           title={t("This stall can't serve your plate", "यह स्टॉल आपकी थाली नहीं परोस सकता")}
@@ -2518,6 +2725,8 @@ function StepStallMenu({
         </a>
       </div>
 
+      {stepTabs}
+
       {/* Course tabs — only the courses this stall actually publishes. */}
       <div
         className={
@@ -2571,37 +2780,65 @@ function StepStallMenu({
         </p>
       )}
 
-      {course.live && (
-        <p className="mt-2 rounded-xl border border-cream-3 bg-cream-2/40 px-3 py-1.5 text-xs text-ink-soft sm:mt-4 sm:px-4 sm:py-2.5">
-          {t(
-            "Live station — cooked fresh in front of your guests.",
-            "लाइव स्टेशन — आपके मेहमानों के सामने ताज़ा बनता है।",
-          )}
-        </p>
-      )}
-
       {/* A set-menu course: one control for the whole spread, and the dishes
           below listed rather than offered. Taking it adds every dish at the
           course's own per-plate rate. */}
-      {/* Phones: the course named in bold beside its set-menu bar. */}
-      <div className="mt-2 flex items-center gap-2.5 sm:block">
-      <h3 className="shrink-0 font-sans text-lg font-bold leading-tight text-ink sm:hidden">
-        {lang === "hi" ? course.nameHi : course.name}
-      </h3>
+      {/* Phones: a menu-section header, food-app style — the course title
+          with its facts beneath, and a raised ADD button for a set menu. */}
+      <div className="mt-3 flex items-end justify-between gap-3 border-b border-dashed border-cream pb-3 sm:hidden">
+        <div className="min-w-0">
+          <h3 className="truncate font-sans text-[22px] font-extrabold leading-none tracking-tight text-ink">
+            {lang === "hi" ? course.nameHi : course.name}
+          </h3>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-none text-ink/60">
+            {course.fixed && (
+              <span className="rounded bg-cream px-1.5 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.1em] text-maroon">
+                {t("Set menu", "तय मेन्यू")}
+              </span>
+            )}
+            <span className="truncate">
+              {t(
+                `${course.items.length} ${course.items.length === 1 ? "dish" : "dishes"}`,
+                `${course.items.length} डिश`,
+              )}
+              {course.fixed && (
+                <>
+                  {" · "}
+                  <span className="font-bold text-ink">{money(course.perPlate)}</span>
+                  {t(" / plate", " / प्लेट")}
+                </>
+              )}
+            </span>
+          </p>
+        </div>
+        {course.fixed && (
+          <button
+            type="button"
+            aria-pressed={courseTaken}
+            onClick={() => toggleCourse(course.id)}
+            className={
+              "relative h-9 shrink-0 rounded-lg border px-5 text-[13px] font-extrabold uppercase tracking-[0.06em] shadow-card transition active:scale-95 " +
+              (courseTaken
+                ? "border-maroon bg-maroon text-white"
+                : "border-maroon/25 bg-white text-maroon")
+            }
+          >
+            {courseTaken ? `✓ ${t("Added", "जोड़ा")}` : t("Add", "जोड़ें")}
+            {!courseTaken && (
+              <span aria-hidden="true" className="absolute right-1 top-0.5 text-[11px] font-bold leading-none">
+                +
+              </span>
+            )}
+          </button>
+        )}
+      </div>
       {course.fixed && (
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-cream bg-cream/35 px-2.5 py-1.5 sm:mt-4 sm:flex-wrap sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3">
+        <div className="hidden min-w-0 flex-1 items-center justify-between rounded-2xl border border-cream bg-cream/35 sm:mt-4 sm:flex sm:flex-wrap sm:gap-3 sm:px-4 sm:py-3">
           <span className="min-w-0 text-[11px] leading-tight text-ink sm:text-sm">
             <span className="font-semibold">
               {t("Set menu", "तय मेन्यू")}
             </span>
-            {/* Phones: the facts in one line; the full sentence from tablet up. */}
-            <span className="block sm:hidden">
-              {t(
-                `${course.items.length} dishes · ${money(course.perPlate)} / plate`,
-                `${course.items.length} डिश · ${money(course.perPlate)} / प्लेट`,
-              )}
-            </span>
-            <span className="hidden sm:inline">
+            <span>
               {" — "}
               {t(
                 `all ${course.items.length} dishes below, ${money(course.perPlate)} per plate. Nothing to pick.`,
@@ -2626,13 +2863,11 @@ function StepStallMenu({
           </button>
         </div>
       )}
-      </div>
 
-      <ul className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+      <ul className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
         {course.items.map((it) => {
           const active = picks.includes(it.id);
           const price = dishPrice(it, course);
-          const mark = DIET_MARK[it.diet];
           // On a set menu the row states what's coming; only a varied course
           // turns it into a control.
           const body = (
@@ -2650,16 +2885,10 @@ function StepStallMenu({
                 />
                 {/* FSSAI veg / non-veg mark, sat on the photo the way a menu
                     card prints it — not floating out in the row. */}
-                <span
-                  aria-hidden="true"
-                  className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border-[1.5px] bg-white sm:left-1 sm:top-1 sm:h-4 sm:w-4 sm:rounded-[4px]"
-                  style={{ borderColor: mark }}
-                >
-                  <span
-                    className="block h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2"
-                    style={{ backgroundColor: mark }}
-                  />
-                </span>
+                <DietMark
+                  diet={it.diet}
+                  className="absolute left-0.5 top-0.5 sm:left-1 sm:top-1 sm:h-4 sm:w-4"
+                />
               </span>
               <span className="min-w-0 flex-1">
                 <span
@@ -2732,16 +2961,7 @@ function StepStallMenu({
                   sizes="50vw"
                   className="object-cover"
                 />
-                <span
-                  aria-hidden="true"
-                  className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-[4px] border-[1.5px] bg-white"
-                  style={{ borderColor: mark }}
-                >
-                  <span
-                    className="block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: mark }}
-                  />
-                </span>
+                <DietMark diet={it.diet} className="absolute left-1 top-1 h-4 w-4" />
               </span>
               <span
                 className={
@@ -2854,15 +3074,12 @@ function StepStallMenu({
   );
 }
 
-/* ─── Step 2 · Venue & extras ─────────────────────────────────────────────
+/* ─── Step 2 · Extras & essentials ────────────────────────────────────────
  * The tiered flow's extras step, on the Single Stall plan: same counters, same
- * vendor rosters, same price bands (StepExtras is shared), with the venue field
- * above it and the optional service package below.
+ * vendor rosters, same price bands (StepExtras is shared), with the optional
+ * service package below it on the same page. Both halves are optional.
  */
 function StepStallDetails({
-  part,
-  onSkip,
-  skipDisabled,
   t,
   lang,
   guests,
@@ -2877,11 +3094,6 @@ function StepStallDetails({
   vendorsForCounter,
   nonVegGuests,
 }: {
-  /** Which step this is: the extras list (2) or the service package (3). */
-  part: "extras" | "essentials";
-  /** Extras are optional — move on without adding any. */
-  onSkip: () => void;
-  skipDisabled: boolean;
   t: (en: string, hi: string) => string;
   lang: Lang;
   guests: number;
@@ -2908,14 +3120,17 @@ function StepStallDetails({
 
           The tiered wizard's own extras step, verbatim. Single Stall opens the
           whole catalogue (no tier narrowing) and holds one vendor per counter,
-          so the multi-vendor toggle is off and the id list is a single pick. */}
-      {part === "extras" && (
+          so the multi-vendor toggle is off and the id list is a single pick.
+          Its "Skip" hops down to the essentials below, not past them. */}
       <StepExtras
         pageSize={5}
         compact
         collapsible
-        onSkip={onSkip}
-        skipDisabled={skipDisabled}
+        onSkip={() =>
+          document
+            .getElementById("stall-essentials")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
         lang={lang}
         t={t}
         guests={guests}
@@ -2932,28 +3147,21 @@ function StepStallDetails({
         fullFilter
         nonVegGuests={nonVegGuests}
       />
-      )}
-
 
       {/* Service package — the same admin-managed tiers as the feast wizard's
           Essentials step, as a compact priced list (each row priced for this
           head-count from the admin's guest-band table). Optional here, unlike
           the tiered feast flow where a full-service crew is part of the package
-          promise — hence "No service needed" as the first row. */}
-      {part === "essentials" && services.length === 0 && (
-        <p className="text-sm text-ink-soft">
-          {t("No service needed", "कोई सर्विस नहीं चाहिए")}
-        </p>
-      )}
-      {part === "essentials" && services.length > 0 && (
-        <>
-          <h3 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl leading-tight text-ink sm:text-3xl">
+          promise — a picked tile taps off. */}
+      {services.length > 0 && (
+        <section
+          id="stall-essentials"
+          className="mt-10 scroll-mt-24 border-t border-maroon/10 pt-8"
+        >
+          <h3 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-[22px] font-bold leading-tight tracking-tight text-ink sm:text-3xl">
             {t("Serving & essentials", "सर्विस और ज़रूरी सामान")}
-            <span className="rounded-full bg-cream/60 px-3 py-1 font-sans text-xs font-medium capitalize text-ink sm:text-sm">
-              {t("optional", "वैकल्पिक")}
-            </span>
           </h3>
-          <p className="mt-1.5 text-sm text-ink-soft">
+          <p className="mt-1.5 text-[14px] leading-snug text-ink/70 sm:text-[15px]">
             {t(
               "Add serving crew, buffet setup and crockery — or skip it if your venue already covers this.",
               "सर्विस स्टाफ, बुफे सेटअप और क्रॉकरी जोड़ें — या छोड़ दें अगर वेन्यू पहले से दे रहा है।",
@@ -2969,13 +3177,13 @@ function StepStallDetails({
               t={t}
             />
           </div>
-        </>
+        </section>
       )}
     </div>
   );
 }
 
-/* ─── Step 4 · Review & confirm ───────────────────────────────────────── */
+/* ─── Step 3 · Review & confirm ───────────────────────────────────────── */
 function StepStallConfirm({
   t,
   stall,
@@ -3304,9 +3512,9 @@ function StepStallConfirm({
 /* ─── Order summary rail ──────────────────────────────────────────────── */
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <span className="text-ink-soft">{label}</span>
-      <span className="font-medium text-ink">{value}</span>
+    <div className="flex items-center justify-between gap-3 py-1 text-sm">
+      <span className="text-ink/70">{label}</span>
+      <span className="text-ink">{value}</span>
     </div>
   );
 }
@@ -3324,6 +3532,7 @@ function StallSummary({
   gst,
   grandTotal,
   pickedCount,
+  onEditMenu,
 }: {
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
@@ -3337,20 +3546,67 @@ function StallSummary({
   gst: number;
   grandTotal: number;
   pickedCount: number;
+  onEditMenu?: () => void;
 }) {
+  // Below xl the summary is a secondary, one-row card — the sticky bar already
+  // carries the total — and the breakdown opens on tap. The xl rail is always
+  // expanded.
+  const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl border border-cream-3 bg-white p-4 shadow-soft sm:p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-maroon">
-        {t("Your order", "आपका ऑर्डर")}
-      </p>
-      <p className="mt-1.5 text-lg font-semibold leading-tight text-ink">{stall?.name ?? "—"}</p>
-      <p className="mt-0.5 text-sm text-ink-soft">
-        {inr.format(pickedCount)} {t("dishes", "व्यंजन")} ·{" "}
-        {inr.format(guests)} {t("guests", "मेहमान")}
-      </p>
+    <div className="rounded-2xl border border-cream-3/70 bg-white px-3.5 py-3 xl:p-5 xl:shadow-soft">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-start gap-2 text-left xl:pointer-events-none"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/50 xl:text-xs xl:text-maroon">
+              {t("Your order", "आपका ऑर्डर")}
+            </span>
+            <span className="mt-0.5 block truncate text-[15px] font-semibold leading-tight text-ink xl:mt-1.5 xl:text-lg">
+              {stall?.name ?? "—"}
+            </span>
+            <span className="mt-0.5 block truncate text-[12px] text-ink/60 xl:text-sm">
+              {inr.format(pickedCount)} {t("dishes", "व्यंजन")} ·{" "}
+              {inr.format(guests)} {t("guests", "मेहमान")}
+              <span className="xl:hidden">
+                {" "}· {money(perPlate)}/{t("plate", "प्लेट")}
+              </span>
+            </span>
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            className={"mt-3.5 h-4 w-4 shrink-0 text-ink/50 transition-transform xl:hidden " + (open ? "rotate-180" : "")}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {onEditMenu && (
+          <button
+            type="button"
+            onClick={onEditMenu}
+            className="inline-flex shrink-0 items-center gap-1 text-[12px] text-maroon hover:underline xl:text-[13px]"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+              <path d="m13.5 6.5 4 4" />
+            </svg>
+            {t("Edit menu", "मेन्यू बदलें")}
+          </button>
+        )}
+      </div>
 
+      <div className={open ? "" : "hidden xl:block"}>
       {/* Per-plate leads; the total is the smaller sub-line. */}
-      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-cream/40 px-4 py-3">
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-cream/35 px-4 py-2.5">
         <p className="whitespace-nowrap text-2xl font-semibold text-maroon">
           {money(perPlate)}
           <span className="text-sm font-normal text-ink">
@@ -3358,13 +3614,16 @@ function StallSummary({
             / {t("plate", "प्लेट")}
           </span>
         </p>
-        <p className="max-w-[9rem] text-right text-xs leading-snug text-ink-soft">
-          {t("menu price before extras & tax", "एक्स्ट्रा और टैक्स से पहले")}
+        <p className="max-w-[9rem] text-right text-xs leading-snug text-ink/70">
+          {t("Menu price before extras & tax", "एक्स्ट्रा और टैक्स से पहले")}
         </p>
       </div>
 
       <div className="mt-3">
-        <SummaryRow label={t("Menu subtotal", "मेन्यू उप-योग")} value={money(subtotal)} />
+        <SummaryRow
+          label={`${t("Menu subtotal", "मेन्यू उप-योग")} (${inr.format(guests)} ${t("guests", "मेहमान")} × ${money(perPlate)})`}
+          value={money(subtotal)}
+        />
         {addOnsTotal > 0 && (
           <SummaryRow label={t("Extra counters", "अतिरिक्त काउंटर")} value={money(addOnsTotal)} />
         )}
@@ -3378,7 +3637,7 @@ function StallSummary({
         <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-cream-3 pt-3">
+      <div className="mt-2 flex items-center justify-between border-t border-cream-3 pt-3">
         <span className="text-base font-semibold text-ink">
           {t("Grand total", "कुल राशि")}
         </span>
@@ -3387,11 +3646,12 @@ function StallSummary({
         </span>
       </div>
       {guests > 0 && grandTotal > 0 && (
-        <p className="mt-1 text-right text-xs text-ink-soft">
-          ≈ {money(perPlateCost(grandTotal, guests))} / {t("plate", "प्लेट")}{" "}
-          {t("all-in", "सब मिलाकर")}
+        <p className="mt-1 text-right text-xs text-ink/70">
+          ≈ {money(perPlateCost(grandTotal, guests))} / {t("plate", "प्लेट")} (
+          {t("all-in", "सब मिलाकर")})
         </p>
       )}
+      </div>
     </div>
   );
 }

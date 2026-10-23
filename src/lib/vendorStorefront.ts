@@ -83,7 +83,20 @@ export type StallBrief = Pick<
   /** Stall type → the diets its dishes cover, so a veg / non-veg filter can
    *  judge the stall the guest is booking rather than the whole caterer. */
   dietsByType?: Record<string, DietType[]>;
+  /** Stall type → a few of its dishes, for the catalog card's veg / non-veg
+   *  dish strip. */
+  dishesByType?: Record<string, StallDishesBrief>;
 };
+
+export interface StallDishesBrief {
+  /** Up to `BRIEF_DISHES` of each diet, menu order — so a card filtered to
+   *  either diet can always lead with it. */
+  dishes: { name: string; diet: DietType }[];
+  /** Every dish on the stall type, for the card's "+N more". */
+  total: number;
+}
+
+const BRIEF_DISHES = 6;
 
 /** Stall types a set of booking courses covers — a stall type IS its course
  *  id, so this is just the stall courses (feast courses cover none). */
@@ -94,18 +107,28 @@ export function stallTypesOfCourses(courseIds: string[]): string[] {
 export function briefOf(s: BookableStall): StallBrief {
   const stallTypes = stallTypesOfCourses(s.courses.map((c) => c.categoryId));
   const dietsByType: Record<string, DietType[]> = {};
+  const dishesByType: Record<string, StallDishesBrief> = {};
   for (const id of stallTypes) {
     const diets = new Set<DietType>();
+    const dishes: StallDishesBrief["dishes"] = [];
+    const perDiet: Record<DietType, number> = { veg: 0, "non-veg": 0 };
+    let total = 0;
     for (const c of s.courses)
       if (c.categoryId === id)
-        for (const it of c.items) diets.add(it.diet === "non-veg" ? "non-veg" : "veg");
+        for (const it of c.items) {
+          const diet: DietType = it.diet === "non-veg" ? "non-veg" : "veg";
+          diets.add(diet);
+          total += 1;
+          if (perDiet[diet]++ < BRIEF_DISHES) dishes.push({ name: it.name, diet });
+        }
     dietsByType[id] = [...diets];
+    dishesByType[id] = { dishes, total };
   }
   return {
     stallId: s.stallId,
     fromPerPlate: s.fromPerPlate,
     stallTypes,
-    ...(stallTypes.length ? { dietsByType } : {}),
+    ...(stallTypes.length ? { dietsByType, dishesByType } : {}),
     ...(s.minGuests ? { minGuests: s.minGuests } : {}),
     ...(s.leadHours ? { leadHours: s.leadHours } : {}),
   };

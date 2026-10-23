@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { occasions, DEFAULT_OCCASION_LEAD_DAYS } from "@/lib/data";
+import { useEffect, useMemo, useState } from "react";
+import {
+  occasions,
+  smallOccasions,
+  DEFAULT_OCCASION_LEAD_DAYS,
+} from "@/lib/data";
 
 /**
  * Occasions shown in the Hero + booking pickers.
@@ -19,6 +23,9 @@ export type OccasionOption = {
    *  booking flow uses `max(packageLead, occasionLead)`; omitted → the default
    *  (see `occasionLeadFor`). */
   leadDays?: number;
+  /** Offered in the Single Stall flow only (kitty party, pooja…) — hidden from
+   *  the home booking bar and the feast wizard. */
+  singleStallOnly?: boolean;
 };
 
 /** Sentinel id for the free-text "Other" choice — the customer types their own
@@ -26,12 +33,15 @@ export type OccasionOption = {
 export const OTHER_OCCASION_ID = "other";
 
 /** Seed list used until the admin-configured list loads. */
-export const DEFAULT_OCCASIONS: OccasionOption[] = occasions.map((o) => ({
-  id: o.id,
-  name: o.name,
-  nameHi: o.nameHi,
-  leadDays: o.leadDays,
-}));
+export const DEFAULT_OCCASIONS: OccasionOption[] = [
+  ...occasions.map((o) => ({
+    id: o.id,
+    name: o.name,
+    nameHi: o.nameHi,
+    leadDays: o.leadDays,
+  })),
+  ...smallOccasions,
+];
 
 /**
  * Advance-booking notice (in days) a chosen occasion requires. A selected
@@ -66,7 +76,12 @@ let cache: OccasionOption[] | null = null;
  * swaps in the admin-configured list once fetched (cached across mounts so the
  * bar doesn't flash on every navigation).
  */
-export function useOccasions(): OccasionOption[] {
+export function useOccasions({
+  singleStall = false,
+}: {
+  /** The Single Stall flow — also offer the `singleStallOnly` occasions. */
+  singleStall?: boolean;
+} = {}): OccasionOption[] {
   const [list, setList] = useState<OccasionOption[]>(
     cache ?? DEFAULT_OCCASIONS,
   );
@@ -88,5 +103,8 @@ export function useOccasions(): OccasionOption[] {
     };
   }, []);
 
-  return list;
+  return useMemo(
+    () => (singleStall ? list : list.filter((o) => !o.singleStallOnly)),
+    [list, singleStall],
+  );
 }

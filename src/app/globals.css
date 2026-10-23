@@ -44,6 +44,10 @@
   --color-brand-black: #000000;
   --color-brand-white: #ffffff;
 
+  /* The one sanctioned non-brand hue: the FSSAI veg-mark green, used ONLY
+     by <DietMark> (veg dot). Non-veg stays the brand red. */
+  --color-diet-veg: #008a00;
+
   /* ── Red — every red role is the one brand red ──────────── */
   --color-maroon: #b92025;
   --color-maroon-soft: #b92025;

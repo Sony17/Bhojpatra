@@ -311,7 +311,7 @@ export default function DatePicker({
             role="dialog"
             aria-label={ariaLabel}
             style={popupStyle}
-            className="animate-rise fixed z-[70] overflow-y-auto rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)]"
+            className="animate-rise fixed z-[95] overflow-y-auto rounded-2xl border border-maroon/40 bg-white p-3 shadow-[0_20px_50px_-12px_rgba(185,32,37,0.35)]"
           >
           {/* Month navigation */}
           <div className="mb-2 flex items-center justify-between px-1">

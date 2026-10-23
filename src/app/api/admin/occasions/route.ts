@@ -1,4 +1,4 @@
-import { occasions } from "@/lib/data";
+import { occasions, smallOccasions } from "@/lib/data";
 import { readSingleton, writeSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
 
@@ -15,6 +15,7 @@ type OccasionOption = {
   name: string;
   nameHi: string;
   leadDays?: number;
+  singleStallOnly?: boolean;
 };
 
 // Guard against an admin fat-fingering an absurd lead time; a year of notice is
@@ -38,19 +39,39 @@ function normalizeLead(raw: unknown): number | undefined {
   return Math.min(MAX_LEAD_DAYS, Math.round(n));
 }
 
-const SEED: OccasionOption[] = occasions.map((o) => ({
-  id: o.id,
-  name: o.name,
-  nameHi: o.nameHi,
-  leadDays: o.leadDays,
-}));
+const SEED: OccasionOption[] = [
+  ...occasions.map((o) => ({
+    id: o.id,
+    name: o.name,
+    nameHi: o.nameHi,
+    leadDays: o.leadDays,
+  })),
+  ...smallOccasions,
+];
+
+/** A list saved before the Single Stall occasions existed gets them appended
+ *  (skipping any the admin already has by id or name) until the admin next
+ *  saves — from then on the saved list is the whole truth (`smallSeeded`), so
+ *  a removed one stays removed. */
+function withSmallSeeds(list: OccasionOption[]): OccasionOption[] {
+  const ids = new Set(list.map((o) => o.id));
+  const names = new Set(list.map((o) => o.name.trim().toLowerCase()));
+  return [
+    ...list,
+    ...smallOccasions.filter(
+      (o) => !ids.has(o.id) && !names.has(o.name.toLowerCase()),
+    ),
+  ];
+}
 
 async function readOccasions(): Promise<OccasionOption[]> {
-  const stored = await readSingleton<{ occasions: OccasionOption[] }>(
-    SETTINGS_KEY,
-  );
+  const stored = await readSingleton<{
+    occasions: OccasionOption[];
+    smallSeeded?: boolean;
+  }>(SETTINGS_KEY);
   const list = stored?.occasions;
-  return Array.isArray(list) && list.length ? list : SEED;
+  if (!Array.isArray(list) || !list.length) return SEED;
+  return stored?.smallSeeded ? list : withSmallSeeds(list);
 }
 
 export async function GET() {
@@ -96,7 +117,13 @@ export async function POST(request: Request) {
     while (seen.has(id)) id = `${base}-${n++}`;
     seen.add(id);
     const leadDays = normalizeLead(row.leadDays);
-    list.push({ id, name, nameHi, ...(leadDays !== undefined ? { leadDays } : {}) });
+    list.push({
+      id,
+      name,
+      nameHi,
+      ...(leadDays !== undefined ? { leadDays } : {}),
+      ...(row.singleStallOnly === true ? { singleStallOnly: true } : {}),
+    });
   }
 
   if (!list.length) {
@@ -107,7 +134,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await writeSingleton(SETTINGS_KEY, { occasions: list });
+    await writeSingleton(SETTINGS_KEY, { occasions: list, smallSeeded: true });
   } catch (err) {
     console.error("Failed to persist occasions", err);
     return Response.json(

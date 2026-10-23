@@ -214,6 +214,25 @@ export const occasions: Occasion[] = [
   { id: "corporate", name: "Corporate Event", nameHi: "कॉर्पोरेट इवेंट", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4"), leadDays: 7 },
 ];
 
+/** Small functions a single stall suits. Seeded into the admin Occasions list
+ *  flagged `singleStallOnly` — offered in the Single Stall flow only, and the
+ *  admin can rename, re-time, unflag or remove them like any other row. */
+export const smallOccasions: {
+  id: string;
+  name: string;
+  nameHi: string;
+  leadDays: number;
+  singleStallOnly: true;
+}[] = [
+  { id: "kitty-party", name: "Kitty Party", nameHi: "किटी पार्टी", leadDays: 2, singleStallOnly: true },
+  { id: "get-together", name: "Family Get-together", nameHi: "पारिवारिक मिलन", leadDays: 2, singleStallOnly: true },
+  { id: "anniversary", name: "Anniversary", nameHi: "सालगिरह", leadDays: 2, singleStallOnly: true },
+  { id: "pooja", name: "Pooja / Satsang", nameHi: "पूजा / सत्संग", leadDays: 2, singleStallOnly: true },
+  { id: "housewarming", name: "Housewarming", nameHi: "गृह प्रवेश", leadDays: 2, singleStallOnly: true },
+  { id: "baby-shower", name: "Baby Shower", nameHi: "गोद भराई", leadDays: 2, singleStallOnly: true },
+  { id: "office-party", name: "Office Party", nameHi: "ऑफिस पार्टी", leadDays: 2, singleStallOnly: true },
+];
+
 /**
  * Fallback advance-booking notice (in days) for an occasion without an explicit
  * `leadDays` — an admin-added occasion left blank, or the free-text "Other"

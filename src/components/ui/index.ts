@@ -22,6 +22,7 @@ export { default as Badge, StatusBadge } from "./Badge";
 export type { BadgeTone } from "./Badge";
 
 export { default as Chip } from "./Chip";
+export { default as DietMark } from "./DietMark";
 export { default as CategoryChips, CategoryChip } from "./CategoryChips";
 
 export { default as SegmentedControl } from "./SegmentedControl";
