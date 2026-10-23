@@ -449,7 +449,8 @@ export default function PaymentBox({
           </span>
           )}
           {app && (
-            <span className="mt-1 w-fit rounded-full bg-cream px-2 py-0.5 text-[10px] font-semibold text-maroon">
+            /* Green by owner's call — the veg-mark green, the one non-brand hue. */
+            <span className="mt-1 w-fit rounded-full bg-diet-veg/10 px-2 py-0.5 text-[10px] font-semibold text-diet-veg">
               {t("Recommended", "सुझावित")}
             </span>
           )}
