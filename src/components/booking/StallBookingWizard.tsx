@@ -23,7 +23,7 @@ import SectionHead from "@/components/booking/shared/SectionHead";
 import EventBar from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
-import ServicePackages from "@/components/sections/ServicePackages";
+import EssentialsPicker from "@/components/booking/EssentialsPicker";
 import {
   WizardHero,
   ProgressRail,
@@ -67,7 +67,7 @@ import {
   type StallItemMap as ItemMap,
 } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
-import { useAllVendors } from "@/lib/useAllVendors";
+import { useAllVendorsStatus } from "@/lib/useAllVendors";
 import {
   sellsOnSingleStall,
   stallTypesOfCourses,
@@ -78,6 +78,7 @@ import {
   stallTypeById,
   toStallTypeId,
 } from "@/lib/stallTypes";
+import type { StallTileImages } from "@/lib/stallTileImages";
 import {
   readStoredLocation,
   markManualLocation,
@@ -91,6 +92,10 @@ import {
   type OccasionOption,
 } from "@/lib/occasions";
 import { useServices } from "@/lib/services";
+import {
+  serviceRate,
+  serviceTotal as serviceChargeFor,
+} from "@/lib/servicePricing";
 import { Button } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
@@ -238,7 +243,12 @@ function coursePrice(course: StallCourse, picks: string[]): number {
 }
 
 /* ─── Component ──────────────────────────────────────────────────────── */
-export default function StallBookingWizard() {
+export default function StallBookingWizard({
+  tileImages,
+}: {
+  /** Admin-set stall-type tile photos (see lib/stallTileImages). */
+  tileImages: StallTileImages;
+}) {
   // Per-browser booking salt — see lib/bookingSalt.ts. Re-keyed to the account
   // once the session is known (below), so two people on one browser never
   // share a booking id.
@@ -666,7 +676,8 @@ export default function StallBookingWizard() {
   // Catalog listings (curated seeds + live vendors) — the only source that
   // knows which counters a vendor runs, so the stall-type grid counts against
   // them rather than the menu roster, which carries no offerings.
-  const catalogVendors = useAllVendors();
+  const { vendors: catalogVendors, loaded: vendorsLoaded } =
+    useAllVendorsStatus();
 
   // A stall type hands off to the Brands catalog pre-filtered to that counter;
   // the catalog's "Book" then comes back here with `?vendor=`, and the guest's
@@ -679,12 +690,6 @@ export default function StallBookingWizard() {
     if (catalogCity) sp.set("city", catalogCity);
     return `/vendors?${sp.toString()}`;
   };
-  // Deliberately the UNfiltered lens — this is the escape hatch for a guest who
-  // doesn't want to commit to a stall type at all.
-  const browseAllStallsHref = catalogCity
-    ? `${brandsBaseHref}&city=${encodeURIComponent(catalogCity)}`
-    : brandsBaseHref;
-
   // Every stall a guest can book, collapsed from the per-course roster into one
   // card per vendor. NO tier gate — that is the whole point of this flow: a
   // Single Stall order browses every verified stall the city offers, whatever
@@ -1006,9 +1011,7 @@ export default function StallBookingWizard() {
 
   const selectedService = services.find((s) => s.id === serviceId);
   const serviceTotal = selectedService
-    ? selectedService.perPlate
-      ? selectedService.priceMin * guests
-      : selectedService.priceMin
+    ? serviceChargeFor(selectedService, guests)
     : 0;
 
   // Counter vendors: the whole catalogue (curated seeds + live vendors, no tier
@@ -1409,7 +1412,7 @@ export default function StallBookingWizard() {
     if (selectedService) {
       lines.push({
         label: selectedService.perPlate
-          ? `Service — ${selectedService.name} (${money(selectedService.priceMin)}/guest × ${guests})`
+          ? `Service — ${selectedService.name} (${money(serviceRate(selectedService, guests))}/guest × ${guests})`
           : `Service — ${selectedService.name}`,
         amount: serviceTotal,
       });
@@ -1815,7 +1818,7 @@ export default function StallBookingWizard() {
   // summary; the menu builder (1) takes the full width.
   const showSummary = step >= 2;
   // The stall-type grid owns the whole screen: it carries its own way onward
-  // (a tile) and its own way out ("See all stalls"), so the wizard's step nav —
+  // (a tile), so the wizard's step nav —
   // a disabled Continue over a duplicate back-link — would only be noise.
   // A stall named by the draft or the URL that the live roster hasn't answered
   // for yet — show a hold, not the stall-type grid (which would flash and then
@@ -1911,9 +1914,12 @@ export default function StallBookingWizard() {
                 lang={lang}
                 cityLabel={catalogCity}
                 counts={stallTypeCount}
+                // Both rosters feed the counts — until they answer, show
+                // placeholder tiles rather than a premature "No stalls".
+                loading={!menuSettled || !vendorsLoaded}
+                images={tileImages}
                 selectedId={counterType}
                 hrefFor={stallTypeHref}
-                browseAllHref={browseAllStallsHref}
               />
             ) : (
               <StallHandoff
@@ -2815,12 +2821,11 @@ function StepStallDetails({
       )}
 
 
-      {/* Service package — the same tiered Essentials comparison the feast
-          wizard makes its own step of (Package A is pitched "For Single Stall &
-          Small Functions", so this flow gets the full cards, not a cut-down
-          list). Optional here, unlike the tiered feast flow where a
-          full-service crew is part of the package promise — hence the skip
-          control, and re-tapping the chosen tier also clears it. */}
+      {/* Service package — the same admin-managed tiers as the feast wizard's
+          Essentials step, as a compact priced list (each row priced for this
+          head-count from the admin's guest-band table). Optional here, unlike
+          the tiered feast flow where a full-service crew is part of the package
+          promise — hence "No service needed" as the first row. */}
       {part === "essentials" && services.length === 0 && (
         <p className="text-sm text-ink-soft">
           {t("No service needed", "कोई सर्विस नहीं चाहिए")}
@@ -2840,48 +2845,14 @@ function StepStallDetails({
               "सर्विस स्टाफ, बुफे सेटअप और क्रॉकरी जोड़ें — या छोड़ दें अगर वेन्यू पहले से दे रहा है।",
             )}
           </p>
-          <button
-            type="button"
-            aria-pressed={serviceId === ""}
-            onClick={() => setServiceId("")}
-            className={
-              "mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border p-4 text-left transition " +
-              (serviceId === ""
-                ? "border-maroon/40 bg-cream/35 shadow-soft"
-                : "border-cream-3 bg-white hover:bg-cream-2")
-            }
-          >
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-ink">
-                {t("No service needed", "कोई सर्विस नहीं चाहिए")}
-              </span>
-              <span className="mt-0.5 block text-xs text-ink-soft">
-                {t("Just the stall", "सिर्फ़ स्टॉल")}
-              </span>
-            </span>
-            <span
-              className={
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold " +
-                (serviceId === ""
-                  ? "border-maroon/40 bg-cream text-maroon"
-                  : "border-cream-3 text-ink-soft")
-              }
-            >
-              {serviceId === ""
-                ? `✓ ${t("Your pick", "आपकी पसंद")}`
-                : t("Skip service", "सर्विस छोड़ें")}
-            </span>
-          </button>
           <div className="mt-4">
-            <ServicePackages
+            <EssentialsPicker
               packages={services}
               selectedId={serviceId}
-              // Tapping the already-chosen tier clears it back to "no service"
-              // — the optionality the feast flow doesn't have.
-              onSelect={(id) => setServiceId(id === serviceId ? "" : id)}
+              onSelect={setServiceId}
               guests={guests}
-              embedded
-              hideIntro
+              lang={lang}
+              t={t}
             />
           </div>
         </>

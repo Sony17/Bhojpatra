@@ -550,40 +550,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     subtitleHi: "मशहूर ब्रांड्स के प्रीमियम बैना बॉक्स, खूबसूरती से पैक किए हुए।",
     cta: "Explore Baina Box →",
     ctaHi: "बैना बॉक्स देखें →",
-    brands: [
-      {
-        id: "ram-asrey",
-        name: "Ram Asrey",
-        nameHi: "राम आसरे",
-        logo: "",
-        image:
-          "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=500&q=70",
-      },
-      {
-        id: "chhappan-bhog",
-        name: "Chhappan Bhog",
-        nameHi: "छप्पन भोग",
-        logo: "",
-        image:
-          "https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=500&q=70",
-      },
-      {
-        id: "hazelnut-factory",
-        name: "Hazelnut Factory",
-        nameHi: "हेज़लनट फैक्ट्री",
-        logo: "",
-        image:
-          "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=70",
-      },
-      {
-        id: "premium-packaging",
-        name: "Premium Packaging",
-        nameHi: "प्रीमियम पैकेजिंग",
-        logo: "",
-        image:
-          "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=500&q=70",
-      },
-    ],
+    brands: [],
   },
   bainaBoxSpecial: {
     enabled: true,
@@ -714,6 +681,14 @@ function mergeHeroImageMap(
 
 /** Per-section shallow merge so newly-added fields keep a default value, while
  *  a saved array (categories, items…) replaces the default wholesale. */
+/** Ids of the placeholder Baina Box brands that used to ship as the default. */
+const RETIRED_BAINA_BRANDS = new Set([
+  "ram-asrey",
+  "chhappan-bhog",
+  "hazelnut-factory",
+  "premium-packaging",
+]);
+
 export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
   if (!stored) return DEFAULT_HOME_CONTENT;
   const d = DEFAULT_HOME_CONTENT;
@@ -782,9 +757,15 @@ export function reconcile(stored: Partial<HomeContent> | null): HomeContent {
     bainaBoxes: {
       ...d.bainaBoxes,
       ...stored.bainaBoxes,
-      brands: stored.bainaBoxes?.brands?.length
-        ? stored.bainaBoxes.brands
-        : d.bainaBoxes.brands,
+      // Content saved while the placeholder brands were the default still
+      // carries them — drop any card left untouched on its stock photo.
+      brands: (stored.bainaBoxes?.brands ?? []).filter(
+        (b) =>
+          !(
+            RETIRED_BAINA_BRANDS.has(b.id) &&
+            b.image?.includes("images.unsplash.com")
+          ),
+      ),
     },
     bainaBoxSpecial: (() => {
       const merged = { ...d.bainaBoxSpecial, ...stored.bainaBoxSpecial };

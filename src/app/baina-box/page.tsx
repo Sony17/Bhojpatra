@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Baina Box & Sweet Box Marketplace — Bhojpatra",
   description:
-    "Explore premium Baina Boxes, mithai gift hampers, and festive sweet packages from Lucknow's iconic brands like Ram Asrey, Chhappan Bhog, and Hazelnut Factory.",
+    "Explore premium Baina Boxes, mithai gift hampers, and festive sweet packages from sweet houses on Bhojpatra.",
 };
 
 export default function BainaBoxOverviewPage() {

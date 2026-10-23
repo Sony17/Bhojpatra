@@ -36,7 +36,6 @@ import {
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
-import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 import {
   AppSearchBar,
   Button,
@@ -1301,8 +1300,8 @@ function VendorCard({
   stats?: VendorRatingSummary;
   /** The stall type the catalog is filtered to, passed on to the wizard. */
   counter?: string;
-  /** Browsing the Baina Box lens (chip or "baina" search) — a brand with a
-   *  Baina Box storefront then links there instead of to its caterer page. */
+  /** Browsing the Baina Box lens (chip or "baina" search) — "Order" then
+   *  lands on the vendor's Baina Box panel instead of the stall wizard. */
   bainaMode?: boolean;
   /** The lens being browsed. The card then advertises that one thing — the
    *  other categories and tier bands a vendor serves are irrelevant to this
@@ -1314,12 +1313,7 @@ function VendorCard({
   const inCompare = has(vendor.id);
   const compareDisabled = !inCompare && isFull;
 
-  const bainaVendorData = bainaMode
-    ? getBainaBoxVendorByVendorId(vendor.id)
-    : undefined;
-  const vendorHref = bainaVendorData
-    ? `/baina-box/${bainaVendorData.slug}`
-    : `/vendors/${vendor.id}`;
+  const vendorHref = `/vendors/${vendor.id}`;
 
   // "Book" from a brand card starts a Single Stall order with this vendor
   // pre-selected (still changeable in that wizard). Live vendors resolve by id;
@@ -1330,9 +1324,9 @@ function VendorCard({
   // list used to drop live vendors from newer cities out of the roster.
   // Boxes are ordered per box, not per plate, so a Baina Box brand goes to its
   // own order panel instead — the flow that actually sells what the lens shows.
-  // Curated brands have a storefront; a live vendor's boxes are ordered from
-  // the same panel on their profile (the anchor is simply absent, landing them
-  // on the profile, if they declared the category but published no boxes).
+  // A vendor's boxes are ordered from the panel on their profile (the anchor
+  // is simply absent, landing them on the profile, if they declared the
+  // category but published no boxes).
   //
   // The CTA is gated on what the vendor can actually be booked for: a Single
   // Stall only when the booking roster has their stall (curated samples are
@@ -1343,11 +1337,7 @@ function VendorCard({
   // Everything else routes to the flow that sells it, or an enquiry.
   const cta = listingCta(vendor, {
     counter,
-    bainaHref: bainaVendorData
-      ? `/baina-box/${bainaVendorData.slug}#baina-order`
-      : bainaMode
-        ? `/vendors/${vendor.id}#baina-order`
-        : undefined,
+    bainaHref: bainaMode ? `/vendors/${vendor.id}#baina-order` : undefined,
   });
   const bookHref = cta.href;
   const ctaText = ctaLabel(cta.kind, t);
@@ -1519,9 +1509,7 @@ function VendorCard({
         >
           {stats || (vendor.reviews > 0 && !isSample) ? (
             <Link
-              href={
-                bainaVendorData ? vendorHref : `/vendors/${vendor.id}#reviews`
-              }
+              href={`/vendors/${vendor.id}#reviews`}
               className="relative z-10 inline-flex items-center gap-0.5 rounded bg-maroon px-1.5 py-0.5 text-[11px] font-bold text-cream shadow-sm"
               aria-label={t(
                 `Rated ${stats?.rating ?? vendor.rating}`,

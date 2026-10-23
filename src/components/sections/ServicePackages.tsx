@@ -6,6 +6,12 @@ import { CategoryChips, CategoryChip } from "@/components/ui";
 import { servicePackages, type ServicePackage } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { money } from "@/lib/money";
+import {
+  serviceRate,
+  serviceTierFor,
+  serviceTotal,
+  tierRangeLabel,
+} from "@/lib/servicePricing";
 
 /**
  * "Choose Your Service Package" — the four-tier service comparison from the
@@ -45,6 +51,10 @@ export default function ServicePackages({
 }) {
   const { lang, t } = useLang();
   const selectable = typeof onSelect === "function";
+  // Inside a wizard step the cards are the whole point of the screen — a
+  // scroll-reveal there leaves them invisible (an empty gap) until the guest
+  // happens to scroll, so embedded hosts render them straight away.
+  const Wrap = embedded ? Plain : Reveal;
 
   // On phones the four tier cards would stack into a very long scroll, so
   // mobile reduces them to a chip-tab row showing one card at a time (the
@@ -86,7 +96,7 @@ export default function ServicePackages({
           </Reveal>
         )}
 
-        <Reveal className={`mx-auto max-w-7xl sm:hidden ${hideIntro ? "" : "mt-10"}`}>
+        <Wrap className={`mx-auto max-w-7xl sm:hidden ${hideIntro ? "" : "mt-10"}`}>
           <CategoryChips label={t("Service packages", "सर्विस पैकेज")}>
             {packages.map((pkg, i) => (
               <CategoryChip
@@ -99,9 +109,9 @@ export default function ServicePackages({
               </CategoryChip>
             ))}
           </CategoryChips>
-        </Reveal>
+        </Wrap>
 
-        <Reveal
+        <Wrap
           stagger
           className={`mx-auto mt-5 grid max-w-7xl grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4 ${
             hideIntro ? "" : "sm:mt-14"
@@ -126,7 +136,7 @@ export default function ServicePackages({
               className={i === shownIdx ? undefined : "max-sm:hidden"}
             />
           ))}
-        </Reveal>
+        </Wrap>
 
         {/* Trust bar — the reference's reassurance strip, in brand colours.
             Marketing surfaces only; the wizard's Essentials step keeps just
@@ -339,10 +349,30 @@ const TRUST_ITEMS = [
   },
 ];
 
-/** Per-guest price band, e.g. "₹180 – ₹300" / "₹400 – ₹700+" / flat "₹5,000". */
+/** Per-guest price band, e.g. "₹180 – ₹300" / "₹400 – ₹700+" / flat "₹5,000".
+ *  With a guest-count table the band is the table's own cheapest → dearest. */
 function priceBand(pkg: ServicePackage): string {
-  if (!pkg.perPlate) return money(pkg.priceMin);
+  const tiers = pkg.guestTiers ?? [];
+  if (tiers.length) {
+    const prices = tiers.map((t) => t.price);
+    const lo = Math.min(...prices);
+    const hi = Math.max(...prices);
+    return lo === hi ? money(lo) : `${money(lo)} – ${money(hi)}`;
+  }
+  if (!pkg.perPlate || pkg.priceMax <= pkg.priceMin) return money(pkg.priceMin);
   return `${money(pkg.priceMin)} – ${money(pkg.priceMax)}${pkg.openTop ? "+" : ""}`;
+}
+
+/** Stand-in for <Reveal> that renders immediately (embedded wizard hosts). */
+function Plain({
+  className,
+  children,
+}: {
+  className?: string;
+  stagger?: boolean;
+  children: ReactNode;
+}) {
+  return <div className={className}>{children}</div>;
 }
 
 function ServiceCard({
@@ -373,11 +403,14 @@ function ServiceCard({
   const name = lang === "hi" ? pkg.nameHi : pkg.name;
   const subtitle = lang === "hi" ? pkg.subtitleHi : pkg.subtitle;
   const choose = () => onSelect?.(pkg.id);
-  // The amount this tier adds to the feast: per-guest floor × headcount (a flat
-  // fee if the tier isn't per-guest). Package A's ₹0 floor adds nothing.
-  const feastPrice =
-    typeof guests === "number" && pkg.perPlate ? pkg.priceMin * guests : pkg.priceMin;
+  // The amount this tier adds to the feast at this head-count — the admin's
+  // guest-band price when one covers it, else the package floor.
+  const hasGuests = typeof guests === "number";
+  const rate = hasGuests ? serviceRate(pkg, guests) : pkg.priceMin;
+  const feastPrice = hasGuests ? serviceTotal(pkg, guests) : pkg.priceMin;
   const feastLabel = money(feastPrice);
+  const activeTier = hasGuests ? serviceTierFor(pkg, guests) : undefined;
+  const tiers = pkg.guestTiers ?? [];
 
   return (
     <div
@@ -519,6 +552,38 @@ function ServiceCard({
               </li>
             ))}
           </ul>
+
+          {/* PRICE BY GUESTS — the admin's head-count table, the band that
+              applies to this order marked. */}
+          {tiers.length > 0 && (
+            <>
+              <SectionLabel variant={variant}>
+                {t("Price by guests", "मेहमानों के हिसाब से कीमत")}
+              </SectionLabel>
+              <ul className="mt-3 space-y-1.5">
+                {tiers.map((tier) => {
+                  const on = tier === activeTier;
+                  return (
+                    <li
+                      key={tier.minGuests}
+                      className={`flex items-center justify-between gap-3 text-sm ${variant.body} ${
+                        on ? "font-bold" : ""
+                      }`}
+                    >
+                      <span>
+                        {tierRangeLabel(tier)} {t("guests", "मेहमान")}
+                        {on && ` · ${t("you", "आप")}`}
+                      </span>
+                      <span>
+                        {money(tier.price)}
+                        {pkg.perPlate ? t(" / guest", " / मेहमान") : ""}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
       </div>
 
@@ -531,13 +596,15 @@ function ServiceCard({
             <p
               className={`text-[0.62rem] font-bold uppercase tracking-[0.18em] ${variant.priceValue}`}
             >
-              {t("Starting from", "शुरुआती कीमत")}
+              {selectable && hasGuests
+                ? t(`For ${guests} guests`, `${guests} मेहमानों के लिए`)
+                : t("Starting from", "शुरुआती कीमत")}
             </p>
             <p className="mt-1 flex flex-wrap items-baseline justify-center gap-x-1.5">
               <span
                 className={`font-display text-2xl leading-none ${variant.priceValue}`}
               >
-                {priceBand(pkg)}
+                {selectable && hasGuests ? money(rate) : priceBand(pkg)}
               </span>
               <span className="text-xs">
                 {pkg.perPlate
@@ -547,7 +614,7 @@ function ServiceCard({
             </p>
           </div>
           {/* Selectable (wizard): the exact amount this tier adds to the feast. */}
-          {selectable && typeof guests === "number" && (
+          {selectable && hasGuests && (
             <>
               <span aria-hidden="true" className={`block h-px ${variant.priceRule}`} />
               {/* A ₹0 tier adds nothing to the total — but "Included" would
@@ -556,10 +623,9 @@ function ServiceCard({
                   Stall). State the charge, not the entitlement. */}
               <p className="px-4 py-2 text-center text-xs font-semibold">
                 {feastPrice > 0
-                  ? t(
-                      `${feastLabel} for ${guests} guests`,
-                      `${guests} मेहमानों के लिए ${feastLabel}`,
-                    )
+                  ? pkg.perPlate
+                    ? t(`${feastLabel} total`, `कुल ${feastLabel}`)
+                    : t("flat fee", "एकमुश्त शुल्क")
                   : t("No extra charge", "कोई अतिरिक्त शुल्क नहीं")}
               </p>
             </>

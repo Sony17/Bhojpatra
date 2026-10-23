@@ -6,16 +6,19 @@ import PublicShell from "@/components/app/PublicShell";
 import CompareTray from "@/components/vendors/CompareTray";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import { useLang } from "@/lib/i18n";
-import { Button, Badge } from "@/components/ui";
-import { BAINA_BOX_VENDOR_DATA, type BainaBoxVendorData } from "@/lib/bainaBoxData";
-import { vendorListings } from "@/lib/data";
+import { Button, EmptyState, SkeletonList } from "@/components/ui";
+import { listingCateringCategories } from "@/lib/data";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
+import { useAllVendorsStatus } from "@/lib/useAllVendors";
 
-/** Curated demo brands (sample listings) never show a Verified badge. */
-const SAMPLE_IDS = new Set(vendorListings.filter((v) => v.sample).map((v) => v.id));
-
+/** Every vendor who declared the Baina Box category — boxes are ordered from
+ *  the panel on their profile. */
 export default function BainaBoxOverview() {
   const { t } = useLang();
-  const vendors: BainaBoxVendorData[] = Object.values(BAINA_BOX_VENDOR_DATA);
+  const { vendors: all, loaded } = useAllVendorsStatus();
+  const vendors = all.filter((v) =>
+    listingCateringCategories(v).includes("baina-box"),
+  );
 
   return (
     <PublicShell>
@@ -39,116 +42,69 @@ export default function BainaBoxOverview() {
         </div>
 
         {/* Vendor Grid Header */}
-        <div className="mt-8 flex items-center justify-between px-1">
-          <p className="text-sm text-ink-soft">
-            <span className="font-bold text-ink">{vendors.length}</span>{" "}
-            {t("Iconic Sweet Houses", "प्रसिद्ध मिठाई घर")}
-          </p>
-        </div>
+        {loaded && vendors.length > 0 && (
+          <div className="mt-8 flex items-center justify-between px-1">
+            <p className="text-sm text-ink-soft">
+              <span className="font-bold text-ink">{vendors.length}</span>{" "}
+              {vendors.length === 1
+                ? t("Sweet House", "मिठाई घर")
+                : t("Sweet Houses", "मिठाई घर")}
+            </p>
+          </div>
+        )}
 
-        {/* Vendor Grid */}
-        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {vendors.map((vendor) => (
-            <Link
-              key={vendor.slug}
-              href={`/baina-box/${vendor.slug}`}
-              className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-maroon/20 hover:shadow-card"
-            >
-              {/* Main Image */}
-              <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream">
-                <Image
-                  src={vendor.heroImage}
-                  alt={vendor.name}
-                  fill
-                  sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-
-                {/* Verified Badge */}
-                {vendor.verified && !SAMPLE_IDS.has(vendor.vendorId) && (
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-md bg-maroon px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
-                    <span aria-hidden="true">✓</span> {t("VERIFIED", "वेरिफाइड")}
-                  </span>
-                )}
-
-                {/* Rating Badge */}
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-bold text-ink shadow-sm backdrop-blur-sm">
-                  <span className="text-maroon">★</span>
-                  <span>{vendor.rating}</span>
-                  <span className="font-normal text-ink-soft">
-                    ({vendor.reviews})
-                  </span>
-                </span>
-              </div>
-
-              {/* Vendor Body */}
-              <div className="flex flex-1 flex-col justify-between p-4 sm:p-5">
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h2 className="font-display text-xl font-bold tracking-tight text-ink transition-colors group-hover:text-maroon">
-                        {vendor.name}
-                      </h2>
-                      {vendor.nameHi && (
-                        <p className="text-xs text-ink-soft">{vendor.nameHi}</p>
-                      )}
-                    </div>
-
-                    {/* Logo Avatar */}
-                    {vendor.logoImage && (
-                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-maroon/15">
-                        <Image
-                          src={vendor.logoImage}
-                          alt={vendor.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Location */}
-                  <p className="mt-2 flex items-center gap-1 text-xs text-ink-soft">
-                    <span className="text-maroon">📍</span>
-                    <span>{vendor.location}</span>
-                  </p>
-
-                  {/* Tags */}
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {vendor.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-cream px-2.5 py-0.5 text-[11px] font-medium text-ink-soft"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Best For */}
-                  <p className="mt-3 text-xs text-ink-soft">
-                    <span className="font-semibold text-ink">
-                      {t("Best For", "उपयुक्त")}:
-                    </span>{" "}
-                    {vendor.bestFor.slice(0, 3).join(" · ")}
-                  </p>
+        {!loaded ? (
+          <div className="mt-8">
+            <SkeletonList />
+          </div>
+        ) : vendors.length === 0 ? (
+          <EmptyState
+            className="mt-8"
+            icon="🎁"
+            title={t("Baina Boxes coming soon", "बैना बॉक्स जल्द आ रहे हैं")}
+            message={t(
+              "Sweet houses are joining Bhojpatra — check back soon.",
+              "मिठाई घर भोजपत्र से जुड़ रहे हैं — जल्द ही देखें।",
+            )}
+          />
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {vendors.map((vendor) => (
+              <Link
+                key={vendor.id}
+                href={`/vendors/${vendor.id}#baina-order`}
+                className="group flex flex-col overflow-hidden rounded-2xl border border-cream-3 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-maroon/20 hover:shadow-card"
+              >
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream">
+                  {vendor.image && (
+                    <Image
+                      src={vendor.image}
+                      alt={vendor.name}
+                      fill
+                      sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      unoptimized={photoNeedsUnoptimized(vendor.image)}
+                    />
+                  )}
+                  {vendor.verified && (
+                    <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-md bg-maroon px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                      <span aria-hidden="true">✓</span> {t("VERIFIED", "वेरिफाइड")}
+                    </span>
+                  )}
                 </div>
 
-                {/* Price & Action */}
-                <div className="mt-5 border-t border-cream-3 pt-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] text-ink-soft">
-                        {t("Starting from", "शुरुआती कीमत")}
-                      </p>
-                      <p className="font-display text-lg font-bold text-maroon">
-                        ₹{vendor.fixedPrice.toLocaleString("en-IN")}{" "}
-                        <span className="text-xs font-normal text-ink-soft">
-                          / {vendor.priceUnit}
-                        </span>
-                      </p>
-                    </div>
+                <div className="flex flex-1 flex-col justify-between p-4 sm:p-5">
+                  <div>
+                    <h2 className="font-display text-xl font-bold tracking-tight text-ink transition-colors group-hover:text-maroon">
+                      {vendor.name}
+                    </h2>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-ink-soft">
+                      <span className="text-maroon">📍</span>
+                      <span>{vendor.city}</span>
+                    </p>
+                  </div>
 
+                  <div className="mt-5 flex justify-end border-t border-cream-3 pt-3">
                     <Button
                       variant="secondary"
                       size="sm"
@@ -158,10 +114,10 @@ export default function BainaBoxOverview() {
                     </Button>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
 
         <CompareTray />
       </section>

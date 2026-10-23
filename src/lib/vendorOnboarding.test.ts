@@ -16,9 +16,11 @@ import {
 } from "@/lib/vendorOnboarding";
 import {
   applyBadgeDecision,
+  applyContentDecision,
   cleanOnboardingDraft,
   nextModerationState,
   publishedView,
+  reviewedItems,
   stripBadgeGrants,
   validateVendorMenuInput,
   type LiveVendorRecord,
@@ -288,4 +290,89 @@ test("publishedView shows approved content while edits wait, hides everything el
   assert.equal(publishedView(vendor({ moderation: "Pending" })), null);
   assert.equal(publishedView({ ...edited, moderation: "Hidden" }), null);
   assert.equal(publishedView({ ...edited, verified: false }), null);
+});
+
+/* ── Item-level moderation: single stalls & dishes ───────────────────────── */
+
+function stallVendor(patch: Partial<LiveVendorRecord> = {}): LiveVendorRecord {
+  return vendor({
+    moderation: "Approved",
+    verified: true,
+    menu: [
+      { categoryId: "main", perPlate: 120, items: [{ name: "Dal", diet: "veg" }, { name: "Kofta", diet: "veg" }] },
+      // Two custom stalls both publish into "regional"; "Thali" is in both.
+      {
+        categoryId: "regional",
+        perPlate: 200,
+        items: [
+          { name: "Litti", diet: "veg" },
+          { name: "Thali", diet: "veg" },
+          { name: "Baati", diet: "veg" },
+        ],
+      },
+      { categoryId: "chaat", perPlate: 90, items: [{ name: "Pani Puri", diet: "veg" }] },
+    ],
+    stallConfig: {
+      categories: ["Bihari", "Rajasthani", "chaat"],
+      menus: {
+        Bihari: [{ name: "Litti", diet: "veg" }, { name: "Thali", diet: "veg" }],
+        Rajasthani: [{ name: "Baati", diet: "veg" }, { name: "thali", diet: "veg" }],
+        chaat: [{ name: "Pani Puri", diet: "veg" }],
+      },
+      categoryPricing: { chaat: { fixedPerPlate: 90, minPaxGuarantee: 50 } },
+    },
+    ...patch,
+  });
+}
+
+const names = (r: LiveVendorRecord | null, course: string) =>
+  r?.menu.find((s) => s.categoryId === course)?.items.map((i) => i.name) ?? null;
+
+test("contentReview: a disapproved stall leaves the listing, the rest stays live", () => {
+  const review = applyContentDecision(undefined, { kind: "stall", stallId: "chaat" }, "reject", " Hygiene photos ");
+  assert.equal(review?.stalls?.chaat.reason, "Hygiene photos");
+  const view = publishedView(stallVendor({ contentReview: review }));
+  assert.equal(names(view, "chaat"), null);
+  assert.deepEqual(view?.stallConfig?.categories, ["Bihari", "Rajasthani"]);
+  assert.equal(view?.stallConfig?.categoryPricing?.chaat, undefined);
+  assert.deepEqual(names(view, "main"), ["Dal", "Kofta"]);
+  assert.equal(view?.moderation, "Approved");
+});
+
+test("contentReview: a stall sharing a course takes only its own dishes", () => {
+  const review = applyContentDecision(undefined, { kind: "stall", stallId: "Bihari" }, "reject");
+  const view = publishedView(stallVendor({ contentReview: review }));
+  // "Litti" was only Bihari's; "Thali" is also on the Rajasthani stall.
+  assert.deepEqual(names(view, "regional"), ["Thali", "Baati"]);
+  assert.equal(view?.stallConfig?.menus?.Bihari, undefined);
+});
+
+test("contentReview: disapproved dishes drop out; ids keep their index", () => {
+  let review = applyContentDecision(undefined, { kind: "dish", courseId: "main", name: "Dal" }, "reject");
+  review = applyContentDecision(review, { kind: "dish", courseId: "regional", name: "THALI" }, "reject");
+  const r = stallVendor({ contentReview: review });
+  const view = publishedView(r);
+  assert.deepEqual(names(view, "main"), ["Kofta"]);
+  assert.deepEqual(names(view, "regional"), ["Litti", "Baati"]);
+  // The same dish in the stall's own list goes too (case-insensitive).
+  assert.deepEqual(view?.stallConfig?.menus?.Rajasthani.map((i) => i.name), ["Baati"]);
+  // Roster ids are built from the index in the FULL section.
+  assert.deepEqual(reviewedItems(r, r.menu[1])?.map((x) => x.index), [0, 2]);
+  // Approving it again restores the dish; nothing left → no review at all.
+  review = applyContentDecision(review, { kind: "dish", courseId: "main", name: "Dal" }, "approve");
+  review = applyContentDecision(review, { kind: "dish", courseId: "regional", name: "Thali" }, "approve");
+  assert.equal(review, undefined);
+});
+
+test("contentReview: reaches the approved snapshot during a pending edit and never re-queues", () => {
+  const live = stallVendor();
+  const pending = stallVendor({
+    moderation: "Pending",
+    approvedSnapshot: nextModerationState(live, { ...live, about: "new" }, true).approvedSnapshot,
+    contentReview: applyContentDecision(undefined, { kind: "stall", stallId: "chaat" }, "reject"),
+  });
+  assert.equal(names(publishedView(pending), "chaat"), null);
+  // An admin decision is not vendor content: no moderation change.
+  const decided = { ...live, contentReview: pending.contentReview };
+  assert.equal(nextModerationState(live, decided, true).moderation, "Approved");
 });

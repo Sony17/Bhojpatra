@@ -18,11 +18,13 @@ import type { ContentBanner, ContentFaq } from "@/lib/admin/types";
 import PagesTab from "./PagesTab";
 import ContactInfoTab from "./ContactInfoTab";
 import HomePageTab from "./HomePageTab";
+import StallTilesTab from "./StallTilesTab";
 
 const TABS: TabItem[] = [
   { id: "home", label: "Home Page" },
   { id: "pages", label: "Pages" },
   { id: "contact", label: "Contact Info" },
+  { id: "stalls", label: "Single Stall Tiles" },
   { id: "banners", label: "Banners" },
   { id: "testimonials", label: "Testimonials" },
   { id: "faq", label: "FAQ" },
@@ -36,12 +38,13 @@ export default function ContentManager() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Content Control"
-        subtitle="Edit the home page, site pages, contact details, banners, testimonials and FAQs."
+        subtitle="Edit the home page, site pages, contact details, Single Stall tile photos, banners, testimonials and FAQs."
       />
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "home" && <HomePageTab />}
       {tab === "pages" && <PagesTab />}
       {tab === "contact" && <ContactInfoTab />}
+      {tab === "stalls" && <StallTilesTab />}
       {tab === "banners" && <BannersTab />}
       {tab === "testimonials" && <TestimonialsTab />}
       {tab === "faq" && <FaqTab />}

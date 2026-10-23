@@ -1,6 +1,7 @@
 import { servicePackages, type ServicePackage } from "@/lib/data";
 import { readSingleton, writeSingleton } from "@/lib/store";
 import { requireRole } from "@/lib/auth";
+import { normalizeGuestTiers } from "@/lib/servicePricing";
 
 // Feast-wide service packages offered in the booking wizard's "Choose Your
 // Service Package" step. The admin curates this list; it is persisted to
@@ -66,8 +67,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Normalise: require a name, default Hindi to the English name, coerce prices
-  // and the per-guest flag, keep the display lists, and derive/dedupe ids.
+  // Normalise: require a name, default Hindi to the English name, coerce prices,
+  // the per-guest flag and the guest-count price table, keep the display lists,
+  // and derive/dedupe ids.
   const seen = new Set<string>();
   const list: ServicePackage[] = [];
   for (const item of raw) {
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
 
     const priceMin = toPrice(row.priceMin);
     const priceMax = Math.max(priceMin, toPrice(row.priceMax));
+    const guestTiers = normalizeGuestTiers(row.guestTiers);
 
     list.push({
       id,
@@ -103,6 +106,7 @@ export async function POST(request: Request) {
       priceMax,
       perPlate: row.perPlate !== false,
       ...(row.openTop === true ? { openTop: true } : {}),
+      ...(guestTiers.length ? { guestTiers } : {}),
     });
   }
 

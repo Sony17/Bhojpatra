@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { listLiveVendorRecords } from "@/lib/vendorMenus";
+import { stallMenuId } from "@/lib/stallTypes";
 import {
   applicationForOwner,
   readVendorApplications,
@@ -44,6 +45,14 @@ export async function GET() {
         badges: r.badges ?? null,
         updatedAt: r.updatedAt,
         menu: r.menu,
+        // Single Stalls (with their own dish lists) and the admin's per-stall /
+        // per-dish disapprovals, for item-level review.
+        stalls: (r.stallConfig?.categories ?? []).map((id) => ({
+          id,
+          courseId: stallMenuId(id),
+          dishes: r.stallConfig?.menus?.[id] ?? [],
+        })),
+        contentReview: r.contentReview ?? null,
         gallery: r.ownerUserId
           ? (await listPhotosByOwner(r.ownerUserId, "gallery")).map(photoUrl)
           : [],

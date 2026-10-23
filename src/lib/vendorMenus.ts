@@ -58,6 +58,10 @@ import {
   tiersForPrice,
 } from "@/lib/tiers";
 import {
+  dishReviewKey,
+  type VendorContentReview,
+} from "@/lib/contentReview";
+import {
   MAX_COURSE_QUOTA,
   VENDOR_ITEM_LIMITS_KEY,
   mergeCourseQuotas,
@@ -91,6 +95,12 @@ export interface VendorMenuItem {
  *  Approved back to Pending for re-review; "Hidden" is an admin takedown that
  *  stays Hidden until restored. Platform seeds are born Approved. */
 export type ModerationStatus = "Pending" | "Approved" | "Hidden";
+
+export {
+  dishReviewKey,
+  type ContentRejection,
+  type VendorContentReview,
+} from "@/lib/contentReview";
 
 /** One course/category a vendor serves, with their per-plate uplift. */
 export interface VendorMenuSection {
@@ -397,6 +407,8 @@ export interface LiveVendorRecord {
   bainaDetails?: VendorBainaDetails;
   /** Recognition badges applied for and granted (Verified, Icon, Heritage). */
   badges?: VendorBadgesState;
+  /** Admin-disapproved stalls & dishes (admin-only; never in a snapshot). */
+  contentReview?: VendorContentReview;
   /** Feast Booking sub-components enabled for this vendor (Live Counters, Extras, Essentials, Add-ons). */
   cateringComponents?: CateringComponentsSelection;
 
@@ -427,6 +439,7 @@ export type VendorPublishedSnapshot = Omit<
   | "onboarding"
   | "approvedSnapshot"
   | "badges"
+  | "contentReview"
 >;
 
 const store = createStore<LiveVendorRecord>({
@@ -480,8 +493,8 @@ function seedRecords(): LiveVendorRecord[] {
  *  resolves in `assembleMenuCategories()` and pre-selects the stall (without
  *  this the picked vendor silently vanishes — it exists only in the catalog
  *  id-space, never in the booking menu). Beverages ride the "welcome"
- *  (Welcome Drinks) course, chaat the "chaat" course, caterers "main", the
- *  Baina Box mithai houses "sweets". Catalog caterers that duplicate a wizard
+ *  (Welcome Drinks) course, chaat the "chaat" course, caterers "main".
+ *  Catalog caterers that duplicate a wizard
  *  specialist by name (vl-1/2/5/9/11 ↔ Awadhi Royal, Nawabi Dawat, Namma
  *  Ruchi, Chettinad Feast Co., Tandoor Tales) are NOT seeded — the wizard's
  *  hand-off bridges those by name-slug so the roster never shows the same
@@ -506,10 +519,6 @@ const PLACEHOLDER_SPECIALIST_MENUS: {
   { id: "vl-8", categoryId: "main", items: ["Dal Baati Churma", "Gatte ki Sabzi", "Ker Sangri", "Pyaaz Kachori", "Bajre ki Roti", "Papad ki Sabzi"] },
   { id: "vl-10", categoryId: "main", items: ["Veg Manchurian", "Hakka Noodles", "Paneer Chilli", ["Grilled Chicken", "non-veg"], "Veg Au Gratin", "Schezwan Fried Rice"] },
   { id: "vl-12", categoryId: "main", items: ["Sattvik Thali", "Jeera Aloo", "Lauki Kofta", "Sambar Rice", "Curd Rice", "Moong Dal Halwa"] },
-  // Baina Box mithai houses — the home Sweets category cards.
-  { id: "vl-13", categoryId: "sweets", items: ["Malai Gilori", "Kesar Peda", "Motichoor Ladoo", "Kaju Katli", "Imarti", "Sondesh"] },
-  { id: "vl-14", categoryId: "sweets", items: ["Besan Ladoo", "Kesar Barfi", "Gujiya", "Rasmalai", "Dry Fruit Ladoo", "Balushahi"] },
-  { id: "vl-15", categoryId: "sweets", items: ["Hazelnut Barfi", "Chocolate Ladoo", "Kaju Katli", "Baklava", "Motichoor Ladoo", "Assorted Mithai Box"] },
 ];
 
 /** Bookable seed records for the catalog placeholder specialists above. Card
@@ -677,8 +686,10 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
   const { pins } = reconcileTopVendors(storedPins);
   // What customers may see: Approved records, plus a live vendor's last
   // approved content while a newer edit waits in moderation.
+  // Admin-disapproved stalls & dishes come out per section below (not via
+  // `publishedView`), so dish ids keep their index in the full section.
   const visible = rows.flatMap((r) => {
-    const view = publishedView(r);
+    const view = approvedView(r);
     return view ? [view] : [];
   });
   return menuCategories.map((cat) => ({
@@ -686,10 +697,9 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
     vendors: orderByPins(
       pins,
       visible.flatMap((r) => {
-      const section = r.menu.find(
-        (s) => s.categoryId === cat.id && !s.hidden && s.items.length > 0,
-      );
-      if (!section) return [];
+      const section = r.menu.find((s) => s.categoryId === cat.id && !s.hidden);
+      const shown = section ? reviewedItems(r, section) : null;
+      if (!section || !shown?.length) return [];
       // Effective per-band dish quota for this course: the caterer's own
       // dashboard numbers with any admin override laid on top, band by band —
       // an admin entry wins its band, the rest keep the caterer's, and a band
@@ -727,7 +737,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           // How this stall sells on Single Stall — resolved here (rather than
           // left undefined) so the wizard never has to know the default.
           menuType: menuTypeOf(section),
-          items: section.items.map((it, i) => ({
+          items: shown.map(({ item: it, index: i }) => ({
             id: `${r.id}-${i}`,
             name: it.name,
             diet: it.diet,
@@ -748,7 +758,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           ...((r.stallConfig?.categories ?? []).some((c) => stallMenuId(c) === cat.id)
             ? { stallCourse: true }
             : {}),
-          ...customStallName(r.stallConfig, cat.id),
+          ...customStallName(applyContentReview(r).stallConfig, cat.id),
         },
       ];
       }),
@@ -2261,6 +2271,7 @@ export function toPublishedSnapshot(
     onboarding,
     approvedSnapshot,
     badges,
+    contentReview,
     ...content
   } = r;
   /* eslint-enable @typescript-eslint/no-unused-vars */
@@ -2348,12 +2359,23 @@ export function nextModerationState(
  *   • Anything else (new vendor awaiting review, Hidden) → null.
  */
 export function publishedView(r: LiveVendorRecord): LiveVendorRecord | null {
+  const view = approvedView(r);
+  return view && applyContentReview(view);
+}
+
+/** {@link publishedView} before admin-disapproved stalls & dishes are taken
+ *  out — the roster needs it to keep dish ids index-based over the whole
+ *  section (see `assembleMenuCategories`). */
+function approvedView(r: LiveVendorRecord): LiveVendorRecord | null {
   if (r.moderation === "Approved") return r;
   if (r.moderation !== "Pending" || !r.approvedSnapshot || !r.verified) {
     return null;
   }
   return {
     ...r.approvedSnapshot,
+    // Item marks always come from the live record, so a disapproval also
+    // reaches the approved content still on show during a pending edit.
+    ...(r.contentReview ? { contentReview: r.contentReview } : {}),
     id: r.id,
     ...(r.ownerUserId ? { ownerUserId: r.ownerUserId } : {}),
     ...(r.ownerEmail ? { ownerEmail: r.ownerEmail } : {}),
@@ -2366,4 +2388,115 @@ export function publishedView(r: LiveVendorRecord): LiveVendorRecord | null {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
+}
+
+/* ── Item-level moderation (single stalls & dishes) ──────────────────────── */
+
+const reviewNameKey = (name: string) => name.trim().toLowerCase();
+
+function hasRejections(
+  review: VendorContentReview | undefined,
+): review is VendorContentReview {
+  return Boolean(
+    review &&
+      (Object.keys(review.stalls ?? {}).length ||
+        Object.keys(review.dishes ?? {}).length),
+  );
+}
+
+/**
+ * A menu section's dishes customers may see, each with its index in the FULL
+ * section (roster dish ids are index-based), or `null` when the whole section
+ * comes off because every Single Stall publishing into it was disapproved.
+ * A disapproved stall also takes out the dishes only it contributed — a dish
+ * another, still-approved stall in the same course also lists stays.
+ */
+export function reviewedItems(
+  r: Pick<LiveVendorRecord, "stallConfig" | "contentReview">,
+  s: VendorMenuSection,
+): { item: VendorMenuItem; index: number }[] | null {
+  const items = s.items.map((item, index) => ({ item, index }));
+  const review = r.contentReview;
+  if (!hasRejections(review)) return items;
+  const stalls = (r.stallConfig?.categories ?? []).filter(
+    (c) => stallMenuId(c) === s.categoryId,
+  );
+  const rejected = stalls.filter((c) => review.stalls?.[c]);
+  if (stalls.length && rejected.length === stalls.length) return null;
+  const dishesOf = (ids: string[]) =>
+    ids.flatMap((c) => (r.stallConfig?.menus?.[c] ?? []).map((it) => reviewNameKey(it.name)));
+  const kept = new Set(dishesOf(stalls.filter((c) => !review.stalls?.[c])));
+  const dropped = new Set(dishesOf(rejected).filter((n) => !kept.has(n)));
+  return items.filter(
+    ({ item }) =>
+      !dropped.has(reviewNameKey(item.name)) &&
+      !review.dishes?.[dishReviewKey(s.categoryId, item.name)],
+  );
+}
+
+/** A record with its admin-disapproved stalls and dishes taken out of the
+ *  menu and the Single Stall config — what every customer surface reads. */
+export function applyContentReview(r: LiveVendorRecord): LiveVendorRecord {
+  const review = r.contentReview;
+  if (!hasRejections(review)) return r;
+  const menu = r.menu.flatMap((s) => {
+    const kept = reviewedItems(r, s);
+    return kept?.length ? [{ ...s, items: kept.map((k) => k.item) }] : [];
+  });
+  const cfg = r.stallConfig;
+  const stallOk = (c: string) => !review.stalls?.[c];
+  const stallConfig: SingleStallConfig | undefined = cfg && {
+    ...cfg,
+    categories: cfg.categories.filter(stallOk),
+    ...(cfg.categoryPricing
+      ? {
+          categoryPricing: Object.fromEntries(
+            Object.entries(cfg.categoryPricing).filter(([c]) => stallOk(c)),
+          ),
+        }
+      : {}),
+    ...(cfg.menus
+      ? {
+          menus: Object.fromEntries(
+            Object.entries(cfg.menus)
+              .filter(([c]) => stallOk(c))
+              .map(([c, list]) => [
+                c,
+                list.filter((it) => !review.dishes?.[dishReviewKey(stallMenuId(c), it.name)]),
+              ]),
+          ),
+        }
+      : {}),
+  };
+  return { ...r, menu, ...(stallConfig ? { stallConfig } : {}) };
+}
+
+export type ContentReviewTarget =
+  | { kind: "stall"; stallId: string }
+  | { kind: "dish"; courseId: string; name: string };
+
+/** `contentReview` after an admin approves or disapproves one stall / dish
+ *  (`undefined` once nothing is disapproved any more). */
+export function applyContentDecision(
+  review: VendorContentReview | undefined,
+  target: ContentReviewTarget,
+  decision: "approve" | "reject",
+  reason?: string,
+): VendorContentReview | undefined {
+  const field = target.kind === "stall" ? "stalls" : "dishes";
+  const key =
+    target.kind === "stall" ? target.stallId : dishReviewKey(target.courseId, target.name);
+  const marks = { ...(review?.[field] ?? {}) };
+  if (decision === "reject") {
+    marks[key] = {
+      ...(reason?.trim() ? { reason: reason.trim().slice(0, 300) } : {}),
+      at: new Date().toISOString(),
+    };
+  } else {
+    delete marks[key];
+  }
+  const next: VendorContentReview = { ...(review ?? {}), [field]: marks };
+  if (!Object.keys(next.stalls ?? {}).length) delete next.stalls;
+  if (!Object.keys(next.dishes ?? {}).length) delete next.dishes;
+  return Object.keys(next).length ? next : undefined;
 }

@@ -15,7 +15,17 @@ import type { ServicePackage } from "@/lib/data";
  *
  * The include / not-included / best-for lists are edited as one-per-line
  * textareas (split + trimmed on save) — the simplest editor for a string list.
+ *
+ * Each package also carries a **price by guests** table (guest range → ₹), so
+ * the charge varies with head-count; the server sorts it and drops overlaps.
  */
+
+// One editable guest band; blank "To" = open-ended.
+interface TierDraft {
+  min: string;
+  max: string;
+  price: string;
+}
 
 // Editing shape: list fields are newline-joined text, prices are input text.
 interface Draft {
@@ -33,6 +43,7 @@ interface Draft {
   priceMax: string;
   perPlate: boolean;
   openTop: boolean;
+  tiers: TierDraft[];
 }
 
 const toDraft = (s: ServicePackage): Draft => ({
@@ -50,6 +61,11 @@ const toDraft = (s: ServicePackage): Draft => ({
   priceMax: String(s.priceMax),
   perPlate: s.perPlate,
   openTop: s.openTop === true,
+  tiers: (s.guestTiers ?? []).map((t) => ({
+    min: String(t.minGuests),
+    max: t.maxGuests === null ? "" : String(t.maxGuests),
+    price: String(t.price),
+  })),
 });
 
 const lines = (v: string) =>
@@ -79,6 +95,13 @@ const toPayload = (d: Draft) => ({
   priceMax: num(d.priceMax),
   perPlate: d.perPlate,
   openTop: d.openTop,
+  guestTiers: d.tiers
+    .filter((t) => t.min.trim() !== "" && t.price.trim() !== "")
+    .map((t) => ({
+      minGuests: num(t.min),
+      maxGuests: t.max.trim() === "" ? null : num(t.max),
+      price: num(t.price),
+    })),
 });
 
 const BLANK: Draft = {
@@ -96,6 +119,7 @@ const BLANK: Draft = {
   priceMax: "0",
   perPlate: true,
   openTop: false,
+  tiers: [],
 };
 
 const textareaClass = inputClass + " min-h-[7rem] resize-y";
@@ -132,6 +156,26 @@ export default function ServicesView() {
     setRows((rs) => [...rs, { ...BLANK, badge: `Package ${rs.length + 1}` }]);
     setSaved(false);
   };
+  const updateTier = (i: number, ti: number, key: keyof TierDraft, value: string) =>
+    update(
+      i,
+      "tiers",
+      rows[i].tiers.map((t, idx) => (idx === ti ? { ...t, [key]: value } : t)),
+    );
+  // A new band starts right after the last one's "To", so the table stays
+  // contiguous without the admin doing the arithmetic.
+  const addTier = (i: number) => {
+    const last = rows[i].tiers[rows[i].tiers.length - 1];
+    const nextMin = last ? (last.max.trim() ? num(last.max) + 1 : num(last.min) + 1) : 1;
+    update(i, "tiers", [...rows[i].tiers, { min: String(nextMin), max: "", price: "" }]);
+  };
+  const removeTier = (i: number, ti: number) =>
+    update(
+      i,
+      "tiers",
+      rows[i].tiers.filter((_, idx) => idx !== ti),
+    );
+
   const removeRow = (i: number) => {
     setRows((rs) => rs.filter((_, idx) => idx !== i));
     setSaved(false);
@@ -175,10 +219,13 @@ export default function ServicesView() {
       <p className="max-w-3xl text-sm text-ink-soft">
         These are the packages shown in the booking wizard&rsquo;s mandatory
         &ldquo;Choose Your Service Package&rdquo; step. Each is payable and folds
-        into the order total &mdash; the amount charged is the{" "}
-        <strong className="text-ink">Starting price</strong> (&times; guests when
-        per-guest). The include / not-included / best-for lists are one item per
-        line.
+        into the order total. The amount charged comes from the package&rsquo;s{" "}
+        <strong className="text-ink">Price by guests</strong>{" "}
+        table for the
+        order&rsquo;s head-count (&times; guests when per-guest); a head-count no
+        band covers falls back to the{" "}
+        <strong className="text-ink">Starting price</strong>. The include /
+        not-included / best-for lists are one item per line.
       </p>
 
       {loading ? (
@@ -249,7 +296,7 @@ export default function ServicesView() {
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
                 <Field
                   label="Starting price (₹)"
-                  hint="Charged amount — × guests when per-guest."
+                  hint="Fallback when no guest band below matches."
                 >
                   <input
                     type="number"
@@ -284,6 +331,85 @@ export default function ServicesView() {
                   />
                   <span className="text-sm text-ink">Show&nbsp;&ldquo;+&rdquo;</span>
                 </label>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-ink">Price by guests</p>
+                <p className="mt-0.5 text-xs text-ink-soft">
+                  One row per head-count band. Price is in ₹,{" "}
+                  {row.perPlate ? "per guest" : "flat for the event"}. Leave
+                  &ldquo;To&rdquo; empty on the last row for &ldquo;and above&rdquo;.
+                </p>
+                {row.tiers.length > 0 && (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full min-w-[26rem] text-left text-sm">
+                      <thead>
+                        <tr className="text-xs uppercase tracking-wider text-ink-soft">
+                          <th className="pb-2 pr-3 font-semibold">From (guests)</th>
+                          <th className="pb-2 pr-3 font-semibold">To (guests)</th>
+                          <th className="pb-2 pr-3 font-semibold">
+                            Price (₹{row.perPlate ? " / guest" : ""})
+                          </th>
+                          <th className="pb-2" aria-label="Actions" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {row.tiers.map((tier, ti) => (
+                          <tr key={ti}>
+                            <td className="pb-2 pr-3">
+                              <input
+                                type="number"
+                                min={0}
+                                aria-label="From guests"
+                                className={inputClass}
+                                value={tier.min}
+                                onChange={(e) => updateTier(i, ti, "min", e.target.value)}
+                              />
+                            </td>
+                            <td className="pb-2 pr-3">
+                              <input
+                                type="number"
+                                min={0}
+                                aria-label="To guests"
+                                placeholder="and above"
+                                className={inputClass}
+                                value={tier.max}
+                                onChange={(e) => updateTier(i, ti, "max", e.target.value)}
+                              />
+                            </td>
+                            <td className="pb-2 pr-3">
+                              <input
+                                type="number"
+                                min={0}
+                                aria-label="Price"
+                                className={inputClass}
+                                value={tier.price}
+                                onChange={(e) => updateTier(i, ti, "price", e.target.value)}
+                              />
+                            </td>
+                            <td className="pb-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => removeTier(i, ti)}
+                              >
+                                Remove
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => addTier(i)}
+                >
+                  + Add guest band
+                </Button>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -24,11 +24,14 @@ import Modal from "@/components/admin/shared/Modal";
 import { Badge, Button } from "@/components/ui";
 import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { menuCategories } from "@/lib/data";
+import { PLATFORM_STALL_CATEGORIES } from "@/lib/stallTypes";
+import { dishReviewKey, type VendorContentReview } from "@/lib/contentReview";
 import type {
   BadgeDecision,
   ModerationStatus,
   RecognitionBadgeKey,
   VendorBadgesState,
+  VendorMenuItem,
   VendorMenuSection,
 } from "@/lib/vendorMenus";
 
@@ -53,7 +56,18 @@ interface ModerationVendor {
   /** True while a live vendor's previous approved content is still shown. */
   liveSnapshot: boolean;
   badges: VendorBadgesState | null;
+  /** The vendor's Single Stalls, each with the course it publishes into. */
+  stalls: { id: string; courseId: string; dishes: VendorMenuItem[] }[];
+  /** Admin-disapproved stalls & dishes (they never reach customers). */
+  contentReview: VendorContentReview | null;
 }
+
+/** One stall or dish an admin approves / disapproves on its own. */
+type ReviewTarget =
+  | { kind: "stall"; stallId: string }
+  | { kind: "dish"; courseId: string; name: string };
+
+const STALL_NAME = new Map(PLATFORM_STALL_CATEGORIES.map((c) => [c.id, c.name]));
 
 const BADGE_LABEL: Record<RecognitionBadgeKey, string> = {
   verified: "Verified",
@@ -236,6 +250,45 @@ export default function MenuModerationConsole() {
       .catch((err: Error) => setToast(err.message));
   };
 
+  // Approve / disapprove ONE stall or dish. Disapproving asks for an optional
+  // note the vendor sees on their dashboard.
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const decideItem = (
+    v: ModerationVendor,
+    target: ReviewTarget,
+    decision: "approve" | "reject",
+  ) => {
+    const label = target.kind === "stall" ? stallName(target.stallId) : target.name;
+    let reason: string | undefined;
+    if (decision === "reject") {
+      const answer = window.prompt(
+        `Disapprove “${label}”? It comes off every customer page until you approve it again.\n\nReason for the vendor (optional):`,
+        "",
+      );
+      if (answer === null) return;
+      reason = answer;
+    }
+    const busyKey = targetKey(target);
+    setReviewBusy(busyKey);
+    fetch(`/api/vendors/moderation/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review: { ...target, decision, ...(reason ? { reason } : {}) } }),
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as
+          | { contentReview?: VendorContentReview | null; error?: string }
+          | null;
+        if (!res.ok || !data) throw new Error(data?.error || "Couldn't save. Please try again.");
+        setVendors((prev) =>
+          prev.map((x) => (x.id === v.id ? { ...x, contentReview: data.contentReview ?? null } : x)),
+        );
+        setToast(`${label} ${decision === "approve" ? "approved" : "disapproved — hidden from customers"}`);
+      })
+      .catch((err: Error) => setToast(err.message))
+      .finally(() => setReviewBusy(null));
+  };
+
   const dishCount = (v: ModerationVendor) =>
     v.menu.reduce((n, s) => n + (s.hidden ? 0 : s.items.length), 0);
 
@@ -266,6 +319,14 @@ export default function MenuModerationConsole() {
           {dishCount(v)} dishes · {v.gallery.length} gallery photos
         </span>
       ),
+    },
+    {
+      key: "disapproved",
+      header: "Disapproved",
+      cell: (v) => {
+        const n = rejectionCount(v.contentReview);
+        return <span className={n ? "font-semibold text-maroon" : "text-ink-soft"}>{n || "—"}</span>;
+      },
     },
     {
       key: "updated",
@@ -483,6 +544,60 @@ export default function MenuModerationConsole() {
               <Detail label="About" value={selected.about} />
             )}
 
+            {/* Single Stalls — approved / disapproved one by one */}
+            {selected.stalls.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  Single Stalls ({selected.stalls.length})
+                </p>
+                <p className="mb-2 text-xs text-ink-soft">
+                  A disapproved stall or dish stays off every customer page. Everything else goes live with the menu.
+                </p>
+                <ul className="space-y-3">
+                  {selected.stalls.map((st) => {
+                    const target: ReviewTarget = { kind: "stall", stallId: st.id };
+                    const mark = selected.contentReview?.stalls?.[st.id];
+                    const busy = reviewBusy === targetKey(target);
+                    return (
+                      <li key={st.id} className="rounded-xl border border-cream-3 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="font-medium text-ink">{stallName(st.id)}</p>
+                            <ItemStatus rejected={Boolean(mark)} vendorStatus={selected.moderation} />
+                            <span className="text-xs text-ink-soft">{st.dishes.length} dishes</span>
+                          </div>
+                          <ReviewButton
+                            rejected={Boolean(mark)}
+                            busy={busy}
+                            onClick={() => decideItem(selected, target, mark ? "approve" : "reject")}
+                            what="stall"
+                          />
+                        </div>
+                        {mark?.reason && (
+                          <p className="mt-1.5 text-xs text-ink-soft">Reason: {mark.reason}</p>
+                        )}
+                        {st.dishes.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {st.dishes.map((it, i) => (
+                              <DishChip
+                                key={`${it.name}-${i}`}
+                                item={it}
+                                courseId={st.courseId}
+                                vendor={selected}
+                                stallOff={Boolean(mark)}
+                                busyKey={reviewBusy}
+                                onDecide={decideItem}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
             {/* Menu by course, with dish photos */}
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
@@ -509,28 +624,14 @@ export default function MenuModerationConsole() {
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-2">
                       {s.items.map((it, i) => (
-                        <span
+                        <DishChip
                           key={`${it.name}-${i}`}
-                          className="flex items-center gap-1.5 rounded-full border border-cream-3 bg-cream/40 py-1 pl-1.5 pr-3 text-sm text-ink"
-                        >
-                          {it.photo ? (
-                            <span className="relative block h-6 w-6 shrink-0 overflow-hidden rounded-full border border-cream-3">
-                              <Image src={it.photo} alt="" unoptimized={photoNeedsUnoptimized(it.photo)} fill sizes="24px" className="object-cover" />
-                            </span>
-                          ) : (
-                            <span className="w-1" />
-                          )}
-                          <span
-                            aria-hidden="true"
-                            className={
-                              "inline-block h-2.5 w-2.5 rounded-sm border " +
-                              (it.diet === "veg"
-                                ? "border-ink"
-                                : "border-maroon bg-maroon")
-                            }
-                          />
-                          {it.name}
-                        </span>
+                          item={it}
+                          courseId={s.categoryId}
+                          vendor={selected}
+                          busyKey={reviewBusy}
+                          onDecide={decideItem}
+                        />
                       ))}
                     </div>
                   </li>
@@ -560,6 +661,109 @@ export default function MenuModerationConsole() {
         )}
       </Modal>
     </div>
+  );
+}
+
+function stallName(id: string) {
+  return STALL_NAME.get(id) ?? CATEGORY_NAME.get(id) ?? id;
+}
+
+function targetKey(t: ReviewTarget) {
+  return t.kind === "stall" ? `stall:${t.stallId}` : `dish:${dishReviewKey(t.courseId, t.name)}`;
+}
+
+function rejectionCount(r: VendorContentReview | null) {
+  return Object.keys(r?.stalls ?? {}).length + Object.keys(r?.dishes ?? {}).length;
+}
+
+/** A stall's / dish's own state: disapproved, or riding the vendor's status
+ *  (live once the menu is approved). */
+function ItemStatus({ rejected, vendorStatus }: { rejected: boolean; vendorStatus: ModerationStatus }) {
+  if (rejected) {
+    return (
+      <span className="rounded-full border border-maroon px-2.5 py-0.5 text-xs font-semibold text-maroon">
+        Disapproved
+      </span>
+    );
+  }
+  return <ModerationBadge status={vendorStatus} />;
+}
+
+function ReviewButton({
+  rejected,
+  busy,
+  onClick,
+  what,
+}: {
+  rejected: boolean;
+  busy: boolean;
+  onClick: () => void;
+  what: string;
+}) {
+  return (
+    <Button size="sm" variant={rejected ? "primary" : "secondary"} onClick={onClick} disabled={busy}>
+      {busy ? "Saving…" : rejected ? `Approve ${what}` : `Disapprove ${what}`}
+    </Button>
+  );
+}
+
+/** One dish with its own approve / disapprove toggle. `stallOff` = its whole
+ *  stall is disapproved, so the dish is off regardless. */
+function DishChip({
+  item,
+  courseId,
+  vendor,
+  stallOff = false,
+  busyKey,
+  onDecide,
+}: {
+  item: VendorMenuItem;
+  courseId: string;
+  vendor: ModerationVendor;
+  stallOff?: boolean;
+  busyKey: string | null;
+  onDecide: (v: ModerationVendor, t: ReviewTarget, d: "approve" | "reject") => void;
+}) {
+  const target: ReviewTarget = { kind: "dish", courseId, name: item.name };
+  const mark = vendor.contentReview?.dishes?.[dishReviewKey(courseId, item.name)];
+  const off = Boolean(mark) || stallOff;
+  const busy = busyKey === targetKey(target);
+  return (
+    <span
+      title={mark?.reason ? `Disapproved: ${mark.reason}` : undefined}
+      className={
+        "flex items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-1 text-sm text-ink " +
+        (mark ? "border-maroon bg-white" : "border-cream-3 bg-cream/40")
+      }
+    >
+      {item.photo ? (
+        <span className="relative block h-6 w-6 shrink-0 overflow-hidden rounded-full border border-cream-3">
+          <Image src={item.photo} alt="" unoptimized={photoNeedsUnoptimized(item.photo)} fill sizes="24px" className="object-cover" />
+        </span>
+      ) : (
+        <span className="w-1" />
+      )}
+      <span
+        aria-hidden="true"
+        className={
+          "inline-block h-2.5 w-2.5 rounded-sm border " +
+          (item.diet === "veg" ? "border-ink" : "border-maroon bg-maroon")
+        }
+      />
+      <span className={off ? "line-through opacity-60" : undefined}>{item.name}</span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onDecide(vendor, target, mark ? "approve" : "reject")}
+        aria-label={`${mark ? "Approve" : "Disapprove"} ${item.name}`}
+        className={
+          "ml-1 rounded-full px-2 py-0.5 text-xs font-semibold disabled:opacity-50 " +
+          (mark ? "bg-maroon text-white" : "border border-cream-3 bg-white text-maroon")
+        }
+      >
+        {busy ? "…" : mark ? "Approve" : "Disapprove"}
+      </button>
+    </span>
   );
 }
 

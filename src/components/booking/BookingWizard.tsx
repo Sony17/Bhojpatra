@@ -87,6 +87,10 @@ import {
   type OccasionOption,
 } from "@/lib/occasions";
 import { useServices } from "@/lib/services";
+import {
+  serviceRate,
+  serviceTotal as serviceChargeFor,
+} from "@/lib/servicePricing";
 import ServicePackages from "@/components/sections/ServicePackages";
 import { Button } from "@/components/ui";
 import { inr, money, perPlateCost } from "@/lib/money";
@@ -1467,9 +1471,7 @@ export default function BookingWizard() {
   // coupon-discounted.
   const selectedService = services.find((s) => s.id === serviceId);
   const serviceTotal = selectedService
-    ? selectedService.perPlate
-      ? selectedService.priceMin * guests
-      : selectedService.priceMin
+    ? serviceChargeFor(selectedService, guests)
     : 0;
 
   // Vendors a guest may assign to an add-on — the existing catalogue narrowed to
@@ -1906,7 +1908,7 @@ export default function BookingWizard() {
     if (selectedService) {
       lines.push({
         label: selectedService.perPlate
-          ? `Service — ${selectedService.name} (${money(selectedService.priceMin)}/guest × ${guests})`
+          ? `Service — ${selectedService.name} (${money(serviceRate(selectedService, guests))}/guest × ${guests})`
           : `Service — ${selectedService.name}`,
         amount: serviceTotal,
       });

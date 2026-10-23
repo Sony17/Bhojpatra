@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
       { source: "/admin", destination: "/admin/dashboard", permanent: false },
       // Analytics was folded into the dashboard; keep old links working.
       { source: "/admin/analytics", destination: "/admin/dashboard", permanent: false },
+      // The curated Baina Box brand storefronts were seed data and are gone;
+      // old brand links land on the marketplace of live Baina Box vendors.
+      { source: "/baina-box/:slug", destination: "/baina-box", permanent: false },
     ];
   },
 };

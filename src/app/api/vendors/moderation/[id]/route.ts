@@ -1,9 +1,11 @@
 import { requireRole } from "@/lib/auth";
 import {
   applyBadgeDecision,
+  applyContentDecision,
   findVendorById,
   saveVendor,
   type BadgeDecision,
+  type ContentReviewTarget,
   type ModerationStatus,
   type RecognitionBadgeKey,
 } from "@/lib/vendorMenus";
@@ -23,6 +25,12 @@ const BADGE_DECISIONS: BadgeDecision[] = ["grant", "reject", "revoke"];
 //                               Verified.
 //   { badge: { key, decision } } grant / reject / revoke a recognition badge
 //                               (the only path that can grant one).
+//   { review: { kind: "stall", stallId, decision, reason? } }
+//   { review: { kind: "dish", courseId, name, decision, reason? } }
+//                               approve / disapprove ONE Single Stall or dish.
+//                               A disapproved item stays off every customer
+//                               surface; the rest of the listing and the
+//                               vendor-wide status are untouched.
 export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -40,8 +48,14 @@ export async function PATCH(
   }
 
   const badge = (body.badge ?? null) as Record<string, unknown> | null;
+  const review = (body.review ?? null) as Record<string, unknown> | null;
   const status = body.status;
-  if (badge) {
+  const target = review ? reviewTarget(review) : null;
+  if (review) {
+    if (!target || (review.decision !== "approve" && review.decision !== "reject")) {
+      return Response.json({ error: "Unknown review decision." }, { status: 400 });
+    }
+  } else if (badge) {
     if (
       !BADGE_KEYS.includes(badge.key as RecognitionBadgeKey) ||
       !BADGE_DECISIONS.includes(badge.decision as BadgeDecision)
@@ -56,6 +70,17 @@ export async function PATCH(
     const record = await findVendorById(id);
     if (!record || !record.ownerUserId) {
       return Response.json({ error: "Vendor not found." }, { status: 404 });
+    }
+
+    if (review && target) {
+      const contentReview = applyContentDecision(
+        record.contentReview,
+        target,
+        review.decision as "approve" | "reject",
+        typeof review.reason === "string" ? review.reason : undefined,
+      );
+      await saveVendor({ ...record, contentReview, updatedAt: new Date().toISOString() });
+      return Response.json({ ok: true, contentReview: contentReview ?? null });
     }
 
     if (badge) {
@@ -102,4 +127,19 @@ export async function PATCH(
       { status: 500 },
     );
   }
+}
+
+/** The stall / dish a `{ review }` body names, or null when malformed. */
+function reviewTarget(r: Record<string, unknown>): ContentReviewTarget | null {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 120) : "");
+  if (r.kind === "stall") {
+    const stallId = str(r.stallId);
+    return stallId ? { kind: "stall", stallId } : null;
+  }
+  if (r.kind === "dish") {
+    const courseId = str(r.courseId);
+    const name = str(r.name);
+    return courseId && name ? { kind: "dish", courseId, name } : null;
+  }
+  return null;
 }

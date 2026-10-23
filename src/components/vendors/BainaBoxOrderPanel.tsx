@@ -59,9 +59,8 @@ function lineLabel(l: { name: string; unit: string }): string {
  * calls to arrange payment & delivery), so they land in My Bookings, the admin
  * console and the confirmation emails like any other booking.
  *
- * Both box sellers use this one panel: the curated Baina Box storefronts
- * (/baina-box/<slug>) and any live vendor who published a box menu in their
- * dashboard, whose boxes render on their own profile page.
+ * Any live vendor who published a box menu in their dashboard sells through
+ * this panel, rendered on their own profile page.
  */
 export default function BainaBoxOrderPanel({
   data,

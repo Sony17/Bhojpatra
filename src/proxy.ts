@@ -33,6 +33,8 @@ function isProtected(pathname: string): boolean {
   if (pathname === "/bookings") return true; // My Bookings (invoice stays public)
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return true;
   if (pathname === "/account" || pathname.startsWith("/account/")) return true;
+  // Caterer catalog + profiles are members-only — browse after signing in.
+  if (pathname === "/vendors" || pathname.startsWith("/vendors/")) return true;
   return false;
 }
 
@@ -50,7 +52,8 @@ export function proxy(request: NextRequest) {
   const loginPath = pathname.startsWith("/admin") ? "/admin/login" : "/login";
   const url = request.nextUrl.clone();
   url.pathname = loginPath;
-  url.searchParams.set("next", pathname);
+  url.search = "";
+  url.searchParams.set("next", pathname + request.nextUrl.search);
   return NextResponse.redirect(url);
 }
 
@@ -60,6 +63,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/vendor/:path*",
+    "/vendors/:path*",
     "/partner/:path*",
     "/bookings/:path*",
     "/dashboard/:path*",

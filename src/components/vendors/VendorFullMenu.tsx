@@ -11,7 +11,6 @@ import type { PublicVendorProfile, VendorBainaBox, VendorEssentialService } from
 import { packageCategoryItems, type VendorListing } from "@/lib/data";
 import type { VendorTier } from "@/lib/admin/types";
 import { dishOnTier, tierRate } from "@/lib/tiers";
-import { getBainaBoxVendorByVendorId } from "@/lib/bainaBoxData";
 import {
   ctaLabel,
   leadTimeLabel,
@@ -229,22 +228,6 @@ export default function VendorFullMenu({
       });
     }
   } else if (listing) {
-    // Check Baina Box data
-    const bainaVendor = getBainaBoxVendorByVendorId(listing.id);
-    if (bainaVendor && bainaVendor.products.length > 0) {
-      categories.push({
-        id: "gift-boxes",
-        name: "Gift Boxes",
-        nameHi: "गिफ़्ट बॉक्स",
-        icon: "🎁",
-        items: bainaVendor.products.map((p) => ({
-          name: p.name,
-          photo: p.image,
-          icon: "🎁",
-        })),
-      });
-    }
-
     // Check cuisines
     for (const c of listing.cuisines) {
       const famous = FAMOUS_FOR[c];

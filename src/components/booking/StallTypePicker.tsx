@@ -3,31 +3,38 @@
 import Image from "next/image";
 import SectionHead from "@/components/booking/shared/SectionHead";
 import { stallTypes } from "@/lib/stallTypes";
+import { isUnoptimized } from "@/lib/homeContentData";
+import type { StallTileImages } from "@/lib/stallTileImages";
 
 /**
  * The Single Stall funnel's first gate: pick WHAT kind of stall you want
  * before you pick WHO runs it. Only types that have stalls in the chosen city
  * are shown — each tile links into the Brands catalog pre-filtered to that
- * type and city. A city with none gets a single "see all stalls" way out.
+ * type and city.
  */
 export default function StallTypePicker({
   t,
   lang,
   cityLabel,
   counts,
+  loading = false,
+  images,
   selectedId = "",
   hrefFor,
-  browseAllHref,
 }: {
   t: (en: string, hi: string) => string;
   lang: string;
   cityLabel: string;
   counts: Record<string, number>;
+  /** The stall roster is still loading — show placeholder tiles, not the
+   *  empty state. */
+  loading?: boolean;
+  /** Admin-set tile photos by type id. A type without one shows its icon. */
+  images: StallTileImages;
   /** The type the guest was last browsing — outlined so backing out of a
    *  stall lands them where they left off. */
   selectedId?: string;
   hrefFor: (typeId: string) => string;
-  browseAllHref: string;
 }) {
   const available = stallTypes.filter((s) => (counts[s.id] ?? 0) > 0);
 
@@ -35,41 +42,41 @@ export default function StallTypePicker({
     <div>
       <SectionHead
         compact
-        eyebrow={t("Single Stall", "सिंगल स्टॉल")}
-        title={t("What stall do you want?", "कौन सा स्टॉल चाहिए?")}
-        sub={
-          cityLabel
-            ? t(`Available in ${cityLabel}`, `${cityLabel} में उपलब्ध`)
-            : undefined
-        }
-        action={
-          <a
-            href={browseAllHref}
-            className="inline-flex items-center gap-0.5 text-xs font-semibold text-maroon transition hover:underline sm:text-sm"
-          >
-            {t("See all stalls", "सभी स्टॉल देखें")}
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m9 6 6 6-6 6" />
-            </svg>
-          </a>
-        }
+        eyebrow={t("One Bhojpatra Experience", "एक भोजपत्र अनुभव")}
+        title={t("Curated Mini Stalls", "चुनिंदा मिनी स्टॉल")}
+        sub={t(
+          "Check availability to reserve your experience • Same-day & Advance booking available.",
+          "अपना अनुभव आरक्षित करने के लिए उपलब्धता देखें • उसी दिन और अग्रिम बुकिंग उपलब्ध।",
+        )}
       />
 
-      {available.length > 0 ? (
+      {loading ? (
+        <div
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4"
+          role="status"
+          aria-label={t("Loading stalls", "स्टॉल लोड हो रहे हैं")}
+        >
+          {Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={i}
+              className="grid h-[8.75rem] grid-rows-[7fr_3fr] overflow-hidden rounded-2xl border border-cream bg-white sm:flex sm:h-auto sm:flex-col"
+              aria-hidden="true"
+            >
+              <div className="min-h-0 w-full animate-pulse bg-cream-2 sm:aspect-[16/10]" />
+              <div className="flex flex-col justify-center gap-1.5 px-2.5 sm:px-3 sm:py-2.5">
+                <span className="h-3 w-2/3 animate-pulse rounded bg-cream-2" />
+                <span className="h-2.5 w-1/3 animate-pulse rounded bg-cream-2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : available.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {available.map((s) => {
             const count = counts[s.id];
             const name = lang === "hi" ? s.nameHi : s.name;
             const selected = s.id === selectedId;
+            const image = images[s.id];
             return (
               <a
                 key={s.id}
@@ -83,13 +90,23 @@ export default function StallTypePicker({
                 }
               >
                 <div className="relative min-h-0 w-full overflow-hidden sm:aspect-[16/10]">
-                  <Image
-                    src={s.image}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw"
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
+                  {image ? (
+                    <Image
+                      src={image}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw"
+                      unoptimized={isUnoptimized(image)}
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <span
+                      className="grid h-full w-full place-items-center bg-cream-2 text-4xl"
+                      aria-hidden="true"
+                    >
+                      {s.icon}
+                    </span>
+                  )}
                   {selected && (
                     <span
                       className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-maroon text-white shadow-soft"

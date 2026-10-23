@@ -313,6 +313,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
       await refreshSession();
+      // Bounced here by the auth gate (/login?next=/vendors) → go back there.
+      // Same-origin paths only, so `next` can't become an open redirect.
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next && next.startsWith("/") && !next.startsWith("//")) {
+        router.push(next);
+        return;
+      }
       // One email ↔ one role — land directly on that role's dashboard.
       router.push(DASHBOARD_PATH[user.role]);
     } catch {

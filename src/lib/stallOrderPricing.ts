@@ -16,6 +16,7 @@ import {
 import { assembleMenuCategories } from "@/lib/vendorMenus";
 import { readSingleton } from "@/lib/store";
 import { computeOrderTotals } from "@/lib/bookingPricing";
+import { serviceTotal } from "@/lib/servicePricing";
 import { readCoupons } from "@/lib/coupons";
 import { adminCoupons as SEED_COUPONS } from "@/lib/admin/mockData";
 import { couponUsable, istTodayISO, type CouponTerms } from "@/lib/bookingRules";
@@ -178,17 +179,13 @@ export async function expectedStallTotal(
   const service = claim.serviceId
     ? (await readServices()).find((s) => s.id === claim.serviceId)
     : undefined;
-  const serviceTotal = service
-    ? service.perPlate
-      ? service.priceMin * guests
-      : service.priceMin
-    : 0;
+  const serviceCharge = service ? serviceTotal(service, guests) : 0;
 
   const { grandTotal } = computeOrderTotals({
     subtotal: perPlate * guests,
     addOnsTotal,
     venueFee: claim.venueFee,
-    serviceTotal,
+    serviceTotal: serviceCharge,
     coupon: coupon ? { percent: coupon.percent, cap: coupon.cap } : null,
     referralPercent,
   });

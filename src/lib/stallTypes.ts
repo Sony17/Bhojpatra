@@ -6,7 +6,7 @@ import {
 } from "@/lib/data";
 
 /**
- * STALL TYPES — the image tiles a guest picks from before browsing stalls
+ * STALL TYPES — the tiles a guest picks from before browsing stalls
  * (Single Stall only), and the `?counter=` value the catalog lens and the stall
  * wizard narrow on.
  *
@@ -20,6 +20,8 @@ import {
  * extras for any booking (Pan, Pizza, Momo…), sold platform-wide. Old links and
  * drafts that still carry an add-on counter id are translated by
  * `toStallTypeId` (`mocktail` → Juices, `dessert` → Desserts…).
+ *
+ * Tile photos are admin-set and live in `stallTileImages`, not here.
  */
 export interface StallType {
   id: string;
@@ -27,7 +29,6 @@ export interface StallType {
   nameHi: string;
   description: string;
   icon: string;
-  image: string;
 }
 
 /** City display names are what listings carry ("Lucknow"). An EXACT match, on
@@ -153,30 +154,8 @@ export function stallMenuId(id: string) {
   return PLATFORM_STALL_CATEGORIES.find((c) => c.id === id)?.menuId ?? (LEGACY_MENU_IDS.has(id) ? id : "regional");
 }
 
-const unsplash = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=600&q=70`;
-
-/** Tile photo per stall type (course id). */
-const STALL_TYPE_IMAGE: Record<string, string> = {
-  chaat: unsplash("photo-1601050690597-df0568f70950"),
-  juices: unsplash("photo-1544145945-f90425340c7e"),
-  beverages: unsplash("photo-1437418747212-8d9709afab22"),
-  "south-indian": unsplash("photo-1630383249896-424e482df921"),
-  "north-indian": unsplash("photo-1585937421612-70a008356fbe"),
-  chinese: unsplash("photo-1585032226651-759b368d7246"),
-  snacks: unsplash("photo-1565895405227-31cffbe0cf86"),
-  desserts: unsplash("photo-1631452180519-c014fe946bc7"),
-  "ice-cream": unsplash("photo-1578985545062-69928b1d9587"),
-  "street-food": unsplash("photo-1490645935967-10de6ba17061"),
-  live: unsplash("photo-1567188040759-fb8a883dc6d8"),
-  breakfast: unsplash("photo-1556910103-1c02745aae4d"),
-  regional: unsplash("photo-1555939594-58d7cb561ad1"),
-  pizza: unsplash("photo-1513104890138-7c749659a591"),
-  pasta: unsplash("photo-1473093295043-cdd812d0e601"),
-};
-
 /** Older stall categories a vendor may still have a menu under. */
-const LEGACY_STALL_TYPES: Omit<StallType, "nameHi" | "image">[] = [
+const LEGACY_STALL_TYPES: Omit<StallType, "nameHi">[] = [
   { id: "pizza", name: "Wood-Fired Pizza", description: "Pizzas tossed & baked live", icon: "🍕" },
   { id: "pasta", name: "Live Pasta", description: "Pasta tossed to order", icon: "🍝" },
 ];
@@ -193,7 +172,6 @@ export const stallTypes: StallType[] = [
   ...s,
   // The course's own Hindi name — the stall builder list is English-only.
   nameHi: menuCategories.find((c) => c.id === s.id)?.nameHi ?? s.name,
-  image: STALL_TYPE_IMAGE[s.id] ?? STALL_TYPE_IMAGE.regional,
 }));
 
 const STALL_TYPE_IDS = new Set(stallTypes.map((s) => s.id));

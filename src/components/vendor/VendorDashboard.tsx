@@ -15,6 +15,8 @@ import CreamLogo from "@/components/CreamLogo";
 import MenuBuilder from "@/components/vendor/MenuBuilder";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import type { LiveVendorRecord } from "@/lib/vendorMenus";
+import { dishReviewKey } from "@/lib/contentReview";
+import { stallMenuId } from "@/lib/stallTypes";
 import type { VendorApplicationStage } from "@/lib/vendorOnboarding";
 import type { VendorOrderSummary } from "@/lib/vendorOrders";
 import { sortTiers } from "@/lib/admin/types";
@@ -686,6 +688,40 @@ function vendorStatus(
   }
 }
 
+/** Stalls & dishes the Bhojpatra team disapproved — kept off the marketplace
+ *  while the rest of the listing stays live. Names come from the vendor's own
+ *  menu (the stored dish key is lowercased). */
+function DisapprovedNotice({ vendor }: { vendor: LiveVendorRecord | null }) {
+  const review = vendor?.contentReview;
+  if (!vendor || !review) return null;
+  const stalls = Object.entries(review.stalls ?? {}).map(([id, m]) => ({ name: stallCategoryName(id), reason: m.reason }));
+  const named = new Map<string, string>();
+  for (const s of vendor.menu) for (const it of s.items) named.set(dishReviewKey(s.categoryId, it.name), it.name);
+  for (const [stall, list] of Object.entries(vendor.stallConfig?.menus ?? {})) {
+    for (const it of list) named.set(dishReviewKey(stallMenuId(stall), it.name), it.name);
+  }
+  const dishes = Object.entries(review.dishes ?? {}).flatMap(([key, m]) => {
+    const name = named.get(key);
+    return name ? [{ name, reason: m.reason }] : [];
+  });
+  const rows = [...stalls.map((x) => ({ ...x, kind: "Stall" })), ...dishes.map((x) => ({ ...x, kind: "Dish" }))];
+  if (!rows.length) return null;
+  return (
+    <div className="mt-2.5 rounded-lg border border-maroon/40 bg-white px-3 py-2.5">
+      <p className="text-[12.5px] font-bold text-maroon">Not approved by Bhojpatra ({rows.length})</p>
+      <p className="text-[11.5px] text-ink/65">Hidden from customers. Update them in My Services and our team will review again.</p>
+      <ul className="mt-1.5 space-y-1">
+        {rows.map((r) => (
+          <li key={`${r.kind}:${r.name}`} className="text-[12px] text-ink">
+            <span className="font-semibold">{r.kind}: {r.name}</span>
+            {r.reason && <span className="text-ink/65"> — {r.reason}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function StatusPills({ label, tier, diet }: { label: string; tier?: string; diet?: string }) {
   return (
     <>
@@ -716,6 +752,7 @@ function DesktopHome(ctx: HomeCtx) {
           <StatusPills label={ctx.status.label} tier={tier} diet={diet} />
         </div>
         <p className="mt-2 text-[12.5px] text-ink/65">{ctx.status.note}</p>
+        <DisapprovedNotice vendor={vendor} />
         {!live && ctx.status.label !== "Pending Review" && ctx.status.label !== "Hidden by Admin" && (
           <Link href="/vendor/register" className="mt-1 inline-block text-[12.5px] font-bold text-maroon hover:underline">
             Open registration →
@@ -977,6 +1014,7 @@ function MobileHome(ctx: HomeCtx) {
         )}
         {tier && <span className="rounded-[3px] bg-cream px-1.5 py-px text-[9px] font-extrabold uppercase tracking-[0.5px] text-maroon">{tier}</span>}
       </div>
+      <DisapprovedNotice vendor={ctx.vendor} />
 
       {/* Urgent alert */}
       {pending && (
