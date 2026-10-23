@@ -15,6 +15,7 @@ import {
 } from "@/lib/venues";
 import { createStore } from "@/lib/store";
 import { sendVenueAlert } from "@/lib/email";
+import { listVenueRecords } from "@/lib/venuesServer";
 
 // Owner-registered venues are written at publish time to Postgres (Neon) so the
 // venue catalogue, the booking flow and the owner's dashboard can read them —
@@ -36,17 +37,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
   const owner = url.searchParams.get("owner");
-  // Sanitize images on the way out too — a previously stored non-servable
-  // URL must never reach a `next/image` and crash the page.
-  const venues = (await store.list())
-    .filter((v) => !v.deleted)
-    .map((v) => ({
-      ...v,
-      image: sanitizeVenueImage(v.image),
-      ...(v.images
-        ? { images: v.images.filter((s) => isServableVenueImage(s)) }
-        : {}),
-    }));
+  // Images are sanitised on the way out too (see listVenueRecords).
+  const venues = await listVenueRecords();
 
   if (id) {
     // The single-venue lookup feeds the public detail page + booking flow, so

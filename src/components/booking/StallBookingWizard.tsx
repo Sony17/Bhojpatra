@@ -69,7 +69,7 @@ import {
   type StallItemMap as ItemMap,
 } from "@/lib/stallDraft";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
-import { useAllVendorsStatus } from "@/lib/useAllVendors";
+import { useAllVendorsStatus, type VendorsPayload } from "@/lib/useAllVendors";
 import {
   sellsOnSingleStall,
   stallTypesOfCourses,
@@ -244,13 +244,83 @@ function coursePrice(course: StallCourse, picks: string[]): number {
     .reduce((s, it) => s + dishPrice(it, course), 0);
 }
 
+/** Event details a deep link carries (Hero booking bar, a brand page's "book
+ *  this stall", a partner's share link). Pure, so the server render and the
+ *  first client render seed identical state — no default → URL swap. */
+interface StallQuery {
+  occasionId?: string;
+  customOccasion?: string;
+  eventDate?: string;
+  cityId?: string;
+  customCity?: string;
+  venue?: string;
+  guests?: number;
+  pendingVendorId?: string;
+  /** "" clears a stale type when a `?vendor=` hand-off carries none. */
+  counterType?: string;
+  referralCode?: string;
+}
+
+function parseStallQuery(sp: URLSearchParams): StallQuery {
+  const q: StallQuery = {};
+  const occ = sp.get("occasion");
+  const occName = sp.get("occName")?.trim();
+  if (occ === OTHER_OCCASION_ID || occName) {
+    q.occasionId = OTHER_OCCASION_ID;
+    if (occName) q.customOccasion = occName;
+  } else if (occ) {
+    q.occasionId = occ;
+  }
+  const date = sp.get("date");
+  if (date) q.eventDate = date;
+  const city = sp.get("city");
+  const loc = sp.get("loc")?.trim();
+  if (city === OTHER_LOCATION_ID || loc) {
+    q.cityId = OTHER_LOCATION_ID;
+    if (loc) q.customCity = loc;
+  } else if (city) {
+    q.cityId = city;
+  }
+  const venueParam = sp.get("venue");
+  if (venueParam) q.venue = venueParam;
+  const g = Number(sp.get("guests"));
+  if (g >= MIN_GUESTS && g <= MAX_GUESTS) q.guests = Math.round(g);
+  // A brand page hands off its vendor — resolved once the roster loads, which
+  // drops the guest straight onto the menu builder for that stall.
+  const vendorParam = sp.get("vendor")?.trim();
+  if (vendorParam) q.pendingVendorId = vendorParam;
+  // Returning from the Brands catalog keeps the stall type, so a guest who
+  // backs out of a stall lands on the type they were browsing, not step one.
+  // It also narrows the stall's menu to that stall — so a new `?vendor=`
+  // hand-off with no type (a brand page's Book Now) clears a stale one.
+  const counterParam = toStallTypeId(sp.get("counter")?.trim() ?? "");
+  if (counterParam) q.counterType = counterParam;
+  else if (vendorParam) q.counterType = "";
+  const ref = sp.get("ref");
+  if (ref) q.referralCode = ref.trim().toUpperCase();
+  return q;
+}
+
 /* ─── Component ──────────────────────────────────────────────────────── */
 export default function StallBookingWizard({
   tileImages,
+  initialMenu,
+  initialVendors,
+  initialSearch = "",
 }: {
   /** Admin-set stall-type tile photos (see lib/stallTileImages). */
   tileImages: StallTileImages;
+  /** Server snapshot of `/api/menu` — the roster paints on the first frame. */
+  initialMenu?: MenuCategory[] | null;
+  /** Server snapshot of `/api/vendors` (catalog listings + stall briefs). */
+  initialVendors?: VendorsPayload | null;
+  /** The request's query string, so URL-carried event details seed state. */
+  initialSearch?: string;
 }) {
+  const initialQuery = useMemo(
+    () => parseStallQuery(new URLSearchParams(initialSearch)),
+    [initialSearch],
+  );
   // Per-browser booking salt — see lib/bookingSalt.ts. Re-keyed to the account
   // once the session is known (below), so two people on one browser never
   // share a booking id.
@@ -266,11 +336,15 @@ export default function StallBookingWizard({
   // Step 1 — the chosen stall (one vendor for the whole order).
   const [stallId, setStallId] = useState<string>("");
   // A `?vendor=` hand-off from a brand page, held until the live roster loads.
-  const [pendingVendorId, setPendingVendorId] = useState<string>("");
+  const [pendingVendorId, setPendingVendorId] = useState<string>(
+    initialQuery.pendingVendorId ?? "",
+  );
   const [missingBrand, setMissingBrand] = useState<string>("");
   // The stall TYPE (a counter id) the guest picked on the way in. Purely a
   // browsing lens — it narrows the Brands catalog, never the stall's own menu.
-  const [counterType, setCounterType] = useState<string>("");
+  const [counterType, setCounterType] = useState<string>(
+    initialQuery.counterType ?? "",
+  );
 
   // Every "back to the Brands page" link keeps the stall type in hand, so a
   // guest who changes their mind about the caterer stays inside the type they
@@ -284,10 +358,16 @@ export default function StallBookingWizard({
   const [categoryItems, setCategoryItems] = useState<ItemMap>({});
 
   // Step 3 — event details.
-  const [occasionId, setOccasionId] = useState<string>("");
-  const [customOccasion, setCustomOccasion] = useState<string>("");
-  const [guests, setGuests] = useState<number>(100);
-  const [eventDate, setEventDate] = useState<string>("");
+  const [occasionId, setOccasionId] = useState<string>(
+    initialQuery.occasionId ?? "",
+  );
+  const [customOccasion, setCustomOccasion] = useState<string>(
+    initialQuery.customOccasion ?? "",
+  );
+  const [guests, setGuests] = useState<number>(initialQuery.guests ?? 100);
+  const [eventDate, setEventDate] = useState<string>(
+    initialQuery.eventDate ?? "",
+  );
   // A tapped "Before you continue" blocker — EventBar scrolls to that field.
   const [briefFocus, setBriefFocus] = useState<{
     field: EventField;
@@ -308,9 +388,11 @@ export default function StallBookingWizard({
     () => resolveNonVeg(foodPreference, nonVegMix, guests),
     [foodPreference, nonVegMix, guests],
   );
-  const [cityId, setCityId] = useState<string>("");
-  const [customCity, setCustomCity] = useState<string>("");
-  const [venue, setVenue] = useState<string>("");
+  const [cityId, setCityId] = useState<string>(initialQuery.cityId ?? "");
+  const [customCity, setCustomCity] = useState<string>(
+    initialQuery.customCity ?? "",
+  );
+  const [venue, setVenue] = useState<string>(initialQuery.venue ?? "");
   const [venueFee, setVenueFee] = useState<number>(0);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   // add-on id → the catalogue vendor running it. A Single Stall order keeps one
@@ -413,44 +495,20 @@ export default function StallBookingWizard({
   }, []);
 
   // Prefill from the query string — the Hero booking bar, a brand page's "book
-  // this stall", or a partner's share link.
+  // this stall", or a partner's share link. The same values already seeded the
+  // initial state; re-applied here so they win over a rehydrated draft.
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const occ = sp.get("occasion");
-    const occName = sp.get("occName")?.trim();
-    if (occ === OTHER_OCCASION_ID || occName) {
-      setOccasionId(OTHER_OCCASION_ID);
-      if (occName) setCustomOccasion(occName);
-    } else if (occ) {
-      setOccasionId(occ);
-    }
-    const date = sp.get("date");
-    if (date) setEventDate(date);
-    const city = sp.get("city");
-    const loc = sp.get("loc")?.trim();
-    if (city === OTHER_LOCATION_ID || loc) {
-      setCityId(OTHER_LOCATION_ID);
-      if (loc) setCustomCity(loc);
-    } else if (city) {
-      setCityId(city);
-    }
-    const venueParam = sp.get("venue");
-    if (venueParam) setVenue(venueParam);
-    const g = Number(sp.get("guests"));
-    if (g >= MIN_GUESTS && g <= MAX_GUESTS) setGuests(Math.round(g));
-    // A brand page hands off its vendor — resolve it once the roster loads and
-    // drop the guest straight onto the menu builder for that stall.
-    const vendorParam = sp.get("vendor")?.trim();
-    if (vendorParam) setPendingVendorId(vendorParam);
-    // Returning from the Brands catalog keeps the stall type, so a guest who
-    // backs out of a stall lands on the type they were browsing, not step one.
-    // It also narrows the stall's menu to that stall — so a new `?vendor=`
-    // hand-off with no type (a brand page's Book Now) clears a stale one.
-    const counterParam = toStallTypeId(sp.get("counter")?.trim() ?? "");
-    if (counterParam) setCounterType(counterParam);
-    else if (vendorParam) setCounterType("");
-    const ref = sp.get("ref");
-    if (ref) setReferralCode(ref.trim().toUpperCase());
+    const q = parseStallQuery(new URLSearchParams(window.location.search));
+    if (q.occasionId) setOccasionId(q.occasionId);
+    if (q.customOccasion) setCustomOccasion(q.customOccasion);
+    if (q.eventDate) setEventDate(q.eventDate);
+    if (q.cityId) setCityId(q.cityId);
+    if (q.customCity) setCustomCity(q.customCity);
+    if (q.venue) setVenue(q.venue);
+    if (q.guests) setGuests(q.guests);
+    if (q.pendingVendorId) setPendingVendorId(q.pendingVendorId);
+    if (q.counterType !== undefined) setCounterType(q.counterType);
+    if (q.referralCode) setReferralCode(q.referralCode);
   }, []);
 
   // Persist the draft on every change (once the rehydrate above has run).
@@ -655,10 +713,14 @@ export default function StallBookingWizard({
   // Courses + dishes come from the vendor store (`/api/menu`): curated seed
   // specialists plus every live vendor menu published from a vendor dashboard.
   // The static fixture renders instantly until the fetch answers.
-  const [liveMenuCategories, setLiveMenuCategories] =
-    useState<MenuCategory[]>(menuCategories);
-  const [menuSettled, setMenuSettled] = useState(false);
+  const [liveMenuCategories, setLiveMenuCategories] = useState<MenuCategory[]>(
+    initialMenu?.length ? initialMenu : menuCategories,
+  );
+  // A server snapshot is the settled roster — nothing to fetch or wait for.
+  const [menuSettled, setMenuSettled] = useState(!!initialMenu?.length);
+  const menuSeeded = useRef(!!initialMenu?.length);
   useEffect(() => {
+    if (menuSeeded.current) return;
     let live = true;
     fetch("/api/menu")
       .then((r) => (r.ok ? r.json() : null))
@@ -686,7 +748,7 @@ export default function StallBookingWizard({
   // knows which counters a vendor runs, so the stall-type grid counts against
   // them rather than the menu roster, which carries no offerings.
   const { vendors: catalogVendors, loaded: vendorsLoaded } =
-    useAllVendorsStatus();
+    useAllVendorsStatus(0, initialVendors);
 
   // A stall type hands off to the Brands catalog pre-filtered to that counter;
   // the catalog's "Book" then comes back here with `?vendor=`, and the guest's

@@ -28,6 +28,25 @@ function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** Today's calendar date in India — the same answer on the server (UTC) and
+ *  in the browser, so a default date can render on the first paint without a
+ *  hydration mismatch. */
+function todayInIndia(): Date {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function daysAhead(n: number): Date {
+  const d = todayInIndia();
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
 /** Local calendar date → `YYYY-MM-DD` (never UTC — `toISOString` shifts days). */
 function isoOf(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -83,11 +102,19 @@ export default function DatePicker({
   const months = lang === "hi" ? MONTHS_HI : MONTHS;
   const weekdays = lang === "hi" ? WEEKDAYS_HI : WEEKDAYS;
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Date | null>(null);
+  // A default date is resolved during render (India's calendar day, identical
+  // on server and client), so the field shows it on the first paint instead of
+  // "Pick a date" swapping to it after hydration.
+  const [selected, setSelected] = useState<Date | null>(() =>
+    defaultDaysAhead == null || valueIso !== undefined
+      ? null
+      : daysAhead(defaultDaysAhead),
+  );
   // The first day of the month currently shown in the grid.
   const [view, setView] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    const base =
+      defaultDaysAhead == null ? todayInIndia() : daysAhead(defaultDaysAhead);
+    return new Date(base.getFullYear(), base.getMonth(), 1);
   });
   const rootRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -166,13 +193,11 @@ export default function DatePicker({
     return d;
   }, [minDaysAhead]);
 
-  // Pre-select a default date `defaultDaysAhead` days out. Done in an effect
-  // (not a lazy initializer) so the server render and first client render
-  // match — `new Date()` would otherwise diverge and trip hydration.
+  // Tell the parent about the default date (already shown — see `selected`),
+  // and move it when the offset changes (e.g. a different occasion's lead time).
   useEffect(() => {
     if (defaultDaysAhead == null) return;
-    const d = startOfDay(new Date());
-    d.setDate(d.getDate() + defaultDaysAhead);
+    const d = daysAhead(defaultDaysAhead);
     setSelected(d);
     setView(new Date(d.getFullYear(), d.getMonth(), 1));
     onChange?.(d);

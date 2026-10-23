@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import BainaBoxOverview from "@/components/vendors/BainaBoxOverview";
+import { loadCatalogSnapshot } from "@/lib/catalogSnapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,8 @@ export const metadata: Metadata = {
     "Explore premium Baina Boxes, mithai gift hampers, and festive sweet packages from sweet houses on Bhojpatra.",
 };
 
-export default function BainaBoxOverviewPage() {
-  return <BainaBoxOverview />;
+export default async function BainaBoxOverviewPage() {
+  // Live sweet houses, read here so the list paints on the first frame.
+  const catalog = await loadCatalogSnapshot();
+  return <BainaBoxOverview initialVendors={catalog?.vendors} />;
 }

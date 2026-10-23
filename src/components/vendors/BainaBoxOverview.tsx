@@ -9,13 +9,18 @@ import { useLang } from "@/lib/i18n";
 import { Button, EmptyState, SkeletonList } from "@/components/ui";
 import { listingCateringCategories } from "@/lib/data";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
-import { useAllVendorsStatus } from "@/lib/useAllVendors";
+import { useAllVendorsStatus, type VendorsPayload } from "@/lib/useAllVendors";
 
 /** Every vendor who declared the Baina Box category — boxes are ordered from
  *  the panel on their profile. */
-export default function BainaBoxOverview() {
+export default function BainaBoxOverview({
+  initialVendors,
+}: {
+  /** Server snapshot of `/api/vendors` — sweet houses paint on the first frame. */
+  initialVendors?: VendorsPayload | null;
+} = {}) {
   const { t } = useLang();
-  const { vendors: all, loaded } = useAllVendorsStatus();
+  const { vendors: all, loaded } = useAllVendorsStatus(0, initialVendors);
   const vendors = all.filter((v) =>
     listingCateringCategories(v).includes("baina-box"),
   );

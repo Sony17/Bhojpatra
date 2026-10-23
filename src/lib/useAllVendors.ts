@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { vendorListings, type VendorListing } from "@/lib/data";
 import type { StallBrief } from "@/lib/vendorStorefront";
 
@@ -16,25 +16,47 @@ import type { StallBrief } from "@/lib/vendorStorefront";
  * at what per-plate price) once the API answers: `undefined` until then,
  * `null` when the vendor has no bookable stall.
  *
- * Pass `refreshToken` (increment on pull-to-refresh) to re-fetch live vendors.
+ * Pass `refreshToken` (increment on pull-to-refresh) to re-fetch live vendors,
+ * and `initial` (server snapshot) to paint the roster on the first frame.
  */
-export function useAllVendors(refreshToken = 0): VendorListing[] {
-  return useAllVendorsStatus(refreshToken).vendors;
+export function useAllVendors(
+  refreshToken = 0,
+  initial?: VendorsPayload | null,
+): VendorListing[] {
+  return useAllVendorsStatus(refreshToken, initial).vendors;
+}
+
+/** The `/api/vendors` payload — also produced server-side (catalogSnapshot)
+ *  and passed in as `initial` so the first paint already has the roster. */
+export interface VendorsPayload {
+  vendors: VendorListing[];
+  stalls: Record<string, StallBrief | null>;
+  samplesHidden: boolean;
 }
 
 /** `useAllVendors` plus whether `/api/vendors` has answered yet — so a page
  *  can show a loading state instead of a premature "no vendors" message. */
-export function useAllVendorsStatus(refreshToken = 0): {
+export function useAllVendorsStatus(
+  refreshToken = 0,
+  initial?: VendorsPayload | null,
+): {
   vendors: VendorListing[];
   loaded: boolean;
 } {
-  const [liveVendors, setLiveVendors] = useState<VendorListing[]>([]);
-  const [stalls, setStalls] = useState<Record<string, StallBrief | null> | null>(
-    null,
+  const [liveVendors, setLiveVendors] = useState<VendorListing[]>(
+    initial?.vendors ?? [],
   );
-  const [samplesHidden, setSamplesHidden] = useState<boolean | null>(null);
+  const [stalls, setStalls] = useState<Record<string, StallBrief | null> | null>(
+    initial?.stalls ?? null,
+  );
+  const [samplesHidden, setSamplesHidden] = useState<boolean | null>(
+    initial ? initial.samplesHidden : null,
+  );
+  // Server-provided roster → no initial fetch (only an explicit refresh).
+  const seeded = useRef(!!initial);
 
   useEffect(() => {
+    if (seeded.current && refreshToken === 0) return;
     let alive = true;
     fetch("/api/vendors")
       .then((r) => (r.ok ? r.json() : null))

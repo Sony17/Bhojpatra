@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cities } from "@/lib/data";
 import {
   staticBookableVenues,
   mergeVenues,
   fetchRegisteredVenues,
+  recordToBookable,
+  rememberVenues,
   type BookableVenue,
+  type VenueRecord,
 } from "@/lib/venues";
 import { useLang, type Lang, type Translate } from "@/lib/i18n";
 import {
@@ -43,7 +46,13 @@ const VENUE_TYPE_HI: Record<string, string> = {
 const cityName = (id: string) =>
   cities.find((c) => c.id === id)?.name ?? id;
 
-export default function VenueExplorer() {
+export default function VenueExplorer({
+  initialVenues,
+}: {
+  /** Server-read public venue records — the live catalogue paints on the
+   *  first frame; without them the client fetches as before. */
+  initialVenues?: VenueRecord[] | null;
+} = {}) {
   const { lang, t } = useLang();
   const [city, setCity] = useState<string>(ALL);
   const [location, setLocation] = useState<string>(ALL);
@@ -51,13 +60,21 @@ export default function VenueExplorer() {
 
   const ratings = useVendorRatings();
 
-  const [venues, setVenues] = useState<BookableVenue[]>(staticBookableVenues);
+  const [venues, setVenues] = useState<BookableVenue[]>(() => {
+    if (!initialVenues?.length) return staticBookableVenues;
+    const registered = initialVenues.map(recordToBookable);
+    rememberVenues(registered);
+    return mergeVenues(registered);
+  });
   const loadVenues = useCallback(async () => {
     const registered = await fetchRegisteredVenues();
     if (registered.length) setVenues(mergeVenues(registered));
   }, []);
 
+  // Server-seeded → already the live catalogue; fetch only without a seed.
+  const seeded = useRef(!!initialVenues);
   useEffect(() => {
+    if (seeded.current) return;
     void loadVenues();
   }, [loadVenues]);
 
