@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { ServicePackage } from "@/lib/data";
+import Image from "next/image";
+import { servicePhoto, type ServicePackage } from "@/lib/data";
 import { money } from "@/lib/money";
 import {
   serviceRate,
@@ -44,15 +45,13 @@ export default function EssentialsPicker({
       <div
         role="radiogroup"
         aria-label={t("Service package", "सर्विस पैकेज")}
-        // Phones: a 2-up grid, so names like "Ultra Luxury Service" and their
-        // "For …" line read in full. Wider screens: one row, like a tier
-        // strip — four tiles fill the width and any more swipe in from the
-        // right. Top padding leaves room for the ✓ badge.
+        // Four tiles to a row on every screen, like a tier strip. Four or
+        // fewer sit in a plain grid; any more swipe in from the right, still
+        // four to a view. Top padding leaves room for the ✓ badge.
         className={
-          "grid grid-cols-2 gap-2 pb-0.5 pt-1.5 sm:flex sm:snap-x sm:gap-2.5 sm:overflow-x-auto sm:[scrollbar-width:none] " +
-          (count <= 4
-            ? "sm:[&>*]:flex-1"
-            : "sm:[&>*]:basis-0 sm:[&>*]:grow")
+          count <= 4
+            ? "grid grid-cols-4 gap-1.5 pb-0.5 pt-1.5 sm:gap-2.5"
+            : "flex snap-x gap-1.5 overflow-x-auto pb-0.5 pr-1 pt-1.5 [scrollbar-width:none] sm:gap-2.5 [&>*]:shrink-0 [&>*]:basis-[calc((100%_-_3*0.375rem)/4)] sm:[&>*]:basis-[calc((100%_-_3*0.625rem)/4)]"
         }
       >
         {packages.map((pkg) => (
@@ -61,8 +60,8 @@ export default function EssentialsPicker({
             selected={pkg.id === selectedId}
             onSelect={() => onSelect(pkg.id === selectedId ? "" : pkg.id)}
             icon={pkg.icon}
+            photo={servicePhoto(pkg)}
             title={lang === "hi" ? pkg.nameHi : pkg.name}
-            subtitle={lang === "hi" ? pkg.subtitleHi : pkg.subtitle}
           />
         ))}
       </div>
@@ -85,14 +84,14 @@ function Tile({
   selected,
   onSelect,
   icon,
+  photo,
   title,
-  subtitle,
 }: {
   selected: boolean;
   onSelect: () => void;
   icon: ReactNode;
+  photo?: string;
   title: string;
-  subtitle: string;
 }) {
   return (
     <button
@@ -101,7 +100,7 @@ function Tile({
       aria-checked={selected}
       onClick={onSelect}
       className={
-        "relative flex min-w-0 snap-start flex-col items-center rounded-xl border px-1 pb-1.5 pt-2 text-center transition sm:px-2 sm:pb-2.5 sm:pt-3 " +
+        "relative flex min-w-0 snap-start flex-col items-center justify-start rounded-lg border p-1 text-center transition sm:p-1.5 " +
         (selected
           ? "border-[1.5px] border-maroon bg-cream/20"
           : "border-cream-3/70 bg-white hover:bg-cream/15")
@@ -117,25 +116,26 @@ function Tile({
           </svg>
         </span>
       )}
-      <span
-        aria-hidden="true"
-        className="flex h-6 items-center justify-center text-[1.35rem] leading-none sm:h-7 sm:text-2xl"
-      >
-        {icon}
-      </span>
+      {photo ? (
+        <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-md bg-cream-2">
+          <Image src={photo} alt="" fill sizes="(min-width: 640px) 160px, 25vw" className="object-cover" />
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="flex h-5 items-center justify-center text-base leading-none sm:h-6 sm:text-xl"
+        >
+          {icon}
+        </span>
+      )}
       <span
         className={
-          "mt-1 line-clamp-2 text-[12px] font-semibold leading-tight [overflow-wrap:anywhere] sm:text-sm " +
+          "mt-0.5 break-words text-[10px] font-semibold leading-tight hyphens-auto min-[390px]:text-[11px] sm:text-[13px] " +
           (selected ? "text-maroon" : "text-ink")
         }
       >
         {title}
       </span>
-      {subtitle && (
-        <span className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-ink/70 sm:text-[11px]">
-          {subtitle}
-        </span>
-      )}
     </button>
   );
 }
@@ -160,7 +160,7 @@ function PackageDetail({
   return (
     <DetailCard
       icon={pkg.icon}
-      badge={pkg.badge}
+      photo={servicePhoto(pkg)}
       title={lang === "hi" ? pkg.nameHi : pkg.name}
       subtitle={lang === "hi" ? pkg.subtitleHi : pkg.subtitle}
       price={money(rate)}
@@ -200,11 +200,11 @@ function PackageDetail({
       details={
         open && (
           <div className="space-y-3 text-sm">
-            {/* Included — the bulk of the list, two columns from tablet up. */}
+            {/* Included — the bulk of the list, in two columns at every width. */}
             {pkg.includes.length > 0 && (
               <section>
                 <DetailHeading>{t("Included", "शामिल")}</DetailHeading>
-                <ul className="mt-1.5 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                <ul className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs sm:gap-x-4 sm:text-sm">
                   {pkg.includes.map((line) => (
                     <li key={line} className="flex items-start gap-2 text-ink">
                       <span
@@ -285,6 +285,7 @@ function DetailHeading({ children }: { children: ReactNode }) {
 /** The picked option opened up: big icon, its name, its price for this order. */
 function DetailCard({
   icon,
+  photo,
   badge,
   title,
   subtitle,
@@ -296,6 +297,7 @@ function DetailCard({
   details,
 }: {
   icon: ReactNode;
+  photo?: string;
   badge?: string;
   title: string;
   subtitle: string;
@@ -310,12 +312,18 @@ function DetailCard({
   return (
     <div className="rounded-xl border border-cream-3 bg-cream/20 px-2.5 py-2 sm:px-3.5 sm:py-3">
       <div className="flex items-center gap-2.5">
-        <span
-          aria-hidden="true"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream/80 text-2xl sm:h-12 sm:w-12 sm:text-[1.75rem]"
-        >
-          {icon}
-        </span>
+        {photo ? (
+          <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-full bg-cream-2 sm:h-12 sm:w-12">
+            <Image src={photo} alt="" fill sizes="48px" className="object-cover" />
+          </span>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream/80 text-2xl sm:h-12 sm:w-12 sm:text-[1.75rem]"
+          >
+            {icon}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           {badge && (
             <span className="block text-[9px] font-bold uppercase leading-tight tracking-wider text-maroon">

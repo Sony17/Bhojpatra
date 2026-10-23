@@ -293,6 +293,56 @@ select:-webkit-autofill {
   line-height: 1.45;
 }
 
+/* ── Phone type scale (iPhone SE → Pro Max, ≤430px) ─────────────────────
+   On phones the desktop scale crowds and clips copy, so every Tailwind text
+   token drops to ~75%. The two smallest steps are floored at 11px / 12px so
+   captions stay legible. Line heights are ratios, so they follow along.
+   Spacing is untouched — tap targets keep their size. This block is
+   unlayered, so it outranks the utilities layer. */
+@media (max-width: 430px) {
+  :root {
+    --text-xs: 0.6875rem;   /* 12 → 11 */
+    --text-sm: 0.75rem;     /* 14 → 12 */
+    --text-base: 0.8125rem; /* 16 → 13 */
+    --text-lg: 0.875rem;    /* 18 → 14 */
+    --text-xl: 0.9375rem;   /* 20 → 15 */
+    --text-2xl: 1.125rem;   /* 24 → 18 */
+    --text-3xl: 1.375rem;   /* 30 → 22 */
+    --text-4xl: 1.6875rem;  /* 36 → 27 */
+    --text-5xl: 2.25rem;    /* 48 → 36 */
+    --text-6xl: 2.8125rem;  /* 60 → 45 */
+    --text-7xl: 3.375rem;   /* 72 → 54 */
+  }
+  body {
+    font-size: 0.8125rem;
+  }
+  .text-hero {
+    font-size: clamp(1.875rem, 1.5rem + 2.1vw, 2.8125rem);
+  }
+  .text-title {
+    font-size: clamp(1.3125rem, 1.05rem + 1.2vw, 1.875rem);
+  }
+  .text-app-title {
+    font-size: clamp(1.0625rem, 0.9rem + 0.6vw, 1.3125rem);
+  }
+  .text-subtitle {
+    font-size: clamp(0.8125rem, 0.75rem + 0.25vw, 0.9375rem);
+  }
+  .text-body {
+    font-size: 0.75rem;
+  }
+  .text-caption {
+    font-size: 0.6875rem;
+  }
+  /* iOS Safari zooms the whole page into any field under 16px — keep text
+     inputs at 16px so focusing one never jolts the layout. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Hero readability — a light veil keeps the photography luminous while
    preserving contrast for the brand's dark typography. */
 .hero-scrim-readability {
@@ -465,6 +515,23 @@ html.header-hidden .app-sticky-chrome {
 
 .app-bottom-safe {
   padding-bottom: calc(6.5rem + var(--safe-bottom));
+}
+
+/* Single Stall on phones ends on its own content: no legal strip below it.
+   The strip's tab-bar / sticky-dock clearance moves onto the page instead. */
+@media (max-width: 1023px) {
+  html.hide-mobile-footer .site-footer-mobile {
+    display: none;
+  }
+  html.hide-mobile-footer .app-shell-main {
+    padding-bottom: calc(
+      var(--tab-bar-h) + var(--safe-bottom) + var(--booking-bar-h, 0px) + 0.75rem
+    );
+  }
+  /* …so a screen's own bottom-bar clearance would only double it. */
+  html.hide-mobile-footer .app-shell-main .app-bottom-safe {
+    padding-bottom: 0;
+  }
 }
 
 @media (min-width: 1024px) {

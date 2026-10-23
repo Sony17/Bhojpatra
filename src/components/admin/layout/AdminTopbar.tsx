@@ -90,7 +90,7 @@ export default function AdminTopbar({ onMenu }: AdminTopbarProps) {
                       />
                     )}
                     {last ? (
-                      <span className="truncate font-semibold text-ink">
+                      <span className="leading-tight font-semibold text-ink sm:truncate">
                         {label}
                       </span>
                     ) : (

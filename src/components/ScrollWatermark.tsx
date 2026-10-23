@@ -30,7 +30,7 @@ export default function ScrollWatermark() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center select-none transition-opacity duration-300 ease-out motion-reduce:transition-none"
+      className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden select-none transition-opacity duration-300 ease-out motion-reduce:transition-none"
       style={{ opacity: scrolled ? 0.035 : 0 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

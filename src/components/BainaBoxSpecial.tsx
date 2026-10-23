@@ -83,7 +83,7 @@ export default function BainaBoxSpecial({
                 {cta}
               </Button>
             ) : (
-              <p className="line-clamp-3 font-script text-sm text-ink-soft sm:text-base">
+              <p className="font-script text-sm text-ink-soft sm:text-base">
                 {body}
               </p>
             )}

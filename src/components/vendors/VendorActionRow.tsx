@@ -65,7 +65,7 @@ export default function VendorActionRow({
   };
 
   return (
-    <div className={`grid grid-cols-4 gap-1 sm:gap-2.5 ${className}`}>
+    <div className={`grid grid-cols-2 gap-2 min-[400px]:grid-cols-4 min-[400px]:gap-1 sm:gap-2.5 ${className}`}>
       {/* 1. Book Now */}
       <Link
         href={bookHref}

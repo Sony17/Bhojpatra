@@ -3034,7 +3034,7 @@ export default function BookingWizard() {
           ].map((b) => (
             <li
               key={b.title}
-              className="flex items-center gap-2.5 rounded-2xl border border-cream-3 bg-white px-3 py-2.5 shadow-sm"
+              className="flex items-center gap-2 rounded-2xl border border-cream-3 bg-white px-2.5 py-2.5 shadow-sm min-[375px]:gap-2.5 min-[375px]:px-3"
             >
               <span
                 aria-hidden="true"
@@ -3043,10 +3043,10 @@ export default function BookingWizard() {
                 {b.icon}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold text-ink">
+                <span className="block text-xs font-semibold leading-tight text-ink">
                   {b.title}
                 </span>
-                <span className="block truncate text-[11px] text-ink-soft">
+                <span className="mt-0.5 block text-[11px] leading-tight text-ink-soft">
                   {b.sub}
                 </span>
               </span>

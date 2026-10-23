@@ -106,7 +106,7 @@ export default function Footer() {
       </section>
 
       {/* Mobile compact footer — app-style legal strip */}
-      <footer className="border-t border-maroon/8 bg-white pb-[calc(var(--tab-bar-h)+var(--safe-bottom))] text-ink lg:hidden">
+      <footer className="site-footer-mobile border-t border-maroon/8 bg-white pb-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] text-ink lg:hidden">
         <div className="mx-auto max-w-lg px-4 py-6">
           <nav
             aria-label={t("Company", "कंपनी")}

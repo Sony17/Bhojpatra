@@ -44,7 +44,7 @@ export default function SectionHead({
         </span>
       </div>
       <h2
-        className={`font-display ${phoneMinimal ? "text-xl" : compact ? "text-2xl" : "text-3xl"} leading-tight text-ink sm:text-4xl${
+        className={`font-display text-3xl leading-tight text-ink sm:text-4xl${
           nowrap ? " sm:whitespace-nowrap" : ""
         }`}
       >

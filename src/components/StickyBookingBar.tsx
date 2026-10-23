@@ -30,7 +30,10 @@ export default function StickyBookingBar({
 
   useEffect(() => {
     const measure = () => {
-      const h = ref.current?.offsetHeight ?? 0;
+      // The wrapper itself is 0px tall — the bar inside is position:fixed —
+      // so measure the bar, or the chat launcher never lifts clear of it.
+      const bar = ref.current?.firstElementChild as HTMLElement | null;
+      const h = bar?.offsetHeight ?? 0;
       if (shown && h > 0) setBookingBarState(true, h);
       else setBookingBarState(false);
     };

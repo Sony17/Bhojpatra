@@ -1277,8 +1277,10 @@ export interface ServicePackage {
   nameHi: string;
   subtitle: string;
   subtitleHi: string;
-  /** Emoji/glyph for the card header. */
+  /** Emoji/glyph — the fallback when the package has no photo. */
   icon: string;
+  /** Card photo; seeded tiers fall back to `servicePhoto` by id. */
+  image?: string;
   /** ✓ checklist of what the tier covers. */
   includes: string[];
   /** ✗ list — only Package A carries these; empty otherwise. */
@@ -1309,6 +1311,18 @@ export interface ServiceGuestTier {
   /** ₹ — per guest, or the flat fee when the package isn't per-guest. */
   price: number;
 }
+
+/** Default photo per seeded service tier — admin-stored copies of these
+ *  packages predate `image`, so the picker resolves through here. */
+const SERVICE_PHOTOS: Record<string, string> = {
+  essential: img("photo-1555244162-803834f70033", 400),
+  standard: img("photo-1414235077428-338989a2e8c0", 400),
+  premium: img("photo-1519225421980-715cb0215aed", 400),
+  ultra: img("photo-1511795409834-ef04bbd61622", 400),
+};
+
+export const servicePhoto = (pkg: Pick<ServicePackage, "id" | "image">): string | undefined =>
+  pkg.image || SERVICE_PHOTOS[pkg.id];
 
 export const servicePackages: ServicePackage[] = [
   {

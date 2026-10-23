@@ -137,10 +137,10 @@ export default function Testimonials() {
             )}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-semibold text-ink">
+            <span className="block text-[13px] font-semibold leading-tight text-ink">
               {t.name}
             </span>
-            <span className="block truncate text-xs text-ink/55">
+            <span className="block text-xs leading-tight text-ink/55">
               {lang === "hi" ? t.roleHi : t.role}
             </span>
           </span>

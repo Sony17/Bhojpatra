@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import PaymentBox from "@/components/booking/shared/PaymentBox";
 import { coupons, type Coupon } from "@/lib/data";
 import { inr, money, perPlateCost } from "@/lib/money";
@@ -58,6 +58,9 @@ export default function CheckoutPanel({
   confirmError,
   whatsappHref,
   blocker = "",
+  stage,
+  afterCoupon,
+  onProceed,
 }: {
   t: (en: string, hi: string) => string;
   venue: string;
@@ -110,7 +113,17 @@ export default function CheckoutPanel({
   /** An unmet order rule (see PaymentBox) — blocks both the pay and the
    *  pay-later confirm buttons until the guest fixes it. */
   blocker?: string;
+  /** Split checkout: "cart" shows the coupon, details and total, ending in
+   *  "Proceed to payment"; "pay" shows the total and how to pay. Omitted, the
+   *  whole checkout renders on one screen. */
+  stage?: "cart" | "pay";
+  /** Rendered straight after the coupon card (e.g. the order breakdown). */
+  afterCoupon?: ReactNode;
+  /** "Proceed to payment" on the cart stage. */
+  onProceed?: () => void;
 }) {
+  const showCart = stage !== "pay";
+  const showPay = stage !== "cart";
   // A contact field counts as "already known" only while it still matches what
   // we have on file — the moment the guest edits it, it's their own input and
   // goes back to being a plain field.
@@ -125,138 +138,8 @@ export default function CheckoutPanel({
   const [editingContact, setEditingContact] = useState(false);
   const showContactField = (known: boolean) => editingContact || !known;
 
-  return (
+  const contactCard = (
     <>
-    {/* Coupon */}
-    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-maroon/10 text-maroon">
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
-            <path d="M9 7v10" strokeDasharray="2 2" />
-          </svg>
-        </span>
-        <h3 className="font-display text-base font-semibold text-ink">
-          {t("Apply a coupon", "कूपन लगाएं")}
-        </h3>
-      </div>
-
-      {appliedCoupon && couponDiscount > 0 ? (
-        /* Applied — compact success card with remove */
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream-2/40 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-white">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">
-                <span className="font-mono font-bold tracking-wide text-maroon">
-                  {appliedCoupon.code}
-                </span>{" "}
-                {t("applied", "लागू")}
-              </p>
-              <p className="text-xs font-medium text-ink-soft/70">
-                {t("You save", "आपकी बचत")} {money(couponDiscount)}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={removeCoupon}
-            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon transition hover:bg-maroon/10"
-          >
-            {t("Remove", "हटाएं")}
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Compact single-line input with inline apply */}
-          <div className="mt-3 flex items-center gap-2 rounded-full border border-cream-3 bg-cream-2/30 py-1 pl-4 pr-1 transition-colors focus-within:border-maroon focus-within:bg-white">
-            <input
-              type="text"
-              value={couponInput}
-              onChange={(e) => setCouponInput(e.target.value)}
-              placeholder={t("Enter code", "कोड दर्ज करें")}
-              className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase tracking-wide text-ink outline-none placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-soft/50"
-            />
-            <button
-              type="button"
-              onClick={applyCoupon}
-              disabled={!couponInput.trim()}
-              className="shrink-0 rounded-full bg-maroon px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t("Apply", "लगाएं")}
-            </button>
-          </div>
-          {couponError && (
-            <p className="mt-2 pl-1 text-xs font-medium text-maroon">
-              {couponError}
-            </p>
-          )}
-
-          {/* Select-to-apply offer tickets */}
-          <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/50">
-            {t("Tap to apply", "लगाने के लिए टैप करें")}
-          </p>
-          <div className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {couponList.map((c) => {
-              const save = Math.min((preDiscount * c.percent) / 100, c.cap);
-              return (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => applyCouponCode(c.code)}
-                  className="group relative flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-dashed border-maroon/40 bg-cream-2/25 p-3 text-left transition hover:border-maroon hover:bg-cream-2/50 hover:shadow-sm"
-                >
-                  {/* punched ticket notches */}
-                  <span className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
-                  <span className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-sm font-bold tracking-wide text-maroon">
-                      {c.code}
-                    </span>
-                    <span className="rounded-md bg-maroon px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white opacity-90 transition group-hover:opacity-100">
-                      {t("Apply", "लगाएं")}
-                    </span>
-                  </div>
-                  <span className="mt-1.5 text-xs font-semibold text-ink">
-                    {save > 0
-                      ? t(`Save ${money(save)}`, `बचाएं ${money(save)}`)
-                      : c.label}
-                  </span>
-                  {save > 0 && (
-                    <span className="mt-0.5 truncate text-[10px] text-ink-soft/60">
-                      {c.label}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-
     {/* Contact — so our team can reach out (required for COD / connect).
         Whatever we already hold (the signed-in account's name and email, the
         number from this customer's last booking) is read back as a single
@@ -397,7 +280,10 @@ export default function CheckoutPanel({
         </div>
       </div>
     </div>
-
+    </>
+  );
+  const referralCard = (
+    <>
     {/* Referral — auto-filled from a partner's share link (?ref=) or typed in.
         A recognised code shows the referrer's name as a tag. */}
     <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
@@ -445,7 +331,152 @@ export default function CheckoutPanel({
         )
       )}
     </div>
+    </>
+  );
 
+  return (
+    <>
+    {showCart && (
+    <>
+    {/* Coupon */}
+    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-maroon/10 text-maroon">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
+            <path d="M9 7v10" strokeDasharray="2 2" />
+          </svg>
+        </span>
+        <h3 className="font-display text-base font-semibold text-ink">
+          {t("Apply a coupon", "कूपन लगाएं")}
+        </h3>
+      </div>
+
+      {appliedCoupon && couponDiscount > 0 ? (
+        /* Applied — compact success card with remove */
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream-2/40 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-maroon text-white">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">
+                <span className="font-mono font-bold tracking-wide text-maroon">
+                  {appliedCoupon.code}
+                </span>{" "}
+                {t("applied", "लागू")}
+              </p>
+              <p className="text-xs font-medium text-ink-soft/70">
+                {t("You save", "आपकी बचत")} {money(couponDiscount)}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={removeCoupon}
+            className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-maroon transition hover:bg-maroon/10"
+          >
+            {t("Remove", "हटाएं")}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Compact single-line input with inline apply */}
+          <div className="mt-3 flex items-center gap-2 rounded-full border border-cream-3 bg-cream-2/30 py-1 pl-4 pr-1 transition-colors focus-within:border-maroon focus-within:bg-white">
+            <input
+              type="text"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value)}
+              placeholder={t("Enter code", "कोड दर्ज करें")}
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase tracking-wide text-ink outline-none placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-soft/50"
+            />
+            <button
+              type="button"
+              onClick={applyCoupon}
+              disabled={!couponInput.trim()}
+              className="shrink-0 rounded-full bg-maroon px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t("Apply", "लगाएं")}
+            </button>
+          </div>
+          {couponError && (
+            <p className="mt-2 pl-1 text-xs font-medium text-maroon">
+              {couponError}
+            </p>
+          )}
+
+          {/* Select-to-apply offer tickets */}
+          <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/50">
+            {t("Tap to apply", "लगाने के लिए टैप करें")}
+          </p>
+          <div className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {couponList.map((c) => {
+              const save = Math.min((preDiscount * c.percent) / 100, c.cap);
+              return (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => applyCouponCode(c.code)}
+                  className="group relative flex w-36 shrink-0 snap-start flex-col overflow-hidden rounded-lg border border-dashed border-maroon/40 bg-cream-2/25 px-2.5 py-2 text-left transition hover:border-maroon hover:bg-cream-2/50 hover:shadow-sm"
+                >
+                  {/* punched ticket notches */}
+                  <span className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
+                  <span className="absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-cream-3 bg-white" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold tracking-wide text-maroon">
+                      {c.code}
+                    </span>
+                    <span className="rounded-md bg-maroon px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white opacity-90 transition group-hover:opacity-100">
+                      {t("Apply", "लगाएं")}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] font-semibold text-ink">
+                    {save > 0
+                      ? t(`Save ${money(save)}`, `बचाएं ${money(save)}`)
+                      : c.label}
+                  </span>
+                  {save > 0 && (
+                    <span className="mt-0.5 truncate text-[10px] text-ink-soft/60">
+                      {c.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+
+    {!stage && contactCard}
+    {referralCard}
+    {stage && afterCoupon}
+    </>
+    )}
+
+    {/* The split checkout's cart already itemises the total, and the pay
+        step's PaymentBox names the advance — this card would only repeat them. */}
+    {!stage && (
     <div className="mt-6 rounded-2xl border border-maroon/30 bg-cream/40 p-5 shadow-soft">
       {guests > 0 && grandTotal > 0 ? (
         <>
@@ -497,6 +528,29 @@ export default function CheckoutPanel({
         </p>
       )}
     </div>
+    )}
+
+    {stage === "cart" && (
+      <>
+        {blocker && (
+          <p role="alert" className="mt-4 text-sm font-medium text-maroon">
+            {blocker}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={onProceed}
+          disabled={Boolean(blocker)}
+          className="mt-6 w-full rounded-full bg-maroon px-6 py-3.5 text-sm font-semibold text-cream shadow-brand transition hover:bg-maroon/90 disabled:opacity-60"
+        >
+          {t("Proceed to payment", "भुगतान के लिए आगे बढ़ें")} →
+        </button>
+      </>
+    )}
+
+    {showPay && (
+    <>
+    {stage === "pay" && contactCard}
 
     {/* Choose how to pay — pay the 10% advance online (UPI ID / QR) to confirm
         right here, or "Bhojpatra connects you (COD)" to book now and settle
@@ -555,6 +609,8 @@ export default function CheckoutPanel({
         "हम आपकी बुकिंग की पुष्टि करेंगे और व्यवस्था पूरी करने के लिए आपसे संपर्क करेंगे।",
       )}
     </p>
+    </>
+    )}
     </>
   );
 }

@@ -24,6 +24,11 @@ function emit(): void {
 export function setBookingBarState(nextVisible: boolean, barHeight = 0): void {
   visible = nextVisible;
   height = nextVisible ? barHeight : 0;
+  // Mirrored as a CSS var so the footer can pad itself clear of the bar —
+  // otherwise its last links sit under the dock with no way to scroll them out.
+  if (typeof document !== "undefined") {
+    document.documentElement.style.setProperty("--booking-bar-h", `${height}px`);
+  }
   emit();
 }
 

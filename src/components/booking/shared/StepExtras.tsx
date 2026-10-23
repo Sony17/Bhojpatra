@@ -236,11 +236,23 @@ export default function StepExtras({
           aria-expanded={false}
           className="mt-1 flex w-full items-center gap-3 rounded-2xl border border-cream-3 bg-white px-4 py-3 text-left shadow-sm transition hover:border-maroon sm:mt-0"
         >
-          <span
-            aria-hidden="true"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cream-2 text-base font-semibold text-maroon"
-          >
-            +
+          {/* A peek at the counters themselves — their own photos. */}
+          <span aria-hidden="true" className="flex shrink-0 -space-x-3">
+            {addOns.slice(0, 3).map((a) => (
+              <span
+                key={a.id}
+                className="relative block h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-cream-2 shadow-sm"
+              >
+                <Image
+                  src={a.image}
+                  alt=""
+                  fill
+                  sizes="40px"
+                  unoptimized={photoNeedsUnoptimized(a.image)}
+                  className="object-cover"
+                />
+              </span>
+            ))}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-ink">
@@ -272,9 +284,9 @@ export default function StepExtras({
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
         >
-          🔍
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         </span>
         <input
           type="search"
@@ -315,7 +327,7 @@ export default function StepExtras({
                   : "border-cream-3 bg-white")
               }
             >
-              <span aria-hidden="true">🔍</span>
+              <span aria-hidden="true" className="text-ink"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></span>
             </button>
           )}
           {catChips.map((c) => {
@@ -408,7 +420,7 @@ export default function StepExtras({
                 <div
                   className={
                     "relative shrink-0 self-stretch overflow-hidden bg-cream-2 sm:w-40 " +
-                    (compact ? "w-12" : "w-24")
+                    (compact ? "w-[3.75rem]" : "w-24")
                   }
                 >
                   <Image
@@ -422,7 +434,7 @@ export default function StepExtras({
                 <div
                   className={
                     "flex min-w-0 flex-1 gap-2.5 sm:items-start sm:gap-3 sm:p-4 " +
-                    (compact ? "min-h-10 items-center px-2.5 py-1.5" : "items-start p-3")
+                    (compact ? "min-h-[3.125rem] items-center px-3 py-2" : "items-start p-3")
                   }
                 >
                   <div
@@ -435,13 +447,10 @@ export default function StepExtras({
                       className={
                         "font-display font-semibold text-ink sm:text-base " +
                         (compact
-                          ? "min-w-0 flex-1 truncate text-[13px] sm:whitespace-normal"
+                          ? "min-w-0 flex-1 text-[16px] leading-tight"
                           : "text-sm")
                       }
                     >
-                      <span aria-hidden="true" className="mr-1.5">
-                        {a.icon}
-                      </span>
                       {lang === "hi" ? a.nameHi : a.name}
                     </h4>
                     <p
@@ -454,8 +463,8 @@ export default function StepExtras({
                     </p>
                     <p
                       className={
-                        "text-xs font-bold text-maroon sm:mt-1 sm:text-sm " +
-                        (compact ? "shrink-0 whitespace-nowrap" : "mt-1")
+                        "font-bold text-maroon sm:mt-1 sm:text-sm " +
+                        (compact ? "shrink-0 whitespace-nowrap text-[15px]" : "mt-1 text-xs")
                       }
                     >
                       {a.perPlate
@@ -479,7 +488,7 @@ export default function StepExtras({
                   <span
                     className={
                       "flex shrink-0 items-center justify-center rounded-md border text-sm transition sm:h-6 sm:w-6 " +
-                      (compact ? "h-5 w-5 " : "h-6 w-6 ") +
+                      "h-6 w-6 " +
                       (active
                         ? "border-maroon bg-maroon text-cream"
                         : "border-cream-3 text-transparent")

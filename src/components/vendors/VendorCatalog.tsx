@@ -7,6 +7,7 @@ import { isUnoptimized } from "@/lib/homeContentData";
 import type { StallTileImages } from "@/lib/stallTileImages";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useHideMobileFooter } from "@/lib/mobileChrome";
 import {
   bookingTimeSlots,
   cateringCategoryIds,
@@ -441,25 +442,6 @@ export default function VendorCatalog({
       toStallTypeId(searchParams.get("counter") ?? "") !== "",
   );
   const router = useRouter();
-  // "Change" returns to the stall picker (type outlined, city kept by the
-  // wizard's draft). Arriving straight from it, step back in history instead
-  // of pushing, so Back doesn't bounce picker ⇄ catalog.
-  const backToStallPicker = () => {
-    try {
-      const ref = document.referrer ? new URL(document.referrer) : null;
-      if (
-        ref?.origin === window.location.origin &&
-        ref.pathname === "/book/stall" &&
-        window.history.length > 1
-      ) {
-        router.back();
-        return;
-      }
-    } catch {
-      // Malformed referrer — fall through to a fresh navigation.
-    }
-    router.push(`/book/stall?counter=${encodeURIComponent(counter)}`);
-  };
   // "Change" swaps the stall type in place, from a sheet of the types that
   // have stalls in this city; the URL follows so a reload / share keeps it.
   const [typeSheetOpen, setTypeSheetOpen] = useState(false);
@@ -532,6 +514,8 @@ export default function VendorCatalog({
   // is also neutralised in the result filter so a stale value can't silently
   // constrain the grid.
   const stallMode = category === "single-stall" && !bainaMode;
+  // The Single Stall view is part of the stall flow — no phone footer.
+  useHideMobileFooter(stallMode);
   // Landed from the stall picker and still on that stall type: category,
   // stall type and city are settled, so search, the lens row and the city /
   // state pickers step aside and "Clear" only clears the refinements.
@@ -581,28 +565,17 @@ export default function VendorCatalog({
     },
     [counter],
   );
-  // A veg / non-veg choice only means something when some stall on offer
-  // actually serves non-veg — never for chaat, pan or sweets.
-  const stallNonVegOnOffer = useMemo(
+  // Veg / Non-veg stays in the filters on every stall type — guests look
+  // for it first, even where every stall on offer is veg.
+  const visibleFilters: ReadonlySet<FilterKey> = useMemo(
     () =>
-      stallMode &&
-      allVendors.some(
-        (v) =>
-          (counter === "" || (v.stall?.stallTypes ?? []).includes(counter)) &&
-          stallDiets(v).includes("non-veg"),
-      ),
-    [stallMode, allVendors, counter, stallDiets],
+      bainaMode
+        ? FILTERS_BY_CATEGORY["baina-box"]
+        : category
+          ? (FILTERS_BY_CATEGORY[category] ?? ALL_FILTERS)
+          : ALL_FILTERS,
+    [bainaMode, category],
   );
-
-  const visibleFilters: ReadonlySet<FilterKey> = useMemo(() => {
-    const base = bainaMode
-      ? FILTERS_BY_CATEGORY["baina-box"]
-      : category
-        ? (FILTERS_BY_CATEGORY[category] ?? ALL_FILTERS)
-        : ALL_FILTERS;
-    if (!stallMode || stallNonVegOnOffer) return base;
-    return new Set([...base].filter((f) => f !== "diet"));
-  }, [bainaMode, category, stallMode, stallNonVegOnOffer]);
   const showFilter = (f: FilterKey) => visibleFilters.has(f);
 
   /** The rating a card's chip shows, picked exactly like `VendorCard` does:
@@ -973,10 +946,10 @@ export default function VendorCatalog({
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="eyebrow block text-[10px] font-bold text-maroon">
+              <span className="eyebrow block whitespace-nowrap text-[9px] font-bold text-maroon sm:text-[10px]">
                 {t("Single Stall", "सिंगल स्टॉल")}
               </span>
-              <span className="block truncate text-[13px] font-semibold text-ink">
+              <span className="block text-[12px] font-semibold leading-tight text-ink sm:text-[13px]">
                 {[
                   (lang === "hi"
                     ? stallTypeById(counter)?.nameHi
@@ -1010,7 +983,7 @@ export default function VendorCatalog({
               type="button"
               onClick={() => setTypeSheetOpen(true)}
               aria-haspopup="dialog"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-maroon px-3 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-maroon px-2.5 py-1.5 text-xs font-semibold text-maroon transition hover:bg-cream-2 active:scale-95 sm:px-3"
             >
               {t("Change", "बदलें")}
               <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1329,7 +1302,9 @@ export default function VendorCatalog({
           type="button"
           onClick={() => {
             setTypeSheetOpen(false);
-            backToStallPicker();
+            // Always a fresh trip to the categories page — a history step
+            // could land on an earlier catalog view instead.
+            router.push(`/book/stall?pick=1&counter=${encodeURIComponent(counter)}`);
           }}
           className="mt-4 w-full text-center text-[13px] font-semibold text-maroon underline underline-offset-2"
         >
@@ -1906,10 +1881,10 @@ function VendorCard({
     }
   };
 
-  // Stall lens: a square, food-app card (Swiggy / Zomato). The price rides
-  // on the photo; under it sit the name, rating · veg / non-veg marks (the
-  // guest's filtered diet first) and cuisines — the dishes themselves live on
-  // the booking menu.
+  // Stall lens: a square, food-app card (Swiggy / Zomato). Rating and the
+  // veg / non-veg marks (the guest's filtered diet first) ride the top of the
+  // photo, price and compare its foot; under it sits just the brand name —
+  // the dishes themselves live on the booking menu.
   if (stallMenu && stallMenu.dishes.length > 0) {
     const servedDiets = (["veg", "non-veg"] as const).filter((diet) =>
       stallMenu.dishes.some((d) => d.diet === diet),
@@ -1942,11 +1917,49 @@ function VendorCard({
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           />
-          {/* Just enough shade at the foot for the price to read. */}
+          {/* Shade at the top for the rating / diet chips, at the foot for
+              the price. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/45 to-transparent"
+          />
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent"
           />
+          <div className="absolute inset-x-2 top-2 z-10 flex items-start justify-between gap-1.5">
+            {rating ? (
+              <Link
+                href={`/vendors/${vendor.id}#reviews`}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[11.5px] font-bold leading-none text-ink shadow-sm"
+                aria-label={t(`Rated ${rating}`, `रेटिंग ${rating}`)}
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid h-3.5 w-3.5 place-items-center rounded-full bg-maroon text-[8px] text-white"
+                >
+                  ★
+                </span>
+                {rating}
+              </Link>
+            ) : (
+              <span className="shrink-0 rounded-full bg-white px-1.5 py-1 text-[9.5px] font-bold uppercase leading-none tracking-wide text-maroon shadow-sm">
+                {isSample ? t("Sample", "नमूना") : t("New", "नया")}
+              </span>
+            )}
+            {servedDiets.length > 0 && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-1 py-1 shadow-sm">
+                {servedDiets.map((diet) => (
+                  <DietMark
+                    key={diet}
+                    diet={diet}
+                    className="h-3.5 w-3.5"
+                    label={diet === "veg" ? t("Veg", "वेज") : t("Non-veg", "नॉन-वेज")}
+                  />
+                ))}
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => toggle(vendor.id)}
@@ -1963,7 +1976,7 @@ function VendorCard({
                 : undefined
             }
             className={
-              "absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-sm ring-1 ring-white/40 backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
+              "absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-sm ring-1 ring-white/40 backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
               (inCompare ? "bg-maroon text-cream" : "bg-black/35 text-white hover:bg-white hover:text-maroon")
             }
           >
@@ -1971,15 +1984,15 @@ function VendorCard({
               {inCompare ? "✓" : "+"}
             </span>
           </button>
-          <p className="absolute inset-x-2.5 bottom-2 font-sans font-extrabold uppercase leading-none tracking-tight text-white sm:inset-x-3 sm:bottom-2.5">
+          <p className="absolute bottom-2 left-2.5 right-11 font-sans font-extrabold uppercase whitespace-nowrap leading-none tracking-tight text-white sm:bottom-2.5 sm:left-3">
             {ctaPrice != null ? (
               <>
                 {cta.kind === "stall" && (
-                  <span className="mb-0.5 block text-[9px] font-semibold tracking-[0.14em] text-cream">
+                  <span className="mb-1 block text-[10px] font-bold tracking-[0.12em] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                     {t("Stall from", "स्टॉल")}
                   </span>
                 )}
-                <span className="text-[17px] sm:text-[19px]">
+                <span className="text-[15px] min-[375px]:text-[17px] sm:text-[19px]">
                   ₹{ctaPrice.toLocaleString("en-IN")}
                 </span>
                 <span className="text-[10px] font-bold"> {ctaUnit}</span>
@@ -1990,53 +2003,22 @@ function VendorCard({
           </p>
         </div>
 
-        {/* Name, then rating · diet, then cuisines — the food-app stack. */}
+        {/* Just the brand name — everything else rides the photo. */}
+        {/* The name wraps rather than truncates — on a 2-up phone grid the
+            whole brand must read, not "Banarasi…". */}
         <div className="mt-2 flex items-start gap-1.5 px-1 pb-1">
-          <div className="min-w-0 flex-1">
-            <h3 className="flex min-w-0 items-center gap-1 font-sans text-[14.5px] font-bold leading-tight tracking-tight text-ink sm:text-[15.5px]">
-              <span className="truncate">{vendor.name}</span>
-              {vendor.verified && !isSample && (
-                <span
-                  aria-label={t("Verified", "वेरिफाइड")}
-                  title={t("Verified", "वेरिफाइड")}
-                  className="inline-grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-maroon text-[8px] text-white"
-                >
-                  ✓
-                </span>
-              )}
-            </h3>
-            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold leading-none text-ink sm:text-[13px]">
-              {rating ? (
-                <Link
-                  href={`/vendors/${vendor.id}#reviews`}
-                  className="relative z-10 inline-flex shrink-0 items-center gap-1"
-                  aria-label={t(`Rated ${rating}`, `रेटिंग ${rating}`)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="grid h-4 w-4 place-items-center rounded-full bg-maroon text-[9px] text-white"
-                  >
-                    ★
-                  </span>
-                  {rating}
-                </Link>
-              ) : (
-                <span className="shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-maroon">
-                  {isSample ? t("Sample", "नमूना") : t("New", "नया")}
-                </span>
-              )}
-              {servedDiets.map((diet) => (
-                <span key={diet} className="inline-flex shrink-0 items-center gap-1">
-                  <span aria-hidden="true" className="text-ink/30">•</span>
-                  <DietMark diet={diet} className="h-3.5 w-3.5" />
-                  {diet === "veg" ? t("Veg", "वेज") : t("Non-veg", "नॉन-वेज")}
-                </span>
-              ))}
-            </p>
-            <p className="mt-1 truncate text-[12px] leading-tight text-ink/55 sm:text-[13px]">
-              {[...vendor.cuisines.slice(0, 2), vendor.city].filter(Boolean).join(" · ")}
-            </p>
-          </div>
+          <h3 className="min-w-0 flex-1 break-words font-sans text-[13px] font-bold leading-[1.25] tracking-tight text-ink sm:text-[15.5px]">
+            {vendor.name}
+            {vendor.verified && !isSample && (
+              <span
+                aria-label={t("Verified", "वेरिफाइड")}
+                title={t("Verified", "वेरिफाइड")}
+                className="ml-1 inline-grid h-3.5 w-3.5 -translate-y-px place-items-center rounded-full bg-maroon align-middle text-[8px] text-white"
+              >
+                ✓
+              </span>
+            )}
+          </h3>
           {/* The card itself books; the caterer's full profile sits behind
               this info button instead. */}
           <Link
@@ -2240,7 +2222,7 @@ function VendorCard({
               className={
                 "font-sans font-bold tracking-tight text-ink sm:truncate sm:text-[15px] sm:leading-snug " +
                 (compact
-                  ? "line-clamp-2 break-words text-[13.5px] leading-[1.2]"
+                  ? "break-words text-[13px] leading-[1.25]"
                   : "truncate text-[15px] leading-snug")
               }
             >
@@ -2275,7 +2257,7 @@ function VendorCard({
               >
                 {dietBadgeLabel(shownDiet)}
               </span>
-              <span className="min-w-0 truncate">
+              <span className="min-w-0 leading-snug">
                 {vendor.cuisines.slice(0, 3).join(" · ")}
                 {vendor.cuisines.length > 3 ? "…" : ""}
               </span>

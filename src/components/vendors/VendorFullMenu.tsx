@@ -5,6 +5,7 @@ import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
+import { useBookingBarDock } from "@/lib/bookingBar";
 import { AppBar, Button, Card, CategoryChip, CategoryChips } from "@/components/ui";
 import { StarIcon } from "@/components/reviews/reviewDisplay";
 import type { PublicVendorProfile, VendorBainaBox, VendorEssentialService } from "@/lib/vendorMenus";
@@ -145,6 +146,7 @@ export default function VendorFullMenu({
   stall?: BookableStall | null;
 }) {
   const { t, lang } = useLang();
+  const dockRef = useBookingBarDock<HTMLDivElement>();
   const [selectedCat, setSelectedCat] = useState<string>("all");
 
   const vendorName = profile?.business ?? listing?.name ?? "";
@@ -592,7 +594,11 @@ export default function VendorFullMenu({
         </div>
 
         {/* ── Sticky Bottom Action Bar ────────────────────────────── */}
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-maroon/10 bg-white/95 p-3.5 shadow-pop-up backdrop-blur-md">
+        {/* Phones: rides above the tab bar (it sat underneath it). */}
+        <div
+          ref={dockRef}
+          className="fixed inset-x-0 bottom-[calc(var(--tab-bar-h)+var(--safe-bottom))] z-40 border-t border-maroon/10 bg-white/95 p-3.5 shadow-pop-up backdrop-blur-md lg:bottom-0"
+        >
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
             <div>
               {ctaPrice ? (

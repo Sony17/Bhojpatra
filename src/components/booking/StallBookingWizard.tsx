@@ -100,6 +100,7 @@ import {
 } from "@/lib/servicePricing";
 import { Button, DietMark, useToast } from "@/components/ui";
 import { useBookingBarDock } from "@/lib/bookingBar";
+import { useHideMobileFooter } from "@/lib/mobileChrome";
 import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
@@ -327,6 +328,7 @@ export default function StallBookingWizard({
   const { lang, t } = useLang();
   const { toast } = useToast();
   const dockRef = useBookingBarDock<HTMLDivElement>();
+  useHideMobileFooter();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
 
@@ -376,6 +378,8 @@ export default function StallBookingWizard({
   } | null>(null);
   const focusBrief = (field: EventField) =>
     setBriefFocus((prev) => ({ field, nonce: (prev?.nonce ?? 0) + 1 }));
+  // Wider screens edit the brief inline, so the cart's "Edit" reveals it there.
+  const [cartEventOpen, setCartEventOpen] = useState(false);
   const [mealTime, setMealTime] = useState<string>("");
   const [eventTime, setEventTime] = useState<string>("");
   const [foodPreference, setFoodPreference] = useState<string>("");
@@ -517,6 +521,17 @@ export default function StallBookingWizard({
     if (q.pendingVendorId) setPendingVendorId(q.pendingVendorId);
     if (q.counterType !== undefined) setCounterType(q.counterType);
     if (q.referralCode) setReferralCode(q.referralCode);
+    // `?pick=1` ("See all stall types") lands on the stall-type grid even when
+    // a saved draft already holds a stall — the rest of the draft is kept.
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("pick") === "1") {
+      setStallId("");
+      setPendingVendorId("");
+      setStep(1);
+      sp.delete("pick");
+      const qs = sp.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    }
   }, []);
 
   // Persist the draft on every change (once the rehydrate above has run).
@@ -1870,14 +1885,7 @@ export default function StallBookingWizard({
   const stepLabels = [
     t("Menu", "मेन्यू"),
     t("Extras & Essentials", "एक्स्ट्रा और ज़रूरी सामान"),
-    t("Review", "समीक्षा"),
-  ];
-  // Phones: one word per step, so all three tabs fit without a sideways
-  // scroll and the sticky Continue keeps room for the running total.
-  const shortStepLabels = [
-    t("Menu", "मेन्यू"),
-    t("Extras", "एक्स्ट्रा"),
-    t("Review", "समीक्षा"),
+    t("Cart", "कार्ट"),
   ];
 
   // The event brief — the same always-editable card the tiered wizard carries,
@@ -1966,7 +1974,7 @@ export default function StallBookingWizard({
     <StepTabs
       t={t}
       step={step}
-      labels={shortStepLabels}
+      labels={stepLabels}
       onPick={(n) => (n === step + 1 ? tryNext() : setStep(n))}
       onStartOver={startOver}
     />
@@ -2017,7 +2025,20 @@ export default function StallBookingWizard({
       </div>
       {/* The brief sits after the step on phones; while it's incomplete the
           chip itself turns red and names what to add. */}
-      <div className="order-2 sm:order-1">{renderEventBar(true)}</div>
+      {/* The cart lists the event itself, so there the brief stays mounted
+          but unseen — "Edit" opens its (portalled) sheet on phones and shows
+          it inline from tablet up. */}
+      <div
+        className={
+          step !== TOTAL_STEPS
+            ? "order-2 sm:order-1"
+            : cartEventOpen
+              ? "hidden sm:order-1 sm:block"
+              : "hidden"
+        }
+      >
+        {renderEventBar(true)}
+      </div>
 
       <div
         className={
@@ -2165,15 +2186,38 @@ export default function StallBookingWizard({
                 onConfirm={() => void handleConfirm()}
                 onEditMenu={() => setStep(1)}
                 onEditExtras={() => setStep(2)}
+                onEditEvent={() => {
+                  setCartEventOpen(true);
+                  focusBrief("occasion");
+                }}
                 brandsHref={brandsHref}
                 whatsappHref={whatsappHref}
                 blocker={reviewBlocker}
+                summary={
+                  <StallSummary
+                    expanded
+                    t={t}
+                    stall={stall}
+                    guests={guests}
+                    perPlate={perPlate}
+                    subtotal={subtotal}
+                    addOnsTotal={addOnsTotal}
+                    serviceTotal={serviceTotal}
+                    venueFee={venueFee}
+                    discount={discount}
+                    gst={gst}
+                    grandTotal={grandTotal}
+                    pickedCount={pickedCount}
+                    onEditMenu={() => setStep(1)}
+                  />
+                }
               />
             ))}
         </div>
 
+        {/* Below xl the cart carries its own expanded copy, after the coupon. */}
         {showSummary && (
-          <aside className="lg:sticky lg:top-24 lg:self-start">
+          <aside className="hidden xl:sticky xl:top-24 xl:block xl:self-start">
             <StallSummary
               t={t}
               stall={stall}
@@ -2199,7 +2243,7 @@ export default function StallBookingWizard({
           as a popup on tap. Review carries its own actions, so the nav stops
           before it. */}
       {step < TOTAL_STEPS && !showTypePicker && (
-        <div className="mt-8 sm:mt-10">
+        <div className="md:mt-10">
           {blockersOpen && nextBlockers.length > 0 && (
             <BlockerPopup
               t={t}
@@ -2488,7 +2532,7 @@ function StepTabs({
               disabled={!reachable}
               onClick={() => !active && onPick(n)}
               className={
-                "relative flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3 text-[13px] font-semibold transition-colors disabled:cursor-default " +
+                "relative flex flex-auto shrink-0 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3 text-[12px] font-semibold transition-colors disabled:cursor-default min-[390px]:text-[13px] " +
                 (active ? "text-maroon" : done ? "text-ink" : "text-ink/45")
               }
             >
@@ -2505,7 +2549,7 @@ function StepTabs({
               >
                 {done ? "✓" : n}
               </span>
-              <span className="truncate">{label}</span>
+              <span>{label}</span>
               {/* Active underline indicator. */}
               <span
                 aria-hidden="true"
@@ -2854,12 +2898,14 @@ function StepStallMenu({
           course's own per-plate rate. */}
       {/* Phones: a menu-section header, food-app style — the course title
           with its facts beneath, and a raised ADD button for a set menu. */}
-      <div className="mt-3 flex items-center justify-between gap-3 border-b border-dashed border-cream pb-3 sm:hidden">
-        <div className="min-w-0">
-          <h3 className="line-clamp-2 break-words font-sans text-[20px] font-extrabold leading-tight tracking-tight text-ink">
-            {lang === "hi" ? course.nameHi : course.name}
-          </h3>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-none text-ink/60">
+      <div className="mt-3 border-b border-dashed border-cream pb-3 sm:hidden">
+        <h3 className="break-words font-display text-3xl leading-tight text-ink">
+          {lang === "hi" ? course.nameHi : course.name}
+        </h3>
+        {/* The facts and the ADD share one line, so the button sits level
+            with the SET MENU label it acts on. */}
+        <div className="mt-1.5 flex items-center justify-between gap-3">
+          <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-none text-ink/60">
             {course.fixed && (
               <span className="shrink-0 whitespace-nowrap rounded bg-cream px-1.5 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.1em] text-maroon">
                 {t("Set menu", "तय मेन्यू")}
@@ -2879,27 +2925,27 @@ function StepStallMenu({
               )}
             </span>
           </p>
-        </div>
         {course.fixed && (
           <button
             type="button"
             aria-pressed={courseTaken}
             onClick={() => toggleCourse(course.id)}
             className={
-              "relative h-9 shrink-0 rounded-lg border px-4 text-[13px] font-extrabold uppercase tracking-[0.06em] shadow-card transition active:scale-95 " +
+              "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg border px-3.5 text-[13px] font-extrabold uppercase leading-none tracking-[0.06em] shadow-card transition active:scale-95 " +
               (courseTaken
                 ? "border-maroon bg-maroon text-white"
                 : "border-maroon/25 bg-white text-maroon")
             }
           >
-            {courseTaken ? `✓ ${t("Added", "जोड़ा")}` : t("Add", "जोड़ें")}
             {!courseTaken && (
-              <span aria-hidden="true" className="absolute right-1 top-0.5 text-[11px] font-bold leading-none">
+              <span aria-hidden="true" className="text-[15px] font-bold leading-none">
                 +
               </span>
             )}
+            {courseTaken ? `✓ ${t("Added", "जोड़ा")}` : t("Add", "जोड़ें")}
           </button>
         )}
+        </div>
       </div>
       {course.fixed && (
         <div className="hidden min-w-0 flex-1 items-center justify-between rounded-2xl border border-cream bg-cream/35 sm:mt-4 sm:flex sm:flex-wrap sm:gap-3 sm:px-4 sm:py-3">
@@ -3019,7 +3065,7 @@ function StepStallMenu({
           // price + Add on a varied course. No new per-dish choices.
           const card = (
             <>
-              <span className="relative block h-full min-h-0 w-full overflow-hidden rounded-lg bg-cream-2">
+              <span className="relative block aspect-[16/10] w-full shrink-0 overflow-hidden rounded-lg bg-cream-2">
                 <DishPhoto
                   photo={it.photo}
                   id={it.id}
@@ -3030,11 +3076,11 @@ function StepStallMenu({
               </span>
               <span
                 className={
-                  "flex min-h-0 flex-col justify-center px-1 " +
+                  "flex flex-1 flex-col justify-center px-1 " +
                   (course.fixed ? "py-1" : "pt-0.5")
                 }
               >
-                <span className="line-clamp-2 break-words text-[13px] font-bold leading-tight text-ink">
+                <span className="break-words text-[13px] font-bold leading-tight text-ink">
                   {displayDishName(it.name)}
                 </span>
                 {/* Set menus need no per-dish status — the bar above says it
@@ -3063,13 +3109,10 @@ function StepStallMenu({
           // Fixed height: photo on top, then the name (up to two lines) and, on
           // a varied course, the price + status line. The photo takes whatever
           // the text leaves, so a long name never gets cut mid-word.
-          // The column is pinned to the card: an implicit `auto` one sizes to
-          // a long nowrap dish name and pushes the card out of its grid cell.
+          // The photo keeps a fixed ratio and the card grows with the name, so
+          // a long dish name reads in full instead of eating the photo.
           const cardClass =
-            "grid w-full grid-cols-[minmax(0,1fr)] rounded-xl border p-1 text-left transition " +
-            (course.fixed
-              ? "h-[8.5rem] grid-rows-[minmax(0,1fr)_auto] "
-              : "h-[9.5rem] grid-rows-[minmax(0,1fr)_auto] ") +
+            "flex h-full w-full min-w-0 flex-col rounded-xl border p-1 text-left transition " +
             (active
               ? "border-maroon/40 bg-cream/35 shadow-soft"
               : "border-cream-3 bg-white");
@@ -3178,8 +3221,20 @@ function StepStallDetails({
   vendorsForCounter: (addOnId: string) => VendorListing[];
   nonVegGuests: NonVegCount;
 }) {
+  // "Skip" folds the whole extras block away, leaving one line to undo it.
+  const [extrasSkipped, setExtrasSkipped] = useState(false);
   return (
     <div>
+      {extrasSkipped && selectedAddOns.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setExtrasSkipped(false)}
+          className="text-xs font-semibold text-maroon underline underline-offset-4"
+        >
+          {t("+ Add extras & counters", "+ एक्स्ट्रा और काउंटर जोड़ें")}
+        </button>
+      ) : (
+      <>
       {/* Occasion / date / city / guests come from the event brief above, and
           the venue is asked for on Review beside the contact details — exactly
           where the tiered flow asks for it. What's left here is the extras.
@@ -3192,11 +3247,7 @@ function StepStallDetails({
         pageSize={5}
         compact
         collapsible
-        onSkip={() =>
-          document
-            .getElementById("stall-essentials")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" })
-        }
+        onSkip={() => setExtrasSkipped(true)}
         lang={lang}
         t={t}
         guests={guests}
@@ -3213,6 +3264,8 @@ function StepStallDetails({
         fullFilter
         nonVegGuests={nonVegGuests}
       />
+      </>
+      )}
 
       {/* Service package — the same admin-managed tiers as the feast wizard's
           Essentials step, as a compact priced list (each row priced for this
@@ -3222,18 +3275,24 @@ function StepStallDetails({
       {services.length > 0 && (
         <section
           id="stall-essentials"
-          className="mt-10 scroll-mt-24 border-t border-maroon/10 pt-8"
+          className={
+            "scroll-mt-24 " +
+            (extrasSkipped && selectedAddOns.length === 0
+              ? "mt-5"
+              : "mt-10 border-t border-maroon/10 pt-8")
+          }
         >
-          <h3 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-[22px] font-bold leading-tight tracking-tight text-ink sm:text-3xl">
-            {t("Serving & essentials", "सर्विस और ज़रूरी सामान")}
-          </h3>
-          <p className="mt-1.5 text-[14px] leading-snug text-ink/70 sm:text-[15px]">
-            {t(
+          {/* Same heading as "Add Extras & Counters" above — one font, one size. */}
+          <SectionHead
+            compact
+            phoneMinimal
+            title={t("Serving & Essentials", "सर्विस और ज़रूरी सामान")}
+            sub={t(
               "Add serving crew, buffet setup and crockery — or skip it if your venue already covers this.",
               "सर्विस स्टाफ, बुफे सेटअप और क्रॉकरी जोड़ें — या छोड़ दें अगर वेन्यू पहले से दे रहा है।",
             )}
-          </p>
-          <div className="mt-4">
+          />
+          <div>
             <EssentialsPicker
               packages={services}
               selectedId={serviceId}
@@ -3305,10 +3364,16 @@ function StepStallConfirm({
   onConfirm,
   onEditMenu,
   onEditExtras,
+  onEditEvent,
   brandsHref,
   whatsappHref,
   blocker,
+  summary,
 }: {
+  /** Opens the event brief (occasion, date, city) for editing. */
+  onEditEvent: () => void;
+  /** The expanded order breakdown, shown on the cart after the coupon. */
+  summary: ReactNode;
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
   menuGroups: { heading: string; items: string[] }[];
@@ -3371,6 +3436,13 @@ function StepStallConfirm({
   /** An earlier step's rule the Review-time edits broke — blocks payment. */
   blocker: string;
 }) {
+  // Cart first (order, coupon, details), then payment on its own screen. An
+  // order that already took money reopens straight on payment.
+  const [stage, setStage] = useState<"cart" | "pay">(paidAmount > 0 ? "pay" : "cart");
+  const goStage = (next: "cart" | "pay") => {
+    setStage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   return (
     // A form, like the tiered wizard's review: the shared checkout panel's
     // pay-later CTA is a submit button, so the confirm handler hangs here.
@@ -3380,11 +3452,28 @@ function StepStallConfirm({
         onConfirm();
       }}
     >
+      {stage === "pay" && (
+        <button
+          type="button"
+          onClick={() => goStage("cart")}
+          className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-maroon"
+        >
+          ← {t("Back to cart", "कार्ट पर वापस")}
+        </button>
+      )}
       <SectionHead
+        compact
+        phoneMinimal
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
-        title={t("One last look", "एक आख़िरी नज़र")}
+        title={
+          stage === "cart"
+            ? t("Your cart", "आपका कार्ट")
+            : t("Payment", "भुगतान")
+        }
       />
 
+      {stage === "cart" && (
+      <>
       {/* The order at a glance */}
       <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -3406,7 +3495,19 @@ function StepStallConfirm({
           </a>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm font-semibold text-ink">
+            {t("Event details", "इवेंट की जानकारी")}
+          </p>
+          <button
+            type="button"
+            onClick={onEditEvent}
+            className="text-xs font-semibold text-maroon underline underline-offset-4"
+          >
+            {t("Edit", "बदलें")}
+          </button>
+        </div>
+        <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-ink-soft">{t("Occasion", "अवसर")}</dt>
             <dd className="font-semibold text-ink">
@@ -3484,7 +3585,7 @@ function StepStallConfirm({
           <div className="mt-4 border-t border-cream-3 pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-ink">
-                {t("Extras", "एक्स्ट्रा")}
+                {t("Extras & Essentials", "एक्स्ट्रा और ज़रूरी सामान")}
               </p>
               <button
                 type="button"
@@ -3512,6 +3613,8 @@ function StepStallConfirm({
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Coupon, contact + venue, referral, the total and how to pay — the
           tiered wizard's own checkout, shared verbatim so settling a Single
@@ -3559,8 +3662,13 @@ function StepStallConfirm({
         confirmError={confirmError}
         whatsappHref={whatsappHref}
         blocker={blocker}
+        stage={stage}
+        afterCoupon={<div className="mt-6 xl:hidden">{summary}</div>}
+        onProceed={() => goStage("pay")}
       />
 
+      {/* Payment carries its own "Share on WhatsApp". */}
+      {stage === "cart" && (
       <div className="mt-6">
         <WhatsAppShareButton
           variant="ghost"
@@ -3571,6 +3679,7 @@ function StepStallConfirm({
           messageHi="Bhojpatra पर सिंगल स्टॉल ऑर्डर प्लान कर रहे हैं — एक वेरिफाइड स्टॉल, अपना मेन्यू। देखिए:"
         />
       </div>
+      )}
     </form>
   );
 }
@@ -3599,7 +3708,10 @@ function StallSummary({
   grandTotal,
   pickedCount,
   onEditMenu,
+  expanded = false,
 }: {
+  /** Always open, no toggle — the cart's own copy of the breakdown. */
+  expanded?: boolean;
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
   guests: number;
@@ -3617,7 +3729,8 @@ function StallSummary({
   // Below xl the summary is a secondary, one-row card — the sticky bar already
   // carries the total — and the breakdown opens on tap. The xl rail is always
   // expanded.
-  const [open, setOpen] = useState(false);
+  const [toggled, setOpen] = useState(false);
+  const open = expanded || toggled;
   return (
     <div className="rounded-2xl border border-cream-3/70 bg-white px-3.5 py-3 xl:p-5 xl:shadow-soft">
       <div className="flex items-start gap-3">
@@ -3625,7 +3738,8 @@ function StallSummary({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-w-0 flex-1 items-start gap-2 text-left xl:pointer-events-none"
+          disabled={expanded}
+          className="flex min-w-0 flex-1 items-start gap-2 text-left disabled:cursor-default xl:pointer-events-none"
         >
           <span className="min-w-0 flex-1">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/50 xl:text-xs xl:text-maroon">
@@ -3644,7 +3758,7 @@ function StallSummary({
           </span>
           <svg
             viewBox="0 0 24 24"
-            className={"mt-3.5 h-4 w-4 shrink-0 text-ink/50 transition-transform xl:hidden " + (open ? "rotate-180" : "")}
+            className={"mt-3.5 h-4 w-4 shrink-0 text-ink/50 transition-transform xl:hidden " + (expanded ? "hidden " : "") + (open ? "rotate-180" : "")}
             fill="none"
             stroke="currentColor"
             strokeWidth="2"

@@ -197,7 +197,7 @@ export default function AnalyticsPanels({ bookings }: { bookings: DatedBooking[]
                   key={v.vendor}
                   className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
                 >
-                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  <span className="min-w-0 break-words text-sm font-medium leading-snug text-ink">
                     {v.vendor}
                   </span>
                   <span className="flex items-center gap-4 whitespace-nowrap">

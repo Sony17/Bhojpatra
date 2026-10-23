@@ -202,7 +202,7 @@ export function ProgressRail({
         className={
           compact
             ? "hidden"
-            : "mx-2 -mt-6 rounded-card border border-cream bg-white px-4 py-2.5 shadow-soft sm:hidden"
+            : "mx-2 -mt-6 rounded-card border border-cream bg-white px-3 py-2.5 shadow-soft min-[375px]:px-4 sm:hidden"
         }
       >
         <p className="text-[11px] font-semibold uppercase tracking-wide text-maroon">
@@ -211,7 +211,7 @@ export function ProgressRail({
         {/* One segment per step with its name underneath — every step is
             visible and evenly spaced, so "what's next" needs no extra line. */}
         <ol
-          className="mt-2 grid gap-2"
+          className="mt-2 grid gap-1 min-[375px]:gap-2"
           style={{ gridTemplateColumns: `repeat(${stepLabels.length}, minmax(0, 1fr))` }}
         >
           {stepLabels.map((label, i) => {
@@ -225,7 +225,7 @@ export function ProgressRail({
                   }`}
                 />
                 <span
-                  className={`mt-1.5 block text-center text-[11px] leading-tight ${
+                  className={`mt-1.5 block whitespace-nowrap text-center text-[9px] leading-tight tracking-tight min-[375px]:text-[10px] min-[440px]:text-[11px] min-[440px]:tracking-normal ${
                     active
                       ? "font-semibold text-maroon"
                       : done

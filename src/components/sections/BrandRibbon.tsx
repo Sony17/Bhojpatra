@@ -143,7 +143,7 @@ export default function BrandRibbon() {
                             )}
                           </span>
 
-                          <span className="line-clamp-1 text-[10px] font-semibold leading-tight text-ink sm:text-[11px]">
+                          <span className="line-clamp-2 break-words text-[10px] font-semibold leading-[1.15] text-ink sm:text-[11px]">
                             {name}
                           </span>
 
