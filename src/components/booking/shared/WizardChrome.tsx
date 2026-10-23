@@ -205,25 +205,40 @@ export function ProgressRail({
             : "mx-2 -mt-6 rounded-card border border-cream bg-white px-4 py-2.5 shadow-soft sm:hidden"
         }
       >
-        <div className="flex items-baseline justify-between gap-3 text-[12px] font-semibold">
-          <span className="text-maroon">
-            {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
-            {" · "}
-            <span className="text-ink">{stepLabels[step - 1]}</span>
-          </span>
-          {nextStepLabel && (
-            <span className="shrink-0 text-[11px] font-medium text-ink/45">
-              {t("Next: ", "आगे: ")}
-              {nextStepLabel}
-            </span>
-          )}
-        </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-cream">
-          <div
-            className="h-full rounded-full bg-maroon transition-all duration-300"
-            style={{ width: `${(step / totalSteps) * 100}%` }}
-          />
-        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-maroon">
+          {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)}
+        </p>
+        {/* One segment per step with its name underneath — every step is
+            visible and evenly spaced, so "what's next" needs no extra line. */}
+        <ol
+          className="mt-2 grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${stepLabels.length}, minmax(0, 1fr))` }}
+        >
+          {stepLabels.map((label, i) => {
+            const done = i < step - 1;
+            const active = i === step - 1;
+            return (
+              <li key={label} aria-current={active ? "step" : undefined}>
+                <span
+                  className={`block h-1.5 rounded-full transition-colors duration-300 ${
+                    done || active ? "bg-maroon" : "bg-cream"
+                  }`}
+                />
+                <span
+                  className={`mt-1.5 block text-center text-[11px] leading-tight ${
+                    active
+                      ? "font-semibold text-maroon"
+                      : done
+                        ? "font-medium text-ink"
+                        : "font-medium text-ink/45"
+                  }`}
+                >
+                  {label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
       {/* Tablet / desktop — the full stepper. */}
       <div className="app-sticky-chrome relative z-20 mx-2 -mt-3 hidden rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:block sm:rounded-2xl sm:px-6 sm:py-5 lg:mx-8">
