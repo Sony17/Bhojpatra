@@ -141,7 +141,9 @@ export default function AppLocationBar({
             onDark
               ? "bg-white/15 text-cream ring-1 ring-white/25"
               : "bg-cream text-maroon",
-            compact ? "h-8 w-8" : "h-9 w-9",
+            // Very narrow phones (≤359px): drop the pin disc so the city
+            // name itself keeps the room beside the logo.
+            compact ? "h-8 w-8 max-[359px]:hidden" : "h-9 w-9",
           )}
         >
           <svg

@@ -99,6 +99,7 @@ import {
   serviceTotal as serviceChargeFor,
 } from "@/lib/servicePricing";
 import { Button, DietMark, useToast } from "@/components/ui";
+import { useBookingBarDock } from "@/lib/bookingBar";
 import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
@@ -200,6 +201,8 @@ interface StallOption {
   image: string;
   rating: number;
   reviews: number;
+  /** Shown when the stall has no reviews of its own yet. */
+  googleRating?: number;
   live: boolean;
   pinned: boolean;
   city?: string;
@@ -323,6 +326,7 @@ export default function StallBookingWizard({
   const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const { toast } = useToast();
+  const dockRef = useBookingBarDock<HTMLDivElement>();
   const sessionStatus = useSessionStatus();
   const hydrated = useRef(false);
 
@@ -816,6 +820,7 @@ export default function StallBookingWizard({
           image: v.image,
           rating: v.rating,
           reviews: v.reviews,
+          googleRating: v.googleRating,
           live: Boolean(v.live),
           pinned: Boolean(v.pinned),
           city: v.city,
@@ -1339,8 +1344,8 @@ export default function StallBookingWizard({
       );
     return stall.allFixed
       ? t(
-          "Add course",
-          "कोर्स जोड़ें",
+          "Tap ADD to include this set menu",
+          "यह तय मेन्यू शामिल करने के लिए ADD दबाएँ",
         )
       : t(
           "Pick at least one dish from this stall's menu.",
@@ -1867,6 +1872,13 @@ export default function StallBookingWizard({
     t("Extras & Essentials", "एक्स्ट्रा और ज़रूरी सामान"),
     t("Review", "समीक्षा"),
   ];
+  // Phones: one word per step, so all three tabs fit without a sideways
+  // scroll and the sticky Continue keeps room for the running total.
+  const shortStepLabels = [
+    t("Menu", "मेन्यू"),
+    t("Extras", "एक्स्ट्रा"),
+    t("Review", "समीक्षा"),
+  ];
 
   // The event brief — the same always-editable card the tiered wizard carries,
   // so occasion / date / city / guests are gathered once and identically on
@@ -1954,7 +1966,7 @@ export default function StallBookingWizard({
     <StepTabs
       t={t}
       step={step}
-      labels={stepLabels}
+      labels={shortStepLabels}
       onPick={(n) => (n === step + 1 ? tryNext() : setStep(n))}
       onStartOver={startOver}
     />
@@ -1963,7 +1975,7 @@ export default function StallBookingWizard({
   return (
     // overflow-x-clip, not -hidden: hidden would make this a scroll container
     // and pin the sticky step tabs to it instead of the page.
-    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-clip px-3 py-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-clip px-3 pb-4 pt-1 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
       {/* Same editorial opening the tiered flow leads with, so the Single Stall
           plan reads as a first-class plan rather than a stripped-down one.
           Phones drop it for a minimal, low-scroll flow. */}
@@ -2011,8 +2023,8 @@ export default function StallBookingWizard({
         className={
           "order-1 sm:order-2 " +
           (showSummary
-            ? "mt-3 grid gap-3 sm:mt-7 sm:gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "mt-3 sm:mt-7")
+            ? "grid gap-3 sm:mt-7 sm:gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : "sm:mt-7")
         }
       >
         <div className="min-w-0">
@@ -2234,7 +2246,7 @@ export default function StallBookingWizard({
               guest has actually picked something — a stall and a headcount are
               not an order, and pricing one they never assembled reads as a quote
               they're on the hook for. */}
-          <div className="app-sticky-cta md:hidden">
+          <div ref={dockRef} className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
               {pickedCount > 0 ? null : (
                 <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
@@ -2244,18 +2256,27 @@ export default function StallBookingWizard({
                   )}
                 </div>
               )}
+              {/* Why Continue is greyed — said up front instead of only after
+                  a tap, so a faded button never reads as broken. */}
+              {!canNext && nextBlockers[0] && (
+                <p className="mb-1.5 truncate text-[11px] font-semibold leading-tight text-maroon">
+                  {nextBlockers[0].text}
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 {/* One row: the running estimate beside the actions, so the
-                    bar costs one line of screen instead of two. */}
+                    bar costs one line of screen instead of two. The estimate
+                    takes the slack; the buttons keep a short label so they
+                    never squeeze it to "₹…". */}
                 {pickedCount > 0 && (
-                  <span className="mr-auto min-w-0 shrink pr-1">
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-[11px] leading-tight text-ink/70">
-                      {t("Total Amount", "कुल राशि")}
+                      {t("Total", "कुल")}
                     </span>
-                    <span className="block truncate text-[22px] font-bold leading-tight text-maroon">
+                    <span className="block truncate text-[20px] font-bold leading-tight text-maroon">
                       {money(grandTotal)}
                     </span>
-                    <span className="block whitespace-nowrap text-[10.5px] leading-tight text-ink/70">
+                    <span className="block truncate text-[10.5px] leading-tight text-ink/70">
                       {t(
                         `${inr.format(guests)} guests · ${inr.format(pickedCount)} dishes`,
                         `${inr.format(guests)} मेहमान · ${inr.format(pickedCount)} व्यंजन`,
@@ -2277,9 +2298,15 @@ export default function StallBookingWizard({
                 <Button
                   onClick={tryNext}
                   aria-disabled={!canNext}
+                  aria-label={`${
+                    step === 2 && selectedAddOns.length === 0 && !selectedService
+                      ? t("Skip", "छोड़ें")
+                      : t("Continue", "आगे")
+                  } · ${stepLabels[step]}`}
                   fullWidth={pickedCount === 0}
                   className={
-                    "min-h-12 shrink-0 rounded-xl px-3 text-[14px]" +
+                    "min-h-12 shrink-0 rounded-xl px-4 text-[14px]" +
+                    (pickedCount === 0 ? " flex-1" : "") +
                     (canNext ? "" : " opacity-50")
                   }
                 >
@@ -2287,7 +2314,7 @@ export default function StallBookingWizard({
                     step === 2 && selectedAddOns.length === 0 && !selectedService
                       ? t("Skip", "छोड़ें")
                       : t("Continue", "आगे")
-                  } · ${stepLabels[step]} →`}
+                  } →`}
                 </Button>
               </div>
             </div>
@@ -2295,6 +2322,34 @@ export default function StallBookingWizard({
         </div>
       )}
     </section>
+  );
+}
+
+/** A dish photo that falls back to the placeholder when its own URL fails —
+ *  a dead link (e.g. an expired upload) otherwise shows Safari's "?" box. */
+function DishPhoto({
+  photo,
+  id,
+  alt,
+  sizes,
+}: {
+  photo?: string;
+  id: string;
+  alt: string;
+  sizes: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = photo && !failed ? photo : dummyDishPhoto(id);
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      unoptimized={photoNeedsUnoptimized(src)}
+      fill
+      sizes={sizes}
+      className="object-cover"
+      onError={() => setFailed(true)}
+    />
   );
 }
 
@@ -2433,14 +2488,14 @@ function StepTabs({
               disabled={!reachable}
               onClick={() => !active && onPick(n)}
               className={
-                "relative flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-3 text-[13px] font-semibold transition-colors disabled:cursor-default " +
+                "relative flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3 text-[13px] font-semibold transition-colors disabled:cursor-default " +
                 (active ? "text-maroon" : done ? "text-ink" : "text-ink/45")
               }
             >
               <span
                 aria-hidden="true"
                 className={
-                  "grid h-[18px] w-[18px] place-items-center rounded-full text-[10px] font-bold leading-none " +
+                  "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-bold leading-none " +
                   (active
                     ? "bg-maroon text-white"
                     : done
@@ -2450,7 +2505,7 @@ function StepTabs({
               >
                 {done ? "✓" : n}
               </span>
-              {label}
+              <span className="truncate">{label}</span>
               {/* Active underline indicator. */}
               <span
                 aria-hidden="true"
@@ -2709,20 +2764,33 @@ function StepStallMenu({
           <p className="eyebrow hidden text-[10px] font-bold text-maroon sm:block">
             {t("YOUR STALL", "आपका स्टॉल")}
           </p>
-          <p className="truncate font-sans text-sm font-semibold text-ink sm:text-lg">
+          <p className="line-clamp-2 break-words font-sans text-sm font-semibold leading-snug text-ink sm:text-lg">
             {stall.name}
           </p>
-          <p className="truncate text-[11px] text-ink-soft sm:mt-0.5 sm:text-xs">
-            ★ {stall.rating.toFixed(1)}
-            {stall.city ? ` · ${stall.city}` : ""}
-            {stall.allFixed ? ` · ${t("set menu", "तय मेन्यू")}` : ""}
+          <p className="line-clamp-2 text-[11px] leading-snug text-ink-soft sm:mt-0.5 sm:text-xs">
+            {/* No reviews of its own yet → the Google rating, else nothing —
+                never a bare "★ 0.0". */}
+            {[
+              stall.reviews > 0
+                ? `★ ${stall.rating.toFixed(1)}`
+                : stall.googleRating
+                  ? `★ ${stall.googleRating} ${t("Google", "गूगल")}`
+                  : "",
+              stall.city ?? "",
+              stall.allFixed ? t("set menu", "तय मेन्यू") : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
         <a
           href={brandsHref}
-          className="shrink-0 rounded-full border border-maroon px-3 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:py-1.5 sm:text-xs"
+          aria-label={t("Change stall", "स्टॉल बदलें")}
+          className="shrink-0 rounded-full border border-maroon px-2.5 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:py-1.5 sm:text-xs"
         >
-          {t("Change stall", "स्टॉल बदलें")}
+          {/* Phones: one word, so the stall's name keeps the row. */}
+          <span className="sm:hidden">{t("Change", "बदलें")}</span>
+          <span className="hidden sm:inline">{t("Change stall", "स्टॉल बदलें")}</span>
         </a>
       </div>
 
@@ -2786,18 +2854,18 @@ function StepStallMenu({
           course's own per-plate rate. */}
       {/* Phones: a menu-section header, food-app style — the course title
           with its facts beneath, and a raised ADD button for a set menu. */}
-      <div className="mt-3 flex items-end justify-between gap-3 border-b border-dashed border-cream pb-3 sm:hidden">
+      <div className="mt-3 flex items-center justify-between gap-3 border-b border-dashed border-cream pb-3 sm:hidden">
         <div className="min-w-0">
-          <h3 className="truncate font-sans text-[22px] font-extrabold leading-none tracking-tight text-ink">
+          <h3 className="line-clamp-2 break-words font-sans text-[20px] font-extrabold leading-tight tracking-tight text-ink">
             {lang === "hi" ? course.nameHi : course.name}
           </h3>
-          <p className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-none text-ink/60">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-none text-ink/60">
             {course.fixed && (
-              <span className="rounded bg-cream px-1.5 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.1em] text-maroon">
+              <span className="shrink-0 whitespace-nowrap rounded bg-cream px-1.5 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.1em] text-maroon">
                 {t("Set menu", "तय मेन्यू")}
               </span>
             )}
-            <span className="truncate">
+            <span className="whitespace-nowrap">
               {t(
                 `${course.items.length} ${course.items.length === 1 ? "dish" : "dishes"}`,
                 `${course.items.length} डिश`,
@@ -2818,7 +2886,7 @@ function StepStallMenu({
             aria-pressed={courseTaken}
             onClick={() => toggleCourse(course.id)}
             className={
-              "relative h-9 shrink-0 rounded-lg border px-5 text-[13px] font-extrabold uppercase tracking-[0.06em] shadow-card transition active:scale-95 " +
+              "relative h-9 shrink-0 rounded-lg border px-4 text-[13px] font-extrabold uppercase tracking-[0.06em] shadow-card transition active:scale-95 " +
               (courseTaken
                 ? "border-maroon bg-maroon text-white"
                 : "border-maroon/25 bg-white text-maroon")
@@ -2876,13 +2944,11 @@ function StepStallMenu({
               <span
                 className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-cream-2 sm:h-14 sm:w-14 sm:rounded-xl"
               >
-                <Image
-                  src={it.photo || dummyDishPhoto(it.id)}
+                <DishPhoto
+                  photo={it.photo}
+                  id={it.id}
                   alt={displayDishName(it.name)}
-                  unoptimized={photoNeedsUnoptimized(it.photo)}
-                  fill
                   sizes="56px"
-                  className="object-cover"
                 />
                 {/* FSSAI veg / non-veg mark, sat on the photo the way a menu
                     card prints it — not floating out in the row. */}
@@ -2954,13 +3020,11 @@ function StepStallMenu({
           const card = (
             <>
               <span className="relative block h-full min-h-0 w-full overflow-hidden rounded-lg bg-cream-2">
-                <Image
-                  src={it.photo || dummyDishPhoto(it.id)}
+                <DishPhoto
+                  photo={it.photo}
+                  id={it.id}
                   alt={displayDishName(it.name)}
-                  unoptimized={photoNeedsUnoptimized(it.photo)}
-                  fill
                   sizes="50vw"
-                  className="object-cover"
                 />
                 <DietMark diet={it.diet} className="absolute left-1 top-1 h-4 w-4" />
               </span>
@@ -2970,7 +3034,7 @@ function StepStallMenu({
                   (course.fixed ? "py-1" : "pt-0.5")
                 }
               >
-                <span className="block truncate text-[13px] font-bold leading-tight text-ink">
+                <span className="line-clamp-2 break-words text-[13px] font-bold leading-tight text-ink">
                   {displayDishName(it.name)}
                 </span>
                 {/* Set menus need no per-dish status — the bar above says it
@@ -2996,15 +3060,16 @@ function StepStallMenu({
               </span>
             </>
           );
-          // Fixed height, split 70% photo / 30% name + status. A set-menu card
-          // keeps the same photo and just loses the status line, so it's shorter.
+          // Fixed height: photo on top, then the name (up to two lines) and, on
+          // a varied course, the price + status line. The photo takes whatever
+          // the text leaves, so a long name never gets cut mid-word.
           // The column is pinned to the card: an implicit `auto` one sizes to
           // a long nowrap dish name and pushes the card out of its grid cell.
           const cardClass =
             "grid w-full grid-cols-[minmax(0,1fr)] rounded-xl border p-1 text-left transition " +
             (course.fixed
-              ? "h-[7.75rem] grid-rows-[1fr_auto] "
-              : "h-[8.75rem] grid-rows-[7fr_3fr] ") +
+              ? "h-[8.5rem] grid-rows-[minmax(0,1fr)_auto] "
+              : "h-[9.5rem] grid-rows-[minmax(0,1fr)_auto] ") +
             (active
               ? "border-maroon/40 bg-cream/35 shadow-soft"
               : "border-cream-3 bg-white");

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
+import { useBookingBarState } from "@/lib/bookingBar";
 
 /**
  * Branded "Install app" prompt — the Bhojpatra version of the bar Chrome shows
@@ -69,6 +70,7 @@ function isIosSafari(): boolean {
 
 export default function InstallAppPrompt() {
   const { t } = useLang();
+  const dock = useBookingBarState();
   const [deferred, setDeferred] = useState<InstallPromptEvent | null>(null);
   const [iosHint, setIosHint] = useState(false);
   const [open, setOpen] = useState(false);
@@ -165,7 +167,9 @@ export default function InstallAppPrompt() {
     <div
       role="dialog"
       aria-label={t("Install the Bhojpatra app", "भोजपत्र ऐप इंस्टॉल करें")}
-      className="animate-rise fixed inset-x-0 bottom-[calc(var(--tab-bar-h)_+_var(--safe-bottom)_+_0.75rem)] z-[70] px-3 [animation-duration:0.4s] lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-[25rem] lg:px-0"
+      // Ride above a docked Continue bar rather than covering it.
+      style={{ ["--dock-lift" as string]: `${dock.visible ? dock.height : 0}px` }}
+      className="animate-rise fixed inset-x-0 bottom-[calc(var(--tab-bar-h)_+_var(--safe-bottom)_+_var(--dock-lift)_+_0.75rem)] z-[70] px-3 [animation-duration:0.4s] lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-[25rem] lg:px-0"
     >
       {/* Cream surface so the red app tile reads as the tile — the same
           artwork the OS is about to drop on the home screen. */}

@@ -55,7 +55,7 @@ export default function StallTypePicker({
           {Array.from({ length: 4 }, (_, i) => (
             <div
               key={i}
-              className="grid h-[8.75rem] grid-rows-[7fr_3fr] overflow-hidden rounded-2xl border border-cream bg-white sm:flex sm:h-auto sm:flex-col"
+              className="grid h-[9.5rem] grid-cols-[minmax(0,1fr)] grid-rows-[7fr_3fr] overflow-hidden rounded-2xl border border-cream bg-white sm:flex sm:h-auto sm:flex-col"
               aria-hidden="true"
             >
               <div className="min-h-0 w-full animate-pulse bg-cream-2 sm:aspect-[16/10]" />
@@ -79,9 +79,11 @@ export default function StallTypePicker({
                 href={hrefFor(s.id)}
                 aria-current={selected ? "true" : undefined}
                 className={
-                  // Phones: a fixed-height card split 70% image / 30% text, so four cards
-                  // fit on one screen. Tablet / desktop keep the natural flow.
-                  "group relative grid h-[8.75rem] grid-rows-[7fr_3fr] overflow-hidden rounded-2xl border bg-white shadow-soft transition hover:border-maroon hover:shadow-card active:scale-[0.98] sm:flex sm:h-auto sm:flex-col " +
+                  // Phones: a fixed-height card — photo on top, the name (up to two
+                  // lines) below it. The single minmax(0,1fr) column stops a long
+                  // name from widening the card past its edge (Safari clips it and
+                  // the chevron with it). Tablet / desktop keep the natural flow.
+                  "group relative grid h-[9.5rem] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-2xl border bg-white shadow-soft transition hover:border-maroon hover:shadow-card active:scale-[0.98] sm:flex sm:h-auto sm:flex-col " +
                   (selected ? "border-maroon ring-1 ring-maroon" : "border-cream")
                 }
               >
@@ -122,9 +124,9 @@ export default function StallTypePicker({
                     </span>
                   )}
                 </div>
-                <div className="flex min-h-0 flex-1 items-center justify-between gap-1.5 px-2.5 sm:gap-2 sm:px-3 sm:py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold leading-tight sm:line-clamp-2 sm:whitespace-normal sm:break-words sm:text-[15px] text-ink group-hover:text-maroon">
+                <div className="flex min-h-0 min-w-0 flex-1 items-center justify-between gap-1.5 px-2.5 py-1.5 sm:gap-2 sm:px-3 sm:py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 break-words text-[13px] font-semibold leading-tight sm:text-[15px] text-ink group-hover:text-maroon">
                       {name}
                     </p>
                     <p className="text-[11px] leading-tight text-ink-soft sm:mt-0.5 sm:text-xs">

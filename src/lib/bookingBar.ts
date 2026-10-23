@@ -39,3 +39,29 @@ export function useBookingBarState(): { visible: boolean; height: number } {
   }, []);
   return { visible, height };
 }
+
+/**
+ * Publish a sticky bottom bar (e.g. a wizard's mobile Continue dock) as the
+ * booking bar, so the chat launcher, install prompt and toasts lift clear of
+ * it. Returns a callback ref for the bar's outer element; the height is kept
+ * live with a ResizeObserver, and a `display:none` bar (desktop) reads as 0 →
+ * not visible.
+ */
+export function useBookingBarDock<T extends HTMLElement>(): (el: T | null) => void {
+  const [el, setEl] = useState<T | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      setBookingBarState(h > 0, h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      setBookingBarState(false);
+    };
+  }, [el]);
+  return setEl;
+}

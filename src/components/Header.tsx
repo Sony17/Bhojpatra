@@ -263,11 +263,14 @@ export default function Header() {
             }
           >
             <LogoMark />
-            <div className="min-w-0 max-w-[13rem] flex-1">
+            {/* A flex row, so the button can be capped at the space left
+                beside the logo — Safari sizes a bare <button> to its content
+                and would push the ˅ past the pill's edge. */}
+            <div className="flex min-w-0 max-w-[13rem] flex-1 justify-end">
               <AppLocationBar
                 compact
                 onDark={false}
-                className="ml-auto min-w-0 justify-end"
+                className="min-w-0 max-w-full"
               />
             </div>
           </div>

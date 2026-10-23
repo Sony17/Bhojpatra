@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
+import { useBookingBarDock } from "@/lib/bookingBar";
 import { useHomeContent } from "@/lib/homeContent";
 import {
   useSessionStatus,
@@ -254,6 +255,8 @@ export default function BookingWizard() {
   const [bookingSalt] = useState(getBookingSalt);
   // Language is driven by the shared, site-wide context (Header toggle).
   const { lang, t } = useLang();
+  // The phone Continue dock — published so the chat launcher lifts clear of it.
+  const dockRef = useBookingBarDock<HTMLDivElement>();
 
   // Booking + payment are only allowed for a signed-in guest. Tri-state:
   // `undefined` while the client session loads, `null` signed out, object
@@ -2945,7 +2948,7 @@ export default function BookingWizard() {
               the full breakdown still lands on Review. Until then the bar says
               plainly that nothing is booked. Desktop already omits the summary
               rail on Step 1 for the same reason. */}
-          <div className="app-sticky-cta md:hidden">
+          <div ref={dockRef} className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
               {orderHasItems ? (
                 <div className="mb-2 flex items-end justify-between gap-3">

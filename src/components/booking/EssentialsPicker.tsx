@@ -44,13 +44,15 @@ export default function EssentialsPicker({
       <div
         role="radiogroup"
         aria-label={t("Service package", "सर्विस पैकेज")}
-        // One row, like a tier strip: four tiles fill the width and any more
-        // swipe in from the right. Top padding leaves room for the ✓ badge.
+        // Phones: a 2-up grid, so names like "Ultra Luxury Service" and their
+        // "For …" line read in full. Wider screens: one row, like a tier
+        // strip — four tiles fill the width and any more swipe in from the
+        // right. Top padding leaves room for the ✓ badge.
         className={
-          "-mx-3 flex snap-x gap-1.5 overflow-x-auto px-3 pb-0.5 pt-1.5 [scrollbar-width:none] sm:mx-0 sm:gap-2.5 sm:px-0 " +
+          "grid grid-cols-2 gap-2 pb-0.5 pt-1.5 sm:flex sm:snap-x sm:gap-2.5 sm:overflow-x-auto sm:[scrollbar-width:none] " +
           (count <= 4
-            ? "[&>*]:flex-1"
-            : "[&>*]:shrink-0 [&>*]:basis-[calc((100%-1.125rem)/4)] sm:[&>*]:basis-0 sm:[&>*]:grow")
+            ? "sm:[&>*]:flex-1"
+            : "sm:[&>*]:basis-0 sm:[&>*]:grow")
         }
       >
         {packages.map((pkg) => (
@@ -324,7 +326,7 @@ function DetailCard({
             {title}
           </p>
           {subtitle && (
-            <p className="truncate text-[11.5px] leading-snug text-ink/70 sm:text-[13px]">{subtitle}</p>
+            <p className="line-clamp-2 text-[11.5px] leading-snug text-ink/70 sm:text-[13px]">{subtitle}</p>
           )}
           {toggle}
         </div>

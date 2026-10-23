@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "./cn";
+import { useBookingBarState } from "@/lib/bookingBar";
 
 /**
  * Lightweight, dependency-free toast system. Wrap the app once with
@@ -50,10 +51,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [remove],
   );
 
+  // Phones: sit above the tab bar — and above a docked Continue bar — so a
+  // toast never hides the nav or the CTA it is confirming.
+  const dock = useBookingBarState();
   return (
     <ToastCtx.Provider value={{ toast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[100] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:right-6 sm:items-end">
+      <div
+        style={{ ["--dock-lift" as string]: `${dock.visible ? dock.height : 0}px` }}
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--dock-lift)+0.5rem)] z-[100] lg:bottom-4 flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:right-6 sm:items-end"
+      >
         {items.map((t) => (
           <div
             key={t.id}

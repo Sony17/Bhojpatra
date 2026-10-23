@@ -802,7 +802,7 @@ export default function EventBar({
                     ? t("COMPLETE YOUR EVENT", "इवेंट पूरा करें")
                     : t("YOUR EVENT", "आपका इवेंट")}
                 </span>
-                <span className="block truncate text-[13px] font-medium leading-snug text-ink">
+                <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">
                   {missing.length > 0 ? (
                     <>
                       <span className="font-semibold text-maroon">
