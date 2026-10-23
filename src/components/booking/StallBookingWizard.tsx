@@ -31,7 +31,6 @@ import {
   WizardHero,
   ProgressRail,
 } from "@/components/booking/shared/WizardChrome";
-import WhatsAppShareButton from "@/components/WhatsAppShareButton";
 import { fetchVenueById } from "@/lib/venues";
 import { downloadInvoice, type InvoiceData } from "@/lib/invoice";
 import {
@@ -100,7 +99,7 @@ import {
 } from "@/lib/servicePricing";
 import { Button, DietMark, useToast } from "@/components/ui";
 import { useBookingBarDock } from "@/lib/bookingBar";
-import { useHideMobileFooter } from "@/lib/mobileChrome";
+import { useHideChatFab, useHideMobileFooter } from "@/lib/mobileChrome";
 import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
@@ -196,6 +195,15 @@ interface StallCourse {
 }
 
 /** A bookable stall — one vendor, collapsed across every course they publish. */
+/** One course as the cart lists it (see `cartMenu`). */
+interface CartCourse {
+  id: string;
+  name: string;
+  fixed: boolean;
+  perPlate: number;
+  items: { id: string; name: string; photo?: string; price: number }[];
+}
+
 interface StallOption {
   id: string;
   name: string;
@@ -1458,6 +1466,29 @@ export default function StallBookingWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stall, categoryItems],
   );
+  // The cart's photo rows — each picked dish with its photo; a varied course
+  // prices dish by dish, a set menu bills once for the whole spread.
+  const cartMenu = useMemo<CartCourse[]>(
+    () =>
+      (stall?.courses ?? [])
+        .map((c): CartCourse | null => {
+          const picks = itemsFor(c.id);
+          const items = c.items
+            .filter((it) => picks.includes(it.id))
+            .map((it) => ({
+              id: it.id,
+              name: displayDishName(it.name),
+              photo: it.photo,
+              price: c.fixed ? 0 : dishPrice(it, c),
+            }));
+          return items.length
+            ? { id: c.id, name: c.name, fixed: c.fixed, perPlate: c.perPlate, items }
+            : null;
+        })
+        .filter((c): c is CartCourse => c !== null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stall, categoryItems],
+  );
 
   // The food line every order artifact prints — the canonical preference,
   // with the actual plate mix spelled out when it's mixed.
@@ -2132,9 +2163,8 @@ export default function StallBookingWizard({
               <StepStallConfirm
                 t={t}
                 stall={stall}
-                menuGroups={menuGroups}
+                cartMenu={cartMenu}
                 guests={guests}
-                perPlate={perPlate}
                 occasion={resolveOccasion(occasionId)}
                 eventDate={eventDate}
                 servingLabel={servingTimeLabel(mealTime, eventTime)}
@@ -2208,7 +2238,24 @@ export default function StallBookingWizard({
                     gst={gst}
                     grandTotal={grandTotal}
                     pickedCount={pickedCount}
-                    onEditMenu={() => setStep(1)}
+                  />
+                }
+                paySummary={
+                  <BookingSummary
+                    t={t}
+                    stall={stall}
+                    occasion={resolveOccasion(occasionId)}
+                    eventDate={eventDate}
+                    guests={guests}
+                    city={resolveCity(cityId)}
+                    perPlate={perPlate}
+                    subtotal={subtotal}
+                    addOnsTotal={addOnsTotal}
+                    serviceTotal={serviceTotal}
+                    venueFee={venueFee}
+                    discount={discount}
+                    gst={gst}
+                    grandTotal={grandTotal}
                   />
                 }
               />
@@ -3312,9 +3359,8 @@ function StepStallDetails({
 function StepStallConfirm({
   t,
   stall,
-  menuGroups,
+  cartMenu,
   guests,
-  perPlate,
   occasion,
   eventDate,
   servingLabel,
@@ -3369,16 +3415,18 @@ function StepStallConfirm({
   whatsappHref,
   blocker,
   summary,
+  paySummary,
 }: {
   /** Opens the event brief (occasion, date, city) for editing. */
   onEditEvent: () => void;
   /** The expanded order breakdown, shown on the cart after the coupon. */
   summary: ReactNode;
+  /** The booking at a glance, beside the contact card on payment. */
+  paySummary: ReactNode;
   t: (en: string, hi: string) => string;
   stall: StallOption | undefined;
-  menuGroups: { heading: string; items: string[] }[];
+  cartMenu: CartCourse[];
   guests: number;
-  perPlate: number;
   occasion: OccasionOption | undefined;
   eventDate: string;
   servingLabel: string;
@@ -3439,6 +3487,10 @@ function StepStallConfirm({
   // Cart first (order, coupon, details), then payment on its own screen. An
   // order that already took money reopens straight on payment.
   const [stage, setStage] = useState<"cart" | "pay">(paidAmount > 0 ? "pay" : "cart");
+  // Checkout on phones: the floating support button would sit on the totals.
+  useHideChatFab();
+  // "Powered by Razorpay" shows only once the pay box confirms the gateway.
+  const [gatewayLive, setGatewayLive] = useState(false);
   const goStage = (next: "cart" | "pay") => {
     setStage(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -3461,159 +3513,210 @@ function StepStallConfirm({
           ← {t("Back to cart", "कार्ट पर वापस")}
         </button>
       )}
+      {stage === "cart" && (
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-display text-3xl leading-tight text-ink">
+              {t("Your cart", "आपका कार्ट")}
+            </h2>
+            <p className="text-[12px] leading-snug text-ink-soft">
+              {t("Review your selections before payment.", "भुगतान से पहले अपना चुनाव देख लें।")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onEditMenu}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cream-3 bg-white px-3 py-1.5 text-[13px] font-semibold text-maroon shadow-soft"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+              <path d="m13.5 6.5 4 4" />
+            </svg>
+            {t("Edit menu", "मेन्यू बदलें")}
+          </button>
+        </div>
+      )}
+      {stage === "pay" && (
       <SectionHead
         compact
         phoneMinimal
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
-        title={
-          stage === "cart"
-            ? t("Your cart", "आपका कार्ट")
-            : t("Payment", "भुगतान")
+        title={t("Payment", "भुगतान")}
+        sub={t("Complete your booking with a secure payment.", "सुरक्षित भुगतान के साथ अपनी बुकिंग पूरी करें।")}
+        action={
+          (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-semibold text-ink">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-maroon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.5 4-1.2 7-5 7-9.5V6l-7-3Z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span className="leading-tight">
+                {t("100% Secure", "100% सुरक्षित")}
+                {gatewayLive && (
+                  <span className="block text-[10px] font-normal text-ink-soft">
+                    {t("Powered by Razorpay", "Razorpay द्वारा संचालित")}
+                  </span>
+                )}
+              </span>
+            </span>
+          )
         }
       />
+      )}
 
       {stage === "cart" && (
-      <>
-      {/* The order at a glance */}
-      <div className="rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-maroon">
-              {t("Single Stall", "सिंगल स्टॉल")}
-            </p>
-            <p className="mt-0.5 text-lg font-semibold text-ink">
-              {stall?.name ?? "—"}
-            </p>
-          </div>
-          {/* Changing the stall means picking another brand, so this leaves for
-              the Brands page rather than stepping back inside the wizard. */}
+      <div className="space-y-1">
+      {/* The stall and the event in one card — tap the stall to change it,
+          the event line to edit it. */}
+      <div className={CART_CARD}>
+        <div className="flex items-center gap-3 px-2.5 py-2">
           <a
             href={brandsHref}
-            className="text-xs font-semibold text-maroon underline underline-offset-4"
+            aria-label={t("Change stall", "स्टॉल बदलें")}
+            className="relative block h-12 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-2"
           >
-            {t("Change", "बदलें")}
+            {stall?.image && (
+              <Image
+                src={stall.image}
+                alt=""
+                fill
+                sizes="64px"
+                unoptimized={photoNeedsUnoptimized(stall.image)}
+                className="object-cover"
+              />
+            )}
           </a>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm font-semibold text-ink">
-            {t("Event details", "इवेंट की जानकारी")}
-          </p>
           <button
             type="button"
             onClick={onEditEvent}
-            className="text-xs font-semibold text-maroon underline underline-offset-4"
+            aria-label={t("Edit event details", "इवेंट की जानकारी बदलें")}
+            className="min-w-0 flex-1 text-left"
           >
-            {t("Edit", "बदलें")}
-          </button>
-        </div>
-        <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-ink-soft">{t("Occasion", "अवसर")}</dt>
-            <dd className="font-semibold text-ink">
-              {occasion ? t(occasion.name, occasion.nameHi) : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">{t("Date", "तारीख")}</dt>
-            <dd className="font-semibold text-ink">
+            <span className="block break-words text-[15px] font-semibold leading-tight text-ink">
+              {stall?.name ?? "—"}
+            </span>
+            <span className="mt-0.5 block text-[12px] leading-snug text-ink/70">
+              {occasion ? t(occasion.name, occasion.nameHi) : "—"} ·{" "}
               {eventDate ? formatEventDate(eventDate) : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">{t("Guests", "मेहमान")}</dt>
-            <dd className="font-semibold text-ink">{inr.format(guests)}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">{t("City", "शहर")}</dt>
-            <dd className="font-semibold text-ink">
-              {city ? t(city.name, city.nameHi) : "—"}
-            </dd>
-          </div>
-          {venue && (
-            <div>
-              <dt className="text-ink-soft">{t("Venue", "वेन्यू")}</dt>
-              <dd className="font-semibold text-ink">{venue}</dd>
-            </div>
-          )}
-          {servingLabel && (
-            <div>
-              <dt className="text-ink-soft">{t("Serving", "परोसना")}</dt>
-              <dd className="font-semibold text-ink">{servingLabel}</dd>
-            </div>
-          )}
-          {foodPreference && (
-            <div>
-              <dt className="text-ink-soft">{t("Food", "भोजन")}</dt>
-              <dd className="font-semibold text-ink">{foodPreference}</dd>
-            </div>
-          )}
-        </dl>
-
-        <div className="mt-5 border-t border-cream-3 pt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-ink">
-              {t("Your menu", "आपका मेन्यू")}
-            </p>
-            <button
-              type="button"
-              onClick={onEditMenu}
-              className="text-xs font-semibold text-maroon underline underline-offset-4"
-            >
-              {t("Edit", "बदलें")}
-            </button>
-          </div>
-          {menuGroups.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-soft">—</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5 text-sm">
-              {menuGroups.map((g) => (
-                <li key={g.heading}>
-                  <span className="font-semibold text-ink">{g.heading}: </span>
-                  <span className="text-ink-soft">{g.items.join(", ")}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-3 text-sm">
-            <span className="font-semibold text-maroon">{money(perPlate)}</span>
-            <span className="text-ink-soft"> / {t("plate", "प्लेट")}</span>
-          </p>
+            </span>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] leading-snug text-ink">
+              <span className="inline-flex items-center gap-1">
+                <CartIcon path="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3 3 0 0 1 0 5.6" />
+                {inr.format(guests)} {t("guests", "मेहमान")}
+              </span>
+              <span aria-hidden="true" className="h-3 w-px bg-cream-3" />
+              <span className="inline-flex items-center gap-1">
+                <CartIcon path="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                {city ? t(city.name, city.nameHi) : "—"}
+              </span>
+            </span>
+            {(venue || servingLabel || foodPreference) && (
+              <span className="mt-0.5 block text-[11px] leading-snug text-ink/60">
+                {[venue, servingLabel, foodPreference].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </button>
+          <a href={brandsHref} aria-label={t("Change stall", "स्टॉल बदलें")} className="shrink-0 p-1">
+            <CartChevron />
+          </a>
         </div>
+      </div>
 
-        {(selectedAddOns.length > 0 || serviceName) && (
-          <div className="mt-4 border-t border-cream-3 pt-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink">
-                {t("Extras & Essentials", "एक्स्ट्रा और ज़रूरी सामान")}
-              </p>
-              <button
-                type="button"
-                onClick={onEditExtras}
-                className="text-xs font-semibold text-maroon underline underline-offset-4"
-              >
-                {t("Edit", "बदलें")}
-              </button>
-            </div>
-            <ul className="mt-2 space-y-1 text-sm text-ink-soft">
-              {addOns
-                .filter((a) => selectedAddOns.includes(a.id))
-                .map((a) => (
-                  <li key={a.id}>
-                    {a.name}
-                    {addOnVendorName(a.id) ? ` — ${addOnVendorName(a.id)}` : ""}
-                  </li>
-                ))}
-              {serviceName && (
-                <li>
-                  {serviceName} ({money(serviceTotal)})
+      {/* The menu — one row per course: its dishes, plates × rate, total. */}
+      <div className={CART_CARD}>
+        <CartCardHead
+          tight
+          icon="M7 3v8a2 2 0 0 0 2 2v8M5 3v5M9 3v5M17 21V3c-2 1.5-3 4-3 7 0 1.5.8 3 3 3"
+          title={(() => {
+            const n = cartMenu.reduce((sum, c) => sum + c.items.length, 0);
+            return t(
+              `Selected menu (${n} ${n === 1 ? "dish" : "dishes"})`,
+              `चुना हुआ मेन्यू (${n} डिश)`,
+            );
+          })()}
+          action={t("Edit", "बदलें")}
+          onAction={onEditMenu}
+        />
+        {cartMenu.length === 0 ? (
+          <p className="border-t border-cream-3 px-3 py-2 text-sm text-ink-soft">—</p>
+        ) : (
+          <ul className="divide-y divide-cream-3/70 border-t border-cream-3">
+            {cartMenu.map((c) => {
+              const rate = c.fixed ? c.perPlate : c.items.reduce((n, it) => n + it.price, 0);
+              return (
+                <li key={c.id} className="flex items-center gap-3 px-2.5 py-1.5">
+                  <span className="relative block h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-cream-2">
+                    <DishPhoto photo={c.items[0]?.photo} id={c.items[0]?.id ?? c.id} alt="" sizes="56px" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold leading-tight text-ink">
+                      {c.name}
+                      {c.fixed && (
+                        <span className="ml-1.5 rounded bg-cream px-1.5 py-px align-middle text-[9px] font-bold uppercase tracking-[0.1em] text-maroon">
+                          {t("Set menu", "तय मेन्यू")}
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block break-words text-[12px] leading-snug text-ink/70">
+                      {c.items.map((it) => it.name).join(" / ")}
+                    </span>
+                    <span className="block text-[11px] text-ink/60">
+                      {inr.format(guests)} {t("plates", "प्लेट")} × {money(rate)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-sm font-bold text-ink">{money(rate * guests)}</span>
                 </li>
-              )}
-            </ul>
-          </div>
+              );
+            })}
+          </ul>
         )}
       </div>
-      </>
+
+      {(selectedAddOns.length > 0 || serviceName) && (
+        <div className={CART_CARD}>
+          <CartCardHead
+            tight
+            icon="M3 11h18a9 9 0 0 1-18 0ZM12 7V4M9 8l-1-2M15 8l1-2"
+            title={(() => {
+              const n = selectedAddOns.length + (serviceName ? 1 : 0);
+              return t(
+                `Extras & Essentials (${n} ${n === 1 ? "item" : "items"})`,
+                `एक्स्ट्रा और ज़रूरी सामान (${n})`,
+              );
+            })()}
+            action={t("Edit", "बदलें")}
+            onAction={onEditExtras}
+          />
+          <ul className="divide-y divide-cream-3/70 border-t border-cream-3 text-[13px]">
+            {addOns
+              .filter((a) => selectedAddOns.includes(a.id))
+              .map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-1">
+                  <span className="min-w-0 leading-snug text-ink">
+                    {a.name}
+                    <span className="text-[11px] text-ink/60">
+                      {addOnVendorName(a.id) ? ` · ${addOnVendorName(a.id)}` : ""}
+                      {" · "}
+                      {a.perPlate
+                        ? `${inr.format(guests)} × ${money(a.price)}`
+                        : t("One-time", "एकमुश्त")}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold text-ink">
+                    {money(a.perPlate ? a.price * guests : a.price)}
+                  </span>
+                </li>
+              ))}
+            {serviceName && (
+              <li className="flex items-center justify-between gap-3 px-3 py-1">
+                <span className="min-w-0 text-ink">{serviceName}</span>
+                <span className="shrink-0 font-semibold text-ink">{money(serviceTotal)}</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      </div>
       )}
 
       {/* Coupon, contact + venue, referral, the total and how to pay — the
@@ -3663,24 +3766,175 @@ function StepStallConfirm({
         whatsappHref={whatsappHref}
         blocker={blocker}
         stage={stage}
-        afterCoupon={<div className="mt-6 xl:hidden">{summary}</div>}
+        afterCoupon={<div className="mt-1 xl:hidden">{summary}</div>}
         onProceed={() => goStage("pay")}
+        paySummary={paySummary}
+        onGateway={setGatewayLive}
       />
 
-      {/* Payment carries its own "Share on WhatsApp". */}
-      {stage === "cart" && (
-      <div className="mt-6">
-        <WhatsAppShareButton
-          variant="ghost"
-          size="sm"
-          label="Share this plan"
-          labelHi="यह प्लान शेयर करें"
-          message="Planning a Single Stall order on Bhojpatra — one verified stall, our own menu. Take a look:"
-          messageHi="Bhojpatra पर सिंगल स्टॉल ऑर्डर प्लान कर रहे हैं — एक वेरिफाइड स्टॉल, अपना मेन्यू। देखिए:"
-        />
-      </div>
-      )}
     </form>
+  );
+}
+
+/* ─── Cart pieces ──────────────────────────────────────────────────────── */
+const CART_CARD = "overflow-hidden rounded-2xl border border-cream-3/80 bg-white shadow-soft";
+
+/** A 24px line glyph in brand red. */
+function CartIcon({ path }: { path: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-maroon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={path} />
+    </svg>
+  );
+}
+
+function CartChevron() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-maroon" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+/** A cart card's heading: icon chip, title, and an "Edit ›" action. */
+function CartCardHead({
+  icon,
+  title,
+  action,
+  onAction,
+  tight = false,
+}: {
+  /** Half-width card on phones — smaller chip and title. */
+  tight?: boolean;
+  icon: string;
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className={"flex items-center px-3 sm:gap-3 sm:px-4 sm:py-2.5 " + (tight ? "gap-2 px-2.5 py-1.5" : "gap-3 py-2.5")}>
+      <span className={"grid shrink-0 place-items-center rounded-full bg-cream/60 sm:h-9 sm:w-9 " + (tight ? "h-7 w-7" : "h-9 w-9")}>
+        <CartIcon path={icon} />
+      </span>
+      <h3 className={"min-w-0 flex-1 font-sans font-semibold leading-tight text-ink sm:text-[15px] " + (tight ? "text-[14px]" : "text-[15px]")}>{title}</h3>
+      {action && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-maroon"
+        >
+          {action}
+          <CartChevron />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Payment's at-a-glance card: the stall, the event, and what it adds up to. */
+function BookingSummary({
+  t,
+  stall,
+  occasion,
+  eventDate,
+  guests,
+  city,
+  perPlate,
+  subtotal,
+  addOnsTotal,
+  serviceTotal,
+  venueFee,
+  discount,
+  gst,
+  grandTotal,
+}: {
+  t: (en: string, hi: string) => string;
+  stall: StallOption | undefined;
+  occasion: OccasionOption | undefined;
+  eventDate: string;
+  guests: number;
+  city: City | undefined;
+  perPlate: number;
+  subtotal: number;
+  addOnsTotal: number;
+  serviceTotal: number;
+  venueFee: number;
+  discount: number;
+  gst: number;
+  grandTotal: number;
+}) {
+  return (
+    <div className={CART_CARD + " flex h-full flex-col"}>
+      <CartCardHead
+        tight
+        icon="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM14 3v5h5M9 13h6M9 17h4"
+        title={t("Booking summary", "बुकिंग सारांश")}
+      />
+      <div className="flex items-center gap-2 px-2.5 pb-1.5 sm:gap-3 sm:px-4">
+        <span className="relative block h-9 w-11 shrink-0 overflow-hidden rounded-lg bg-cream-2 sm:h-11 sm:w-14">
+          {stall?.image && (
+            <Image
+              src={stall.image}
+              alt=""
+              fill
+              sizes="64px"
+              unoptimized={photoNeedsUnoptimized(stall.image)}
+              className="object-cover"
+            />
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block break-words text-[13px] font-semibold leading-tight text-ink sm:text-sm">
+            {stall?.name ?? "—"}
+          </span>
+          <span className="block text-[11px] text-ink/60">{t("Single Stall", "सिंगल स्टॉल")}</span>
+        </span>
+      </div>
+      <dl className="space-y-1 px-2.5 pb-2 text-[12px] sm:px-4 sm:text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+          <dt className="flex items-center gap-1.5 text-ink sm:gap-2">
+            <CartIcon path="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+            {occasion ? t(occasion.name, occasion.nameHi) : "—"}
+          </dt>
+          <dd className="pl-5 text-ink sm:pl-0">{eventDate ? formatEventDate(eventDate) : "—"}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="flex items-center gap-2 text-ink">
+            <CartIcon path="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3 3 0 0 1 0 5.6" />
+            {t("Guests", "मेहमान")}
+          </dt>
+          <dd className="text-ink">{inr.format(guests)}</dd>
+        </div>
+        <div className="flex items-center gap-2 text-ink">
+          <CartIcon path="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+          {city ? t(city.name, city.nameHi) : "—"}
+        </div>
+      </dl>
+      <div className="border-t border-cream-3 px-2.5 py-1 text-[12px] sm:px-4 sm:text-sm [&>div]:py-0.5 [&>div]:text-[12px] sm:[&>div]:text-sm">
+        <SummaryRow
+          label={`${t("Menu", "मेन्यू")} (${inr.format(guests)} ${t("guests", "मेहमान")} × ${money(perPlate)})`}
+          value={money(subtotal)}
+        />
+        {addOnsTotal > 0 && (
+          <SummaryRow label={t("Extra counters", "अतिरिक्त काउंटर")} value={money(addOnsTotal)} />
+        )}
+        {serviceTotal > 0 && <SummaryRow label={t("Service", "सर्विस")} value={money(serviceTotal)} />}
+        {venueFee > 0 && <SummaryRow label={t("Venue fee", "वेन्यू शुल्क")} value={money(venueFee)} />}
+        {discount > 0 && <SummaryRow label={t("Discount", "छूट")} value={`- ${money(discount)}`} />}
+        <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+      </div>
+      <div className="mt-auto bg-cream/35 px-2.5 py-2 sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3">
+          <span className="text-[13px] font-semibold text-ink sm:text-base">{t("Grand total", "कुल राशि")}</span>
+          <span className="text-lg font-bold text-maroon sm:text-xl">{money(grandTotal)}</span>
+        </div>
+        {guests > 0 && grandTotal > 0 && (
+          <p className="mt-0.5 text-right text-xs text-ink/70">
+            ≈ {money(perPlateCost(grandTotal, guests))} / {t("plate", "प्लेट")} ({t("all-in", "सब मिलाकर")})
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3732,8 +3986,25 @@ function StallSummary({
   const [toggled, setOpen] = useState(false);
   const open = expanded || toggled;
   return (
-    <div className="rounded-2xl border border-cream-3/70 bg-white px-3.5 py-3 xl:p-5 xl:shadow-soft">
-      <div className="flex items-start gap-3">
+    <div
+      className={
+        expanded
+          ? CART_CARD + " px-2.5 py-2 sm:px-4 sm:py-2.5"
+          : "rounded-2xl border border-cream-3/70 bg-white px-3.5 py-3 xl:p-5 xl:shadow-soft"
+      }
+    >
+      {expanded && (
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cream/60 sm:h-9 sm:w-9">
+            <CartIcon path="M7 3h10a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1ZM9 8h6M9 12h6M9 16h3" />
+          </span>
+          <h3 className="font-sans text-[15px] font-semibold leading-tight text-ink">
+            {t("Order total", "कुल ऑर्डर")}
+          </h3>
+        </div>
+      )}
+      {/* The cart's copy already lists the stall and dishes above it. */}
+      <div className={expanded ? "hidden" : "flex items-start gap-3"}>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -3785,8 +4056,9 @@ function StallSummary({
       </div>
 
       <div className={open ? "" : "hidden xl:block"}>
-      {/* Per-plate leads; the total is the smaller sub-line. */}
-      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-cream/35 px-4 py-2.5">
+      {/* Per-plate leads; the total is the smaller sub-line. (The cart's menu
+          rows already carry the plate rate.) */}
+      <div className={(expanded ? "hidden " : "") + "mt-3 flex items-center justify-between gap-3 rounded-xl bg-cream/35 px-4 py-2.5"}>
         <p className="whitespace-nowrap text-2xl font-semibold text-maroon">
           {money(perPlate)}
           <span className="text-sm font-normal text-ink">
@@ -3799,7 +4071,7 @@ function StallSummary({
         </p>
       </div>
 
-      <div className="mt-3">
+      <div className={expanded ? "pl-9 sm:pl-12 [&>div]:py-0 [&>div]:leading-snug" : "mt-3"}>
         <SummaryRow
           label={`${t("Menu subtotal", "मेन्यू उप-योग")} (${inr.format(guests)} ${t("guests", "मेहमान")} × ${money(perPlate)})`}
           value={money(subtotal)}
@@ -3817,15 +4089,21 @@ function StallSummary({
         <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
       </div>
 
-      <div className="mt-2 flex items-center justify-between border-t border-cream-3 pt-3">
-        <span className="text-base font-semibold text-ink">
+      <div className={(expanded ? "ml-9 mt-1 pt-1.5 sm:ml-12 " : "mt-2 pt-3 ") + "flex items-center justify-between border-t border-cream-3"}>
+        <span className="text-base font-semibold leading-tight text-ink">
           {t("Grand total", "कुल राशि")}
+          {/* The cart's copy tucks the all-in per-plate under the label. */}
+          {expanded && guests > 0 && grandTotal > 0 && (
+            <span className="block text-[11px] font-normal text-ink/70">
+              ≈ {money(perPlateCost(grandTotal, guests))} / {t("plate", "प्लेट")} ({t("all-in", "सब मिलाकर")})
+            </span>
+          )}
         </span>
         <span className="text-xl font-bold text-maroon">
           {money(grandTotal)}
         </span>
       </div>
-      {guests > 0 && grandTotal > 0 && (
+      {!expanded && guests > 0 && grandTotal > 0 && (
         <p className="mt-1 text-right text-xs text-ink/70">
           ≈ {money(perPlateCost(grandTotal, guests))} / {t("plate", "प्लेट")} (
           {t("all-in", "सब मिलाकर")})

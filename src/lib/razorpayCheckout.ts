@@ -39,7 +39,14 @@ interface RazorpayOptions {
   currency: string;
   name: string;
   description?: string;
-  prefill?: { name?: string; email?: string; contact?: string };
+  prefill?: { name?: string; email?: string; contact?: string; method?: string };
+  config?: {
+    display: {
+      blocks: Record<string, { name: string; instruments: { method: string }[] }>;
+      sequence: string[];
+      preferences: { show_default_blocks: boolean };
+    };
+  };
   notes?: Record<string, string>;
   theme?: { color?: string };
   modal?: { ondismiss?: () => void };
@@ -90,6 +97,19 @@ function loadCheckoutScript(): Promise<void> {
   return scriptPromise;
 }
 
+/** The methods the customer picks from on our side before the modal opens. */
+export type RazorpayMethod = "upi" | "card" | "netbanking" | "wallet";
+
+/** Every method the modal lists when the customer hasn't picked one. */
+const ALL_METHODS: RazorpayMethod[] = ["upi", "card", "netbanking", "wallet"];
+
+const METHOD_BLOCK_NAMES: Record<RazorpayMethod, string> = {
+  upi: "Pay using UPI",
+  card: "Pay using Card",
+  netbanking: "Pay using Net Banking",
+  wallet: "Pay using Wallet",
+};
+
 export interface RazorpayCheckoutResult {
   /** Rupees actually captured, as recorded server-side from the gateway. */
   amountPaid: number;
@@ -109,6 +129,9 @@ export async function startRazorpayCheckout(opts: {
   /** "advance" when the caller is collecting the booking advance — the server
    *  then answers "already paid" instead of charging the balance. */
   purpose?: "advance";
+  /** Open the modal on just this method — the customer already chose it, so
+   *  Razorpay's own default (UPI expanded, Google Pay first) never shows. */
+  method?: RazorpayMethod;
 }): Promise<RazorpayCheckoutResult> {
   await loadCheckoutScript();
   if (!window.Razorpay) {
@@ -176,6 +199,33 @@ export async function startRazorpayCheckout(opts: {
           name: opts.customerName,
           email: opts.customerEmail,
           contact: opts.customerPhone,
+          ...(opts.method ? { method: opts.method } : {}),
+        },
+        // Open on the method list itself. Left to its defaults, Razorpay's
+        // phone layout leads with one "recommended" UPI app and tucks every
+        // other way to pay behind "More Options".
+        config: {
+          display: opts.method
+            ? {
+                blocks: {
+                  chosen: {
+                    name: METHOD_BLOCK_NAMES[opts.method],
+                    instruments: [{ method: opts.method }],
+                  },
+                },
+                sequence: ["block.chosen"],
+                preferences: { show_default_blocks: false },
+              }
+            : {
+                blocks: {
+                  all: {
+                    name: "All payment options",
+                    instruments: ALL_METHODS.map((method) => ({ method })),
+                  },
+                },
+                sequence: ["block.all"],
+                preferences: { show_default_blocks: false },
+              },
         },
         notes: { bookingId: opts.bookingId },
         theme: { color: "#B92025" },

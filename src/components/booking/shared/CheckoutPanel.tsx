@@ -61,6 +61,8 @@ export default function CheckoutPanel({
   stage,
   afterCoupon,
   onProceed,
+  paySummary,
+  onGateway,
 }: {
   t: (en: string, hi: string) => string;
   venue: string;
@@ -121,6 +123,10 @@ export default function CheckoutPanel({
   afterCoupon?: ReactNode;
   /** "Proceed to payment" on the cart stage. */
   onProceed?: () => void;
+  /** Beside the contact card on the pay stage (e.g. a booking summary). */
+  paySummary?: ReactNode;
+  /** Passed to PaymentBox — fires once the Razorpay gateway is live. */
+  onGateway?: (live: boolean) => void;
 }) {
   const showCart = stage !== "pay";
   const showPay = stage !== "cart";
@@ -136,6 +142,21 @@ export default function CheckoutPanel({
   // Opened by "Edit" — reveals every field so a guest can book under a
   // different name, address or number than the one on their account.
   const [editingContact, setEditingContact] = useState(false);
+  // On the split cart the referral field folds behind one line until wanted.
+  const [referralOpen, setReferralOpen] = useState(false);
+  // …and the coupon field behind one row with the best offer as a chip.
+  const [couponOpen, setCouponOpen] = useState(false);
+  const couponApplied = Boolean(appliedCoupon && couponDiscount > 0);
+  const bestCoupon = couponList.reduce<Coupon | null>(
+    (best, c) =>
+      !best ||
+      Math.min((preDiscount * c.percent) / 100, c.cap) >
+        Math.min((preDiscount * best.percent) / 100, best.cap)
+        ? c
+        : best,
+    null,
+  );
+  const showReferralField = stage !== "cart" || referralOpen || referralCode.trim() !== "";
   const showContactField = (known: boolean) => editingContact || !known;
 
   const contactCard = (
@@ -146,9 +167,28 @@ export default function CheckoutPanel({
         confirmation line instead of being typed a second time; only the
         fields we genuinely don't have are asked for. "Edit" reopens all of
         them for a guest booking under different details. */}
-    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-display text-base font-semibold text-ink">
+    <div
+      className={
+        stage
+          ? "flex h-full min-w-0 flex-col rounded-2xl border border-cream-3/80 bg-white p-2.5 shadow-soft sm:p-4"
+          : "mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm"
+      }
+    >
+      <div className={stage ? "flex items-center gap-2 sm:gap-3" : "flex items-start justify-between gap-3"}>
+        {stage && (
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cream/60 text-maroon sm:h-9 sm:w-9">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0" />
+            </svg>
+          </span>
+        )}
+        <h3
+          className={
+            stage
+              ? "min-w-0 flex-1 font-sans text-[13px] font-semibold leading-tight text-ink sm:text-[15px]"
+              : "font-display text-base font-semibold text-ink"
+          }
+        >
           {t("Your contact details", "आपकी संपर्क जानकारी")}
         </h3>
         {knowSomething && !editingContact && (
@@ -163,27 +203,55 @@ export default function CheckoutPanel({
       </div>
 
       {knowSomething && !editingContact && (
-        <div className="mt-3 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-3">
+        <div className={stage ? "mt-2 rounded-xl border border-cream-3 bg-cream-2/40 px-2.5 py-2 sm:px-3 sm:py-2.5" : "mt-3 rounded-xl border border-cream-3 bg-cream-2/40 px-4 py-3"}>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
             {t("Booking as", "बुकिंग इनके नाम")}
           </p>
-          {knownName && (
-            <p className="mt-0.5 text-sm font-semibold text-ink">
-              {customerName}
+          {stage ? (
+            /* App look: each detail under its own small label. */
+            <dl className="mt-1 space-y-1 text-[12px] sm:text-sm">
+              {knownName && (
+                <div>
+                  <dt className="text-[11px] text-ink-soft">{t("Name", "नाम")}</dt>
+                  <dd className="font-semibold text-ink">{customerName}</dd>
+                </div>
+              )}
+              {knownEmail && (
+                <div>
+                  <dt className="text-[11px] text-ink-soft">{t("Email", "ईमेल")}</dt>
+                  <dd className="break-all text-ink">{customerEmail}</dd>
+                </div>
+              )}
+              {knownPhone && (
+                <div>
+                  <dt className="text-[11px] text-ink-soft">{t("Phone", "फ़ोन")}</dt>
+                  <dd className="text-ink">{customerPhone}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <>
+              {knownName && (
+                <p className="mt-0.5 text-sm font-semibold text-ink">
+                  {customerName}
+                </p>
+              )}
+              {knownEmail && <p className="text-sm text-ink-soft">{customerEmail}</p>}
+              {knownPhone && <p className="text-sm text-ink-soft">{customerPhone}</p>}
+            </>
+          )}
+          {!stage && (
+            <p className="mt-1.5 text-[11px] text-ink-soft">
+              {t(
+                "Already on file from your account — tap Edit if anything changed.",
+                "आपके खाते से ली गई जानकारी — कुछ बदला हो तो बदलें पर टैप करें।",
+              )}
             </p>
           )}
-          {knownEmail && <p className="text-sm text-ink-soft">{customerEmail}</p>}
-          {knownPhone && <p className="text-sm text-ink-soft">{customerPhone}</p>}
-          <p className="mt-1.5 text-[11px] text-ink-soft">
-            {t(
-              "Already on file from your account — tap Edit if anything changed.",
-              "आपके खाते से ली गई जानकारी — कुछ बदला हो तो बदलें पर टैप करें।",
-            )}
-          </p>
         </div>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className={stage ? "mt-2 grid flex-1 content-end gap-2" : "mt-3 grid gap-3 sm:grid-cols-2"}>
         {showContactField(knownName) && (
           <div>
             <label className="text-xs font-medium text-ink-soft">
@@ -195,7 +263,7 @@ export default function CheckoutPanel({
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder={t("e.g. Ankit Sharma", "उदा. अंकित शर्मा")}
               autoComplete="name"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              className={`mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 ${stage ? "px-3 py-2" : "px-4 py-2.5"} text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60`}
             />
           </div>
         )}
@@ -211,16 +279,18 @@ export default function CheckoutPanel({
               placeholder={t("10-digit mobile", "10 अंकों का मोबाइल")}
               autoComplete="tel"
               inputMode="tel"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              className={`mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 ${stage ? "px-3 py-2" : "px-4 py-2.5"} text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60`}
             />
             {/* When name + email came from the account this is the only thing
                 we're asking for — say why, so it doesn't read as busywork. */}
             {!editingContact && knownName && knownEmail && (
               <p className="mt-1 text-[11px] text-ink-soft">
-                {t(
-                  "The one thing we still need — our team calls this number to confirm your feast.",
-                  "बस यही चाहिए — हमारी टीम पुष्टि के लिए इसी नंबर पर कॉल करेगी।",
-                )}
+                {stage
+                  ? t("We'll call to confirm.", "पुष्टि के लिए हम कॉल करेंगे।")
+                  : t(
+                      "The one thing we still need — our team calls this number to confirm your feast.",
+                      "बस यही चाहिए — हमारी टीम पुष्टि के लिए इसी नंबर पर कॉल करेगी।",
+                    )}
               </p>
             )}
           </div>
@@ -237,16 +307,27 @@ export default function CheckoutPanel({
               placeholder={t("you@example.com", "you@example.com")}
               autoComplete="email"
               inputMode="email"
-              className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+              className={`mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 ${stage ? "px-3 py-2" : "px-4 py-2.5"} text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60`}
             />
           </div>
         )}
         {/* Venue — usually pre-filled from the Hero booking bar or the venue
             catalogue, but editable here so it's captured even when the guest
             reached the wizard without one. Spans the full row. */}
-        <div className="sm:col-span-2">
+        <div className={stage ? "border-t border-cream-3 pt-2" : "sm:col-span-2"}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="text-xs font-medium text-ink-soft">
+            <label
+              className={
+                stage
+                  ? "inline-flex items-center gap-2 text-sm font-semibold text-ink"
+                  : "text-xs font-medium text-ink-soft"
+              }
+            >
+              {stage && (
+                <svg viewBox="0 0 24 24" className="h-4 w-4 text-maroon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                </svg>
+              )}
               {t("Venue", "वेन्यू")}
             </label>
             {/* A catalogue venue (booked from /venues) carries a fee — flag it
@@ -267,7 +348,7 @@ export default function CheckoutPanel({
               "e.g. Grand Palace Lawn, Gomti Nagar",
               "उदा. ग्रैंड पैलेस लॉन, गोमती नगर",
             )}
-            className="mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60"
+            className={`mt-1 w-full rounded-lg border border-cream-3 bg-cream-2/40 ${stage ? "px-3 py-2" : "px-4 py-2.5"} text-sm text-ink outline-none transition-colors focus:border-maroon focus:bg-white placeholder:text-ink-soft/60`}
           />
           {venueFee > 0 && (
             <p className="mt-1 text-[11px] text-ink-soft">
@@ -286,13 +367,43 @@ export default function CheckoutPanel({
     <>
     {/* Referral — auto-filled from a partner's share link (?ref=) or typed in.
         A recognised code shows the referrer's name as a tag. */}
-    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm">
+    <div
+      className={
+        stage === "cart"
+          ? "rounded-b-2xl border border-t-0 border-cream-3/80 bg-white px-2.5 py-2 shadow-soft sm:p-3"
+          : "mt-6 rounded-2xl border border-cream-3 bg-white p-5 shadow-sm"
+      }
+    >
+      {stage === "cart" ? (
+        <button
+          type="button"
+          onClick={() => setReferralOpen((v) => !v)}
+          aria-expanded={showReferralField}
+          className="flex w-full items-center gap-2 text-left sm:gap-3"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/60 text-maroon sm:h-9 sm:w-9">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3 3 0 0 1 0 5.6" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink sm:text-[15px]">
+            {t("Have a referral code?", "रेफ़रल कोड है?")}{" "}
+            <span className="text-xs font-normal text-ink-soft">({t("optional", "वैकल्पिक")})</span>
+          </span>
+          <svg viewBox="0 0 24 24" className={"h-4 w-4 shrink-0 text-maroon transition-transform " + (showReferralField ? "rotate-180" : "")} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      ) : (
       <h3 className="font-display text-base font-semibold text-ink">
         {t("Referral code", "रेफ़रल कोड")}{" "}
         <span className="text-sm font-normal text-ink-soft">
           ({t("optional", "वैकल्पिक")})
         </span>
       </h3>
+      )}
+      {showReferralField && (
+      <>
       <p className="mt-1 text-sm text-ink-soft">
         {t(
           "Referred by a Bhojpatra partner? Enter their code so they get credit.",
@@ -330,6 +441,8 @@ export default function CheckoutPanel({
           </div>
         )
       )}
+      </>
+      )}
     </div>
     </>
   );
@@ -339,9 +452,25 @@ export default function CheckoutPanel({
     {showCart && (
     <>
     {/* Coupon */}
-    <div className="mt-6 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-maroon/10 text-maroon">
+    <div
+      className={
+        stage === "cart"
+          ? "mt-1 rounded-t-2xl border border-cream-3/80 bg-white px-2.5 py-2 sm:p-3"
+          : stage
+            ? "mt-3 rounded-2xl border border-cream-3/80 bg-white p-3 shadow-soft sm:p-4"
+            : "mt-6 rounded-2xl border border-cream-3 bg-white p-4 shadow-sm"
+      }
+    >
+      <div className={stage === "cart" ? "flex items-center gap-2" : "flex items-center gap-3"}>
+        <span
+          className={
+            stage === "cart"
+              ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/60 text-maroon sm:h-9 sm:w-9"
+              : stage
+              ? "flex h-9 w-9 items-center justify-center rounded-full bg-cream/60 text-maroon"
+              : "flex h-7 w-7 items-center justify-center rounded-lg bg-maroon/10 text-maroon"
+          }
+        >
           <svg
             viewBox="0 0 24 24"
             className="h-4 w-4"
@@ -356,12 +485,65 @@ export default function CheckoutPanel({
             <path d="M9 7v10" strokeDasharray="2 2" />
           </svg>
         </span>
-        <h3 className="font-display text-base font-semibold text-ink">
+        <h3
+          className={
+            stage
+              ? "min-w-0 flex-1 font-sans text-[14px] font-semibold leading-tight text-ink sm:text-[15px]"
+              : "font-display text-base font-semibold text-ink"
+          }
+        >
           {t("Apply a coupon", "कूपन लगाएं")}
         </h3>
+        {stage === "cart" && couponApplied && appliedCoupon && (
+          <>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream/60 px-2 py-1 text-[11px] font-semibold text-ink">
+              <span aria-hidden="true" className="text-maroon">✓</span>
+              {appliedCoupon.code}
+              <span className="text-maroon">− {money(couponDiscount)}</span>
+            </span>
+            <button
+              type="button"
+              onClick={removeCoupon}
+              aria-label={t(`Remove coupon ${appliedCoupon.code}`, `कूपन ${appliedCoupon.code} हटाएं`)}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-maroon hover:bg-cream/50"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </>
+        )}
+        {stage === "cart" && !couponApplied && (
+          <>
+            {bestCoupon && (
+              <button
+                type="button"
+                onClick={() => applyCouponCode(bestCoupon.code)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-cream/60 px-2.5 py-1 text-[11px] font-semibold text-ink"
+              >
+                <span aria-hidden="true" className="text-maroon">★</span>
+                <span className="font-mono tracking-wide">{bestCoupon.code}</span>
+                <span className="text-maroon">
+                  {bestCoupon.percent}% {t("off", "छूट")}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCouponOpen((v) => !v)}
+              aria-expanded={couponOpen}
+              aria-label={t("More coupons", "और कूपन")}
+              className="shrink-0 p-1 text-maroon"
+            >
+              <svg viewBox="0 0 24 24" className={"h-4 w-4 transition-transform " + (couponOpen ? "rotate-90" : "")} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
-      {appliedCoupon && couponDiscount > 0 ? (
+      {stage === "cart" && couponApplied ? null : appliedCoupon && couponDiscount > 0 ? (
         /* Applied — compact success card with remove */
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-maroon/30 bg-cream-2/40 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -399,22 +581,41 @@ export default function CheckoutPanel({
             {t("Remove", "हटाएं")}
           </button>
         </div>
+      ) : stage === "cart" && !couponOpen ? (
+        couponError ? (
+          <p className="mt-2 pl-12 text-xs font-medium text-maroon">{couponError}</p>
+        ) : null
       ) : (
         <>
           {/* Compact single-line input with inline apply */}
-          <div className="mt-3 flex items-center gap-2 rounded-full border border-cream-3 bg-cream-2/30 py-1 pl-4 pr-1 transition-colors focus-within:border-maroon focus-within:bg-white">
+          <div
+            className={
+              stage
+                ? "mt-3 flex items-center gap-2"
+                : "mt-3 flex items-center gap-2 rounded-full border border-cream-3 bg-cream-2/30 py-1 pl-4 pr-1 transition-colors focus-within:border-maroon focus-within:bg-white"
+            }
+          >
             <input
               type="text"
               value={couponInput}
               onChange={(e) => setCouponInput(e.target.value)}
-              placeholder={t("Enter code", "कोड दर्ज करें")}
-              className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase tracking-wide text-ink outline-none placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-soft/50"
+              placeholder={t("Enter coupon code", "कूपन कोड दर्ज करें")}
+              className={
+                (stage
+                  ? "rounded-xl border border-cream-3 bg-white px-3.5 py-2.5 focus:border-maroon "
+                  : "bg-transparent ") +
+                "min-w-0 flex-1 text-sm font-medium uppercase tracking-wide text-ink outline-none placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-soft/50"
+              }
             />
             <button
               type="button"
               onClick={applyCoupon}
               disabled={!couponInput.trim()}
-              className="shrink-0 rounded-full bg-maroon px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className={
+                stage
+                  ? "shrink-0 rounded-xl border border-maroon bg-white px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-cream/40 disabled:cursor-not-allowed disabled:opacity-40"
+                  : "shrink-0 rounded-full bg-maroon px-5 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              }
             >
               {t("Apply", "लगाएं")}
             </button>
@@ -456,7 +657,7 @@ export default function CheckoutPanel({
                       : c.label}
                   </span>
                   {save > 0 && (
-                    <span className="mt-0.5 truncate text-[10px] text-ink-soft/60">
+                    <span className="mt-0.5 text-[10px] leading-tight text-ink-soft/60">
                       {c.label}
                     </span>
                   )}
@@ -541,16 +742,25 @@ export default function CheckoutPanel({
           type="button"
           onClick={onProceed}
           disabled={Boolean(blocker)}
-          className="mt-6 w-full rounded-full bg-maroon px-6 py-3.5 text-sm font-semibold text-cream shadow-brand transition hover:bg-maroon/90 disabled:opacity-60"
+          className="mt-2 flex w-full items-center justify-between rounded-2xl bg-maroon px-5 py-3 text-base font-semibold text-cream shadow-brand transition hover:bg-maroon/90 disabled:opacity-60"
         >
-          {t("Proceed to payment", "भुगतान के लिए आगे बढ़ें")} →
+          <span aria-hidden="true" className="w-5" />
+          {t("Proceed to payment", "भुगतान के लिए आगे बढ़ें")}
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
       </>
     )}
 
     {showPay && (
     <>
-    {stage === "pay" && contactCard}
+    {stage === "pay" && (
+      <div className="mt-3 grid grid-cols-2 items-stretch gap-2 sm:gap-3">
+        {contactCard}
+        {paySummary}
+      </div>
+    )}
 
     {/* Choose how to pay — pay the 10% advance online (UPI ID / QR) to confirm
         right here, or "Bhojpatra connects you (COD)" to book now and settle
@@ -571,6 +781,8 @@ export default function CheckoutPanel({
       emiCount={emiCount}
       setEmiCount={setEmiCount}
       blocker={blocker}
+      app={Boolean(stage)}
+      onGateway={onGateway}
     />
 
     {confirmError && (
@@ -579,6 +791,46 @@ export default function CheckoutPanel({
       </p>
     )}
 
+    {(payMethod === "Connect" || paidAmount > 0) && stage && (
+      /* The online (UPI) path confirms straight from its own pay button, so
+         this submit only shows for the pay-later Connect flow, or as a retry
+         once an advance has already been recorded. */
+      <button
+        type="submit"
+        disabled={confirming || Boolean(blocker)}
+        className="mt-4 flex w-full items-center justify-center rounded-2xl bg-maroon px-5 py-4 text-base font-semibold text-cream shadow-brand transition hover:bg-maroon/90 disabled:opacity-60"
+      >
+        {confirming
+          ? t("Confirming…", "पुष्टि हो रही है…")
+          : t("Confirm Booking", "बुकिंग पक्की करें")}
+      </button>
+    )}
+    {stage ? (
+      /* App look: share and the reassurance line side by side. */
+      <div className="mt-4 flex flex-col gap-3 min-[400px]:flex-row min-[400px]:items-center">
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-maroon px-5 py-2.5 text-sm font-semibold text-maroon transition hover:bg-maroon/5"
+        >
+          <svg viewBox="0 0 32 32" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+            <path d="M16.04 4C9.93 4 4.98 8.95 4.98 15.06c0 1.95.51 3.86 1.48 5.54L4.9 27.1l6.66-1.74a11 11 0 0 0 5.29 1.35h.01c6.11 0 11.06-4.95 11.06-11.06C27.92 8.95 22.97 4 16.04 4Zm0 20.27h-.01a9.2 9.2 0 0 1-4.68-1.28l-.34-.2-3.95 1.03 1.05-3.85-.22-.35a9.16 9.16 0 0 1-1.41-4.89c0-5.07 4.13-9.2 9.21-9.2 2.46 0 4.77.96 6.51 2.7a9.13 9.13 0 0 1 2.7 6.51c0 5.08-4.13 9.21-9.2 9.21Z" />
+          </svg>
+          {t("Share on WhatsApp with Bhojpatra", "Bhojpatra के साथ WhatsApp पर शेयर करें")}
+        </a>
+        <p className="flex items-start gap-2 text-xs text-ink-soft min-[400px]:border-l min-[400px]:border-cream-3 min-[400px]:pl-3">
+          <svg viewBox="0 0 24 24" className="mt-px h-4 w-4 shrink-0 text-maroon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM21 19v-1a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3 3 0 0 1 0 5.6" />
+          </svg>
+          {t(
+            "We'll confirm your booking and contact you to complete the arrangements.",
+            "हम आपकी बुकिंग की पुष्टि करेंगे और व्यवस्था पूरी करने के लिए आपसे संपर्क करेंगे।",
+          )}
+        </p>
+      </div>
+    ) : (
+    <>
     <div className="mt-6 flex flex-wrap items-center gap-3">
       {/* The online (UPI) path confirms straight from its "Pay & Confirm"
           button, so this submit only shows for the pay-later Connect flow, or
@@ -609,6 +861,8 @@ export default function CheckoutPanel({
         "हम आपकी बुकिंग की पुष्टि करेंगे और व्यवस्था पूरी करने के लिए आपसे संपर्क करेंगे।",
       )}
     </p>
+    </>
+    )}
     </>
     )}
     </>

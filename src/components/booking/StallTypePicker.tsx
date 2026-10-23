@@ -107,7 +107,7 @@ export default function StallTypePicker({
                   )}
                   {selected && (
                     <span
-                      className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-maroon text-white shadow-soft"
+                      className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-maroon text-white shadow-soft"
                       aria-hidden="true"
                     >
                       <svg

@@ -528,6 +528,9 @@ html.header-hidden .app-sticky-chrome {
       var(--tab-bar-h) + var(--safe-bottom) + var(--booking-bar-h, 0px) + 0.75rem
     );
   }
+  html.hide-chat-fab .chat-fab {
+    display: none;
+  }
   /* …so a screen's own bottom-bar clearance would only double it. */
   html.hide-mobile-footer .app-shell-main .app-bottom-safe {
     padding-bottom: 0;

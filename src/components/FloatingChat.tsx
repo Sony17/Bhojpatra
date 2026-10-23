@@ -340,7 +340,7 @@ export default function FloatingChat() {
 
   return (
     <div
-      className="fixed bottom-[calc(var(--tab-bar-h)+var(--safe-bottom)+0.75rem)] right-3 z-[60] flex flex-col-reverse items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
+      className="chat-fab fixed bottom-[calc(var(--tab-bar-h)+var(--safe-bottom)+0.75rem)] right-3 z-[60] flex flex-col-reverse items-end gap-3 transition-transform duration-200 ease-out lg:bottom-6 lg:right-6"
       style={
         !isDesktop && launcherPosition
           ? {
