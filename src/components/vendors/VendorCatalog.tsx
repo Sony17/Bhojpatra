@@ -423,14 +423,14 @@ export default function VendorCatalog() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Arriving from the Single Stall picker (/book/stall → a stall-type tile),
   // the guest has already chosen the category, stall type and city. Fold the
-  // category row, search and filter chips into one summary line; "Change"
-  // brings the full controls back. Decided once from the landing URL.
+  // category row, search and filter chips into one summary line; its funnel
+  // opens the Filters sheet straight away and "Change" goes back to the
+  // picker. Decided once from the landing URL.
   const [fromStallPicker] = useState<boolean>(
     () =>
       searchParams.get("category") === "single-stall" &&
       toStallTypeId(searchParams.get("counter") ?? "") !== "",
   );
-  const [refineOpen, setRefineOpen] = useState(false);
   const router = useRouter();
   // "Change" returns to the stall picker (type outlined, city kept by the
   // wizard's draft). Arriving straight from it, step back in history instead
@@ -552,9 +552,15 @@ export default function VendorCatalog() {
   }, [bainaMode, category, stallMode, stallNonVegOnOffer]);
   const showFilter = (f: FilterKey) => visibleFilters.has(f);
 
-  /** The rating a card shows — real customer reviews when there are any. */
+  /** The rating a card's chip shows, picked exactly like `VendorCard` does:
+   *  Bhojpatra reviews when there are any, else the Google rating; 0 for a
+   *  "New" / "Sample" card with neither. */
   const ratingOf = useCallback(
-    (v: VendorListing) => storefrontStat(ratings, v)?.rating ?? v.rating,
+    (v: VendorListing) => {
+      const stats = storefrontStat(ratings, v);
+      if (stats || (v.reviews > 0 && !v.sample)) return stats?.rating ?? v.rating;
+      return v.googleRating ?? 0;
+    },
     [ratings],
   );
 
@@ -892,7 +898,7 @@ export default function VendorCatalog() {
       {/* Every way Bhojpatra sells, written out up front — categories, tier
           bands and add-ons in one row. Pick one to focus the grid, trim the
           filters to what that offering needs, and pin every card to that tag. */}
-      {fromStallPicker && !refineOpen && counter !== "" ? (
+      {fromStallPicker && counter !== "" ? (
         <div className="app-sticky-chrome -mx-4 mt-3 px-4 py-2 sm:-mx-5 sm:px-5">
           <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft">
             <span
@@ -918,12 +924,22 @@ export default function VendorCatalog() {
             </span>
             <button
               type="button"
-              onClick={() => setRefineOpen(true)}
-              aria-expanded={false}
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
               aria-label={t("Filters", "फ़िल्टर")}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-cream text-maroon transition hover:bg-cream-2 active:scale-95"
+              className={
+                "relative grid h-8 w-8 shrink-0 place-items-center rounded-full border text-maroon transition hover:bg-cream-2 active:scale-95 " +
+                (activeFilterCount > 0 || sort !== "relevance"
+                  ? "border-maroon bg-cream"
+                  : "border-cream")
+              }
             >
               <FilterGlyph />
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-maroon px-1 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -937,16 +953,6 @@ export default function VendorCatalog() {
         </div>
       ) : (
       <>
-      {fromStallPicker && counter !== "" && (
-        <button
-          type="button"
-          onClick={backToStallPicker}
-          className="mt-3 px-1 text-sm font-semibold text-maroon underline underline-offset-4"
-        >
-          ← {t("Back to stall types", "स्टॉल प्रकार पर वापस")}
-        </button>
-      )}
-      {!stallView && (
       <CategoryChips className="mt-4 px-1" label={t("Browse by", "इसके अनुसार देखें")}>
         <CategoryChip selected={lens === ""} onClick={() => selectLens("")}>
           {t("All", "सभी")}
@@ -965,13 +971,11 @@ export default function VendorCatalog() {
           </CategoryChip>
         ))}
       </CategoryChips>
-      )}
 
       {/* Sticky app chrome — search + chip row */}
       <div className="app-sticky-chrome -mx-4 mt-4 px-4 py-3 sm:-mx-5 sm:px-5">
         <div className="mx-auto max-w-7xl">
           <div className="lg:flex lg:items-center lg:gap-3">
-            {!stallView && (
             <AppSearchBar
               id="vendor-search"
               value={query}
@@ -983,12 +987,9 @@ export default function VendorCatalog() {
               )}
               className="lg:w-96 lg:shrink-0"
             />
-            )}
 
             <CategoryChips
-              className={
-                (stallView ? "" : "mt-3 lg:mt-0 ") + "lg:min-w-0 lg:flex-1"
-              }
+              className="mt-3 lg:mt-0 lg:min-w-0 lg:flex-1"
               label={t("Filters", "फ़िल्टर")}
             >
               <CategoryChip
@@ -1204,6 +1205,34 @@ export default function VendorCatalog() {
         title={t("Filters", "फ़िल्टर")}
       >
         <div className="space-y-5">
+          {/* The stall view has no chip row — its sort lives in the sheet. */}
+          {stallView && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
+                {t("Sort by", "क्रम")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["relevance", t("Recommended", "सुझाए गए")],
+                    ["price-asc", t("Price: Low to High", "कीमत: कम से ज्यादा")],
+                    ["price-desc", t("Price: High to Low", "कीमत: ज्यादा से कम")],
+                    ["rating", t("Top rated", "सबसे अच्छी रेटिंग")],
+                  ] as [SortKey, string][]
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSort(value)}
+                    aria-pressed={sort === value}
+                    className={chipClass(sort === value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {!stallMode && (
           <>
           <FilterSelect
