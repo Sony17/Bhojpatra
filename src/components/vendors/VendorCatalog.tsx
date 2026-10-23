@@ -23,7 +23,7 @@ import {
   type VendorRatingSummary,
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
-import { useAllVendors } from "@/lib/useAllVendors";
+import { useAllVendorsStatus } from "@/lib/useAllVendors";
 import { ctaLabel, listingCta } from "@/lib/vendorStorefront";
 import { stallTypeById, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
@@ -46,6 +46,7 @@ import {
   Drawer,
   EmptyState,
   PullToRefresh,
+  SkeletonList,
 } from "@/components/ui";
 
 const ALL = "all";
@@ -461,7 +462,8 @@ export default function VendorCatalog() {
 
   // Curated static listings + live dashboard-published vendors.
   const [refreshToken, setRefreshToken] = useState(0);
-  const allVendors = useAllVendors(refreshToken);
+  const { vendors: allVendors, loaded: vendorsLoaded } =
+    useAllVendorsStatus(refreshToken);
   const onPullRefresh = useCallback(async () => {
     setRefreshToken((n) => n + 1);
     await new Promise((r) => setTimeout(r, 350));
@@ -1443,8 +1445,14 @@ export default function VendorCatalog() {
         </div>
       </Drawer>
 
-      {/* Results summary */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1">
+      {/* Results summary — hidden until the roster is in, so it never reads
+          "0 caterers" while still loading. */}
+      <div
+        className={
+          "mt-3 flex flex-wrap items-center justify-between gap-2 px-1" +
+          (vendorsLoaded ? "" : " invisible")
+        }
+      >
         <p className="text-[13px] text-ink/55">
           <span className="font-semibold text-ink">{results.length}</span>{" "}
           {results.length === 1
@@ -1466,8 +1474,14 @@ export default function VendorCatalog() {
         </p>
       </div>
 
-      {/* Vendor grid — denser app spacing */}
-      {results.length > 0 ? (
+      {/* Vendor grid — denser app spacing. Normally seeded from the server
+          (VendorsSeed); if it ever has to wait, show skeletons — never a
+          premature "No caterers found". */}
+      {!vendorsLoaded ? (
+        <div className="mt-3">
+          <SkeletonList count={4} />
+        </div>
+      ) : results.length > 0 ? (
         <ul
           className={
             "grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 " +

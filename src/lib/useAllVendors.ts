@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { vendorListings, type VendorListing } from "@/lib/data";
 import type { StallBrief } from "@/lib/vendorStorefront";
 
@@ -34,15 +43,35 @@ export interface VendorsPayload {
   samplesHidden: boolean;
 }
 
+/** Server snapshot for every vendor hook below it (catalog, compare tray…),
+ *  so a page wraps once instead of threading `initial` through components. */
+const VendorsSeedContext = createContext<VendorsPayload | null>(null);
+
+export function VendorsSeed({
+  initial,
+  children,
+}: {
+  initial: VendorsPayload | null | undefined;
+  children: ReactNode;
+}) {
+  return createElement(
+    VendorsSeedContext.Provider,
+    { value: initial ?? null },
+    children,
+  );
+}
+
 /** `useAllVendors` plus whether `/api/vendors` has answered yet — so a page
  *  can show a loading state instead of a premature "no vendors" message. */
 export function useAllVendorsStatus(
   refreshToken = 0,
-  initial?: VendorsPayload | null,
+  explicitInitial?: VendorsPayload | null,
 ): {
   vendors: VendorListing[];
   loaded: boolean;
 } {
+  const seed = useContext(VendorsSeedContext);
+  const initial = explicitInitial ?? seed;
   const [liveVendors, setLiveVendors] = useState<VendorListing[]>(
     initial?.vendors ?? [],
   );
