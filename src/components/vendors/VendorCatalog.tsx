@@ -1620,8 +1620,11 @@ export default function VendorCatalog({
       ) : results.length > 0 ? (
         <ul
           className={
-            "grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 " +
-            (fromStallPicker ? "mt-2 grid-cols-2 gap-2 sm:mt-3" : "mt-3 grid-cols-1 gap-3")
+            "grid " +
+            (stallMode
+              ? "mt-3 grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4"
+              : "sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 " +
+                (fromStallPicker ? "mt-2 grid-cols-2 gap-2 sm:mt-3" : "mt-3 grid-cols-1 gap-3"))
           }
         >
           {results.map((vendor) => (
@@ -1643,6 +1646,7 @@ export default function VendorCatalog({
               stallDiets={stallMode ? stallDiets(vendor) : undefined}
               stallMenu={stallMode ? stallMenu(vendor) : undefined}
               leadDiet={diet === "Non-Veg" ? "non-veg" : diet === "Veg" ? "veg" : undefined}
+              tileImages={tileImages}
               compact={fromStallPicker}
             />
           ))}
@@ -1749,6 +1753,7 @@ function VendorCard({
   stallDiets,
   stallMenu,
   leadDiet,
+  tileImages,
   compact = false,
 }: {
   /** Phones: a half-width card for the two-column stall-picker grid — short
@@ -1768,6 +1773,8 @@ function VendorCard({
   stallMenu?: StallDishesBrief;
   /** The diet the guest filtered to; its dishes lead the strip. */
   leadDiet?: DietType;
+  /** Admin stall-type photos — a stall card's fallback image. */
+  tileImages?: StallTileImages;
   /** Browsing the Baina Box lens (chip or "baina" search) — "Order" then
    *  lands on the vendor's Baina Box panel instead of the stall wizard. */
   bainaMode?: boolean;
@@ -1899,18 +1906,24 @@ function VendorCard({
     }
   };
 
-  // Stall lens: a photo-led card. Name, diet and price sit on the photo; the
-  // strip under it lists the stall's own dishes with their veg / non-veg
-  // marks, the guest's filtered diet first.
+  // Stall lens: a square, food-app card (Swiggy / Zomato). The price rides
+  // on the photo; under it sit the name, rating · veg / non-veg marks (the
+  // guest's filtered diet first) and cuisines — the dishes themselves live on
+  // the booking menu.
   if (stallMenu && stallMenu.dishes.length > 0) {
-    const dishes = leadDiet
-      ? [
-          ...stallMenu.dishes.filter((d) => d.diet === leadDiet),
-          ...stallMenu.dishes.filter((d) => d.diet !== leadDiet),
-        ]
-      : stallMenu.dishes;
-    const shown = dishes.slice(0, compact ? 2 : 4);
-    const more = stallMenu.total - shown.length;
+    const servedDiets = (["veg", "non-veg"] as const).filter((diet) =>
+      stallMenu.dishes.some((d) => d.diet === diet),
+    );
+    if (leadDiet === "non-veg") servedDiets.reverse();
+    // The stall's own food leads: a dish photo the brand uploaded for this
+    // stall (the filtered diet's first), else the admin's photo for the stall
+    // type, and only then the brand's main photo — which may show a feast
+    // dish this stall doesn't sell.
+    const photo =
+      (stallMenu.dishes.find((d) => d.photo && (!leadDiet || d.diet === leadDiet)) ??
+        stallMenu.dishes.find((d) => d.photo))?.photo ??
+      tileImages?.[counter || (vendor.stall?.stallTypes?.[0] ?? "")] ??
+      vendor.image;
     const rating =
       stats || (vendor.reviews > 0 && !isSample)
         ? (stats?.rating ?? vendor.rating).toFixed(1)
@@ -1919,151 +1932,118 @@ function VendorCard({
           : null;
 
     return (
-      <Card
-        as="li"
-        interactive
-        padding="none"
-        className="group relative flex flex-col overflow-hidden ring-1 ring-cream"
-      >
-        <div
-          className={
-            "relative w-full overflow-hidden bg-cream sm:aspect-[16/10] " +
-            (compact ? "aspect-[4/5]" : "aspect-[16/10]")
-          }
-        >
+      <li className="group relative min-w-0 rounded-2xl border border-maroon/15 bg-white p-1.5 shadow-[0_4px_14px_-8px_rgba(0,0,0,0.25)] transition-shadow hover:shadow-[0_10px_24px_-10px_rgba(0,0,0,0.35)] sm:p-2">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-cream">
           <Image
-            src={vendor.image}
-            unoptimized={photoNeedsUnoptimized(vendor.image)}
+            src={photo}
+            unoptimized={photoNeedsUnoptimized(photo) || isUnoptimized(photo)}
             alt={vendor.name}
             fill
-            sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 50vw"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           />
-          {/* Near-solid at the foot so text baked into a photo (logos,
-              banners) can't bleed through the name and price. */}
+          {/* Just enough shade at the foot for the price to read. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 from-10% via-black/45 via-45% to-black/10"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent"
           />
-
-          <div className="absolute inset-x-2.5 top-2.5 z-10 flex items-start justify-between gap-2 sm:inset-x-3 sm:top-3">
-            {rating ? (
-              <Link
-                href={`/vendors/${vendor.id}#reviews`}
-                className="relative inline-flex items-center gap-0.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-ink shadow-sm"
-                aria-label={t(`Rated ${rating}`, `रेटिंग ${rating}`)}
-              >
-                {rating}
-                <span aria-hidden="true" className="text-maroon">★</span>
-              </Link>
-            ) : (
-              <span className="rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-maroon shadow-sm">
-                {isSample ? t("Sample", "नमूना") : t("New", "नया")}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => toggle(vendor.id)}
-              disabled={compareDisabled}
-              aria-pressed={inCompare}
-              aria-label={
-                inCompare
-                  ? t("Remove from compare", "तुलना से हटाएँ")
-                  : t("Add to compare", "तुलना में जोड़ें")
-              }
-              title={
-                compareDisabled
-                  ? t("Compare list is full", "तुलना सूची भर गई है")
-                  : undefined
-              }
-              className={
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-white/40 backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8 " +
-                (inCompare ? "bg-maroon text-cream" : "bg-black/35 text-white hover:bg-white hover:text-maroon")
-              }
-            >
-              <span aria-hidden="true" className="text-sm font-bold leading-none">
-                {inCompare ? "✓" : "+"}
-              </span>
-            </button>
-          </div>
-
-          <div className="absolute inset-x-2.5 bottom-2.5 z-10 sm:inset-x-3.5 sm:bottom-3">
-            <span
-              className={
-                "inline-block rounded-full px-1.5 py-px text-[9px] font-bold uppercase leading-tight tracking-[0.08em] sm:px-2 sm:text-[10px] " +
-                (shownDiet === "Non-Veg"
-                  ? "bg-maroon text-white"
-                  : shownDiet === "Veg"
-                    ? "bg-cream text-maroon"
-                    : "bg-white text-ink")
-              }
-            >
-              {dietBadgeLabel(shownDiet)}
+          <button
+            type="button"
+            onClick={() => toggle(vendor.id)}
+            disabled={compareDisabled}
+            aria-pressed={inCompare}
+            aria-label={
+              inCompare
+                ? t("Remove from compare", "तुलना से हटाएँ")
+                : t("Add to compare", "तुलना में जोड़ें")
+            }
+            title={
+              compareDisabled
+                ? t("Compare list is full", "तुलना सूची भर गई है")
+                : undefined
+            }
+            className={
+              "absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-sm ring-1 ring-white/40 backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
+              (inCompare ? "bg-maroon text-cream" : "bg-black/35 text-white hover:bg-white hover:text-maroon")
+            }
+          >
+            <span aria-hidden="true" className="text-sm font-bold leading-none">
+              {inCompare ? "✓" : "+"}
             </span>
-            <h3 className="mt-1 line-clamp-2 break-words font-sans text-[14px] font-bold leading-[1.15] tracking-tight text-white sm:mt-1.5 sm:text-[18px]">
-              {vendor.name}
+          </button>
+          <p className="absolute inset-x-2.5 bottom-2 font-sans font-extrabold uppercase leading-none tracking-tight text-white sm:inset-x-3 sm:bottom-2.5">
+            {ctaPrice != null ? (
+              <>
+                {cta.kind === "stall" && (
+                  <span className="mb-0.5 block text-[9px] font-semibold tracking-[0.14em] text-cream">
+                    {t("Stall from", "स्टॉल")}
+                  </span>
+                )}
+                <span className="text-[17px] sm:text-[19px]">
+                  ₹{ctaPrice.toLocaleString("en-IN")}
+                </span>
+                <span className="text-[10px] font-bold"> {ctaUnit}</span>
+              </>
+            ) : (
+              <span className="text-[11px]">{t("On enquiry", "पूछताछ पर")}</span>
+            )}
+          </p>
+        </div>
+
+        {/* Name, then rating · diet, then cuisines — the food-app stack. */}
+        <div className="mt-2 flex items-start gap-1.5 px-1 pb-1">
+          <div className="min-w-0 flex-1">
+            <h3 className="flex min-w-0 items-center gap-1 font-sans text-[14.5px] font-bold leading-tight tracking-tight text-ink sm:text-[15.5px]">
+              <span className="truncate">{vendor.name}</span>
               {vendor.verified && !isSample && (
                 <span
                   aria-label={t("Verified", "वेरिफाइड")}
                   title={t("Verified", "वेरिफाइड")}
-                  className="ml-1 inline-grid h-3.5 w-3.5 translate-y-[-1px] place-items-center rounded-full bg-maroon align-middle text-[8px] text-white sm:h-4 sm:w-4 sm:text-[9px]"
+                  className="inline-grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-maroon text-[8px] text-white"
                 >
                   ✓
                 </span>
               )}
             </h3>
-            <p className="mt-1 font-sans leading-none text-white">
-              {ctaPrice != null ? (
-                <>
-                  <span className="mr-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-cream sm:text-[10px]">
-                    {t("Stall from", "स्टॉल")}
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold leading-none text-ink sm:text-[13px]">
+              {rating ? (
+                <Link
+                  href={`/vendors/${vendor.id}#reviews`}
+                  className="relative z-10 inline-flex shrink-0 items-center gap-1"
+                  aria-label={t(`Rated ${rating}`, `रेटिंग ${rating}`)}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="grid h-4 w-4 place-items-center rounded-full bg-maroon text-[9px] text-white"
+                  >
+                    ★
                   </span>
-                  <span className="text-[15px] font-bold sm:text-[17px]">
-                    ₹{ctaPrice.toLocaleString("en-IN")}
-                  </span>
-                  <span className="text-[10px] font-semibold sm:text-[11px]"> {ctaUnit}</span>
-                </>
+                  {rating}
+                </Link>
               ) : (
-                <span className="text-[11px] font-semibold">
-                  {t("Price on enquiry", "कीमत पूछताछ पर")}
+                <span className="shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-maroon">
+                  {isSample ? t("Sample", "नमूना") : t("New", "नया")}
                 </span>
               )}
+              {servedDiets.map((diet) => (
+                <span key={diet} className="inline-flex shrink-0 items-center gap-1">
+                  <span aria-hidden="true" className="text-ink/30">•</span>
+                  <DietMark diet={diet} className="h-3.5 w-3.5" />
+                  {diet === "veg" ? t("Veg", "वेज") : t("Non-veg", "नॉन-वेज")}
+                </span>
+              ))}
+            </p>
+            <p className="mt-1 truncate text-[12px] leading-tight text-ink/55 sm:text-[13px]">
+              {[...vendor.cuisines.slice(0, 2), vendor.city].filter(Boolean).join(" · ")}
             </p>
           </div>
-        </div>
-
-        {/* The stall's dishes, each with its veg / non-veg mark. */}
-        <div className="flex flex-1 items-start gap-2 px-2.5 pb-2.5 pt-2 sm:px-3.5 sm:pb-3.5 sm:pt-3">
-          <ul
-            className="min-w-0 flex-1 space-y-1 sm:space-y-1.5"
-            aria-label={t("Dishes on this stall", "इस स्टॉल के व्यंजन")}
-          >
-            {shown.map((d) => (
-              <li
-                key={d.name}
-                className="flex min-w-0 items-center gap-1.5 text-[11.5px] leading-tight text-ink sm:text-[13px]"
-              >
-                <DietMark
-                  diet={d.diet}
-                  label={d.diet === "veg" ? t("Veg", "वेज") : t("Non-veg", "नॉन-वेज")}
-                  className="h-3 w-3 sm:h-3.5 sm:w-3.5"
-                />
-                <span className="truncate">{d.name}</span>
-              </li>
-            ))}
-            {more > 0 && (
-              <li className="pl-[18px] text-[10.5px] font-semibold text-maroon sm:pl-5 sm:text-[12px]">
-                {t(`+${more} more`, `+${more} और`)}
-              </li>
-            )}
-          </ul>
           {/* The card itself books; the caterer's full profile sits behind
               this info button instead. */}
           <Link
             href={vendorHref}
             aria-label={t(`About ${vendor.name}`, `${vendor.name} के बारे में`)}
             title={t("Vendor info", "वेंडर जानकारी")}
-            className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-cream sm:h-7 sm:w-7"
+            className="relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-cream"
           >
             <InfoGlyph />
           </Link>
@@ -2072,12 +2052,12 @@ function VendorCard({
         <Link
           href={bookHref}
           aria-label={`${ctaText} ${vendor.name}`}
-          className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+          className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
           tabIndex={-1}
         >
           <span className="sr-only">{`${ctaText} ${vendor.name}`}</span>
         </Link>
-      </Card>
+      </li>
     );
   }
 

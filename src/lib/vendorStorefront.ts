@@ -91,7 +91,7 @@ export type StallBrief = Pick<
 export interface StallDishesBrief {
   /** Up to `BRIEF_DISHES` of each diet, menu order — so a card filtered to
    *  either diet can always lead with it. */
-  dishes: { name: string; diet: DietType }[];
+  dishes: { name: string; diet: DietType; photo?: string }[];
   /** Every dish on the stall type, for the card's "+N more". */
   total: number;
 }
@@ -119,7 +119,10 @@ export function briefOf(s: BookableStall): StallBrief {
           const diet: DietType = it.diet === "non-veg" ? "non-veg" : "veg";
           diets.add(diet);
           total += 1;
-          if (perDiet[diet]++ < BRIEF_DISHES) dishes.push({ name: it.name, diet });
+          // Inline `data:` photos are left behind — they'd bloat every card.
+          const photo = it.photo && !it.photo.startsWith("data:") ? it.photo : undefined;
+          if (perDiet[diet]++ < BRIEF_DISHES)
+            dishes.push({ name: it.name, diet, ...(photo ? { photo } : {}) });
         }
     dietsByType[id] = [...diets];
     dishesByType[id] = { dishes, total };

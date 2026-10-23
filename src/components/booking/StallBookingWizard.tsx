@@ -99,6 +99,7 @@ import {
   serviceTotal as serviceChargeFor,
 } from "@/lib/servicePricing";
 import { Button, DietMark, useToast } from "@/components/ui";
+import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
   MIN_GUESTS,
@@ -2877,7 +2878,7 @@ function StepStallMenu({
               >
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
-                  alt={it.name}
+                  alt={displayDishName(it.name)}
                   unoptimized={photoNeedsUnoptimized(it.photo)}
                   fill
                   sizes="56px"
@@ -2900,7 +2901,7 @@ function StepStallMenu({
                       : t("Non-veg", "मांसाहारी")}
                     {" · "}
                   </span>
-                  {it.name}
+                  {displayDishName(it.name)}
                 </span>
                 {/* Only a varied course prices a dish, because only there does
                     the guest buy one: the price is the vendor's own, and the
@@ -2955,7 +2956,7 @@ function StepStallMenu({
               <span className="relative block h-full min-h-0 w-full overflow-hidden rounded-lg bg-cream-2">
                 <Image
                   src={it.photo || dummyDishPhoto(it.id)}
-                  alt={it.name}
+                  alt={displayDishName(it.name)}
                   unoptimized={photoNeedsUnoptimized(it.photo)}
                   fill
                   sizes="50vw"
@@ -2970,7 +2971,7 @@ function StepStallMenu({
                 }
               >
                 <span className="block truncate text-[13px] font-bold leading-tight text-ink">
-                  {it.name}
+                  {displayDishName(it.name)}
                 </span>
                 {/* Set menus need no per-dish status — the bar above says it
                     all, and the card tint shows once the course is added. */}
