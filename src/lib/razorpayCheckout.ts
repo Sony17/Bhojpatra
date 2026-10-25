@@ -32,6 +32,11 @@ interface RazorpayHandlerResponse {
   razorpay_signature: string;
 }
 
+interface RazorpayInstrument {
+  method: string;
+  flows?: string[];
+}
+
 interface RazorpayOptions {
   key: string;
   order_id: string;
@@ -42,7 +47,7 @@ interface RazorpayOptions {
   prefill?: { name?: string; email?: string; contact?: string; method?: string };
   config?: {
     display: {
-      blocks: Record<string, { name: string; instruments: { method: string }[] }>;
+      blocks: Record<string, { name: string; instruments: RazorpayInstrument[] }>;
       sequence: string[];
       preferences: { show_default_blocks: boolean };
     };
@@ -102,6 +107,12 @@ export type RazorpayMethod = "upi" | "card" | "netbanking" | "wallet";
 
 /** Every method the modal lists when the customer hasn't picked one. */
 const ALL_METHODS: RazorpayMethod[] = ["upi", "card", "netbanking", "wallet"];
+
+// A custom display block replaces Razorpay's defaults, and a bare
+// `{ method: "upi" }` drops the "Scan QR" card — list every UPI flow so the QR
+// still shows (Razorpay renders it on desktop; phones get the UPI-app intents).
+const instrumentFor = (method: RazorpayMethod): RazorpayInstrument =>
+  method === "upi" ? { method, flows: ["qr", "intent", "collect"] } : { method };
 
 const METHOD_BLOCK_NAMES: Record<RazorpayMethod, string> = {
   upi: "Pay using UPI",
@@ -210,7 +221,7 @@ export async function startRazorpayCheckout(opts: {
                 blocks: {
                   chosen: {
                     name: METHOD_BLOCK_NAMES[opts.method],
-                    instruments: [{ method: opts.method }],
+                    instruments: [instrumentFor(opts.method)],
                   },
                 },
                 sequence: ["block.chosen"],
@@ -220,7 +231,7 @@ export async function startRazorpayCheckout(opts: {
                 blocks: {
                   all: {
                     name: "All payment options",
-                    instruments: ALL_METHODS.map((method) => ({ method })),
+                    instruments: ALL_METHODS.map(instrumentFor),
                   },
                 },
                 sequence: ["block.all"],
