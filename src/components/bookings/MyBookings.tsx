@@ -23,6 +23,7 @@ import {
   type BookingPatchResult,
 } from "@/lib/bookings";
 import type { EmiPlan } from "@/lib/emi";
+import type { CustomerRefund } from "@/lib/admin/types";
 import { downloadInvoice, invoiceShareUrl } from "@/lib/invoice";
 import { useLang } from "@/lib/i18n";
 import {
@@ -33,6 +34,7 @@ import {
   EmptyState,
   Input,
   PullToRefresh,
+  SegmentedControl,
   Textarea,
 } from "@/components/ui";
 import InvoicePreview from "./InvoicePreview";
@@ -147,6 +149,34 @@ export default function MyBookings() {
     [bookings, reviewId],
   );
 
+  // The customer's refund requests, newest first — the latest per booking
+  // drives the refund status shown on its card.
+  const [refunds, setRefunds] = useState<CustomerRefund[]>([]);
+  const loadRefunds = useCallback(() => {
+    void fetchMyRefunds().then((list) => {
+      if (list) setRefunds(list);
+    });
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void fetchMyRefunds().then((list) => {
+        if (active && list) setRefunds(list);
+      });
+    };
+    load();
+    const unsub = onStoredBookingsChange(load);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+  const latestRefund = useMemo(() => {
+    const map = new Map<string, CustomerRefund>();
+    for (const r of refunds) if (!map.has(r.bookingId)) map.set(r.bookingId, r);
+    return map;
+  }, [refunds]);
+
   const loadBookings = useCallback(async () => {
     const list = await fetchMyBookings();
     setBookings(list);
@@ -254,6 +284,8 @@ export default function MyBookings() {
               <BookingCard
                 key={booking.id}
                 booking={booking}
+                refund={latestRefund.get(booking.id)}
+                onRefundRequested={loadRefunds}
                 onView={() => setActiveId(booking.id)}
                 onReview={() => setReviewId(booking.id)}
               />
@@ -652,19 +684,113 @@ function CancelBookingButton({ booking }: { booking: StoredBooking }) {
   );
 }
 
+/** The signed-in customer's refunds, newest first; null when unreachable. */
+async function fetchMyRefunds(): Promise<CustomerRefund[] | null> {
+  try {
+    const res = await fetch("/api/refunds", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as
+      | { refunds?: CustomerRefund[] }
+      | null;
+    return Array.isArray(json?.refunds) ? json.refunds : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where the customer's latest refund on this booking stands. */
+function RefundStatusNote({ refund }: { refund: CustomerRefund }) {
+  const { t } = useLang();
+  const amount = money(refund.amount);
+  let text: string;
+  switch (refund.status) {
+    case "Requested":
+      text = t(
+        `Refund of ${amount} requested on ${refund.requestedAt} — we're reviewing it.`,
+        `${amount} का रिफ़ंड ${refund.requestedAt} को माँगा गया — हम समीक्षा कर रहे हैं।`,
+      );
+      break;
+    case "Approved":
+      text = t(
+        `Refund of ${amount} approved — we'll send it shortly.`,
+        `${amount} का रिफ़ंड मंज़ूर — जल्द भेजा जाएगा।`,
+      );
+      break;
+    case "Processed": {
+      const date = refund.processedAt ?? "";
+      const byHand = refund.manualAmount
+        ? t(
+            ` ${money(refund.manualAmount)} sent${refund.payoutTo ? ` to ${refund.payoutTo}` : ""}${refund.payoutRef ? ` (UTR ${refund.payoutRef})` : ""}.`,
+            ` ${money(refund.manualAmount)} भेजा गया${refund.payoutTo ? ` — ${refund.payoutTo}` : ""}${refund.payoutRef ? ` (UTR ${refund.payoutRef})` : ""}।`,
+          )
+        : "";
+      const gateway = refund.gatewayAmount
+        ? refund.gatewayPending
+          ? t(
+              ` ${money(refund.gatewayAmount)} is on its way back to your original payment method — it can take 5–7 working days to show.`,
+              ` ${money(refund.gatewayAmount)} आपके मूल भुगतान तरीके पर लौट रहा है — दिखने में 5–7 कार्यदिवस लग सकते हैं।`,
+            )
+          : t(
+              ` ${money(refund.gatewayAmount)} credited back to your original payment method${refund.gatewayRefundId ? ` (ref ${refund.gatewayRefundId})` : ""}.`,
+              ` ${money(refund.gatewayAmount)} आपके मूल भुगतान तरीके पर लौटा दिया गया${refund.gatewayRefundId ? ` (रेफ़ ${refund.gatewayRefundId})` : ""}।`,
+            )
+        : refund.gatewayRefundId && !refund.manualAmount
+          ? t(
+              ` Sent to your original payment method (ref ${refund.gatewayRefundId}).`,
+              ` आपके मूल भुगतान तरीके पर भेजा गया (रेफ़ ${refund.gatewayRefundId})।`,
+            )
+          : "";
+      text =
+        (refund.gatewayPending
+          ? t(`Refund of ${amount} initiated on ${date}.`, `${amount} का रिफ़ंड ${date} को शुरू हुआ।`)
+          : t(`Refund of ${amount} sent on ${date}.`, `${amount} का रिफ़ंड ${date} को भेजा गया।`)) +
+        gateway +
+        byHand;
+      break;
+    }
+    case "Declined":
+      text = t(
+        "Your last refund request was declined. You can ask again or use Get help.",
+        "आपका पिछला रिफ़ंड अनुरोध अस्वीकार हुआ। आप फिर से माँग सकते हैं या मदद लें।",
+      );
+      break;
+  }
+  return (
+    <p role="status" className="mt-5 rounded-card bg-cream-2 px-4 py-3 text-sm font-medium text-maroon">
+      {text}
+    </p>
+  );
+}
+
 /**
  * "Request refund" — raises a refund claim against a booking the customer paid
  * on (POST /api/refunds). Shown once an order is Cancelled or Completed with
  * money collected; the server derives the amount/method from the booking and
  * allows one open claim at a time (a second attempt gets a friendly 409).
  */
-function RequestRefundButton({ booking }: { booking: StoredBooking }) {
+function RequestRefundButton({
+  booking,
+  onRequested,
+}: {
+  booking: StoredBooking;
+  onRequested: () => void;
+}) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // A booking not paid through Razorpay can't be refunded automatically, so
+  // ask where to send the money. The server has the final say (needsPayout).
+  const [askPayout, setAskPayout] = useState(
+    !!booking.paymentMethod && booking.paymentMethod !== "Razorpay",
+  );
+  const [payoutKind, setPayoutKind] = useState<"upi" | "bank">("upi");
+  const [upiId, setUpiId] = useState("");
+  const [holderName, setHolderName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [ifsc, setIfsc] = useState("");
 
   if (done) {
     return (
@@ -709,12 +835,24 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
       const res = await fetch("/api/refunds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, reason: trimmed }),
+        body: JSON.stringify({
+          bookingId: booking.id,
+          reason: trimmed,
+          ...(askPayout
+            ? {
+                payoutTo:
+                  payoutKind === "upi"
+                    ? { upiId }
+                    : { holderName, accountNumber, ifsc },
+              }
+            : {}),
+        }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { error?: string }
+        | { error?: string; needsPayout?: boolean }
         | null;
       if (!res.ok) {
+        if (json?.needsPayout) setAskPayout(true);
         setError(
           json?.error ??
             t(
@@ -725,6 +863,7 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
         return;
       }
       setDone(true);
+      onRequested();
     } catch {
       setError(
         t(
@@ -738,7 +877,7 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
   };
 
   return (
-    <div className="flex shrink-0 flex-col items-start gap-1.5">
+    <div className="flex w-full flex-col items-start gap-1.5 sm:max-w-md">
       <Textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
@@ -749,8 +888,59 @@ function RequestRefundButton({ booking }: { booking: StoredBooking }) {
           "आप रिफ़ंड का अनुरोध क्यों कर रहे हैं?",
         )}
         aria-label={t("Refund reason", "रिफ़ंड का कारण")}
-        className="w-72"
+        className="w-full"
       />
+      {askPayout && (
+        <div className="flex w-full flex-col gap-2">
+          <p className="text-xs text-ink-soft">
+            {t(
+              "Where should we send your refund?",
+              "आपका रिफ़ंड कहाँ भेजें?",
+            )}
+          </p>
+          <SegmentedControl
+            options={[
+              { value: "upi", label: t("UPI ID", "UPI आईडी") },
+              { value: "bank", label: t("Bank account", "बैंक खाता") },
+            ]}
+            value={payoutKind}
+            onChange={setPayoutKind}
+          />
+          {payoutKind === "upi" ? (
+            <Input
+              value={upiId}
+              onChange={(e) => setUpiId(e.target.value.replace(/\s/g, ""))}
+              placeholder="name@okhdfcbank"
+              aria-label={t("UPI ID", "UPI आईडी")}
+              autoComplete="off"
+            />
+          ) : (
+            <>
+              <Input
+                value={holderName}
+                onChange={(e) => setHolderName(e.target.value)}
+                placeholder={t("Account holder name", "खाताधारक का नाम")}
+                aria-label={t("Account holder name", "खाताधारक का नाम")}
+              />
+              <Input
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 18))}
+                placeholder={t("Account number", "खाता संख्या")}
+                aria-label={t("Account number", "खाता संख्या")}
+                inputMode="numeric"
+                autoComplete="off"
+              />
+              <Input
+                value={ifsc}
+                onChange={(e) => setIfsc(e.target.value.replace(/\s/g, "").toUpperCase().slice(0, 11))}
+                placeholder="IFSC (e.g. HDFC0001234)"
+                aria-label="IFSC"
+                autoComplete="off"
+              />
+            </>
+          )}
+        </div>
+      )}
       <div className="flex flex-nowrap items-center gap-2.5">
         <Button variant="primary" onClick={submit} disabled={busy} className="shrink-0">
           {busy
@@ -934,10 +1124,14 @@ function GetHelpButton({ booking }: { booking: StoredBooking }) {
 
 function BookingCard({
   booking,
+  refund,
+  onRefundRequested,
   onView,
   onReview,
 }: {
   booking: StoredBooking;
+  refund?: CustomerRefund;
+  onRefundRequested: () => void;
   onView: () => void;
   onReview: () => void;
 }) {
@@ -1072,6 +1266,8 @@ function BookingCard({
         <EmiSchedule plan={booking.emiPlan} />
       )}
 
+      {refund && <RefundStatusNote refund={refund} />}
+
       {/* Actions */}
       <div className="mt-5 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar border-t border-cream-3 pt-4 md:flex-wrap md:overflow-visible">
         {(booking.status === "Pending" || booking.status === "Confirmed") && (
@@ -1084,8 +1280,6 @@ function BookingCard({
         {(booking.status === "Pending" || booking.status === "Confirmed") && (
           <CancelBookingButton booking={booking} />
         )}
-        {(booking.status === "Cancelled" || booking.status === "Completed") &&
-          booking.paid > 0 && <RequestRefundButton booking={booking} />}
         <GetHelpButton booking={booking} />
 
         {/* Status actions, right-aligned: review a completed order plus the
@@ -1118,6 +1312,15 @@ function BookingCard({
           <CompleteToggle booking={booking} />
         </div>
       </div>
+
+      {/* Refund request — its own row: the form needs full width on phones. */}
+      {(booking.status === "Cancelled" || booking.status === "Completed") &&
+        booking.paid > 0 &&
+        (!refund || refund.status === "Declined") && (
+          <div className="mt-3">
+            <RequestRefundButton booking={booking} onRequested={onRefundRequested} />
+          </div>
+        )}
     </Card>
   );
 }

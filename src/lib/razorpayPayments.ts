@@ -5,11 +5,11 @@
 // whichever arrives first wins and the other is a no-op.
 
 import { createStore } from "@/lib/store";
-import { sendPaymentAlert } from "@/lib/email";
+import { sendPaymentAlert, sendRefundFailedAlert } from "@/lib/email";
 import { refundRazorpayPayment } from "@/lib/razorpay";
 import { syncBookingWithLedger } from "@/lib/bookingPaymentSync";
 import type { StoredPayment } from "@/app/api/payments/route";
-import { store as refundStore, displayDate } from "@/lib/refunds";
+import { store as refundStore, type GatewayRefundLeg } from "@/lib/refunds";
 
 const store = createStore<StoredPayment>({
   table: "payments",
@@ -87,44 +87,76 @@ async function syncBooking(
   }
 }
 
-/** Execute a gateway refund for a booking's Razorpay advance and mark the
- *  ledger row Refunded. Returns null when the booking has no refundable
- *  gateway payment (the caller falls back to the manual refund rail); throws
- *  when Razorpay refuses the refund, so the caller must NOT mark anything
- *  processed on that path. */
+/** What's still refundable on a ledger row, in rupees. */
+const refundableOn = (p: StoredPayment) => Math.max(0, p.amount - (p.refundedAmount ?? 0));
+
+/** The booking's captured Razorpay payments with money left to refund,
+ *  largest first. A partly refunded row stays a candidate for the rest. */
+async function gatewayRefundCandidates(bookingId: string): Promise<StoredPayment[]> {
+  const payments = await store.list();
+  return payments
+    .filter(
+      (p) =>
+        p.bookingId === bookingId &&
+        p.method === "Razorpay" &&
+        p.razorpayPaymentId &&
+        (p.status === "Advance Received" ||
+          p.status === "Settled" ||
+          p.status === "Refunded") &&
+        refundableOn(p) > 0,
+    )
+    .sort((a, b) => refundableOn(b) - refundableOn(a));
+}
+
+/** Rupees of this booking that can go back through Razorpay — across every
+ *  captured payment, net of what was already refunded. The rest of a refund
+ *  has to be paid out by hand. */
+export async function gatewayRefundCoverage(bookingId: string): Promise<number> {
+  return (await gatewayRefundCandidates(bookingId)).reduce(
+    (sum, p) => sum + refundableOn(p),
+    0,
+  );
+}
+
+/** Execute Razorpay refunds for `amountRupees` of a booking, spread across
+ *  its captured payments (largest first), marking each ledger row Refunded.
+ *  Never throws: returns the refunds that went through plus Razorpay's error
+ *  if one was refused part-way, so the caller can record what moved and
+ *  report what didn't. The caller caps the amount at the coverage. */
 export async function refundBookingGatewayPayment(
   bookingId: string,
   amountRupees: number,
-): Promise<{ refundId: string; paymentRecordId: string } | null> {
-  const payments = await store.list();
-  const candidates = payments.filter(
-    (p) =>
-      p.bookingId === bookingId &&
-      p.method === "Razorpay" &&
-      p.razorpayPaymentId &&
-      (p.status === "Advance Received" || p.status === "Settled"),
-  );
-  if (!candidates.length) return null;
-
-  // Prefer a payment large enough to cover the whole refund; otherwise refund
-  // (partially) against the largest one — anything beyond it stays manual.
-  const target =
-    candidates.find((p) => p.amount >= amountRupees) ??
-    candidates.sort((a, b) => b.amount - a.amount)[0];
-  const amount = Math.min(Math.round(amountRupees), target.amount);
-
-  const refund = await refundRazorpayPayment(
-    target.razorpayPaymentId!,
-    amount * 100,
-  );
-
-  await store.upsert({
-    ...target,
-    status: "Refunded",
-    razorpayRefundId: refund.id,
-  });
-
-  return { refundId: refund.id, paymentRecordId: target.id };
+): Promise<{ legs: GatewayRefundLeg[]; error?: string }> {
+  const legs: GatewayRefundLeg[] = [];
+  let remaining = Math.round(amountRupees);
+  for (const row of await gatewayRefundCandidates(bookingId)) {
+    if (remaining <= 0) break;
+    const take = Math.min(remaining, refundableOn(row));
+    let refund;
+    try {
+      refund = await refundRazorpayPayment(row.razorpayPaymentId!, take * 100);
+    } catch (err) {
+      return {
+        legs,
+        error: err instanceof Error && err.message ? err.message : "unknown error",
+      };
+    }
+    await store.upsert({
+      ...row,
+      status: "Refunded",
+      ...(row.status !== "Refunded" ? { statusBeforeRefund: row.status } : {}),
+      razorpayRefundId: row.razorpayRefundId ?? refund.id,
+      refundedAmount: (row.refundedAmount ?? 0) + take,
+    });
+    legs.push({
+      id: refund.id,
+      paymentId: row.razorpayPaymentId!,
+      amount: take,
+      status: refund.status === "processed" ? "processed" : "pending",
+    });
+    remaining -= take;
+  }
+  return { legs };
 }
 
 /** Record a failed checkout attempt (payment.failed webhook) so it shows in
@@ -204,16 +236,74 @@ export async function applyRazorpayRefund(opts: {
     await store.upsert(next);
   }
 
-  // The refund request that executed this refund, if any, is now settled.
+  // The refund request that executed this refund: that leg has now landed.
+  await markRefundLeg(opts.refundId, "processed");
+
+  return { bookingId: row.bookingId };
+}
+
+/** Flip one gateway leg's status on the refund request that issued it.
+ *  Returns the updated request (or null when no request issued this refund,
+ *  e.g. one made straight from the Razorpay dashboard). */
+async function markRefundLeg(
+  refundId: string,
+  status: GatewayRefundLeg["status"],
+  failureReason?: string,
+) {
   const requests = await refundStore.list();
-  const request = requests.find((r) => r.gatewayRefundId === opts.refundId);
-  if (request && request.status !== "Processed" && request.status !== "Declined") {
-    await refundStore.upsert({
-      ...request,
-      status: "Processed",
-      processedAt: request.processedAt ?? displayDate(new Date()),
+  const request = requests.find(
+    (r) => r.gatewayRefunds?.some((l) => l.id === refundId) || r.gatewayRefundId === refundId,
+  );
+  if (!request) return null;
+  const legs = request.gatewayRefunds ?? [];
+  const leg = legs.find((l) => l.id === refundId);
+  if (leg?.status === status) return request;
+  const next = {
+    ...request,
+    gatewayRefunds: legs.map((l) => (l.id === refundId ? { ...l, status } : l)),
+  };
+  // A failed leg means the customer did NOT get that money: reopen the
+  // request so the team retries or pays it by hand.
+  if (status === "failed" && next.status === "Processed") {
+    next.status = "Approved";
+    next.processedAt = undefined;
+    next.gatewayFailure = `Razorpay refund ${refundId} failed${failureReason ? `: ${failureReason}` : ""}. Retry, or pay the customer by hand and record the UTR.`;
+  }
+  await refundStore.upsert(next);
+  return next;
+}
+
+/** A refund Razorpay could not complete (refund.failed webhook): give the
+ *  money back to the ledger row and reopen the refund request. Idempotent —
+ *  a redelivery finds the leg already failed. */
+export async function applyRazorpayRefundFailure(opts: {
+  refundId: string;
+  paymentId: string;
+  /** Paise of the failed refund. */
+  amountPaise: number;
+  reason?: string;
+}): Promise<{ bookingId: string } | null> {
+  const requests = await refundStore.list();
+  const alreadyFailed = requests.some((r) =>
+    r.gatewayRefunds?.some((l) => l.id === opts.refundId && l.status === "failed"),
+  );
+
+  const payments = await store.list();
+  const row = payments.find(
+    (p) => p.razorpayPaymentId === opts.paymentId && p.status !== "Failed",
+  );
+  if (row && !alreadyFailed) {
+    const refunded = Math.max(0, (row.refundedAmount ?? 0) - Math.round(opts.amountPaise / 100));
+    await store.upsert({
+      ...row,
+      status: refunded > 0 ? "Refunded" : row.statusBeforeRefund ?? "Advance Received",
+      refundedAmount: refunded > 0 ? refunded : undefined,
+      razorpayRefundId: row.razorpayRefundId === opts.refundId ? undefined : row.razorpayRefundId,
     });
   }
 
-  return { bookingId: row.bookingId };
+  const request = await markRefundLeg(opts.refundId, "failed", opts.reason);
+  if (request && !alreadyFailed) await sendRefundFailedAlert(request);
+  const bookingId = row?.bookingId ?? request?.bookingId;
+  return bookingId ? { bookingId } : null;
 }

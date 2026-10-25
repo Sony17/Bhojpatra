@@ -7,6 +7,7 @@
 // hiccup never breaks the write that just succeeded.
 
 import type { StoredOrder } from "@/app/api/bookings/route";
+import { maskAccountNumber } from "@/lib/payoutAccount";
 import type { StoredPayment } from "@/app/api/payments/route";
 import type { Lead } from "@/app/api/leads/route";
 import type { PartnerRecord } from "@/app/api/partners/route";
@@ -14,6 +15,7 @@ import type { VendorApplicationRecord } from "@/lib/vendorApplications";
 import type { VenueRecord } from "@/lib/venues";
 import type { EnquiryRecord } from "@/lib/enquiries";
 import type { SupportTicketRecord } from "@/lib/supportTickets";
+import type { StoredRefund } from "@/lib/refunds";
 
 export interface AlertField {
   label: string;
@@ -55,6 +57,7 @@ export const ALERT_ENABLED = {
   vendorApplication: true, // vendor KYC application
   partner: true, //           referral partner signup
   venue: true, //             venue listing
+  refund: true, //            refund requested by a customer
 } as const;
 
 /** Comma-separated recipients from ALERT_EMAIL_TO, defaulting to both owners. */
@@ -407,6 +410,112 @@ export async function sendPaymentAlert(payment: StoredPayment): Promise<void> {
         : []),
       ...(unverified ? [{ label: "Status", value: "Unverified" }] : []),
     ],
+  });
+}
+
+/** Where a refund's money goes, for the emails below. */
+function refundPayoutLine(refund: StoredRefund): string {
+  const original = "Back to the card / UPI / bank you paid with";
+  const p = refund.payoutTo;
+  const manual = p
+    ? p.upiId
+      ? `UPI ${p.upiId}`
+      : `${p.holderName} · A/c ${maskAccountNumber(p.accountNumber ?? "")}`
+    : refund.method === "Razorpay"
+      ? ""
+      : "To be confirmed with you";
+  if (!manual) return original;
+  // Split refunds: part goes back via Razorpay, the rest to the given account.
+  return refund.method === "Razorpay" || refund.gatewayRefunds?.length
+    ? `${original}, rest to ${manual}`
+    : manual;
+}
+
+/** Owner alert: a customer asked for a refund. */
+export async function sendRefundRequestAlert(refund: StoredRefund): Promise<void> {
+  if (!ALERT_ENABLED.refund) return;
+  const base = siteBaseUrl();
+  await sendAlert({
+    subject: `Refund requested — ${refund.bookingId}`,
+    heading: `Refund requested for ${refund.bookingId}`,
+    fields: [
+      { label: "Refund", value: refund.id },
+      { label: "Customer", value: refund.customer },
+      { label: "Amount", value: inr(refund.amount) },
+      { label: "Paid via", value: refund.method },
+      { label: "Send to", value: refundPayoutLine(refund) },
+      { label: "Reason", value: refund.reason },
+    ],
+    link: base ? { label: "Open Refunds", url: `${base}/admin/refunds` } : null,
+  });
+}
+
+/** Owner alert: Razorpay reported a refund failed and the request reopened. */
+export async function sendRefundFailedAlert(refund: StoredRefund): Promise<void> {
+  if (!ALERT_ENABLED.refund) return;
+  const base = siteBaseUrl();
+  await sendAlert({
+    subject: `Refund failed — ${refund.bookingId}`,
+    heading: `Razorpay couldn't complete refund ${refund.id}`,
+    intro: "The request is back to Approved. Retry it, or pay the customer by hand and record the UTR.",
+    fields: [
+      { label: "Booking", value: refund.bookingId },
+      { label: "Customer", value: refund.customer },
+      { label: "Amount", value: inr(refund.amount) },
+      { label: "Detail", value: refund.gatewayFailure ?? "—" },
+    ],
+    link: base ? { label: "Open Refunds", url: `${base}/admin/refunds` } : null,
+  });
+}
+
+/** Tell the customer where their refund stands. Sent when it's raised,
+ *  approved, paid out or declined. */
+export async function sendRefundUpdateToCustomer(
+  refund: StoredRefund,
+): Promise<boolean> {
+  const to = refund.email?.trim().toLowerCase();
+  if (!to) return false;
+  const base = siteBaseUrl();
+  const copy: Record<StoredRefund["status"], { heading: string; intro: string }> = {
+    Requested: {
+      heading: "We've received your refund request",
+      intro: "Our team will review it and update you here and on My Bookings.",
+    },
+    Approved: {
+      heading: "Your refund is approved",
+      intro: "We'll send the money shortly. You'll get another email once it's on its way.",
+    },
+    Processed: {
+      heading: "Your refund has been sent",
+      intro: refund.gatewayRefunds?.length
+        ? "Razorpay usually credits it back to your original payment method within 5–7 working days."
+        : "The money has been sent. Use the reference below if you need to check with your bank.",
+    },
+    Declined: {
+      heading: "Update on your refund request",
+      intro:
+        "We couldn't approve this refund. If you think this is a mistake, reply to this email or use Get help on My Bookings.",
+    },
+  };
+  const { heading, intro } = copy[refund.status];
+  const ref = [refund.gatewayRefunds?.map((l) => l.id).join(", "), refund.payoutRef && `UTR ${refund.payoutRef}`]
+    .filter(Boolean)
+    .join(" · ");
+  return sendAlert({
+    to,
+    subject: `${heading} — ${refund.bookingId}`,
+    heading,
+    intro,
+    fields: [
+      { label: "Booking", value: refund.bookingId },
+      { label: "Refund", value: refund.id },
+      { label: "Amount", value: inr(refund.amount) },
+      ...(refund.status === "Declined"
+        ? []
+        : [{ label: "Sent to", value: refundPayoutLine(refund) }]),
+      ...(refund.status === "Processed" && ref ? [{ label: "Reference", value: ref }] : []),
+    ],
+    link: base ? { label: "View my bookings", url: `${base}/bookings` } : null,
   });
 }
 

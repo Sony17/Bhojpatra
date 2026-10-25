@@ -64,6 +64,9 @@ export interface StoredPayment {
   // Rupees refunded so far, from Razorpay's cumulative `amount_refunded`
   // (set by the refund.processed webhook; less than `amount` for a partial).
   refundedAmount?: number;
+  // The status before a gateway refund flipped it to Refunded — restored if
+  // Razorpay later reports that refund failed (refund.failed webhook).
+  statusBeforeRefund?: StoredPaymentStatus;
   // Gateway's reason for a "Failed" attempt (payment.failed webhook).
   failureReason?: string;
   status: StoredPaymentStatus;

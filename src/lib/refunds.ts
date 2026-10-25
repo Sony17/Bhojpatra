@@ -11,7 +11,22 @@
  * way the booking console does.
  */
 import { createStore } from "@/lib/store";
-import type { AdminRefund, PaymentMethod, RefundStatus } from "@/lib/admin/types";
+import type {
+  AdminRefund,
+  CustomerRefund,
+  PaymentMethod,
+  RefundPayoutTo,
+  RefundStatus,
+} from "@/lib/admin/types";
+import {
+  ACCOUNT_NUMBER_RE,
+  IFSC_RE,
+  maskAccountNumber,
+  UPI_RE,
+  normalizeAccountNumber,
+  normalizeIfsc,
+  normalizeUpi,
+} from "@/lib/payoutAccount";
 
 /** Payment rails a refund can be returned over — mirrors the admin `PaymentMethod`. */
 export type RefundMethod = PaymentMethod;
@@ -44,9 +59,59 @@ export interface StoredRefund {
   adminNote?: string;
   /** Who opened it — absent on older rows, which were all customer-raised. */
   raisedBy?: "customer" | "admin";
-  /** Razorpay refund id (`rfnd_…`) when Processing executed a real gateway
-   *  refund; absent for refunds settled manually outside the gateway. */
+  /** Razorpay refund id (`rfnd_…`) of the first gateway refund — kept for
+   *  older rows; {@link gatewayRefunds} is the full list. */
   gatewayRefundId?: string;
+  /** Every Razorpay refund this request issued (one per captured payment it
+   *  was spread across), with Razorpay's latest status for each. */
+  gatewayRefunds?: GatewayRefundLeg[];
+  /** Rupees paid out by hand (recorded with {@link payoutRef}) — the part
+   *  Razorpay couldn't send back, or all of it for UPI / QR bookings. */
+  manualAmount?: number;
+  /** Set when Razorpay reported a refund failed and the request reopened. */
+  gatewayFailure?: string;
+  /** Where a manual (non-Razorpay) refund should be sent — given by the
+   *  customer when they raise it. Razorpay refunds need none: the money goes
+   *  back to the instrument the customer paid with. */
+  payoutTo?: RefundPayoutTo;
+  /** UTR / transaction reference of the manual payout, entered by the admin
+   *  when marking a non-gateway refund Processed. */
+  payoutRef?: string;
+}
+
+/** One Razorpay refund issued for a request. `pending` until Razorpay's
+ *  refund.processed webhook confirms the money left. */
+export interface GatewayRefundLeg {
+  id: string;
+  paymentId: string;
+  /** Rupees. */
+  amount: number;
+  status: "pending" | "processed" | "failed";
+}
+
+/** Rupees already sent back via Razorpay (pending or landed) on a request. */
+export function gatewayRefunded(r: Pick<StoredRefund, "gatewayRefunds">): number {
+  return (r.gatewayRefunds ?? [])
+    .filter((l) => l.status !== "failed")
+    .reduce((sum, l) => sum + l.amount, 0);
+}
+
+/** A processed refund whose Razorpay money hasn't landed yet. */
+export function isGatewayPending(r: Pick<StoredRefund, "status" | "gatewayRefunds">): boolean {
+  return r.status === "Processed" && !!r.gatewayRefunds?.some((l) => l.status === "pending");
+}
+
+/** Next free `RFD-<year>NNNN` id. Derived from the highest existing number,
+ *  not the row count, so a deleted row can never make two refunds share an
+ *  id (the upsert would silently overwrite the older one). */
+export function nextRefundId(existing: { id: string }[], now: Date): string {
+  const prefix = `RFD-${now.getFullYear()}`;
+  const max = existing.reduce((m, r) => {
+    if (!r.id.startsWith(prefix)) return m;
+    const n = Number(r.id.slice(prefix.length));
+    return Number.isFinite(n) ? Math.max(m, n) : m;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(4, "0")}`;
 }
 
 export const store = createStore<StoredRefund>({
@@ -94,6 +159,47 @@ export function displayDate(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+const str = (v: unknown, max: number) =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
+
+/** Parse + validate where a manual refund should be paid. Returns the payout
+ *  destination, `null` when nothing was given, or an error message. */
+export function parseRefundPayout(
+  v: unknown,
+): RefundPayoutTo | null | { error: string } {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const raw = v as Record<string, unknown>;
+  const upi = normalizeUpi(str(raw.upiId, 120));
+  if (upi) {
+    return UPI_RE.test(upi)
+      ? { upiId: upi }
+      : { error: "That UPI ID doesn't look right (e.g. name@okhdfcbank)." };
+  }
+  const accountNumber = normalizeAccountNumber(str(raw.accountNumber, 30));
+  const ifsc = normalizeIfsc(str(raw.ifsc, 20));
+  const holderName = str(raw.holderName, 100);
+  if (!accountNumber && !ifsc && !holderName) return null;
+  if (!holderName) return { error: "Add the account holder's name." };
+  if (!ACCOUNT_NUMBER_RE.test(accountNumber)) {
+    return { error: "Account number must be 9–18 digits." };
+  }
+  if (!IFSC_RE.test(ifsc)) return { error: "Invalid IFSC (e.g. HDFC0001234)." };
+  return { holderName, accountNumber, ifsc };
+}
+
+/** UTR / reference for a manual payout: 6–40 letters, digits or dashes. */
+export function parsePayoutRef(v: unknown): string {
+  const ref = str(v, 40).replace(/\s/g, "");
+  return /^[A-Za-z0-9-]{6,40}$/.test(ref) ? ref : "";
+}
+
+/** One-line description of a payout destination, e.g. for emails. */
+export function describePayout(p: RefundPayoutTo): string {
+  return p.upiId
+    ? `UPI ${p.upiId}`
+    : `A/c ${maskAccountNumber(p.accountNumber ?? "")} · ${p.ifsc} (${p.holderName})`;
+}
+
 /** Map a persisted refund onto the admin display shape. */
 export function toAdminRefund(r: StoredRefund): AdminRefund {
   return {
@@ -106,5 +212,34 @@ export function toAdminRefund(r: StoredRefund): AdminRefund {
     status: r.status,
     requestedAt: r.requestedAt,
     ...(r.processedAt ? { processedAt: r.processedAt } : {}),
+    ...(r.gatewayRefundId ? { gatewayRefundId: r.gatewayRefundId } : {}),
+    ...(r.gatewayRefunds?.length ? { gatewayRefunds: r.gatewayRefunds } : {}),
+    ...(isGatewayPending(r) ? { gatewayPending: true } : {}),
+    ...(r.gatewayFailure ? { gatewayFailure: r.gatewayFailure } : {}),
+    ...(r.payoutTo ? { payoutTo: r.payoutTo } : {}),
+    ...(r.payoutRef ? { payoutRef: r.payoutRef } : {}),
+    ...(r.manualAmount ? { manualAmount: r.manualAmount } : {}),
+    ...(r.adminNote ? { adminNote: r.adminNote } : {}),
+  };
+}
+
+/** The customer's own view of a refund — status and where the money went,
+ *  never the admin's internal note. */
+export function toCustomerRefund(r: StoredRefund): CustomerRefund {
+  return {
+    id: r.id,
+    bookingId: r.bookingId,
+    amount: r.amount,
+    method: r.method,
+    status: r.status,
+    requestedAt: r.requestedAt,
+    createdAt: r.createdAt,
+    ...(r.processedAt ? { processedAt: r.processedAt } : {}),
+    ...(r.gatewayRefundId ? { gatewayRefundId: r.gatewayRefundId } : {}),
+    ...(gatewayRefunded(r) ? { gatewayAmount: gatewayRefunded(r) } : {}),
+    ...(isGatewayPending(r) ? { gatewayPending: true } : {}),
+    ...(r.payoutRef ? { payoutRef: r.payoutRef } : {}),
+    ...(r.manualAmount ? { manualAmount: r.manualAmount } : {}),
+    ...(r.payoutTo ? { payoutTo: describePayout(r.payoutTo) } : {}),
   };
 }

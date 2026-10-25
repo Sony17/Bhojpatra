@@ -6,9 +6,14 @@ import {
   toAdminRefund,
   displayDate,
   isOpenRefund,
+  nextRefundId,
+  parseRefundPayout,
+  toCustomerRefund,
   type RefundMethod,
   type StoredRefund,
 } from "@/lib/refunds";
+import { gatewayRefundCoverage } from "@/lib/razorpayPayments";
+import { sendRefundRequestAlert, sendRefundUpdateToCustomer } from "@/lib/email";
 import type { StoredOrder } from "@/app/api/bookings/route";
 
 // Refund requests are written at request time to Postgres (Neon) so the admin
@@ -19,19 +24,28 @@ export const dynamic = "force-dynamic";
 // claim and derive the customer/method/paid amount server-side.
 const bookings = createStore<StoredOrder>({ table: "bookings", idField: "id" });
 
-/** Map a booking's original payment method onto a refund rail. A "Connect"
- *  (COD) booking has no online rail, so its refund defaults to UPI. */
-function refundMethodFor(order: StoredOrder): RefundMethod {
+/** The rail a refund goes back over. Razorpay only when a captured gateway
+ *  payment is there to refund; otherwise the booking's manual rail (a
+ *  "Connect" / COD booking has none, so it defaults to UPI). */
+function refundMethodFor(order: StoredOrder, viaGateway: boolean): RefundMethod {
+  if (viaGateway) return "Razorpay";
   return order.paymentMethod === "QR" ? "QR" : "UPI";
 }
 
-// GET /api/refunds → admin list of refund requests, newest first.
+// GET /api/refunds → admin: every refund request, newest first.
 // Backward-compatible `{ refunds }`; adds a `Paginated` envelope when filtered.
+// A signed-in customer gets only their own refunds (customer view), so
+// My Bookings can show where each one stands.
 export async function GET(request: Request) {
-  const guard = await requireRole("admin");
+  const guard = await requireRole();
   if (guard instanceof Response) return guard;
 
   const records = (await store.list()).slice().reverse();
+  if (guard.role !== "admin") {
+    return Response.json({
+      refunds: records.filter((r) => r.userId === guard.id).map(toCustomerRefund),
+    });
+  }
   const refunds = records.map(toAdminRefund);
 
   const { q, status, page, pageSize, hasQuery } = parseListQuery(request.url);
@@ -117,15 +131,37 @@ export async function POST(request: Request) {
     );
   }
 
-  // Amount is capped at what was actually paid; defaults to the full paid sum.
+  // A refund Razorpay can't send back needs somewhere to go. The customer
+  // says where up front; an admin raising one can leave it for later (they
+  // record the UTR of whatever payout they make when processing it).
   const wanted = Number(body.amount);
   const amount =
     Number.isFinite(wanted) && wanted > 0 ? Math.min(Math.round(wanted), paid) : paid;
+  // Fully refundable via Razorpay → no destination needed. Otherwise (UPI /
+  // QR booking, or a booking paid partly outside Razorpay) some money has to
+  // be sent by hand, so we need somewhere to send it.
+  const coverage = await gatewayRefundCoverage(bookingId);
+  const viaGateway = coverage >= amount;
+  const payout = parseRefundPayout(body.payoutTo);
+  if (payout && "error" in payout) {
+    return Response.json({ error: payout.error, needsPayout: true }, { status: 400 });
+  }
+  if (!viaGateway && !payout && !isAdmin) {
+    return Response.json(
+      {
+        error:
+          coverage > 0
+            ? `Only ₹${coverage.toLocaleString("en-IN")} of this can go back to your original payment. Tell us the UPI ID or bank account for the rest.`
+            : "This booking wasn't paid online through Razorpay, so tell us the UPI ID or bank account to send your refund to.",
+        needsPayout: true,
+      },
+      { status: 400 },
+    );
+  }
 
   const now = new Date();
-  const seq = existing.length + 1;
   const record: StoredRefund = {
-    id: `RFD-${now.getFullYear()}${String(seq).padStart(4, "0")}`,
+    id: nextRefundId(existing, now),
     bookingId,
     // The booking's owner, even when an admin raises it on their behalf — so
     // the customer still sees the refund in My Bookings.
@@ -139,7 +175,8 @@ export async function POST(request: Request) {
     ...(order.phone ? { phone: order.phone } : {}),
     amount,
     reason,
-    method: refundMethodFor(order),
+    method: refundMethodFor(order, coverage > 0),
+    ...(payout && !viaGateway ? { payoutTo: payout } : {}),
     // An admin raising a refund has already decided on it — it starts
     // Approved, one "Process" click away from the gateway refund.
     status: isAdmin ? "Approved" : "Requested",
@@ -158,5 +195,14 @@ export async function POST(request: Request) {
     );
   }
 
-  return Response.json({ ok: true, refund: toAdminRefund(record) }, { status: 201 });
+  // Best-effort — never fails the request that already saved.
+  await Promise.allSettled([
+    sendRefundUpdateToCustomer(record),
+    ...(isAdmin ? [] : [sendRefundRequestAlert(record)]),
+  ]);
+
+  return Response.json(
+    { ok: true, refund: isAdmin ? toAdminRefund(record) : toCustomerRefund(record) },
+    { status: 201 },
+  );
 }

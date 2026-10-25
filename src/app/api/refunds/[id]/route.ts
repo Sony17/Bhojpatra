@@ -5,8 +5,14 @@ import {
   displayDate,
   isRefundStatus,
   canTransition,
+  parsePayoutRef,
+  gatewayRefunded,
 } from "@/lib/refunds";
-import { refundBookingGatewayPayment } from "@/lib/razorpayPayments";
+import {
+  gatewayRefundCoverage,
+  refundBookingGatewayPayment,
+} from "@/lib/razorpayPayments";
+import { sendRefundUpdateToCustomer } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +31,13 @@ export async function GET(
   return Response.json({ refund: toAdminRefund(refund) });
 }
 
-// PATCH /api/refunds/[id] → { status, adminNote? } — admin advances a refund
-// through its lifecycle (Requested → Approved → Processed, or Declined). Only
-// valid transitions are accepted; reaching a terminal state stamps `processedAt`.
+// PATCH /api/refunds/[id] → { status, adminNote?, payoutRef? } — admin advances
+// a refund through its lifecycle (Requested → Approved → Processed, or
+// Declined). Only valid transitions are accepted; reaching a terminal state
+// stamps `processedAt`. Processing a refund Razorpay can't pay out requires
+// `payoutRef` — the UTR of the manual transfer — so "Processed" always means
+// money actually moved. `skipGateway: true` records a by-hand payout of the
+// whole remainder instead of trying Razorpay.
 export async function PATCH(
   request: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -60,27 +70,66 @@ export async function PATCH(
         { status: 409 },
       );
     }
-    // Processing a refund on a gateway-paid booking moves REAL money: the
-    // Razorpay refund runs first, and only its success lets the status flip.
-    // Bookings paid by other rails (or nothing) keep the manual flow — the
-    // status records that the team settled it outside the gateway.
-    if (body.status === "Processed" && !next.gatewayRefundId) {
-      try {
-        const executed = await refundBookingGatewayPayment(
-          refund.bookingId,
-          refund.amount,
+    // Processing moves REAL money. Whatever the booking's captured Razorpay
+    // payments can cover goes back through Razorpay (spread across them); any
+    // rest — or all of it for UPI / QR bookings — the team pays by hand and
+    // records the UTR. `skipGateway` (with a UTR) records that the team paid
+    // the whole remainder by hand, e.g. after Razorpay refused.
+    if (body.status === "Processed" && refund.status !== "Processed") {
+      if (body.payoutRef !== undefined && !parsePayoutRef(body.payoutRef)) {
+        return Response.json(
+          { error: "Enter a valid UTR / transaction reference (6–40 letters or digits).", needsPayoutRef: true },
+          { status: 400 },
         );
-        if (executed) next.gatewayRefundId = executed.refundId;
-      } catch (err) {
-        console.error("Razorpay refund failed", err);
+      }
+      const payoutRef = parsePayoutRef(body.payoutRef);
+      const owed = Math.max(0, refund.amount - gatewayRefunded(refund) - (refund.manualAmount ?? 0));
+      const coverage = body.skipGateway === true ? 0 : await gatewayRefundCoverage(refund.bookingId);
+      const viaGateway = Math.min(owed, coverage);
+      const byHand = owed - viaGateway;
+
+      if (byHand > 0 && !payoutRef) {
         return Response.json(
           {
             error:
-              "Razorpay rejected the refund — nothing was changed. Check the payment on the Razorpay dashboard and try again.",
+              viaGateway > 0
+                ? `₹${viaGateway.toLocaleString("en-IN")} can go back through Razorpay, but ₹${byHand.toLocaleString("en-IN")} was paid outside it. Pay that part to the customer, enter the UTR, then process again.`
+                : `No Razorpay payment covers this refund, so no money moves automatically. Pay the customer ₹${byHand.toLocaleString("en-IN")}, then enter the UTR / transaction reference to mark it processed.`,
+            needsPayoutRef: true,
           },
-          { status: 502 },
+          { status: 400 },
         );
       }
+
+      if (viaGateway > 0) {
+        const { legs, error } = await refundBookingGatewayPayment(refund.bookingId, viaGateway);
+        if (legs.length) {
+          next.gatewayRefunds = [...(next.gatewayRefunds ?? []), ...legs];
+          next.gatewayRefundId ??= legs[0].id;
+        }
+        if (error) {
+          // Keep any refunds that did go through, so a retry only sends the rest.
+          const sent = legs.reduce((sum, l) => sum + l.amount, 0);
+          if (legs.length) await store.upsert(next).catch(() => undefined);
+          console.error("Razorpay refund failed", error);
+          return Response.json(
+            {
+              error:
+                (sent > 0 ? `₹${sent.toLocaleString("en-IN")} went back through Razorpay, but the rest was refused: ` : "Razorpay rejected the refund: ") +
+                `"${error}". The refund is still Approved. Retry, or pay the customer by hand, tick "Paid by hand" and enter the UTR.`,
+              gatewayError: error,
+              needsPayoutRef: true,
+              ...(legs.length ? { refund: toAdminRefund(next) } : {}),
+            },
+            { status: 502 },
+          );
+        }
+      }
+      if (byHand > 0) {
+        next.payoutRef = payoutRef;
+        next.manualAmount = (next.manualAmount ?? 0) + byHand;
+      }
+      next.gatewayFailure = undefined;
     }
 
     next.status = body.status;
@@ -104,6 +153,13 @@ export async function PATCH(
     return Response.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 },
+    );
+  }
+
+  // Tell the customer when the status moved (best-effort, never blocks).
+  if (next.status !== refund.status) {
+    await sendRefundUpdateToCustomer(next).catch((err) =>
+      console.error("Refund update email failed", err),
     );
   }
 

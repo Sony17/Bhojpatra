@@ -49,6 +49,9 @@ export interface StoredBooking extends Booking {
   phone?: string;
   /** Set while the order is only an open checkout (nothing paid yet). */
   awaitingPayment?: boolean;
+  /** How the order was paid — decides whether a refund can go back through
+   *  Razorpay or needs the customer's UPI ID / bank account. */
+  paymentMethod?: "Razorpay" | "UPI" | "QR" | "Connect";
 }
 
 /** A vendor chosen for an order — the catalogue id (empty for legacy orders that

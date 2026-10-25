@@ -92,10 +92,11 @@ export async function PATCH(
       next.razorpayRefundId = refund.id;
     } catch (err) {
       console.error("Razorpay refund failed", err);
+      const reason = err instanceof Error && err.message ? err.message : "unknown error";
       return Response.json(
         {
-          error:
-            "Razorpay rejected the refund — nothing was changed. Check the payment on the Razorpay dashboard and try again.",
+          error: `Razorpay rejected the refund: "${reason}". Nothing was changed — check the payment on the Razorpay dashboard.`,
+          gatewayError: reason,
         },
         { status: 502 },
       );

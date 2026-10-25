@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { fetchRazorpayOrder, verifyWebhookSignature } from "@/lib/razorpay";
 import {
   applyRazorpayRefund,
+  applyRazorpayRefundFailure,
   recordFailedRazorpayPayment,
   recordRazorpayPayment,
 } from "@/lib/razorpayPayments";
@@ -20,8 +21,10 @@ export const dynamic = "force-dynamic";
 //   payment.captured / order.paid → record the advance (if the customer's tab
 //                                   died before /verify landed)
 //   payment.failed                → record a "Failed" attempt for the admin
-//   refund.processed              → mark the ledger row Refunded and settle
-//                                   the matching refund request
+//   refund.processed              → mark the ledger row Refunded and the
+//                                   refund request's Razorpay leg landed
+//   refund.failed                 → give the money back to the ledger row
+//                                   and reopen the refund request
 //
 // Anything else is acknowledged so Razorpay stops retrying. Idempotent twice
 // over: each event id is remembered in payment_events (a redelivery returns
@@ -29,7 +32,7 @@ export const dynamic = "force-dynamic";
 //
 // Auth is the webhook signature, not a session: the raw body is HMAC'd with
 // RAZORPAY_WEBHOOK_SECRET (set both on the dashboard webhook and in the env).
-// All four events must be ticked on the dashboard webhook to arrive here.
+// All five events must be ticked on the dashboard webhook to arrive here.
 
 interface PaymentEntity {
   id?: string;
@@ -47,6 +50,7 @@ interface RefundEntity {
   payment_id?: string;
   amount?: number;
   status?: string;
+  error_description?: string;
 }
 
 interface WebhookEvent {
@@ -197,6 +201,21 @@ export async function POST(request: Request) {
           return Response.json({ ok: true, skipped: "no-ledger-row" });
         }
         await log("refund-applied", applied.bookingId);
+        return Response.json({ ok: true });
+      }
+
+      case "refund.failed": {
+        if (!refund?.id || !refund.payment_id) {
+          await log("skipped:no-refund-entity");
+          return Response.json({ ok: true, skipped: "no-refund-entity" });
+        }
+        const failed = await applyRazorpayRefundFailure({
+          refundId: refund.id,
+          paymentId: refund.payment_id,
+          amountPaise: Number.isFinite(refund.amount) ? (refund.amount as number) : 0,
+          reason: refund.error_description,
+        });
+        await log(failed ? "refund-failed" : "skipped:no-ledger-row", failed?.bookingId);
         return Response.json({ ok: true });
       }
 

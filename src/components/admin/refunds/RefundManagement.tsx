@@ -21,7 +21,7 @@ import { Field, inputClass } from "@/components/admin/shared/FormControls";
 import { money } from "@/components/admin/shared/money";
 import { Refund, Wallet, ShieldCheck } from "@/components/admin/shared/icons";
 import { Button } from "@/components/ui";
-import { adminRefunds, queryRefunds } from "@/lib/admin/mockData";
+import { queryRefunds } from "@/lib/admin/mockData";
 import type { AdminRefund, RefundStatus } from "@/lib/admin/types";
 
 const PAGE_SIZE = 8;
@@ -35,35 +35,35 @@ const STATUS_OPTIONS = [
 ];
 
 export default function RefundManagement() {
-  const [rows, setRows] = useState<AdminRefund[]>(adminRefunds);
-  // Ids of rows persisted in the DB (fetched live) — only these get PATCHed;
-  // the demo seed rows are updated locally so the console still works with no DB.
-  const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
+  // Only real, persisted refund requests — no demo rows, so the totals are
+  // true money figures.
+  const [rows, setRows] = useState<AdminRefund[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [raiseOpen, setRaiseOpen] = useState(false);
+  // Detail-modal state for processing: the server's error (shown in place, not
+  // a toast) and the UTR of a manual payout.
+  const [actionError, setActionError] = useState("");
+  const [utr, setUtr] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [byHand, setByHand] = useState(false);
 
-  // Pull the real, persisted refund requests and surface them ahead of the demo
-  // seed so genuine customer requests show up first. Same live-merge pattern the
-  // booking console uses.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/refunds", { cache: "no-store" });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(String(res.status));
         const { refunds } = (await res.json()) as { refunds?: AdminRefund[] };
-        if (cancelled || !Array.isArray(refunds) || refunds.length === 0) return;
-        setLiveIds(new Set(refunds.map((r) => r.id)));
-        setRows((prev) => {
-          const ids = new Set(refunds.map((r) => r.id));
-          return [...refunds, ...prev.filter((r) => !ids.has(r.id))];
-        });
+        if (cancelled) return;
+        setRows(Array.isArray(refunds) ? refunds : []);
+        setLoadState("ready");
       } catch {
-        // Network/parse failure — keep the seed rows.
+        if (!cancelled) setLoadState("error");
       }
     })();
     return () => {
@@ -78,7 +78,7 @@ export default function RefundManagement() {
 
   const stats = useMemo(() => {
     const open = rows.filter((r) => r.status === "Requested" || r.status === "Approved");
-    const processed = rows.filter((r) => r.status === "Processed");
+    const processed = rows.filter((r) => r.status === "Processed" && !r.gatewayPending);
     return {
       open: open.length,
       pendingValue: open.reduce((s, r) => s + r.amount, 0),
@@ -92,6 +92,55 @@ export default function RefundManagement() {
   );
 
   const selected = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null;
+
+  const openRefund = (id: string | null) => {
+    setSelectedId(id);
+    setActionError("");
+    setUtr("");
+    setByHand(false);
+  };
+
+  // Paying a refund out moves real money, so it is never optimistic: wait for
+  // the server and show exactly what it said if it refuses.
+  const processRefund = async (r: AdminRefund) => {
+    setProcessing(true);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/refunds/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Processed",
+          ...(utr.trim() ? { payoutRef: utr.trim() } : {}),
+          ...(byHand ? { skipGateway: true } : {}),
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { refund?: AdminRefund; error?: string }
+        | null;
+      // A partial gateway success comes back with the updated row too.
+      if (data?.refund) {
+        const updated = data.refund;
+        setRows((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+      }
+      if (!res.ok || !data?.refund) {
+        setActionError(data?.error ?? `Couldn't process the refund (error ${res.status}).`);
+        return;
+      }
+      const refund = data.refund;
+      setUtr("");
+      setByHand(false);
+      setToast(
+        refund.gatewayRefunds?.length
+          ? `Refund ${refund.id} sent through Razorpay${refund.payoutRef ? ` + UTR ${refund.payoutRef}` : ""}.`
+          : `Refund ${refund.id} marked paid — UTR ${refund.payoutRef}.`,
+      );
+    } catch {
+      setActionError("Couldn't reach the server. Nothing was changed — please try again.");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // Optimistic status change. Live (persisted) rows are PATCHed and rolled back
   // if the server rejects the transition; demo seed rows update locally only.
@@ -111,23 +160,29 @@ export default function RefundManagement() {
       ),
     );
 
-    if (!liveIds.has(id)) return;
-
     fetch(`/api/refunds/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("request failed"))))
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as
+          | { refund?: AdminRefund; error?: string }
+          | null;
+        if (!res.ok) throw new Error(data?.error ?? `error ${res.status}`);
+        return data ?? {};
+      })
       .then((data: { refund?: AdminRefund }) => {
         // Adopt the server's canonical row (it stamps the real processedAt).
         if (data?.refund) {
           setRows((prev) => prev.map((r) => (r.id === id ? data.refund! : r)));
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         setRows(snapshot);
-        setToast("Couldn't save the refund. Please try again.");
+        setToast(
+          `Couldn't save the refund: ${err instanceof Error ? err.message : "please try again"}`,
+        );
       });
   };
 
@@ -157,7 +212,7 @@ export default function RefundManagement() {
       className: "text-right",
       headerClassName: "text-right",
     },
-    { key: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+    { key: "status", header: "Status", cell: (r) => <RefundBadge refund={r} /> },
     {
       key: "actions",
       header: "Actions",
@@ -171,7 +226,7 @@ export default function RefundManagement() {
             </Button>
           )}
           {r.status === "Approved" && (
-            <Button size="sm" variant="primary" onClick={stop(() => setRefundStatus(r.id, "Processed"))}>
+            <Button size="sm" variant="primary" onClick={stop(() => openRefund(r.id))}>
               Process
             </Button>
           )}
@@ -181,7 +236,9 @@ export default function RefundManagement() {
             </Button>
           )}
           {(r.status === "Processed" || r.status === "Declined") && (
-            <span className="text-xs text-ink-soft">{r.status}</span>
+            <span className="text-xs text-ink-soft">
+              {r.gatewayPending ? "Awaiting Razorpay" : r.status}
+            </span>
           )}
         </div>
       ),
@@ -223,9 +280,19 @@ export default function RefundManagement() {
         columns={columns}
         rows={result.data}
         getRowKey={(r) => r.id}
-        onRowClick={(r) => setSelectedId(r.id)}
+        onRowClick={(r) => openRefund(r.id)}
         minWidthClass="min-w-[900px]"
-        empty={<EmptyState title="No refunds found" message="Try a different search term or filters." />}
+        empty={
+          loadState === "loading" ? (
+            <EmptyState title="Loading refunds…" message="Fetching refund requests." />
+          ) : loadState === "error" ? (
+            <EmptyState title="Couldn't load refunds" message="Refresh the page to try again." />
+          ) : rows.length === 0 ? (
+            <EmptyState title="No refund requests yet" message="Requests customers raise from My Bookings, or that you raise here, show up in this list." />
+          ) : (
+            <EmptyState title="No refunds found" message="Try a different search term or filters." />
+          )
+        }
       />
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} onPageChange={setPage} />
@@ -245,16 +312,15 @@ export default function RefundManagement() {
         onClose={() => setRaiseOpen(false)}
         onCreated={(refund) => {
           setRows((prev) => [refund, ...prev.filter((r) => r.id !== refund.id)]);
-          setLiveIds((prev) => new Set(prev).add(refund.id));
           setRaiseOpen(false);
-          setSelectedId(refund.id);
+          openRefund(refund.id);
           setToast(`Refund ${refund.id} raised and approved. Click Process Refund to pay it out.`);
         }}
       />
 
       <Modal
         open={!!selected}
-        onClose={() => setSelectedId(null)}
+        onClose={() => openRefund(null)}
         title={selected ? `Refund ${selected.id}` : "Refund"}
         size="lg"
         footer={
@@ -266,12 +332,17 @@ export default function RefundManagement() {
                 </Button>
               )}
               {selected.status === "Approved" && (
-                <Button variant="primary" onClick={() => setRefundStatus(selected.id, "Processed")}>
-                  Process Refund
+                <Button
+                  variant="primary"
+                  onClick={() => processRefund(selected)}
+                  loading={processing}
+                  disabled={processing || ((byHand || selected.method !== "Razorpay") && !utr.trim())}
+                >
+                  {byHand || selected.method !== "Razorpay" ? "Mark Paid" : "Process Refund"}
                 </Button>
               )}
               {(selected.status === "Requested" || selected.status === "Approved") && (
-                <Button variant="secondary" onClick={() => setRefundStatus(selected.id, "Declined")}>
+                <Button variant="secondary" disabled={processing} onClick={() => setRefundStatus(selected.id, "Declined")}>
                   Decline
                 </Button>
               )}
@@ -282,7 +353,7 @@ export default function RefundManagement() {
         {selected && (
           <div className="space-y-5">
             <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
-              <StatusBadge status={selected.status} />
+              <RefundBadge refund={selected} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
 
@@ -295,11 +366,81 @@ export default function RefundManagement() {
               {selected.processedAt && (
                 <Field label="Processed"><p className="text-sm text-ink">{selected.processedAt}</p></Field>
               )}
+              {selected.gatewayRefunds?.length ? (
+                <Field label="Via Razorpay">
+                  <ul className="space-y-0.5 text-sm text-ink">
+                    {selected.gatewayRefunds.map((l) => (
+                      <li key={l.id}>
+                        {money(l.amount)} · {l.id} ·{" "}
+                        {l.status === "processed" ? "landed" : l.status === "failed" ? "failed" : "in progress"}
+                      </li>
+                    ))}
+                  </ul>
+                </Field>
+              ) : selected.gatewayRefundId ? (
+                <Field label="Razorpay refund ID"><p className="text-sm text-ink">{selected.gatewayRefundId}</p></Field>
+              ) : null}
+              {selected.payoutRef && (
+                <Field label="Paid by hand">
+                  <p className="text-sm text-ink">
+                    {selected.manualAmount ? `${money(selected.manualAmount)} · ` : ""}UTR {selected.payoutRef}
+                  </p>
+                </Field>
+              )}
             </dl>
 
             <Field label="Reason">
               <p className="rounded-card bg-cream-2 p-3 text-sm text-ink">{selected.reason}</p>
             </Field>
+
+            {selected.method !== "Razorpay" || selected.payoutTo ? (
+              <Field label="Pay the refund to">
+                <PayoutTo payout={selected.payoutTo} />
+              </Field>
+            ) : null}
+
+            {selected.gatewayFailure && selected.status === "Approved" && (
+              <p role="alert" className="rounded-card bg-cream-2 p-3 text-sm font-medium text-maroon">
+                {selected.gatewayFailure}
+              </p>
+            )}
+
+            {selected.status === "Approved" && (
+              <div className="space-y-3 rounded-card border border-cream-3 p-4">
+                <p className="text-sm text-ink">
+                  {selected.method === "Razorpay" && !byHand
+                    ? "Process Refund sends the money back through Razorpay to whatever the customer paid with (5–7 working days). If part of the booking was paid outside Razorpay, pay that part by hand and enter its UTR here first."
+                    : "This refund isn't paid automatically. Send the money to the customer, then enter the UTR / transaction reference to mark it paid."}
+                </p>
+                {selected.method === "Razorpay" && (
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={byHand}
+                      onChange={(e) => setByHand(e.target.checked)}
+                      className="accent-maroon"
+                    />
+                    Paid by hand — don&apos;t refund through Razorpay
+                  </label>
+                )}
+                <Field label="UTR / transaction reference" htmlFor="refund-utr">
+                  <input
+                    id="refund-utr"
+                    className={inputClass}
+                    value={utr}
+                    onChange={(e) => setUtr(e.target.value.replace(/[^A-Za-z0-9-]/g, "").slice(0, 40))}
+                    placeholder="e.g. 412345678901"
+                    autoComplete="off"
+                  />
+                </Field>
+              </div>
+            )}
+
+            {actionError && (
+              <p role="alert" className="rounded-card bg-cream-2 p-3 text-sm font-medium text-maroon">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
       </Modal>
@@ -442,5 +583,30 @@ function RaiseRefundModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Status pill — a processed refund Razorpay hasn't confirmed shows as
+ *  "Initiated" until the refund.processed webhook lands. */
+function RefundBadge({ refund }: { refund: AdminRefund }) {
+  return <StatusBadge status={refund.gatewayPending ? "Initiated" : refund.status} />;
+}
+
+/** Where a manual refund should be paid, as the customer gave it. */
+function PayoutTo({ payout }: { payout?: AdminRefund["payoutTo"] }) {
+  if (!payout) {
+    return (
+      <p className="text-sm text-ink">
+        No UPI ID or bank account on file — ask the customer where to send it.
+      </p>
+    );
+  }
+  if (payout.upiId) {
+    return <p className="text-sm text-ink">UPI · {payout.upiId}</p>;
+  }
+  return (
+    <p className="text-sm text-ink">
+      {payout.holderName} · A/c {payout.accountNumber} · IFSC {payout.ifsc}
+    </p>
   );
 }

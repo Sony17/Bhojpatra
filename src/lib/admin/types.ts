@@ -444,6 +444,49 @@ export interface AdminRefund {
   requestedAt: string;
   /** Set once the refund reaches a terminal state (Processed / Declined). */
   processedAt?: string;
+  /** Razorpay refund id (`rfnd_…`) when the money went back via the gateway. */
+  gatewayRefundId?: string;
+  /** Every Razorpay refund issued for this request, with its status. */
+  gatewayRefunds?: { id: string; paymentId: string; amount: number; status: "pending" | "processed" | "failed" }[];
+  /** Processed, but Razorpay hasn't confirmed the money landed yet. */
+  gatewayPending?: boolean;
+  /** Why the request reopened after Razorpay reported a refund failed. */
+  gatewayFailure?: string;
+  /** Where the customer asked a manual (UPI / QR) refund to be paid. */
+  payoutTo?: RefundPayoutTo;
+  /** UTR of the manual payout, recorded when it was processed. */
+  payoutRef?: string;
+  /** Rupees paid out by hand (the rest went back via Razorpay). */
+  manualAmount?: number;
+  adminNote?: string;
+}
+
+/** Customer-given destination for a refund that can't go back via Razorpay:
+ *  a UPI ID, or a bank account. */
+export type RefundPayoutTo =
+  | { upiId: string; holderName?: undefined; accountNumber?: undefined; ifsc?: undefined }
+  | { upiId?: undefined; holderName: string; accountNumber: string; ifsc: string };
+
+/** A refund as the customer sees it in My Bookings. */
+export interface CustomerRefund {
+  id: string;
+  bookingId: string;
+  amount: number;
+  method: PaymentMethod;
+  status: RefundStatus;
+  requestedAt: string;
+  createdAt: string;
+  processedAt?: string;
+  gatewayRefundId?: string;
+  /** Rupees sent back via Razorpay. */
+  gatewayAmount?: number;
+  /** Razorpay hasn't confirmed the money landed yet. */
+  gatewayPending?: boolean;
+  payoutRef?: string;
+  /** Rupees paid out by hand. */
+  manualAmount?: number;
+  /** One-line payout destination, e.g. "UPI name@okhdfcbank". */
+  payoutTo?: string;
 }
 
 export interface RefundQuery {
