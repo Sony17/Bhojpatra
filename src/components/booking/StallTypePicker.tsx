@@ -50,24 +50,6 @@ export default function StallTypePicker({
         )}
       />
 
-      {/* Per-head guide by gathering size — display copy only; the bill is
-          still the picked dishes' per-plate. */}
-      <ul className="-mt-1 mb-3 flex flex-wrap gap-2 sm:-mt-3 sm:mb-6">
-        {[
-          [t("50–99 guests", "50–99 मेहमान"), "₹299"],
-          [t("100+ guests", "100+ मेहमान"), "₹199"],
-        ].map(([band, price]) => (
-          <li
-            key={band}
-            className="flex items-baseline gap-1.5 rounded-full border border-cream bg-white px-3 py-1 text-[11px] text-ink sm:text-sm"
-          >
-            <span>{band}</span>
-            <span className="font-bold text-maroon">{price}</span>
-            <span className="text-ink/55">{t("per head", "प्रति व्यक्ति")}</span>
-          </li>
-        ))}
-      </ul>
-
       {loading ? (
         <div
           className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4"
