@@ -20,6 +20,7 @@ import {
   applyContentDecision,
   cleanOnboardingDraft,
   nextModerationState,
+  feastTiersOf,
   publishedView,
   reviewedItems,
   stripBadgeGrants,
@@ -164,6 +165,22 @@ test("buildApplication creates a Pending application bound to the account", () =
   assert.deepEqual(app.cateringCategories, ["full-catering"]);
   assert.equal(app.history?.[0].action, "submitted");
   assert.equal(applicationStage(app), "pending");
+});
+
+test("Feast tiers are requested only when the vendor chose Full Catering", () => {
+  // Regression (Open Idea, 2026-10-27): a Single Stall-only vendor was given
+  // price-derived Silver/Gold, which later switched Feast on by itself.
+  const stallOnly = buildApplication({
+    existing: null,
+    id: "VND-STALL",
+    vendor: vendor({ serviceCategories: ["single-stall"], priceFrom: 120 }),
+    identity: IDENTITY,
+    owner: OWNER,
+    now: NOW,
+  });
+  assert.deepEqual(stallOnly.requestedTiers, []);
+  const feast = buildApplication({ existing: null, id: "VND-FEAST", vendor: vendor({ priceFrom: 120 }), identity: IDENTITY, owner: OWNER, now: NOW });
+  assert.deepEqual(feast.requestedTiers, ["Silver", "Gold"]);
 });
 
 test("resubmitting after changes requested reuses the record and returns it to Pending", () => {
@@ -541,4 +558,12 @@ test("changedPublicFields names what a pending edit changes, ignoring the GST ra
     ["About", "Starting price"],
   );
   assert.deepEqual(changedPublicFields(snap, { ...live, gstRate: 5 }), []);
+});
+
+test("feastTiersOf: no Feast bands for a vendor who didn't choose Full Catering", () => {
+  // Stray tiers on a Single Stall-only record never reach the Feast rosters.
+  assert.deepEqual(feastTiersOf(vendor({ serviceCategories: ["single-stall"], tiers: ["Silver", "Gold"] })), []);
+  assert.deepEqual(feastTiersOf(vendor({ serviceCategories: ["full-catering"], tiers: ["Gold"] })), ["Gold"]);
+  // Nothing declared (seeds, legacy) keeps the price-derived default.
+  assert.deepEqual(feastTiersOf(vendor({ serviceCategories: undefined, priceFrom: 900 })), ["Silver", "Gold"]);
 });

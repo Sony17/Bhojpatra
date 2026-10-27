@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import {
   dishOnTier,
   effectiveTiers,
+  offersFeast,
   ownCourseQuota,
   pruneDishTiers,
   pruneTierMap,
@@ -154,4 +155,12 @@ test("a dish restricted to every band still sold loses its list", () => {
 test("an untouched menu comes back untouched", () => {
   const plain = course({ items: [{ name: "Paneer Tikka", diet: "veg" }] });
   assert.deepEqual(pruneMenuBands([plain], ["Silver", "Gold"]), [plain]);
+});
+
+test("offersFeast: only a declared Full Catering (or nothing declared) counts", () => {
+  assert.equal(offersFeast(["single-stall"]), false);
+  assert.equal(offersFeast(["single-stall", "essential"]), false);
+  assert.equal(offersFeast(["full-catering", "single-stall"]), true);
+  assert.equal(offersFeast([]), true);
+  assert.equal(offersFeast(undefined), true);
 });
