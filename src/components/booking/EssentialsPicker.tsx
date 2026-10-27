@@ -63,13 +63,6 @@ export default function EssentialsPicker({
             icon={pkg.icon}
             photo={servicePhoto(pkg)}
             title={lang === "hi" ? pkg.nameHi : pkg.name}
-            price={
-              serviceTotal(pkg, guests) <= 0
-                ? t("Free", "मुफ़्त")
-                : pkg.perPlate
-                  ? `${money(serviceRate(pkg, guests))}${t("/guest", "/मेहमान")}`
-                  : money(serviceRate(pkg, guests))
-            }
           />
         ))}
       </div>
@@ -87,22 +80,20 @@ export default function EssentialsPicker({
   );
 }
 
-/** One selectable tile in the tier row, priced for this head-count so the
- *  packages compare at a glance. */
+/** One selectable tile in the tier row — name and photo only; the price
+ *  lives in the detail card below. */
 function Tile({
   selected,
   onSelect,
   icon,
   photo,
   title,
-  price,
 }: {
   selected: boolean;
   onSelect: () => void;
   icon: ReactNode;
   photo?: string;
   title: string;
-  price: string;
 }) {
   return (
     <button
@@ -146,9 +137,6 @@ function Tile({
         }
       >
         {title}
-      </span>
-      <span className="mt-auto pt-0.5 text-[10px] font-bold leading-tight text-maroon min-[390px]:text-[11px] sm:text-xs">
-        {price}
       </span>
     </button>
   );
