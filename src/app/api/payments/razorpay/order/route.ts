@@ -7,6 +7,7 @@ import {
   isRazorpayConfigured,
   razorpayKeyId,
 } from "@/lib/razorpay";
+import { checkoutSlotProblem } from "@/lib/vendorAvailabilityServer";
 
 // Talks to the live Razorpay API per request — never prerender or cache.
 export const dynamic = "force-dynamic";
@@ -84,6 +85,21 @@ export async function POST(request: Request) {
       { error: "This booking was cancelled — please don't pay for it." },
       { status: 409 },
     );
+  }
+
+  // First to pay wins: an open checkout holds no slot, so refuse to start the
+  // payment once a paid / accepted order has taken this date.
+  if (booking?.awaitingPayment) {
+    let problem: string | null = null;
+    try {
+      problem = await checkoutSlotProblem(booking);
+    } catch (err) {
+      // Protective, not load-bearing — a failed read lets the payment proceed.
+      console.error("Failed to re-check the stall slot before order", err);
+    }
+    if (problem) {
+      return Response.json({ error: problem, code: "SLOT_TAKEN" }, { status: 409 });
+    }
   }
 
   // Only THIS account's received payments ever count (receivedPayments'

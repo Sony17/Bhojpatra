@@ -38,10 +38,14 @@ type T = (en: string, hi: string) => string;
 
 export async function fetchVendorAvailability(
   vendorId: string,
+  excludeOrderId = "",
 ): Promise<VendorAvailability | null> {
   try {
+    const exclude = excludeOrderId
+      ? `&exclude=${encodeURIComponent(excludeOrderId)}`
+      : "";
     const r = await fetch(
-      `/api/vendors/availability?id=${encodeURIComponent(vendorId)}`,
+      `/api/vendors/availability?id=${encodeURIComponent(vendorId)}${exclude}`,
       { cache: "no-store" },
     );
     if (!r.ok) return null;
@@ -54,8 +58,14 @@ export async function fetchVendorAvailability(
 
 /** The vendor's public calendar; null while loading, or when it can't be read
  *  (the booking POST still checks, so a failed read never blocks anyone).
- *  Bump `refresh` to read it again (e.g. after checkout found the slot gone). */
-export function useVendorAvailability(vendorId: string | undefined, refresh = 0) {
+ *  Bump `refresh` to read it again (e.g. after checkout found the slot gone).
+ *  `excludeOrderId` leaves the guest's own in-progress order out, so a checkout
+ *  they opened and backed out of doesn't read as the vendor being booked. */
+export function useVendorAvailability(
+  vendorId: string | undefined,
+  refresh = 0,
+  excludeOrderId = "",
+) {
   const [state, setState] = useState<{ id: string; av: VendorAvailability | null }>({
     id: "",
     av: null,
@@ -64,7 +74,7 @@ export function useVendorAvailability(vendorId: string | undefined, refresh = 0)
     if (!vendorId) return;
     let live = true;
     const load = () =>
-      void fetchVendorAvailability(vendorId).then((av) => {
+      void fetchVendorAvailability(vendorId, excludeOrderId).then((av) => {
         // A failed re-read keeps the last good calendar.
         if (live) setState((prev) => (av || prev.id !== vendorId ? { id: vendorId, av } : prev));
       });
@@ -79,7 +89,7 @@ export function useVendorAvailability(vendorId: string | undefined, refresh = 0)
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", load);
     };
-  }, [vendorId, refresh]);
+  }, [vendorId, refresh, excludeOrderId]);
   return vendorId && state.id === vendorId ? state.av : null;
 }
 

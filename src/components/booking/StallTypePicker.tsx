@@ -43,8 +43,30 @@ export default function StallTypePicker({
       <SectionHead
         compact
         eyebrow={t("One Bhojpatra Experience", "एक भोजपत्र अनुभव")}
-        title={t("Curated Mini Stalls", "चुनिंदा मिनी स्टॉल")}
+        title={t("Curated Single Stall", "क्यूरेटेड सिंगल स्टॉल")}
+        sub={t(
+          "Don’t Just Order Food—Bring Lucknow’s Iconic Food Stalls to Your Home Parties & Get-Togethers!",
+          "सिर्फ़ खाना ऑर्डर न करें — लखनऊ के मशहूर फ़ूड स्टॉल्स को अपनी घर की पार्टियों और मिलन-समारोहों में लाएँ!",
+        )}
       />
+
+      {/* Per-head guide by gathering size — display copy only; the bill is
+          still the picked dishes' per-plate. */}
+      <ul className="-mt-1 mb-3 flex flex-wrap gap-2 sm:-mt-3 sm:mb-6">
+        {[
+          [t("50–99 guests", "50–99 मेहमान"), "₹299"],
+          [t("100+ guests", "100+ मेहमान"), "₹199"],
+        ].map(([band, price]) => (
+          <li
+            key={band}
+            className="flex items-baseline gap-1.5 rounded-full border border-cream bg-white px-3 py-1 text-[11px] text-ink sm:text-sm"
+          >
+            <span>{band}</span>
+            <span className="font-bold text-maroon">{price}</span>
+            <span className="text-ink/55">{t("per head", "प्रति व्यक्ति")}</span>
+          </li>
+        ))}
+      </ul>
 
       {loading ? (
         <div

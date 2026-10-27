@@ -119,7 +119,7 @@ import { useHideChatFab, useHideMobileFooter } from "@/lib/mobileChrome";
 import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
 import {
-  MIN_GUESTS,
+  STALL_MIN_GUESTS,
   MAX_GUESTS,
   ADVANCE_RATE,
   computeOrderTotals,
@@ -315,7 +315,7 @@ function parseStallQuery(sp: URLSearchParams): StallQuery {
   const venueParam = sp.get("venue");
   if (venueParam) q.venue = venueParam;
   const g = Number(sp.get("guests"));
-  if (g >= MIN_GUESTS && g <= MAX_GUESTS) q.guests = Math.round(g);
+  if (g >= STALL_MIN_GUESTS && g <= MAX_GUESTS) q.guests = Math.round(g);
   // A brand page hands off its vendor — resolved once the roster loads, which
   // drops the guest straight onto the menu builder for that stall.
   const vendorParam = sp.get("vendor")?.trim();
@@ -1125,7 +1125,7 @@ export default function StallBookingWizard({
   // enforces (`vendorMinGuests`), so the guest stepper never allows a count
   // the booking API would then refuse.
   const minGuests = useMemo<number>(() => {
-    let min = MIN_GUESTS;
+    let min = STALL_MIN_GUESTS;
     for (const c of stall?.courses ?? []) {
       if (!itemsFor(c.id).some((id) => id.startsWith(`${stall!.id}-`))) continue;
       min = Math.max(min, c.terms?.minPax ?? 0, c.terms?.minPaxGuarantee ?? 0);
@@ -1367,7 +1367,11 @@ export default function StallBookingWizard({
   // The stall vendor's calendar: days off and meal periods already booked.
   // Checked the moment a stall and date are both in hand — not at payment.
   const [availabilityNonce, setAvailabilityNonce] = useState(0);
-  const stallAvailability = useVendorAvailability(rawStall?.id, availabilityNonce);
+  const stallAvailability = useVendorAvailability(
+    rawStall?.id,
+    availabilityNonce,
+    bookingId,
+  );
   const slotReason = availabilityFor(stallAvailability, eventDate, mealTime);
   const availabilityWarning =
     slotReason && rawStall
@@ -1405,6 +1409,9 @@ export default function StallBookingWizard({
           guests >= minGuests &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
+          // A meal period is required: without one an order would hold the
+          // vendor's whole day.
+          mealTime !== "" &&
           dateMeetsLead &&
           !slotReason
         );
@@ -1445,10 +1452,18 @@ export default function StallBookingWizard({
         out.push({ text: leadWarning, field: "date" });
       else if (availabilityWarning)
         out.push({ text: availabilityWarning, field: "date" });
+      if (mealTime === "")
+        out.push({
+          text: t(
+            "Pick a meal time — breakfast, lunch, hi-tea or dinner",
+            "भोजन का समय चुनें — नाश्ता, लंच, हाई-टी या डिनर",
+          ),
+          field: "meal",
+        });
       if (guests < minGuests || guests > MAX_GUESTS)
         out.push({
           text:
-            minGuests > MIN_GUESTS && guests < minGuests
+            minGuests > STALL_MIN_GUESTS && guests < minGuests
               ? t(
                   `${stall?.name ?? "This stall"} serves a minimum of ${inr.format(minGuests)} guests`,
                   `${stall?.name ?? "यह स्टॉल"} कम से कम ${inr.format(minGuests)} मेहमानों के लिए है`,
@@ -2044,6 +2059,7 @@ export default function StallBookingWizard({
       setEventDate={setEventDate}
       mealTime={mealTime}
       setMealTime={setMealTime}
+      mealRequired
       eventTime={eventTime}
       setEventTime={setEventTime}
       foodPreference={foodPreference}

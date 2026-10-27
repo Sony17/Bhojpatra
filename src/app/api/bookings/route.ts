@@ -17,7 +17,7 @@ import { requireRole } from "@/lib/auth";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
 import type { PartnerRecord } from "@/app/api/partners/route";
 import { parseListQuery } from "@/lib/validate";
-import { MAX_GUESTS, MIN_GUESTS } from "@/lib/bookingPricing";
+import { MAX_GUESTS, STALL_MIN_GUESTS } from "@/lib/bookingPricing";
 import { customerPercentFor } from "@/lib/referralRates";
 import {
   expectedStallTotal,
@@ -314,6 +314,12 @@ export async function POST(request: Request) {
   if (isStall && !iso) {
     return Response.json({ error: "Please pick an event date." }, { status: 400 });
   }
+  if (isStall && !(typeof mealTime === "string" && mealTime.trim())) {
+    return Response.json(
+      { error: "Please pick a meal time — breakfast, lunch, hi-tea or dinner." },
+      { status: 400 },
+    );
+  }
   if (iso && !isBainaBox) {
     const fixedLead =
       typeof packageId === "string" ? packageLeadDays[packageId] : undefined;
@@ -599,10 +605,10 @@ async function checkStallOrder(req: {
       { status: 400 },
     );
   }
-  if (req.guestCount < MIN_GUESTS || req.guestCount > MAX_GUESTS) {
+  if (req.guestCount < STALL_MIN_GUESTS || req.guestCount > MAX_GUESTS) {
     return Response.json(
       {
-        error: `Guests must be between ${MIN_GUESTS} and ${MAX_GUESTS.toLocaleString("en-IN")}.`,
+        error: `Guests must be between ${STALL_MIN_GUESTS} and ${MAX_GUESTS.toLocaleString("en-IN")}.`,
       },
       { status: 400 },
     );
@@ -674,7 +680,7 @@ async function checkStallOrder(req: {
 
   // The vendor's own stall terms (Vendor Portal → onboarding).
   const minGuests = Math.max(
-    MIN_GUESTS,
+    STALL_MIN_GUESTS,
     vendorMinGuests(vendorRecord, quote.categoryIds),
   );
   if (req.guestCount < minGuests) {

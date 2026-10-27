@@ -228,11 +228,10 @@ export interface CalendarOrder {
   createdAt?: string;
 }
 
-/** How long an unpaid, unaccepted Pending order holds the vendor's slot: a
- *  checkout in progress briefly, a submitted pay-later (Connect) order long
- *  enough for the team to call. After that the slot is free again, so an
- *  abandoned order can't lock a vendor's calendar for good. */
-export const CHECKOUT_HOLD_MS = 30 * 60 * 1000;
+/** How long a submitted pay-later (Connect) order holds the vendor's slot —
+ *  long enough for the team to call. After that the slot is free again, so an
+ *  abandoned order can't lock a vendor's calendar for good. An open checkout
+ *  holds nothing: the slot goes to whoever pays the advance first. */
 export const SUBMITTED_HOLD_MS = 48 * 60 * 60 * 1000;
 
 /** Does this existing order occupy its vendor's slot right now? */
@@ -240,10 +239,10 @@ export function holdsSlot(o: CalendarOrder, now: Date = new Date()): boolean {
   if (o.status === "Cancelled" || o.vendorDeclined) return false;
   if (o.status === "Confirmed" || o.status === "Completed") return true;
   if ((o.paid ?? 0) > 0 || o.vendorAcknowledged) return true;
+  if (o.awaitingPayment) return false;
   const created = Date.parse(o.createdAt ?? "");
   if (!Number.isFinite(created)) return true;
-  const hold = o.awaitingPayment ? CHECKOUT_HOLD_MS : SUBMITTED_HOLD_MS;
-  return now.getTime() - created < hold;
+  return now.getTime() - created < SUBMITTED_HOLD_MS;
 }
 
 /**

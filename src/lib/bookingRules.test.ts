@@ -150,12 +150,12 @@ test("cancelled, declined and stale unpaid orders free the slot", () => {
   assert.equal(slotConflict([order({ status: "Cancelled" })], req, now), null);
   assert.equal(slotConflict([order({ vendorDeclined: true })], req, now), null);
   const unpaid = { status: "Pending", paid: 0 };
-  // A Connect order holds for 48h, an open checkout for 30 minutes.
+  // A Connect order holds for 48h; an unpaid open checkout never holds.
   assert.equal(holdsSlot(order({ ...unpaid, createdAt: "2026-10-05T00:00:00Z" }), now), true);
   assert.equal(holdsSlot(order({ ...unpaid, createdAt: "2026-10-01T00:00:00Z" }), now), false);
   assert.equal(
     holdsSlot(order({ ...unpaid, awaitingPayment: true, createdAt: "2026-10-06T11:45:00Z" }), now),
-    true,
+    false,
   );
   assert.equal(
     holdsSlot(order({ ...unpaid, awaitingPayment: true, createdAt: "2026-10-06T11:00:00Z" }), now),

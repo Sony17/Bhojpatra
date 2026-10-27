@@ -1334,6 +1334,10 @@ export const servicePackages: ServicePackage[] = [
     priceMin: 0,
     priceMax: 40,
     perPlate: true,
+    guestTiers: [
+      { minGuests: 50, maxGuests: 99, price: 299 },
+      { minGuests: 100, maxGuests: 300, price: 199 },
+    ],
   },
   {
     id: "standard",

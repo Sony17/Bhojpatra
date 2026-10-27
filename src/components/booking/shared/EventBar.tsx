@@ -118,7 +118,7 @@ function OtherField({
 }
 
 /** A brief field a "Before you continue" blocker can jump the guest to. */
-export type EventField = "occasion" | "date" | "city" | "guests";
+export type EventField = "occasion" | "date" | "city" | "guests" | "meal";
 
 /* ─── Event brief ─────────────────────────────────────────────────────────
  * Occasion / date / city / guests / serving time / food preference, editable on
@@ -159,6 +159,7 @@ export default function EventBar({
   onCheckAvailability,
   minDaysAhead = 1,
   showGuests = true,
+  mealRequired = false,
   flush = false,
   collapsible = false,
   collapseAt = "lg",
@@ -215,6 +216,9 @@ export default function EventBar({
   /** The headcount is fixed and echoed in the order summary by the Confirm
    *  step, so the editable field is hidden there to avoid a redundant control. */
   showGuests?: boolean;
+  /** The meal period must be picked (Single Stall: an order without one
+   *  would hold the vendor's whole day). */
+  mealRequired?: boolean;
   /** Drops the card's top margin so it can sit inside a grid whose gap already
    *  supplies the spacing (used when the event brief is reordered on mobile). */
   flush?: boolean;
@@ -698,9 +702,9 @@ export default function EventBar({
         )}
 
         {/* Serving time — the meal period plus a clock slot within it.
-            Optional; when set it rides onto the order, invoice ("Serving
-            time") and admin/My-Bookings via `servingTimeLabel`. */}
-        <div className="block min-w-0">
+            Optional unless `mealRequired`; when set it rides onto the order,
+            invoice ("Serving time") and admin/My-Bookings via `servingTimeLabel`. */}
+        <div className="block min-w-0" data-event-field="meal">
           <span className={labelRowClass}>
             <span className={labelClass}>{t("Meal", "भोजन")}</span>
           </span>
@@ -714,7 +718,11 @@ export default function EventBar({
                 setEventTime("");
             }}
             ariaLabel={t("Meal period", "भोजन अवधि")}
-            placeholder={t("Optional", "वैकल्पिक")}
+            placeholder={
+              mealRequired
+                ? t("Choose a meal", "भोजन चुनें")
+                : t("Optional", "वैकल्पिक")
+            }
             className="mt-1.5"
             buttonClassName={selectButtonClass}
             options={bookingMealTimes.map((m) => ({

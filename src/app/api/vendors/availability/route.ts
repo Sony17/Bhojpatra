@@ -14,7 +14,12 @@ import { readVendorAvailability } from "@/lib/vendorAvailabilityServer";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const id = new URL(request.url).searchParams.get("id")?.trim();
+  const params = new URL(request.url).searchParams;
+  const id = params.get("id")?.trim();
+  // The caller's own in-progress order (its booking id), left off the
+  // calendar. Only ever frees a day in this caller's view — the booking POST
+  // still checks every other order.
+  const exclude = params.get("exclude")?.trim() ?? "";
   if (!id) {
     return Response.json({ error: "Missing vendor id." }, { status: 400 });
   }
@@ -22,7 +27,7 @@ export async function GET(request: Request) {
     // An id with no vendor record (a curated listing bridged by name) simply
     // has nothing on its calendar yet.
     const vendor = (await findVendorById(id)) ?? { id };
-    return Response.json(await readVendorAvailability(vendor));
+    return Response.json(await readVendorAvailability(vendor, new Date(), exclude));
   } catch (err) {
     console.error("Failed to read vendor availability", err);
     return Response.json(

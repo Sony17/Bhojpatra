@@ -14,6 +14,9 @@
  */
 
 export const MIN_GUESTS = 50;
+/** Single Stall's platform minimum, kept separate from the feast one; a
+ *  vendor's own stall terms can still raise it (`vendorMinGuests`). */
+export const STALL_MIN_GUESTS = 50;
 export const MAX_GUESTS = 50_000;
 
 /** GST on platform services — the venue fee and the service package. */
