@@ -16,6 +16,13 @@
  */
 import { TIER_ORDER, type VendorTier } from "@/lib/admin/types";
 
+/** Whether a vendor's declared catering categories include Full Catering
+ *  (Feast). Feast bands only ever apply to such a vendor. Nothing declared
+ *  (seeds, legacy records) counts as yes, as before. */
+export function offersFeast(categories: readonly string[] | undefined): boolean {
+  return !categories?.length || categories.includes("full-catering");
+}
+
 /** Marketplace bands a per-plate price falls into — the catalog's price-range
  *  filter, and the fallback for a caterer who never picked their own bands. */
 export function tiersForPrice(priceFrom: number): VendorTier[] {

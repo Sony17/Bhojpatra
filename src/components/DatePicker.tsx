@@ -72,6 +72,7 @@ export default function DatePicker({
   valueIso,
   minDaysAhead = 1,
   bookedDates,
+  offDates,
   onChange,
 }: {
   placeholder?: string;
@@ -97,6 +98,10 @@ export default function DatePicker({
   /** Dates already taken as `YYYY-MM-DD` — a venue's existing bookings. These
    *  paint red and can't be picked, and a legend explains the colour. */
   bookedDates?: string[];
+  /** Days the vendor switched off (not taking orders) — not pickable, and
+   *  painted apart from `bookedDates` so "not available" never reads as
+   *  "already booked". */
+  offDates?: string[];
   onChange?: (date: Date) => void;
 }) {
   const { lang, t } = useLang();
@@ -185,6 +190,7 @@ export default function DatePicker({
 
   // Already-taken dates, as a set for O(1) lookup while painting the grid.
   const booked = useMemo(() => new Set(bookedDates ?? []), [bookedDates]);
+  const off = useMemo(() => new Set(offDates ?? []), [offDates]);
 
   // The earliest selectable day — today plus the required advance notice. Dates
   // before this are disabled in the grid (defaults to tomorrow; 0 = today, for
@@ -357,9 +363,11 @@ export default function DatePicker({
               if (!date) return <div key={i} className="h-9" />;
               // Already booked at this venue — shown, but not pickable.
               const isBooked = booked.has(isoOf(date));
+              // The vendor isn't taking orders that day (their Calendar).
+              const isOff = !isBooked && off.has(isoOf(date)) && date >= minDate;
               // Disabled = before the earliest allowed date (past days, plus any
               // that fall short of the occasion's required lead time).
-              const isDisabled = date < minDate || isBooked;
+              const isDisabled = date < minDate || isBooked || isOff;
               const isToday = date.getTime() === today.getTime();
               const isSel =
                 selected !== null && date.getTime() === selected.getTime();
@@ -372,7 +380,9 @@ export default function DatePicker({
                   aria-label={
                     isBooked
                       ? `${date.getDate()} — ${t("already booked", "पहले से बुक")}`
-                      : undefined
+                      : isOff
+                        ? `${date.getDate()} — ${t("not available", "उपलब्ध नहीं")}`
+                        : undefined
                   }
                   onClick={() => {
                     setSelected(date);
@@ -384,6 +394,8 @@ export default function DatePicker({
                       ? "bg-maroon font-semibold text-cream"
                       : isBooked
                         ? "cursor-not-allowed bg-maroon/15 font-semibold text-maroon line-through"
+                        : isOff
+                          ? "cursor-not-allowed bg-ink/10 text-ink/45"
                         : isDisabled
                           ? "cursor-not-allowed text-ink/25"
                           : isToday
@@ -398,14 +410,27 @@ export default function DatePicker({
           </div>
 
           {/* Legend — only worth the space once there's something red to explain. */}
-          {booked.size > 0 && (
-            <p className="mt-2 flex items-center gap-1.5 border-t border-cream-3 pt-2 text-xs text-ink/60">
-              <span
-                aria-hidden="true"
-                className="inline-block h-3 w-3 shrink-0 rounded bg-maroon/15"
-              />
-              {t("Already booked — pick another date", "पहले से बुक — दूसरी तारीख़ चुनें")}
-            </p>
+          {(booked.size > 0 || off.size > 0) && (
+            <div className="mt-2 space-y-1 border-t border-cream-3 pt-2 text-xs text-ink/60">
+              {booked.size > 0 && (
+                <p className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-3 w-3 shrink-0 rounded bg-maroon/15"
+                  />
+                  {t("Already booked — pick another date", "पहले से बुक — दूसरी तारीख़ चुनें")}
+                </p>
+              )}
+              {off.size > 0 && (
+                <p className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-3 w-3 shrink-0 rounded bg-ink/10"
+                  />
+                  {t("Not available — vendor isn't taking orders", "उपलब्ध नहीं — वेंडर ऑर्डर नहीं ले रहे")}
+                </p>
+              )}
+            </div>
           )}
           </div>,
           document.body,

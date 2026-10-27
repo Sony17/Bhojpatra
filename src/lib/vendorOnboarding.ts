@@ -279,7 +279,11 @@ export function buildApplication(opts: {
     cuisines: vendor.cuisines,
     speciality:
       vendor.goldSpecialization || vendor.cuisines.slice(0, 2).join(", ") || "Catering",
-    requestedTiers: effectiveTiers(vendor.tiers, vendor.priceFrom),
+    // Feast bands only for a vendor who offers Full Catering — never
+    // price-derived ones for a Single Stall-only caterer.
+    requestedTiers: (vendor.serviceCategories ?? []).includes("full-catering")
+      ? effectiveTiers(vendor.tiers, vendor.priceFrom)
+      : [],
     gstNumber: identity.gstNumber,
     ...(identity.panNumber ? { panNumber: identity.panNumber } : {}),
     fssaiNumber: identity.fssaiNumber,

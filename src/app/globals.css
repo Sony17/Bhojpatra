@@ -793,6 +793,42 @@ html.header-hidden .app-sticky-chrome {
   }
 }
 
+/* Same-day stall card: a red / cream light running round the border. The
+   gradient lives on the border box under a white padding box, so the card
+   keeps its own shape; reduced motion leaves it as a still two-tone ring.
+   (Moves by background-position — an `@property` angle sweep gets dropped,
+   with the rules after it, by Turbopack's CSS parser.) */
+@keyframes bp-sweep {
+  to {
+    background-position: 0 0, 100% 0;
+  }
+}
+@keyframes bp-sweep-glow {
+  0%,
+  100% {
+    box-shadow: 0 6px 18px -10px rgba(185, 32, 37, 0.35);
+  }
+  50% {
+    box-shadow: 0 10px 26px -10px rgba(185, 32, 37, 0.6);
+  }
+}
+.same-day-ring {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(
+        90deg,
+        #b92025,
+        #f0d09e,
+        #b92025,
+        #f0d09e,
+        #b92025
+      )
+      border-box;
+  background-size: 100% 100%, 200% 100%;
+  background-position: 0 0, 0 0;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* ── Scroll reveal — snappy food-app motion (≤250ms), small travel ── */
   .reveal {
@@ -899,6 +935,11 @@ html.header-hidden .app-sticky-chrome {
      Pair with an inline negative animation-delay per step. */
   .animate-step-trace {
     animation: bp-step-trace 5.6s var(--ease-out-soft) infinite;
+  }
+  .same-day-ring {
+    animation:
+      bp-sweep 3.2s linear infinite,
+      bp-sweep-glow 3.2s ease-in-out infinite;
   }
   /* Highlights ribbon — pair with a doubled track. Hover to pause. */
   .animate-marquee {

@@ -456,6 +456,42 @@ function briefInHand(): { date: string; mealTime: string } {
 }
 
 /**
+ * Which of these stalls can't take the event date (and meal) the guest has
+ * already given — for the /vendors cards. Empty with no date in hand, while
+ * loading, or when the read fails (the wizard and booking POST still check).
+ */
+export function useDayAvailability(vendorIds: string[]): {
+  date: string;
+  unavailable: Record<string, Unavailable>;
+} {
+  const [brief, setBrief] = useState({ date: "", mealTime: "" });
+  const [unavailable, setUnavailable] = useState<Record<string, Unavailable>>({});
+  // The brief lives in the URL / localStorage — read after mount.
+  useEffect(() => {
+    const b = briefInHand();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (b.date >= todayIsoIST()) setBrief(b);
+  }, []);
+  const key = [...new Set(vendorIds)].sort().join(",");
+  useEffect(() => {
+    if (!brief.date || !key) return;
+    let live = true;
+    const qs = new URLSearchParams({ ids: key, date: brief.date });
+    if (brief.mealTime) qs.set("meal", brief.mealTime);
+    void fetch(`/api/vendors/availability?${qs.toString()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { unavailable?: Record<string, Unavailable> } | null) => {
+        if (live) setUnavailable(d?.unavailable ?? {});
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [key, brief.date, brief.mealTime]);
+  return { date: brief.date, unavailable };
+}
+
+/**
  * Wraps a "Book this stall" link: when the guest's brief already has an
  * event date, the vendor's calendar is checked before leaving the page. A
  * free slot navigates as normal; a taken one opens the availability sheet,

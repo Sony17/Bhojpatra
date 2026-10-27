@@ -376,7 +376,13 @@ export default function MenuBuilder() {
             // on the way in, so a lit Silver/Gold/Platinum chip always has its
             // plated menu underneath it (and an already-published course list
             // never becomes unreachable).
-            if (src.tiers?.length) {
+            // A vendor who declared their categories without Full Catering (a
+            // Single Stall-only caterer) keeps it off: bands the platform
+            // pre-filled from their price never switch Feast on by themselves.
+            const declaredNoFeast =
+              (src.serviceCategories?.length ?? 0) > 0 &&
+              !src.serviceCategories!.includes("full-catering");
+            if (src.tiers?.length && !declaredNoFeast) {
               setTiers(src.tiers);
               setServiceCats((prev) =>
                 prev.includes("full-catering")

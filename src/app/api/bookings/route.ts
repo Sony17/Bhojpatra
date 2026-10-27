@@ -35,7 +35,7 @@ import {
 } from "@/lib/bookingRules";
 import { paymentActivity, receivedPayments } from "@/lib/bookingPaymentSync";
 import { notifyOrderPlaced } from "@/lib/bookingNotify";
-import { findVendorById } from "@/lib/vendorMenus";
+import { findVendorById, publishedView } from "@/lib/vendorMenus";
 import { cleanBlockedDates } from "@/lib/vendorAvailability";
 import { formatCutoff, stallNoticeProblem } from "@/lib/stallNotice";
 
@@ -342,10 +342,11 @@ export async function POST(request: Request) {
             )
           : customOrderLeadDays(vendorIds);
     // The stricter of the package/vendor lead and the occasion's own notice —
-    // mirrors the wizard's `max(packageLead, occasionLead)`.
+    // mirrors the wizard's `max(packageLead, occasionLead)`. The occasion lead
+    // is the admin default; a stall vendor's own Calendar notice overrides it.
     const requiredLead = Math.max(
       packageOrVendorLead,
-      await occasionLeadFromName(occasionName),
+      stallNotice != null ? 0 : await occasionLeadFromName(occasionName),
     );
     const days = daysUntilIST(iso);
     if (days !== null && days < requiredLead) {
@@ -650,11 +651,13 @@ async function checkStallOrder(req: {
       { status: 500 },
     );
   }
-  // Off the roster (unknown, hidden, or not moderation-Approved).
+  // Off the roster (unknown, hidden, or never approved). A vendor with an edit
+  // awaiting review stays bookable on their last approved menu — the same
+  // view customers are shown (`publishedView`).
   if (
     quote === null ||
     !vendorRecord ||
-    (vendorRecord.moderation ?? "Approved") !== "Approved"
+    (vendorRecord.moderation !== undefined && !publishedView(vendorRecord))
   ) {
     return Response.json(
       { error: "This stall isn't available to book right now." },

@@ -133,7 +133,7 @@ export function briefOf(s: BookableStall): StallBrief {
     stallTypes,
     ...(stallTypes.length ? { dietsByType, dishesByType } : {}),
     ...(s.minGuests ? { minGuests: s.minGuests } : {}),
-    ...(s.leadHours ? { leadHours: s.leadHours } : {}),
+    ...(s.leadHours != null ? { leadHours: s.leadHours } : {}),
   };
 }
 

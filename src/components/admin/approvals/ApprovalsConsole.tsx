@@ -16,6 +16,7 @@ import { Calendar, ShieldCheck, Close } from "@/components/admin/shared/icons";
 import { queryApprovals } from "@/lib/admin/mockData";
 import { refreshAdminSession } from "@/lib/adminAuth";
 import { TIER_ORDER, sortTiers } from "@/lib/admin/types";
+import { offersFeast } from "@/lib/tiers";
 import type {
   VendorApplication,
   VendorTier,
@@ -34,8 +35,10 @@ const STATUS_OPTIONS = [
 ];
 
 /** The tiers currently in force for an application: the admin's explicit
- *  decision if made, otherwise the price-derived baseline shown as the default. */
+ *  decision if made, otherwise the price-derived baseline shown as the default.
+ *  None for a vendor who didn't choose Feast (Full Catering). */
 function effectiveTiers(a: VendorApplication): VendorTier[] {
+  if (!offersFeast(a.cateringCategories)) return [];
   return sortTiers(a.assignedTiers ?? a.requestedTiers);
 }
 
@@ -164,8 +167,8 @@ export default function ApprovalsConsole() {
     // Lock in the tier selection at the moment of approval so the vendor's
     // catalog badges match what the admin sees here (even if untouched → the
     // price-derived default).
-    const tiers =
-      next === "Verified" && current ? effectiveTiers(current) : undefined;
+    const locked = next === "Verified" && current ? effectiveTiers(current) : [];
+    const tiers = locked.length ? locked : undefined;
     setApps((prev) =>
       prev.map((a) =>
         a.id === id
@@ -222,7 +225,7 @@ export default function ApprovalsConsole() {
 
   const toggleTier = (id: string, t: VendorTier) => {
     const app = apps.find((a) => a.id === id);
-    if (!app) return;
+    if (!app || !offersFeast(app.cateringCategories)) return;
     const current = effectiveTiers(app);
     setTiers(
       id,
@@ -267,7 +270,16 @@ export default function ApprovalsConsole() {
       ),
     },
     { key: "city", header: "City", cell: (a) => <span className="text-ink-soft">{a.city}</span> },
-    { key: "tier", header: "Requested", cell: (a) => <TierBadges tiers={a.requestedTiers} /> },
+    {
+      key: "tier",
+      header: "Requested",
+      cell: (a) =>
+        offersFeast(a.cateringCategories) ? (
+          <TierBadges tiers={a.requestedTiers} />
+        ) : (
+          <span className="text-xs text-ink-soft">No Feast</span>
+        ),
+    },
     { key: "submitted", header: "Submitted", cell: (a) => <span className="text-ink-soft">{a.submitted}</span> },
     { key: "status", header: "Status", cell: (a) => <AppStatus app={a} /> },
     {
@@ -441,24 +453,35 @@ export default function ApprovalsConsole() {
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
                 Assigned Tiers
               </p>
-              <p className="mb-3 text-sm text-ink-soft">
-                Choose every marketplace tier this vendor serves — a caterer can
-                sit in more than one band. Requested: {selected.requestedTiers.join(", ")}.
-              </p>
+              {offersFeast(selected.cateringCategories) ? (
+                <p className="mb-3 text-sm text-ink-soft">
+                  Choose every marketplace tier this vendor serves — a caterer can
+                  sit in more than one band. Requested: {selected.requestedTiers.join(", ")}.
+                </p>
+              ) : (
+                <p className="mb-3 text-sm text-ink-soft">
+                  This vendor didn&apos;t choose Feast (Full Catering), so Feast
+                  tiers don&apos;t apply. Only the vendor can turn Feast on.
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {TIER_ORDER.map((t) => {
+                  const feast = offersFeast(selected.cateringCategories);
                   const active = effectiveTiers(selected).includes(t);
                   const last = active && effectiveTiers(selected).length === 1;
                   return (
                     <label
                       key={t}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-control border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-cream-2"
+                      className={
+                        "flex items-center gap-2.5 rounded-control border border-cream-3 px-3 py-2 text-sm font-medium text-ink transition-colors " +
+                        (feast ? "cursor-pointer hover:bg-cream-2" : "cursor-not-allowed opacity-50")
+                      }
                     >
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-maroon"
                         checked={active}
-                        disabled={last}
+                        disabled={last || !feast}
                         onChange={() => toggleTier(selected.id, t)}
                       />
                       {t}

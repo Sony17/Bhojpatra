@@ -30,7 +30,12 @@ import { useAllVendorsStatus } from "@/lib/useAllVendors";
 import { ctaLabel, listingCta, type StallDishesBrief } from "@/lib/vendorStorefront";
 import { stallTypeById, stallTypes, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
-import { useStallAvailabilityGate } from "@/components/booking/VendorAvailability";
+import {
+  useDayAvailability,
+  useStallAvailabilityGate,
+} from "@/components/booking/VendorAvailability";
+import type { Unavailable } from "@/lib/vendorAvailability";
+import { formatEventDate } from "@/lib/bookingPricing";
 import { useLocations } from "@/lib/locations";
 import {
   LOCATION_CHANGED_EVENT,
@@ -402,6 +407,10 @@ export default function VendorCatalog({
   const [shortNotice, setShortNotice] = useState<boolean>(
     () => searchParams.get("notice") === "1",
   );
+  // Stalls whose vendor takes same-day orders (Vendor Portal → Calendar).
+  const [sameDayOnly, setSameDayOnly] = useState<boolean>(
+    () => searchParams.get("notice") === "0",
+  );
   const [sort, setSort] = useState<SortKey>(() => {
     const s = searchParams.get("sort");
     if (
@@ -708,6 +717,7 @@ export default function VendorCatalog({
         (!visibleFilters.has("notice") ||
           !shortNotice ||
           (v.stall?.leadHours ?? 0) <= SHORT_NOTICE_HOURS) &&
+        (!visibleFilters.has("notice") || !sameDayOnly || v.stall?.leadHours === 0) &&
         matchesMeals &&
         matchesServingTime
       );
@@ -765,10 +775,17 @@ export default function VendorCatalog({
     topRated,
     guests,
     shortNotice,
+    sameDayOnly,
     meals,
     servingTime,
     sort,
   ]);
+
+  // The guest's event date against each stall's calendar — a fully booked
+  // or switched-off vendor says so on their card.
+  const dayAvailability = useDayAvailability(
+    results.flatMap((v) => (v.stall ? [v.stall.stallId] : [])),
+  );
 
   /** How many caterers each lens would surface, counted against the always-on
    *  search + location narrowing so the numbers track what the guest has
@@ -804,7 +821,8 @@ export default function VendorCatalog({
     servingTime !== "" ||
     topRated ||
     guests > 0 ||
-    shortNotice;
+    shortNotice ||
+    sameDayOnly;
 
   /** Count of sheet filters (excludes search) — drives the Filters chip badge.
    *  Only counts controls the current category lens shows; hidden filters are
@@ -821,6 +839,7 @@ export default function VendorCatalog({
     showFilter("rating") && topRated,
     showFilter("guests") && guests > 0,
     showFilter("notice") && shortNotice,
+    showFilter("notice") && sameDayOnly,
   ].filter(Boolean).length;
 
   /** Whether anything the stall view's Clear would undo is set. */
@@ -831,7 +850,8 @@ export default function VendorCatalog({
       price !== ALL ||
       topRated ||
       guests > 0 ||
-      shortNotice
+      shortNotice ||
+      sameDayOnly
     );
   }
 
@@ -855,6 +875,7 @@ export default function VendorCatalog({
     setTopRated(false);
     setGuests(0);
     setShortNotice(false);
+    setSameDayOnly(false);
     setSort("relevance");
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("bhoj_vendor_sort");
@@ -1509,6 +1530,14 @@ export default function VendorCatalog({
                 >
                   {t("Can serve within 24 hrs", "24 घंटे में सेवा")}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSameDayOnly((v) => !v)}
+                  aria-pressed={sameDayOnly}
+                  className={chipClass(sameDayOnly)}
+                >
+                  {t("Same-day orders", "उसी दिन ऑर्डर")}
+                </button>
               </div>
             </div>
           )}
@@ -1605,6 +1634,10 @@ export default function VendorCatalog({
         >
           {results.map((vendor) => (
             <VendorCard
+              dayDate={dayAvailability.date}
+              dayStatus={
+                vendor.stall ? dayAvailability.unavailable[vendor.stall.stallId] : undefined
+              }
               key={vendor.id}
               vendor={vendor}
               stats={storefrontStat(ratings, vendor)}
@@ -1731,7 +1764,14 @@ function VendorCard({
   leadDiet,
   tileImages,
   compact = false,
+  dayDate = "",
+  dayStatus,
 }: {
+  /** The guest's event date, when they've given one. */
+  dayDate?: string;
+  /** Why the stall can't take `dayDate` (fully booked, day off, a meal
+   *  taken) — absent when it can. */
+  dayStatus?: Unavailable;
   /** Phones: a half-width card for the two-column stall-picker grid — short
    *  photo, name + cuisine + price, one Book button (the card itself opens
    *  the caterer). Tablet / desktop render the full card. */
@@ -1800,6 +1840,52 @@ function VendorCard({
           gate.onSelect(e, { vendorId: vendor.id, vendorName: vendor.name, href: bookHref })
       : undefined;
   const ctaText = ctaLabel(cta.kind, t);
+  // Same-day stalls are tagged, and a stall that can't take the guest's date
+  // says so before they tap in.
+  const when = dayDate ? formatEventDate(dayDate) : "";
+  const dayNote =
+    cta.kind !== "stall" || !dayStatus || !when
+      ? null
+      : dayStatus === "day"
+        ? t(`Already booked · ${when}`, `पहले से बुक · ${when}`)
+        : dayStatus === "blocked"
+          ? t(`Not available · ${when}`, `उपलब्ध नहीं · ${when}`)
+          : t(`Some meals booked on ${when}`, `${when} को कुछ भोजन बुक`);
+  const sameDay = cta.kind === "stall" && vendor.stall?.leadHours === 0;
+  // Can't take the guest's date at all — the card fades to grey (the status
+  // pill keeps its colour) and drops the same-day highlight.
+  const dayClosed = Boolean(dayNote) && dayStatus !== "slot";
+  const cardState = dayClosed
+    ? " opacity-75 [&_img]:grayscale"
+    : sameDay
+      ? " same-day-ring"
+      : "";
+  const stallStatus =
+    dayNote || sameDay ? (
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        {sameDay && (
+          <span className="rounded-full bg-cream px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink">
+            {t("Same-day orders", "उसी दिन ऑर्डर")}
+          </span>
+        )}
+        {dayNote && (
+          <span
+            className={
+              "rounded-full px-1.5 py-0.5 text-[10px] font-bold " +
+              // Booked (red) vs the vendor not taking orders (black) vs only
+              // some meals gone (red outline) — three different situations.
+              (dayStatus === "day"
+                ? "bg-maroon text-white"
+                : dayStatus === "blocked"
+                  ? "bg-ink text-cream"
+                  : "border border-maroon/40 text-maroon")
+            }
+          >
+            {dayNote}
+          </span>
+        )}
+      </div>
+    ) : null;
   // The price that sits next to the CTA — always the thing the CTA sells.
   const ctaPrice =
     cta.kind === "stall"
@@ -1911,7 +1997,12 @@ function VendorCard({
           : null;
 
     return (
-      <li className="group relative min-w-0 rounded-2xl border border-maroon/15 bg-white p-1.5 shadow-[0_4px_14px_-8px_rgba(0,0,0,0.25)] transition-shadow hover:shadow-[0_10px_24px_-10px_rgba(0,0,0,0.35)] sm:p-2">
+      <li
+        className={
+          "group relative min-w-0 rounded-2xl border border-maroon/15 bg-white p-1.5 shadow-[0_4px_14px_-8px_rgba(0,0,0,0.25)] transition-shadow hover:shadow-[0_10px_24px_-10px_rgba(0,0,0,0.35)] sm:p-2" +
+          cardState
+        }
+      >
         <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-cream">
           <Image
             src={photo}
@@ -2034,6 +2125,7 @@ function VendorCard({
             <InfoGlyph />
           </Link>
         </div>
+        {stallStatus && <div className="px-1 pb-1">{stallStatus}</div>}
 
         <Link
           href={bookHref}
@@ -2056,6 +2148,7 @@ function VendorCard({
       padding="none"
       className={
         "group relative overflow-hidden " +
+        cardState.trim() + " " +
         // Compact phones: a fixed-height card split 70% photo / 30% text, the
         // Swiggy/Zomato shape — price, rating and Book ride on the photo.
         // The column is pinned to the card width: an implicit `auto` column
@@ -2268,6 +2361,7 @@ function VendorCard({
                 {vendor.cuisines.length > 3 ? "…" : ""}
               </span>
             </p>
+            {stallStatus}
             <p
               className={
                 "mt-0.5 truncate text-[12px] leading-snug text-ink/45 " +

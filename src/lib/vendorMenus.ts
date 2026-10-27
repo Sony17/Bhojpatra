@@ -65,6 +65,7 @@ import {
 import {
   dishOnTier,
   effectiveTiers,
+  offersFeast,
   pruneDishTiers,
   pruneTierMap,
   tiersForPrice,
@@ -749,6 +750,19 @@ export function effectiveGstRateOf(
   return hasVerifiedGstin(app) ? (r.gstRate ?? DEFAULT_VENDOR_GST_RATE) : 0;
 }
 
+/** The Feast bands (Silver / Gold / Platinum) a vendor appears under:
+ *  admin-assigned first, else price-derived. None for a vendor who declared
+ *  their catering categories without Full Catering — a Single Stall-only
+ *  caterer never shows up as a Feast option. */
+export function feastTiersOf(
+  r: Pick<LiveVendorRecord, "tiers" | "priceFrom" | "serviceCategories">,
+): VendorTier[] {
+  if (!offersFeast(r.serviceCategories)) return [];
+  return r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom);
+}
+
+export { offersFeast };
+
 export async function assembleMenuCategories(): Promise<MenuCategory[]> {
   const [rows, storedPins, adminLimits, apps] = await Promise.all([
     ensureSeededVendors(),
@@ -807,7 +821,7 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
           // Tier bands: admin-assigned win, else the price-derived default —
           // identical to the catalog card (`toVendorListing`), so the wizard's
           // tier lens and the /vendors listing agree on where a vendor sits.
-          tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
+          tiers: feastTiersOf(r),
           // The per-band dish quota for this course (caterer's own + admin
           // override, resolved above) — the wizard prefers it over
           // `packageCategoryItems`.
@@ -1004,7 +1018,7 @@ export function toVendorListing(r: LiveVendorRecord): VendorListing {
     name: r.business,
     // Admin-assigned tiers win; price-derived bands are the fallback for seeds
     // and vendors that predate a review decision.
-    tiers: r.tiers?.length ? sortTiers(r.tiers) : tiersFor(r.priceFrom),
+    tiers: feastTiersOf(r),
     rating: r.rating,
     reviews: r.reviews,
     ...(r.googleRating ? { googleRating: r.googleRating } : {}),
@@ -2552,6 +2566,11 @@ function approvedView(r: LiveVendorRecord): LiveVendorRecord | null {
     // GST on food is always the vendor's current pick — never an older
     // snapshot's (snapshots taken before the picker carry none → 18%).
     ...(r.gstRate !== undefined ? { gstRate: r.gstRate } : {}),
+    // Calendar settings are operational, never in the snapshot — always live,
+    // so a same-day notice or a day off applies during a pending edit too.
+    ...(r.blockedDates ? { blockedDates: r.blockedDates } : {}),
+    ...(r.stallNoticeDays != null ? { stallNoticeDays: r.stallNoticeDays } : {}),
+    ...(r.sameDayCutoff ? { sameDayCutoff: r.sameDayCutoff } : {}),
     moderation: "Approved",
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,

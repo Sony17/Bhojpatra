@@ -8,7 +8,8 @@
  * meal periods only — never who booked or anything else on an order.
  */
 import { findVendorById } from "@/lib/vendorMenus";
-import { readVendorAvailability } from "@/lib/vendorAvailabilityServer";
+import { readDayAvailability, readVendorAvailability } from "@/lib/vendorAvailabilityServer";
+import { isIsoDate } from "@/lib/vendorAvailability";
 
 // Reads live orders — never prerender or cache.
 export const dynamic = "force-dynamic";
@@ -20,6 +21,27 @@ export async function GET(request: Request) {
   // calendar. Only ever frees a day in this caller's view — the booking POST
   // still checks every other order.
   const exclude = params.get("exclude")?.trim() ?? "";
+  // ?ids=a,b,c&date=YYYY-MM-DD[&meal=] — several vendors on one date, for the
+  // /vendors stall cards: `{ unavailable: { [id]: "blocked" | "day" | "slot" } }`.
+  const ids = params.get("ids");
+  if (ids !== null) {
+    const date = params.get("date") ?? "";
+    if (!isIsoDate(date)) {
+      return Response.json({ error: "Missing date." }, { status: 400 });
+    }
+    const list = [...new Set(ids.split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 100);
+    try {
+      return Response.json({
+        unavailable: await readDayAvailability(list, date, params.get("meal") ?? ""),
+      });
+    } catch (err) {
+      console.error("Failed to read vendor availability", err);
+      return Response.json(
+        { error: "Couldn't load availability. Please try again." },
+        { status: 500 },
+      );
+    }
+  }
   if (!id) {
     return Response.json({ error: "Missing vendor id." }, { status: 400 });
   }

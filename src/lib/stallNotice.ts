@@ -1,7 +1,8 @@
 /* ─── Single Stall booking notice ─────────────────────────────────────────
  * How far ahead a customer must book a vendor's Single Stall — the vendor's
  * own choice (Vendor Portal → Calendar), down to same day. When a vendor has
- * set it, it replaces the platform's default vendor lead for their stall; a
+ * set it, it replaces the platform's default vendor lead and the admin's
+ * occasion lead (Settings → Occasions, default 7 days) for their stall; a
  * vendor who never set it keeps exactly the old behaviour. Same-day orders
  * close at the vendor's cut-off time (IST) on the day itself.
  *

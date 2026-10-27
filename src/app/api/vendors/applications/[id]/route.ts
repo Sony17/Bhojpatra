@@ -10,6 +10,7 @@ import {
 } from "@/lib/vendorApplications";
 import { getKycDocument, saveKycDocument } from "@/lib/kyc";
 import { listLiveVendorRecords, saveVendor } from "@/lib/vendorMenus";
+import { offersFeast } from "@/lib/tiers";
 import { requireRole } from "@/lib/auth";
 import { parseTiers } from "@/lib/admin/types";
 import type { VerificationStatus } from "@/lib/admin/types";
@@ -77,6 +78,13 @@ export async function PATCH(
   const tiers = parseTiers(body.tiers);
   if (tiersProvided && tiers.length === 0) {
     return Response.json({ error: "Assign at least one tier." }, { status: 400 });
+  }
+  // Feast tiers are only for a vendor who chose Full Catering themselves.
+  if (tiers.length && !offersFeast(record.cateringCategories)) {
+    return Response.json(
+      { error: "This vendor didn't choose Feast (Full Catering), so tiers can't be assigned." },
+      { status: 400 },
+    );
   }
   if (tiers.length) record.assignedTiers = tiers;
 
@@ -275,7 +283,10 @@ async function syncLiveVendorFromReview(
           approvedSnapshot: undefined,
         }
       : {}),
-    ...(app.assignedTiers?.length ? { tiers: app.assignedTiers } : {}),
+    // Feast bands mean nothing to a vendor who doesn't offer Full Catering.
+    ...(app.assignedTiers?.length && offersFeast(app.cateringCategories)
+      ? { tiers: app.assignedTiers }
+      : {}),
     updatedAt: new Date().toISOString(),
   });
 }

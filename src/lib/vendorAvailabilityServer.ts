@@ -5,12 +5,18 @@
  */
 import { createStore } from "@/lib/store";
 import type { StoredOrder } from "@/app/api/bookings/route";
-import { findVendorById, type LiveVendorRecord } from "@/lib/vendorMenus";
+import {
+  ensureSeededVendors,
+  findVendorById,
+  type LiveVendorRecord,
+} from "@/lib/vendorMenus";
 import { slotConflict } from "@/lib/bookingRules";
 import {
+  availabilityFor,
   bookedDays,
   cleanBlockedDates,
   todayIsoIST,
+  type Unavailable,
   type VendorAvailability,
 } from "@/lib/vendorAvailability";
 
@@ -33,6 +39,34 @@ export async function readVendorAvailability(
       now,
     }),
   };
+}
+
+/**
+ * Many vendors' standing on one date (the /vendors stall cards), reading the
+ * orders once. A vendor that's free is left out of the result.
+ */
+export async function readDayAvailability(
+  vendorIds: string[],
+  date: string,
+  mealTime = "",
+  now: Date = new Date(),
+): Promise<Record<string, Unavailable>> {
+  const [orders, vendors] = await Promise.all([bookingStore.list(), ensureSeededVendors()]);
+  const byId = new Map(vendors.map((v) => [v.id, v]));
+  const out: Record<string, Unavailable> = {};
+  for (const id of vendorIds) {
+    const vendor: Partial<LiveVendorRecord> = byId.get(id) ?? {};
+    const reason = availabilityFor(
+      {
+        blocked: cleanBlockedDates(vendor.blockedDates, todayIsoIST(now)),
+        booked: bookedDays(orders, id, { maxEventsPerDay: vendor.maxEventsPerDay, now }),
+      },
+      date,
+      mealTime,
+    );
+    if (reason) out[id] = reason;
+  }
+  return out;
 }
 
 /**

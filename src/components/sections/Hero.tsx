@@ -6,7 +6,13 @@ import BrandSelect from "@/components/BrandSelect";
 import DatePicker from "@/components/DatePicker";
 import { ShieldCheck, PriceTag, ClipboardCheck, Headset, ChefHat } from "@/components/icons";
 import type { ComponentType } from "react";
-import { occasions, cities, guestPresets } from "@/lib/data";
+import {
+  occasions,
+  cities,
+  guestPresets,
+  DEFAULT_VENDOR_LEAD_DAYS,
+} from "@/lib/data";
+import { isoAfterDays } from "@/lib/bookingPricing";
 import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
 import {
@@ -136,7 +142,12 @@ export default function Hero() {
   if (occasionId) stallParams.set("occasion", occasionId);
   if (isOtherOccasion && customOccasion.trim())
     stallParams.set("occName", customOccasion.trim());
-  if (date) stallParams.set("date", toYmd(date));
+  // The picker pre-fills the occasion's lead (a Wedding is a month out), which
+  // suits a Feast but not a stall. Unless the guest picked a date themselves,
+  // Single Stall starts at the default vendor lead (2 days) instead.
+  const pickedDate =
+    date && toYmd(date) !== isoAfterDays(occasionLead) ? toYmd(date) : null;
+  stallParams.set("date", pickedDate ?? isoAfterDays(DEFAULT_VENDOR_LEAD_DAYS));
   stallParams.set("guests", guests);
   const vendorsHref = `/book/stall?${stallParams.toString()}`;
 

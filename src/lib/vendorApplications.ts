@@ -212,6 +212,7 @@ export function toAdminApplication(
     speciality: r.speciality,
     requestedTiers: r.requestedTiers,
     assignedTiers: r.assignedTiers,
+    ...(r.cateringCategories ? { cateringCategories: r.cateringCategories } : {}),
     submitted: r.submitted,
     status: r.status,
     email: r.email,

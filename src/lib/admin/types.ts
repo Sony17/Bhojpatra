@@ -160,6 +160,9 @@ export interface VendorApplication extends PendingVendorApproval {
    *  admin decides — the console then defaults the editor to `requestedTiers`
    *  (the price-derived baseline). Once set, this drives the public catalog. */
   assignedTiers?: VendorTier[];
+  /** Catering categories the vendor chose at registration. Without
+   *  "full-catering" the vendor doesn't offer Feast and has no tiers. */
+  cateringCategories?: string[];
   /** Rejected with a request to fix and resubmit (vs. a final rejection). */
   changesRequested?: boolean;
   /** The admin's note to the vendor on the last reject / changes request. */

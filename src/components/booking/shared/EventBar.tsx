@@ -154,6 +154,7 @@ export default function EventBar({
   paxMax,
   leadWarning,
   bookedDates,
+  offDates,
   takenMeals,
   availabilityWarning = "",
   onCheckAvailability,
@@ -204,6 +205,8 @@ export default function EventBar({
   /** Days the chosen vendor can't take (YYYY-MM-DD) — painted red in the
    *  date picker, not pickable. */
   bookedDates?: string[];
+  /** Days the vendor isn't taking orders — painted apart from booked ones. */
+  offDates?: string[];
   /** Meal periods the chosen vendor already has booked on `eventDate`. */
   takenMeals?: string[];
   /** The vendor can't take this date / meal — shown under the date. */
@@ -483,6 +486,7 @@ export default function EventBar({
             align="left"
             minDaysAhead={minDaysAhead}
             bookedDates={bookedDates}
+            offDates={offDates}
             valueIso={eventDate}
             onChange={(d) => {
               const y = d.getFullYear();

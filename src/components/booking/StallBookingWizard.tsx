@@ -1328,7 +1328,15 @@ export default function StallBookingWizard({
           customOrderLeadDays(orderVendorIds),
           Math.ceil(stallLeadHours / 24),
         );
-  const occasionLead = occasionLeadFor(occasionId, occasionList);
+  // The admin's occasion lead is only the default: a stall vendor who set
+  // their own notice in their Calendar takes precedence over it. A Feast-only
+  // occasion carried in from the home bar (a wedding) must be re-chosen, so it
+  // doesn't hold the date back meanwhile.
+  const occasionLead =
+    stallNoticeTerms?.noticeDays != null ||
+    (occasionId !== OTHER_OCCASION_ID && !occasionList.some((o) => o.id === occasionId))
+      ? 0
+      : occasionLeadFor(occasionId, occasionList);
   const effectiveLeadDays = Math.max(vendorLead, occasionLead);
 
   const daysToEvent = daysUntil(eventDate);
@@ -1383,9 +1391,15 @@ export default function StallBookingWizard({
         )
       : "";
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const stallBookedDates = useMemo(
-    () => unavailableDates(stallAvailability),
+  // Fully booked days and days the vendor switched off read differently in
+  // the picker — "already booked" vs "not available".
+  const stallOffDates = useMemo(
+    () => stallAvailability?.blocked ?? [],
     [stallAvailability],
+  );
+  const stallBookedDates = useMemo(
+    () => unavailableDates(stallAvailability).filter((d) => !stallOffDates.includes(d)),
+    [stallAvailability, stallOffDates],
   );
 
   // An occasion carried in from the home bar or an old draft may be a big
@@ -2076,6 +2090,7 @@ export default function StallBookingWizard({
       paxMax={MAX_GUESTS}
       leadWarning={leadWarning}
       bookedDates={stallBookedDates}
+      offDates={stallOffDates}
       takenMeals={eventDate ? takenMeals(stallAvailability, eventDate) : []}
       availabilityWarning={availabilityWarning}
       onCheckAvailability={rawStall ? () => setAvailabilityOpen(true) : undefined}
