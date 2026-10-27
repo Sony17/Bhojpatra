@@ -1255,8 +1255,8 @@ export default function StallBookingWizard({
       phone: referrerPhone,
     });
 
-  // The stall vendor's own GST on the food; the venue fee and service
-  // package are always 18%. The server re-prices with the same rate.
+  // The stall vendor's own GST is the only GST on the bill. The server
+  // re-prices with the same rate.
   const foodGstRate = stall?.gstRate ?? DEFAULT_VENDOR_GST_RATE;
   const totals = computeOrderTotals({
     subtotal,
@@ -1267,8 +1267,7 @@ export default function StallBookingWizard({
     referralPercent: referralCustomerPercent,
     foodGstRate,
   });
-  const servicesTaxed = venueFee + serviceTotal > 0;
-  const gstLine = gstLabel(foodGstRate, servicesTaxed, t);
+  const gstLine = gstLabel(foodGstRate, t);
   const {
     preDiscount,
     couponDiscount,
@@ -1659,7 +1658,7 @@ export default function StallBookingWizard({
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
-    lines.push(`${gstLabel(foodGstRate, servicesTaxed)}:   ${money(gst)}`);
+    lines.push(`${gstLabel(foodGstRate)}:   ${money(gst)}`);
     if (guests > 0)
       lines.push(
         `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
@@ -1742,7 +1741,7 @@ export default function StallBookingWizard({
       addOnsTotal,
       discount,
       gst,
-      gstLabel: gstLabel(foodGstRate, servicesTaxed),
+      gstLabel: gstLabel(foodGstRate),
       grandTotal,
       paid,
     };

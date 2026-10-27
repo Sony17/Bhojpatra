@@ -19,9 +19,6 @@ export const MIN_GUESTS = 50;
 export const STALL_MIN_GUESTS = 50;
 export const MAX_GUESTS = 50_000;
 
-/** GST on platform services — the venue fee and the service package. */
-export const GST_RATE = 0.18;
-
 /** The GST a vendor charges on their food, in percent — picked at onboarding.
  *  0 = No GST (a vendor without a GSTIN can't charge it). */
 export type VendorGstRate = 18 | 5 | 0;
@@ -35,26 +32,15 @@ export function isVendorGstRate(v: unknown): v is VendorGstRate {
 }
 
 /** The label beside the GST line in every summary, receipt and invoice —
- *  "GST (18%)", "GST (5% food + 18% services)", or "No GST" when nothing on
- *  the order is taxed. `servicesTaxed` = a venue fee or service package is on
- *  the bill (those are always 18%). */
+ *  "GST (18%)", "GST (5%)" or "No GST": the vendor's own rate, which is the
+ *  only GST on the bill. */
 export function gstLabel(
-  foodRate: VendorGstRate,
-  servicesTaxed: boolean,
+  rate: VendorGstRate,
   t: (en: string, hi: string) => string = (en) => en,
 ): string {
-  const services = Math.round(GST_RATE * 100);
-  if (!servicesTaxed || foodRate === services) {
-    return foodRate === 0
-      ? t("No GST", "जीएसटी नहीं")
-      : t(`GST (${foodRate}%)`, `जीएसटी (${foodRate}%)`);
-  }
-  return foodRate === 0
-    ? t(`GST (food exempt + ${services}% services)`, `जीएसटी (भोजन पर नहीं · सेवाओं पर ${services}%)`)
-    : t(
-        `GST (${foodRate}% food + ${services}% services)`,
-        `जीएसटी (भोजन ${foodRate}% · सेवाएँ ${services}%)`,
-      );
+  return rate === 0
+    ? t("No GST", "जीएसटी नहीं")
+    : t(`GST (${rate}%)`, `जीएसटी (${rate}%)`);
 }
 /** Advance booking fee — guests lock a date by paying this share of the grand
  *  total up front; the balance is settled later (in full or over EMIs). */
@@ -108,8 +94,8 @@ export interface OrderTotalsInput {
   coupon?: { percent: number; cap: number } | null;
   /** Customer-side referral discount as a percent of the catering base. */
   referralPercent?: number;
-  /** The vendor's GST on food (menu + add-ons, after discounts), in percent.
-   *  Defaults to {@link DEFAULT_VENDOR_GST_RATE}. */
+  /** The vendor's GST, in percent — charged on the whole taxable amount
+   *  (food after discounts + venue fee + services). Defaults to {@link DEFAULT_VENDOR_GST_RATE}. */
   foodGstRate?: VendorGstRate;
 }
 
@@ -119,10 +105,6 @@ export interface OrderTotals {
   referralDiscount: number;
   discount: number;
   taxable: number;
-  /** GST on the food at the vendor's rate. */
-  foodGst: number;
-  /** GST on the venue fee + service package (always 18%). */
-  serviceGst: number;
   gst: number;
   grandTotal: number;
 }
@@ -153,17 +135,13 @@ export function computeOrderTotals({
   );
   const discount = couponDiscount + referralDiscount;
   const taxable = preDiscount - discount + venueFee + serviceTotal;
-  const foodGst = ((preDiscount - discount) * foodGstRate) / 100;
-  const serviceGst = (venueFee + serviceTotal) * GST_RATE;
-  const gst = foodGst + serviceGst;
+  const gst = (taxable * foodGstRate) / 100;
   return {
     preDiscount,
     couponDiscount,
     referralDiscount,
     discount,
     taxable,
-    foodGst,
-    serviceGst,
     gst,
     grandTotal: taxable + gst,
   };

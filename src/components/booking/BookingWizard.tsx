@@ -117,7 +117,6 @@ import {
 import {
   MIN_GUESTS,
   MAX_GUESTS,
-  GST_RATE,
   DEFAULT_VENDOR_GST_RATE,
   gstLabel,
   type VendorGstRate,
@@ -1686,11 +1685,8 @@ export default function BookingWizard() {
   // The venue booking fee and the feast-wide service package are taxed
   // alongside the catering but aren't subject to the catering coupon.
   const taxable = preDiscount - discount + venueFee + serviceTotal;
-  const gst =
-    ((preDiscount - discount) * foodGstRate) / 100 +
-    (venueFee + serviceTotal) * GST_RATE;
-  const servicesTaxed = venueFee + serviceTotal > 0;
-  const gstLine = gstLabel(foodGstRate, servicesTaxed, t);
+  const gst = (taxable * foodGstRate) / 100;
+  const gstLine = gstLabel(foodGstRate, t);
   const grandTotal = taxable + gst;
 
   // Booking id: this browser's booking salt + the order's shape — stable for
@@ -1881,7 +1877,7 @@ export default function BookingWizard() {
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
-    lines.push(`${gstLabel(foodGstRate, servicesTaxed)}:   ${money(gst)}`);
+    lines.push(`${gstLabel(foodGstRate)}:   ${money(gst)}`);
     if (guests > 0)
       lines.push(
         `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
@@ -1993,7 +1989,7 @@ export default function BookingWizard() {
       addOnsTotal,
       discount,
       gst,
-      gstLabel: gstLabel(foodGstRate, servicesTaxed),
+      gstLabel: gstLabel(foodGstRate),
       grandTotal,
       paid,
     };
