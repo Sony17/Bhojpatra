@@ -1,3 +1,4 @@
+import { needsReReview, RE_REVIEW } from "@/lib/admin/types";
 import { requireRole } from "@/lib/auth";
 import { randomUUID } from "crypto";
 import {
@@ -18,6 +19,7 @@ import {
   type VendorTier,
 } from "@/lib/admin/types";
 import {
+  effectiveGstRateOf,
   listLiveVendorRecords,
   stripBadgeGrants,
   cleanBadges,
@@ -288,7 +290,7 @@ export async function GET(request: Request) {
       (!r.ownerUserId &&
         vendors.find((v) => v.ownerEmail?.trim().toLowerCase() === email)) ||
       null;
-    const summary = vendor ? offerSummary(vendor) : null;
+    const summary = vendor ? offerSummary(vendor, effectiveGstRateOf(records, vendor)) : null;
     return { ...toAdminApplication(r), ...(summary ? { offerSummary: summary } : {}) };
   });
 
@@ -302,7 +304,9 @@ export async function GET(request: Request) {
       a.id.toLowerCase().includes(needle) ||
       a.business.toLowerCase().includes(needle) ||
       a.owner.toLowerCase().includes(needle);
-    const matchesStatus = status === "All" || a.status === status;
+    const matchesStatus =
+      status === "All" ||
+      (status === RE_REVIEW ? needsReReview(a) : a.status === status);
     return matchesQ && matchesStatus;
   });
   const start = (page - 1) * pageSize;
@@ -320,7 +324,7 @@ const COURSE_NAME = new Map(menuCategories.map((c) => [c.id, c.name]));
 
 /** Compact review summary of a vendor's saved (current, possibly pending)
  *  listing for the approvals console. */
-function offerSummary(v: LiveVendorRecord): VendorOfferSummary {
+function offerSummary(v: LiveVendorRecord, gstRateBilled: number): VendorOfferSummary {
   return {
     vendorId: v.id,
     services: (v.serviceCategories ?? []).map((id) => SERVICE_NAME.get(id) ?? id),
@@ -346,5 +350,7 @@ function offerSummary(v: LiveVendorRecord): VendorOfferSummary {
     bainaBoxes: (v.bainaBoxes ?? []).map((b) => ({ name: b.name, price: b.price })),
     counters: v.counters?.length ?? 0,
     moderation: v.moderation ?? "Pending",
+    ...(v.gstRate !== undefined ? { gstRatePicked: v.gstRate } : {}),
+    gstRateBilled,
   };
 }

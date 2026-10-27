@@ -63,6 +63,7 @@ export function Sheet({
   children,
   footer,
   wide,
+  overlayClassName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -71,6 +72,8 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  /** Overrides the backdrop's stacking (e.g. above a z-[90] Drawer). */
+  overlayClassName?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -87,7 +90,7 @@ export function Sheet({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/50 sm:items-center sm:p-4"
+      className={cn("fixed inset-0 z-[70] flex items-end justify-center bg-ink/50 sm:items-center sm:p-4", overlayClassName)}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { setBookingBarState } from "@/lib/bookingBar";
 import { useCompareTrayState } from "@/lib/compareTray";
 import { StickyActionBar } from "@/components/ui";
@@ -21,7 +21,7 @@ export default function StickyBookingBar({
   priceNote?: string;
   cta: string;
   href?: string;
-  onClick?: () => void;
+  onClick?: (e: MouseEvent<HTMLElement>) => void;
   hidden?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);

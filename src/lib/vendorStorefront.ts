@@ -192,6 +192,7 @@ export function collectStalls(categories: MenuCategory[]): BookableStall[] {
         terms?.minPaxGuarantee ?? 0,
       );
       const leadHours =
+        (terms?.noticeDays != null ? terms.noticeDays * 24 : undefined) ??
         terms?.leadHours ??
         (typeof v.leadDays === "number" ? v.leadDays * 24 : undefined);
       const existing = byId.get(v.id);

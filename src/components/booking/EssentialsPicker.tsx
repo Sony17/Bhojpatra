@@ -41,7 +41,8 @@ export default function EssentialsPicker({
   const count = packages.length;
 
   return (
-    <div className="space-y-2">
+    // Capped on wide screens so four photo tiles stay a strip, not a gallery.
+    <div className="space-y-2 sm:max-w-3xl">
       <div
         role="radiogroup"
         aria-label={t("Service package", "सर्विस पैकेज")}
@@ -62,6 +63,13 @@ export default function EssentialsPicker({
             icon={pkg.icon}
             photo={servicePhoto(pkg)}
             title={lang === "hi" ? pkg.nameHi : pkg.name}
+            price={
+              serviceTotal(pkg, guests) <= 0
+                ? t("Free", "मुफ़्त")
+                : pkg.perPlate
+                  ? `${money(serviceRate(pkg, guests))}${t("/guest", "/मेहमान")}`
+                  : money(serviceRate(pkg, guests))
+            }
           />
         ))}
       </div>
@@ -79,19 +87,22 @@ export default function EssentialsPicker({
   );
 }
 
-/** One selectable tile in the tier row. */
+/** One selectable tile in the tier row, priced for this head-count so the
+ *  packages compare at a glance. */
 function Tile({
   selected,
   onSelect,
   icon,
   photo,
   title,
+  price,
 }: {
   selected: boolean;
   onSelect: () => void;
   icon: ReactNode;
   photo?: string;
   title: string;
+  price: string;
 }) {
   return (
     <button
@@ -109,7 +120,7 @@ function Tile({
       {selected && (
         <span
           aria-hidden="true"
-          className="absolute -right-1 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-maroon text-white ring-2 ring-white"
+          className="absolute -right-1 -top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-maroon text-white ring-2 ring-white"
         >
           <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m5 12 5 5 9-10" />
@@ -136,6 +147,9 @@ function Tile({
       >
         {title}
       </span>
+      <span className="mt-auto pt-0.5 text-[10px] font-bold leading-tight text-maroon min-[390px]:text-[11px] sm:text-xs">
+        {price}
+      </span>
     </button>
   );
 }
@@ -155,7 +169,9 @@ function PackageDetail({
   const rate = serviceRate(pkg, guests);
   const total = serviceTotal(pkg, guests);
   const activeTier = serviceTierFor(pkg, guests);
-  const tiers = pkg.guestTiers ?? [];
+  // Only the band this head-count falls in — the other bands are noise to the
+  // customer.
+  const tiers = activeTier ? [activeTier] : (pkg.guestTiers ?? []);
 
   return (
     <DetailCard

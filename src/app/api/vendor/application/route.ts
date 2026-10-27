@@ -14,6 +14,7 @@ import {
   validateSubmission,
 } from "@/lib/vendorOnboarding";
 import { sendVendorApplicationAlert } from "@/lib/email";
+import { needsReReview } from "@/lib/admin/types";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,8 @@ export async function GET() {
 }
 
 // POST /api/vendor/application → submit (or resubmit) the onboarding wizard.
-// Body: { ownerName, phone, gstNumber, fssaiNumber, docIds: { gst?, fssai? } }.
+// Body: { ownerName, phone, gstNumber, panNumber, aadhaarNumber, fssaiNumber,
+//         docIds: { gst?, pan?, aadhaar?, fssai? } }.
 // The listing itself is read from the vendor's SAVED record (the wizard saves a
 // draft first), so what the admin reviews is exactly what would go live.
 export async function POST(request: Request) {
@@ -104,8 +106,9 @@ export async function POST(request: Request) {
     });
     await saveVendorApplication(record);
 
-    // New or back-in-queue applications alert the owners (best-effort).
-    if (record.status === "Pending") {
+    // New or back-in-queue applications alert the owners (best-effort) — and
+    // so does a live vendor's KYC change, which needs a re-check.
+    if (record.status === "Pending" || needsReReview(record)) {
       await sendVendorApplicationAlert(record).catch((err) =>
         console.error("Vendor application alert failed", err),
       );

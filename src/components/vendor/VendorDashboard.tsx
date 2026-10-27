@@ -4,15 +4,16 @@
  * Vendor Portal (handover: vendor-registration-v2/index.html — desktop
  * dashboard shell + 390px mobile dashboard shell). Owns the full viewport: red
  * sidebar + sticky topbar on desktop, AppBar + fixed bottom nav on mobile.
- * Dashboard · My Services · Orders are live; Calendar, Finances, Reviews and
- * Profile & KYC are "Soon". Wired to GET /api/vendor/menu (the vendor's live
- * record) and GET/PATCH /api/vendor/orders.
+ * Dashboard · My Services · Orders · Calendar are live; Finances and Reviews
+ * are "Soon". Wired to GET /api/vendor/menu (the vendor's live record),
+ * GET/PATCH /api/vendor/orders and GET/POST /api/vendor/availability.
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import CreamLogo from "@/components/CreamLogo";
 import MenuBuilder from "@/components/vendor/MenuBuilder";
+import AvailabilityTab from "@/components/vendor/AvailabilityTab";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import type { LiveVendorRecord } from "@/lib/vendorMenus";
 import { dishReviewKey } from "@/lib/contentReview";
@@ -24,7 +25,7 @@ import { cn } from "@/components/ui/cn";
 import { logout } from "@/lib/session";
 import { BtnBack, BtnNext, DIET_NAMES, Sheet, stallCategoryName } from "@/components/vendor/portalUi";
 
-type Tab = "dashboard" | "services" | "orders";
+type Tab = "dashboard" | "services" | "orders" | "calendar";
 interface OrdersPayload {
   pending: VendorOrderSummary[];
   confirmed: VendorOrderSummary[];
@@ -111,7 +112,6 @@ function Icon({ name, size = 18, className }: { name: IconName; size?: number; c
 }
 
 const SOON: { label: string; icon: IconName; toast: string }[] = [
-  { label: "Calendar", icon: "calendar", toast: "Calendar scheduling module — Coming Soon" },
   { label: "Finances", icon: "wallet", toast: "Partner finances & payouts — Coming Soon" },
   { label: "Reviews", icon: "star", toast: "Customer reviews & ratings — Coming Soon" },
 ];
@@ -119,7 +119,7 @@ const SOON: { label: string; icon: IconName; toast: string }[] = [
  *  which reopens pre-filled for a registered vendor. */
 const PROFILE_HREF = "/vendor/register";
 const TIER_LABEL: Record<string, string> = { Silver: "Silver / Bhoj City", Gold: "Gold / Bhoj Signature", Platinum: "Platinum / Bhoj Royale" };
-const BREADCRUMB: Record<Tab, string> = { dashboard: "Dashboard Home", services: "My Services", orders: "Orders" };
+const BREADCRUMB: Record<Tab, string> = { dashboard: "Dashboard Home", services: "My Services", orders: "Orders", calendar: "Calendar" };
 
 /* Shared surface styles (handover: .metric-card / .health-card / .feed-panel). */
 const CARD = "rounded-card border border-cream/30 bg-white shadow-card";
@@ -247,6 +247,7 @@ export default function VendorDashboard() {
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "services", label: "My Services", icon: "services", count: configured.length, soft: true },
     { id: "orders", label: "Orders", icon: "orders", count: orders.pending.length },
+    { id: "calendar", label: "Calendar", icon: "calendar" },
   ];
 
   const ctx: HomeCtx = {
@@ -423,6 +424,8 @@ export default function VendorDashboard() {
             </>
           ) : tab === "services" ? (
             <ServicesHub services={services} onEdit={editServices} />
+          ) : tab === "calendar" ? (
+            <AvailabilityTab orders={[...orders.pending, ...orders.confirmed]} flash={flash} />
           ) : (
             <OrdersPipeline orders={orders} upcoming={upcoming} onReview={setReview} onDecline={(o) => setDeclining(o)} onPrep={setPrep} />
           )}

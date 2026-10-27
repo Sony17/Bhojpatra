@@ -91,7 +91,8 @@ export default function DatePicker({
    *  picker uncontrolled (the Hero hero-bar usage). */
   valueIso?: string;
   /** Minimum advance notice, in days — dates before `today + minDaysAhead` are
-   *  disabled (e.g. a wedding that needs 30 days' lead). Defaults to 1 (tomorrow). */
+   *  disabled (e.g. a wedding that needs 30 days' lead). Defaults to 1
+   *  (tomorrow); 0 opens today. */
   minDaysAhead?: number;
   /** Dates already taken as `YYYY-MM-DD` — a venue's existing bookings. These
    *  paint red and can't be picked, and a legend explains the colour. */
@@ -186,10 +187,11 @@ export default function DatePicker({
   const booked = useMemo(() => new Set(bookedDates ?? []), [bookedDates]);
 
   // The earliest selectable day — today plus the required advance notice. Dates
-  // before this are disabled in the grid (defaults to tomorrow).
+  // before this are disabled in the grid (defaults to tomorrow; 0 = today, for
+  // a same-day Single Stall).
   const minDate = useMemo(() => {
     const d = startOfDay(new Date());
-    d.setDate(d.getDate() + Math.max(1, minDaysAhead));
+    d.setDate(d.getDate() + Math.max(0, minDaysAhead));
     return d;
   }, [minDaysAhead]);
 

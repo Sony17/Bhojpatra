@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cn } from "./cn";
 import Button from "./Button";
 
@@ -24,7 +24,7 @@ export default function StickyActionBar({
   priceNote?: string;
   cta?: string;
   href?: string;
-  onClick?: () => void;
+  onClick?: (e: MouseEvent<HTMLElement>) => void;
   loading?: boolean;
   disabled?: boolean;
   children?: ReactNode;

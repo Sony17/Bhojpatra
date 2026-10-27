@@ -38,6 +38,8 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Processed: "soft",
   Resolved: "solid",
   Approved: "solid",
+  // A live vendor's changed KYC awaiting a re-check — needs attention.
+  "Re-review": "outline",
   // Priority
   High: "solid",
   Medium: "outline",

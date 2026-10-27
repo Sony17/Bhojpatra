@@ -590,9 +590,17 @@ export async function sendVendorApplicationAlert(
   record: VendorApplicationRecord,
 ): Promise<void> {
   if (!ALERT_ENABLED.vendorApplication) return;
+  // A live (Verified) vendor whose changed KYC documents await a re-check.
+  const reReview =
+    record.status === "Verified" && record.documents.some((d) => d.status === "Pending");
+  const changed = record.documents.filter((d) => d.status === "Pending").map((d) => d.kind);
   await sendAlert({
-    subject: `New vendor application — ${record.business}`,
-    heading: `New vendor application (${record.id})`,
+    subject: reReview
+      ? `KYC changed — re-review ${record.business}`
+      : `New vendor application — ${record.business}`,
+    heading: reReview
+      ? `Live vendor changed KYC: ${changed.join(", ")} (${record.id})`
+      : `New vendor application (${record.id})`,
     fields: [
       { label: "Business", value: record.business },
       { label: "Owner", value: record.owner },
@@ -601,7 +609,23 @@ export async function sendVendorApplicationAlert(
       { label: "City", value: record.city || "—" },
       { label: "Cuisines", value: record.cuisines.join(", ") || "—" },
       { label: "GST", value: record.gstNumber || "—" },
+      // Aadhaar is deliberately left out of email — review it in the console.
+      { label: "PAN", value: record.panNumber || "—" },
       { label: "FSSAI", value: record.fssaiNumber || "—" },
+      // Account number masked — the full one is in the console only.
+      {
+        label: "Payout account",
+        value:
+          [
+            record.payoutAccount?.accountNumber &&
+              maskAccountNumber(record.payoutAccount.accountNumber),
+            record.payoutAccount?.ifsc,
+            record.payoutAccount?.upiId && "UPI",
+            record.upiQrDocId && "UPI QR",
+          ]
+            .filter(Boolean)
+            .join(" · ") || "—",
+      },
     ],
   });
 }

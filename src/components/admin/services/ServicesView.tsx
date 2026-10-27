@@ -223,7 +223,8 @@ export default function ServicesView() {
         <strong className="text-ink">Price by guests</strong>{" "}
         table for the
         order&rsquo;s head-count (&times; guests when per-guest); a head-count no
-        band covers falls back to the{" "}
+        band covers takes the nearest band below it (or the first band). Only a
+        package with no bands charges its{" "}
         <strong className="text-ink">Starting price</strong>. The include /
         not-included / best-for lists are one item per line.
       </p>

@@ -134,17 +134,21 @@ export function ChoiceChip({
   onClick,
   children,
   className,
+  disabled,
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
       className={cn("choice-chip", active && "active", className)}
     >
       {active && <span className="chip-check">✓</span>}

@@ -15,7 +15,11 @@ import {
 } from "@/lib/data";
 import { assembleMenuCategories } from "@/lib/vendorMenus";
 import { readSingleton } from "@/lib/store";
-import { computeOrderTotals } from "@/lib/bookingPricing";
+import {
+  computeOrderTotals,
+  DEFAULT_VENDOR_GST_RATE,
+  type VendorGstRate,
+} from "@/lib/bookingPricing";
 import { serviceTotal } from "@/lib/servicePricing";
 import { readCoupons } from "@/lib/coupons";
 import { adminCoupons as SEED_COUPONS } from "@/lib/admin/mockData";
@@ -123,15 +127,17 @@ export async function resolveCoupon(
  *  is on the roster; `categoryIds` lists the courses actually billed. */
 async function stallPerPlate(
   claim: StallPricingClaim,
-): Promise<{ perPlate: number; categoryIds: string[] } | null> {
+): Promise<{ perPlate: number; categoryIds: string[]; gstRate: VendorGstRate } | null> {
   const categories = await assembleMenuCategories();
   let found = false;
+  let gstRate: VendorGstRate = DEFAULT_VENDOR_GST_RATE;
   let perPlate = 0;
   const categoryIds: string[] = [];
   for (const cat of categories) {
     const v = cat.vendors.find((x) => x.id === claim.stallId && x.items.length);
     if (!v) continue;
     found = true;
+    gstRate = v.gstRate ?? DEFAULT_VENDOR_GST_RATE;
     // Only dish ids that really are on this course count as picks.
     const picks = (claim.picks[cat.id] ?? []).filter((id) =>
       v.items.some((it) => it.id === id),
@@ -145,7 +151,7 @@ async function stallPerPlate(
       .filter((it) => picks.includes(it.id))
       .reduce((s, it) => s + (it.price ?? v.perPlate), 0);
   }
-  return found ? { perPlate, categoryIds } : null;
+  return found ? { perPlate, categoryIds, gstRate } : null;
 }
 
 export interface StallQuote {
@@ -170,7 +176,7 @@ export async function expectedStallTotal(
 ): Promise<StallQuote | null> {
   const menu = await stallPerPlate(claim);
   if (menu === null) return null;
-  const { perPlate, categoryIds } = menu;
+  const { perPlate, categoryIds, gstRate } = menu;
 
   const addOnsTotal = addOns
     .filter((a) => claim.addOnIds.includes(a.id))
@@ -188,6 +194,8 @@ export async function expectedStallTotal(
     serviceTotal: serviceCharge,
     coupon: coupon ? { percent: coupon.percent, cap: coupon.cap } : null,
     referralPercent,
+    // The stall vendor's own GST on food (18 / 5 / none) — as the wizard bills.
+    foodGstRate: gstRate,
   });
   return { grandTotal, perPlate, categoryIds };
 }

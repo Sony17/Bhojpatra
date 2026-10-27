@@ -3,7 +3,9 @@
  *  Both booking flows — the tiered feast wizard (`/book`) and the Single Stall
  *  wizard (`/book/stall`) — price an order the same way once the menu total is
  *  known: catering subtotal + extras, less coupon/referral, plus the untaxed-by-
- *  coupon venue fee and service package, then 18% GST. Only the *menu* differs
+ *  coupon venue fee and service package, then GST — the food at the vendor's
+ *  own rate (18% / 5% / none, set at onboarding), the venue fee and service
+ *  package always at 18%. Only the *menu* differs
  *  (per-vendor uplift on a tier, per-dish on a single stall), so that number is
  *  an input here rather than something this module derives.
  *
@@ -14,8 +16,43 @@
 export const MIN_GUESTS = 50;
 export const MAX_GUESTS = 50_000;
 
+/** GST on platform services — the venue fee and the service package. */
 export const GST_RATE = 0.18;
 
+/** The GST a vendor charges on their food, in percent — picked at onboarding.
+ *  0 = No GST (a vendor without a GSTIN can't charge it). */
+export type VendorGstRate = 18 | 5 | 0;
+export const VENDOR_GST_RATES: VendorGstRate[] = [18, 5, 0];
+/** A vendor who never picked a rate (curated seeds, older records) bills the
+ *  platform's long-standing 18%. */
+export const DEFAULT_VENDOR_GST_RATE: VendorGstRate = 18;
+
+export function isVendorGstRate(v: unknown): v is VendorGstRate {
+  return v === 18 || v === 5 || v === 0;
+}
+
+/** The label beside the GST line in every summary, receipt and invoice —
+ *  "GST (18%)", "GST (5% food + 18% services)", or "No GST" when nothing on
+ *  the order is taxed. `servicesTaxed` = a venue fee or service package is on
+ *  the bill (those are always 18%). */
+export function gstLabel(
+  foodRate: VendorGstRate,
+  servicesTaxed: boolean,
+  t: (en: string, hi: string) => string = (en) => en,
+): string {
+  const services = Math.round(GST_RATE * 100);
+  if (!servicesTaxed || foodRate === services) {
+    return foodRate === 0
+      ? t("No GST", "जीएसटी नहीं")
+      : t(`GST (${foodRate}%)`, `जीएसटी (${foodRate}%)`);
+  }
+  return foodRate === 0
+    ? t(`GST (food exempt + ${services}% services)`, `जीएसटी (भोजन पर नहीं · सेवाओं पर ${services}%)`)
+    : t(
+        `GST (${foodRate}% food + ${services}% services)`,
+        `जीएसटी (भोजन ${foodRate}% · सेवाएँ ${services}%)`,
+      );
+}
 /** Advance booking fee — guests lock a date by paying this share of the grand
  *  total up front; the balance is settled later (in full or over EMIs). */
 export const ADVANCE_RATE = 0.1;
@@ -68,6 +105,9 @@ export interface OrderTotalsInput {
   coupon?: { percent: number; cap: number } | null;
   /** Customer-side referral discount as a percent of the catering base. */
   referralPercent?: number;
+  /** The vendor's GST on food (menu + add-ons, after discounts), in percent.
+   *  Defaults to {@link DEFAULT_VENDOR_GST_RATE}. */
+  foodGstRate?: VendorGstRate;
 }
 
 export interface OrderTotals {
@@ -76,6 +116,10 @@ export interface OrderTotals {
   referralDiscount: number;
   discount: number;
   taxable: number;
+  /** GST on the food at the vendor's rate. */
+  foodGst: number;
+  /** GST on the venue fee + service package (always 18%). */
+  serviceGst: number;
   gst: number;
   grandTotal: number;
 }
@@ -90,6 +134,7 @@ export function computeOrderTotals({
   serviceTotal,
   coupon,
   referralPercent = 0,
+  foodGstRate = DEFAULT_VENDOR_GST_RATE,
 }: OrderTotalsInput): OrderTotals {
   const preDiscount = subtotal + addOnsTotal;
   const couponDiscount = coupon
@@ -105,13 +150,17 @@ export function computeOrderTotals({
   );
   const discount = couponDiscount + referralDiscount;
   const taxable = preDiscount - discount + venueFee + serviceTotal;
-  const gst = taxable * GST_RATE;
+  const foodGst = ((preDiscount - discount) * foodGstRate) / 100;
+  const serviceGst = (venueFee + serviceTotal) * GST_RATE;
+  const gst = foodGst + serviceGst;
   return {
     preDiscount,
     couponDiscount,
     referralDiscount,
     discount,
     taxable,
+    foodGst,
+    serviceGst,
     gst,
     grandTotal: taxable + gst,
   };

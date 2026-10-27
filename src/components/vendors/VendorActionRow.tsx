@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 
@@ -11,6 +11,7 @@ import { useLang } from "@/lib/i18n";
 export default function VendorActionRow({
   bookHref,
   bookLabel,
+  onBook,
   vendorName,
   vendorCity,
   priceFrom,
@@ -23,6 +24,8 @@ export default function VendorActionRow({
   /** Primary CTA text — defaults to "Book Now"; an enquiry / order CTA
    *  passes its own. */
   bookLabel?: string;
+  /** Click hook on Book (the Single Stall availability check). */
+  onBook?: (e: MouseEvent<HTMLElement>) => void;
   vendorName: string;
   vendorCity?: string;
   priceFrom?: number;
@@ -69,6 +72,7 @@ export default function VendorActionRow({
       {/* 1. Book Now */}
       <Link
         href={bookHref}
+        onClick={onBook}
         className="focus-ring flex min-h-[2.75rem] items-center justify-center gap-0.5 sm:gap-1.5 rounded-xl bg-maroon px-1 sm:px-1.5 py-2 text-[10px] xs:text-[11px] sm:text-sm font-semibold text-cream shadow-sm transition hover:bg-maroon-dark active:scale-95"
       >
         <svg

@@ -1,6 +1,10 @@
 import { isLinkedPhotoUrl } from "@/lib/photoLinks";
 import { requireRole } from "@/lib/auth";
-import { findApplicationForOwner } from "@/lib/vendorApplications";
+import {
+  findApplicationForOwner,
+  saveVendorApplication,
+  withHistory,
+} from "@/lib/vendorApplications";
 import {
   findPhotoByOwner,
   listPhotosByOwner,
@@ -210,6 +214,10 @@ export async function PUT(request: Request) {
       : check.value.stallConfig;
 
     const verified = app?.status === "Verified";
+    // GST on food: the vendor's pick is stored as-is (kept when this save
+    // sent none). It only BILLS on an admin-verified GSTIN — enforced where
+    // prices are computed (`effectiveGstRateOf`), not here.
+    const gstRate = check.value.gstRate ?? existing?.gstRate;
 
     const candidate: LiveVendorRecord = {
       ...(existing ?? {}),
@@ -235,6 +243,7 @@ export async function PUT(request: Request) {
       // Wizard progress: keep what's stored when this save didn't send any
       // (the dashboard menu builder doesn't).
       onboarding: check.value.onboarding ?? existing?.onboarding,
+      ...(gstRate !== undefined ? { gstRate } : {}),
     };
 
     // Content moderation (see nextModerationState): a Hidden vendor stays
@@ -248,6 +257,25 @@ export async function PUT(request: Request) {
     };
 
     await saveVendor(record);
+
+    // A GST-rate change bills customers at once (no moderation), so it goes on
+    // the application's audit trail for the admin to see. Best-effort.
+    const rateOf = (r: number | undefined) => (r === undefined ? "18% (default)" : r === 0 ? "No GST" : `${r}%`);
+    if (app && existing && existing.gstRate !== record.gstRate) {
+      try {
+        await saveVendorApplication({
+          ...app,
+          history: withHistory(app, {
+            at: now,
+            by: "vendor",
+            action: "gst-rate",
+            note: `GST on food: ${rateOf(existing.gstRate)} → ${rateOf(record.gstRate)}`,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to log GST rate change", err);
+      }
+    }
 
     // Clean up dish/box photos no longer referenced by any item or box.
     const referenced = new Set(

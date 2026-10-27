@@ -1,5 +1,6 @@
 "use client";
 
+import type { VendorGstRate } from "@/lib/bookingPricing";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSession } from "@/lib/session";
 import type {
@@ -20,7 +21,7 @@ import type {
 import type { VendorApplicationStage } from "@/lib/vendorOnboarding";
 import VendorContextHeader from "./VendorContextHeader";
 import Step1IdentityOps from "./steps/Step1IdentityOps";
-import Step2KycCompliance from "./steps/Step2KycCompliance";
+import Step2KycCompliance, { type PayoutForm } from "./steps/Step2KycCompliance";
 import Step3Offerings from "./steps/Step3Offerings";
 import CateringBuilder from "./builders/catering/CateringBuilder";
 import SingleStallBuilder from "./builders/stall/SingleStallBuilder";
@@ -52,7 +53,12 @@ export interface OnboardingState {
 
   // Step 2: KYC & Compliance
   gstNumber: string;
+  /** GST on food billed to customers (18 / 5 / 0). Undefined until picked. */
+  gstRate?: VendorGstRate;
+  panNumber: string;
+  aadhaarNumber: string;
   fssaiNumber: string;
+  payout: PayoutForm;
   documents: Record<
     string,
     { fileName: string; status: "idle" | "uploading" | "done" | "error"; id?: string }
@@ -107,6 +113,14 @@ interface ApplicationInfo {
  *  (component toggles, quota counts, packaging style) carry a default. */
 const EMPTY_STALL: SingleStallConfig = { categories: [], categoryPricing: {}, equipment: [] };
 
+
+/** The payout account to save / submit — everything but the wizard-only
+ *  confirm field. */
+function payoutOf(form: PayoutForm) {
+  const account = { ...form };
+  delete account.confirmAccountNumber;
+  return account;
+}
 export default function VendorOnboarding() {
   const session = useSession();
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -144,7 +158,10 @@ export default function VendorOnboarding() {
     googleRating: undefined,
     googleReviews: undefined,
     gstNumber: "",
+    panNumber: "",
+    aadhaarNumber: "",
     fssaiNumber: "",
+    payout: {},
     documents: {},
     badges: { applied: [], granted: [], applications: [] },
     serviceCategories: [],
@@ -252,7 +269,14 @@ export default function VendorOnboarding() {
             // Accounts don't store a phone; signup hands it over via the browser draft.
             phone: draft.phone || prefill.phone || readDraft(session?.email).phone || prev.phone,
             gstNumber: draft.gstNumber || prev.gstNumber,
+            panNumber: draft.panNumber || prev.panNumber,
+            gstRate: record?.gstRate ?? prev.gstRate,
+            aadhaarNumber: draft.aadhaarNumber || prev.aadhaarNumber,
             fssaiNumber: draft.fssaiNumber || prev.fssaiNumber,
+            // A saved account was already confirmed when it was typed.
+            payout: draft.payout
+              ? { ...draft.payout, confirmAccountNumber: draft.payout.accountNumber }
+              : prev.payout,
             documents: Object.fromEntries(
               Object.entries(draft.docs ?? {}).map(([k, d]) => [
                 k,
@@ -379,6 +403,8 @@ export default function VendorOnboarding() {
           minPax: target.minPax,
           serviceCities: target.serviceCities,
           dietaryOffering: target.dietaryOffering,
+          // GST on food — the server forces No GST without a GSTIN.
+          ...(target.gstRate !== undefined ? { gstRate: target.gstRate } : {}),
           googleRating: target.googleRating,
           googleReviews: target.googleReviews,
           serviceCategories: target.serviceCategories,
@@ -411,7 +437,10 @@ export default function VendorOnboarding() {
             ownerName: target.ownerName,
             phone: target.phone,
             gstNumber: target.gstNumber,
+            panNumber: target.panNumber,
+            aadhaarNumber: target.aadhaarNumber,
             fssaiNumber: target.fssaiNumber,
+            payout: payoutOf(target.payout),
             docs,
             step: Math.min(step, 5),
             maxPhase: Math.max(maxPhase, Math.min(step, 5) - 1),
@@ -462,7 +491,14 @@ export default function VendorOnboarding() {
   };
 
   const handleStep1Continue = () => saveThen(() => goStep(2), 2);
-  const handleStep2Continue = () => saveThen(() => goStep(3), 3);
+  // A live (verified) vendor's KYC edits go to the admin as soon as Step 2 is
+  // done — not only on the final Submit, which they may never reach, leaving
+  // the change stranded in their draft. Their listing stays live meanwhile.
+  const handleStep2Continue = () =>
+    saveThen(async () => {
+      if (application?.stage === "verified" && !(await postApplication())) return;
+      goStep(3);
+    }, 3);
 
   const handleStep3Finish = () =>
     saveThen(() => {
@@ -526,10 +562,9 @@ export default function VendorOnboarding() {
     goStep(4);
   };
 
-  // Final submit: save the draft, then create / resubmit the ONE application
-  // bound to this account. The server re-validates the saved listing.
-  const handleSubmit = async () => {
-    if (!(await persistDraft(undefined, { step: 5 }))) return;
+  // Create / resubmit the ONE application bound to this account from the
+  // identity + KYC fields. False (with saveError set) when it didn't go through.
+  const postApplication = async (): Promise<boolean> => {
     setSaving(true);
     setSaveError("");
     try {
@@ -540,7 +575,10 @@ export default function VendorOnboarding() {
           ownerName: formData.ownerName || session?.name || "",
           phone: formData.phone,
           gstNumber: formData.gstNumber,
+          panNumber: formData.panNumber,
+          aadhaarNumber: formData.aadhaarNumber,
           fssaiNumber: formData.fssaiNumber,
+          payout: payoutOf(formData.payout),
           docIds: Object.fromEntries(
             Object.entries(formData.documents)
               .filter(([, d]) => d.status === "done" && d.id)
@@ -551,15 +589,23 @@ export default function VendorOnboarding() {
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setSaveError(data?.error || "Couldn't submit your application. Please try again.");
-        return;
+        return false;
       }
       setApplication(data?.application ?? null);
-      goStep(6);
+      return true;
     } catch {
       setSaveError("Network error while submitting. Please try again.");
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  // Final submit: save the draft, then create / resubmit the application.
+  // The server re-validates the saved listing.
+  const handleSubmit = async () => {
+    if (!(await persistDraft(undefined, { step: 5 }))) return;
+    if (await postApplication()) goStep(6);
   };
 
   const jumpToPhase = (idx: number) => {
@@ -704,7 +750,11 @@ export default function VendorOnboarding() {
         <Step2KycCompliance
           data={{
             gstNumber: formData.gstNumber,
+            panNumber: formData.panNumber,
+            aadhaarNumber: formData.aadhaarNumber,
             fssaiNumber: formData.fssaiNumber,
+            gstRate: formData.gstRate,
+            payout: formData.payout,
             documents: formData.documents,
             badges: formData.badges,
           }}

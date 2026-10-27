@@ -153,6 +153,11 @@ export default function EventBar({
   paxMin,
   paxMax,
   leadWarning,
+  bookedDates,
+  takenMeals,
+  availabilityWarning = "",
+  onCheckAvailability,
+  minDaysAhead = 1,
   showGuests = true,
   flush = false,
   collapsible = false,
@@ -195,6 +200,18 @@ export default function EventBar({
   paxMin: number;
   paxMax: number;
   leadWarning: string;
+  /** Days the chosen vendor can't take (YYYY-MM-DD) — painted red in the
+   *  date picker, not pickable. */
+  bookedDates?: string[];
+  /** Meal periods the chosen vendor already has booked on `eventDate`. */
+  takenMeals?: string[];
+  /** The vendor can't take this date / meal — shown under the date. */
+  availabilityWarning?: string;
+  /** Opens the chosen vendor's availability calendar (a link beside Date). */
+  onCheckAvailability?: () => void;
+  /** The date picker's floor in days — tomorrow by default; 0 opens today
+   *  (a same-day Single Stall). Any longer lead is surfaced by `leadWarning`. */
+  minDaysAhead?: number;
   /** The headcount is fixed and echoed in the order summary by the Confirm
    *  step, so the editable field is hidden there to avoid a redundant control. */
   showGuests?: boolean;
@@ -446,12 +463,13 @@ export default function EventBar({
             {fieldLabel("date", t("Date", "तारीख"))}
           </span>
           {/* Branded calendar (same on-brand popup as the Hero booking bar).
-              The floor is just today (`minDaysAhead={0}`) — the lead-time
-              shortfall is surfaced softly by `leadWarning` below. */}
+              The floor is tomorrow, or today for a same-day stall
+              (`minDaysAhead`) — any longer lead-time shortfall is surfaced
+              softly by `leadWarning` below. */}
           <DatePicker
             className={
               "mt-1.5 h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
-              (leadWarning || isMissing("date") ? "border-maroon" : "border-cream focus-within:border-maroon")
+              (leadWarning || availabilityWarning || isMissing("date") ? "border-maroon" : "border-cream focus-within:border-maroon")
             }
             buttonClassName="h-12 w-full px-3.5 pr-11 text-sm"
             iconClassName="right-3.5"
@@ -459,7 +477,8 @@ export default function EventBar({
             ariaLabel={t("Event date", "इवेंट की तारीख")}
             direction="down"
             align="left"
-            minDaysAhead={0}
+            minDaysAhead={minDaysAhead}
+            bookedDates={bookedDates}
             valueIso={eventDate}
             onChange={(d) => {
               const y = d.getFullYear();
@@ -472,6 +491,21 @@ export default function EventBar({
             <span className="mt-1.5 flex items-start gap-1.5 text-xs text-maroon">
               <span aria-hidden="true">★</span>
               <span>{leadWarning}</span>
+            </span>
+          )}
+          {onCheckAvailability && (
+            <button
+              type="button"
+              onClick={onCheckAvailability}
+              className="mt-1 inline-flex min-h-[28px] items-center gap-1 text-[11px] font-bold text-maroon underline-offset-2 hover:underline"
+            >
+              {t("Check availability", "उपलब्धता देखें")}
+            </button>
+          )}
+          {availabilityWarning && (
+            <span role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-maroon">
+              <span aria-hidden="true">★</span>
+              <span>{availabilityWarning}</span>
             </span>
           )}
         </div>
@@ -685,7 +719,11 @@ export default function EventBar({
             buttonClassName={selectButtonClass}
             options={bookingMealTimes.map((m) => ({
               value: m.id,
-              label: lang === "hi" ? m.nameHi : m.name,
+              label:
+                (lang === "hi" ? m.nameHi : m.name) +
+                (takenMeals?.some((x) => x.toLowerCase() === m.id.toLowerCase())
+                  ? ` · ${t("booked", "बुक")}`
+                  : ""),
             }))}
           />
         </div>
@@ -749,7 +787,7 @@ export default function EventBar({
             (flush ? "" : chipSummary ? "mt-2.5 sm:mt-7" : "mt-5 sm:mt-7")
       }
     >
-      {Boolean(leadWarning) && !embedded && (
+      {Boolean(leadWarning || availabilityWarning) && !embedded && (
         <span
           className="absolute inset-y-0 left-0 w-1 rounded-l-[1.5rem] bg-maroon"
           aria-hidden="true"

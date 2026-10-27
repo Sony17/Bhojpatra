@@ -149,7 +149,7 @@ export interface HomeContent {
     headlineBottomHi: string;
     lede: string;
     ledeHi: string;
-    /** Booking-bar CTA label (e.g. "Find Your Perfect Feast"). */
+    /** Booking-bar CTA label (e.g. "Plan your feast"). */
     cta: string;
     ctaHi: string;
     /** Fallback backdrop when no occasion/location override matches. */
@@ -303,8 +303,8 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     lede: "Compare curated menus, customize your feast and book trusted celebration partners in minutes.",
     ledeHi:
       "क्यूरेटेड मेन्यू की तुलना करें, अपनी दावत कस्टमाइज़ करें और मिनटों में भरोसेमंद सेलिब्रेशन पार्टनर बुक करें।",
-    cta: "Find Your Perfect Feast",
-    ctaHi: "अपनी परफेक्ट दावत खोजें",
+    cta: "Plan your feast",
+    ctaHi: "अपना भोज बुक करें",
     background: "/bhoj_Hero_1.png",
     backgroundsByOccasion: { ...heroEventImages },
     backgroundsByLocation: { ...heroLocationImages },

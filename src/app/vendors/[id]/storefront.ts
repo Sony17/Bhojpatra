@@ -9,10 +9,12 @@ import {
   findVendorById,
   seedStallsHidden,
   readVendorItemLimits,
+  sellerDetailsOf,
   toPublicVendorProfile,
   type PublicVendorProfile,
 } from "@/lib/vendorMenus";
 import { listPhotosByOwner, photoUrl } from "@/lib/vendorPhotos";
+import { readVendorApplications } from "@/lib/vendorApplications";
 import {
   collectStalls,
   resolveBookableStall,
@@ -46,14 +48,16 @@ export const loadStorefront = cache(
     const stalls = categories ? collectStalls(categories) : [];
 
     if (record?.ownerUserId) {
-      const [gallery, limits] = await Promise.all([
+      const [gallery, limits, apps] = await Promise.all([
         listPhotosByOwner(record.ownerUserId, "gallery").catch(() => []),
         readVendorItemLimits(),
+        readVendorApplications().catch(() => []),
       ]);
       const profile = toPublicVendorProfile(
         record,
         gallery.map(photoUrl),
         limits[record.id],
+        sellerDetailsOf(apps, record),
       );
       if (profile) {
         // A real vendor is bookable as a stall only when they sell one (no

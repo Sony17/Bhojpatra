@@ -173,3 +173,32 @@ test("the vendor's per-day cap applies across meal slots", () => {
   assert.equal(slotConflict([lunch], { ...req, maxEventsPerDay: 2 }, now), null);
   assert.equal(slotConflict([lunch], { ...req, maxEventsPerDay: 1 }, now), "day");
 });
+
+/* ── Vendor GST on food (18 / 5 / none) ────────────────────────────────── */
+
+test("computeOrderTotals taxes food at the vendor's rate and services at 18%", async () => {
+  const { computeOrderTotals } = await import("@/lib/bookingPricing");
+  const base = { subtotal: 10000, addOnsTotal: 0, venueFee: 0, serviceTotal: 1000 };
+  // Default stays the long-standing flat 18% on everything.
+  const d = computeOrderTotals(base);
+  assert.equal(Math.round(d.gst), 1980);
+  const five = computeOrderTotals({ ...base, foodGstRate: 5 });
+  assert.equal(Math.round(five.foodGst), 500);
+  assert.equal(Math.round(five.serviceGst), 180);
+  assert.equal(Math.round(five.grandTotal), 11680);
+  const none = computeOrderTotals({ ...base, foodGstRate: 0 });
+  assert.equal(none.foodGst, 0);
+  assert.equal(Math.round(none.grandTotal), 11180);
+  // Coupons come off the food before its GST.
+  const off = computeOrderTotals({ ...base, serviceTotal: 0, foodGstRate: 5, coupon: { percent: 10, cap: 5000 } });
+  assert.equal(Math.round(off.gst), 450);
+});
+
+test("gstLabel names the rate, splitting food and services when they differ", async () => {
+  const { gstLabel } = await import("@/lib/bookingPricing");
+  assert.equal(gstLabel(18, true), "GST (18%)");
+  assert.equal(gstLabel(5, false), "GST (5%)");
+  assert.equal(gstLabel(5, true), "GST (5% food + 18% services)");
+  assert.equal(gstLabel(0, false), "No GST");
+  assert.equal(gstLabel(0, true), "GST (food exempt + 18% services)");
+});

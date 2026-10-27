@@ -17,6 +17,7 @@ import {
   packages,
   coupons,
 } from "@/lib/data";
+import { needsReReview, RE_REVIEW } from "@/lib/admin/types";
 import type {
   AdminProfile,
   PendingVendorApproval,
@@ -118,7 +119,9 @@ export function queryApprovals(
       a.business.toLowerCase().includes(needle) ||
       a.owner.toLowerCase().includes(needle) ||
       a.city.toLowerCase().includes(needle);
-    const matchesStatus = status === "All" || a.status === status;
+    const matchesStatus =
+      status === "All" ||
+      (status === RE_REVIEW ? needsReReview(a) : a.status === status);
     return matchesQ && matchesStatus;
   });
 

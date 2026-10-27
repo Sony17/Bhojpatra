@@ -4,6 +4,7 @@
  */
 
 import type { StallBrief } from "@/lib/vendorStorefront";
+import { DISH_PLACEHOLDER } from "@/lib/photoLinks";
 
 export interface Stat {
   value: string;
@@ -30,6 +31,9 @@ export interface Occasion {
    *  the chosen package's own lead via `max()` in the booking flow. Admin-
    *  editable; omitted → `DEFAULT_OCCASION_LEAD_DAYS`. */
   leadDays?: number;
+  /** A big function (wedding and its ceremonies) — booked as a full feast,
+   *  never offered in the Single Stall flow. Admin-editable ("Shown in"). */
+  feastOnly?: boolean;
 }
 
 export interface Category {
@@ -120,36 +124,14 @@ const img = (id: string, w = 800) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
 
 /**
- * Placeholder dish photography. Seed menu items ship without their own photo,
- * so the booking menu deterministically borrows from this pool of verified
- * food shots to stay premium-looking until real dish images are uploaded.
- * (All ids are already allow-listed via {@link img}.)
+ * The image a dish without its own photo shows: the Bhojpatra logo
+ * placeholder. It used to borrow from a pool of stock food shots, but that
+ * pool was the same art as the stall-type tiles and seed stall covers, so one
+ * picture showed up as a tile, a stall and a dish at once. The arguments stay
+ * so existing call sites keep working.
  */
-const DUMMY_DISH_PHOTOS = [
-  "photo-1414235077428-338989a2e8c0",
-  "photo-1437418747212-8d9709afab22",
-  "photo-1473093295043-cdd812d0e601",
-  "photo-1490645935967-10de6ba17061",
-  "photo-1565557623262-b51c2513a641",
-  "photo-1565895405227-31cffbe0cf86",
-  "photo-1567188040759-fb8a883dc6d8",
-  "photo-1578985545062-69928b1d9587",
-  "photo-1585032226651-759b368d7246",
-  "photo-1601050690597-df0568f70950",
-  "photo-1606471191009-63994c53433b",
-  "photo-1606491956689-2ea866880c84",
-  "photo-1630383249896-424e482df921",
-  "photo-1631452180519-c014fe946bc7",
-  "photo-1633945274405-b6c8069047b0",
-];
-
-/** Deterministic dummy dish photo — same seed (item id) always maps to the
- *  same food shot, so the menu stays stable across renders. */
-export const dummyDishPhoto = (seed: string, w = 240) => {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return img(DUMMY_DISH_PHOTOS[h % DUMMY_DISH_PHOTOS.length], w);
-};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const dummyDishPhoto = (_seed?: string, _w?: number) => DISH_PLACEHOLDER;
 
 export interface ValueProp {
   title: string;
@@ -204,12 +186,12 @@ export const steps: Step[] = [
 ];
 
 export const occasions: Occasion[] = [
-  { id: "wedding", name: "Wedding", nameHi: "शादी", icon: "💍", image: img("photo-1414235077428-338989a2e8c0"), leadDays: 30 },
-  { id: "engagement", name: "Engagement", nameHi: "सगाई", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf"), leadDays: 21 },
-  { id: "tilak", name: "Tilak", nameHi: "तिलक", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7"), leadDays: 14 },
-  { id: "haldi", name: "Haldi", nameHi: "हल्दी", icon: "🌼", image: img("photo-1606491956689-2ea866880c84"), leadDays: 14 },
-  { id: "mehndi", name: "Mehndi", nameHi: "मेहंदी", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c"), leadDays: 14 },
-  { id: "reception", name: "Reception", nameHi: "रिसेप्शन", icon: "🥂", image: img("photo-1565557623262-b51c2513a641"), leadDays: 21 },
+  { id: "wedding", name: "Wedding", nameHi: "शादी", icon: "💍", image: img("photo-1414235077428-338989a2e8c0"), leadDays: 30, feastOnly: true },
+  { id: "engagement", name: "Engagement", nameHi: "सगाई", icon: "💐", image: img("photo-1519671482749-fd09be7ccebf"), leadDays: 21, feastOnly: true },
+  { id: "tilak", name: "Tilak", nameHi: "तिलक", icon: "🪔", image: img("photo-1631452180519-c014fe946bc7"), leadDays: 14, feastOnly: true },
+  { id: "haldi", name: "Haldi", nameHi: "हल्दी", icon: "🌼", image: img("photo-1606491956689-2ea866880c84"), leadDays: 14, feastOnly: true },
+  { id: "mehndi", name: "Mehndi", nameHi: "मेहंदी", icon: "🌿", image: img("photo-1546069901-ba9599a7e63c"), leadDays: 14, feastOnly: true },
+  { id: "reception", name: "Reception", nameHi: "रिसेप्शन", icon: "🥂", image: img("photo-1565557623262-b51c2513a641"), leadDays: 21, feastOnly: true },
   { id: "birthday", name: "Birthday Party", nameHi: "बर्थडे पार्टी", icon: "🎂", image: img("photo-1530103862676-de8c9debad1d"), leadDays: 7 },
   { id: "corporate", name: "Corporate Event", nameHi: "कॉर्पोरेट इवेंट", icon: "🏢", image: img("photo-1517248135467-4c7edcad34c4"), leadDays: 7 },
 ];
@@ -1528,6 +1510,12 @@ export interface CategoryItem {
 export interface CategoryVendor {
   id: string;
   name: string;
+  /** Verified GSTIN / PAN / FSSAI / Aadhaar last-4 for the checkout "Sold by"
+   *  card. Live vendors with a Verified application only. */
+  seller?: import("@/lib/sellerDetails").SellerDetails;
+  /** GST the vendor charges on their food, in percent (18 / 5 / 0). Absent on
+   *  the static fixture = the platform default 18%. */
+  gstRate?: import("@/lib/bookingPricing").VendorGstRate;
   rating: number;
   reviews: number;
   /** Vendor-declared Google rating (0–5) + review count, imported at
@@ -1603,6 +1591,11 @@ export interface StallTerms {
   minPax?: number;
   /** Minimum booking lead time the vendor needs (hours). */
   leadHours?: number;
+  /** The vendor's own Single Stall notice in days (0 = same day), when set —
+   *  replaces the platform default vendor lead. See `stallNotice.ts`. */
+  noticeDays?: number;
+  /** Same-day orders close at this IST time ("HH:MM") when `noticeDays` is 0. */
+  sameDayCutoff?: string;
 }
 
 export interface MenuCategory {

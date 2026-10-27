@@ -410,7 +410,8 @@ function ServiceCard({
   const feastPrice = hasGuests ? serviceTotal(pkg, guests) : pkg.priceMin;
   const feastLabel = money(feastPrice);
   const activeTier = hasGuests ? serviceTierFor(pkg, guests) : undefined;
-  const tiers = pkg.guestTiers ?? [];
+  // With a head-count, only the band it falls in; otherwise the full table.
+  const tiers = activeTier ? [activeTier] : (pkg.guestTiers ?? []);
 
   return (
     <div
@@ -553,8 +554,8 @@ function ServiceCard({
             ))}
           </ul>
 
-          {/* PRICE BY GUESTS — the admin's head-count table, the band that
-              applies to this order marked. */}
+          {/* PRICE BY GUESTS — the band that applies to this order, or the
+              admin's whole head-count table before guests are known. */}
           {tiers.length > 0 && (
             <>
               <SectionLabel variant={variant}>

@@ -19,6 +19,8 @@ export interface BainaOrderVendor {
   name: string;
   location: string;
   products: BainaBoxProduct[];
+  /** Verified statutory details for the checkout "Sold by" card. */
+  seller?: import("@/lib/sellerDetails").SellerDetails;
 }
 
 /** A live vendor's published Baina Box menu, flattened into the order panel's

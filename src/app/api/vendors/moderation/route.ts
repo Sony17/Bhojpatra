@@ -1,5 +1,7 @@
 import { requireRole } from "@/lib/auth";
-import { listLiveVendorRecords } from "@/lib/vendorMenus";
+import {
+  changedPublicFields,
+  effectiveGstRateOf, listLiveVendorRecords } from "@/lib/vendorMenus";
 import { stallMenuId } from "@/lib/stallTypes";
 import {
   applicationForOwner,
@@ -42,6 +44,14 @@ export async function GET() {
           : null,
         // A live vendor's last approved content is still what customers see.
         liveSnapshot: Boolean(r.approvedSnapshot),
+        // …and what this pending edit changes against it.
+        ...(r.approvedSnapshot && r.moderation === "Pending"
+          ? { changedFields: changedPublicFields(r.approvedSnapshot, r) }
+          : {}),
+        // GST on food: the vendor's pick vs what checkout bills (No GST until
+        // their GSTIN is verified). Not moderated — shown for context.
+        ...(r.gstRate !== undefined ? { gstRatePicked: r.gstRate } : {}),
+        gstRateBilled: effectiveGstRateOf(apps, r),
         badges: r.badges ?? null,
         updatedAt: r.updatedAt,
         menu: r.menu,

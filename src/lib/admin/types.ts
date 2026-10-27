@@ -6,6 +6,7 @@
  * never drift between the customer site and the admin panel.
  */
 import type { BookingStatus } from "@/lib/data";
+import type { VendorPayoutAccount } from "@/lib/payoutAccount";
 
 // Re-export so admin components import booking status from a single surface.
 export type { BookingStatus } from "@/lib/data";
@@ -83,7 +84,15 @@ export interface RevenueSummary {
 
 /* ── Vendor Management (Phase 2) ─────────────────────────────────────────── */
 
-export type VendorDocKind = "GST" | "FSSAI" | "ID" | "Business Proof";
+export type VendorDocKind =
+  | "GST"
+  | "PAN"
+  | "Aadhaar"
+  | "FSSAI"
+  | "Bank Account"
+  | "UPI"
+  | "ID"
+  | "Business Proof";
 
 export interface VendorDocument {
   kind: VendorDocKind;
@@ -145,6 +154,8 @@ export interface VendorApplication extends PendingVendorApproval {
   email: string;
   phone: string;
   documents: VendorDocument[];
+  /** Where payouts go — shown with the "Bank Account" document. */
+  payoutAccount?: VendorPayoutAccount;
   /** Tiers the admin has explicitly assigned during review. Absent until an
    *  admin decides — the console then defaults the editor to `requestedTiers`
    *  (the price-derived baseline). Once set, this drives the public catalog. */
@@ -172,7 +183,9 @@ export interface VendorApplicationEvent {
     | "rejected"
     | "changes-requested"
     | "reopened"
-    | "document";
+    | "document"
+    /** The vendor changed the GST rate billed on their food. */
+    | "gst-rate";
   note?: string;
 }
 
@@ -188,12 +201,28 @@ export interface VendorOfferSummary {
   bainaBoxes: { name: string; price: number }[];
   counters: number;
   moderation: string;
+  /** GST on food the vendor picked (18 / 5 / 0; absent = never picked). */
+  gstRatePicked?: number;
+  /** What checkout actually bills — 0 until the GSTIN is verified. */
+  gstRateBilled: number;
 }
+
+/** An approved (Verified) vendor who changed KYC details since: the
+ *  application stays Verified — they're live — but the changed documents are
+ *  back to Pending and need an admin's re-check. */
+export function needsReReview(
+  a: Pick<VendorApplication, "status" | "documents">,
+): boolean {
+  return a.status === "Verified" && a.documents.some((d) => d.status === "Pending");
+}
+
+/** Status filter value for {@link needsReReview} applications. */
+export const RE_REVIEW = "Re-review";
 
 /** Query params for the approvals queue. */
 export interface ApprovalQuery {
   q?: string;
-  status?: VerificationStatus | "All";
+  status?: VerificationStatus | "All" | typeof RE_REVIEW;
   page?: number;
   pageSize?: number;
 }
@@ -305,8 +334,49 @@ export interface VendorSettlement {
   vendor: string;
   bookings: number;
   amount: number;
-  status: "Settled" | "Pending";
+  /** Vendor advances already released on these bookings (already deducted
+   *  from `amount`). */
+  advancePaid?: number;
+  status: "Settled" | "Pending" | "Processing";
   period: string;
+  payee?: VendorPayee;
+  /** Why the last RazorpayX send failed (the row is Pending again). */
+  lastFailure?: string;
+}
+
+/** Where to send a vendor's money, from their application. Each part is
+ *  verified separately (the "Bank Account" and "UPI" documents). */
+export interface VendorPayee extends VendorPayoutAccount {
+  bankVerified: boolean;
+  upiVerified: boolean;
+  /** Admin-only link to the vendor's uploaded UPI QR code image. */
+  upiQrUrl?: string;
+}
+
+/** One booking's vendor advance payout — suggested by the admin's rule, and
+ *  once released, what was actually paid and how. */
+export interface VendorAdvanceRow {
+  /** `ADV-<bookingId>`. */
+  id: string;
+  bookingId: string;
+  vendor: string;
+  customer: string;
+  eventDate: string;
+  eventDateISO: string;
+  bookingStatus: BookingStatus;
+  bookingAmount: number;
+  /** Money collected from the customer so far, net of refunds. */
+  collected: number;
+  /** What the current rule says to advance on this booking. */
+  suggested: number;
+  status: "Pending" | "Processing" | "Paid";
+  /** Why the last RazorpayX send failed (the row is Pending again). */
+  lastFailure?: string;
+  paidAmount?: number;
+  method?: string;
+  reference?: string;
+  paidAt?: string;
+  payee?: VendorPayee;
 }
 
 export interface PaymentQuery {

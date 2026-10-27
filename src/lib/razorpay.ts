@@ -6,6 +6,10 @@
 // Configuration is env-only:
 //   RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET — API keypair (test or live).
 //   RAZORPAY_WEBHOOK_SECRET — the secret set on the dashboard webhook.
+//   RAZORPAYX_ACCOUNT_NUMBER — the RazorpayX business account vendor payouts
+//     are debited from (RazorpayX → Account details). Same API keypair.
+//   RAZORPAYX_WEBHOOK_SECRET — the RazorpayX payouts webhook's secret
+//     (falls back to RAZORPAY_WEBHOOK_SECRET).
 // With the keypair absent the gateway is simply off and checkout falls back to
 // the manual UPI flow.
 
@@ -65,7 +69,7 @@ export interface RazorpayPayment {
 // duration and a PII-free summary of the response — success and failure alike.
 async function razorpayRequest<T>(
   path: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; headers?: Record<string, string> },
 ): Promise<T> {
   const method = init?.method ?? "GET";
   const started = Date.now();
@@ -76,6 +80,7 @@ async function razorpayRequest<T>(
       headers: {
         Authorization: authHeader(),
         ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers,
       },
       ...(init?.body ? { body: JSON.stringify(init.body) } : {}),
       // A hung gateway must not hang checkout — fail after 20s.
@@ -218,9 +223,124 @@ export function verifyCheckoutSignature(opts: {
 export function verifyWebhookSignature(
   rawBody: string,
   signature: string,
+  secret = razorpayWebhookSecret(),
 ): boolean {
-  const secret = razorpayWebhookSecret();
   if (!secret || !signature) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   return safeEqualHex(expected, signature);
+}
+
+/* ── RazorpayX payouts (money OUT to vendors) ─────────────────────────────── */
+
+export function razorpayXAccountNumber(): string {
+  return (process.env.RAZORPAYX_ACCOUNT_NUMBER ?? "").replace(/\s/g, "");
+}
+
+/** Vendor payouts are on only with the keypair AND a RazorpayX account. */
+export function isRazorpayXConfigured(): boolean {
+  return isRazorpayConfigured() && Boolean(razorpayXAccountNumber());
+}
+
+export function razorpayXWebhookSecret(): string {
+  return (process.env.RAZORPAYX_WEBHOOK_SECRET ?? "").trim() || razorpayWebhookSecret();
+}
+
+export interface RazorpayXContact {
+  id: string;
+}
+
+export interface RazorpayXFundAccount {
+  id: string;
+  active?: boolean;
+}
+
+export type RazorpayXPayoutMode = "IMPS" | "NEFT" | "RTGS" | "UPI";
+
+export interface RazorpayXPayout {
+  id: string;
+  /** Paise. */
+  amount: number;
+  /** queued · pending · processing · processed · reversed · cancelled · rejected · failed */
+  status: string;
+  mode?: string;
+  utr?: string | null;
+  reference_id?: string | null;
+  failure_reason?: string | null;
+  status_details?: { description?: string | null; reason?: string | null } | null;
+}
+
+export async function createRazorpayXContact(opts: {
+  name: string;
+  email?: string;
+  phone?: string;
+  referenceId: string;
+}): Promise<RazorpayXContact> {
+  return razorpayRequest<RazorpayXContact>("/contacts", {
+    method: "POST",
+    body: {
+      name: opts.name.slice(0, 50),
+      type: "vendor",
+      reference_id: opts.referenceId.slice(0, 40),
+      ...(opts.email ? { email: opts.email } : {}),
+      ...(opts.phone ? { contact: opts.phone } : {}),
+    },
+  });
+}
+
+export async function createRazorpayXFundAccount(
+  contactId: string,
+  target:
+    | { kind: "bank"; name: string; ifsc: string; accountNumber: string }
+    | { kind: "upi"; vpa: string },
+): Promise<RazorpayXFundAccount> {
+  return razorpayRequest<RazorpayXFundAccount>("/fund_accounts", {
+    method: "POST",
+    body:
+      target.kind === "bank"
+        ? {
+            contact_id: contactId,
+            account_type: "bank_account",
+            bank_account: {
+              name: target.name.slice(0, 120),
+              ifsc: target.ifsc,
+              account_number: target.accountNumber,
+            },
+          }
+        : { contact_id: contactId, account_type: "vpa", vpa: { address: target.vpa } },
+  });
+}
+
+/** Send a payout. `idempotencyKey` makes a retried request (network blip,
+ *  double click) return the same payout instead of paying twice. */
+export async function createRazorpayXPayout(opts: {
+  fundAccountId: string;
+  amountRupees: number;
+  mode: RazorpayXPayoutMode;
+  referenceId: string;
+  narration: string;
+  idempotencyKey: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayXPayout> {
+  return razorpayRequest<RazorpayXPayout>("/payouts", {
+    method: "POST",
+    headers: { "X-Payout-Idempotency": opts.idempotencyKey },
+    body: {
+      account_number: razorpayXAccountNumber(),
+      fund_account_id: opts.fundAccountId,
+      amount: Math.round(opts.amountRupees) * 100,
+      currency: "INR",
+      mode: opts.mode,
+      purpose: "vendor bill",
+      // Wait for a top-up instead of failing when the balance is short.
+      queue_if_low_balance: true,
+      reference_id: opts.referenceId.slice(0, 40),
+      // Shown on the vendor's bank statement — alphanumerics + spaces, ≤30.
+      narration: opts.narration.replace(/[^a-zA-Z0-9 ]/g, " ").slice(0, 30).trim(),
+      ...(opts.notes ? { notes: opts.notes } : {}),
+    },
+  });
+}
+
+export async function fetchRazorpayXPayout(payoutId: string): Promise<RazorpayXPayout> {
+  return razorpayRequest<RazorpayXPayout>(`/payouts/${encodeURIComponent(payoutId)}`);
 }

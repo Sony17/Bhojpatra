@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import PaymentBox from "@/components/booking/shared/PaymentBox";
+import SellerDetailsCard from "@/components/booking/shared/SellerDetails";
+import type { SellerDetails } from "@/lib/sellerDetails";
 import { coupons, type Coupon } from "@/lib/data";
 import { inr, money, perPlateCost } from "@/lib/money";
 import { ADVANCE_RATE } from "@/lib/bookingPricing";
@@ -63,6 +65,7 @@ export default function CheckoutPanel({
   onProceed,
   paySummary,
   onGateway,
+  sellers = [],
 }: {
   t: (en: string, hi: string) => string;
   venue: string;
@@ -127,6 +130,9 @@ export default function CheckoutPanel({
   paySummary?: ReactNode;
   /** Passed to PaymentBox — fires once the Razorpay gateway is live. */
   onGateway?: (live: boolean) => void;
+  /** Verified statutory details of every vendor on the order ("Sold by"),
+   *  shown on the pay stage. */
+  sellers?: SellerDetails[];
 }) {
   const showCart = stage !== "pay";
   const showPay = stage !== "cart";
@@ -863,6 +869,7 @@ export default function CheckoutPanel({
     </p>
     </>
     )}
+    <SellerDetailsCard t={t} sellers={sellers} />
     </>
     )}
     </>

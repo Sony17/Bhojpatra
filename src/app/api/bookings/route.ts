@@ -36,6 +36,8 @@ import {
 import { paymentActivity, receivedPayments } from "@/lib/bookingPaymentSync";
 import { notifyOrderPlaced } from "@/lib/bookingNotify";
 import { findVendorById } from "@/lib/vendorMenus";
+import { cleanBlockedDates } from "@/lib/vendorAvailability";
+import { formatCutoff, stallNoticeProblem } from "@/lib/stallNotice";
 
 // Orders are written at confirm time to Postgres (Neon) so they show up in the
 // admin booking console — never prerender or cache this.
@@ -315,10 +317,24 @@ export async function POST(request: Request) {
   if (iso && !isBainaBox) {
     const fixedLead =
       typeof packageId === "string" ? packageLeadDays[packageId] : undefined;
+    // A stall vendor who set their own Single Stall notice (Vendor Portal →
+    // Calendar) replaces the platform default for their stall; any counter
+    // vendors on the order keep theirs. The notice itself (incl. the same-day
+    // cut-off) is enforced in `checkStallOrder`.
+    const stallId = isStall ? parseStallPricingClaim(pricing)?.stallId : undefined;
+    const stallNotice = stallId
+      ? (await findVendorById(stallId))?.stallNoticeDays
+      : undefined;
+    const otherVendorIds = vendorIds.filter((v) => v !== stallId);
     const packageOrVendorLead =
       fixedLead !== undefined && packageId !== "custom"
         ? fixedLead
-        : customOrderLeadDays(vendorIds);
+        : stallNotice != null
+          ? Math.max(
+              stallNotice,
+              otherVendorIds.length ? customOrderLeadDays(otherVendorIds) : 0,
+            )
+          : customOrderLeadDays(vendorIds);
     // The stricter of the package/vendor lead and the occasion's own notice —
     // mirrors the wizard's `max(packageLead, occasionLead)`.
     const requiredLead = Math.max(
@@ -670,7 +686,26 @@ async function checkStallOrder(req: {
       { status: 400 },
     );
   }
-  const leadHours = Number(vendorRecord.leadHours);
+  // The vendor's own Single Stall notice, when set, replaces their general
+  // (feast) notice for a stall — including same day, until their cut-off.
+  const noticeProblem = stallNoticeProblem(
+    { noticeDays: vendorRecord.stallNoticeDays, cutoff: vendorRecord.sameDayCutoff },
+    daysUntilIST(req.iso),
+  );
+  if (noticeProblem) {
+    return Response.json(
+      {
+        error:
+          noticeProblem.kind === "cutoff"
+            ? `${vendorRecord.business} takes same-day orders until ${formatCutoff(noticeProblem.cutoff)}. Please pick tomorrow or a later date.`
+            : `${vendorRecord.business} needs at least ${noticeProblem.days} day${noticeProblem.days === 1 ? "" : "s"}' notice. Please pick a later date.`,
+        code: "LEAD_TIME",
+      },
+      { status: 400 },
+    );
+  }
+  const leadHours =
+    vendorRecord.stallNoticeDays != null ? NaN : Number(vendorRecord.leadHours);
   if (Number.isFinite(leadHours) && leadHours > 0) {
     const hours = hoursUntilEventIST(req.iso, {
       eventTime: req.eventTime,
@@ -685,6 +720,17 @@ async function checkStallOrder(req: {
         { status: 400 },
       );
     }
+  }
+
+  // A day the vendor switched off in their portal calendar.
+  if (cleanBlockedDates(vendorRecord.blockedDates, "").includes(req.iso)) {
+    return Response.json(
+      {
+        error: `${vendorRecord.business} isn't taking orders on this date. Please pick another date or another stall.`,
+        code: "SLOT_TAKEN",
+      },
+      { status: 409 },
+    );
   }
 
   // Double-booking: one event per meal slot per vendor (and the vendor's

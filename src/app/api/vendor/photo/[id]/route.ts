@@ -4,7 +4,7 @@ import {
   getVendorPhoto,
   readPhotoFile,
 } from "@/lib/vendorPhotos";
-import { DEFAULT_VENDOR_IMAGE } from "@/lib/vendorMenus";
+import { DISH_PLACEHOLDER } from "@/lib/photoLinks";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +20,15 @@ export async function GET(
   const { id } = await ctx.params;
 
   // Any failure to produce the bytes (unknown id, metadata DB hiccup, missing
-  // or unreadable Blob) degrades to the platform's default vendor image, so a
+  // or unreadable Blob) degrades to the Bhojpatra logo placeholder (never stock
+  // food art, which doubles as stall-tile photos), so a
   // storefront never renders a broken photo. The redirect is NOT cached — the
   // photo may come back once the store recovers.
   const fallback = () =>
     new Response(null, {
       status: 307,
       headers: {
-        Location: DEFAULT_VENDOR_IMAGE,
+        Location: DISH_PLACEHOLDER,
         "Cache-Control": "no-store",
       },
     });

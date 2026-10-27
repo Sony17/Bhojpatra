@@ -6,18 +6,25 @@ import type { ServiceGuestTier, ServicePackage } from "@/lib/data";
  * the price a guest sees is the price `/api/bookings` expects.
  *
  * A package's admin-set `guestTiers` table wins for the band that covers the
- * guest count; outside every band (or with no table) it falls back to the
- * package's `priceMin`.
+ * guest count. A head-count that falls outside every band (below the first, in
+ * a gap, above a closed last band) takes the nearest band below it — or the
+ * first band when it's under all of them — so a table never silently drops an
+ * order to `priceMin` (often ₹0). Only a package with no table uses `priceMin`.
  */
 
-/** The guest band covering `guests`, if the package's table has one. */
+/** The guest band pricing `guests`, if the package has a table. */
 export function serviceTierFor(
   pkg: Pick<ServicePackage, "guestTiers">,
   guests: number,
 ): ServiceGuestTier | undefined {
-  return pkg.guestTiers?.find(
+  const tiers = pkg.guestTiers ?? [];
+  const covering = tiers.find(
     (t) => guests >= t.minGuests && (t.maxGuests === null || guests <= t.maxGuests),
   );
+  if (covering || !tiers.length) return covering;
+  // Bands are sorted by `minGuests` (normalizeGuestTiers), but don't rely on it.
+  const sorted = [...tiers].sort((a, b) => a.minGuests - b.minGuests);
+  return sorted.filter((t) => t.minGuests <= guests).pop() ?? sorted[0];
 }
 
 /** The rate charged for `guests` — per guest, or flat when not per-guest. */

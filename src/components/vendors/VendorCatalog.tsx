@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import Image from "next/image";
-import { photoNeedsUnoptimized } from "@/lib/photoLinks";
+import { photoNeedsUnoptimized, stallCoverPhoto } from "@/lib/photoLinks";
 import { isUnoptimized } from "@/lib/homeContentData";
 import type { StallTileImages } from "@/lib/stallTileImages";
 import Link from "next/link";
@@ -30,6 +30,7 @@ import { useAllVendorsStatus } from "@/lib/useAllVendors";
 import { ctaLabel, listingCta, type StallDishesBrief } from "@/lib/vendorStorefront";
 import { stallTypeById, stallTypes, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
+import { useStallAvailabilityGate } from "@/components/booking/VendorAvailability";
 import { useLocations } from "@/lib/locations";
 import {
   LOCATION_CHANGED_EVENT,
@@ -1790,6 +1791,14 @@ function VendorCard({
     bainaHref: bainaMode ? `/vendors/${vendor.id}#baina-order` : undefined,
   });
   const bookHref = cta.href;
+  // Picking a stall checks the vendor's calendar against the date already in
+  // the guest's brief — a taken day opens "check availability" instead.
+  const gate = useStallAvailabilityGate();
+  const onBook =
+    cta.kind === "stall"
+      ? (e: MouseEvent<HTMLElement>) =>
+          gate.onSelect(e, { vendorId: vendor.id, vendorName: vendor.name, href: bookHref })
+      : undefined;
   const ctaText = ctaLabel(cta.kind, t);
   // The price that sits next to the CTA — always the thing the CTA sells.
   const ctaPrice =
@@ -1890,15 +1899,10 @@ function VendorCard({
       stallMenu.dishes.some((d) => d.diet === diet),
     );
     if (leadDiet === "non-veg") servedDiets.reverse();
-    // The stall's own food leads: a dish photo the brand uploaded for this
-    // stall (the filtered diet's first), else the admin's photo for the stall
-    // type, and only then the brand's main photo — which may show a feast
-    // dish this stall doesn't sell.
-    const photo =
-      (stallMenu.dishes.find((d) => d.photo && (!leadDiet || d.diet === leadDiet)) ??
-        stallMenu.dishes.find((d) => d.photo))?.photo ??
-      tileImages?.[counter || (vendor.stall?.stallTypes?.[0] ?? "")] ??
-      vendor.image;
+    // The brand's own cover only. Never a dish photo (the card would repeat
+    // the menu's first dish) or a stall-type tile (it would repeat the tile
+    // the guest just tapped). No cover → the stall placeholder.
+    const photo = stallCoverPhoto(vendor.image, tileImages);
     const rating =
       stats || (vendor.reviews > 0 && !isSample)
         ? (stats?.rating ?? vendor.rating).toFixed(1)
@@ -2033,12 +2037,14 @@ function VendorCard({
 
         <Link
           href={bookHref}
+          onClick={onBook}
           aria-label={`${ctaText} ${vendor.name}`}
           className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
           tabIndex={-1}
         >
           <span className="sr-only">{`${ctaText} ${vendor.name}`}</span>
         </Link>
+        {gate.sheet}
       </li>
     );
   }
@@ -2342,6 +2348,7 @@ function VendorCard({
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
             <Button
               href={bookHref}
+              onClick={onBook}
               variant="primary"
               size="sm"
               className={
@@ -2370,12 +2377,14 @@ function VendorCard({
           button goes. Vendor details live behind the info button. */}
       <Link
         href={bookHref}
+        onClick={onBook}
         aria-label={`${ctaText} ${vendor.name}`}
         className="absolute inset-0 z-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
         tabIndex={-1}
       >
         <span className="sr-only">{`${ctaText} ${vendor.name}`}</span>
       </Link>
+      {gate.sheet}
     </Card>
   );
 }

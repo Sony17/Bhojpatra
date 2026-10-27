@@ -51,6 +51,9 @@ export interface InvoiceData {
   addOnsTotal: number;
   discount: number;
   gst: number;
+  /** The GST line's label ("GST (5%)", "No GST"…). Absent on invoices saved
+   *  before vendors set their own rate — those were all billed at 18%. */
+  gstLabel?: string;
   grandTotal: number;
   paid: number;
 }
@@ -520,7 +523,7 @@ export function buildInvoicePdf(
   totalRow("Subtotal", money(data.subtotal));
   if (data.addOnsTotal > 0) totalRow("Add-ons", money(data.addOnsTotal));
   if (data.discount > 0) totalRow("Discount", `- ${money(data.discount)}`, MAROON);
-  totalRow("GST (18%)", money(data.gst));
+  totalRow(data.gstLabel ?? "GST (18%)", money(data.gst));
   p.y -= 8;
 
   /* Grand-total showpiece — full-width maroon band with an inner cream keyline

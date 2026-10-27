@@ -26,6 +26,9 @@ export type OccasionOption = {
   /** Offered in the Single Stall flow only (kitty party, pooja…) — hidden from
    *  the home booking bar and the feast wizard. */
   singleStallOnly?: boolean;
+  /** A big function (wedding, reception…) — offered in the feast flows only,
+   *  hidden from Single Stall. */
+  feastOnly?: boolean;
 };
 
 /** Sentinel id for the free-text "Other" choice — the customer types their own
@@ -39,6 +42,7 @@ export const DEFAULT_OCCASIONS: OccasionOption[] = [
     name: o.name,
     nameHi: o.nameHi,
     leadDays: o.leadDays,
+    ...(o.feastOnly ? { feastOnly: true } : {}),
   })),
   ...smallOccasions,
 ];
@@ -79,7 +83,8 @@ let cache: OccasionOption[] | null = null;
 export function useOccasions({
   singleStall = false,
 }: {
-  /** The Single Stall flow — also offer the `singleStallOnly` occasions. */
+  /** The Single Stall flow — also offer the `singleStallOnly` occasions, and
+   *  leave out the `feastOnly` big functions. */
   singleStall?: boolean;
 } = {}): OccasionOption[] {
   const [list, setList] = useState<OccasionOption[]>(
@@ -104,7 +109,8 @@ export function useOccasions({
   }, []);
 
   return useMemo(
-    () => (singleStall ? list : list.filter((o) => !o.singleStallOnly)),
+    () =>
+      list.filter((o) => (singleStall ? !o.feastOnly : !o.singleStallOnly)),
     [list, singleStall],
   );
 }

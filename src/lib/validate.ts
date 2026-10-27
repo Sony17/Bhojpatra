@@ -37,6 +37,57 @@ export function isValidGst(v: unknown): v is string {
   return typeof v === "string" && GST_RE.test(normalizeGst(v.trim()));
 }
 
+/** Indian PAN: 10 chars — 5 letters, 4 digits, 1 letter (ABCDE1234F). */
+export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+/** Uppercase and strip spaces from a PAN. */
+export function normalizePan(raw: string): string {
+  return raw.replace(/\s/g, "").toUpperCase();
+}
+
+export function isValidPan(v: unknown): v is string {
+  return typeof v === "string" && PAN_RE.test(normalizePan(v.trim()));
+}
+
+/** The PAN a GSTIN is issued against (characters 3–12), or "" when the GSTIN
+ *  is malformed. A GSTIN and the PAN filed beside it must agree. */
+export function panOfGstin(gstin: string): string {
+  const g = normalizeGst(gstin);
+  return GST_RE.test(g) ? g.slice(2, 12) : "";
+}
+
+/** Strip spaces/dashes from an Aadhaar number. */
+export function normalizeAadhaar(raw: string): string {
+  return raw.replace(/[\s-]/g, "");
+}
+
+// Verhoeff checksum tables — UIDAI's check digit on every Aadhaar number.
+const VERHOEFF_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+];
+const VERHOEFF_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+];
+
+/** Aadhaar: 12 digits, never starting 0/1, with a valid Verhoeff check digit. */
+export function isValidAadhaar(v: unknown): v is string {
+  if (typeof v !== "string") return false;
+  const n = normalizeAadhaar(v.trim());
+  if (!/^[2-9]\d{11}$/.test(n)) return false;
+  let c = 0;
+  n.split("").reverse().forEach((ch, i) => {
+    c = VERHOEFF_D[c][VERHOEFF_P[i % 8][Number(ch)]];
+  });
+  return c === 0;
+}
+
 /** Parse the shared list-query params (`?q&status&city&method&tier&page&pageSize`)
  *  off a request URL. Values default sensibly; callers pass the rest through to
  *  their `query*` helper. */

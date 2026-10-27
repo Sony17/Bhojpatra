@@ -11,6 +11,7 @@
  * `kyc` store and are referenced here by id.
  */
 import { createStore } from "@/lib/store";
+import type { VendorPayoutAccount } from "@/lib/payoutAccount";
 import type {
   VendorApplication,
   VendorApplicationEvent,
@@ -64,7 +65,15 @@ export interface VendorApplicationRecord {
    *  drives the vendor's public badges once set. */
   assignedTiers?: VendorTier[];
   gstNumber: string;
+  /** Business PAN (wizard submissions since PAN was added). The Aadhaar
+   *  number lives only on its `documents` entry. */
+  panNumber?: string;
   fssaiNumber: string;
+  /** Where payouts go (bank + optional UPI). Admin-only; its "Bank Account"
+   *  document carries the review status. Absent on pre-payout applications. */
+  payoutAccount?: VendorPayoutAccount;
+  /** Uploaded UPI QR code image (KYC store id), when the vendor gave one. */
+  upiQrDocId?: string;
   /** Vendor-declared Google rating (0–5) + review count imported at
    *  registration. Carried onto the live vendor record (prefilled into the
    *  dashboard menu editor) so it surfaces as a "Google" badge on the card. */
@@ -213,6 +222,7 @@ export function toAdminApplication(
       status: d.status,
       ...(d.docId ? { fileUrl: `/api/vendors/kyc/${d.docId}` } : {}),
     })),
+    ...(r.payoutAccount ? { payoutAccount: r.payoutAccount } : {}),
     ...(r.changesRequested ? { changesRequested: true } : {}),
     ...(r.reviewReason ? { reviewReason: r.reviewReason } : {}),
     ...(r.reviewedBy ? { reviewedBy: r.reviewedBy } : {}),

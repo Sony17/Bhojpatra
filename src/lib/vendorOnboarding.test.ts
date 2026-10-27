@@ -7,6 +7,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { sellerDetailsFrom } from "@/lib/sellerDetails";
 import {
   applicationStage,
   buildApplication,
@@ -60,26 +61,70 @@ const IDENTITY: SubmissionIdentity = {
   ownerName: "Kabir",
   phone: "9876543210",
   gstNumber: "09AAACH7409R1ZZ",
+  panNumber: "AAACH7409R",
+  aadhaarNumber: "234567890124",
   fssaiNumber: "12345678901234",
+  payout: {
+    holderName: "Kabir Foods",
+    accountNumber: "50100123456789",
+    ifsc: "HDFC0001234",
+    accountType: "Current",
+  },
   docIds: { gst: "KYC-AAAA1111" },
+};
+
+const PAYOUT = {
+  holderName: "Kabir Foods",
+  accountNumber: "50100123456789",
+  ifsc: "HDFC0001234",
+  accountType: "Current",
 };
 
 /* ── Submission validation ─────────────────────────────────────────────── */
 
-test("parseSubmissionIdentity validates phone, GSTIN and 14-digit FSSAI", () => {
+test("parseSubmissionIdentity validates phone, GSTIN, PAN, Aadhaar and 14-digit FSSAI", () => {
   const ok = parseSubmissionIdentity({
     ownerName: " Kabir ",
     phone: "+91 98765 43210",
     gstNumber: "09aaach7409r1zz",
+    panNumber: "aaach 7409r",
+    aadhaarNumber: "2345 6789 0124",
     fssaiNumber: "12345678901234",
+    payout: { ...PAYOUT, ifsc: "hdfc 0001234", upiId: " kabir@okhdfcbank " },
     docIds: { gst: "KYC-AAAA1111", junk: "x" },
   });
   assert.ok(ok.ok);
   assert.equal(ok.value.phone, "9876543210");
   assert.equal(ok.value.gstNumber, "09AAACH7409R1ZZ");
+  assert.equal(ok.value.panNumber, "AAACH7409R");
+  assert.equal(ok.value.aadhaarNumber, "234567890124");
   assert.deepEqual(ok.value.docIds, { gst: "KYC-AAAA1111" });
+  assert.equal(ok.value.payout?.ifsc, "HDFC0001234");
+  assert.equal(ok.value.payout?.upiId, "kabir@okhdfcbank");
 
-  const base = { ownerName: "Kabir", phone: "9876543210", gstNumber: "09AAACH7409R1ZZ", fssaiNumber: "12345678901234" };
+  const base = { ownerName: "Kabir", phone: "9876543210", gstNumber: "09AAACH7409R1ZZ", panNumber: "AAACH7409R", aadhaarNumber: "234567890124", fssaiNumber: "12345678901234", payout: PAYOUT };
+  assert.ok(parseSubmissionIdentity(base).ok);
+  // Payout details are all optional, but what's entered must be well-formed.
+  const noPayout = parseSubmissionIdentity({ ...base, payout: undefined });
+  assert.ok(noPayout.ok && noPayout.value.payout === undefined);
+  assert.equal(parseSubmissionIdentity({ ...base, payout: { ...PAYOUT, ifsc: "HDFC1001234" } }).ok, false);
+  assert.equal(parseSubmissionIdentity({ ...base, payout: { ...PAYOUT, accountNumber: "1234" } }).ok, false);
+  assert.equal(parseSubmissionIdentity({ ...base, payout: { ...PAYOUT, upiId: "not-a-vpa" } }).ok, false);
+  assert.equal(parseSubmissionIdentity({ ...base, panNumber: "AAACH7409" }).ok, false);
+  // A well-formed PAN that isn't the one inside the GSTIN.
+  assert.equal(parseSubmissionIdentity({ ...base, panNumber: "ABCDE1234F" }).ok, false);
+  // Verhoeff check digit off by one; and Aadhaar never starts 0/1.
+  assert.equal(parseSubmissionIdentity({ ...base, aadhaarNumber: "234567890123" }).ok, false);
+  assert.equal(parseSubmissionIdentity({ ...base, aadhaarNumber: "123456789012" }).ok, false);
+  // Either-or: GSTIN alone, or PAN + Aadhaar alone — but not PAN or Aadhaar alone.
+  const gstOnly = parseSubmissionIdentity({ ...base, panNumber: "", aadhaarNumber: "" });
+  assert.ok(gstOnly.ok);
+  assert.equal(gstOnly.value.panNumber, "");
+  assert.ok(parseSubmissionIdentity({ ...base, gstNumber: "" }).ok);
+  assert.equal(parseSubmissionIdentity({ ...base, gstNumber: "", aadhaarNumber: "" }).ok, false);
+  assert.equal(parseSubmissionIdentity({ ...base, gstNumber: "", panNumber: "" }).ok, false);
+  // Without a GSTIN there's nothing for the PAN to match against.
+  assert.ok(parseSubmissionIdentity({ ...base, gstNumber: "", panNumber: "ABCDE1234F" }).ok);
   assert.equal(parseSubmissionIdentity({ ...base, phone: "12345" }).ok, false);
   assert.equal(parseSubmissionIdentity({ ...base, gstNumber: "BAD" }).ok, false);
   assert.equal(parseSubmissionIdentity({ ...base, fssaiNumber: "1234" }).ok, false);
@@ -112,6 +157,10 @@ test("buildApplication creates a Pending application bound to the account", () =
   assert.equal(app.status, "Pending");
   assert.equal(app.gstNumber, IDENTITY.gstNumber);
   assert.equal(app.documents.find((d) => d.kind === "GST")?.docId, "KYC-AAAA1111");
+  assert.deepEqual(app.documents.map((d) => d.kind), ["GST", "PAN", "Aadhaar", "FSSAI", "Bank Account"]);
+  assert.equal(app.documents.find((d) => d.kind === "Bank Account")?.number, "50100123456789 · HDFC0001234");
+  assert.equal(app.payoutAccount?.ifsc, "HDFC0001234");
+  assert.equal(app.documents.find((d) => d.kind === "Aadhaar")?.number, "234567890124");
   assert.deepEqual(app.cateringCategories, ["full-catering"]);
   assert.equal(app.history?.[0].action, "submitted");
   assert.equal(applicationStage(app), "pending");
@@ -232,6 +281,8 @@ test("cleanOnboardingDraft keeps identity, KYC, step and gold rate; drops junk",
     ownerName: "Kabir",
     phone: "98765 43210",
     gstNumber: "09aaach7409r1zz",
+    panNumber: "aaach7409r",
+    aadhaarNumber: "2345-6789-0124",
     fssaiNumber: "1234-5678-9012-34",
     docs: { gst: { id: "KYC-AAAA1111", fileName: "gst.pdf" }, fssai: { id: "../etc" } },
     step: 4,
@@ -242,6 +293,8 @@ test("cleanOnboardingDraft keeps identity, KYC, step and gold rate; drops junk",
     ownerName: "Kabir",
     phone: "9876543210",
     gstNumber: "09AAACH7409R1ZZ",
+    panNumber: "AAACH7409R",
+    aadhaarNumber: "234567890124",
     fssaiNumber: "12345678901234",
     docs: { gst: { id: "KYC-AAAA1111", fileName: "gst.pdf" } },
     step: 4,
@@ -375,4 +428,117 @@ test("contentReview: reaches the approved snapshot during a pending edit and nev
   // An admin decision is not vendor content: no moderation change.
   const decided = { ...live, contentReview: pending.contentReview };
   assert.equal(nextModerationState(live, decided, true).moderation, "Approved");
+});
+
+/* ── Checkout "Sold by" details ────────────────────────────────────────── */
+
+test("sellerDetailsFrom shows only verified GSTIN/FSSAI, never PAN or Aadhaar", () => {
+  const app = buildApplication({ existing: null, id: "VND-1", vendor: vendor(), identity: IDENTITY, owner: OWNER, now: NOW });
+  // Pending application → nothing reaches a customer.
+  assert.equal(sellerDetailsFrom(app), undefined);
+  const verified = {
+    ...app,
+    status: "Verified" as const,
+    documents: app.documents.map((d) => (d.kind === "FSSAI" ? d : { ...d, status: "Verified" as const })),
+  };
+  const LOCATION = [app.city, app.state].filter(Boolean).join(", ");
+  assert.deepEqual(sellerDetailsFrom(verified), {
+    name: app.business,
+    ...(LOCATION ? { location: LOCATION } : {}),
+    gstin: "09AAACH7409R1ZZ",
+  });
+  // PAN + Aadhaar alone (no GSTIN) are KYC only → no customer card at all.
+  const panOnly = { ...verified, documents: verified.documents.filter((d) => d.kind !== "GST") };
+  assert.equal(sellerDetailsFrom(panOnly), undefined);
+});
+
+test("switching from GSTIN to PAN + Aadhaar drops the GST document", () => {
+  const first = buildApplication({ existing: null, id: "VND-1", vendor: vendor(), identity: { ...IDENTITY, panNumber: "", aadhaarNumber: "" }, owner: OWNER, now: NOW });
+  assert.deepEqual(first.documents.filter((d) => ["GST", "PAN", "Aadhaar"].includes(d.kind)).map((d) => d.kind), ["GST"]);
+  assert.equal(first.panNumber, undefined);
+  const verified = { ...first, status: "Verified" as const };
+  const again = buildApplication({ existing: verified, id: "x", vendor: vendor(), identity: { ...IDENTITY, gstNumber: "" }, owner: OWNER, now: NOW });
+  assert.deepEqual(again.documents.filter((d) => ["GST", "PAN", "Aadhaar"].includes(d.kind)).map((d) => d.kind), ["PAN", "Aadhaar"]);
+  assert.equal(again.history?.at(-1)?.note, "KYC details changed");
+});
+
+test("payout documents appear only for what the vendor gave", () => {
+  const kinds = (identity: SubmissionIdentity) =>
+    buildApplication({ existing: null, id: "VND-P", vendor: vendor(), identity, owner: OWNER, now: NOW })
+      .documents.map((d) => d.kind);
+  assert.ok(!kinds({ ...IDENTITY, payout: undefined }).some((k) => k === "Bank Account" || k === "UPI"));
+  const qrOnly = buildApplication({
+    existing: null,
+    id: "VND-Q",
+    vendor: vendor(),
+    identity: { ...IDENTITY, payout: undefined, docIds: { upiQr: "KYC-QR000001" } },
+    owner: OWNER,
+    now: NOW,
+  });
+  const upi = qrOnly.documents.find((d) => d.kind === "UPI");
+  assert.equal(upi?.number, "QR code");
+  assert.equal(upi?.docId, "KYC-QR000001");
+  assert.equal(qrOnly.upiQrDocId, "KYC-QR000001");
+  assert.ok(!qrOnly.documents.some((d) => d.kind === "Bank Account"));
+});
+
+test("GST rate goes live at once — never stuck behind an older approved snapshot", () => {
+  const live = vendor({ moderation: "Approved", verified: true });
+  // Changing only the GST rate is not a content edit: no re-queue.
+  const rated = { ...live, gstRate: 5 as const };
+  assert.equal(nextModerationState(live, rated, true).moderation, "Approved");
+  // A pending edit whose snapshot predates the GST picker (no rate) — the
+  // reported bug: customers saw 18% although the vendor had picked 5%.
+  const edited = { ...rated, about: "New about text" };
+  const state = nextModerationState(rated, edited, true);
+  assert.equal(state.moderation, "Pending");
+  const pending = { ...edited, ...state, approvedSnapshot: { ...state.approvedSnapshot! } };
+  delete (pending.approvedSnapshot as { gstRate?: number }).gstRate;
+  assert.equal(publishedView(pending)?.gstRate, 5);
+  assert.equal(publishedView(pending)?.about, live.about); // content still waits for review
+});
+
+/* ── Post-approval edits: re-review, GST gate, change labels ───────────── */
+
+test("GST bills only on an admin-verified GSTIN; curated seeds keep the default", async () => {
+  const { effectiveGstRateOf } = await import("@/lib/vendorMenus");
+  const app = buildApplication({ existing: null, id: "VND-1", vendor: vendor(), identity: IDENTITY, owner: OWNER, now: NOW });
+  const v = vendor({ gstRate: 5 });
+  // Submitted but not yet verified → No GST, whatever they picked.
+  assert.equal(effectiveGstRateOf([app], v), 0);
+  const verified = { ...app, status: "Verified" as const, documents: app.documents.map((d) => ({ ...d, status: "Verified" as const })) };
+  assert.equal(effectiveGstRateOf([verified], v), 5);
+  // A changed GSTIN awaiting re-review stops billing GST until re-checked.
+  const changed = buildApplication({ existing: verified, id: "x", vendor: vendor(), identity: { ...IDENTITY, gstNumber: "09AAACH7409R2ZY" }, owner: OWNER, now: NOW });
+  assert.equal(effectiveGstRateOf([changed], v), 0);
+  // No application at all (e.g. a typed-in GSTIN never submitted) → No GST.
+  assert.equal(effectiveGstRateOf([], v), 0);
+  assert.equal(effectiveGstRateOf([], { gstRate: undefined }), 18);
+  // Never picked a rate (listings from before the picker): grandfathered 18%.
+  assert.equal(effectiveGstRateOf([changed], vendor()), 18);
+});
+
+test("a live vendor's KYC change flags re-review; an identical re-save logs nothing", async () => {
+  const { needsReReview } = await import("@/lib/admin/types");
+  const first = buildApplication({ existing: null, id: "VND-1", vendor: vendor(), identity: IDENTITY, owner: OWNER, now: NOW });
+  const verified = { ...first, status: "Verified" as const, documents: first.documents.map((d) => ({ ...d, status: "Verified" as const })) };
+  assert.equal(needsReReview(verified), false);
+  const same = buildApplication({ existing: verified, id: "x", vendor: vendor(), identity: IDENTITY, owner: OWNER, now: NOW });
+  assert.deepEqual(same.history, verified.history);
+  assert.equal(needsReReview(same), false);
+  const fssai = buildApplication({ existing: verified, id: "x", vendor: vendor(), identity: { ...IDENTITY, fssaiNumber: "99999999999999" }, owner: OWNER, now: NOW });
+  assert.equal(needsReReview(fssai), true);
+  assert.equal(fssai.status, "Verified"); // stays live
+  assert.equal(fssai.history?.at(-1)?.note, "KYC details changed");
+});
+
+test("changedPublicFields names what a pending edit changes, ignoring the GST rate", async () => {
+  const { changedPublicFields, toPublishedSnapshot } = await import("@/lib/vendorMenus");
+  const live = vendor({ moderation: "Approved", verified: true });
+  const snap = toPublishedSnapshot(live);
+  assert.deepEqual(
+    changedPublicFields(snap, { ...live, about: "Fresh text", priceFrom: live.priceFrom + 50 }).sort(),
+    ["About", "Starting price"],
+  );
+  assert.deepEqual(changedPublicFields(snap, { ...live, gstRate: 5 }), []);
 });

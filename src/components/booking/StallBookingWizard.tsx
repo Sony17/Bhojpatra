@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { photoNeedsUnoptimized } from "@/lib/photoLinks";
+import { photoNeedsUnoptimized, stallCoverPhoto } from "@/lib/photoLinks";
 import { useLang } from "@/lib/i18n";
 import {
   useSessionStatus,
@@ -26,6 +26,7 @@ import EventBar, {
 } from "@/components/booking/shared/EventBar";
 import StepExtras from "@/components/booking/shared/StepExtras";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
+import type { SellerDetails } from "@/lib/sellerDetails";
 import EssentialsPicker from "@/components/booking/EssentialsPicker";
 import {
   WizardHero,
@@ -99,6 +100,21 @@ import {
 } from "@/lib/servicePricing";
 import { Button, DietMark, useToast } from "@/components/ui";
 import { useBookingBarDock } from "@/lib/bookingBar";
+import {
+  DEFAULT_SAME_DAY_CUTOFF,
+  formatCutoff,
+  stallNoticeProblem,
+} from "@/lib/stallNotice";
+import {
+  availabilityFor,
+  takenMeals,
+  unavailableDates,
+} from "@/lib/vendorAvailability";
+import {
+  VendorAvailabilitySheet,
+  unavailableText,
+  useVendorAvailability,
+} from "@/components/booking/VendorAvailability";
 import { useHideChatFab, useHideMobileFooter } from "@/lib/mobileChrome";
 import { displayDishName } from "@/lib/dishName";
 import { inr, money, perPlateCost } from "@/lib/money";
@@ -107,6 +123,9 @@ import {
   MAX_GUESTS,
   ADVANCE_RATE,
   computeOrderTotals,
+  DEFAULT_VENDOR_GST_RATE,
+  gstLabel,
+  type VendorGstRate,
   bookingRef,
   daysUntil,
   formatEventDate,
@@ -224,6 +243,10 @@ interface StallOption {
   /** Every course this stall runs is a set menu, so the card can say so and
    *  price per plate rather than per dish. */
   allFixed: boolean;
+  /** Verified statutory details for the checkout "Sold by" card. */
+  seller?: SellerDetails;
+  /** The vendor's GST on food (18 / 5 / 0), as set at onboarding. */
+  gstRate: VendorGstRate;
 }
 
 /** The price of one dish on a VARIED course: the vendor's own per-delicacy
@@ -840,7 +863,8 @@ export default function StallBookingWizard({
         byId.set(v.id, {
           id: v.id,
           name: v.name,
-          image: v.image,
+          // The brand's own cover, never stock art or a stall-type tile photo.
+          image: stallCoverPhoto(v.image, tileImages),
           rating: v.rating,
           reviews: v.reviews,
           googleRating: v.googleRating,
@@ -851,6 +875,8 @@ export default function StallBookingWizard({
           fromPrice: 0,
           dishCount: 0,
           allFixed: false,
+          ...(v.seller ? { seller: v.seller } : {}),
+          gstRate: v.gstRate ?? DEFAULT_VENDOR_GST_RATE,
         });
       }
     }
@@ -870,7 +896,7 @@ export default function StallBookingWizard({
       (a, b) =>
         Number(b.pinned) - Number(a.pinned) || b.rating - a.rating,
     );
-  }, [liveMenuCategories, cityName, stallId, pendingVendorId]);
+  }, [liveMenuCategories, cityName, stallId, pendingVendorId, tileImages]);
 
   // Which catalog listings can actually be booked here — by id, or by brand
   // name for a curated listing bridged to its wizard record — and which stall
@@ -1168,6 +1194,24 @@ export default function StallBookingWizard({
   const addOnVendorName = (addOnId: string): string =>
     counterVendors.find((v) => v.id === addOnVendorId(addOnId))?.name ?? "";
 
+  // "Sold by" at checkout: the stall plus each counter's vendor, deduped. A
+  // counter vendor comes from the catalog, so its verified details are looked
+  // up on the menu roster by the same id.
+  const sellerById = new Map(
+    liveMenuCategories.flatMap((c) =>
+      c.vendors.flatMap((v) => (v.seller ? [[v.id, v.seller] as const] : [])),
+    ),
+  );
+  const orderSellers = Array.from(
+    new Set([
+      ...(stall ? [stall.id] : []),
+      ...selectedAddOns.map(addOnVendorId).filter(Boolean),
+    ]),
+  ).flatMap((id) => {
+    const s = sellerById.get(id);
+    return s ? [s] : [];
+  });
+
   const toggleAddOn = (id: string) => {
     const addOn = addOns.find((a) => a.id === id);
     if (addOn) {
@@ -1211,6 +1255,9 @@ export default function StallBookingWizard({
       phone: referrerPhone,
     });
 
+  // The stall vendor's own GST on the food; the venue fee and service
+  // package are always 18%. The server re-prices with the same rate.
+  const foodGstRate = stall?.gstRate ?? DEFAULT_VENDOR_GST_RATE;
   const totals = computeOrderTotals({
     subtotal,
     addOnsTotal,
@@ -1218,7 +1265,10 @@ export default function StallBookingWizard({
     serviceTotal,
     coupon: appliedCoupon,
     referralPercent: referralCustomerPercent,
+    foodGstRate,
   });
+  const servicesTaxed = venueFee + serviceTotal > 0;
+  const gstLine = gstLabel(foodGstRate, servicesTaxed, t);
   const {
     preDiscount,
     couponDiscount,
@@ -1264,21 +1314,46 @@ export default function StallBookingWizard({
     0,
     ...(stall?.courses ?? []).map((c) => c.terms?.leadHours ?? 0),
   );
-  const vendorLead = Math.max(
-    customOrderLeadDays(orderVendorIds),
-    Math.ceil(stallLeadHours / 24),
-  );
+  // The stall vendor's own Single Stall notice (Vendor Portal → Calendar),
+  // when they set one, replaces the platform default for their stall — down
+  // to same day. Counter vendors on the order keep their own leads.
+  const stallNoticeTerms = stall?.courses.find((c) => c.terms?.noticeDays != null)?.terms;
+  const addOnVendorIds = orderVendorIds.filter((id) => id !== stallId);
+  const vendorLead =
+    stallNoticeTerms?.noticeDays != null
+      ? Math.max(
+          stallNoticeTerms.noticeDays,
+          addOnVendorIds.length ? customOrderLeadDays(addOnVendorIds) : 0,
+        )
+      : Math.max(
+          customOrderLeadDays(orderVendorIds),
+          Math.ceil(stallLeadHours / 24),
+        );
   const occasionLead = occasionLeadFor(occasionId, occasionList);
   const effectiveLeadDays = Math.max(vendorLead, occasionLead);
 
   const daysToEvent = daysUntil(eventDate);
-  const dateMeetsLead = daysToEvent === null || daysToEvent >= effectiveLeadDays;
+  // Same day is open only until the vendor's cut-off time.
+  const sameDayClosed =
+    daysToEvent === 0 &&
+    effectiveLeadDays === 0 &&
+    stallNoticeProblem(
+      { noticeDays: stallNoticeTerms?.noticeDays, cutoff: stallNoticeTerms?.sameDayCutoff },
+      0,
+    )?.kind === "cutoff";
+  const dateMeetsLead =
+    daysToEvent === null || (daysToEvent >= effectiveLeadDays && !sameDayClosed);
   const earliestDate = isoAfterDays(effectiveLeadDays);
   const leadOccasion =
     occasionLead > vendorLead ? resolveOccasion(occasionId) : undefined;
   const leadWarning =
     eventDate === "" || dateMeetsLead
       ? ""
+      : sameDayClosed
+        ? t(
+            `${stall?.name ?? "This stall"} takes same-day orders until ${formatCutoff(stallNoticeTerms?.sameDayCutoff ?? DEFAULT_SAME_DAY_CUTOFF)}. Pick tomorrow or a later date.`,
+            `${stall?.name ?? "यह स्टॉल"} उसी दिन के ऑर्डर ${formatCutoff(stallNoticeTerms?.sameDayCutoff ?? DEFAULT_SAME_DAY_CUTOFF)} तक लेते हैं। कल या उसके बाद की तारीख़ चुनें।`,
+          )
       : leadOccasion
         ? t(
             `A ${leadOccasion.name} needs ${effectiveLeadDays} days' notice. Pick a date on or after ${formatEventDate(earliestDate)}.`,
@@ -1289,6 +1364,33 @@ export default function StallBookingWizard({
             `${stall?.name ?? "इस स्टॉल"} के लिए ${effectiveLeadDays} दिन का अग्रिम समय चाहिए। ${formatEventDate(earliestDate)} या उसके बाद की तारीख़ चुनें, या सेम-डे स्टॉल चुनें।`,
           );
 
+  // The stall vendor's calendar: days off and meal periods already booked.
+  // Checked the moment a stall and date are both in hand — not at payment.
+  const [availabilityNonce, setAvailabilityNonce] = useState(0);
+  const stallAvailability = useVendorAvailability(rawStall?.id, availabilityNonce);
+  const slotReason = availabilityFor(stallAvailability, eventDate, mealTime);
+  const availabilityWarning =
+    slotReason && rawStall
+      ? unavailableText(
+          t,
+          slotReason,
+          rawStall.name,
+          eventDate,
+          slotReason === "slot" ? takenMeals(stallAvailability, eventDate) : [],
+        )
+      : "";
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const stallBookedDates = useMemo(
+    () => unavailableDates(stallAvailability),
+    [stallAvailability],
+  );
+
+  // An occasion carried in from the home bar or an old draft may be a big
+  // function Single Stall doesn't offer (a wedding) — it must be re-chosen.
+  const occasionOffered =
+    occasionId === OTHER_OCCASION_ID ||
+    occasionList.some((o) => o.id === occasionId);
+
   /* ─── Validation per step ──────────────────────────────────────────── */
   const stepValid = (s: number): boolean => {
     switch (s) {
@@ -1296,14 +1398,15 @@ export default function StallBookingWizard({
         return Boolean(stall) && pickedCount > 0;
       case 2:
         return (
-          occasionId !== "" &&
+          occasionOffered &&
           (occasionId !== OTHER_OCCASION_ID || customOccasion.trim() !== "") &&
           cityId !== "" &&
           (cityId !== OTHER_LOCATION_ID || customCity.trim() !== "") &&
           guests >= minGuests &&
           guests <= MAX_GUESTS &&
           eventDate !== "" &&
-          dateMeetsLead
+          dateMeetsLead &&
+          !slotReason
         );
       default:
         return true;
@@ -1316,7 +1419,7 @@ export default function StallBookingWizard({
     if (s === 1) return [{ text: menuBlockerText() }];
     if (s === 2) {
       const out: Blocker[] = [];
-      if (occasionId === "")
+      if (!occasionOffered)
         out.push({ text: t("Choose an occasion", "अवसर चुनें"), field: "occasion" });
       else if (
         occasionId === OTHER_OCCASION_ID &&
@@ -1340,6 +1443,8 @@ export default function StallBookingWizard({
         });
       else if (!dateMeetsLead && leadWarning)
         out.push({ text: leadWarning, field: "date" });
+      else if (availabilityWarning)
+        out.push({ text: availabilityWarning, field: "date" });
       if (guests < minGuests || guests > MAX_GUESTS)
         out.push({
           text:
@@ -1539,7 +1644,7 @@ export default function StallBookingWizard({
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
-    lines.push(`GST (18%):   ${money(gst)}`);
+    lines.push(`${gstLabel(foodGstRate, servicesTaxed)}:   ${money(gst)}`);
     if (guests > 0)
       lines.push(
         `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
@@ -1622,6 +1727,7 @@ export default function StallBookingWizard({
       addOnsTotal,
       discount,
       gst,
+      gstLabel: gstLabel(foodGstRate, servicesTaxed),
       grandTotal,
       paid,
     };
@@ -1813,6 +1919,9 @@ export default function StallBookingWizard({
           setAppliedCoupon(null);
           setCouponError(data.error ?? "");
         }
+        // Someone took the slot since the calendar was read — re-read it so
+        // the date picker and the blockers show the clash too.
+        if (data?.code === "SLOT_TAKEN") setAvailabilityNonce((n) => n + 1);
         return {
           ok: false,
           error:
@@ -1951,6 +2060,12 @@ export default function StallBookingWizard({
       paxMin={minGuests}
       paxMax={MAX_GUESTS}
       leadWarning={leadWarning}
+      bookedDates={stallBookedDates}
+      takenMeals={eventDate ? takenMeals(stallAvailability, eventDate) : []}
+      availabilityWarning={availabilityWarning}
+      onCheckAvailability={rawStall ? () => setAvailabilityOpen(true) : undefined}
+      // Today is pickable only for a stall that takes same-day orders.
+      minDaysAhead={stallNoticeTerms?.noticeDays === 0 ? 0 : 1}
       // Review locks the headcount and echoes it in the order summary, so the
       // editable field would be redundant there.
       showGuests={step !== TOTAL_STEPS}
@@ -2162,6 +2277,7 @@ export default function StallBookingWizard({
             ) : (
               <StepStallConfirm
                 t={t}
+                sellers={orderSellers}
                 stall={stall}
                 cartMenu={cartMenu}
                 guests={guests}
@@ -2236,6 +2352,7 @@ export default function StallBookingWizard({
                     venueFee={venueFee}
                     discount={discount}
                     gst={gst}
+                    gstLine={gstLine}
                     grandTotal={grandTotal}
                     pickedCount={pickedCount}
                   />
@@ -2255,6 +2372,7 @@ export default function StallBookingWizard({
                     venueFee={venueFee}
                     discount={discount}
                     gst={gst}
+                    gstLine={gstLine}
                     grandTotal={grandTotal}
                   />
                 }
@@ -2276,6 +2394,7 @@ export default function StallBookingWizard({
               venueFee={venueFee}
               discount={discount}
               gst={gst}
+              gstLine={gstLine}
               grandTotal={grandTotal}
               pickedCount={pickedCount}
               onEditMenu={() => setStep(1)}
@@ -2291,6 +2410,28 @@ export default function StallBookingWizard({
           before it. */}
       {step < TOTAL_STEPS && !showTypePicker && (
         <div className="md:mt-10">
+          {/* "Availability" beside the date: the stall vendor's calendar.
+              Picking an open day (and meal) writes it into the brief. */}
+          {availabilityOpen &&
+            rawStall &&
+            createPortal(
+              <VendorAvailabilitySheet
+                open
+                onClose={() => setAvailabilityOpen(false)}
+                vendorId={rawStall.id}
+                vendorName={rawStall.name}
+                date={eventDate}
+                mealTime={mealTime}
+                continueLabel={t("Use this date", "यह तारीख़ चुनें")}
+                onContinue={(date, meal) => {
+                  setEventDate(date);
+                  if (meal) setMealTime(meal);
+                  setAvailabilityOpen(false);
+                  setAvailabilityNonce((n) => n + 1);
+                }}
+              />,
+              document.body,
+            )}
           {blockersOpen && nextBlockers.length > 0 && (
             <BlockerPopup
               t={t}
@@ -3416,9 +3557,12 @@ function StepStallConfirm({
   blocker,
   summary,
   paySummary,
+  sellers,
 }: {
   /** Opens the event brief (occasion, date, city) for editing. */
   onEditEvent: () => void;
+  /** Verified "Sold by" details of the stall + counter vendors. */
+  sellers: SellerDetails[];
   /** The expanded order breakdown, shown on the cart after the coupon. */
   summary: ReactNode;
   /** The booking at a glance, beside the contact card on payment. */
@@ -3770,6 +3914,7 @@ function StepStallConfirm({
         onProceed={() => goStage("pay")}
         paySummary={paySummary}
         onGateway={setGatewayLive}
+        sellers={sellers}
       />
 
     </form>
@@ -3846,6 +3991,7 @@ function BookingSummary({
   venueFee,
   discount,
   gst,
+  gstLine,
   grandTotal,
 }: {
   t: (en: string, hi: string) => string;
@@ -3861,6 +4007,8 @@ function BookingSummary({
   venueFee: number;
   discount: number;
   gst: number;
+  /** "GST (5%)", "No GST"… — see `gstLabel`. */
+  gstLine: string;
   grandTotal: number;
 }) {
   return (
@@ -3921,7 +4069,7 @@ function BookingSummary({
         {serviceTotal > 0 && <SummaryRow label={t("Service", "सर्विस")} value={money(serviceTotal)} />}
         {venueFee > 0 && <SummaryRow label={t("Venue fee", "वेन्यू शुल्क")} value={money(venueFee)} />}
         {discount > 0 && <SummaryRow label={t("Discount", "छूट")} value={`- ${money(discount)}`} />}
-        <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+        <SummaryRow label={gstLine} value={money(gst)} />
       </div>
       <div className="mt-auto bg-cream/35 px-2.5 py-2 sm:px-4">
         <div className="flex flex-wrap items-center justify-between gap-x-3">
@@ -3959,6 +4107,7 @@ function StallSummary({
   venueFee,
   discount,
   gst,
+  gstLine,
   grandTotal,
   pickedCount,
   onEditMenu,
@@ -3976,6 +4125,8 @@ function StallSummary({
   venueFee: number;
   discount: number;
   gst: number;
+  /** "GST (5%)", "No GST"… — see `gstLabel`. */
+  gstLine: string;
   grandTotal: number;
   pickedCount: number;
   onEditMenu?: () => void;
@@ -4086,7 +4237,7 @@ function StallSummary({
         {discount > 0 && (
           <SummaryRow label={t("Discount", "छूट")} value={`- ${money(discount)}`} />
         )}
-        <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+        <SummaryRow label={gstLine} value={money(gst)} />
       </div>
 
       <div className={(expanded ? "ml-9 mt-1 pt-1.5 sm:ml-12 " : "mt-2 pt-3 ") + "flex items-center justify-between border-t border-cream-3"}>

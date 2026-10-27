@@ -21,19 +21,35 @@ const BLOB_TOKEN =
   (process.env.BLOB_READ_WRITE_TOKEN ?? "").match(/vercel_blob_rw_\S+/)?.[0] ??
   undefined;
 
-/** The four documents collected during vendor registration (Step 2). */
-export type KycDocKey = "gst" | "fssai" | "ownerId" | "businessProof";
+/** The documents collected during vendor registration (Step 2). */
+export type KycDocKey =
+  | "gst"
+  | "pan"
+  | "aadhaar"
+  | "fssai"
+  | "cheque"
+  | "upiQr"
+  | "ownerId"
+  | "businessProof";
 
 export const KYC_DOC_KEYS: KycDocKey[] = [
   "gst",
+  "pan",
+  "aadhaar",
   "fssai",
+  "cheque",
+  "upiQr",
   "ownerId",
   "businessProof",
 ];
 
 export const KYC_DOC_LABELS: Record<KycDocKey, string> = {
   gst: "GST Certificate",
+  pan: "PAN Card",
+  aadhaar: "Aadhaar Card",
   fssai: "FSSAI Licence",
+  cheque: "Cancelled Cheque / Passbook",
+  upiQr: "UPI QR Code",
   ownerId: "Owner ID Proof",
   businessProof: "Business Proof",
 };

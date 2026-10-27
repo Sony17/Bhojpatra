@@ -10,7 +10,7 @@
  * Essential Service, or an enquiry.
  */
 
-import { useMemo } from "react";
+import { useMemo, type MouseEvent } from "react";
 import Link from "next/link";
 import type { PublicVendorProfile } from "@/lib/vendorMenus";
 import { useLang } from "@/lib/i18n";
@@ -29,6 +29,7 @@ import {
   type BookableStall,
 } from "@/lib/vendorStorefront";
 import ReviewCard from "@/components/vendors/ReviewCard";
+import { useStallAvailabilityGate } from "@/components/booking/VendorAvailability";
 import { useVendorReviews } from "@/components/vendors/useVendorReviews";
 
 export default function VendorProfile({
@@ -52,6 +53,14 @@ export default function VendorProfile({
   const cta = profileCta(profile, stall);
   const bookHref = cta.href;
   const bookText = cta.kind === "stall" ? t("Book Now", "अभी बुक करें") : ctaLabel(cta.kind, t);
+  // A Single Stall booking checks this vendor's calendar first (against the
+  // date already in the guest's brief), and the calendar is one tap away.
+  const gate = useStallAvailabilityGate();
+  const onBook =
+    cta.kind === "stall"
+      ? (e: MouseEvent<HTMLElement>) =>
+          gate.onSelect(e, { vendorId: profile.id, vendorName: profile.business, href: bookHref })
+      : undefined;
   // The price beside the CTA is the price of what it sells.
   const boxFrom = bainaProducts.length
     ? Math.min(...bainaProducts.map((p) => p.price))
@@ -201,8 +210,20 @@ export default function VendorProfile({
               inCompare={inCompare}
               compareDisabled={compareDisabled}
               onToggleCompare={() => toggle(profile.id)}
+              onBook={onBook}
               className="mt-5"
             />
+            {cta.kind === "stall" && (
+              <button
+                type="button"
+                onClick={() =>
+                  gate.openCalendar({ vendorId: profile.id, vendorName: profile.business, href: bookHref })
+                }
+                className="focus-ring mt-2.5 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-maroon/40 bg-white text-sm font-semibold text-maroon transition hover:bg-cream/30"
+              >
+                {t("Check availability", "उपलब्धता देखें")}
+              </button>
+            )}
           </Card>
         </div>
       </div>
@@ -286,6 +307,7 @@ export default function VendorProfile({
             name: profile.business,
             location: profile.city,
             products: bainaProducts,
+            ...(profile.seller ? { seller: profile.seller } : {}),
           }}
           heading={`🎁 ${t("Our Baina Boxes", "हमारे बैना बॉक्स")}`}
         />
@@ -365,7 +387,9 @@ export default function VendorProfile({
         priceNote={ctaPrice?.note ?? ""}
         cta={bookText}
         href={bookHref}
+        onClick={onBook}
       />
+      {gate.sheet}
     </section>
   );
 }

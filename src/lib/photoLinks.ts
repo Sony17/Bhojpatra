@@ -15,6 +15,31 @@ export function isStockVendorImage(src: string | undefined | null): boolean {
   return src === DEFAULT_VENDOR_IMAGE;
 }
 
+/** The Bhojpatra logo on brand red: what a missing photo shows. Single Stall
+ *  keeps its three image kinds apart — stall-type tiles (admin), stall covers
+ *  (the brand's own) and dishes (the vendor's own) — so a missing one shows
+ *  the logo, never a photo borrowed from another kind. */
+const NO_PHOTO_PLACEHOLDER = "/placeholders/no-photo.svg";
+export const DISH_PLACEHOLDER = NO_PHOTO_PLACEHOLDER;
+export const STALL_PLACEHOLDER = NO_PHOTO_PLACEHOLDER;
+
+/**
+ * A stall's cover photo: the brand's own upload or pasted link. Stock Unsplash
+ * art (the seed set, which the tile defaults share) and any photo the admin
+ * uses on a stall-type tile read as "no cover", so a stall never wears the
+ * same picture as a tile.
+ */
+export function stallCoverPhoto(
+  src: string | undefined | null,
+  tileImages?: Record<string, string>,
+): string {
+  if (!src || /^https:\/\/(images|plus)\.unsplash\.com\//.test(src)) {
+    return STALL_PLACEHOLDER;
+  }
+  if (tileImages && Object.values(tileImages).includes(src)) return STALL_PLACEHOLDER;
+  return src;
+}
+
 /** True for a pasted https image link (no credentials, sane length). */
 export function isLinkedPhotoUrl(v: unknown): v is string {
   if (typeof v !== "string" || !v || v.length > MAX_LINK_LENGTH) return false;

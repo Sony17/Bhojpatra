@@ -16,6 +16,7 @@ type OccasionOption = {
   nameHi: string;
   leadDays?: number;
   singleStallOnly?: boolean;
+  feastOnly?: boolean;
 };
 
 // Guard against an admin fat-fingering an absurd lead time; a year of notice is
@@ -45,9 +46,24 @@ const SEED: OccasionOption[] = [
     name: o.name,
     nameHi: o.nameHi,
     leadDays: o.leadDays,
+    ...(o.feastOnly ? { feastOnly: true } : {}),
   })),
   ...smallOccasions,
 ];
+
+/** The big functions (wedding & its ceremonies) — kept out of Single Stall. */
+const FEAST_ONLY_IDS = new Set(
+  occasions.filter((o) => o.feastOnly).map((o) => o.id),
+);
+
+/** A list saved before "Feast only" existed has its big functions flagged
+ *  until the admin next saves — from then on the saved list is the whole
+ *  truth (`feastScoped`), so an unflagged one stays unflagged. */
+function withFeastDefaults(list: OccasionOption[]): OccasionOption[] {
+  return list.map((o) =>
+    FEAST_ONLY_IDS.has(o.id) && !o.singleStallOnly ? { ...o, feastOnly: true } : o,
+  );
+}
 
 /** A list saved before the Single Stall occasions existed gets them appended
  *  (skipping any the admin already has by id or name) until the admin next
@@ -68,10 +84,12 @@ async function readOccasions(): Promise<OccasionOption[]> {
   const stored = await readSingleton<{
     occasions: OccasionOption[];
     smallSeeded?: boolean;
+    feastScoped?: boolean;
   }>(SETTINGS_KEY);
   const list = stored?.occasions;
   if (!Array.isArray(list) || !list.length) return SEED;
-  return stored?.smallSeeded ? list : withSmallSeeds(list);
+  const seeded = stored?.smallSeeded ? list : withSmallSeeds(list);
+  return stored?.feastScoped ? seeded : withFeastDefaults(seeded);
 }
 
 export async function GET() {
@@ -122,7 +140,12 @@ export async function POST(request: Request) {
       name,
       nameHi,
       ...(leadDays !== undefined ? { leadDays } : {}),
-      ...(row.singleStallOnly === true ? { singleStallOnly: true } : {}),
+      // One audience per row: Single Stall only, Feast only, or both.
+      ...(row.singleStallOnly === true
+        ? { singleStallOnly: true }
+        : row.feastOnly === true
+          ? { feastOnly: true }
+          : {}),
     });
   }
 
@@ -134,7 +157,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    await writeSingleton(SETTINGS_KEY, { occasions: list, smallSeeded: true });
+    await writeSingleton(SETTINGS_KEY, {
+      occasions: list,
+      smallSeeded: true,
+      feastScoped: true,
+    });
   } catch (err) {
     console.error("Failed to persist occasions", err);
     return Response.json(

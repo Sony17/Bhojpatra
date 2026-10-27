@@ -21,12 +21,14 @@ import type {
   VendorTier,
   VerificationStatus,
 } from "@/lib/admin/types";
+import { needsReReview, RE_REVIEW } from "@/lib/admin/types";
 
 const PAGE_SIZE = 6;
 
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "All" },
   { label: "Pending", value: "Pending" },
+  { label: "Re-review (live vendor changed KYC)", value: RE_REVIEW },
   { label: "Verified", value: "Verified" },
   { label: "Rejected", value: "Rejected" },
 ];
@@ -82,6 +84,7 @@ export default function ApprovalsConsole() {
   const counts = useMemo(
     () => ({
       pending: apps.filter((a) => a.status === "Pending").length,
+      reReview: apps.filter(needsReReview).length,
       verified: apps.filter((a) => a.status === "Verified").length,
       rejected: apps.filter((a) => a.status === "Rejected").length,
     }),
@@ -247,7 +250,7 @@ export default function ApprovalsConsole() {
           : a,
       ),
     );
-    void persist(id, { document: { kind, status: next } }, snapshot);
+    return persist(id, { document: { kind, status: next } }, snapshot);
   };
 
   const columns: Column<VendorApplication>[] = [
@@ -284,8 +287,9 @@ export default function ApprovalsConsole() {
       />
 
       {/* Summary */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Calendar} label="Pending Review" value={String(counts.pending)} />
+        <StatCard icon={ShieldCheck} label="Re-review (KYC changed)" value={String(counts.reReview)} />
         <StatCard icon={ShieldCheck} label="Verified" value={String(counts.verified)} />
         <StatCard icon={Close} label="Rejected" value={String(counts.rejected)} />
       </div>
@@ -367,14 +371,34 @@ export default function ApprovalsConsole() {
               >
                 Request Changes
               </Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={() => setAppStatus(selected.id, "Verified")}
-                disabled={selected.status === "Verified"}
-              >
-                Approve Vendor
-              </Button>
+              {needsReReview(selected) ? (
+                /* A live vendor's changed documents: verify just those — the
+                   vendor is already approved, and re-approving the whole
+                   application would also publish any menu edit still waiting
+                   in Menu Moderation. */
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={async () => {
+                    // One at a time: each PATCH rewrites the application, so
+                    // parallel ones could overwrite each other's document.
+                    for (const d of selected.documents) {
+                      if (d.status === "Pending") await setDocStatus(selected.id, d.kind, "Verified");
+                    }
+                  }}
+                >
+                  Verify Changed Documents
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => setAppStatus(selected.id, "Verified")}
+                  disabled={selected.status === "Verified"}
+                >
+                  Approve Vendor
+                </Button>
+              )}
             </>
           )
         }
@@ -386,6 +410,21 @@ export default function ApprovalsConsole() {
               <AppStatus app={selected} />
               <span className="text-xs text-ink-soft">{selected.id}</span>
             </div>
+
+            {needsReReview(selected) && (
+              <p role="note" className="rounded-control border border-maroon/30 bg-maroon/5 px-3 py-2 text-sm text-ink">
+                <span className="font-semibold text-maroon">Re-review needed.</span> This vendor is
+                live and changed{" "}
+                <span className="font-semibold">
+                  {selected.documents.filter((d) => d.status === "Pending").map((d) => d.kind).join(", ")}
+                </span>
+                . Until you verify, the changed numbers are hidden from customers
+                {selected.documents.some((d) => d.kind === "GST" && d.status === "Pending")
+                  ? " and their food is billed with No GST"
+                  : ""}
+                . Their listing stays live.
+              </p>
+            )}
 
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <Detail label="Owner" value={selected.owner} />
@@ -445,6 +484,23 @@ export default function ApprovalsConsole() {
                         <StatusBadge status={d.status} />
                       </div>
                       <p className="mt-0.5 text-sm tabular-nums tracking-wide text-ink-soft">{d.number}</p>
+                      {d.kind === "Bank Account" && selected.payoutAccount && (
+                        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+                          <dt className="text-ink-soft">Holder</dt>
+                          <dd className="text-ink">{selected.payoutAccount.holderName || "—"}</dd>
+                          <dt className="text-ink-soft">Type</dt>
+                          <dd className="text-ink">{selected.payoutAccount.accountType || "—"}</dd>
+                          {selected.payoutAccount.bankName && (
+                            <>
+                              <dt className="text-ink-soft">Bank</dt>
+                              <dd className="text-ink">
+                                {selected.payoutAccount.bankName}
+                                {selected.payoutAccount.branch ? ` · ${selected.payoutAccount.branch}` : ""}
+                              </dd>
+                            </>
+                          )}
+                        </dl>
+                      )}
                       {d.fileUrl ? (
                         <a
                           href={d.fileUrl}
@@ -552,13 +608,29 @@ const HISTORY_LABEL: Record<string, string> = {
   "changes-requested": "Changes requested",
   reopened: "Reopened",
   document: "Document reviewed",
+  "gst-rate": "GST rate changed",
 };
+
+const rateName = (r: number) => (r === 0 ? "No GST" : `${r}%`);
+
+/** "5%" — or "Picked 5% · billing No GST until the GSTIN is verified". */
+function gstSummary(picked: number | undefined, billed: number): string {
+  const chosen = picked ?? 18;
+  if (chosen === billed) return `${rateName(billed)}${picked === undefined ? " (not picked yet — platform default)" : ""}`;
+  return `Picked ${rateName(chosen)} · billing ${rateName(billed)} until the GSTIN is verified`;
+}
 
 /** Status pill that tells a changes request apart from a final rejection. */
 function AppStatus({ app }: { app: VendorApplication }) {
   return (
     <StatusBadge
-      status={app.status === "Rejected" && app.changesRequested ? "Changes requested" : app.status}
+      status={
+        app.status === "Rejected" && app.changesRequested
+          ? "Changes requested"
+          : needsReReview(app)
+            ? RE_REVIEW
+            : app.status
+      }
     />
   );
 }
@@ -617,6 +689,7 @@ function OfferSummary({ app }: { app: VendorApplication }) {
           value={s.bainaBoxes.length ? s.bainaBoxes.map((b) => `${b.name} ₹${b.price}`).join(" · ") : "—"}
         />
         <Detail label="Listing status" value={`${s.moderation}${s.counters ? ` · ${s.counters} counters` : ""}`} />
+        <Detail label="GST on food" value={gstSummary(s.gstRatePicked, s.gstRateBilled)} />
       </dl>
     </div>
   );

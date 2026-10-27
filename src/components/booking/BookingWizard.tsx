@@ -109,6 +109,7 @@ import {
   type NonVegCount,
 } from "@/lib/dietSplit";
 import CheckoutPanel from "@/components/booking/shared/CheckoutPanel";
+import type { SellerDetails } from "@/lib/sellerDetails";
 import {
   WizardHero,
   ProgressRail,
@@ -117,6 +118,9 @@ import {
   MIN_GUESTS,
   MAX_GUESTS,
   GST_RATE,
+  DEFAULT_VENDOR_GST_RATE,
+  gstLabel,
+  type VendorGstRate,
   ADVANCE_RATE,
   daysUntil,
   deriveBookingId,
@@ -1512,6 +1516,40 @@ export default function BookingWizard() {
       .map((id) => eligibleAddOnVendors.find((v) => v.id === id)?.name)
       .filter((n): n is string => Boolean(n));
 
+  // "Sold by" at checkout: every vendor cooking a course plus each counter's
+  // vendor, deduped. Counter vendors come from the catalog, so their verified
+  // details are looked up on the menu roster by the same id.
+  const sellerById = new Map(
+    liveMenuCategories.flatMap((c) =>
+      c.vendors.flatMap((v) => (v.seller ? [[v.id, v.seller] as const] : [])),
+    ),
+  );
+  const orderVendorIds = Array.from(
+    new Set([
+      ...activeCategories.flatMap((c) => vendorsFor(c.id)),
+      ...selectedAddOns.flatMap(addOnVendorIds),
+    ]),
+  );
+  const orderSellers = orderVendorIds.flatMap((id) => {
+    const s = sellerById.get(id);
+    return s ? [s] : [];
+  });
+  // GST on the food: each vendor sets their own (18 / 5 / none). A feast is one
+  // package cooked by several of them, so it bills the HIGHEST rate among the
+  // vendors on it — never under-collecting. No vendor picked yet = default.
+  const gstRateById = new Map(
+    liveMenuCategories.flatMap((c) =>
+      c.vendors.map((v) => [v.id, v.gstRate ?? DEFAULT_VENDOR_GST_RATE] as const),
+    ),
+  );
+  const orderRates = orderVendorIds.flatMap((id) => {
+    const r = gstRateById.get(id);
+    return r === undefined ? [] : [r];
+  });
+  const foodGstRate: VendorGstRate = orderRates.length
+    ? (Math.max(...orderRates) as VendorGstRate)
+    : DEFAULT_VENDOR_GST_RATE;
+
   // Assign / unassign a vendor to a counter. Single-vendor packages replace the
   // pick; only Platinum toggles it in/out — but always keeps at least one
   // vendor on a selected counter.
@@ -1648,7 +1686,11 @@ export default function BookingWizard() {
   // The venue booking fee and the feast-wide service package are taxed
   // alongside the catering but aren't subject to the catering coupon.
   const taxable = preDiscount - discount + venueFee + serviceTotal;
-  const gst = taxable * GST_RATE;
+  const gst =
+    ((preDiscount - discount) * foodGstRate) / 100 +
+    (venueFee + serviceTotal) * GST_RATE;
+  const servicesTaxed = venueFee + serviceTotal > 0;
+  const gstLine = gstLabel(foodGstRate, servicesTaxed, t);
   const grandTotal = taxable + gst;
 
   // Booking id: this browser's booking salt + the order's shape — stable for
@@ -1839,7 +1881,7 @@ export default function BookingWizard() {
       lines.push(`Service:     ${selectedService.name} (${money(serviceTotal)})`);
     if (venueFee > 0) lines.push(`Venue Fee:   ${money(venueFee)}`);
     if (discount > 0) lines.push(`Discount:    - ${money(discount)}`);
-    lines.push(`GST (18%):   ${money(gst)}`);
+    lines.push(`${gstLabel(foodGstRate, servicesTaxed)}:   ${money(gst)}`);
     if (guests > 0)
       lines.push(
         `Per Plate:   ≈ ${money(perPlateCost(grandTotal, guests))} × ${guests} guests`,
@@ -1951,6 +1993,7 @@ export default function BookingWizard() {
       addOnsTotal,
       discount,
       gst,
+      gstLabel: gstLabel(foodGstRate, servicesTaxed),
       grandTotal,
       paid,
     };
@@ -2739,6 +2782,7 @@ export default function BookingWizard() {
               itemsFor={itemsFor}
               selectedAddOns={selectedAddOns}
               addOnVendorNames={addOnVendorNames}
+              sellers={orderSellers}
               serviceName={selectedService?.name}
               serviceTotal={serviceTotal}
               onEditMenu={() => setStep(2)}
@@ -2826,6 +2870,7 @@ export default function BookingWizard() {
             referralDiscount={referralDiscount}
             referrerName={referrerName}
             gst={gst}
+            gstLine={gstLine}
             grandTotal={grandTotal}
           />
         )}
@@ -4683,8 +4728,11 @@ function StepConfirm({
   confirmError,
   onConfirm,
   whatsappHref,
+  sellers,
 }: {
   t: (en: string, hi: string) => string;
+  /** Verified "Sold by" details of every vendor on the order. */
+  sellers: SellerDetails[];
   occasion: OccasionOption | undefined;
   packageName: string;
   eventDate: string;
@@ -5058,6 +5106,7 @@ function StepConfirm({
         confirming={confirming}
         confirmError={confirmError}
         whatsappHref={whatsappHref}
+        sellers={sellers}
       />
     </form>
   );
@@ -5289,6 +5338,7 @@ function SummaryPanel({
   referralDiscount,
   referrerName,
   gst,
+  gstLine,
   grandTotal,
 }: {
   t: (en: string, hi: string) => string;
@@ -5308,6 +5358,8 @@ function SummaryPanel({
   referralDiscount: number;
   referrerName: string;
   gst: number;
+  /** "GST (5%)", "No GST"… — see `gstLabel`. */
+  gstLine: string;
   grandTotal: number;
 }) {
   // Bill breakdown collapses by default — like Swiggy/Zomato, the guest sees
@@ -5461,7 +5513,7 @@ function SummaryPanel({
                 accent
               />
             )}
-            <SummaryRow label={t("GST (18%)", "जीएसटी (18%)")} value={money(gst)} />
+            <SummaryRow label={gstLine} value={money(gst)} />
             <div className="my-2 h-px bg-cream-3" />
             <div className="flex items-center justify-between">
               <span className="font-display text-base font-semibold text-ink">

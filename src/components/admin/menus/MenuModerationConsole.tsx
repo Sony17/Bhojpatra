@@ -55,6 +55,12 @@ interface ModerationVendor {
   applicationStatus: string | null;
   /** True while a live vendor's previous approved content is still shown. */
   liveSnapshot: boolean;
+  /** For a pending edit to a live listing: what it changes ("Menu & prices"…). */
+  changedFields?: string[];
+  /** GST on food the vendor picked (absent = never picked → 18%). */
+  gstRatePicked?: number;
+  /** What checkout bills — No GST (0) until their GSTIN is verified. */
+  gstRateBilled: number;
   badges: VendorBadgesState | null;
   /** The vendor's Single Stalls, each with the course it publishes into. */
   stalls: { id: string; courseId: string; dishes: VendorMenuItem[] }[];
@@ -338,7 +344,12 @@ export default function MenuModerationConsole() {
     {
       key: "status",
       header: "Status",
-      cell: (v) => <ModerationBadge status={v.moderation} />,
+      cell: (v) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ModerationBadge status={v.moderation} />
+          {isLiveEdit(v) && <LiveEditTag />}
+        </div>
+      ),
     },
     {
       key: "action",
@@ -470,6 +481,7 @@ export default function MenuModerationConsole() {
           <div className="space-y-5">
             <div className="flex flex-nowrap items-center gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap">
               <ModerationBadge status={selected.moderation} />
+              {isLiveEdit(selected) && <LiveEditTag />}
               {selected.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-3 py-1 text-xs font-semibold text-ink">
                   ✓ KYC Verified
@@ -485,11 +497,24 @@ export default function MenuModerationConsole() {
                   : "This vendor hasn't submitted their KYC application yet — their menu can't be published."}
               </p>
             )}
-            {selected.liveSnapshot && selected.moderation === "Pending" && (
-              <p className="text-sm text-ink-soft">
-                Customers currently see this vendor&apos;s last approved listing; approving publishes the edits below.
-              </p>
+            {isLiveEdit(selected) && (
+              <div role="note" className="rounded-control border border-maroon/30 bg-maroon/5 px-3 py-2 text-sm text-ink">
+                <p>
+                  <span className="font-semibold text-maroon">Re-approval of a live listing.</span>{" "}
+                  Customers currently see this vendor&apos;s last approved listing; approving publishes the edits below.
+                </p>
+                {selected.changedFields && selected.changedFields.length > 0 && (
+                  <p className="mt-1">
+                    <span className="font-semibold">What changed:</span> {selected.changedFields.join(", ")}
+                  </p>
+                )}
+              </div>
             )}
+            <p className="text-sm text-ink-soft">
+              <span className="font-semibold text-ink">GST on food:</span>{" "}
+              {gstRateText(selected.gstRatePicked, selected.gstRateBilled)}{" "}
+              <span className="text-xs">(set by the vendor — not part of menu approval)</span>
+            </p>
 
             {/* Recognition badges — vendors apply, only admins grant. */}
             {(selected.badges?.applied.length || selected.badges?.granted.length) ? (
@@ -776,4 +801,25 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 text-sm text-ink">{value}</dd>
     </div>
   );
+}
+
+/** A pending edit to a listing that's already live (vs a brand-new vendor). */
+function isLiveEdit(v: Pick<ModerationVendor, "liveSnapshot" | "moderation">): boolean {
+  return v.liveSnapshot && v.moderation === "Pending";
+}
+
+/** Marks a pending row as a re-approval, so it isn't mistaken for a new vendor. */
+function LiveEditTag() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-maroon px-2.5 py-0.5 text-xs font-semibold text-maroon">
+      Edit to live listing
+    </span>
+  );
+}
+
+function gstRateText(picked: number | undefined, billed: number): string {
+  const name = (r: number) => (r === 0 ? "No GST" : `${r}%`);
+  const chosen = picked ?? 18;
+  if (chosen === billed) return `${name(billed)}${picked === undefined ? " (not picked yet — platform default)" : ""}`;
+  return `Picked ${name(chosen)} · billing ${name(billed)} until the GSTIN is verified`;
 }

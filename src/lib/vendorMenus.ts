@@ -17,6 +17,7 @@
  * that prefix to drop a de-selected vendor's items (multi-vendor tiers).
  */
 import { DEFAULT_VENDOR_IMAGE, isLinkedPhotoUrl } from "@/lib/photoLinks";
+import { cleanPayoutAccount, type VendorPayoutAccount } from "@/lib/payoutAccount";
 import {
   PLATFORM_STALL_CATEGORIES,
   stallMenuId,
@@ -24,6 +25,17 @@ import {
 } from "@/lib/stallTypes";
 import { randomUUID } from "crypto";
 import { createStore, readSingleton } from "@/lib/store";
+import {
+  applicationForOwner,
+  readVendorApplications,
+  type VendorApplicationRecord,
+} from "@/lib/vendorApplications";
+import { sellerDetailsFrom, type SellerDetails } from "@/lib/sellerDetails";
+import {
+  DEFAULT_VENDOR_GST_RATE,
+  isVendorGstRate,
+  type VendorGstRate,
+} from "@/lib/bookingPricing";
 import {
   TOP_VENDORS_KEY,
   pinRank,
@@ -310,7 +322,7 @@ export interface VendorBadgesState {
 }
 
 /** KYC documents the V2 onboarding wizard uploads (Step 2). */
-export type OnboardingDocKey = "gst" | "fssai";
+export type OnboardingDocKey = "gst" | "pan" | "aadhaar" | "fssai" | "cheque" | "upiQr";
 
 /** The vendor's private onboarding progress, saved with every draft so a
  *  refresh (or a new device) resumes where they left off. Holds identity / KYC
@@ -321,7 +333,14 @@ export interface VendorOnboardingDraft {
   ownerName?: string;
   phone?: string;
   gstNumber?: string;
+  panNumber?: string;
+  /** Owner's full Aadhaar — private like the rest of this block; customers
+   *  only ever get the last four digits, via the verified application. */
+  aadhaarNumber?: string;
   fssaiNumber?: string;
+  /** Payout bank account / UPI, as typed so far (private — admin-only once
+   *  submitted on the application). */
+  payout?: VendorPayoutAccount;
   /** Uploaded KYC files (ids in the KYC store) + their display names. */
   docs?: Partial<Record<OnboardingDocKey, { id: string; fileName: string }>>;
   /** Wizard position: step 1–6 and the furthest phase reached (0–5). */
@@ -348,6 +367,15 @@ export interface LiveVendorRecord {
   maxCapacity?: number;
   /** Max events the caterer can cater in a single day. */
   maxEventsPerDay?: number;
+  /** Days (YYYY-MM-DD, IST) the vendor switched themselves off for Single
+   *  Stall orders — Vendor Portal → Calendar. Operational, not moderated
+   *  content: kept out of `approvedSnapshot` (see `toPublishedSnapshot`). */
+  blockedDates?: string[];
+  /** Single Stall booking notice in days (0 = same day) — Vendor Portal →
+   *  Calendar. Unset = the platform default. Operational like `blockedDates`. */
+  stallNoticeDays?: number;
+  /** Same-day order cut-off ("HH:MM" IST) when `stallNoticeDays` is 0. */
+  sameDayCutoff?: string;
   image: string;
   /** Seed display rating; live vendors start at 0 = "New" until real reviews land. */
   rating: number;
@@ -387,6 +415,10 @@ export interface LiveVendorRecord {
   serviceCities?: string[];
   /** Dietary orientation: vegetarian only, non-veg only, or both. */
   dietaryOffering?: VendorDietaryOffering;
+  /** GST the vendor charges on their food (18 / 5 / 0 = No GST), picked at
+   *  onboarding. Absent = {@link DEFAULT_VENDOR_GST_RATE}. Only a vendor with
+   *  a GSTIN may charge GST — the menu route forces 0 otherwise. */
+  gstRate?: VendorGstRate;
   /** Minimum guest guarantee across their standard service. */
   minPax?: number;
   /** Minimum booking lead time required (hours). */
@@ -440,6 +472,12 @@ export type VendorPublishedSnapshot = Omit<
   | "approvedSnapshot"
   | "badges"
   | "contentReview"
+  | "blockedDates"
+  | "stallNoticeDays"
+  | "sameDayCutoff"
+  // A tax declaration, not content: it takes effect at once and never waits
+  // behind moderation (see `approvedView`).
+  | "gstRate"
 >;
 
 const store = createStore<LiveVendorRecord>({
@@ -676,12 +714,52 @@ export async function readVendorItemLimits(): Promise<VendorItemLimits> {
  *  category taxonomy with every vendor (seed + live) that publishes at least
  *  one dish in that category. Admin-pinned "Top 5" brands lead each roster
  *  they appear in (pin order); everyone else keeps the stored order. */
+/** A live vendor's verified "Sold by" details (see `sellerDetails.ts`), matched
+ *  to their application by account. Curated seeds have none. */
+export function sellerDetailsOf(
+  apps: VendorApplicationRecord[],
+  r: Pick<LiveVendorRecord, "ownerUserId" | "ownerEmail" | "business">,
+): SellerDetails | undefined {
+  if (!r.ownerUserId) return undefined;
+  const app = applicationForOwner(apps, { id: r.ownerUserId, email: r.ownerEmail ?? "" });
+  return sellerDetailsFrom(app, r.business);
+}
+
+/** Is this application's GSTIN admin-verified (application and document)? */
+export function hasVerifiedGstin(app: VendorApplicationRecord | null | undefined): boolean {
+  return Boolean(
+    app?.status === "Verified" &&
+      app.documents.some((d) => d.kind === "GST" && d.status === "Verified"),
+  );
+}
+
+/** The GST rate a vendor's food is actually billed at. A vendor who PICKED a
+ *  rate charges it only on an admin-Verified GSTIN: until then — no GSTIN, a
+ *  typed-in one still in their draft, or a changed one awaiting re-review —
+ *  it is No GST. Their pick is kept and applies once verified.
+ *  A vendor who never picked one (curated seeds, listings from before the
+ *  picker) keeps the platform's long-standing 18% — grandfathered, so no live
+ *  listing's price changes silently. */
+export function effectiveGstRateOf(
+  apps: VendorApplicationRecord[],
+  r: Pick<LiveVendorRecord, "ownerUserId" | "ownerEmail" | "gstRate">,
+): VendorGstRate {
+  if (!r.ownerUserId || r.gstRate === undefined) return r.gstRate ?? DEFAULT_VENDOR_GST_RATE;
+  const app = applicationForOwner(apps, { id: r.ownerUserId, email: r.ownerEmail ?? "" });
+  return hasVerifiedGstin(app) ? (r.gstRate ?? DEFAULT_VENDOR_GST_RATE) : 0;
+}
+
 export async function assembleMenuCategories(): Promise<MenuCategory[]> {
-  const [rows, storedPins, adminLimits] = await Promise.all([
+  const [rows, storedPins, adminLimits, apps] = await Promise.all([
     ensureSeededVendors(),
     // A broken pin row must never take the menu down with it.
     readSingleton<TopVendors>(TOP_VENDORS_KEY).catch(() => null),
     readVendorItemLimits(),
+    // Nor may the applications table — it only feeds the checkout "Sold by".
+    readVendorApplications().catch((err) => {
+      console.error("Menu: failed to read vendor applications", err);
+      return [] as VendorApplicationRecord[];
+    }),
   ]);
   const { pins } = reconcileTopVendors(storedPins);
   // What customers may see: Approved records, plus a live vendor's last
@@ -692,6 +770,12 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
     const view = approvedView(r);
     return view ? [view] : [];
   });
+  const sellers = new Map(
+    visible.flatMap((r) => {
+      const s = sellerDetailsOf(apps, r);
+      return s ? [[r.id, s] as const] : [];
+    }),
+  );
   return menuCategories.map((cat) => ({
     ...cat,
     vendors: orderByPins(
@@ -750,6 +834,11 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
             ...(it.tiers?.length ? { tiers: it.tiers } : {}),
           })),
           ...(r.ownerUserId ? { live: true, city: r.city } : {}),
+          // GST on food the booking ladder bills — the vendor's pick, but only
+          // on an admin-verified GSTIN (see effectiveGstRateOf).
+          gstRate: effectiveGstRateOf(apps, r),
+          // Verified GSTIN / PAN / FSSAI / Aadhaar last-4 for checkout.
+          ...(sellers.has(r.id) ? { seller: sellers.get(r.id) } : {}),
           // The vendor's own Single Stall terms for this course, so the
           // booking flow can enforce them (additive; absent when none set).
           ...stallTermsFor(r, cat.id),
@@ -771,7 +860,10 @@ export async function assembleMenuCategories(): Promise<MenuCategory[]> {
  *  guest guarantee) plus the vendor-wide `minPax` / `leadHours`. Empty object
  *  when the vendor declared none, so the payload is unchanged for them. */
 export function stallTermsFor(
-  r: Pick<LiveVendorRecord, "stallConfig" | "minPax" | "leadHours">,
+  r: Pick<
+    LiveVendorRecord,
+    "stallConfig" | "minPax" | "leadHours" | "stallNoticeDays" | "sameDayCutoff"
+  >,
   categoryId: string,
 ): { stallTerms?: StallTerms } {
   const pricing = r.stallConfig?.categoryPricing?.[categoryId];
@@ -782,6 +874,10 @@ export function stallTermsFor(
       : {}),
     ...(r.minPax ? { minPax: r.minPax } : {}),
     ...(r.leadHours ? { leadHours: r.leadHours } : {}),
+    ...(r.stallNoticeDays != null ? { noticeDays: r.stallNoticeDays } : {}),
+    ...(r.stallNoticeDays === 0 && r.sameDayCutoff
+      ? { sameDayCutoff: r.sameDayCutoff }
+      : {}),
   };
   return Object.keys(terms).length ? { stallTerms: terms } : {};
 }
@@ -1002,6 +1098,8 @@ export interface PublicVendorProfile {
   googleRating?: number;
   googleReviews?: number;
   verified: boolean;
+  /** Verified statutory details shown on the Baina Box checkout. */
+  seller?: SellerDetails;
   gallery: string[];
   /** Feast bands this caterer sells (their own selection, else price-derived) —
    *  the bands the per-course numbers below are keyed by, so the public menu
@@ -1172,6 +1270,7 @@ export function toPublicVendorProfile(
   record: LiveVendorRecord,
   gallery: string[],
   adminQuotas?: VendorCourseLimits,
+  seller?: SellerDetails,
 ): PublicVendorProfile | null {
   if (!record.ownerUserId) return null;
   // The customer-visible view: Approved, or the last approved content while
@@ -1193,6 +1292,7 @@ export function toPublicVendorProfile(
     ...(r.googleRating ? { googleRating: r.googleRating } : {}),
     ...(r.googleReviews !== undefined ? { googleReviews: r.googleReviews } : {}),
     verified: r.verified,
+    ...(seller ? { seller } : {}),
     gallery,
     tiers: effectiveTiers(r.tiers, r.priceFrom),
     menu: visible.flatMap((s) => {
@@ -1361,6 +1461,7 @@ export interface VendorMenuInput {
   /* ── V2 Extensions ── */
   serviceCities?: string[];
   dietaryOffering?: VendorDietaryOffering;
+  gstRate?: VendorGstRate;
   minPax?: number;
   leadHours?: number;
   bestFor?: string[];
@@ -2101,6 +2202,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
 
   const serviceCities = cleanServiceCities(body.serviceCities);
   const dietaryOffering = cleanDietaryOffering(body.dietaryOffering);
+  const gstRate = isVendorGstRate(body.gstRate) ? body.gstRate : undefined;
   const minPax = cleanMoney(body.minPax, 10000);
   const leadHours = cleanMoney(body.leadHours, 1000);
   const bestFor = cleanBestFor(body.bestFor);
@@ -2137,6 +2239,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
       ...(tiers.length ? { tiers } : {}),
       ...(serviceCities.length ? { serviceCities } : {}),
       ...(dietaryOffering ? { dietaryOffering } : {}),
+      ...(gstRate !== undefined ? { gstRate } : {}),
       ...(minPax !== null && minPax > 0 ? { minPax } : {}),
       ...(leadHours !== null && leadHours > 0 ? { leadHours } : {}),
       ...(bestFor.length ? { bestFor } : {}),
@@ -2156,7 +2259,7 @@ export function validateVendorMenuInput(body: Record<string, unknown>): Check {
 /* ── Onboarding draft, badges & moderation (vendor saves / admin review) ──── */
 
 const KYC_ID_RE = /^KYC-[A-Z0-9]{1,16}$/;
-const ONBOARDING_DOC_KEYS: OnboardingDocKey[] = ["gst", "fssai"];
+const ONBOARDING_DOC_KEYS: OnboardingDocKey[] = ["gst", "pan", "aadhaar", "fssai", "cheque", "upiQr"];
 
 /** Shape-check the wizard's private progress block. Lenient by design (drafts
  *  save half-filled forms) — the strict checks run on Submit. */
@@ -2171,9 +2274,17 @@ export function cleanOnboardingDraft(
     .replace(/\s/g, "")
     .toUpperCase()
     .slice(0, 15);
+  const panNumber = cleanString(raw.panNumber, 20)
+    .replace(/\s/g, "")
+    .toUpperCase()
+    .slice(0, 10);
+  const aadhaarNumber = cleanString(raw.aadhaarNumber, 20)
+    .replace(/\D/g, "")
+    .slice(0, 12);
   const fssaiNumber = cleanString(raw.fssaiNumber, 20)
     .replace(/\D/g, "")
     .slice(0, 14);
+  const payout = cleanPayoutAccount(raw.payout);
   const docs: VendorOnboardingDraft["docs"] = {};
   const rawDocs = (raw.docs ?? {}) as Record<string, unknown>;
   for (const key of ONBOARDING_DOC_KEYS) {
@@ -2194,7 +2305,10 @@ export function cleanOnboardingDraft(
     ...(ownerName ? { ownerName } : {}),
     ...(phone ? { phone } : {}),
     ...(gstNumber ? { gstNumber } : {}),
+    ...(panNumber ? { panNumber } : {}),
+    ...(aadhaarNumber ? { aadhaarNumber } : {}),
     ...(fssaiNumber ? { fssaiNumber } : {}),
+    ...(payout ? { payout } : {}),
     ...(Object.keys(docs).length ? { docs } : {}),
     ...(step !== undefined ? { step } : {}),
     ...(maxPhase !== undefined ? { maxPhase } : {}),
@@ -2272,6 +2386,10 @@ export function toPublishedSnapshot(
     approvedSnapshot,
     badges,
     contentReview,
+    blockedDates,
+    stallNoticeDays,
+    sameDayCutoff,
+    gstRate,
     ...content
   } = r;
   /* eslint-enable @typescript-eslint/no-unused-vars */
@@ -2302,6 +2420,53 @@ export function publicContentChanged(
     stableJson(toPublishedSnapshot(prev)) !==
     stableJson(toPublishedSnapshot(next))
   );
+}
+
+/** Admin-facing names for the public content fields (see `changedPublicFields`). */
+const CONTENT_FIELD_LABEL: Record<string, string> = {
+  business: "Business name",
+  city: "City",
+  state: "State",
+  cuisines: "Cuisines",
+  about: "About",
+  priceFrom: "Starting price",
+  image: "Cover photo",
+  menu: "Menu & prices",
+  featured: "Featured dishes",
+  counters: "Counters",
+  serviceCategories: "Services offered",
+  bainaBoxes: "Baina Boxes",
+  essentialService: "Essential Service",
+  serviceCities: "Service cities",
+  dietaryOffering: "Veg / non-veg",
+  minPax: "Minimum guests",
+  maxCapacity: "Max capacity",
+  maxEventsPerDay: "Events per day",
+  leadHours: "Notice period",
+  bestFor: "Best for",
+  packageName: "Package name",
+  goldSpecialization: "Gold specialisation",
+  cutleryTier: "Cutlery",
+  customOfferings: "Custom offerings",
+  stallConfig: "Single Stall setup",
+  bainaDetails: "Baina Box details",
+  cateringComponents: "Feast components",
+  googleRating: "Google rating",
+  googleReviews: "Google reviews",
+};
+
+/** What a pending edit changes against the content customers still see —
+ *  admin-readable field names ("Menu & prices", "About"…), in field order. */
+export function changedPublicFields(
+  live: VendorPublishedSnapshot,
+  next: LiveVendorRecord,
+): string[] {
+  const a = live as Record<string, unknown>;
+  const b = toPublishedSnapshot(next) as Record<string, unknown>;
+  const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]));
+  return keys
+    .filter((k) => stableJson(a[k]) !== stableJson(b[k]))
+    .map((k) => CONTENT_FIELD_LABEL[k] ?? k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()));
 }
 
 /**
@@ -2384,6 +2549,9 @@ function approvedView(r: LiveVendorRecord): LiveVendorRecord | null {
     verified: r.verified,
     ...(r.tiers ? { tiers: r.tiers } : {}),
     ...(r.badges ? { badges: r.badges } : {}),
+    // GST on food is always the vendor's current pick — never an older
+    // snapshot's (snapshots taken before the picker carry none → 18%).
+    ...(r.gstRate !== undefined ? { gstRate: r.gstRate } : {}),
     moderation: "Approved",
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,

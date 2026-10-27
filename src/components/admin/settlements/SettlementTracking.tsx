@@ -2,9 +2,11 @@
 
 /**
  * Settlement Tracking — vendor payouts. Each row is a period's worth of a
- * vendor's completed bookings that Bhojpatra owes out. Distinct from Payments
- * (money coming IN from customers): this is money going OUT to vendors. Admins
- * mark a pending settlement as settled once the payout is released.
+ * vendor's completed bookings that Bhojpatra owes out, net of any advance
+ * already released. Distinct from Payments (money coming IN from customers):
+ * this is money going OUT to vendors. Admins send the transfer (Razorpay
+ * dashboard / UPI / bank) and record it here with its reference. The Vendor
+ * Advances tab handles the pre-event part of the payout.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,6 +17,7 @@ import SelectFilter from "@/components/admin/shared/SelectFilter";
 import DataTable, { type Column } from "@/components/admin/shared/DataTable";
 import StatusBadge from "@/components/admin/shared/StatusBadge";
 import Pagination from "@/components/admin/shared/Pagination";
+import Tabs from "@/components/admin/shared/Tabs";
 import EmptyState from "@/components/admin/shared/EmptyState";
 import { exportCsv } from "@/components/admin/shared/exportCsv";
 import { money } from "@/components/admin/shared/money";
@@ -22,16 +25,39 @@ import { Banknote, Wallet, Store } from "@/components/admin/shared/icons";
 import { Button } from "@/components/ui";
 import { vendorSettlements } from "@/lib/admin/mockData";
 import type { VendorSettlement } from "@/lib/admin/types";
+import PayoutModal, { type PayoutDetails } from "./PayoutModal";
+import VendorAdvances from "./VendorAdvances";
 
 const PAGE_SIZE = 8;
 
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "All" },
   { label: "Pending", value: "Pending" },
+  { label: "Processing", value: "Processing" },
   { label: "Settled", value: "Settled" },
 ];
 
+const TABS = [
+  { id: "periods", label: "Period Payouts" },
+  { id: "advances", label: "Vendor Advances" },
+];
+
 export default function SettlementTracking() {
+  const [tab, setTab] = useState("periods");
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Admin Panel"
+        title="Settlements"
+        subtitle="Vendor payouts — advances before the event, balance after it."
+      />
+      <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      {tab === "periods" ? <PeriodPayouts /> : <VendorAdvances />}
+    </div>
+  );
+}
+
+function PeriodPayouts() {
   const [rows, setRows] = useState<VendorSettlement[]>(vendorSettlements);
   // Ids of rows derived from real bookings (fetched live) — only these get
   // PATCHed; the demo seed rows are updated locally so the console still works
@@ -41,6 +67,10 @@ export default function SettlementTracking() {
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
+  const [settling, setSettling] = useState<VendorSettlement | null>(null);
+  const [payoutsEnabled, setPayoutsEnabled] = useState(false);
+  // Bumped to refetch — e.g. after a RazorpayX send failed server-side.
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Pull the real settlement rows (derived server-side from completed bookings)
   // and surface them ahead of the demo seed. Same live-merge pattern the refund
@@ -51,10 +81,13 @@ export default function SettlementTracking() {
       try {
         const res = await fetch("/api/settlements", { cache: "no-store" });
         if (!res.ok) return;
-        const { settlements } = (await res.json()) as {
+        const { settlements, payoutsEnabled: enabled } = (await res.json()) as {
           settlements?: VendorSettlement[];
+          payoutsEnabled?: boolean;
         };
-        if (cancelled || !Array.isArray(settlements) || settlements.length === 0) return;
+        if (cancelled) return;
+        setPayoutsEnabled(Boolean(enabled));
+        if (!Array.isArray(settlements) || settlements.length === 0) return;
         setLiveIds(new Set(settlements.map((s) => s.id)));
         setRows((prev) => {
           const ids = new Set(settlements.map((s) => s.id));
@@ -67,7 +100,7 @@ export default function SettlementTracking() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const onFilter = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -99,30 +132,41 @@ export default function SettlementTracking() {
 
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Optimistic settle. Live (derived-from-bookings) rows are PATCHed and rolled
-  // back if the server rejects it; demo seed rows update locally only.
-  const markSettled = (id: string) => {
-    const snapshot = rows;
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Settled" } : r)));
-
-    if (!liveIds.has(id)) return;
-
-    fetch(`/api/settlements/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Settled" }),
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("request failed"))))
-      .then((data: { settlement?: VendorSettlement }) => {
-        // Adopt the server's canonical row.
-        if (data?.settlement) {
-          setRows((prev) => prev.map((r) => (r.id === id ? data.settlement! : r)));
-        }
-      })
-      .catch(() => {
-        setRows(snapshot);
-        setToast("Couldn't save the settlement. Please try again.");
+  // Live (derived-from-bookings) rows are PATCHed with how the payout was
+  // sent; demo seed rows update locally only.
+  const markSettled = async (
+    id: string,
+    { method, reference, send, target }: PayoutDetails,
+  ): Promise<string | null> => {
+    if (!liveIds.has(id)) {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Settled" } : r)));
+      setSettling(null);
+      return null;
+    }
+    try {
+      const res = await fetch(`/api/settlements/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Settled", method, reference, send, target }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        settlement?: VendorSettlement;
+        error?: string;
+      };
+      if (!res.ok) {
+        if (send) setReloadKey((k) => k + 1);
+        return data.error ?? "Couldn't save the settlement. Please try again.";
+      }
+      // Adopt the server's canonical row.
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? (data.settlement ?? { ...r, status: "Settled" }) : r)),
+      );
+      setSettling(null);
+      setToast(send ? "Payout sent via RazorpayX." : "Payout recorded.");
+      return null;
+    } catch {
+      return "Couldn't save the settlement. Please try again.";
+    }
   };
 
   const handleExport = () =>
@@ -133,6 +177,7 @@ export default function SettlementTracking() {
         Vendor: r.vendor,
         Period: r.period,
         Bookings: r.bookings,
+        "Advance Paid": r.advancePaid ?? 0,
         Amount: r.amount,
         Status: r.status,
       })),
@@ -158,11 +203,29 @@ export default function SettlementTracking() {
     {
       key: "amount",
       header: "Payout",
-      cell: (r) => <span className="font-display font-semibold text-ink">{money(r.amount)}</span>,
+      cell: (r) => (
+        <div>
+          <p className="font-display font-semibold text-ink">{money(r.amount)}</p>
+          {(r.advancePaid ?? 0) > 0 && (
+            <p className="text-xs text-ink-soft">after {money(r.advancePaid!)} advance</p>
+          )}
+        </div>
+      ),
       className: "text-right",
       headerClassName: "text-right",
     },
-    { key: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => (
+        <div className="space-y-1">
+          <StatusBadge status={r.status} />
+          {r.lastFailure && r.status === "Pending" && (
+            <p className="max-w-[14rem] text-xs font-medium text-maroon">Razorpay failed: {r.lastFailure}</p>
+          )}
+        </div>
+      ),
+    },
     {
       key: "actions",
       header: "Actions",
@@ -170,27 +233,17 @@ export default function SettlementTracking() {
       headerClassName: "text-right",
       cell: (r) =>
         r.status === "Pending" ? (
-          <Button size="sm" variant="primary" onClick={stop(() => markSettled(r.id))}>
-            Mark Settled
+          <Button size="sm" variant="primary" onClick={stop(() => setSettling(r))}>
+            {r.lastFailure ? "Retry Payout" : "Pay / Mark Settled"}
           </Button>
         ) : (
-          <span className="text-xs text-ink-soft">Paid out</span>
+          <span className="text-xs text-ink-soft">{r.status === "Processing" ? "Sending…" : "Paid out"}</span>
         ),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Admin Panel"
-        title="Settlements"
-        subtitle="Vendor payouts for completed bookings, period by period."
-        actions={
-          <Button type="button" variant="secondary" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
-            Export CSV
-          </Button>
-        }
-      />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <StatCard icon={Banknote} label="Due to Vendors" value={money(stats.due)} />
@@ -207,6 +260,9 @@ export default function SettlementTracking() {
         />
         <div className="flex flex-nowrap gap-2.5 overflow-x-auto no-scrollbar [&>*]:shrink-0">
           <SelectFilter label="Status" value={status} options={STATUS_OPTIONS} onChange={onFilter(setStatus)} />
+          <Button type="button" variant="secondary" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
+            Export CSV
+          </Button>
         </div>
       </div>
 
@@ -218,6 +274,24 @@ export default function SettlementTracking() {
       />
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+
+      {settling && (
+        <PayoutModal
+          key={settling.id}
+          open
+          title="Record vendor payout"
+          subtitle={
+            `${settling.vendor} · ${settling.period} · ${settling.bookings} booking${settling.bookings === 1 ? "" : "s"}. Send the transfer first, then record it here.`
+          }
+          payee={settling.payee}
+          payoutsEnabled={payoutsEnabled}
+          lastFailure={settling.lastFailure}
+          amount={settling.amount}
+          submitLabel="Mark Settled"
+          onClose={() => setSettling(null)}
+          onSubmit={(d) => markSettled(settling.id, d)}
+        />
+      )}
 
       {toast && (
         <p

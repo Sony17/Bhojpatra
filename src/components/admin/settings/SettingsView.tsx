@@ -30,7 +30,7 @@ export default function SettingsView() {
         <NameListTab
           dataKey="occasions"
           title="Occasions"
-          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. Tick “Single Stall only” for small functions (kitty party, pooja…) shown only in the Single Stall booking flow. Hindi is optional — it defaults to the English name. Lead (days) is the minimum advance notice to book that occasion (weddings need more than a birthday); it’s combined with the package’s own lead — leave blank to use the default (7 days)."
+          description="Occasions offered in the homepage booking bar and the booking wizard. Customers can enter their own via the “Other” option. “Shown in” decides where each occasion is offered: “Feast only” for big functions (wedding, reception…) that a single stall doesn’t suit, “Single Stall only” for small functions (kitty party, pooja…), or “Everywhere”. Hindi is optional — it defaults to the English name. Lead (days) is the minimum advance notice to book that occasion (weddings need more than a birthday); it’s combined with the package’s own lead — leave blank to use the default (7 days)."
           endpoint="/api/admin/occasions"
           addLabel="+ Add occasion"
           namePlaceholder="e.g. Anniversary"
@@ -165,6 +165,7 @@ type NameRow = {
   nameHi: string;
   leadDays?: number;
   singleStallOnly?: boolean;
+  feastOnly?: boolean;
 };
 
 /**
@@ -196,7 +197,7 @@ function NameListTab({
   nameHiPlaceholder: string;
   emptyError: string;
   withLead?: boolean;
-  /** Occasions: a "Single Stall only" tick per row. */
+  /** Occasions: a "Shown in" choice per row (everywhere / feast / stall). */
   withStallOnly?: boolean;
   leadPlaceholder?: string;
 }) {
@@ -239,10 +240,18 @@ function NameListTab({
     setSaved(false);
     setError("");
   };
-  const updateStallOnly = (i: number, on: boolean) => {
+  // Where an occasion is offered: everywhere, the feast flows only (big
+  // functions), or Single Stall only (small get-togethers).
+  const updateShownIn = (i: number, where: "all" | "feast" | "stall") => {
     setRows((rs) =>
       rs.map((r, idx) =>
-        idx === i ? { ...r, singleStallOnly: on || undefined } : r,
+        idx === i
+          ? {
+              ...r,
+              singleStallOnly: where === "stall" || undefined,
+              feastOnly: where === "feast" || undefined,
+            }
+          : r,
       ),
     );
     setSaved(false);
@@ -285,7 +294,7 @@ function NameListTab({
 
   // Occasions carry an extra numeric lead column; locations keep two columns.
   const gridCols = withStallOnly
-    ? "sm:grid-cols-[1fr_1fr_7rem_8rem_auto]"
+    ? "sm:grid-cols-[1fr_1fr_7rem_11rem_auto]"
     : withLead
       ? "sm:grid-cols-[1fr_1fr_7rem_auto]"
       : "sm:grid-cols-[1fr_1fr_auto]";
@@ -304,7 +313,7 @@ function NameListTab({
               <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Lead (days)</span>
             )}
             {withStallOnly && (
-              <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Single Stall only</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Shown in</span>
             )}
             <span className="sr-only">Actions</span>
           </div>
@@ -337,15 +346,16 @@ function NameListTab({
                 />
               )}
               {withStallOnly && (
-                <label className="flex items-center gap-2 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-maroon"
-                    checked={Boolean(row.singleStallOnly)}
-                    onChange={(e) => updateStallOnly(i, e.target.checked)}
-                  />
-                  <span className="sm:sr-only">Single Stall only</span>
-                </label>
+                <select
+                  className={inputClass}
+                  aria-label={`Where ${row.name || "this occasion"} is offered`}
+                  value={row.singleStallOnly ? "stall" : row.feastOnly ? "feast" : "all"}
+                  onChange={(e) => updateShownIn(i, e.target.value as "all" | "feast" | "stall")}
+                >
+                  <option value="all">Everywhere</option>
+                  <option value="feast">Feast only (not Single Stall)</option>
+                  <option value="stall">Single Stall only</option>
+                </select>
               )}
               <Button
                 type="button"

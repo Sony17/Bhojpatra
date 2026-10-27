@@ -12,6 +12,7 @@ import { Button, Input, QuantitySelector } from "@/components/ui";
 import { DEFAULT_VENDOR_LEAD_DAYS } from "@/lib/data";
 import type { BainaOrderVendor } from "@/lib/bainaBoxData";
 import { bookingRef } from "@/lib/bookingPricing";
+import SellerDetailsCard from "@/components/booking/shared/SellerDetails";
 import { getBookingSalt, rotateBookingSalt } from "@/lib/bookingSalt";
 
 const MONTHS = [
@@ -506,6 +507,10 @@ export default function BainaBoxOrderPanel({
                         "अभी कोई ऑनलाइन भुगतान नहीं — भुगतान और डिलीवरी के लिए हमारी टीम कॉल करेगी।",
                       )}
                     </p>
+                    <SellerDetailsCard
+                      t={t}
+                      sellers={data.seller ? [data.seller] : []}
+                    />
                   </div>
                 </div>
               )}

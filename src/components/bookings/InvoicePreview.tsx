@@ -134,7 +134,7 @@ export default function InvoicePreview({ data }: { data: InvoiceData }) {
                 accent
               />
             )}
-            <TotalRow label="GST (18%)" value={money(data.gst)} />
+            <TotalRow label={data.gstLabel ?? "GST (18%)"} value={money(data.gst)} />
           </dl>
         </Section>
 
