@@ -98,7 +98,7 @@ import {
   serviceRate,
   serviceTotal as serviceChargeFor,
 } from "@/lib/servicePricing";
-import { Button, DietMark, useToast } from "@/components/ui";
+import { BackLink, Button, DietMark, useToast } from "@/components/ui";
 import { useBookingBarDock } from "@/lib/bookingBar";
 import {
   DEFAULT_SAME_DAY_CUTOFF,
@@ -2261,24 +2261,32 @@ export default function StallBookingWizard({
             ) : stallLoading ? (
               <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
             ) : showTypePicker ? (
-              <StallTypePicker
-                t={t}
-                lang={lang}
-                cityLabel={catalogCity}
-                counts={stallTypeCount}
-                // Both rosters feed the counts — until they answer, show
-                // placeholder tiles rather than a premature "No stalls".
-                loading={!menuSettled || !vendorsLoaded}
-                images={tileImages}
-                selectedId={counterType}
-                hrefFor={stallTypeHref}
-              />
+              <>
+                {/* The picker is the flow's first screen and hides the step
+                    nav, so it carries its own way out. */}
+                <FlowBackLink href="/" label={t("Back to home", "होम पर वापस")} />
+                <StallTypePicker
+                  t={t}
+                  lang={lang}
+                  cityLabel={catalogCity}
+                  counts={stallTypeCount}
+                  // Both rosters feed the counts — until they answer, show
+                  // placeholder tiles rather than a premature "No stalls".
+                  loading={!menuSettled || !vendorsLoaded}
+                  images={tileImages}
+                  selectedId={counterType}
+                  hrefFor={stallTypeHref}
+                />
+              </>
             ) : (
-              <StallHandoff
-                t={t}
-                missingBrand={missingBrand}
-                brandsHref={brandsHref}
-              />
+              <>
+                <FlowBackLink href="/" label={t("Back to home", "होम पर वापस")} />
+                <StallHandoff
+                  t={t}
+                  missingBrand={missingBrand}
+                  brandsHref={brandsHref}
+                />
+              </>
             ))}
 
           {step === 2 && (
@@ -2477,20 +2485,12 @@ export default function StallBookingWizard({
               menu step's own way back is to the Brands page, in its header. */}
           <div className="hidden items-center justify-between md:flex">
             {step > 1 ? (
-              <Button
-                variant="secondary"
-                onClick={goBack}
-                aria-label={t("Back", "पीछे")}
-              >
-                {t("Back", "पीछे")}
-              </Button>
+              <BackLink onClick={goBack} label={t("Back", "पीछे")} />
             ) : (
-              <a
+              <BackLink
                 href={brandsHref}
-                className="text-sm font-semibold text-ink-soft underline underline-offset-4 transition hover:text-maroon"
-              >
-                ← {t("Back to all stalls", "सभी स्टॉल पर वापस")}
-              </a>
+                label={t("Back to all stalls", "सभी स्टॉल पर वापस")}
+              />
             )}
             <Button
               onClick={tryNext}
@@ -2547,15 +2547,11 @@ export default function StallBookingWizard({
                   </span>
                 )}
                 {step > 1 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                  <BackLink
+                    iconOnly
                     onClick={goBack}
-                    aria-label={t("Back", "पीछे")}
-                    className="min-h-12 w-10 shrink-0 rounded-xl px-0"
-                  >
-                    ←
-                  </Button>
+                    label={t("Back", "पीछे")}
+                  />
                 )}
                 <Button
                   onClick={tryNext}
@@ -2803,6 +2799,11 @@ function StepTabs({
       </button>
     </nav>
   );
+}
+
+/** Back link for screens that hide the wizard's step nav (shared BackLink). */
+function FlowBackLink({ href, label }: { href: string; label: string }) {
+  return <BackLink href={href} label={label} className="mb-1" />;
 }
 
 function StallHandoff({
@@ -3679,13 +3680,18 @@ function StepStallConfirm({
       }}
     >
       {stage === "pay" && (
-        <button
-          type="button"
+        <BackLink
           onClick={() => goStage("cart")}
-          className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-maroon"
-        >
-          ← {t("Back to cart", "कार्ट पर वापस")}
-        </button>
+          label={t("Back to cart", "कार्ट पर वापस")}
+          className="mb-1"
+        />
+      )}
+      {stage === "cart" && (
+        <BackLink
+          onClick={onEditExtras}
+          label={t("Back to extras & essentials", "एक्स्ट्रा और ज़रूरी सामान पर वापस")}
+          className="mb-1"
+        />
       )}
       {stage === "cart" && (
         <div className="mb-2 flex items-end justify-between gap-3">

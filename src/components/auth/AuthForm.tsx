@@ -49,8 +49,22 @@ function EyeIcon({ off }: { off: boolean }) {
   );
 }
 
+/** `?next=` when it is a same-origin path (never `//host`), else "". Set by the
+ *  booking gate so a guest who registers there lands back in their booking. */
+function readNextPath(): string {
+  if (typeof window === "undefined") return "";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "";
+}
+
 export default function AuthForm({ mode }: { mode: Mode }) {
   const { t } = useLang();
+  // Read after mount so server and first client render match.
+  const [nextPath, setNextPath] = useState("");
+  useEffect(() => {
+    setNextPath(readNextPath());
+  }, []);
+  const nextQuery = nextPath ? `?next=${encodeURIComponent(nextPath)}` : "";
   const isSignup = mode === "signup";
   const isForgot = mode === "forgot";
   const isReset = mode === "reset";
@@ -399,6 +413,17 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             <Button href="/partner/dashboard?tab=venues" size="lg" fullWidth>
               {t("List your venue", "अपना वेन्यू लिस्ट करें")}
             </Button>
+          ) : nextPath && !isVendor && !isPartner ? (
+            <>
+              {/* A customer who registered from the booking gate goes straight
+                  back to it — the in-progress booking is kept in the session. */}
+              <Button href={nextPath} size="lg" fullWidth>
+                {t("Continue your booking", "अपनी बुकिंग जारी रखें")}
+              </Button>
+              <Button href={DASHBOARD_HOME_PATH} variant="secondary" size="lg" fullWidth>
+                {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
+              </Button>
+            </>
           ) : (
             <Button href={DASHBOARD_HOME_PATH} size="lg" fullWidth>
               {t("Go to My Dashboard", "मेरे डैशबोर्ड पर जाएं")}
@@ -964,7 +989,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               ? t("Already have an account? ", "पहले से अकाउंट है? ")
               : t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
             <Link
-              href={isSignup ? "/login" : "/signup"}
+              href={`${isSignup ? "/login" : "/signup"}${nextQuery}`}
               className="font-semibold text-maroon hover:underline"
             >
               {isSignup

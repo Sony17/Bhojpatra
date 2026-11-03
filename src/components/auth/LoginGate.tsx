@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import { refreshSession, type AccountType } from "@/lib/session";
-import { Button, controlClass } from "@/components/ui";
+import { BackLink, Button, controlClass } from "@/components/ui";
 
 const inputClass = controlClass;
 
@@ -39,6 +40,7 @@ function LockIcon() {
  */
 export default function LoginGate({ onBack }: { onBack?: () => void }) {
   const { t } = useLang();
+  const pathname = usePathname();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -155,8 +157,11 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
 
       <p className="mt-6 text-center text-sm text-ink-soft">
         {t("New to Bhojpatra? ", "Bhojpatra पर नए हैं? ")}
+        {/* Registering from here returns the guest to this booking (`next`),
+            where the saved draft is picked back up — it's only carried from
+            the gate, so a plain /signup still lands on the dashboard. */}
         <Link
-          href="/signup"
+          href={`/signup?next=${encodeURIComponent(pathname || "/book/stall")}`}
           className="font-semibold text-maroon hover:underline"
         >
           {t("Create an account", "अकाउंट बनाएं")}
@@ -164,13 +169,9 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
       </p>
 
       {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-4 w-full text-center text-sm font-medium text-ink-soft transition-colors hover:text-maroon"
-        >
-          ← {t("Back", "पीछे")}
-        </button>
+        <div className="mt-4 flex justify-center">
+          <BackLink onClick={onBack} label={t("Back", "पीछे")} />
+        </div>
       )}
     </div>
   );

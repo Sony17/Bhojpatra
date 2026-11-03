@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import BackLink from "./BackLink";
 import { cn } from "./cn";
 
 /**
@@ -49,24 +50,7 @@ export default function AppBar({
         className,
       )}
     >
-      <button
-        type="button"
-        onClick={goBack}
-        aria-label="Go back"
-        className="focus-ring tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink transition duration-150 active:scale-95 hover:bg-cream/60"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M15 6 9 12l6 6" />
-        </svg>
-      </button>
+      <BackLink iconOnly label="Go back" onClick={goBack} />
       <div className="min-w-0 flex-1">
         {title && (
           <h1 className="truncate text-[15px] font-bold tracking-tight text-ink sm:text-base">

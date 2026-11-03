@@ -74,6 +74,13 @@ export function clearStallDraft(): void {
   }
 }
 
+/** Overwrite these draft fields — cleared ones included, unlike
+ *  {@link seedStallDraftBrief}. Used by an editor of the brief itself (the
+ *  Brands page event bar), where emptying a field is a real edit. */
+export function patchStallDraft(patch: Partial<StallDraft>): void {
+  writeStallDraft({ ...(readStallDraft() ?? {}), ...patch } as StallDraft);
+}
+
 /** The event brief a guest has already given — carried across when they leave
  *  the tiered flow for the Single Stall one. Merged into (never replacing) an
  *  existing draft, and only for the fields actually set, so a stall and menu

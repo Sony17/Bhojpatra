@@ -33,7 +33,7 @@ import VendorReviewPanel from "@/components/vendors/VendorReviewPanel";
 import ReviewCard from "@/components/vendors/ReviewCard";
 import VendorActionRow from "@/components/vendors/VendorActionRow";
 import { Stars, StarIcon } from "@/components/reviews/reviewDisplay";
-import { Button, AppBar } from "@/components/ui";
+import { AppBar, BackLink } from "@/components/ui";
 import WhatsAppShareButton, { SITE_ORIGIN } from "@/components/WhatsAppShareButton";
 
 /** A small cream disc with a red check — the trust marker in the summary. */
@@ -272,9 +272,11 @@ export default function VendorDetail({
             "यह कैटरर हटाया जा चुका हो सकता है। सभी कैटरर देखें।",
           )}
         </p>
-        <Button href="/vendors" variant="primary" size="lg" className="mt-6">
-          {t("Back to Caterers", "कैटरर पर वापस")}
-        </Button>
+        <BackLink
+          href="/vendors"
+          label={t("Back to Caterers", "कैटरर पर वापस")}
+          className="mt-6"
+        />
       </section>
     );
   }

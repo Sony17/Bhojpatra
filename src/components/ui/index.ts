@@ -49,6 +49,7 @@ export { default as AppLocationBar } from "./AppLocationBar";
 export { default as ImageCarousel } from "./ImageCarousel";
 export type { CarouselSlide } from "./ImageCarousel";
 export { default as AppBar } from "./AppBar";
+export { default as BackLink, BackChevron } from "./BackLink";
 export { default as StickyActionBar } from "./StickyActionBar";
 export { default as PullToRefresh } from "./PullToRefresh";
 export { default as FloatingCart } from "./FloatingCart";

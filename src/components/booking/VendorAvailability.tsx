@@ -460,11 +460,17 @@ function briefInHand(): { date: string; mealTime: string } {
  * already given — for the /vendors cards. Empty with no date in hand, while
  * loading, or when the read fails (the wizard and booking POST still check).
  */
-export function useDayAvailability(vendorIds: string[]): {
+export function useDayAvailability(
+  vendorIds: string[],
+  /** A brief being edited on this page (the Brands page event bar) — wins
+   *  over the one read at mount. */
+  live?: { date: string; mealTime: string },
+): {
   date: string;
   unavailable: Record<string, Unavailable>;
 } {
-  const [brief, setBrief] = useState({ date: "", mealTime: "" });
+  const [stored, setBrief] = useState({ date: "", mealTime: "" });
+  const brief = live?.date ? live : stored;
   const [unavailable, setUnavailable] = useState<Record<string, Unavailable>>({});
   // The brief lives in the URL / localStorage — read after mount.
   useEffect(() => {
@@ -474,7 +480,11 @@ export function useDayAvailability(vendorIds: string[]): {
   }, []);
   const key = [...new Set(vendorIds)].sort().join(",");
   useEffect(() => {
-    if (!brief.date || !key) return;
+    if (!brief.date || !key) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUnavailable({});
+      return;
+    }
     let live = true;
     const qs = new URLSearchParams({ ids: key, date: brief.date });
     if (brief.mealTime) qs.set("meal", brief.mealTime);

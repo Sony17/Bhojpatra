@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import WhatsAppShareButton from "@/components/WhatsAppShareButton";
+import BackLink from "@/components/ui/BackLink";
 import { inr, money, perPlateCost } from "@/lib/money";
 import { cities } from "@/lib/data";
 import { type OccasionOption } from "@/lib/occasions";
@@ -213,6 +214,18 @@ export default function StepDone({
         >
           {t("Share on WhatsApp", "WhatsApp पर शेयर करें")}
         </a>
+      </div>
+
+      <div className="mt-3 flex flex-wrap justify-center gap-3">
+        <a
+          href="/bookings"
+          className="rounded-full border border-maroon px-4 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 sm:px-6"
+        >
+          {t("View my bookings", "मेरी बुकिंग देखें")}
+        </a>
+      </div>
+      <div className="mt-1 flex justify-center">
+        <BackLink href="/" label={t("Back to home", "होम पर वापस")} />
       </div>
 
       {secondsLeft !== null && (

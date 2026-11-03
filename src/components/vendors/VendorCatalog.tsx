@@ -43,8 +43,10 @@ import {
   resolveLocationDisplayName,
   type StoredLocation,
 } from "@/lib/detectedLocation";
+import BackLink from "@/components/ui/BackLink";
 import ThemedSelect from "@/components/ThemedSelect";
 import CompareTray from "@/components/vendors/CompareTray";
+import { useStallEventBrief } from "@/components/vendors/StallEventBrief";
 import BainaBoxSpecial from "@/components/BainaBoxSpecial";
 import {
   AppSearchBar,
@@ -781,10 +783,19 @@ export default function VendorCatalog({
     sort,
   ]);
 
+  // Single Stall: the editable event brief at the foot of the list.
+  const eventBrief = useStallEventBrief({
+    city,
+    setCity,
+    allValue: ALL,
+    enabled: stallMode,
+  });
+
   // The guest's event date against each stall's calendar — a fully booked
   // or switched-off vendor says so on their card.
   const dayAvailability = useDayAvailability(
     results.flatMap((v) => (v.stall ? [v.stall.stallId] : [])),
+    stallMode ? eventBrief : undefined,
   );
 
   /** How many caterers each lens would surface, counted against the always-on
@@ -949,6 +960,12 @@ export default function VendorCatalog({
       {fromStallPicker && counter !== "" ? (
         <div className="app-sticky-chrome -mx-4 mt-3 px-4 py-2 sm:-mx-5 sm:px-5">
           <div className="mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-cream bg-white px-3 py-2 shadow-soft">
+            {/* Back to the stall-type picker this list was opened from. */}
+            <BackLink
+              iconOnly
+              href={`/book/stall?pick=1&counter=${encodeURIComponent(counter)}`}
+              label={t("Back to stall types", "स्टॉल प्रकार पर वापस")}
+            />
             <span
               className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-cream-2 text-base"
               aria-hidden="true"
@@ -1677,6 +1694,8 @@ export default function VendorCatalog({
           }
         />
       )}
+
+      {eventBrief.bar}
 
       <CompareTray />
       </div>

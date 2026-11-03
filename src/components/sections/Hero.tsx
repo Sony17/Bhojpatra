@@ -152,7 +152,7 @@ export default function Hero() {
   const vendorsHref = `/book/stall?${stallParams.toString()}`;
 
   const ctaLabel = lang === "hi" ? hero.ctaHi : hero.cta;
-  const browseLabel = t("Explore stalls", "स्टॉल देखें");
+  const browseLabel = t("Explore food stalls", "फूड स्टॉल देखें");
 
   const fieldLabel =
     "block truncate text-[8px] font-bold uppercase tracking-[0.12em] text-ink/65 sm:text-[10px] sm:tracking-[0.16em]";
