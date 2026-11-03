@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SubnavPills } from "../../ui";
 import Step6AStallWorkspace from "./Step6AStallWorkspace";
 import Step6BStallSetup from "./Step6BStallSetup";
+import QuickStallConfigure from "./QuickStallConfigure";
 import type { SingleStallConfig, VendorDietaryOffering, VendorMenuSection } from "@/lib/vendorMenus";
 
 export interface SingleStallBuilderData {
@@ -22,6 +23,9 @@ interface SingleStallBuilderProps {
   saving?: boolean;
   section?: string;
   onSectionChange?: (id: string) => void;
+  /** Single-stall-only vendor: render the one-card "Quick Configure" layout
+   *  (6A + 6B folded together) instead of the two-section workspace. */
+  compact?: boolean;
 }
 
 /** Handover breadcrumb: Menus › Live & Cutlery. */
@@ -40,6 +44,7 @@ export default function SingleStallBuilder({
   saving = false,
   section,
   onSectionChange,
+  compact = false,
 }: SingleStallBuilderProps) {
   const [localSection, setLocalSection] = useState<string>("6A");
   const activeSection = section ?? localSection;
@@ -67,6 +72,24 @@ export default function SingleStallBuilder({
       onBackToPreviousService();
     }
   };
+
+  // Single-stall-only vendors get the whole stall config as ONE compact card
+  // (no 6A/6B breadcrumb) — same data, validations, and autosave behaviour.
+  if (compact) {
+    return (
+      <QuickStallConfigure
+        stallConfig={data.stallConfig}
+        menu={data.menu}
+        dietaryOffering={dietaryOffering}
+        onChangeStallConfig={(stallConfig) => onChange({ stallConfig })}
+        onChangeMenu={(menu) => onChange({ menu })}
+        onBack={onBackToPreviousService}
+        onFinish={onFinishStall}
+        onSaveDraft={onSaveDraft}
+        saving={saving}
+      />
+    );
+  }
 
   return (
     <div>

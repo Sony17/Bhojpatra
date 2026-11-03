@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorMenuItem } from "@/lib/vendorMenus";
+import { defaultNewDishDiet, type VendorDietaryOffering, type VendorMenuItem } from "@/lib/vendorMenus";
 import PhotoUploadButton from "../common/PhotoUploadButton";
 import { BtnBack, BtnNext, FieldError, FormLabel, Sheet } from "../../ui";
 
@@ -11,6 +11,8 @@ interface StallDishModalProps {
   delicacyToEdit?: { item: VendorMenuItem; index: number } | null;
   /** Pure-veg kitchen: only vegetarian dishes may be added. */
   vegOnly?: boolean;
+  /** Kitchen dietary offering — pre-selects diet on new dishes. */
+  dietaryOffering?: VendorDietaryOffering;
   /** Names already on this stall's menu — a dish can't be added twice. */
   existingNames?: string[];
   onClose: () => void;
@@ -28,9 +30,18 @@ export default function StallDishModal(props: StallDishModalProps) {
 }
 
 /** Handover: "Configure Stall Menu Item". */
-function StallDishModalInner({ delicacyToEdit, vegOnly = false, existingNames = [], onClose, onSave }: StallDishModalProps) {
+function StallDishModalInner({
+  delicacyToEdit,
+  vegOnly = false,
+  dietaryOffering,
+  existingNames = [],
+  onClose,
+  onSave,
+}: StallDishModalProps) {
   const [name, setName] = useState(delicacyToEdit?.item.name || "");
-  const [diet, setDiet] = useState<"veg" | "non-veg">(vegOnly ? "veg" : delicacyToEdit?.item.diet || "veg");
+  const [diet, setDiet] = useState<"veg" | "non-veg">(
+    vegOnly ? "veg" : delicacyToEdit?.item.diet || defaultNewDishDiet(dietaryOffering),
+  );
   const [price, setPrice] = useState<number | undefined>(delicacyToEdit?.item.price);
   const [desc, setDesc] = useState(delicacyToEdit?.item.desc || "");
   const [photo, setPhoto] = useState<string | undefined>(delicacyToEdit?.item.photo);

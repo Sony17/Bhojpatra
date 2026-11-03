@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import BuilderNav from "../common/BuilderNav";
 import DishModal from "./DishModal";
-import type { VendorMenuSection, VendorMenuItem } from "@/lib/vendorMenus";
+import type { VendorDietaryOffering, VendorMenuSection, VendorMenuItem } from "@/lib/vendorMenus";
 import { dummyDishPhoto } from "@/lib/data";
 import { cn } from "@/components/ui/cn";
 import { AddDashed, ContentCard, DietMark, FieldError, R, StepHeading } from "../../ui";
@@ -12,6 +12,7 @@ import { AddDashed, ContentCard, DietMark, FieldError, R, StepHeading } from "..
 interface Step5DDishBuilderProps {
   sections: VendorMenuSection[];
   featured: string[];
+  dietaryOffering?: VendorDietaryOffering;
   onChangeSections: (sections: VendorMenuSection[]) => void;
   onChangeFeatured: (featured: string[]) => void;
   initialCourseId?: string;
@@ -33,6 +34,7 @@ const COURSES = [
 export default function Step5DDishBuilder({
   sections,
   featured,
+  dietaryOffering,
   onChangeSections,
   onChangeFeatured,
   initialCourseId = "starters",
@@ -283,6 +285,8 @@ export default function Step5DDishBuilder({
         isOpen={modalOpen}
         dishToEdit={dishToEdit}
         defaultCourseId={activeTab}
+        vegOnly={dietaryOffering === "veg"}
+        dietaryOffering={dietaryOffering}
         onClose={() => setModalOpen(false)}
         onSave={handleSaveDish}
       />

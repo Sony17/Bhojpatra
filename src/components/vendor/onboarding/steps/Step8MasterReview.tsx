@@ -13,6 +13,7 @@ import { TABLEWARE_PACKAGES } from "../builders/catering/Step5HTablewareAddons";
 import { stallCategoryName, stallDishes } from "../builders/stall/Step6AStallWorkspace";
 import { PACKAGING_STYLES } from "../builders/baina/Step7CPackaging";
 import { DietMark, FlowFooter, StepHeading } from "../ui";
+import { SHOW_COVERAGE_CITIES_FIELD, SHOW_CUISINES_FIELD } from "@/lib/vendorDashboardFlags";
 import type { RecognitionBadgeKey } from "@/lib/vendorMenus";
 
 /** Where an "Edit ✎" link should land. */
@@ -168,10 +169,13 @@ export default function Step8MasterReview({ data, onEdit, onBack, onSubmit, onPr
               <p style={LBL}>City & State</p>
               <p style={{ fontSize: 13, fontWeight: 700 }}>{[data.city, data.state].filter(Boolean).join(", ") || "—"}</p>
             </div>
-            <div>
-              <p style={LBL}>Coverage Cities</p>
-              <p style={{ fontSize: 12, fontWeight: 600 }}>{data.serviceCities.join(", ") || "—"}</p>
-            </div>
+            {/* Hidden with the Step 1 editor (SHOW_COVERAGE_CITIES_FIELD). */}
+            {SHOW_COVERAGE_CITIES_FIELD && (
+              <div>
+                <p style={LBL}>Coverage Cities</p>
+                <p style={{ fontSize: 12, fontWeight: 600 }}>{data.serviceCities.join(", ") || "—"}</p>
+              </div>
+            )}
           </div>
           <div className="form-grid-2" style={{ marginTop: 10, ...DASHED_TOP }}>
             <div>
@@ -180,10 +184,13 @@ export default function Step8MasterReview({ data, onEdit, onBack, onSubmit, onPr
                 {data.dietaryOffering ? DIET_NAMES[data.dietaryOffering] : "Not selected"}
               </p>
             </div>
-            <div>
-              <p style={LBL}>Primary Cuisines</p>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-red)" }}>{data.cuisines.join(" · ") || "—"}</p>
-            </div>
+            {/* Hidden with the Step 1 editor (SHOW_CUISINES_FIELD). */}
+            {SHOW_CUISINES_FIELD && (
+              <div>
+                <p style={LBL}>Primary Cuisines</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-red)" }}>{data.cuisines.join(" · ") || "—"}</p>
+              </div>
+            )}
           </div>
         </Section>
 

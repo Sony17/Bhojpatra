@@ -15,6 +15,7 @@ import type {
   VendorCounter,
   VendorEssentialService,
   CutleryTierOption,
+  VendorDietaryOffering,
 } from "@/lib/vendorMenus";
 
 export interface CateringBuilderData {
@@ -45,6 +46,8 @@ export interface CateringBuilderData {
 
 interface CateringBuilderProps {
   data: CateringBuilderData;
+  /** Kitchen dietary offering from Step 1 — defaults new dish diet and veg-only gate. */
+  dietaryOffering?: VendorDietaryOffering;
   onChange: (patch: Partial<CateringBuilderData>) => void;
   onBackToPreviousService: () => void;
   onFinishCatering: () => void;
@@ -75,6 +78,7 @@ export function activeCateringSections(components?: CateringBuilderData["caterin
 
 export default function CateringBuilder({
   data,
+  dietaryOffering,
   onChange,
   onBackToPreviousService,
   onFinishCatering,
@@ -185,6 +189,7 @@ export default function CateringBuilder({
         <Step5DDishBuilder
           sections={data.menu}
           featured={data.featured}
+          dietaryOffering={dietaryOffering}
           onChangeSections={(menu) => onChange({ menu })}
           onChangeFeatured={(featured) => onChange({ featured })}
           initialCourseId={targetCourseForDishes}

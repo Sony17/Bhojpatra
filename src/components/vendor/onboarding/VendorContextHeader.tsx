@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
 
 export const DIET_NAMES: Record<VendorDietaryOffering, string> = {
@@ -85,6 +86,10 @@ export default function VendorContextHeader({
             </span>
           ))}
         </div>
+        <Link href="/vendor/dashboard" className="btn-edit-vendor-context btn-dashboard-nav">
+          <span className="vob-d">Dashboard →</span>
+          <span className="vob-m">Dashboard</span>
+        </Link>
         <button type="button" className="btn-edit-vendor-context" onClick={onEditDetails}>
           <span className="vob-d">Edit Details ✎</span>
           <span className="vob-m">Edit ✎</span>

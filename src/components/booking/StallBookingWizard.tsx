@@ -8,6 +8,7 @@ import { useLang } from "@/lib/i18n";
 import {
   useSessionStatus,
   partnerMemberships,
+  refreshSession,
   type PartnerRole,
 } from "@/lib/session";
 import { isSelfReferral, isPhoneSelfReferral } from "@/lib/referral";
@@ -47,7 +48,6 @@ import {
 import {
   cities,
   addOns,
-  coupons,
   menuCategories,
   servingTimeLabel,
   isLiveStallCategory,
@@ -98,7 +98,15 @@ import {
   serviceRate,
   serviceTotal as serviceChargeFor,
 } from "@/lib/servicePricing";
-import { BackLink, Button, DietMark, useToast } from "@/components/ui";
+import { BackLink, Button, DietMark, useErrorDialog, useToast } from "@/components/ui";
+import {
+  bookingFailureSpec,
+  menuLoadFailureSpec,
+  networkFailure,
+  statusCheckFailureSpec,
+  type FailureInfo,
+} from "@/lib/failureDialogs";
+import type { ErrorDialogSpec } from "@/components/ui/ErrorDialog";
 import { useBookingBarDock } from "@/lib/bookingBar";
 import {
   DEFAULT_SAME_DAY_CUTOFF,
@@ -358,6 +366,7 @@ export default function StallBookingWizard({
   const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const { toast } = useToast();
+  const { showError } = useErrorDialog();
   const dockRef = useBookingBarDock<HTMLDivElement>();
   useHideMobileFooter();
   const sessionStatus = useSessionStatus();
@@ -454,12 +463,15 @@ export default function StallBookingWizard({
   );
   // A manual UPI/QR transfer was reported — Pending until the team checks it.
   const [paymentVerifying, setPaymentVerifying] = useState<boolean>(false);
+  // A heads-up for the success screen when the post-payment status read failed.
+  const [statusAttention, setStatusAttention] = useState<ErrorDialogSpec | undefined>();
   // Set once the order exists server-side (checkout opened / order placed):
   // from then on the booking id is frozen — the payment is bound to it.
   const [orderPlaced, setOrderPlaced] = useState<boolean>(false);
   // Coupon offers from the admin Coupon Manager (the server re-validates any
-  // code at order time); the static seed list renders until it answers.
-  const [liveCoupons, setLiveCoupons] = useState<Coupon[]>(coupons);
+  // code at order time). Starts empty — the static seed codes may be switched
+  // off in admin, so they must never flash up as if they were live.
+  const [liveCoupons, setLiveCoupons] = useState<Coupon[]>([]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentRef, setPaymentRef] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
@@ -716,17 +728,44 @@ export default function StallBookingWizard({
     if (salt !== bookingSalt) setBookingSalt(salt);
   }, [sessionStatus?.email, paidAmount, orderPlaced, bookingSalt]);
 
+  const [couponsLoadFailed, setCouponsLoadFailed] = useState(false);
   useEffect(() => {
     let active = true;
     fetch("/api/coupons/public")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d: { coupons?: Coupon[] } | null) => {
         if (active && Array.isArray(d?.coupons)) setLiveCoupons(d.coupons);
       })
-      .catch(() => {});
+      // Remembered so a code that "doesn't look right" can say the offers
+      // never loaded, rather than blaming the guest's typing.
+      .catch(() => active && setCouponsLoadFailed(true));
     return () => {
       active = false;
     };
+  }, []);
+
+  // Dropping offline mid-booking is the commonest way a payment goes wrong —
+  // tell them as it happens (and when it's back), before they tap Pay.
+  useEffect(() => {
+    const off = () =>
+      toast(
+        t(
+          "You're offline — your picks are saved on this page. Reconnect before you pay.",
+          "आप ऑफ़लाइन हैं — आपकी चुनी चीज़ें इसी पेज पर सेव हैं। भुगतान से पहले फिर कनेक्ट करें।",
+        ),
+        { tone: "error" },
+      );
+    const on = () => toast(t("Back online.", "फिर ऑनलाइन।"), { tone: "success" });
+    window.addEventListener("offline", off);
+    window.addEventListener("online", on);
+    return () => {
+      window.removeEventListener("offline", off);
+      window.removeEventListener("online", on);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [lastBookingPhone, setLastBookingPhone] = useState<string>("");
@@ -773,22 +812,35 @@ export default function StallBookingWizard({
   // A server snapshot is the settled roster — nothing to fetch or wait for.
   const [menuSettled, setMenuSettled] = useState(!!initialMenu?.length);
   const menuSeeded = useRef(!!initialMenu?.length);
+  const [menuNonce, setMenuNonce] = useState(0);
   useEffect(() => {
     if (menuSeeded.current) return;
     let live = true;
     fetch("/api/menu")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d: { categories?: MenuCategory[] } | null) => {
         if (live && d?.categories?.length) setLiveMenuCategories(d.categories);
       })
-      .catch(() => {})
+      .catch(() => {
+        // The roster is what they're about to book from — don't quietly fall
+        // back to the saved list; say so and offer a retry.
+        if (live)
+          showError(
+            menuLoadFailureSpec({ t, retry: () => setMenuNonce((n) => n + 1) }),
+          );
+      })
       .finally(() => {
         if (live) setMenuSettled(true);
       });
     return () => {
       live = false;
     };
-  }, []);
+    // Reruns on mount and on an explicit retry only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuNonce]);
 
   const cityDisplayName = resolveCity(cityId)?.name ?? "";
   const cityName = cityDisplayName.toLowerCase();
@@ -1561,10 +1613,15 @@ export default function StallBookingWizard({
     } else {
       setAppliedCoupon(null);
       setCouponError(
-        t(
-          "That coupon code doesn't look right — give it another try.",
-          "यह कूपन कोड सही नहीं लग रहा — एक बार फिर से देख लें।",
-        ),
+        couponsLoadFailed
+          ? t(
+              "We couldn't load the latest offers, so we can't check this code right now. Check your connection and reload the page to try again.",
+              "हम ताज़ा ऑफ़र लोड नहीं कर सके, इसलिए अभी यह कोड जाँच नहीं सकते। कनेक्शन जाँचें और फिर से कोशिश करने के लिए पेज रीलोड करें।",
+            )
+          : t(
+              "That coupon code doesn't look right — give it another try.",
+              "यह कूपन कोड सही नहीं लग रहा — एक बार फिर से देख लें।",
+            ),
       );
     }
   };
@@ -1852,7 +1909,10 @@ export default function StallBookingWizard({
    */
   const placeOrder = async (
     intent: "pay" | "place",
-  ): Promise<{ ok: true; status: "Pending" | "Confirmed" } | { ok: false; error: string }> => {
+  ): Promise<
+    | { ok: true; status: "Pending" | "Confirmed" }
+    | { ok: false; error: string; info: FailureInfo }
+  > => {
     const occ = resolveOccasion(occasionId);
     const cityObj = resolveCity(cityId);
 
@@ -1958,6 +2018,7 @@ export default function StallBookingWizard({
               "Couldn't place your booking. Please try again.",
               "आपकी बुकिंग नहीं हो सकी। कृपया पुनः प्रयास करें।",
             ),
+          info: { status: res.status, code: data?.code, message: data?.error },
         };
       }
       setOrderPlaced(true);
@@ -1972,9 +2033,35 @@ export default function StallBookingWizard({
           "Network error. Please check your connection and try again.",
           "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जाँचें और पुनः प्रयास करें।",
         ),
+        info: networkFailure,
       };
     }
   };
+
+  /** Pop up the friendly, specific explanation for a failed order submit —
+   *  what happened, what it means for their money, and the next action. */
+  const reportOrderFailure = (info: FailureInfo, intent: "pay" | "place") =>
+    showError(
+      bookingFailureSpec({
+        t,
+        info,
+        bookingId,
+        intent,
+        // A payment already recorded server-side (verified) — say it's safe.
+        paid:
+          paidAmount > 0 ? { amount: paidAmount, ref: paymentRef || bookingId } : null,
+        // A "pay" attempt is retried by tapping Pay again (it re-runs this).
+        retry: intent === "place" ? () => void handleConfirm() : undefined,
+        editField: (field) => {
+          setCartEventOpen(true);
+          focusBrief(field);
+        },
+        reload: () => window.location.reload(),
+        startNew: startOver,
+        relogin: () => void refreshSession(),
+        brandsHref,
+      }),
+    );
 
   /** Land on the success screen with what the server says about the order. */
   const finishOrder = (status: "Pending" | "Confirmed") => {
@@ -1996,11 +2083,13 @@ export default function StallBookingWizard({
     const problem = orderProblem();
     if (problem) {
       setConfirmError(problem);
+      reportOrderFailure({ status: 400, message: problem }, "pay");
       return false;
     }
     const result = await placeOrder("pay");
     if (!result.ok) {
       setConfirmError(result.error);
+      reportOrderFailure(result.info, "pay");
       return false;
     }
     return true;
@@ -2018,6 +2107,7 @@ export default function StallBookingWizard({
       const res = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
         cache: "no-store",
       });
+      if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json().catch(() => null)) as {
         order?: { status?: string; paid?: number };
       } | null;
@@ -2026,7 +2116,11 @@ export default function StallBookingWizard({
         setPaidAmount(data.order.paid);
       }
     } catch {
-      // The payment is safe either way; the screen just says Pending.
+      // The payment is safe either way; the screen just says Pending — and
+      // the success screen tells them why, with their references.
+      setStatusAttention(
+        statusCheckFailureSpec({ t, bookingId, paid: amount, ref, verified }),
+      );
     }
     finishOrder(status);
   };
@@ -2037,6 +2131,7 @@ export default function StallBookingWizard({
     const problem = orderProblem();
     if (problem) {
       setConfirmError(problem);
+      reportOrderFailure({ status: 400, message: problem }, "place");
       return;
     }
     setConfirming(true);
@@ -2044,6 +2139,7 @@ export default function StallBookingWizard({
     if (!result.ok) {
       setConfirmError(result.error);
       setConfirming(false);
+      reportOrderFailure(result.info, "place");
       return;
     }
     finishOrder(result.status);
@@ -2102,6 +2198,7 @@ export default function StallBookingWizard({
       collapsible={mobileCollapse}
       collapseAt="sm"
       chipSummary
+      dense
       focusRequest={briefFocus}
     />
   );
@@ -2125,6 +2222,7 @@ export default function StallBookingWizard({
           whatsappHref={whatsappHref}
           status={orderStatus}
           verifying={paymentVerifying}
+          attention={statusAttention}
         />
       </div>
     );
@@ -2159,11 +2257,12 @@ export default function StallBookingWizard({
   return (
     // overflow-x-clip, not -hidden: hidden would make this a scroll container
     // and pin the sticky step tabs to it instead of the page.
-    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-clip px-3 pb-4 pt-1 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+    <section className="app-bottom-safe relative mx-auto w-full max-w-[90rem] overflow-x-clip px-3 pb-4 pt-1 sm:px-6 sm:py-8 lg:px-8 lg:pb-12 lg:pt-3">
       {/* Same editorial opening the tiered flow leads with, so the Single Stall
           plan reads as a first-class plan rather than a stripped-down one.
           Phones drop it for a minimal, low-scroll flow. */}
       <WizardHero
+        dense
         eyebrow={t("SINGLE STALL", "सिंगल स्टॉल")}
         title={t("One Stall, One Great Menu", "एक स्टॉल, एक बढ़िया मेन्यू")}
         sub={t(
@@ -2197,6 +2296,7 @@ export default function StallBookingWizard({
           stepLabels={stepLabels}
           onStartOver={startOver}
           compact
+          dense
         />
       </div>
       {/* The brief sits after the step on phones; while it's incomplete the
@@ -2220,8 +2320,8 @@ export default function StallBookingWizard({
         className={
           "order-1 sm:order-2 " +
           (showSummary
-            ? "grid gap-3 sm:mt-7 sm:gap-7 xl:grid-cols-[minmax(0,1fr)_21rem]"
-            : "sm:mt-7")
+            ? "grid gap-3 sm:mt-7 sm:gap-7 lg:mt-3 xl:grid-cols-[minmax(0,1fr)_21rem]"
+            : "sm:mt-7 lg:mt-3")
         }
       >
         <div className="min-w-0">
@@ -2803,7 +2903,7 @@ function StepTabs({
 
 /** Back link for screens that hide the wizard's step nav (shared BackLink). */
 function FlowBackLink({ href, label }: { href: string; label: string }) {
-  return <BackLink href={href} label={label} className="mb-1" />;
+  return <BackLink href={href} label={label} className="mb-1 lg:-mb-1" />;
 }
 
 function StallHandoff({
@@ -2990,6 +3090,7 @@ function StepStallMenu({
       <SectionHead
         compact
         phoneMinimal
+        dense
         eyebrow={t("Single Stall", "सिंगल स्टॉल")}
         title={
           stall.allFixed
@@ -3013,7 +3114,7 @@ function StepStallMenu({
       {/* Whose stall this is — the counterpart to the tiered flow's package
           rail. The guest picked this brand on the Brands page, so its identity
           rides along here, with the way back to change it. */}
-      <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-cream bg-white px-2 py-1.5 shadow-soft sm:mb-6 sm:gap-4 sm:rounded-[1.5rem] sm:p-4 sm:shadow-card">
+      <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-cream bg-white px-2 py-1.5 shadow-soft sm:mb-6 sm:gap-4 sm:rounded-[1.5rem] sm:p-4 sm:shadow-card lg:mb-3 lg:rounded-2xl lg:p-2.5">
         <span className="relative block h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-cream bg-cream/40 sm:h-16 sm:w-16 sm:rounded-2xl">
           <Image
             src={stall.image} unoptimized={photoNeedsUnoptimized(stall.image)}

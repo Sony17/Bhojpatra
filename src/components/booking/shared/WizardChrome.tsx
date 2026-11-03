@@ -15,6 +15,7 @@ export function WizardHero({
   sub,
   chips,
   aside,
+  dense = false,
 }: {
   eyebrow: string;
   title: string;
@@ -23,9 +24,20 @@ export function WizardHero({
   /** Optional link / control pinned to the hero's top-right (e.g. the cross-flow
    *  hand-off between the tiered packages and the Single Stall plan). */
   aside?: React.ReactNode;
+  /** Desktop (lg+) only: collapse the banner into one slim row — eyebrow, title,
+   *  chips and the aside link side by side, no sub-line. Phones and tablets
+   *  render exactly as without it. Opted into by the Single Stall flow. */
+  dense?: boolean;
 }) {
   return (
-    <div className="relative isolate hidden overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:block sm:rounded-[2rem] sm:px-9 sm:py-10 lg:px-12 lg:py-12">
+    <div
+      className={
+        "relative isolate hidden overflow-hidden rounded-[1.75rem] bg-maroon px-5 py-7 shadow-brand sm:block sm:rounded-[2rem] sm:px-9 sm:py-10 " +
+        (dense
+          ? "lg:flex lg:items-center lg:gap-5 lg:rounded-2xl lg:px-6 lg:py-3.5"
+          : "lg:px-12 lg:py-12")
+      }
+    >
       {/* Feast photo backdrop, dimmed and flooded maroon so the white
           headline stays legible and the brand red still reads dominant. */}
       <Image
@@ -43,31 +55,68 @@ export function WizardHero({
       />
       <span
         aria-hidden="true"
-        className="absolute -right-12 -top-20 h-56 w-56 rounded-full border-[34px] border-cream/15"
+        className={
+          "absolute -right-12 -top-20 h-56 w-56 rounded-full border-[34px] border-cream/15" +
+          (dense ? " lg:hidden" : "")
+        }
       />
       <span
         aria-hidden="true"
-        className="absolute -bottom-20 right-[22%] h-44 w-44 rounded-full bg-cream/10"
+        className={
+          "absolute -bottom-20 right-[22%] h-44 w-44 rounded-full bg-cream/10" +
+          (dense ? " lg:hidden" : "")
+        }
       />
       {aside && (
-        <div className="absolute right-5 top-5 z-10 sm:right-9 lg:right-12">
+        <div
+          className={
+            "absolute right-5 top-5 z-10 sm:right-9 " +
+            (dense ? "lg:static lg:order-last lg:shrink-0" : "lg:right-12")
+          }
+        >
           {aside}
         </div>
       )}
-      <div className="relative max-w-3xl">
-        <div className="flex items-center gap-3">
+      <div
+        className={
+          "relative max-w-3xl " +
+          (dense ? "lg:flex lg:min-w-0 lg:max-w-none lg:flex-1 lg:items-center lg:gap-5" : "")
+        }
+      >
+        <div
+          className={
+            "flex items-center gap-3" +
+            // Dense: the title already names the flow, so the eyebrow goes.
+            (dense ? " lg:hidden" : "")
+          }
+        >
           <span className="h-px w-8 bg-cream" />
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cream sm:text-xs">
             {eyebrow}
           </p>
         </div>
-        <h1 className="mt-3 font-display text-[2rem] font-normal leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
+        <h1
+          className={
+            "mt-3 font-display text-[2rem] font-normal leading-[1.05] tracking-tight text-white sm:text-5xl " +
+            (dense ? "lg:mt-0 lg:shrink-0 lg:text-3xl" : "lg:text-6xl")
+          }
+        >
           {title}
         </h1>
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:mt-4 sm:text-lg">
+        <p
+          className={
+            "mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:mt-4 sm:text-lg" +
+            (dense ? " lg:hidden" : "")
+          }
+        >
           {sub}
         </p>
-        <div className="mt-5 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-cream sm:mt-6 sm:gap-2 sm:text-xs sm:tracking-[0.12em]">
+        <div
+          className={
+            "mt-5 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-cream sm:mt-6 sm:gap-2 sm:text-xs sm:tracking-[0.12em]" +
+            (dense ? " lg:mt-0 lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:justify-center lg:gap-1.5 max-xl:lg:hidden" : "")
+          }
+        >
           {chips.map((chip) => (
             <span
               key={chip}
@@ -94,12 +143,17 @@ export function ProgressRail({
   stepLabels,
   onStartOver,
   compact = false,
+  dense = false,
 }: {
   t: (en: string, hi: string) => string;
   /** Phones only: a numbered stepper (circles + labels) with "Start over"
    *  under it — the app-style header the Single Stall flow uses.
    *  Tablet / desktop are unchanged. */
   compact?: boolean;
+  /** Desktop (lg+) only: a single slim row — the stepper and "Start over" side
+   *  by side, no "Step X of Y · Next" caption. Phones and tablets are
+   *  untouched. Opted into by the Single Stall flow. */
+  dense?: boolean;
   /** 1-based current step. */
   step: number;
   totalSteps: number;
@@ -241,9 +295,25 @@ export function ProgressRail({
         </ol>
       </div>
       {/* Tablet / desktop — the full stepper. */}
-      <div className="app-sticky-chrome relative z-20 mx-2 -mt-3 hidden rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:block sm:rounded-2xl sm:px-6 sm:py-5 lg:mx-8">
-        <Stepper current={step - 1} steps={stepLabels} />
-        <p className="mt-2 text-[12px] text-ink/55 sm:mt-3 sm:text-sm sm:text-ink-soft">
+      <div
+        className={
+          "app-sticky-chrome relative z-20 mx-2 -mt-3 hidden rounded-card border border-cream bg-white px-4 py-3 shadow-pop sm:static sm:mx-5 sm:-mt-5 sm:block sm:rounded-2xl sm:px-6 sm:py-5 " +
+          (dense
+            ? "lg:mx-0 lg:mt-2 lg:flex lg:items-center lg:gap-5 lg:px-5 lg:py-2 lg:shadow-soft"
+            : "lg:mx-8")
+        }
+      >
+        <Stepper
+          current={step - 1}
+          steps={stepLabels}
+          className={dense ? "lg:min-w-0 lg:flex-1" : undefined}
+        />
+        <p
+          className={
+            "mt-2 text-[12px] text-ink/55 sm:mt-3 sm:text-sm sm:text-ink-soft" +
+            (dense ? " lg:hidden" : "")
+          }
+        >
           {t(`Step ${step} of ${totalSteps}`, `चरण ${step} / ${totalSteps}`)} ·{" "}
           <span className="font-semibold text-maroon">{stepLabels[step - 1]}</span>
           {nextStepLabel && (
@@ -258,12 +328,24 @@ export function ProgressRail({
             </>
           )}
         </p>
+        {/* Dense desktop: "Start over" rides in the card's own row instead of
+            a line under it. */}
+        {dense && onStartOver && (
+          <button
+            type="button"
+            onClick={onStartOver}
+            className="hidden shrink-0 text-xs font-semibold text-ink/50 underline underline-offset-2 transition-colors hover:text-maroon lg:block"
+          >
+            {t("Start over", "फिर से शुरू करें")}
+          </button>
+        )}
       </div>
       {onStartOver && (
         <div
           className={
             "mx-2 mt-2 justify-end sm:mx-5 lg:mx-8 " +
-            (compact ? "hidden sm:flex" : "flex")
+            (compact ? "hidden sm:flex" : "flex") +
+            (dense ? " lg:hidden" : "")
           }
         >
           <button

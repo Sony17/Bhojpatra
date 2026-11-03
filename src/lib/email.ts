@@ -523,20 +523,26 @@ export async function sendLeadAlert(lead: Lead): Promise<void> {
   if (!ALERT_ENABLED.lead) return;
   const isCallback = lead.source === "support-callback";
   const isVenue = lead.source === "venue-enquiry";
-  // Both of these key on a `cb:` / `venue:` +phone sentinel rather than a real
-  // address, so neither shows an "Email" row.
-  const phoneKeyed = isCallback || isVenue;
+  const isFeast = lead.source === "feast-2027-interest";
+  // These key on a `cb:` / `venue:` / `feast:` +phone sentinel rather than a
+  // real address, so none of them shows an "Email" row (a feast lead's real
+  // email, when given, rides in its note).
+  const phoneKeyed = isCallback || isVenue || isFeast;
   await sendAlert({
     subject: isCallback
       ? `Callback requested — +91 ${lead.phone}`
       : isVenue
         ? `Venue enquiry (${lead.topic || "follow-up"}) — +91 ${lead.phone}`
-        : `New lead — ${lead.email || lead.phone}`,
+        : isFeast
+          ? `Feast 2027 interest — +91 ${lead.phone}`
+          : `New lead — ${lead.email || lead.phone}`,
     heading: isCallback
       ? "Callback requested (call within 10 mins)"
       : isVenue
         ? "Venue enquiry — customer wants to be contacted"
-        : "New lead / enquiry",
+        : isFeast
+          ? "Feast 2027 waitlist — new interest registered"
+          : "New lead / enquiry",
     fields: [
       ...(phoneKeyed ? [] : [{ label: "Email", value: lead.email || "—" }]),
       { label: "Phone", value: lead.phone || "—" },
@@ -550,15 +556,34 @@ export async function sendLeadAlert(lead: Lead): Promise<void> {
 export async function sendEnquiryAlert(record: EnquiryRecord): Promise<void> {
   if (!ALERT_ENABLED.enquiry) return;
   const base = siteBaseUrl();
+  const isFeast = record.source === "feast-package-interest";
   await sendAlert({
-    subject: `New enquiry — ${record.subject} — ${record.name}`,
-    heading: `New contact enquiry (${record.id})`,
+    subject: isFeast
+      ? `Feast package interest — ${record.packageName ?? record.subject} — ${record.name}`
+      : `New enquiry — ${record.subject} — ${record.name}`,
+    heading: isFeast
+      ? `Feast 2027 package interest (${record.id})`
+      : `New contact enquiry (${record.id})`,
     fields: [
       { label: "Name", value: record.name },
-      { label: "Email", value: record.email },
+      ...(record.email
+        ? [{ label: "Email", value: record.email }]
+        : [{ label: "Email", value: "—" }]),
       { label: "Phone", value: `+91 ${record.phone}` },
-      { label: "Subject", value: record.subject },
-      { label: "Message", value: record.message },
+      { label: "Source", value: record.source },
+      ...(isFeast
+        ? [
+            { label: "Package", value: record.packageName ?? record.packageId ?? "—" },
+            { label: "City", value: record.city ?? "—" },
+            { label: "Occasion", value: record.occasion ?? "—" },
+            { label: "Event date", value: record.eventDate ?? "—" },
+            { label: "Guests", value: record.guests != null ? String(record.guests) : "—" },
+            ...(record.venue ? [{ label: "Venue", value: record.venue }] : []),
+          ]
+        : [
+            { label: "Subject", value: record.subject },
+            { label: "Message", value: record.message },
+          ]),
     ],
     link: base ? { label: "Open Enquiries", url: `${base}/admin/enquiries` } : null,
   });

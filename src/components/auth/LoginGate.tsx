@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
 import { refreshSession, type AccountType } from "@/lib/session";
-import { BackLink, Button, controlClass } from "@/components/ui";
+import { BackLink, Button, controlClass, useErrorDialog } from "@/components/ui";
+import { authFailureSpec } from "@/lib/failureDialogs";
 
 const inputClass = controlClass;
 
@@ -43,6 +44,11 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
   const pathname = usePathname();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // The last failure was the guest's credentials (vs. network / server) — the
+  // only case where "Forgot password?" is the useful next step.
+  const [credError, setCredError] = useState(false);
+  const { showError } = useErrorDialog();
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,6 +59,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
 
     setSubmitting(true);
     setError("");
+    setCredError(false);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -63,6 +70,25 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
         | { user?: { role: AccountType | "admin"; name?: string }; error?: string }
         | null;
       if (!res.ok || !json?.user) {
+        // Wrong credentials (4xx) stay inline beside the fields; a server-side
+        // failure (5xx) isn't the guest's doing — pop it up with a retry.
+        if (res.status >= 500) {
+          const msg = t(
+            "Something went wrong on our side. Please try again.",
+            "हमारी तरफ़ कुछ गड़बड़ हो गई। कृपया फिर कोशिश करें।",
+          );
+          setError(msg);
+          showError(
+            authFailureSpec({
+              t,
+              info: { status: res.status },
+              mode: "login",
+              retry: () => formRef.current?.requestSubmit(),
+            }),
+          );
+          return;
+        }
+        setCredError(true);
         setError(
           json?.error ?? t("Invalid email or password.", "अमान्य ईमेल या पासवर्ड।"),
         );
@@ -87,9 +113,17 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
     } catch {
       setError(
         t(
-          "Couldn't sign in. Please try again.",
-          "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।",
+          "Couldn't reach Bhojpatra — check your connection and try again.",
+          "भोजपत्र तक नहीं पहुँच सके — कनेक्शन जाँचकर फिर कोशिश करें।",
         ),
+      );
+      showError(
+        authFailureSpec({
+          t,
+          info: { network: true },
+          mode: "login",
+          retry: () => formRef.current?.requestSubmit(),
+        }),
       );
     } finally {
       setSubmitting(false);
@@ -111,7 +145,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
         )}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="gate-email" className="text-sm text-ink-soft">
             {t("Email Address", "ईमेल पता")}
@@ -143,8 +177,22 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
         </div>
 
         {error && (
-          <p className="rounded-control border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon">
+          <p
+            role="alert"
+            className="rounded-control border border-maroon bg-maroon/10 px-3 py-2 text-sm font-medium text-maroon"
+          >
             {error}
+            {credError && (
+              <>
+                {" "}
+                <Link
+                  href="/forgot-password"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  {t("Forgot password?", "पासवर्ड भूल गए?")}
+                </Link>
+              </>
+            )}
           </p>
         )}
 

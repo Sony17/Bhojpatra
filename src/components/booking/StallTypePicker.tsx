@@ -42,6 +42,7 @@ export default function StallTypePicker({
     <div>
       <SectionHead
         compact
+        dense
         eyebrow={t("One Bhojpatra Experience", "एक भोजपत्र अनुभव")}
         title={t("Curated Single Stall", "क्यूरेटेड सिंगल स्टॉल")}
         sub={t(

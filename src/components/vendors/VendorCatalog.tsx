@@ -894,6 +894,12 @@ export default function VendorCatalog({
     }
   };
 
+  // Desktop only: on a stall list reached from the stall picker, the stall-type
+  // header card below already says where the guest is, so the promo and the
+  // generic "Choose your favourite caterer" heading give way to the results.
+  const stallListDesktopHide =
+    fromStallPicker && counter !== "" ? " lg:hidden" : "";
+
   const chipClass = (active: boolean) =>
     "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors " +
     (active
@@ -917,11 +923,11 @@ export default function VendorCatalog({
           whether they're browsing brands or filtering Baina Boxes. */}
       {/* From the stall picker the guest already knows what they want — on
           phones the promo and the generic heading give way to the results. */}
-      <div className={"mb-6 mt-2 " + (fromStallPicker ? "hidden sm:block" : "")}>
+      <div className={"mb-6 mt-2 " + (fromStallPicker ? "hidden sm:block" + stallListDesktopHide : "")}>
         <BainaBoxSpecial variant="search" />
       </div>
 
-      <div className={"max-w-xl px-1 " + (fromStallPicker ? "hidden sm:block" : "")}>
+      <div className={"max-w-xl px-1 " + (fromStallPicker ? "hidden sm:block" + stallListDesktopHide : "")}>
         <p className="eyebrow text-[11px] font-semibold text-maroon">
           {bainaMode
             ? t("Baina Boxes", "बैना बॉक्स")

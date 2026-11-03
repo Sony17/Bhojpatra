@@ -166,6 +166,7 @@ export default function EventBar({
   collapseAt = "lg",
   embedded = false,
   chipSummary = false,
+  dense = false,
   focusRequest = null,
 }: {
   lang: Lang;
@@ -240,6 +241,10 @@ export default function EventBar({
    *  "YOUR EVENT" label stacked over the summary, tinted card. Same content
    *  and the same tap-to-expand editor; used by the Single Stall flow. */
   chipSummary?: boolean;
+  /** Desktop (lg+) only: a slim brief — no "YOUR EVENT" header row, tighter card
+   *  padding and 36px controls (vs 48px), "Check availability" moved up beside
+   *  the Date label. Phones and tablets are untouched. Used by Single Stall. */
+  dense?: boolean;
   /** Bump `nonce` to expand the brief, scroll `field` into view and open its
    *  picker — how a tapped blocker takes the guest straight to the fix. */
   focusRequest?: { field: EventField; nonce: number } | null;
@@ -247,6 +252,7 @@ export default function EventBar({
   // Trigger styling for the themed dropdowns — matches the other field boxes
   // (bordered, cream, shadowed) so the select reads as one of the inputs.
   const selectButtonClass =
+    (dense ? "lg:h-9 " : "") +
     "h-12 w-full rounded-control border border-cream bg-white px-3.5 text-sm shadow-soft outline-none transition focus:border-maroon focus:shadow-card";
   // Every field shares one fixed-height label line, so the controls below
   // line up across the row whether or not a label carries an action.
@@ -468,6 +474,29 @@ export default function EventBar({
         <div className="block min-w-0" data-event-field="date">
           <span className={labelRowClass}>
             {fieldLabel("date", t("Date", "तारीख"))}
+            {dense && onCheckAvailability && (
+              <button
+                type="button"
+                onClick={onCheckAvailability}
+                aria-label={t("Check availability", "उपलब्धता देखें")}
+                title={t("Check availability", "उपलब्धता देखें")}
+                className="hidden shrink-0 rounded-full text-maroon transition hover:bg-cream/60 lg:inline-flex"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
+                  <path d="M3 9.5h18M8 2.5v4M16 2.5v4M9 15l2 2 4-4" />
+                </svg>
+              </button>
+            )}
           </span>
           {/* Branded calendar (same on-brand popup as the Hero booking bar).
               The floor is tomorrow, or today for a same-day stall
@@ -476,9 +505,10 @@ export default function EventBar({
           <DatePicker
             className={
               "mt-1.5 h-12 w-full rounded-control border bg-white shadow-soft transition focus-within:shadow-card " +
+              (dense ? "lg:h-9 " : "") +
               (leadWarning || availabilityWarning || isMissing("date") ? "border-maroon" : "border-cream focus-within:border-maroon")
             }
-            buttonClassName="h-12 w-full px-3.5 pr-11 text-sm"
+            buttonClassName={"h-12 w-full px-3.5 pr-11 text-sm" + (dense ? " lg:h-9" : "")}
             iconClassName="right-3.5"
             placeholder={t("Pick a date", "तारीख चुनें")}
             ariaLabel={t("Event date", "इवेंट की तारीख")}
@@ -505,7 +535,10 @@ export default function EventBar({
             <button
               type="button"
               onClick={onCheckAvailability}
-              className="mt-1 inline-flex min-h-[28px] items-center gap-1 text-[11px] font-bold text-maroon underline-offset-2 hover:underline"
+              className={
+                "mt-1 inline-flex min-h-[28px] items-center gap-1 text-[11px] font-bold text-maroon underline-offset-2 hover:underline" +
+                (dense ? " lg:hidden" : "")
+              }
             >
               {t("Check availability", "उपलब्धता देखें")}
             </button>
@@ -589,7 +622,7 @@ export default function EventBar({
               </span>
             </span>
             {/* Inline stepper in a field-height box: − [count] + */}
-            <div className="mt-1.5 flex h-12 items-center justify-between gap-1 rounded-control border border-cream bg-white px-1.5 shadow-soft transition focus-within:border-maroon focus-within:shadow-card">
+            <div className={"mt-1.5 flex h-12 items-center justify-between gap-1 rounded-control border border-cream bg-white px-1.5 shadow-soft transition focus-within:border-maroon focus-within:shadow-card" + (dense ? " lg:h-9" : "")}>
               <button
                 type="button"
                 onClick={() => stepGuests(-10)}
@@ -647,7 +680,7 @@ export default function EventBar({
                 </button>
               )}
             </span>
-            <div className="mt-1.5 flex h-12 items-center gap-1.5 rounded-control border border-cream bg-white px-2 shadow-soft">
+            <div className={"mt-1.5 flex h-12 items-center gap-1.5 rounded-control border border-cream bg-white px-2 shadow-soft" + (dense ? " lg:h-9" : "")}>
               {!splitSet ? (
                 bookingFoodPreferences.map((f) => (
                   <button
@@ -794,9 +827,14 @@ export default function EventBar({
           ? "relative"
           : (chipSummary
               ? "relative rounded-2xl border bg-white px-3 py-2 sm:rounded-[1.5rem] sm:border-cream sm:p-6 sm:shadow-card " +
-                (missing.length > 0 ? "border-maroon shadow-soft " : "border-cream ")
+                (missing.length > 0 ? "border-maroon shadow-soft " : "border-cream ") +
+                (dense ? "lg:rounded-2xl lg:p-3 lg:shadow-soft " : "")
               : "relative rounded-[1.5rem] border border-cream bg-white p-4 shadow-card sm:p-6 ") +
-            (flush ? "" : chipSummary ? "mt-2.5 sm:mt-7" : "mt-5 sm:mt-7")
+            (flush
+              ? ""
+              : chipSummary
+                ? "mt-2.5 sm:mt-7" + (dense ? " lg:mt-2" : "")
+                : "mt-5 sm:mt-7")
       }
     >
       {Boolean(leadWarning || availabilityWarning) && !embedded && (
@@ -924,7 +962,8 @@ export default function EventBar({
               ? collapseAt === "sm"
                 ? "hidden sm:flex"
                 : "hidden lg:flex"
-              : "")
+              : "") +
+          (dense ? " lg:hidden" : "")
         }
       >
         <p className="eyebrow shrink-0 text-[10px] font-bold text-maroon sm:text-xs">
@@ -937,6 +976,7 @@ export default function EventBar({
       </div>
       {renderFields(
           "mt-4 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:gap-3 " +
+          (dense ? "lg:mt-0 lg:gap-2.5 xl:gap-2 " : "") +
           // One aligned row on wide screens: every field is a label line over a
           // 48px control, so the boxes share a baseline and a height. Guests is
           // a compact inline stepper (no slider) so it fits a single column.

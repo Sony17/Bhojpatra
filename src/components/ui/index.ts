@@ -37,6 +37,8 @@ export { default as SkeletonCard, SkeletonList } from "./SkeletonCard";
 export { default as Spinner } from "./Spinner";
 
 export { ToastProvider, useToast } from "./Toast";
+export { ErrorDialogProvider, useErrorDialog } from "./ErrorDialog";
+export type { ErrorDialogSpec, ErrorDialogAction } from "./ErrorDialog";
 
 export { default as Drawer } from "./Drawer";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/i18n";
 import {
@@ -13,7 +13,8 @@ import {
 import { setAdminSession } from "@/lib/adminAuth";
 import { makeReferralCode, PARTNER_ROLE_LABEL } from "@/lib/referral";
 import { isValidGst, isValidEmail, isValidPhone } from "@/lib/validate";
-import { Button, controlClass } from "@/components/ui";
+import { Button, controlClass, useErrorDialog } from "@/components/ui";
+import { authFailureSpec } from "@/lib/failureDialogs";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
 
@@ -59,6 +60,8 @@ function readNextPath(): string {
 
 export default function AuthForm({ mode }: { mode: Mode }) {
   const { t } = useLang();
+  const { showError } = useErrorDialog();
+  const formRef = useRef<HTMLFormElement>(null);
   // Read after mount so server and first client render match.
   const [nextPath, setNextPath] = useState("");
   useEffect(() => {
@@ -267,6 +270,18 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           | null;
         if (!res.ok || !json?.user) {
           setError(json?.error ?? t("Couldn't create your account.", "आपका अकाउंट नहीं बन सका।"));
+          // "Already registered" and server faults deserve more than a red line:
+          // say what to do next (log in instead / retry / contact support).
+          if (res.status === 409 || res.status >= 500) {
+            showError(
+              authFailureSpec({
+                t,
+                info: { status: res.status, message: json?.error },
+                mode: "signup",
+                retry: () => formRef.current?.requestSubmit(),
+              }),
+            );
+          }
           return;
         }
 
@@ -296,6 +311,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         setSubmitted(true);
       } catch {
         setError(t("Couldn't create your account. Please try again.", "आपका अकाउंट नहीं बन सका। कृपया पुनः प्रयास करें।"));
+        showError(
+          authFailureSpec({
+            t,
+            info: { network: true },
+            mode: "signup",
+            retry: () => formRef.current?.requestSubmit(),
+          }),
+        );
       } finally {
         setSubmitting(false);
       }
@@ -316,6 +339,17 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         | null;
       if (!res.ok || !json?.user) {
         setError(json?.error ?? t("Invalid email or password.", "अमान्य ईमेल या पासवर्ड।"));
+        // Wrong credentials stay inline by the fields; a server fault pops up.
+        if (res.status >= 500) {
+          showError(
+            authFailureSpec({
+              t,
+              info: { status: res.status },
+              mode: "login",
+              retry: () => formRef.current?.requestSubmit(),
+            }),
+          );
+        }
         return;
       }
       const user = json.user;
@@ -341,6 +375,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       window.location.assign(DASHBOARD_PATH[user.role]);
     } catch {
       setError(t("Couldn't sign in. Please try again.", "साइन इन नहीं हो सका। कृपया पुनः प्रयास करें।"));
+      showError(
+        authFailureSpec({
+          t,
+          info: { network: true },
+          mode: "login",
+          retry: () => formRef.current?.requestSubmit(),
+        }),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -730,7 +772,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         )}
       </header>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
         {isSignup && (
           <div className="flex flex-col gap-1.5">
             <label htmlFor="fullName" className="text-sm text-ink-soft">

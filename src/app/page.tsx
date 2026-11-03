@@ -14,11 +14,11 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
 /**
  * Conversion-first home funnel:
  * 1. Hero — location + book / find caterers
- * 2. Promo offer banner (art) — below the hero
- * 3. Occasions → /book
- * 4. Categories → /vendors
- * 5. Packages → book
- * 6. Baina → order path
+ * 2. Baina → order path (directly under the hero)
+ * 3. Promo offer banner (art) — below Baina
+ * 4. Occasions → /book
+ * 5. Categories → /vendors
+ * 6. Packages → Book opens Feast interest popup until 2027
  * 7. Social proof
  * 8. Promo lead capture — post-testimonials
  */
@@ -26,13 +26,13 @@ export default function Home() {
   return (
     <PublicShell hero>
       <Hero />
+      <BainaBoxes />
       <PromoBanner />
       <ChooseOccasion />
       <div className="home-band-cream">
         <TopCategories />
       </div>
       <Packages />
-      <BainaBoxes />
       <div className="home-band-cream">
         <Gallery />
       </div>

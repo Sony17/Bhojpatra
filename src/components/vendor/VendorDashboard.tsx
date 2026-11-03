@@ -5,7 +5,8 @@
  * dashboard shell + 390px mobile dashboard shell). Owns the full viewport: red
  * sidebar + sticky topbar on desktop, AppBar + fixed bottom nav on mobile.
  * Dashboard · My Services · Orders · Calendar are live; Finances and Reviews
- * are "Soon". Wired to GET /api/vendor/menu (the vendor's live record),
+ * ("Soon") are hidden for launch behind src/lib/vendorDashboardFlags.ts.
+ * Wired to GET /api/vendor/menu (the vendor's live record),
  * GET/PATCH /api/vendor/orders and GET/POST /api/vendor/availability.
  */
 
@@ -23,6 +24,22 @@ import type { VendorOrderSummary } from "@/lib/vendorOrders";
 import { sortTiers } from "@/lib/admin/types";
 import { cn } from "@/components/ui/cn";
 import { logout } from "@/lib/session";
+import { useLang } from "@/lib/i18n";
+import {
+  SHOW_ADD_CONFIGURE_SERVICES_CTA,
+  SHOW_EDIT_BUSINESS_PROFILE_LINK,
+  SHOW_EDIT_MENU_SERVICES_LINK,
+  SHOW_FINANCES_TAB,
+  SHOW_MENU_BUILDER,
+  SHOW_REVIEWS_TAB,
+} from "@/lib/vendorDashboardFlags";
+import {
+  optedServices,
+  VENDOR_SERVICE_NAMES,
+  type OptedServices,
+  type VendorServiceId,
+  type VendorServicesInput,
+} from "@/lib/vendorServices";
 import { BtnBack, BtnNext, DIET_NAMES, Sheet, stallCategoryName } from "@/components/vendor/portalUi";
 
 type Tab = "dashboard" | "services" | "orders" | "calendar";
@@ -111,9 +128,13 @@ function Icon({ name, size = 18, className }: { name: IconName; size?: number; c
   );
 }
 
+/** "Coming Soon" nav entries (desktop sidebar + mobile More sheet). Finances
+ *  and Reviews are hidden for launch — flip the flags in
+ *  src/lib/vendorDashboardFlags.ts to bring one back (see
+ *  docs/HIDDEN_SURFACES_BACKLOG.md). */
 const SOON: { label: string; icon: IconName; toast: string }[] = [
-  { label: "Finances", icon: "wallet", toast: "Partner finances & payouts — Coming Soon" },
-  { label: "Reviews", icon: "star", toast: "Customer reviews & ratings — Coming Soon" },
+  ...(SHOW_FINANCES_TAB ? [{ label: "Finances", icon: "wallet" as IconName, toast: "Partner finances & payouts — Coming Soon" }] : []),
+  ...(SHOW_REVIEWS_TAB ? [{ label: "Reviews", icon: "star" as IconName, toast: "Customer reviews & ratings — Coming Soon" }] : []),
 ];
 /** Business profile + statutory KYC live in the onboarding wizard (steps 1–2),
  *  which reopens pre-filled for a registered vendor. */
@@ -126,7 +147,11 @@ const CARD = "rounded-card border border-cream/30 bg-white shadow-card";
 const PILL = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold";
 
 export default function VendorDashboard() {
+  const { t } = useLang();
   const [vendor, setVendor] = useState<LiveVendorRecord | null>(null);
+  /** The registration application's offerings, used to resolve the opted
+   *  services until a live catalog record exists (GET /api/vendor/menu prefill). */
+  const [prefill, setPrefill] = useState<VendorServicesInput | null>(null);
   const [fallbackName, setFallbackName] = useState("");
   const [gallery, setGallery] = useState<{ id: string }[]>([]);
   const [orders, setOrders] = useState<OrdersPayload>({ pending: [], confirmed: [], completed: [], pendingPayout: 0 });
@@ -175,7 +200,10 @@ export default function VendorDashboard() {
       if (r?.ok && live) {
         const d = await r.json();
         if (d.vendor) setVendor(d.vendor);
-        else setFallbackName(d.prefill?.business ?? "");
+        else {
+          setFallbackName(d.prefill?.business ?? "");
+          setPrefill(d.prefill ?? null);
+        }
         setGallery(d.gallery ?? []);
       }
       await loadOrders();
@@ -206,7 +234,11 @@ export default function VendorDashboard() {
   const [declining, setDeclining] = useState<VendorOrderSummary | null>(null);
 
   const name = vendor?.business || fallbackName || "Your Business";
-  const tier = vendor?.tiers?.length ? sortTiers(vendor.tiers).slice(-1)[0] : undefined;
+  // What the vendor opted into at onboarding drives every service-specific
+  // surface below; the rest is hidden (see src/lib/vendorServices.ts).
+  const opted = useMemo(() => optedServices(vendor ?? prefill), [vendor, prefill]);
+  // Feast bands (Silver / Gold / Platinum) only exist for a Feast vendor.
+  const tier = opted.ids.includes("feast") && vendor?.tiers?.length ? sortTiers(vendor.tiers).slice(-1)[0] : undefined;
   const diet = vendor?.dietaryOffering ? DIET_NAMES[vendor.dietaryOffering] : undefined;
   // Live = approved, or a live vendor's edit pending review while their last
   // approved listing stays up (same rule as `publishedView` on the server).
@@ -214,7 +246,7 @@ export default function VendorDashboard() {
     vendor?.moderation === "Approved" ||
     (vendor?.moderation === "Pending" && Boolean(vendor?.approvedSnapshot) && Boolean(vendor?.verified));
   const status = vendorStatus(vendor, live, application);
-  const services = useMemo(() => buildServices(vendor), [vendor]);
+  const services = useMemo(() => buildServices(vendor, opted), [vendor, opted]);
   const configured = services.filter((s) => s.configured);
   const initials = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
@@ -232,9 +264,11 @@ export default function VendorDashboard() {
     setMoreOpen(false);
     window.scrollTo({ top: 0 });
   };
-  // Menus & services are edited in the in-page builder on My Services.
+  // Menus & services are edited in the in-page builder on My Services (when
+  // SHOW_MENU_BUILDER is on). Otherwise just open the services summary.
   const editServices = () => {
     go("services");
+    if (!SHOW_MENU_BUILDER) return;
     setTimeout(() => document.getElementById(BUILDER_ID)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
   const signOut = async () => {
@@ -243,15 +277,21 @@ export default function VendorDashboard() {
   };
   const openNotifications = () => (pending ? setReview(pending) : flash("No new booking notifications."));
 
+  // The Calendar is the Single Stall availability — it only exists for a vendor
+  // who opted into Single Stall.
   const nav: { id: Tab; label: string; icon: IconName; count?: number; soft?: boolean }[] = [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "services", label: "My Services", icon: "services", count: configured.length, soft: true },
     { id: "orders", label: "Orders", icon: "orders", count: orders.pending.length },
-    { id: "calendar", label: "Calendar", icon: "calendar" },
+    ...(opted.ids.includes("stall") ? [{ id: "calendar" as Tab, label: "Calendar", icon: "calendar" as IconName }] : []),
   ];
+  // A tab the vendor can't see is never rendered, however `tab` got set (a
+  // stale selection, a future ?tab= link): fall back to the first visible one.
+  const activeTab: Tab = nav.some((n) => n.id === tab) ? tab : nav[0].id;
 
   const ctx: HomeCtx = {
     vendor,
+    opted,
     tier,
     diet,
     live,
@@ -302,7 +342,7 @@ export default function VendorDashboard() {
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4" aria-label="Vendor portal">
           {nav.map((n) => {
-            const active = tab === n.id;
+            const active = activeTab === n.id;
             return (
               <button
                 key={n.id}
@@ -355,14 +395,18 @@ export default function VendorDashboard() {
             <Icon name="help" size={16} />
             Partner Helpdesk
           </a>
-          <button type="button" onClick={editServices} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
-            <Icon name="edit" size={16} />
-            Edit Menu & Services
-          </button>
-          <Link href={PROFILE_HREF} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
-            <Icon name="note" size={16} />
-            Edit Business Profile
-          </Link>
+          {SHOW_EDIT_MENU_SERVICES_LINK && (
+            <button type="button" onClick={editServices} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
+              <Icon name="edit" size={16} />
+              Edit Menu & Services
+            </button>
+          )}
+          {SHOW_EDIT_BUSINESS_PROFILE_LINK && (
+            <Link href={PROFILE_HREF} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
+              <Icon name="note" size={16} />
+              Edit Business Profile
+            </Link>
+          )}
           <button type="button" onClick={signOut} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-cream hover:bg-white/10 hover:text-white">
             <Icon name="logout" size={16} />
             Sign out
@@ -377,7 +421,7 @@ export default function VendorDashboard() {
           <div className="flex items-center gap-2 text-[13.5px]">
             <span className="text-ink/60">Vendor Portal</span>
             <span className="text-cream">/</span>
-            <span className="font-bold">{BREADCRUMB[tab]}</span>
+            <span className="font-bold">{BREADCRUMB[activeTab]}</span>
           </div>
           <div className="flex items-center gap-3">
             <BellButton dot={orders.pending.length > 0} onClick={openNotifications} />
@@ -413,7 +457,7 @@ export default function VendorDashboard() {
             <div className="flex min-h-[40vh] items-center justify-center">
               <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-maroon border-t-transparent" />
             </div>
-          ) : tab === "dashboard" ? (
+          ) : activeTab === "dashboard" ? (
             <>
               <div className="hidden lg:block">
                 <DesktopHome {...ctx} />
@@ -422,9 +466,9 @@ export default function VendorDashboard() {
                 <MobileHome {...ctx} />
               </div>
             </>
-          ) : tab === "services" ? (
-            <ServicesHub services={services} onEdit={editServices} />
-          ) : tab === "calendar" ? (
+          ) : activeTab === "services" ? (
+            <ServicesHub services={services} opted={opted} onEdit={editServices} />
+          ) : activeTab === "calendar" ? (
             <AvailabilityTab orders={[...orders.pending, ...orders.confirmed]} flash={flash} />
           ) : (
             <OrdersPipeline orders={orders} upcoming={upcoming} onReview={setReview} onDecline={(o) => setDeclining(o)} onPrep={setPrep} />
@@ -439,8 +483,8 @@ export default function VendorDashboard() {
             key={n.id}
             type="button"
             onClick={() => go(n.id)}
-            aria-current={tab === n.id ? "page" : undefined}
-            className={cn("relative flex flex-1 flex-col items-center justify-center gap-[3px] text-[10px] font-bold", tab === n.id ? "text-maroon" : "text-ink/60")}
+            aria-current={activeTab === n.id ? "page" : undefined}
+            className={cn("relative flex flex-1 flex-col items-center justify-center gap-[3px] text-[10px] font-bold", activeTab === n.id ? "text-maroon" : "text-ink/60")}
           >
             <span className="relative">
               <Icon name={n.icon} size={20} />
@@ -520,14 +564,18 @@ function MoreSheet({
         <Icon name="help" className="text-maroon" />
         Partner Helpdesk
       </a>
-      <button type="button" onClick={onEdit} className={row}>
-        <Icon name="edit" className="text-maroon" />
-        Edit Menu & Services
-      </button>
-      <Link href={PROFILE_HREF} className={row}>
-        <Icon name="note" className="text-maroon" />
-        Edit Business Profile
-      </Link>
+      {SHOW_EDIT_MENU_SERVICES_LINK && (
+        <button type="button" onClick={onEdit} className={row}>
+          <Icon name="edit" className="text-maroon" />
+          Edit Menu & Services
+        </button>
+      )}
+      {SHOW_EDIT_BUSINESS_PROFILE_LINK && (
+        <Link href={PROFILE_HREF} className={row}>
+          <Icon name="note" className="text-maroon" />
+          Edit Business Profile
+        </Link>
+      )}
       <button type="button" onClick={onSignOut} className={cn(row, "border-b-0 text-maroon")}>
         Sign out
       </button>
@@ -537,14 +585,24 @@ function MoreSheet({
 
 /* ── Services model (the 7 V2 services, in handover order) ────────────────── */
 interface ServiceCard {
-  key: string;
+  key: VendorServiceId;
   title: string;
+  titleHi: string;
   configured: boolean;
   status: string;
   detail: string;
 }
 
-function buildServices(v: LiveVendorRecord | null): ServiceCard[] {
+/** The vendor's services — ONLY the ones they opted into at onboarding
+ *  (`opted`, see src/lib/vendorServices.ts); the rest are not built at all, so
+ *  no card, count, stat or empty-state prompt can leak for them. */
+function buildServices(v: LiveVendorRecord | null, opted: OptedServices): ServiceCard[] {
+  return buildAllServices(v)
+    .filter((s) => opted.ids.includes(s.key))
+    .map((s) => ({ ...s, titleHi: VENDOR_SERVICE_NAMES[s.key].hi }));
+}
+
+function buildAllServices(v: LiveVendorRecord | null): Omit<ServiceCard, "titleHi">[] {
   const cats = v?.serviceCategories || [];
   const comps = v?.cateringComponents || {};
   const courses = ["welcome", "starters", "main", "breads", "sweets"];
@@ -564,7 +622,7 @@ function buildServices(v: LiveVendorRecord | null): ServiceCard[] {
   const stall = cats.length ? cats.includes("single-stall") : stallCats.length > 0;
   const baina = Boolean(cats.includes("baina-box") || v?.bainaBoxes?.length);
   const hasCounters = comps.counters !== false && counters.length > 0;
-  const hasExtras = Boolean(comps.extras && extras.length);
+  const hasExtras = comps.extras !== false && extras.length > 0;
   const hasAddons = comps.addons !== false && Boolean(v?.cutleryTier);
   const hasEssentials = comps.essentials !== false && Boolean(v?.essentialService);
 
@@ -594,6 +652,8 @@ interface VendorApplicationView {
 
 interface HomeCtx {
   vendor: LiveVendorRecord | null;
+  /** Services the vendor opted into at onboarding. */
+  opted: OptedServices;
   tier?: string;
   diet?: string;
   live: boolean;
@@ -613,14 +673,43 @@ interface HomeCtx {
   flash: (msg: string) => void;
 }
 
-function useHomeStats({ vendor, orders, galleryCount }: Pick<HomeCtx, "vendor" | "orders" | "galleryCount">) {
+/** Whether an opted service has real content saved (what "published" means for
+ *  the completeness checklist — never judged by a service the vendor skipped). */
+function serviceHasContent(v: LiveVendorRecord | null, id: VendorServiceId): boolean {
+  switch (id) {
+    case "feast":
+      return (v?.menu || []).some((s) => ["welcome", "starters", "main", "breads", "sweets"].includes(s.categoryId) && s.items.length > 0);
+    case "stall":
+      return Boolean(v?.stallConfig?.categories?.length);
+    case "baina":
+      return Boolean(v?.bainaBoxes?.length);
+    case "counters":
+      return Boolean(v?.counters?.length);
+    case "extras":
+      return Boolean(v?.customOfferings?.length);
+    case "addons":
+      return Boolean(v?.cutleryTier);
+    case "essentials":
+      return Boolean(v?.essentialService);
+  }
+}
+
+function useHomeStats({ vendor, orders, galleryCount, opted }: Pick<HomeCtx, "vendor" | "orders" | "galleryCount" | "opted">) {
+  const { t } = useLang();
   const payout = orders.pendingPayout;
   const rating = vendor?.rating || vendor?.googleRating;
   const reviews = vendor?.reviews || vendor?.googleReviews || 0;
+  // Name only what the vendor opted into: the headline services if any, else
+  // whichever add-on services they have.
+  const headline = opted.ids.filter((id) => id === "feast" || id === "stall" || id === "baina");
+  const named = (headline.length ? headline : opted.ids).map((id) => VENDOR_SERVICE_NAMES[id]);
+  const packagesLabel = named.length
+    ? t(`${named.map((n) => n.en).join(" & ")} published`, `${named.map((n) => n.hi).join(" और ")} प्रकाशित`)
+    : t("Choose your services & publish them", "अपनी सेवाएं चुनें और प्रकाशित करें");
   const checklist: { done: boolean; label: string; weight: number }[] = [
     { done: Boolean(vendor?.about && vendor?.business), label: "Business bio & contact phone verified", weight: 30 },
     { done: Boolean(vendor?.verified), label: "GST & FSSAI statutory documents submitted", weight: 25 },
-    { done: (vendor?.menu || []).some((s) => s.items.length), label: "V2 Feast & Service packages published", weight: 25 },
+    { done: opted.ids.some((id) => serviceHasContent(vendor, id)), label: packagesLabel, weight: 25 },
     { done: galleryCount >= 3, label: "Upload 3 kitchen gallery photos (+20%)", weight: 20 },
   ];
   const completeness = checklist.reduce((n, c) => n + (c.done ? c.weight : 0), 0);
@@ -662,7 +751,7 @@ function vendorStatus(
         }
       : {
           label: "Live on Marketplace",
-          note: `Your kitchen profile is active and discoverable for feast & stall bookings in ${city}.`,
+          note: `Your kitchen profile is active and discoverable for bookings in ${city}.`,
         };
   }
   if (vendor?.moderation === "Hidden") {
@@ -694,14 +783,21 @@ function vendorStatus(
 /** Stalls & dishes the Bhojpatra team disapproved — kept off the marketplace
  *  while the rest of the listing stays live. Names come from the vendor's own
  *  menu (the stored dish key is lowercased). */
-function DisapprovedNotice({ vendor }: { vendor: LiveVendorRecord | null }) {
+function DisapprovedNotice({ vendor, opted }: { vendor: LiveVendorRecord | null; opted: OptedServices }) {
   const review = vendor?.contentReview;
   if (!vendor || !review) return null;
-  const stalls = Object.entries(review.stalls ?? {}).map(([id, m]) => ({ name: stallCategoryName(id), reason: m.reason }));
+  // Only what the vendor actually sells: stalls & stall dishes need Single
+  // Stall; the plated course dishes are shared by Feast and Single Stall, and
+  // live-station dishes by Live Counters.
+  const hasStall = opted.ids.includes("stall");
+  const hasDishes = hasStall || opted.ids.includes("feast") || opted.ids.includes("counters");
+  const stalls = hasStall ? Object.entries(review.stalls ?? {}).map(([id, m]) => ({ name: stallCategoryName(id), reason: m.reason })) : [];
   const named = new Map<string, string>();
-  for (const s of vendor.menu) for (const it of s.items) named.set(dishReviewKey(s.categoryId, it.name), it.name);
-  for (const [stall, list] of Object.entries(vendor.stallConfig?.menus ?? {})) {
-    for (const it of list) named.set(dishReviewKey(stallMenuId(stall), it.name), it.name);
+  if (hasDishes) for (const s of vendor.menu) for (const it of s.items) named.set(dishReviewKey(s.categoryId, it.name), it.name);
+  if (hasStall) {
+    for (const [stall, list] of Object.entries(vendor.stallConfig?.menus ?? {})) {
+      for (const it of list) named.set(dishReviewKey(stallMenuId(stall), it.name), it.name);
+    }
   }
   const dishes = Object.entries(review.dishes ?? {}).flatMap(([key, m]) => {
     const name = named.get(key);
@@ -746,6 +842,12 @@ function StatusPills({ label, tier, diet }: { label: string; tier?: string; diet
 function DesktopHome(ctx: HomeCtx) {
   const { vendor, tier, diet, live, orders, upcoming, next, days, pending, services, onReview, onDecline, onPrep, go } = ctx;
   const { payout, rating, reviews, checklist, completeness } = useHomeStats(ctx);
+  const metrics: [string, IconName, string, string][] = [
+    ["Upcoming Bookings", "event", `${upcoming.length} Event${upcoming.length === 1 ? "" : "s"}`, upcoming[0] ? `Next: ${fmtDate(upcoming[0])}` : "No events scheduled"],
+    ["Completed Events", "check", `${orders.completed.length} Event${orders.completed.length === 1 ? "" : "s"}`, "Lifetime events"],
+    ...(SHOW_REVIEWS_TAB ? [["Average Rating", "star", rating ? `★ ${rating}` : "★ —", reviews ? `Based on ${reviews} reviews` : "No reviews yet"] as [string, IconName, string, string]] : []),
+    ...(SHOW_FINANCES_TAB ? [["Pending Payout", "wallet", inr(payout), "Completed events, awaiting settlement"] as [string, IconName, string, string]] : []),
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -755,7 +857,7 @@ function DesktopHome(ctx: HomeCtx) {
           <StatusPills label={ctx.status.label} tier={tier} diet={diet} />
         </div>
         <p className="mt-2 text-[12.5px] text-ink/65">{ctx.status.note}</p>
-        <DisapprovedNotice vendor={vendor} />
+        <DisapprovedNotice vendor={vendor} opted={ctx.opted} />
         {!live && ctx.status.label !== "Pending Review" && ctx.status.label !== "Hidden by Admin" && (
           <Link href="/vendor/register" className="mt-1 inline-block text-[12.5px] font-bold text-maroon hover:underline">
             Open registration →
@@ -797,16 +899,10 @@ function DesktopHome(ctx: HomeCtx) {
       {/* 3. Next upcoming event (focal point) */}
       <NextEventSpotlight next={next} days={days} vendor={vendor} onPrep={onPrep} go={go} />
 
-      {/* 4. Metrics */}
-      <section className="grid grid-cols-4 gap-4">
-        {(
-          [
-            ["Upcoming Bookings", "event", `${upcoming.length} Event${upcoming.length === 1 ? "" : "s"}`, upcoming[0] ? `Next: ${fmtDate(upcoming[0])}` : "No events scheduled"],
-            ["Completed Events", "check", `${orders.completed.length} Event${orders.completed.length === 1 ? "" : "s"}`, "Lifetime events"],
-            ["Average Rating", "star", rating ? `★ ${rating}` : "★ —", reviews ? `Based on ${reviews} reviews` : "No reviews yet"],
-            ["Pending Payout", "wallet", inr(payout), "Completed events, awaiting settlement"],
-          ] as [string, IconName, string, string][]
-        ).map(([label, icon, value, sub]) => (
+      {/* 4. Metrics — the Rating (Reviews) and Pending Payout (Finances) cards
+          are hidden for launch (src/lib/vendorDashboardFlags.ts). */}
+      <section className={cn("grid gap-4", metrics.length === 4 ? "grid-cols-4" : metrics.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
+        {metrics.map(([label, icon, value, sub]) => (
           <div key={label} className={cn(CARD, "flex flex-col gap-1 p-[18px]")}>
             <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.5px] text-ink/55">
               <span>{label}</span>
@@ -1017,7 +1113,7 @@ function MobileHome(ctx: HomeCtx) {
         )}
         {tier && <span className="rounded-[3px] bg-cream px-1.5 py-px text-[9px] font-extrabold uppercase tracking-[0.5px] text-maroon">{tier}</span>}
       </div>
-      <DisapprovedNotice vendor={ctx.vendor} />
+      <DisapprovedNotice vendor={ctx.vendor} opted={ctx.opted} />
 
       {/* Urgent alert */}
       {pending && (
@@ -1088,13 +1184,14 @@ function MobileHome(ctx: HomeCtx) {
         )}
       </div>
 
-      {/* Metrics 2×2 */}
+      {/* Metrics 2×2 — the Pending Payout (Finances) and Rating (Reviews)
+          tiles are hidden for launch (src/lib/vendorDashboardFlags.ts). */}
       <div className="grid grid-cols-2 gap-2">
         {(
           [
             ["Active Orders", String(upcoming.length), upcoming[0] ? `Next: ${fmtDate(upcoming[0], { day: "numeric", month: "short" })}` : "None scheduled", false],
-            ["Pending Payout", inrCompact(payout), "Awaiting settlement", true],
-            ["Rating", rating ? `★ ${rating}` : "★ —", reviews ? `${reviews} reviews` : "No reviews yet", false],
+            ...(SHOW_FINANCES_TAB ? [["Pending Payout", inrCompact(payout), "Awaiting settlement", true] as [string, string, string, boolean]] : []),
+            ...(SHOW_REVIEWS_TAB ? [["Rating", rating ? `★ ${rating}` : "★ —", reviews ? `${reviews} reviews` : "No reviews yet", false] as [string, string, string, boolean]] : []),
             ["Completed", String(orders.completed.length), "Lifetime events", false],
           ] as [string, string, string, boolean][]
         ).map(([label, value, sub, red]) => (
@@ -1164,42 +1261,70 @@ function BookingList({ list, onOpen }: { list: VendorOrderSummary[]; onOpen?: (o
 /* ── My Services ──────────────────────────────────────────────────────────── */
 const BUILDER_ID = "vendor-menu-builder";
 
-function ServicesHub({ services, onEdit }: { services: ServiceCard[]; onEdit: () => void }) {
+function ServicesHub({ services, opted, onEdit }: { services: ServiceCard[]; opted: OptedServices; onEdit: () => void }) {
   const active = services.filter((s) => s.configured).length;
+  const canConfigure = SHOW_ADD_CONFIGURE_SERVICES_CTA && SHOW_MENU_BUILDER;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-sans text-xl font-extrabold">My Services & Offerings ({services.length} Independent Services)</h1>
+          <h1 className="font-sans text-xl font-extrabold">My Services & Offerings{services.length > 1 ? ` (${services.length} Independent Services)` : ""}</h1>
           <p className="mt-0.5 text-[12.5px] text-ink/60">
-            Your live offerings. Edit dishes, counters and Baina boxes in the menu builder below — changes go to admin review before they appear to customers.
+            {SHOW_MENU_BUILDER
+              ? "Your live offerings. Edit them in the menu builder below — changes go to admin review before they appear to customers."
+              : "Your live offerings from onboarding. Contact Partner Helpdesk if you need a change."}
           </p>
         </div>
-        <button type="button" onClick={onEdit} className="inline-flex shrink-0 items-center justify-center rounded-control bg-maroon px-4 py-2 text-[13px] font-bold text-cream">
-          + Add / Configure Services
-        </button>
+        {SHOW_ADD_CONFIGURE_SERVICES_CTA && (
+          <button type="button" onClick={onEdit} className="inline-flex shrink-0 items-center justify-center rounded-control bg-maroon px-4 py-2 text-[13px] font-bold text-cream">
+            + Add / Configure Services
+          </button>
+        )}
       </div>
       <p className="text-xs font-semibold text-ink/60">
         {active} of {services.length} services active
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {services.map((s) => (
-          <button key={s.key} type="button" onClick={onEdit} className={cn(CARD, "p-4 text-left hover:border-maroon/40")}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[14px] font-bold">{s.title}</span>
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", s.configured ? "bg-maroon text-cream" : "bg-cream/40 text-ink/70")}>
-                {s.configured ? "Active Service" : "Not Configured"}
-              </span>
+        {services.map((s) => {
+          const body = (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-bold">{s.title}</span>
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", s.configured ? "bg-maroon text-cream" : "bg-cream/40 text-ink/70")}>
+                  {s.configured ? "Active Service" : "Not Configured"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-ink/60">
+                {s.configured
+                  ? s.detail
+                  : canConfigure
+                    ? "Add this service in the builder."
+                    : "Not configured yet."}
+              </p>
+              {canConfigure && (
+                <span className="mt-2 inline-block text-xs font-bold text-maroon">
+                  {s.configured ? "Edit in builder →" : "Add +"}
+                </span>
+              )}
+            </>
+          );
+          return canConfigure ? (
+            <button key={s.key} type="button" onClick={onEdit} className={cn(CARD, "p-4 text-left hover:border-maroon/40")}>
+              {body}
+            </button>
+          ) : (
+            <div key={s.key} className={cn(CARD, "p-4")}>
+              {body}
             </div>
-            <p className="mt-1 text-xs text-ink/60">{s.configured ? s.detail : "Add this service in the builder."}</p>
-            <span className="mt-2 inline-block text-xs font-bold text-maroon">{s.configured ? "Edit in builder →" : "Add +"}</span>
-          </button>
-        ))}
+          );
+        })}
       </div>
-      <div id={BUILDER_ID} className="flex scroll-mt-20 flex-col gap-4">
-        <BainaBoxSpecial variant="dashboard" />
-        <MenuBuilder />
-      </div>
+      {SHOW_MENU_BUILDER && (
+        <div id={BUILDER_ID} className="flex scroll-mt-20 flex-col gap-4">
+          {opted.ids.includes("baina") && <BainaBoxSpecial variant="dashboard" />}
+          <MenuBuilder />
+        </div>
+      )}
     </div>
   );
 }

@@ -659,6 +659,7 @@ export default function Step6AStallWorkspace({
         categoryName={currentName}
         delicacyToEdit={modal === "new" ? null : modal}
         vegOnly={dietaryOffering === "veg"}
+        dietaryOffering={dietaryOffering}
         existingNames={dishes.map((d) => d.name)}
         onClose={() => setModal(null)}
         onSave={saveDish}

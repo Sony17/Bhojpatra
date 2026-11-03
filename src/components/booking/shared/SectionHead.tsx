@@ -14,12 +14,16 @@ export default function SectionHead({
   nowrap = false,
   compact = false,
   phoneMinimal = false,
+  dense = false,
   action,
 }: {
   /** Phones: title only — the eyebrow and sub-line return from tablet up. */
   phoneMinimal?: boolean;
   /** Tighter phone spacing + a smaller title (Single Stall's picker). */
   compact?: boolean;
+  /** Desktop (lg+) only: drop the eyebrow and shrink the title, sub-line and
+   *  spacing so the content below starts higher. Phones and tablets unchanged. */
+  dense?: boolean;
   /** Optional link/button aligned to the right of the sub-line (e.g. "See all"). */
   action?: ReactNode;
   title: string;
@@ -30,11 +34,16 @@ export default function SectionHead({
   nowrap?: boolean;
 }) {
   return (
-    <div className={compact ? "mb-2.5 sm:mb-7" : "mb-5 sm:mb-7"}>
+    <div
+      className={
+        (compact ? "mb-2.5 sm:mb-7" : "mb-5 sm:mb-7") + (dense ? " lg:mb-3" : "")
+      }
+    >
       <div
         className={
           (compact ? "mb-1 sm:mb-2" : "mb-2") +
           (phoneMinimal ? " hidden sm:flex" : " flex") +
+          (dense ? " lg:hidden" : "") +
           " items-center gap-2"
         }
       >
@@ -46,7 +55,7 @@ export default function SectionHead({
       <h2
         className={`font-display text-3xl leading-tight text-ink sm:text-4xl${
           nowrap ? " sm:whitespace-nowrap" : ""
-        }`}
+        }${dense ? " lg:text-2xl" : ""}`}
       >
         {title}
       </h2>
@@ -55,11 +64,17 @@ export default function SectionHead({
           className={
             (phoneMinimal && !action ? "hidden sm:flex " : "flex ") +
             "items-baseline justify-between gap-3 " +
-            (compact ? "mt-0.5 sm:mt-2" : "mt-2")
+            (compact ? "mt-0.5 sm:mt-2" : "mt-2") +
+            (dense ? " lg:mt-0.5" : "")
           }
         >
           {sub ? (
-            <p className="min-w-0 max-w-2xl text-xs leading-relaxed text-ink/55 break-words sm:text-base">
+            <p
+              className={
+                "min-w-0 max-w-2xl text-xs leading-relaxed text-ink/55 break-words sm:text-base" +
+                (dense ? " lg:max-w-none lg:text-sm" : "")
+              }
+            >
               {sub}
             </p>
           ) : (

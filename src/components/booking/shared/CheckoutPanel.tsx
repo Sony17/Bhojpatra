@@ -633,6 +633,15 @@ export default function CheckoutPanel({
           )}
 
           {/* Select-to-apply offer tickets */}
+          {couponList.length === 0 ? (
+            <p className="mt-3 text-xs font-medium leading-snug text-ink-soft/70">
+              {t(
+                "No coupons available right now — have a code? Enter it above.",
+                "अभी कोई कूपन उपलब्ध नहीं है — आपके पास कोड है? ऊपर दर्ज करें।",
+              )}
+            </p>
+          ) : (
+          <>
           <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-soft/50">
             {t("Tap to apply", "लगाने के लिए टैप करें")}
           </p>
@@ -671,6 +680,8 @@ export default function CheckoutPanel({
               );
             })}
           </div>
+          </>
+          )}
         </>
       )}
     </div>

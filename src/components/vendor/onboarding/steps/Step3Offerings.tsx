@@ -3,7 +3,7 @@
 import { useState, type KeyboardEvent } from "react";
 import type { RecognitionBadgeKey, VendorBadgesState, VendorCustomOffering } from "@/lib/vendorMenus";
 import { cn } from "@/components/ui/cn";
-import BadgeApplicationModal, { BADGE_DEFINITIONS, BadgeReqItems } from "../components/BadgeApplicationModal";
+import BadgeApplicationModal, { BADGE_DEFINITIONS, BadgeFee, BadgeReqItems } from "../components/BadgeApplicationModal";
 import { ContentCard, FlowFooter, R, StepHeading } from "../ui";
 
 export interface Step3Data {
@@ -298,6 +298,7 @@ export default function Step3Offerings({ data, onChange, onBack, onFinishStep3, 
                       </div>
                     </div>
                     <div className="badge-card-actions">
+                      <BadgeFee meta={meta} />
                       <button
                         type="button"
                         className={cn("btn-badge-action", granted || applied ? "submitted" : "unapplied")}

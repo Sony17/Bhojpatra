@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { RecognitionBadgeKey, VendorBadgesState } from "@/lib/vendorMenus";
+import { money } from "@/lib/money";
 
 export interface BadgeCriterion {
   id: string;
@@ -12,12 +13,17 @@ export interface BadgeCriterion {
   orCondition?: string;
 }
 
-interface BadgeMeta {
+export interface BadgeMeta {
   key: RecognitionBadgeKey;
   title: string;
   icon: string;
   badgeTag: string;
   description: string;
+  /** One-time badge application fee (₹). 0 = free. Display-only: the fee is
+   *  not collected or stored on the application record. */
+  fee: number;
+  /** Regular fee (₹), shown struck through when the current fee is lower. */
+  originalFee?: number;
   /** Mandatory criteria. */
   criteriaList: BadgeCriterion[];
   /** Optional, non-mandatory plus points (City Icon only). */
@@ -40,6 +46,8 @@ export const BADGE_DEFINITIONS: Record<RecognitionBadgeKey, BadgeMeta> = {
     title: "Verified Caterer",
     icon: "🛡️",
     badgeTag: "Entry-Level Recognition",
+    fee: 0,
+    originalFee: 999,
     reqCount: ["10 mandatory criteria", "10 Mandatory Criteria"],
     description: "Entry-level recognition for vendors meeting Bhojpatra's core quality and operational standards.",
     criteriaList: [
@@ -62,6 +70,7 @@ export const BADGE_DEFINITIONS: Record<RecognitionBadgeKey, BadgeMeta> = {
     title: "City Icon Caterer",
     icon: "⭐",
     badgeTag: "City-Level Recognition",
+    fee: 6000,
     reqCount: ["8 mandatory criteria + 6 Plus Points", "8 Mandatory Criteria"],
     description:
       "Prestigious city-level recognition for established caterers with proven scale, reputation, and excellence.",
@@ -89,6 +98,7 @@ export const BADGE_DEFINITIONS: Record<RecognitionBadgeKey, BadgeMeta> = {
     title: "Heritage Caterer",
     icon: "👑",
     badgeTag: "Generational & Culinary Legacy",
+    fee: 12000,
     reqCount: ["Exactly 9 legacy criteria", "Exactly 9 Legacy Criteria"],
     description:
       "Our most exclusive recognition for caterers with a long-standing culinary legacy and generational heritage.",
@@ -135,6 +145,40 @@ const capsLabel = {
   textTransform: "uppercase",
   letterSpacing: 0.5,
 } as const;
+
+/** Visually hidden but announced by screen readers (no global sr-only class). */
+const srOnly: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+/** One-time badge fee line — current fee in brand maroon, with the regular fee
+ *  struck through when discounted (Verified: ₹0, was ₹999). Display-only. */
+export function BadgeFee({ meta, style }: { meta: BadgeMeta; style?: CSSProperties }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", ...style }}>
+      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--color-black-60)" }}>
+        Badge fee
+      </span>
+      <strong style={{ fontSize: 15, fontWeight: 800, color: "var(--color-red)" }}>{money(meta.fee)}</strong>
+      {typeof meta.originalFee === "number" && meta.originalFee > meta.fee && (
+        <>
+          <s aria-hidden="true" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--color-black-60)" }}>
+            {money(meta.originalFee)}
+          </s>
+          <span style={srOnly}>originally {money(meta.originalFee)}</span>
+        </>
+      )}
+    </div>
+  );
+}
 
 /** Requirement checklist rows (.badge-req-list > .badge-req-item). With `checked`
  *  the ✓ mark becomes a real checkbox the vendor ticks to self-certify. */
@@ -313,6 +357,7 @@ export default function BadgeApplicationModal({ badgeKey, badgesState, onClose, 
         <div style={{ ...capsLabel, fontWeight: 800, color: "var(--color-red)" }}>Bhojpatra Recognition Program</div>
         <h3 style={{ fontSize: 18, margin: "4px 0 6px 0", color: "var(--color-black)" }}>{meta.title}</h3>
         <p style={{ fontSize: 13, color: "var(--color-black-80)", lineHeight: 1.5, margin: 0 }}>{meta.description}</p>
+        <BadgeFee meta={meta} style={{ marginTop: 8 }} />
       </div>
 
       <p style={{ fontSize: 13, color: "var(--color-black-70)", marginTop: 0, marginBottom: 14, lineHeight: 1.5 }}>

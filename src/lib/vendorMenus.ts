@@ -234,6 +234,13 @@ const MAX_COUNTER_EXTRAS = 12;
 /** Dietary offering classification: veg-only, non-veg only, or both. */
 export type VendorDietaryOffering = "veg" | "non-veg" | "both";
 
+/** Default per-dish diet when adding a new menu item — follows kitchen classification. */
+export function defaultNewDishDiet(
+  offering?: VendorDietaryOffering,
+): "veg" | "non-veg" {
+  return offering === "non-veg" ? "non-veg" : "veg";
+}
+
 /** Tableware and cutlery tier options for caterers and stalls. */
 export type CutleryTierOption = "essential" | "standard" | "premium" | "ultra";
 

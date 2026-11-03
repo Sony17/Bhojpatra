@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorMenuItem } from "@/lib/vendorMenus";
+import { defaultNewDishDiet, type VendorDietaryOffering, type VendorMenuItem } from "@/lib/vendorMenus";
 import type { VendorTier } from "@/lib/admin/types";
 import PhotoUploadButton from "../common/PhotoUploadButton";
 import { BtnBack, BtnNext, FieldError, FormLabel, Sheet } from "../../ui";
@@ -10,6 +10,10 @@ interface DishModalProps {
   isOpen: boolean;
   dishToEdit?: { dish: VendorMenuItem; courseId: string; index: number } | null;
   defaultCourseId?: string;
+  /** Pure-veg kitchen: only vegetarian dishes may be added. */
+  vegOnly?: boolean;
+  /** Kitchen dietary offering — pre-selects diet on new dishes. */
+  dietaryOffering?: VendorDietaryOffering;
   onClose: () => void;
   onSave: (dish: VendorMenuItem, targetCourseId: string, index?: number) => void;
 }
@@ -28,6 +32,8 @@ export default function DishModal({
   isOpen,
   dishToEdit,
   defaultCourseId = "starters",
+  vegOnly = false,
+  dietaryOffering,
   onClose,
   onSave,
 }: DishModalProps) {
@@ -38,6 +44,8 @@ export default function DishModal({
       key={dishToEdit ? `${dishToEdit.courseId}-${dishToEdit.index}` : `new-${defaultCourseId}`}
       dishToEdit={dishToEdit}
       defaultCourseId={defaultCourseId}
+      vegOnly={vegOnly}
+      dietaryOffering={dietaryOffering}
       onClose={onClose}
       onSave={onSave}
     />
@@ -47,12 +55,16 @@ export default function DishModal({
 function DishModalInner({
   dishToEdit,
   defaultCourseId = "starters",
+  vegOnly = false,
+  dietaryOffering,
   onClose,
   onSave,
 }: Omit<DishModalProps, "isOpen">) {
   const [name, setName] = useState(dishToEdit?.dish.name || "");
   const [courseId, setCourseId] = useState(dishToEdit?.courseId || defaultCourseId);
-  const [diet, setDiet] = useState<"veg" | "non-veg">(dishToEdit?.dish.diet || "veg");
+  const [diet, setDiet] = useState<"veg" | "non-veg">(
+    vegOnly ? "veg" : dishToEdit?.dish.diet || defaultNewDishDiet(dietaryOffering),
+  );
   const [tiers, setTiers] = useState<VendorTier[]>(dishToEdit?.dish.tiers || ["Silver", "Gold"]);
   const [desc, setDesc] = useState(dishToEdit?.dish.desc || "");
   const [photo, setPhoto] = useState<string | undefined>(dishToEdit?.dish.photo);
@@ -74,6 +86,10 @@ function DishModalInner({
   const handleSave = () => {
     if (!name.trim()) {
       setError("Dish name is required.");
+      return;
+    }
+    if (vegOnly && diet !== "veg") {
+      setError("Your kitchen is Pure Vegetarian — only veg dishes can be added.");
       return;
     }
 
@@ -126,7 +142,7 @@ function DishModalInner({
             className="form-select"
           >
             <option value="veg">100% Vegetarian</option>
-            <option value="non-veg">Non-Vegetarian</option>
+            {!vegOnly && <option value="non-veg">Non-Vegetarian</option>}
           </select>
         </div>
         <div className="form-group">

@@ -11,11 +11,15 @@ import { useSiteContent } from "@/lib/sitePages";
 import { useHomeContent } from "@/lib/homeContent";
 import { Button, Input } from "@/components/ui";
 import { isValidPhone } from "@/lib/validate";
+import FeastInterestPopup from "@/components/sections/FeastInterest";
+import { FEAST_BOOKING_OPEN } from "@/lib/launchFlags";
 
 export default function Packages() {
   const { lang, t } = useLang();
   const { contact } = useSiteContent();
   const { packages: homePackages } = useHomeContent();
+  const [interestOpen, setInterestOpen] = useState(false);
+  const [interestPackageId, setInterestPackageId] = useState("");
   const waText = t(
     "Hi Bhojpatra, none of the packages quite fit my event — I'd like a curated package.",
     "नमस्ते भोजपत्र, कोई भी पैकेज मेरे इवेंट के लिए पूरी तरह फिट नहीं है — मुझे एक कस्टम पैकेज चाहिए।",
@@ -111,8 +115,18 @@ export default function Packages() {
 
   // One tier scroll + its "Book" fold CTA — shared by the mobile single-card
   // view and the desktop side-by-side grid so both render an identical card.
+  const bookCtaClass =
+    "btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95";
+
+  const openFeastInterest = (tierId: string) => {
+    setSelectedId(tierId);
+    setInterestPackageId(tierId);
+    setInterestOpen(true);
+  };
+
   const renderCard = (tier: (typeof tiers)[number], isSelected: boolean) => {
     const tierName = lang === "hi" ? tier.nameHi : tier.name;
+    const bookLabel = `${t("Book", "बुक करें")} ${tierName}`;
     return (
       <PackageScrollCard
         tier={tier}
@@ -121,25 +135,38 @@ export default function Packages() {
         priority={tier.popular}
         ctaOnFold
         cta={
-          <Link
-            href={`/book?package=${tier.id}&step=menu`}
-            onClick={() => setSelectedId(tier.id)}
-            aria-label={`${t("Book", "बुक करें")} ${tierName}`}
-            className="btn-sheen inline-flex h-8 items-center gap-1.5 rounded-full bg-cream px-4 text-[13px] font-semibold tracking-wide text-maroon shadow-card ring-1 ring-maroon/30 transition-all duration-300 hover:brightness-105 active:scale-95"
-          >
-            <span className="font-display leading-none">
-              {t("Book", "बुक करें")} {tierName}
-            </span>
-            <span aria-hidden="true" className="text-sm leading-none">
-              →
-            </span>
-          </Link>
+          FEAST_BOOKING_OPEN ? (
+            <Link
+              href={`/book?package=${tier.id}&step=menu`}
+              onClick={() => setSelectedId(tier.id)}
+              aria-label={bookLabel}
+              className={bookCtaClass}
+            >
+              <span className="font-display leading-none">{bookLabel}</span>
+              <span aria-hidden="true" className="text-sm leading-none">
+                →
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openFeastInterest(tier.id)}
+              aria-label={bookLabel}
+              className={bookCtaClass}
+            >
+              <span className="font-display leading-none">{bookLabel}</span>
+              <span aria-hidden="true" className="text-sm leading-none">
+                →
+              </span>
+            </button>
+          )
         }
       />
     );
   };
 
   return (
+    <>
     <section
       id="packages"
       className="relative overflow-hidden py-20 sm:py-24"
@@ -446,6 +473,14 @@ export default function Packages() {
         </Reveal>
       </div>
     </section>
+    {!FEAST_BOOKING_OPEN && (
+      <FeastInterestPopup
+        open={interestOpen}
+        onClose={() => setInterestOpen(false)}
+        initialPackageId={interestPackageId}
+      />
+    )}
+    </>
   );
 }
 

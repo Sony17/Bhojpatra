@@ -35,6 +35,7 @@ import { PhaseStepper } from "./OnboardingChrome";
 import { ShellSlots } from "./ui";
 import { readDraft } from "./draft";
 import { isStockVendorImage } from "@/lib/photoLinks";
+import { FIXED_PRIMARY_KITCHEN_CITY } from "@/lib/vendorDashboardFlags";
 import "./onboarding.css";
 
 export interface OnboardingState {
@@ -150,7 +151,8 @@ export default function VendorOnboarding() {
     businessName: "",
     email: session?.email || "",
     phone: "",
-    city: "",
+    // Launch scope: primary kitchen city is always Lucknow (Step 1 read-only).
+    city: FIXED_PRIMARY_KITCHEN_CITY,
     state: "",
     serviceCities: [],
     cuisines: [],
@@ -284,7 +286,7 @@ export default function VendorOnboarding() {
               ]),
             ),
             goldRate: draft.goldRate || prev.goldRate,
-            city: record?.city || prefill.city || prev.city,
+            city: FIXED_PRIMARY_KITCHEN_CITY,
             state: record?.state || prefill.state || prev.state,
             serviceCities: record?.serviceCities?.length
               ? record.serviceCities
@@ -393,7 +395,7 @@ export default function VendorOnboarding() {
         );
         const payload = {
           business: target.businessName,
-          city: target.city,
+          city: FIXED_PRIMARY_KITCHEN_CITY,
           state: target.state,
           cuisines: target.cuisines,
           about: target.about,
@@ -740,7 +742,9 @@ export default function VendorOnboarding() {
               ? `VND-${formData.existingVendorId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
               : undefined,
           }}
-          onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+          onChange={(patch) =>
+            setFormData((prev) => ({ ...prev, ...patch, city: FIXED_PRIMARY_KITCHEN_CITY }))
+          }
           onContinue={handleStep1Continue}
           saving={saving}
         />
@@ -787,6 +791,7 @@ export default function VendorOnboarding() {
 
       {currentStep === 4 && currentBranch === "catering" && (
         <CateringBuilder
+          dietaryOffering={formData.dietaryOffering}
           data={{
             packageName: formData.packageName,
             about: formData.about,
@@ -820,6 +825,10 @@ export default function VendorOnboarding() {
       {currentStep === 4 && currentBranch === "stall" && (
         <SingleStallBuilder
           data={{ stallConfig: formData.stallConfig, menu: formData.menu }}
+          // Vendors who opted into ONLY Single Stall get the one-card
+          // "Quick Configure" layout; multi-service vendors keep the
+          // two-section workspace their breadcrumb flow expects.
+          compact={activeBranches.length === 1 && activeBranches[0] === "stall"}
           dietaryOffering={formData.dietaryOffering}
           onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
           onBackToPreviousService={handleBackFromBranch}

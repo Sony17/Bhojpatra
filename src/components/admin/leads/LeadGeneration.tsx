@@ -31,6 +31,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "booking-intent": "Booking Intent",
   "home-booking-form": "Home — Booking Form",
   "support-callback": "Support — Callback",
+  "feast-2027-interest": "Feast 2027 — Interest",
 };
 
 function sourceLabel(source: string) {

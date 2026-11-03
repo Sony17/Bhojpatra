@@ -14,8 +14,8 @@ interface Step6BStallSetupProps {
   saving?: boolean;
 }
 
-/** Handover: Live Cooking Equipment Included. */
-const EQUIPMENT_OPTIONS = [
+/** Handover: Live Cooking Equipment Included (also the Quick Configure setup rows). */
+export const EQUIPMENT_OPTIONS = [
   "Live Charcoal Sigdi / Tandoor",
   "Inverted Ulta Tawa Griddle",
   "Copper Degchis & Chafers",
@@ -47,7 +47,7 @@ export default function Step6BStallSetup({
   };
 
   return (
-    <div>
+    <div className="stall-setup-compact">
       <StepHeading
         eyebrow="Stall Builder · Setup & Cutlery"
         heading="On-site equipment & stall cutlery"
@@ -58,22 +58,27 @@ export default function Step6BStallSetup({
       />
 
       <div className="content-card">
-        <div className="form-group">
+        <div className="form-group stall-setup-equipment-block">
           <FormLabel>Live Cooking Equipment Included</FormLabel>
-          <div className="review-pills-row" style={{ alignItems: "center" }}>
-            {options.map((eq) => (
-              <ChoiceChip key={eq} active={equipment.includes(eq)} onClick={() => toggle(eq)}>
-                {eq}
-              </ChoiceChip>
-            ))}
-            <ChipAddInput value={custom} onChange={setCustom} onAdd={addCustom} placeholder="+ Other equipment" />
+          <div className="stall-setup-rows stall-setup-rows--two-col">
+            {options.map((eq) => {
+              const on = equipment.includes(eq);
+              return (
+                <div key={eq} className="stall-setup-row">
+                  <span className="stall-setup-row__label">{eq}</span>
+                  <ChoiceChip className="stall-setup-chip" active={on} onClick={() => toggle(eq)}>
+                    <span className="stall-setup-chip-text">{on ? "Selected" : "Select"}</span>
+                  </ChoiceChip>
+                </div>
+              );
+            })}
+            <div className="stall-setup-custom-row" style={{ gridColumn: "1 / -1" }}>
+              <ChipAddInput value={custom} onChange={setCustom} onAdd={addCustom} placeholder="+ Other equipment" />
+            </div>
           </div>
         </div>
 
-        <div
-          className="form-group"
-          style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed var(--color-cream-30)" }}
-        >
+        <div className="form-group stall-setup-cutlery">
           <FormLabel htmlFor="stall-cutlery">
             <R d="Stall Tableware & Disposables Inclusions" m="Tableware & Disposables" />
           </FormLabel>
@@ -91,7 +96,7 @@ export default function Step6BStallSetup({
         {/* Wizard Action Bar */}
         <div
           className="wizard-actions-bar"
-          style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+          style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
         >
           <button type="button" className="btn-back" onClick={onBack} disabled={saving}>
             ← Back to Menus

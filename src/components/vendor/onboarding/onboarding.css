@@ -484,12 +484,27 @@
   font-weight: 700;
   border-radius: var(--radius-pill);
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
   transition: all var(--dur-fast) ease;
 }
 
 .vob .btn-edit-vendor-context:hover {
   background: var(--color-red);
   color: var(--color-cream);
+}
+
+/* Primary escape hatch back to the portal while mid-KYC / service setup. */
+.vob .btn-dashboard-nav {
+  background: var(--color-red);
+  color: var(--color-cream);
+  border-color: var(--color-red);
+}
+
+.vob .btn-dashboard-nav:hover {
+  background: transparent;
+  color: var(--color-red);
 }
 
 .vob .builder-subnav-bar {
@@ -3782,6 +3797,341 @@
 .vob .btn-add-item-dashed:hover {
   border-color: var(--color-red);
   background: var(--color-red-05);
+}
+
+/* Single Stall · Quick Configure + compact stall setup checklist */
+.vob .quick-stall-configure .step-header {
+  margin-bottom: 6px;
+}
+
+.vob .quick-stall-configure .step-subtext {
+  display: none;
+}
+
+.vob .quick-stall-configure .quick-stall-card {
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.vob .quick-stall-configure .quick-stall-banner {
+  border: 1px solid var(--color-cream);
+  background: var(--color-cream-10);
+  border-radius: var(--radius-card);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-black);
+  margin-bottom: 8px;
+}
+
+.vob .quick-stall-configure .form-group {
+  gap: 3px;
+  margin-bottom: 7px;
+}
+
+.vob .quick-stall-configure .form-label {
+  font-size: 11px;
+}
+
+.vob .quick-stall-configure .form-input,
+.vob .quick-stall-configure .form-select,
+.vob .quick-stall-configure .form-textarea {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+.vob .quick-stall-configure .form-textarea {
+  min-height: 42px;
+}
+
+.vob .quick-stall-configure .form-grid-2 {
+  gap: 8px;
+}
+
+.vob .quick-stall-configure .stall-menu-section-divider {
+  margin: 10px 0;
+}
+
+.vob .quick-stall-configure .quick-stall-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-black);
+  margin: 0 0 5px;
+}
+
+.vob .quick-stall-configure .form-group--inline-diet {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.vob .quick-stall-configure .form-group--inline-diet .form-label {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.vob .quick-stall-configure .form-group--inline-diet .review-pills-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vob .quick-stall-configure .quick-stall-dish-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.vob .quick-stall-configure .quick-stall-dish-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-cream);
+  border-radius: var(--radius-card);
+  background: var(--color-white);
+}
+
+.vob .quick-stall-configure .quick-stall-dish-row.is-editing {
+  border-color: var(--color-red);
+}
+
+.vob .quick-stall-configure .quick-stall-dish-photo {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.vob .quick-stall-configure .quick-stall-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.vob .quick-stall-configure .quick-stall-actions .btn-next,
+.vob .quick-stall-configure .quick-stall-actions .btn-back {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.vob .quick-stall-configure .stall-setup-panel {
+  margin-top: 8px;
+}
+
+.vob .stall-setup-panel {
+  padding: 7px 8px 8px;
+  border: 1.5px solid var(--color-gold);
+  border-radius: var(--radius-card);
+  background: var(--bg-cream-tint);
+}
+
+.vob .stall-setup-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.vob .stall-setup-panel__title {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--color-black);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.vob .stall-setup-panel__intro {
+  font-size: 10px;
+  color: var(--color-black-60);
+  margin: 1px 0 0;
+  line-height: 1.25;
+}
+
+.vob .stall-setup-panel .stall-pricing-independent-pill {
+  font-size: 8.5px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+
+.vob .stall-setup-panel .form-group {
+  gap: 2px;
+  margin-bottom: 0;
+}
+
+.vob .stall-setup-panel .form-label {
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.vob .stall-setup-panel .form-input {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.vob .stall-setup-pricing-grid {
+  margin-top: 4px;
+  gap: 6px;
+}
+
+.vob .stall-setup-rows {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.vob .stall-setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 0;
+  min-height: 22px;
+}
+
+.vob .stall-setup-row + .stall-setup-row {
+  border-top: 1px dashed var(--color-cream-30);
+}
+
+.vob .stall-setup-row__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-black);
+  line-height: 1.2;
+  flex: 1;
+  min-width: 0;
+}
+
+.vob .stall-setup-chip {
+  padding: 1px 6px !important;
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  flex-shrink: 0;
+  min-height: 24px;
+  min-width: 24px;
+  justify-content: center;
+  gap: 3px !important;
+}
+
+.vob .stall-setup-chip .chip-check {
+  font-size: 8px;
+  margin: 0;
+}
+
+.vob .stall-setup-custom-row {
+  padding-top: 4px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--color-cream-30);
+}
+
+.vob .stall-setup-custom-row .chip-custom-adder {
+  gap: 4px;
+}
+
+.vob .stall-setup-custom-row .input-chip-add {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 10.5px;
+  width: 108px;
+}
+
+.vob .stall-setup-custom-row .input-chip-add:focus {
+  width: 140px;
+}
+
+.vob .stall-setup-custom-row .btn-chip-add {
+  height: 26px;
+  width: 26px;
+  min-width: 26px;
+}
+
+.vob .stall-setup-cutlery {
+  margin-top: 5px;
+  margin-bottom: 0;
+  padding-top: 5px;
+  border-top: 1px dashed var(--color-cream-30);
+}
+
+.vob .stall-setup-cutlery .form-input {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.vob .stall-setup-equipment-block {
+  margin-bottom: 0;
+  gap: 2px;
+}
+
+.vob .stall-setup-equipment-block > .form-label {
+  font-size: 10.5px;
+  margin-bottom: 2px;
+}
+
+.vob .stall-setup-compact .content-card {
+  padding: 14px;
+}
+
+.vob .stall-setup-compact .form-group {
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+@media (min-width: 640px) {
+  .vob .stall-setup-rows--two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    row-gap: 0;
+  }
+
+  .vob .stall-setup-rows--two-col .stall-setup-row + .stall-setup-row {
+    border-top: none;
+  }
+
+  .vob .stall-setup-rows--two-col .stall-setup-row:nth-child(n + 3) {
+    border-top: 1px dashed var(--color-cream-30);
+  }
+}
+
+@media (max-width: 639px) {
+  .vob .quick-stall-configure .form-input,
+  .vob .quick-stall-configure .form-select {
+    min-height: 38px;
+  }
+
+  .vob .quick-stall-configure .stall-setup-panel .form-input {
+    min-height: 30px;
+  }
+
+  .vob .stall-setup-panel__intro {
+    display: none;
+  }
+
+  .vob .stall-setup-chip.active .stall-setup-chip-text {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+    white-space: nowrap;
+  }
+
+  .vob .stall-setup-chip.active {
+    padding: 1px 5px !important;
+  }
+
+  .vob .quick-stall-configure .wizard-actions-bar {
+    display: none;
+  }
 }
 
 @media (max-width: 639px) {

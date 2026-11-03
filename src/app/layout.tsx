@@ -4,7 +4,7 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
-import { ToastProvider } from "@/components/ui";
+import { ErrorDialogProvider, ToastProvider } from "@/components/ui";
 import ScrollWatermark from "@/components/ScrollWatermark";
 import ScrollToTop from "@/components/ScrollToTop";
 import SiteLoader from "@/components/SiteLoader";
@@ -109,9 +109,11 @@ export default async function RootLayout({
       <body className="flex min-h-full flex-col overflow-x-hidden bg-bg text-ink">
         <LanguageProvider initialLang={initialLang} signedIn={signedIn}>
           <ToastProvider>
-            <ScrollToTop />
-            {content}
-            <ScrollWatermark />
+            <ErrorDialogProvider>
+              <ScrollToTop />
+              {content}
+              <ScrollWatermark />
+            </ErrorDialogProvider>
           </ToastProvider>
           {/* Inside the provider — the prompt is bilingual. */}
           <InstallAppPrompt />

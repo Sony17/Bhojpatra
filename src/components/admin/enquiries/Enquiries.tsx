@@ -25,6 +25,39 @@ interface Enquiry {
   /** Menu & budget PDF attached to a home-page custom-package request. */
   documentUrl?: string;
   documentName?: string;
+  packageId?: string;
+  packageName?: string;
+  city?: string;
+  occasion?: string;
+  eventDate?: string;
+  guests?: number;
+  venue?: string;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  "contact-page": "Contact page",
+  "custom-package": "Custom package",
+  "feast-package-interest": "Feast package",
+};
+
+function sourceLabel(source: string) {
+  return SOURCE_LABELS[source] ?? source;
+}
+
+function SourceBadge({ source }: { source: string }) {
+  const label = sourceLabel(source);
+  const feast = source === "feast-package-interest";
+  return (
+    <span
+      className={
+        feast
+          ? "inline-flex rounded-full bg-maroon/10 px-2 py-0.5 text-[11px] font-semibold text-maroon"
+          : "inline-flex rounded-full bg-cream-2 px-2 py-0.5 text-[11px] font-medium text-ink/70"
+      }
+    >
+      {label}
+    </span>
+  );
 }
 
 const PAGE_SIZE = 10;
@@ -54,6 +87,7 @@ export default function Enquiries() {
   const [enquiries, setEnquiries] = useState<Enquiry[] | null>(null);
   const [error, setError] = useState(false);
   const [q, setQ] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -89,17 +123,25 @@ export default function Enquiries() {
 
   const filtered = useMemo(() => {
     const all = enquiries ?? [];
+    const bySource =
+      sourceFilter === "all"
+        ? all
+        : all.filter((e) => e.source === sourceFilter);
     const term = q.trim().toLowerCase();
-    if (!term) return all;
-    return all.filter(
+    if (!term) return bySource;
+    return bySource.filter(
       (e) =>
         e.name.toLowerCase().includes(term) ||
         e.email.toLowerCase().includes(term) ||
         e.phone.includes(term) ||
         e.subject.toLowerCase().includes(term) ||
-        e.message.toLowerCase().includes(term),
+        e.message.toLowerCase().includes(term) ||
+        (e.packageName ?? "").toLowerCase().includes(term) ||
+        (e.packageId ?? "").toLowerCase().includes(term) ||
+        (e.occasion ?? "").toLowerCase().includes(term) ||
+        (e.city ?? "").toLowerCase().includes(term),
     );
-  }, [enquiries, q]);
+  }, [enquiries, q, sourceFilter]);
 
   const total = filtered.length;
   const pageRows = useMemo(
@@ -119,7 +161,12 @@ export default function Enquiries() {
         Name: e.name,
         Email: e.email,
         Phone: e.phone,
+        Source: sourceLabel(e.source),
         Subject: e.subject,
+        Package: e.packageName ?? "",
+        Occasion: e.occasion ?? "",
+        "Event date": e.eventDate ?? "",
+        Guests: e.guests != null ? String(e.guests) : "",
         Message: e.message,
         Attachment: e.documentUrl ?? "",
         "Received At": formatDateTime(e.createdAt),
@@ -156,6 +203,53 @@ export default function Enquiries() {
           +91 {e.phone}
         </a>
       ),
+    },
+    {
+      key: "source",
+      header: "Source",
+      cell: (e) => <SourceBadge source={e.source} />,
+    },
+    {
+      key: "packageName",
+      header: "Package",
+      cell: (e) =>
+        e.source === "feast-package-interest" ? (
+          <span className="font-medium text-ink">
+            {e.packageName ?? e.packageId ?? "—"}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
+    {
+      key: "occasion",
+      header: "Occasion",
+      cell: (e) =>
+        e.source === "feast-package-interest" ? (
+          <span className="text-ink-soft">{e.occasion ?? "—"}</span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
+    {
+      key: "eventDate",
+      header: "Event date",
+      cell: (e) =>
+        e.source === "feast-package-interest" ? (
+          <span className="text-ink-soft">{e.eventDate ?? "—"}</span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
+    {
+      key: "guests",
+      header: "Guests",
+      cell: (e) =>
+        e.source === "feast-package-interest" && e.guests != null ? (
+          <span className="text-ink-soft">{e.guests}</span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
     },
     {
       key: "subject",
@@ -210,7 +304,7 @@ export default function Enquiries() {
       <PageHeader
         eyebrow="Admin Panel"
         title="Enquiries"
-        subtitle="Messages from the public Contact page, plus curated-package requests raised on the home page."
+        subtitle="Contact page messages, custom-package PDF requests, and Feast tier interest sign-ups from the home page."
         actions={
           <Button
             type="button"
@@ -239,25 +333,43 @@ export default function Enquiries() {
         <StatCard icon={Users} label="Unique Contacts" value={String(stats.contacts)} />
       </div>
 
-      <SearchBar
-        value={q}
-        onChange={onSearch}
-        placeholder="Search by name, email, phone or subject…"
-        className="lg:max-w-sm"
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchBar
+          value={q}
+          onChange={onSearch}
+          placeholder="Search by name, email, phone, package…"
+          className="lg:max-w-sm"
+        />
+        <label className="flex items-center gap-2 text-sm text-ink-soft">
+          <span className="shrink-0 font-medium text-ink">Source</span>
+          <select
+            value={sourceFilter}
+            onChange={(e) => {
+              setSourceFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-control border border-cream-3 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-maroon"
+          >
+            <option value="all">All sources</option>
+            <option value="contact-page">Contact page</option>
+            <option value="custom-package">Custom package</option>
+            <option value="feast-package-interest">Feast package</option>
+          </select>
+        </label>
+      </div>
 
       <DataTable
         columns={columns}
         rows={pageRows}
         getRowKey={(e) => e.id}
-        minWidthClass="min-w-[1060px]"
+        minWidthClass="min-w-[1280px]"
         empty={
           <EmptyState
             title={q ? "No matching enquiries" : "No enquiries yet"}
             message={
               q
                 ? "Try a different search term."
-                : "Enquiries will appear here as visitors submit the Contact page form or request a curated package."
+                : "Enquiries will appear here from the Contact page, custom-package uploads, or Feast package interest sign-ups."
             }
           />
         }

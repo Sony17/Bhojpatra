@@ -24,6 +24,15 @@ import {
   startRazorpayCheckout,
   RazorpayCheckoutError,
 } from "@/lib/razorpayCheckout";
+import { useErrorDialog } from "@/components/ui/ErrorDialog";
+import { refreshSession } from "@/lib/session";
+import {
+  paymentFailureSpec,
+  paymentSettingsFailureSpec,
+  upiRecordFailureSpec,
+  networkFailure,
+  supportHref,
+} from "@/lib/failureDialogs";
 
 /* ─── Choose a payment method ──────────────────────────────────────────
  * Shared by both booking flows (`/book` and `/book/stall`). Ways to settle a
@@ -115,15 +124,26 @@ export default function PaymentBox({
   // it travels onto the payment record and the order before the booking is
   // confirmed, letting the team reconcile the transfer.
   const [txnId, setTxnId] = useState<string>("");
+  const { showError } = useErrorDialog();
+  // The live payee/gateway settings couldn't be read. Online payment pauses
+  // (rather than silently falling back to the default VPA) until a retry works
+  // or the guest picks pay-later.
+  const [settingsFailed, setSettingsFailed] = useState<boolean>(false);
+  const [settingsNonce, setSettingsNonce] = useState<number>(0);
 
   // Pull the live merchant VPA (admin-configurable) plus the gateway key;
   // fall back to the default manual-UPI merchant.
   useEffect(() => {
     let active = true;
     fetch("/api/admin/payment-settings")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((cfg) => {
-        if (!active || !cfg) return;
+        if (!active) return;
+        setSettingsFailed(false);
+        if (!cfg) return;
         if (typeof cfg.vpa === "string") {
           setMerchant({
             vpa: cfg.vpa,
@@ -136,11 +156,24 @@ export default function PaymentBox({
           setRazorpayKeyId(cfg.razorpayKeyId);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!active) return;
+        setSettingsFailed(true);
+        showError(
+          paymentSettingsFailureSpec({
+            t,
+            retry: () => setSettingsNonce((n) => n + 1),
+            payLater: () => setPayMethod("Connect"),
+          }),
+        );
+      });
     return () => {
       active = false;
     };
-  }, []);
+    // `t`/`showError`/`setPayMethod` are intentionally not deps: the fetch
+    // should rerun only on mount and on an explicit retry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsNonce]);
 
   // With the gateway on, the manual UPI/QR modes aren't offered — upgrade any
   // lingering UPI/QR selection (the wizards default to "UPI") to Razorpay so
@@ -206,6 +239,19 @@ export default function PaymentBox({
     const customerTxnId = normalizeTxnId(txnId);
     setSubmitting(true);
     setError("");
+    const failUpi = (info: Parameters<typeof upiRecordFailureSpec>[0]["info"], inline: string) => {
+      setError(inline);
+      showError(
+        upiRecordFailureSpec({
+          t,
+          info,
+          bookingId,
+          txnId: customerTxnId,
+          retry: () => void markPaid(),
+          relogin: () => void refreshSession(),
+        }),
+      );
+    };
     try {
       if (onBeforePay && !(await onBeforePay())) return;
       const res = await fetch("/api/payments", {
@@ -226,9 +272,12 @@ export default function PaymentBox({
         payment?: { amount?: number; status?: string };
       } | null;
       if (!res.ok) {
-        setError(
-          data?.error ??
-            t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
+        failUpi(
+          { status: res.status, code: undefined, message: data?.error },
+          t(
+            "We couldn't save your payment details. If you've already paid, don't pay again — try saving the transaction ID once more or contact us.",
+            "हम आपके भुगतान की जानकारी सेव नहीं कर सके। अगर आप भुगतान कर चुके हैं तो दोबारा न करें — लेनदेन आईडी फिर सेव करें या हमसे संपर्क करें।",
+          ),
         );
         return;
       }
@@ -239,8 +288,12 @@ export default function PaymentBox({
           data?.payment?.status === "Settled",
       );
     } catch {
-      setError(
-        t("We couldn't save your payment — please try again.", "आपका भुगतान सेव नहीं हो पाया — कृपया फिर कोशिश करें।"),
+      failUpi(
+        networkFailure,
+        t(
+          "We couldn't save your payment details — check your connection. If you've already paid, don't pay again; try saving the transaction ID once more.",
+          "हम आपके भुगतान की जानकारी सेव नहीं कर सके — कनेक्शन जाँचें। अगर आप भुगतान कर चुके हैं तो दोबारा न करें; लेनदेन आईडी फिर सेव करें।",
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -277,38 +330,43 @@ export default function PaymentBox({
             "भुगतान पूरा नहीं हुआ — कोई राशि नहीं कटी। तैयार होने पर फिर कोशिश करें, या बाद में भुगतान के लिए “भोजपत्र आपसे संपर्क करेगा” चुनें।",
           ),
         );
-      } else if (
-        err instanceof RazorpayCheckoutError &&
-        err.code === "failed"
-      ) {
-        // A payment attempt failed and the customer left the modal — show the
-        // failure panel with the gateway's reason and the ways forward.
-        setFailedPayment(true);
-        setError(
-          t(
-            `${err.message} Nothing was charged.`,
-            `${err.message} कोई राशि नहीं कटी।`,
-          ),
-        );
-      } else if (
-        err instanceof RazorpayCheckoutError &&
-        err.code === "verify"
-      ) {
-        // Money may have moved but our confirm call didn't land — the webhook
-        // still records it, so above all stop them paying twice.
-        setError(
-          t(
-            "Your payment went through but we couldn't confirm it here. Don't pay again — it will be recorded automatically. If your booking doesn't confirm shortly, contact us with your booking ID.",
-            "आपका भुगतान हो गया लेकिन हम यहाँ इसकी पुष्टि नहीं कर सके। दोबारा भुगतान न करें — यह अपने आप दर्ज हो जाएगा। यदि आपकी बुकिंग जल्द कन्फर्म न हो, तो अपनी बुकिंग आईडी के साथ हमसे संपर्क करें।",
-          ),
-        );
+      } else if (err instanceof RazorpayCheckoutError) {
+        // Everything else is a real failure — the dialog says exactly what
+        // happened and what it means for their money (see paymentFailureSpec);
+        // the inline line below the button keeps the gist once it's closed.
+        const spec = paymentFailureSpec({
+          t,
+          err,
+          bookingId,
+          retry: () => void payViaRazorpay(),
+          payLater: () => setPayMethod("Connect"),
+          relogin: () => void refreshSession(),
+        });
+        // "failed" (order / gateway attempt) shows the retry / go-home panel.
+        setFailedPayment(err.code === "failed");
+        setError(spec.message);
+        showError(spec);
       } else {
-        setError(
-          t(
-            "Couldn't start the payment. Try again.",
-            "भुगतान शुरू नहीं हो सका। फिर कोशिश करें।",
-          ),
+        // Unexpected — we can't promise the money didn't move, so don't.
+        const msg = t(
+          "Something unexpected happened during payment. Before trying again, check My Bookings to see whether a payment was recorded, so you don't pay twice.",
+          "भुगतान के दौरान कुछ अनपेक्षित हुआ। फिर कोशिश करने से पहले मेरी बुकिंग में देखें कि भुगतान दर्ज हुआ या नहीं, ताकि दोबारा भुगतान न हो।",
         );
+        setError(msg);
+        showError({
+          title: t("We couldn't finish the payment step", "हम भुगतान का चरण पूरा नहीं कर सके"),
+          message: msg,
+          reference: { label: t("Booking ID", "बुकिंग आईडी"), value: bookingId },
+          actions: [
+            { label: t("View my bookings", "मेरी बुकिंग देखें"), href: "/bookings" },
+            {
+              label: t("Contact support", "सहायता से संपर्क करें"),
+              href: supportHref(`Hi Bhojpatra, something went wrong while paying for booking ${bookingId}.`),
+              newTab: true,
+              variant: "secondary",
+            },
+          ],
+        });
       }
     } finally {
       setSubmitting(false);
@@ -766,6 +824,7 @@ export default function PaymentBox({
               submitting ||
               !contactReady ||
               Boolean(blocker) ||
+              settingsFailed ||
               (!gatewayMode && !isValidTxnId(txnId))
             }
             className={
@@ -812,6 +871,24 @@ export default function PaymentBox({
           {blocker && (
             <p role="alert" className="mt-2 text-xs font-medium text-maroon">
               {blocker}
+            </p>
+          )}
+          {settingsFailed && (
+            <p role="alert" className="mt-2 text-xs font-medium text-maroon">
+              {t(
+                "Online payment is paused — we couldn't load our payment details.",
+                "ऑनलाइन भुगतान रुका है — हम अपनी भुगतान जानकारी लोड नहीं कर सके।",
+              )}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsFailed(false);
+                  setSettingsNonce((n) => n + 1);
+                }}
+                className="font-semibold underline underline-offset-2"
+              >
+                {t("Try again", "फिर कोशिश करें")}
+              </button>
             </p>
           )}
           {!contactReady && (

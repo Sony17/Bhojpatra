@@ -15,6 +15,7 @@ import { useSession } from "@/lib/session";
 import { isValidGst } from "@/lib/validate";
 import ThemedSelect from "@/components/ThemedSelect";
 import { Badge, Button, Card, Chip as UIChip } from "@/components/ui";
+import { FIXED_PRIMARY_KITCHEN_CITY } from "@/lib/vendorDashboardFlags";
 
 const WHATSAPP = "https://wa.me/919918359017";
 
@@ -218,7 +219,8 @@ export default function VendorRegister() {
   const [ownerName, setOwnerName] = useState<string>("");
   const [ownerTouched, setOwnerTouched] = useState<boolean>(false);
   const [mobile, setMobile] = useState<string>("");
-  const [city, setCity] = useState<string>("");
+  /** Launch scope: primary kitchen city is always Lucknow (read-only in UI). */
+  const city = FIXED_PRIMARY_KITCHEN_CITY;
   const [state, setState] = useState<string>("");
   const [cuisines, setCuisines] = useState<string[]>([]);
 
@@ -508,7 +510,6 @@ export default function VendorRegister() {
           "कृपया सभी आवश्यक बिज़नेस विवरण भरें।",
         );
       }
-      if (!city) return t("Please select your city.", "कृपया अपना शहर चुनें।");
       if (!state) return t("Please select your state.", "कृपया अपना राज्य चुनें।");
       if (cuisines.length === 0) {
         return t(
@@ -645,7 +646,7 @@ export default function VendorRegister() {
       owner: ownerNameValue,
       email,
       phone: mobile,
-      city: city ? cityName(city) : "",
+      city: FIXED_PRIMARY_KITCHEN_CITY,
       state,
       cuisines,
       gstNumber,
@@ -919,17 +920,23 @@ export default function VendorRegister() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="city" className={labelClass}>
-                  {t("City", "शहर")}
+                  {t("Primary Kitchen City", "प्राथमिक किचन शहर")}{" "}
+                  <span className="text-maroon">*</span>
                 </label>
-                <ThemedSelect
+                <input
                   id="city"
-                  value={city}
-                  onChange={setCity}
-                  placeholder={t("Select a city", "एक शहर चुनें")}
-                  ariaLabel={t("City", "शहर")}
-                  buttonClassName={inputClass}
-                  options={cities.map((c) => ({ value: c.id, label: c.name }))}
+                  type="text"
+                  value={FIXED_PRIMARY_KITCHEN_CITY}
+                  readOnly
+                  aria-readonly="true"
+                  className={`${inputClass} cursor-not-allowed bg-cream-2/60 text-ink-soft`}
                 />
+                <span
+                  aria-disabled="true"
+                  className="inline-flex w-fit cursor-not-allowed select-none items-center gap-1 rounded-full border border-dashed border-cream-3 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft/70"
+                >
+                  + {t("Add more cities — coming soon", "और शहर जोड़ें — जल्द आ रहा है")}
+                </span>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="state" className={labelClass}>
@@ -1753,7 +1760,7 @@ export default function VendorRegister() {
               />
               <ReviewItem
                 label={t("City / State", "शहर / राज्य")}
-                value={`${city ? cityName(city) : "—"} · ${state || "—"}`}
+                value={`${FIXED_PRIMARY_KITCHEN_CITY} · ${state || "—"}`}
               />
               <ReviewItem
                 label={t("Cuisine Specialities", "व्यंजन विशेषज्ञता")}

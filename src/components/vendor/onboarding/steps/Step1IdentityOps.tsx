@@ -2,6 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { indianStates } from "@/lib/data";
+import {
+  FIXED_PRIMARY_KITCHEN_CITY,
+  SHOW_COVERAGE_CITIES_FIELD,
+  SHOW_CUISINES_FIELD,
+} from "@/lib/vendorDashboardFlags";
 import { normalizePhone, PHONE_RE } from "@/lib/validate";
 import type { VendorDietaryOffering } from "@/lib/vendorMenus";
 import DietaryOfferingSelector from "../components/DietaryOfferingSelector";
@@ -91,8 +96,10 @@ export default function Step1IdentityOps({
     if (!PHONE_RE.test(normalizePhone(data.phone || ""))) e.phone = "Enter a valid 10-digit WhatsApp mobile number.";
     if (!data.city.trim()) e.city = "Primary Kitchen City is required.";
     if (!data.state.trim()) e.state = "State is required.";
-    if (!data.serviceCities?.length) e.serviceCities = "Select at least one serviceable coverage city.";
-    if (!data.cuisines?.length) e.cuisines = "Select at least one cuisine.";
+    // Hidden fields are never required — a vendor can't fix what isn't shown.
+    if (SHOW_COVERAGE_CITIES_FIELD && !data.serviceCities?.length)
+      e.serviceCities = "Select at least one serviceable coverage city.";
+    if (SHOW_CUISINES_FIELD && !data.cuisines?.length) e.cuisines = "Select at least one cuisine.";
     setErrors(e);
     const first = Object.keys(e)[0];
     if (first) {
@@ -113,7 +120,6 @@ export default function Step1IdentityOps({
     if (errors.phone) setErrors((p) => ({ ...p, phone: "" }));
   };
 
-  const cityOptions = withExtras(KITCHEN_CITIES, data.city ? [data.city] : []);
   const cuisineChips = withExtras(CUISINE_CHIPS, data.cuisines || []);
   const coverageChips = withExtras(COVERAGE_CHIPS, data.serviceCities || []);
 
@@ -164,6 +170,17 @@ export default function Step1IdentityOps({
 
   return (
     <div className="animate-in fade-in duration-200">
+      {/* Kitchen dietary classification — first field in onboarding (mandatory). */}
+      <DietaryOfferingSelector
+        id="field-dietaryOffering"
+        value={data.dietaryOffering}
+        onChange={(diet) => {
+          onChange({ dietaryOffering: diet });
+          if (errors.dietaryOffering) setErrors((p) => ({ ...p, dietaryOffering: "" }));
+        }}
+        error={errors.dietaryOffering}
+      />
+
       <StepHeading
         eyebrow="Vendor Identity & Operations"
         heading="Your business identity"
@@ -174,17 +191,6 @@ export default function Step1IdentityOps({
       />
 
       <ContentCard>
-        {/* Mandatory Dietary Offering */}
-        <DietaryOfferingSelector
-          id="field-dietaryOffering"
-          value={data.dietaryOffering}
-          onChange={(diet) => {
-            onChange({ dietaryOffering: diet });
-            if (errors.dietaryOffering) setErrors((p) => ({ ...p, dietaryOffering: "" }));
-          }}
-          error={errors.dietaryOffering}
-        />
-
         <div id="field-businessName">
           {/* Verified Vendor Account Details — desktop */}
           <div className="vendor-account-reused-card vob-d-flex" style={{ flexDirection: "column" }}>
@@ -289,19 +295,41 @@ export default function Step1IdentityOps({
             <label className="form-label" htmlFor="d-city">
               <R d="Primary Kitchen City" m="City" /> <span className="required">*</span>
             </label>
-            <select
+            {/* Launch scope: primary kitchen city is always Lucknow (read-only).
+                More cities are coming soon. */}
+            <input
               id="d-city"
-              className="form-select"
-              value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
+              type="text"
+              className="form-input"
+              value={FIXED_PRIMARY_KITCHEN_CITY}
+              readOnly
+              aria-readonly="true"
+              style={{
+                cursor: "not-allowed",
+                background: "var(--color-cream-10)",
+                color: "var(--color-black-60)",
+              }}
+            />
+            <span
+              aria-disabled="true"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                width: "fit-content",
+                marginTop: 6,
+                padding: "3px 10px",
+                border: "1px dashed var(--color-cream-30)",
+                borderRadius: 9999,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--color-black-40)",
+                cursor: "not-allowed",
+                userSelect: "none",
+              }}
             >
-              {!data.city && <option value="">Select city</option>}
-              {cityOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              + Add more cities — <em>coming soon</em>
+            </span>
             <FieldError>{errors.city}</FieldError>
           </div>
 
@@ -326,7 +354,9 @@ export default function Step1IdentityOps({
           </div>
         </div>
 
-        {/* Cuisines Multi-Select */}
+        {/* Cuisines Multi-Select — hidden for launch (SHOW_CUISINES_FIELD);
+            saved cuisines still travel untouched in the draft payload. */}
+        {SHOW_CUISINES_FIELD && (
         <div className="form-group" id="field-cuisines" style={{ marginTop: 10 }}>
           <span className="form-label">
             <R d="Primary Culinary Specialties & Cuisines" m="Cuisines" />
@@ -358,8 +388,12 @@ export default function Step1IdentityOps({
           </div>
           <FieldError>{errors.cuisines}</FieldError>
         </div>
+        )}
 
-        {/* Serviceable Cities Multi-Select */}
+        {/* Serviceable Cities Multi-Select — hidden for launch
+            (SHOW_COVERAGE_CITIES_FIELD); saved serviceCities still travel
+            untouched in the draft payload. */}
+        {SHOW_COVERAGE_CITIES_FIELD && (
         <div className="form-group full-width" id="field-serviceCities" style={{ marginTop: 10 }}>
           <span className="form-label">
             <R d="Serviceable Coverage Cities" m="Coverage Cities" /> <span className="required">*</span>{" "}
@@ -402,6 +436,7 @@ export default function Step1IdentityOps({
           </span>
           <FieldError>{errors.serviceCities}</FieldError>
         </div>
+        )}
 
         {/* Google Reviews & Reputation */}
         <div

@@ -50,7 +50,6 @@ import {
   cities,
   packages,
   addOns,
-  coupons,
   menuCategories,
   servingTimeLabel,
   packageCategories,
@@ -706,6 +705,22 @@ export default function BookingWizard() {
   const [couponInput, setCouponInput] = useState<string>("");
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string>("");
+  // Offers from the admin Coupon Manager (Active + inside their dates). Starts
+  // empty so codes switched off in admin never show or apply from the static
+  // seed list.
+  const [liveCoupons, setLiveCoupons] = useState<Coupon[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/coupons/public")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { coupons?: Coupon[] } | null) => {
+        if (active && Array.isArray(d?.coupons)) setLiveCoupons(d.coupons);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [confirming, setConfirming] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string>("");
   const [confirmed, setConfirmed] = useState<boolean>(false);
@@ -1773,7 +1788,7 @@ export default function BookingWizard() {
 
   const applyCouponCode = (raw: string) => {
     const code = raw.trim().toUpperCase();
-    const found = coupons.find((c) => c.code.toUpperCase() === code);
+    const found = liveCoupons.find((c) => c.code.toUpperCase() === code);
     if (found) {
       setAppliedCoupon(found);
       setCouponInput(found.code);
@@ -2786,6 +2801,7 @@ export default function BookingWizard() {
               onRemoveVendor={removeVendor}
               onEditExtras={() => setStep(4)}
               onEditService={() => setStep(5)}
+              couponList={liveCoupons}
               couponInput={couponInput}
               setCouponInput={setCouponInput}
               applyCoupon={applyCoupon}
@@ -4690,6 +4706,7 @@ function StepConfirm({
   onRemoveVendor,
   onEditExtras,
   onEditService,
+  couponList,
   couponInput,
   setCouponInput,
   applyCoupon,
@@ -4751,6 +4768,7 @@ function StepConfirm({
   onRemoveVendor: (catId: string, vendorId: string) => void;
   onEditExtras: () => void;
   onEditService: () => void;
+  couponList: Coupon[];
   couponInput: string;
   setCouponInput: (v: string) => void;
   applyCoupon: () => void;
@@ -5069,6 +5087,7 @@ function StepConfirm({
         venueFee={venueFee}
         guests={guests}
         eventDate={eventDate}
+        couponList={couponList}
         couponInput={couponInput}
         setCouponInput={setCouponInput}
         applyCoupon={applyCoupon}

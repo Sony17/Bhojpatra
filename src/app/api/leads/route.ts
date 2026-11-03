@@ -77,6 +77,9 @@ export async function POST(request: Request) {
     "home-booking-form",
     "support-callback",
     "venue-enquiry",
+    // Feast-2027 waitlist — interest captured on the home page and /book
+    // while full-catering Feast bookings aren't open yet (src/lib/launchFlags).
+    "feast-2027-interest",
   ];
   const leadSource =
     typeof source === "string" && ALLOWED_SOURCES.includes(source)
@@ -84,9 +87,11 @@ export async function POST(request: Request) {
       : "home-promo";
   const isCallback = leadSource === "support-callback";
   const isVenue = leadSource === "venue-enquiry";
+  const isFeast = leadSource === "feast-2027-interest";
 
-  // A callback or venue enquiry is only actionable with a number to ring back on.
-  if ((isCallback || isVenue) && !validPhone) {
+  // A callback, venue enquiry or feast-waitlist signup is only actionable
+  // with a number to ring back on.
+  if ((isCallback || isVenue || isFeast) && !validPhone) {
     return Response.json(
       { error: "Please enter a valid 10-digit mobile number." },
       { status: 400 },
@@ -102,12 +107,23 @@ export async function POST(request: Request) {
   }
 
   const allowedTopics = isVenue ? VENUE_TOPICS : CALLBACK_TOPICS;
-  const cleanTopic =
-    typeof topic === "string" && allowedTopics.includes(topic.trim())
+  // A feast-waitlist lead always carries the fixed topic so the admin console
+  // shows what the lead is about (the detail rides in `note`).
+  const cleanTopic = isFeast
+    ? "Feast 2027 waitlist"
+    : typeof topic === "string" && allowedTopics.includes(topic.trim())
       ? topic.trim()
       : "";
-  const cleanNote =
-    typeof note === "string" ? note.trim().slice(0, 500) : "";
+  let cleanNote = typeof note === "string" ? note.trim().slice(0, 500) : "";
+  // A feast lead keys on a `feast:`+phone sentinel, so its real email (when
+  // given) would otherwise be lost — keep it in the note for the admin console
+  // and the alert email.
+  if (isFeast && cleanEmail) {
+    cleanNote = [cleanNote, `Email: ${cleanEmail}`]
+      .filter(Boolean)
+      .join(" · ")
+      .slice(0, 500);
+  }
 
   const lead: Lead = {
     // Leads are keyed by the `email` field. A callback keys on a `cb:` +phone
@@ -116,12 +132,16 @@ export async function POST(request: Request) {
     // phone-only leads key on their email/phone as before.
     // A venue enquiry keys on `venue:`+phone for the same reason, so wanting a
     // visit to a venue never collides with (or gets swallowed by) an existing
-    // promo lead for that number.
+    // promo lead for that number. A feast-waitlist signup keys on
+    // `feast:`+phone likewise — one waitlist entry per number, refreshed on
+    // re-submit, never swallowed by a promo lead.
     email: isCallback
       ? `cb:${cleanedPhone}`
       : isVenue
         ? `venue:${cleanedPhone}`
-        : cleanEmail || cleanedPhone,
+        : isFeast
+          ? `feast:${cleanedPhone}`
+          : cleanEmail || cleanedPhone,
     phone: validPhone ? cleanedPhone : "",
     source: leadSource,
     createdAt: new Date().toISOString(),
@@ -130,10 +150,11 @@ export async function POST(request: Request) {
   };
 
   try {
-    if (isCallback || isVenue) {
-      // Always record (and alert on) a callback or venue enquiry — the team
-      // needs to reach out, and a re-request should refresh the topic/note
-      // (a different venue, a new date) rather than be dropped as a duplicate.
+    if (isCallback || isVenue || isFeast) {
+      // Always record (and alert on) a callback, venue enquiry or feast
+      // signup — the team needs to reach out, and a re-request should refresh
+      // the topic/note (a different venue, a new date, updated guest count)
+      // rather than be dropped as a duplicate.
       await store.upsert(lead);
       await sendLeadAlert(lead);
     } else {

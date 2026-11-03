@@ -40,15 +40,23 @@ import {
 import { TIER_ORDER, sortTiers, type VendorTier } from "@/lib/admin/types";
 import { dishOnTier, effectiveTiers } from "@/lib/tiers";
 import { money } from "@/lib/money";
-import { useLocations } from "@/lib/locations";
 import { useLang } from "@/lib/i18n";
+import {
+  FIXED_PRIMARY_KITCHEN_CITY,
+  SHOW_CUISINES_FIELD,
+} from "@/lib/vendorDashboardFlags";
+import {
+  optedServices,
+  type OptedServices,
+  type VendorServicesInput,
+} from "@/lib/vendorServices";
 import { Button, Card } from "@/components/ui";
 
 const GALLERY_MAX = 8;
 
-/** Sentinel option value for "my city isn't listed" — swaps the City select for
- *  a free-text box. Never a real city name, so it can't collide with one. */
-const OTHER_CITY = "__other__";
+/** Launch scope: single-city operations — a profile without a saved city gets
+ *  this as its fixed kitchen city (the field renders read-only either way). */
+const DEFAULT_KITCHEN_CITY = FIXED_PRIMARY_KITCHEN_CITY;
 
 const inputClass =
   "w-full rounded-lg border border-cream-3 bg-cream/40 px-3.5 py-2.5 text-ink outline-none focus:border-maroon focus:ring-1 focus:ring-maroon/30";
@@ -89,7 +97,8 @@ interface DraftSection {
   menuType: SingleStallMenuType;
 }
 
-interface VendorPayload {
+interface VendorPayload
+  extends Pick<VendorServicesInput, "cateringComponents" | "stallConfig" | "customOfferings" | "cutleryTier"> {
   business: string;
   city: string;
   state: string;
@@ -206,9 +215,6 @@ const DISH_SUGGESTIONS: Record<string, DraftItem[]> = Object.fromEntries(
 
 export default function MenuBuilder() {
   const { t, lang } = useLang();
-  // Serviceable cities the admin has opened (seed list until they load), so a
-  // newly added city shows up here without a code change.
-  const locations = useLocations();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -216,9 +222,7 @@ export default function MenuBuilder() {
   const [isLive, setIsLive] = useState(false);
 
   const [business, setBusiness] = useState("");
-  const [city, setCity] = useState("");
-  /** True once the vendor picks "Other" — the City select becomes a text box. */
-  const [cityOther, setCityOther] = useState(false);
+  const [city, setCity] = useState(DEFAULT_KITCHEN_CITY);
   const [stateName, setStateName] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [cuisineDraft, setCuisineDraft] = useState("");
@@ -261,6 +265,10 @@ export default function MenuBuilder() {
   // Catering categories served — the same offering types customers browse on
   // the frontend (full catering, single stall, live stall, baina box, …).
   const [serviceCats, setServiceCats] = useState<string[]>([]);
+  /** The services the vendor opted into at onboarding — only these get an
+   *  editor; everything else on this page is hidden (presentation only: the
+   *  saved data for other services is left untouched). */
+  const [opted, setOpted] = useState<OptedServices>(() => optedServices(null));
   /** Which category's menu is expanded. One at a time keeps the page short on
    *  a phone; `null` = every menu collapsed to its pricing summary. */
   const [openCat, setOpenCat] = useState<string | null>(null);
@@ -314,8 +322,9 @@ export default function MenuBuilder() {
           if (!live) return;
           const src = d.vendor ?? d.prefill;
           if (src) {
+            setOpted(optedServices(src));
             setBusiness(src.business ?? "");
-            setCity(src.city ?? "");
+            setCity(FIXED_PRIMARY_KITCHEN_CITY);
             setStateName(src.state ?? "");
             setCuisines(src.cuisines ?? []);
             setAbout(src.about ?? "");
@@ -552,12 +561,43 @@ export default function MenuBuilder() {
   const platedCats = menuCategories.filter((c) => !isLiveStallCategory(c.id));
   const liveCats = menuCategories.filter((c) => isLiveStallCategory(c.id));
 
-  // Only the segments the vendor ticked get an editor — in segment-bar order.
+  // What the vendor opted into at onboarding decides what this page shows.
+  // A legacy record with no recorded selection (`inferred`) keeps whatever it
+  // had already ticked, on top of what its data shows it sells.
+  const inferredOptIn = opted.source === "inferred";
+  const catOpted = (id: string) =>
+    opted.categories.includes(id) || (inferredOptIn && serviceCats.includes(id));
+  const feastOpted = catOpted("full-catering");
+  const sellsDishes = feastOpted || catOpted("single-stall");
+  // Counters, Extras, Essentials & Add-ons are Feast components; a legacy
+  // Feast vendor (no recorded component toggles) keeps the editor to add them.
+  const countersOpted = opted.ids.includes("counters") || (inferredOptIn && feastOpted);
+  const serviceAddOnsOpted =
+    opted.ids.some((id) => id === "extras" || id === "addons" || id === "essentials") ||
+    (inferredOptIn && feastOpted);
+  const addOnsOpted = countersOpted || serviceAddOnsOpted;
+
+  // Only the segments the vendor opted into AND ticked get an editor — in
+  // segment-bar order.
   const visibleCats = SEGMENT_ROW_IDS.flatMap((id) => {
-    if (!serviceCats.includes(id)) return [];
+    if (!serviceCats.includes(id) || !catOpted(id)) return [];
     const c = cateringCategories.find((cat) => cat.id === id);
     return c ? [c] : [];
   });
+  // Segment chips offered: opted categories only (Feast's chips are the tier
+  // buttons, shown only when Feast is opted). With exactly one opted service
+  // that is already ticked, a one-chip bar is just noise — it's dropped and the
+  // menu opens directly under the service's own heading.
+  const chipCats = SEGMENT_CATEGORY_IDS.filter(catOpted);
+  const optedCount = new Set([...(feastOpted ? ["full-catering"] : []), ...chipCats]).size;
+  const soleOpted =
+    optedCount === 1 && (feastOpted ? serviceCats.includes("full-catering") : serviceCats.includes(chipCats[0]));
+  const showChipCats = chipCats.length > 0 && !soleOpted;
+  const showTierChips = feastOpted;
+  const showSegmentBar = showChipCats || showTierChips;
+  const soleCategory = soleOpted
+    ? cateringCategories.find((cat) => cat.id === (feastOpted ? "full-catering" : chipCats[0]))
+    : undefined;
 
   const publishedDishes = Object.values(sections)
     .filter((s) => s.enabled)
@@ -967,7 +1007,8 @@ export default function MenuBuilder() {
       return;
     }
     // Signature dishes are all-or-nothing — exactly four, or none.
-    if (validFeatured.length !== 0 && validFeatured.length !== FEATURED_COUNT) {
+    // (Skipped when the Signature Dishes card is hidden — nothing to fix there.)
+    if (sellsDishes && validFeatured.length !== 0 && validFeatured.length !== FEATURED_COUNT) {
       setSaveError(
         t(
           `Pick exactly ${FEATURED_COUNT} signature dishes to feature, or none.`,
@@ -980,7 +1021,7 @@ export default function MenuBuilder() {
     try {
       const payload: VendorPayload = {
         business: business.trim(),
-        city: city.trim(),
+        city: FIXED_PRIMARY_KITCHEN_CITY,
         state: stateName.trim(),
         cuisines,
         about: about.trim(),
@@ -1502,7 +1543,9 @@ export default function MenuBuilder() {
           // the price-derived ones when they've picked none. Without the
           // fallback, a caterer who never ticked a band still appeared on those
           // bands but had no way to say what they serve there.
-          bands={courseBands}
+          // Feast bands only exist for a vendor who opted into Feast Booking —
+          // a stall-only vendor's courses show no Silver/Gold/Platinum rows.
+          bands={feastOpted ? courseBands : []}
           bandsDerived={tiers.length === 0}
           platformItems={platformItemsFor(cat.id)}
           onTierItems={(tier, v) => setTierItems(cat.id, tier, v)}
@@ -1631,80 +1674,37 @@ export default function MenuBuilder() {
               className={inputClass}
             />
           </Field>
-          <Field label={t("Base Price (₹ / plate)", "आधार मूल्य (₹ / प्लेट)")}>
-            <input
-              type="number"
-              min={0}
-              value={priceFrom}
-              onChange={(e) => {
-                setPriceFrom(e.target.value);
-                setSaved(false);
-              }}
-              className={inputClass}
-            />
-          </Field>
-          <Field label={t("City", "शहर")}>
-            {/* The booking wizard matches caterers to the customer's event city
-                by this exact name, so the serviceable list comes first — but a
-                city we don't list yet can be typed in via "Other". A previously
-                saved / application-prefilled city outside the list is kept as
-                an extra option so nothing silently changes. */}
-            {cityOther ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  autoFocus
-                  value={city}
-                  onChange={(e) => {
-                    setCity(e.target.value);
-                    setSaved(false);
-                  }}
-                  placeholder={t("Type your city", "अपना शहर लिखें")}
-                  className={inputClass}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCityOther(false);
-                    setCity("");
-                    setSaved(false);
-                  }}
-                  className="shrink-0 text-xs font-semibold text-maroon underline underline-offset-2"
-                >
-                  {t("Pick from list", "सूची से चुनें")}
-                </button>
-              </div>
-            ) : (
-              <select
-                value={city}
+          {/* The per-plate base price is the Feast rate — hidden (still saved
+              as-is) for a vendor who didn't opt into Feast Booking. */}
+          {feastOpted && (
+            <Field label={t("Base Price (₹ / plate)", "आधार मूल्य (₹ / प्लेट)")}>
+              <input
+                type="number"
+                min={0}
+                value={priceFrom}
                 onChange={(e) => {
-                  const next = e.target.value;
-                  if (next === OTHER_CITY) {
-                    setCityOther(true);
-                    setCity("");
-                  } else {
-                    setCity(next);
-                  }
+                  setPriceFrom(e.target.value);
                   setSaved(false);
                 }}
                 className={inputClass}
-              >
-                <option value="" disabled>
-                  {t("Select your city…", "अपना शहर चुनें…")}
-                </option>
-                {city && !locations.some((c) => c.name === city) && (
-                  <option value={city}>{city}</option>
-                )}
-                {locations.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {t(c.name, c.nameHi)}
-                  </option>
-                ))}
-                <option value={OTHER_CITY}>
-                  {t("Other — add my city", "अन्य — मेरा शहर जोड़ें")}
-                </option>
-              </select>
-            )}
+              />
+            </Field>
+          )}
+          <Field label={t("City", "शहर")}>
+            {/* Launch scope: primary kitchen city is always Lucknow (read-only). */}
+            <input
+              type="text"
+              value={FIXED_PRIMARY_KITCHEN_CITY}
+              readOnly
+              aria-readonly="true"
+              className={`${inputClass} cursor-not-allowed bg-cream-2/60 text-ink-soft`}
+            />
+            <span
+              aria-disabled="true"
+              className="mt-1.5 inline-flex w-fit cursor-not-allowed select-none items-center gap-1 rounded-full border border-dashed border-cream-3 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft/70"
+            >
+              + {t("Add more cities — coming soon", "और शहर जोड़ें — जल्द आ रहा है")}
+            </span>
             <span className="mt-1 block text-xs text-ink-soft">
               {t(
                 "Customers booking an event in this city will see your menu.",
@@ -1798,6 +1798,9 @@ export default function MenuBuilder() {
               className={inputClass}
             />
           </Field>
+          {/* Cuisines editor — hidden for launch (SHOW_CUISINES_FIELD); the
+              saved list is still loaded into state and resaved untouched. */}
+          {SHOW_CUISINES_FIELD && (
           <div className="sm:col-span-2 lg:col-span-3">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
               {t("Cuisines", "व्यंजन शैलियाँ")}
@@ -1845,6 +1848,7 @@ export default function MenuBuilder() {
               </Button>
             </div>
           </div>
+          )}
         </div>
       </Card>
 
@@ -1921,43 +1925,65 @@ export default function MenuBuilder() {
           actually offer. */}
       <Card padding="none" className="p-5 sm:p-6">
         <h3 className="font-display text-base font-semibold text-ink">
-          {t("What You Sell", "आप क्या बेचते हैं")}
+          {soleCategory
+            ? lang === "hi"
+              ? soleCategory.nameHi
+              : soleCategory.name
+            : t("What You Sell", "आप क्या बेचते हैं")}
         </h3>
-        <p className="mt-0.5 text-xs text-ink-soft">
-          {t(
-            "Tick every segment you serve — each one opens its own menu below, and customers browse and book by these.",
-            "जो भी सेगमेंट आप देते हैं उन्हें टिक करें — हर एक का अपना मेन्यू नीचे खुलेगा, और ग्राहक इन्हीं से ब्राउज़ व बुक करते हैं।",
-          )}
-        </p>
-        <div className="-mx-5 mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-          {TIER_ORDER.map((tier) => (
-            <Chip
-              key={tier}
-              label={`${tier} · ${TIER_BAND_HINTS[tier]}`}
-              active={tiers.includes(tier)}
-              onClick={() => toggleTier(tier)}
-            />
-          ))}
-          {SEGMENT_CATEGORY_IDS.map((id) => {
-            const c = cateringCategories.find((cat) => cat.id === id);
-            if (!c) return null;
-            return (
-              <Chip
-                key={c.id}
-                label={`${c.icon} ${lang === "hi" ? c.nameHi : c.name}`}
-                active={serviceCats.includes(c.id)}
-                onClick={() => toggleServiceCat(c.id)}
-              />
-            );
-          })}
-        </div>
-        <p className="mt-2 text-xs text-ink-soft">
-          {t(
-            "Silver, Gold and Platinum are your feast bands — they share one plated menu and decide where your card sits in the catalog. Leave all three off and we place you by your prices.",
-            "सिल्वर, गोल्ड और प्लैटिनम आपके फ़ीस्ट बैंड हैं — इनका प्लेटेड मेन्यू एक ही रहता है और इसी से कैटलॉग में आपके कार्ड की जगह तय होती है। तीनों खाली छोड़ने पर आपकी कीमतों से जगह तय होगी।",
-          )}
-        </p>
-        {visibleCats.length === 0 && (
+        {showChipCats && (
+          <p className="mt-0.5 text-xs text-ink-soft">
+            {t(
+              "Tick every segment you serve — each one opens its own menu below, and customers browse and book by these.",
+              "जो भी सेगमेंट आप देते हैं उन्हें टिक करें — हर एक का अपना मेन्यू नीचे खुलेगा, और ग्राहक इन्हीं से ब्राउज़ व बुक करते हैं।",
+            )}
+          </p>
+        )}
+        {showSegmentBar && (
+          <div className="-mx-5 mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 no-scrollbar sm:-mx-6 sm:px-6 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+            {showTierChips &&
+              TIER_ORDER.map((tier) => (
+                <Chip
+                  key={tier}
+                  label={`${tier} · ${TIER_BAND_HINTS[tier]}`}
+                  active={tiers.includes(tier)}
+                  onClick={() => toggleTier(tier)}
+                />
+              ))}
+            {chipCats.map((id) => {
+              const c = cateringCategories.find((cat) => cat.id === id);
+              if (!c || soleOpted) return null;
+              return (
+                <Chip
+                  key={c.id}
+                  label={`${c.icon} ${lang === "hi" ? c.nameHi : c.name}`}
+                  active={serviceCats.includes(c.id)}
+                  onClick={() => toggleServiceCat(c.id)}
+                />
+              );
+            })}
+          </div>
+        )}
+        {showTierChips && (
+          <p className="mt-2 text-xs text-ink-soft">
+            {t(
+              "Silver, Gold and Platinum are your feast bands — they share one plated menu and decide where your card sits in the catalog. Leave all three off and we place you by your prices.",
+              "सिल्वर, गोल्ड और प्लैटिनम आपके फ़ीस्ट बैंड हैं — इनका प्लेटेड मेन्यू एक ही रहता है और इसी से कैटलॉग में आपके कार्ड की जगह तय होती है। तीनों खाली छोड़ने पर आपकी कीमतों से जगह तय होगी।",
+            )}
+          </p>
+        )}
+        {!showSegmentBar && visibleCats.length === 0 && (
+          <p className="mt-4 rounded-lg border border-dashed border-cream-3 bg-cream/40 px-3.5 py-3 text-xs text-ink-soft">
+            {t(
+              "You haven't chosen your services yet. Pick them in Profile & KYC → Offerings and their menus appear here.",
+              "आपने अभी अपनी सेवाएं नहीं चुनी हैं। प्रोफ़ाइल और KYC → ऑफ़रिंग्स में उन्हें चुनें, उनके मेन्यू यहाँ दिखेंगे।",
+            )}{" "}
+            <a href="/vendor/register" className="font-semibold text-maroon underline underline-offset-2">
+              {t("Choose services", "सेवाएं चुनें")}
+            </a>
+          </p>
+        )}
+        {showSegmentBar && visibleCats.length === 0 && (
           <p className="mt-4 rounded-lg border border-dashed border-cream-3 bg-cream/40 px-3.5 py-3 text-xs text-ink-soft">
             {t(
               "Nothing ticked yet — pick a segment above and its menu appears here.",
@@ -1967,7 +1993,9 @@ export default function MenuBuilder() {
         )}
         <div className="mt-4 space-y-3">
           {visibleCats.map((c) => {
-            const open = openCat === c.id;
+            // A vendor with a single service has nothing else to switch to —
+            // its menu stays open rather than behind a collapse toggle.
+            const open = soleOpted || openCat === c.id;
             return (
               <div
                 key={c.id}
@@ -1997,18 +2025,20 @@ export default function MenuBuilder() {
                   {/* Ticking lives entirely in the segment bar above — this row
                       exists because the segment is on, so it only opens and
                       closes. */}
-                  <button
-                    type="button"
-                    onClick={() => setOpenCat(open ? null : c.id)}
-                    aria-expanded={open}
-                    aria-controls={`cat-menu-${c.id}`}
-                    className="shrink-0 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold text-maroon transition hover:underline"
-                  >
-                    {open
-                      ? t("Hide menu", "मेन्यू छिपाएं")
-                      : t("Menu", "मेन्यू")}{" "}
-                    <span aria-hidden="true">{open ? "▲" : "▼"}</span>
-                  </button>
+                  {!soleOpted && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenCat(open ? null : c.id)}
+                      aria-expanded={open}
+                      aria-controls={`cat-menu-${c.id}`}
+                      className="shrink-0 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold text-maroon transition hover:underline"
+                    >
+                      {open
+                        ? t("Hide menu", "मेन्यू छिपाएं")
+                        : t("Menu", "मेन्यू")}{" "}
+                      <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+                    </button>
+                  )}
                 </div>
 
                 {open && (
@@ -2066,6 +2096,7 @@ export default function MenuBuilder() {
       {/* Signature dishes — the up-to-four "famous for" tags shown on the
           vendor's catalog card. The pool is the vendor's own live dishes, so a
           dish must exist in an active course before it can be featured. */}
+      {sellsDishes && (
       <Card padding="none" className="p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-display text-base font-semibold text-ink">
@@ -2132,9 +2163,12 @@ export default function MenuBuilder() {
           </>
         )}
       </Card>
+      )}
 
       {/* Live counters & services — the same extras the /book wizard sells, so a
-          vendor can advertise every counter/service they run at their own rate. */}
+          vendor can advertise every counter/service they run at their own rate.
+          Only for a vendor who opted into those Feast components. */}
+      {addOnsOpted && (
       <Card padding="none" className="p-5 sm:p-6">
         <h3 className="font-display text-base font-semibold text-ink">
           {t("Live Counters & Services", "लाइव काउंटर और सेवाएं")}
@@ -2148,6 +2182,10 @@ export default function MenuBuilder() {
         {(["counter", "service"] as const).map((group) => {
           const items = vendorOfferings.filter((o) => o.category === group);
           if (items.length === 0) return null;
+          // Live Counters is its own opt-in; the "Services" group (staff,
+          // tableware, decor) belongs to Extras / Essentials / Add-ons.
+          if (group === "counter" && !countersOpted) return null;
+          if (group === "service" && !serviceAddOnsOpted) return null;
           return (
             <div key={group} className="mt-4">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-ink-soft">
@@ -2435,6 +2473,7 @@ export default function MenuBuilder() {
           );
         })}
       </Card>
+      )}
 
       {/* Save bar */}
       <Card padding="none" className="flex flex-wrap items-center gap-4 p-5">

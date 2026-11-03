@@ -16,10 +16,25 @@ export type RazorpayCheckoutErrorCode =
   // so the message must say "don't pay again" (the webhook still records it).
   | "verify";
 
+/** Where in the round trip it broke, and what the server said — lets the UI
+ *  tell "never reached the gateway" (nothing charged) from "paid but unconfirmed". */
+export interface RazorpayCheckoutErrorInfo {
+  stage?: "script" | "order" | "payment" | "verify";
+  /** HTTP status of the failing call (0 / undefined when it never answered). */
+  status?: number;
+  /** The call never got an answer — offline, DNS, dropped connection. */
+  network?: boolean;
+  /** The server's machine code (e.g. SLOT_TAKEN) when it sent one. */
+  code?: string;
+  /** Razorpay's payment id once the customer has paid — the reference to quote. */
+  paymentId?: string;
+}
+
 export class RazorpayCheckoutError extends Error {
   constructor(
     public code: RazorpayCheckoutErrorCode,
     message: string,
+    public info: RazorpayCheckoutErrorInfo = {},
   ) {
     super(message);
     this.name = "RazorpayCheckoutError";
@@ -93,6 +108,7 @@ function loadCheckoutScript(): Promise<void> {
           new RazorpayCheckoutError(
             "unavailable",
             "Could not load the payment window.",
+            { stage: "script", network: true },
           ),
         );
       };
@@ -149,19 +165,29 @@ export async function startRazorpayCheckout(opts: {
     throw new RazorpayCheckoutError(
       "unavailable",
       "Could not load the payment window.",
+      { stage: "script", network: true },
     );
   }
 
-  const orderRes = await fetch("/api/payments/razorpay/order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bookingId: opts.bookingId,
-      amount: opts.amount,
-      customer: opts.customerName,
-      ...(opts.purpose ? { purpose: opts.purpose } : {}),
-    }),
-  });
+  let orderRes: Response;
+  try {
+    orderRes = await fetch("/api/payments/razorpay/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: opts.bookingId,
+        amount: opts.amount,
+        customer: opts.customerName,
+        ...(opts.purpose ? { purpose: opts.purpose } : {}),
+      }),
+    });
+  } catch {
+    // No answer at all — the gateway was never opened, so nothing was charged.
+    throw new RazorpayCheckoutError("failed", "Couldn't reach the server.", {
+      stage: "order",
+      network: true,
+    });
+  }
   const order = (await orderRes.json().catch(() => null)) as {
     ok?: boolean;
     orderId?: string;
@@ -169,6 +195,7 @@ export async function startRazorpayCheckout(opts: {
     currency?: string;
     keyId?: string;
     error?: string;
+    code?: string;
     alreadyPaid?: { amount?: number; paymentId?: string };
   } | null;
   if (!orderRes.ok || !order?.orderId || !order.keyId) {
@@ -189,6 +216,7 @@ export async function startRazorpayCheckout(opts: {
     throw new RazorpayCheckoutError(
       "failed",
       order?.error ?? "Couldn't start the payment.",
+      { stage: "order", status: orderRes.status, code: order?.code },
     );
   }
 
@@ -244,7 +272,9 @@ export async function startRazorpayCheckout(opts: {
           ondismiss: () =>
             reject(
               lastFailure
-                ? new RazorpayCheckoutError("failed", lastFailure)
+                ? new RazorpayCheckoutError("failed", lastFailure, {
+                    stage: "payment",
+                  })
                 : new RazorpayCheckoutError("dismissed", "Checkout was closed."),
             ),
         },
@@ -258,17 +288,29 @@ export async function startRazorpayCheckout(opts: {
     },
   );
 
-  const verifyRes = await fetch("/api/payments/razorpay/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bookingId: opts.bookingId,
-      orderId: callback.razorpay_order_id,
+  let verifyRes: Response;
+  try {
+    verifyRes = await fetch("/api/payments/razorpay/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: opts.bookingId,
+        orderId: callback.razorpay_order_id,
+        paymentId: callback.razorpay_payment_id,
+        signature: callback.razorpay_signature,
+        customer: opts.customerName,
+      }),
+    });
+  } catch {
+    // The customer HAS paid — only our confirm call was lost. Surface it as a
+    // verify error (with the payment id) so the UI says "don't pay again"
+    // instead of a generic "couldn't start the payment".
+    throw new RazorpayCheckoutError("verify", "Couldn't confirm the payment.", {
+      stage: "verify",
+      network: true,
       paymentId: callback.razorpay_payment_id,
-      signature: callback.razorpay_signature,
-      customer: opts.customerName,
-    }),
-  });
+    });
+  }
   const verified = (await verifyRes.json().catch(() => null)) as {
     ok?: boolean;
     payment?: { amount?: number };
@@ -278,6 +320,11 @@ export async function startRazorpayCheckout(opts: {
     throw new RazorpayCheckoutError(
       "verify",
       verified?.error ?? "Couldn't confirm the payment.",
+      {
+        stage: "verify",
+        status: verifyRes.status,
+        paymentId: callback.razorpay_payment_id,
+      },
     );
   }
 

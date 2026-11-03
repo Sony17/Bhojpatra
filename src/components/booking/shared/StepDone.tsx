@@ -6,6 +6,8 @@ import BackLink from "@/components/ui/BackLink";
 import { inr, money, perPlateCost } from "@/lib/money";
 import { cities } from "@/lib/data";
 import { type OccasionOption } from "@/lib/occasions";
+import { useErrorDialog, type ErrorDialogSpec } from "@/components/ui/ErrorDialog";
+import { downloadFailureSpec } from "@/lib/failureDialogs";
 
 type City = (typeof cities)[number];
 
@@ -30,6 +32,7 @@ export default function StepDone({
   whatsappHref,
   status,
   verifying = false,
+  attention,
 }: {
   t: (en: string, hi: string) => string;
   bookingId: string;
@@ -44,14 +47,20 @@ export default function StepDone({
    *  gateway payments, or the customer's UPI UTR for the manual flow. */
   paymentRef?: string;
   referrerName: string;
-  onDownload: () => void;
+  /** May be async (PDF generation) — a failure is caught here and shown. */
+  onDownload: () => void | Promise<void>;
   whatsappHref: string;
   /** The order's server-decided status, when the flow knows it. A Pending
    *  order is "received", never "confirmed". Omitted → the legacy copy. */
   status?: "Pending" | "Confirmed";
   /** A manual UPI/QR transfer was reported and awaits the team's check. */
   verifying?: boolean;
+  /** Something the guest should know about the order that doesn't change its
+   *  outcome (e.g. the post-payment status read failed). Shown as a popup and
+   *  pauses the auto-redirect so they can read it. */
+  attention?: ErrorDialogSpec;
 }) {
+  const { showError } = useErrorDialog();
   const pending = status === "Pending";
   const total = Math.round(grandTotal);
   const balance = Math.max(0, total - paidAmount);
@@ -62,7 +71,25 @@ export default function StepDone({
   // share, or just linger). `null` means the redirect was called off.
   const [secondsLeft, setSecondsLeft] = useState<number | null>(15);
   useEffect(() => {
-    if (secondsLeft === null) return;
+    if (!attention) return;
+    showError(attention);
+    // Show once per distinct notice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attention?.title, attention?.message]);
+  const handleDownload = async () => {
+    try {
+      await onDownload();
+    } catch {
+      // Hold the redirect so the guest can retry or read the popup.
+      setSecondsLeft(null);
+      showError(
+        downloadFailureSpec({ t, bookingId, retry: () => void handleDownload() }),
+      );
+    }
+  };
+  useEffect(() => {
+    // A pending notice holds the redirect so the guest can read it.
+    if (secondsLeft === null || attention) return;
     if (secondsLeft <= 0) {
       window.location.assign("/");
       return;
@@ -72,7 +99,7 @@ export default function StepDone({
       1000,
     );
     return () => clearTimeout(timer);
-  }, [secondsLeft]);
+  }, [secondsLeft, attention]);
 
   return (
     <div className="mx-auto max-w-2xl text-center">
@@ -201,7 +228,7 @@ export default function StepDone({
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           type="button"
-          onClick={onDownload}
+          onClick={() => void handleDownload()}
           className="rounded-full border border-maroon px-4 py-3 text-sm font-semibold text-maroon transition hover:bg-maroon/5 sm:px-6"
         >
           ⬇ {t("Download Menu", "मेन्यू डाउनलोड")}
@@ -228,7 +255,7 @@ export default function StepDone({
         <BackLink href="/" label={t("Back to home", "होम पर वापस")} />
       </div>
 
-      {secondsLeft !== null && (
+      {secondsLeft !== null && !attention && (
         <p className="mt-4 text-sm text-ink-soft">
           {t(
             `Taking you back to Bhojpatra in ${secondsLeft}s…`,
