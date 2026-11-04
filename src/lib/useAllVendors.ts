@@ -69,6 +69,8 @@ export function useAllVendorsStatus(
 ): {
   vendors: VendorListing[];
   loaded: boolean;
+  /** Live `/api/vendors` failed and no server snapshot had real roster data. */
+  rosterFailed: boolean;
 } {
   const seed = useContext(VendorsSeedContext);
   const initial = explicitInitial ?? seed;
@@ -81,31 +83,44 @@ export function useAllVendorsStatus(
   const [samplesHidden, setSamplesHidden] = useState<boolean | null>(
     initial ? initial.samplesHidden : null,
   );
+  const [liveFetchFailed, setLiveFetchFailed] = useState(false);
+  const hadLiveRoster = useRef(Boolean(initial?.vendors?.length));
   // Server-provided roster → no initial fetch (only an explicit refresh).
   const seeded = useRef(!!initial);
 
   useEffect(() => {
     if (seeded.current && refreshToken === 0) return;
     let alive = true;
+    setLiveFetchFailed(false);
     fetch("/api/vendors")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then(
         (
           d: {
             vendors?: VendorListing[];
             stalls?: Record<string, StallBrief | null>;
             samplesHidden?: boolean;
-          } | null,
+          },
         ) => {
           if (!alive) return;
-          if (d?.vendors) setLiveVendors(d.vendors);
+          if (d?.vendors) {
+            setLiveVendors(d.vendors);
+            hadLiveRoster.current = d.vendors.length > 0;
+          }
           if (d?.stalls) setStalls(d.stalls);
-          if (d) setSamplesHidden(Boolean(d.samplesHidden));
+          setSamplesHidden(Boolean(d.samplesHidden));
+          setLiveFetchFailed(false);
         },
       )
       .catch(() => {
         // Offline — stop "loading" so the page can settle on what it has.
-        if (alive) setSamplesHidden((prev) => prev ?? false);
+        if (alive) {
+          setSamplesHidden((prev) => prev ?? false);
+          setLiveFetchFailed(true);
+        }
       });
     return () => {
       alive = false;
@@ -118,5 +133,6 @@ export function useAllVendorsStatus(
     const samples = samplesHidden === false ? vendorListings : [];
     return [...liveVendors, ...samples].map(withStall);
   }, [liveVendors, stalls, samplesHidden]);
-  return { vendors, loaded: samplesHidden !== null };
+  const rosterFailed = liveFetchFailed && !hadLiveRoster.current;
+  return { vendors, loaded: samplesHidden !== null, rosterFailed };
 }

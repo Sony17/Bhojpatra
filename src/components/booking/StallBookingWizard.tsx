@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { photoNeedsUnoptimized, stallCoverPhoto } from "@/lib/photoLinks";
@@ -100,10 +107,13 @@ import {
 } from "@/lib/servicePricing";
 import { BackLink, Button, DietMark, useErrorDialog, useToast } from "@/components/ui";
 import {
+  availabilityLoadFailureSpec,
   bookingFailureSpec,
+  couponsLoadFailureSpec,
   menuLoadFailureSpec,
   networkFailure,
   statusCheckFailureSpec,
+  vendorsRosterFailureSpec,
   type FailureInfo,
 } from "@/lib/failureDialogs";
 import type { ErrorDialogSpec } from "@/components/ui/ErrorDialog";
@@ -163,6 +173,8 @@ import {
 // entered from a brand's "Book Now" and opens straight on that stall's menu.
 // Menu → Extras & Essentials (one page, both optional) → Review.
 const TOTAL_STEPS = 3;
+/** Brief action feedback in the stall flow (~3s). */
+const STALL_ACTION_TOAST_MS = 3000;
 
 // Where a guest picks their stall: the Brands catalogue, lensed to the Single
 // Stall category. Every entry point into this flow that doesn't already name a
@@ -366,6 +378,23 @@ export default function StallBookingWizard({
   const [bookingSalt, setBookingSalt] = useState(getBookingSalt);
   const { lang, t } = useLang();
   const { toast } = useToast();
+  const actionToast = useCallback(
+    (
+      message: string,
+      tone: "default" | "success" | "error" = "success",
+    ) => toast(message, { tone, durationMs: STALL_ACTION_TOAST_MS }),
+    [toast],
+  );
+  const flashBrands = useCallback(
+    (detail?: string) =>
+      actionToast(
+        detail
+          ? t(`Opening brands — ${detail}`, `ब्रांड्स खोले जा रहे हैं — ${detail}`)
+          : t("Opening brands…", "ब्रांड्स खोले जा रहे हैं…"),
+        "default",
+      ),
+    [actionToast, t],
+  );
   const { showError } = useErrorDialog();
   const dockRef = useBookingBarDock<HTMLDivElement>();
   useHideMobileFooter();
@@ -711,6 +740,37 @@ export default function StallBookingWizard({
     };
   }, [referralCode, ownMemberships]);
 
+  const pickOccasionId = useCallback(
+    (id: string) => {
+      setOccasionId(id);
+      if (id === OTHER_OCCASION_ID) {
+        actionToast(
+          t("Type your occasion below.", "नीचे अपना अवसर लिखें।"),
+          "default",
+        );
+      } else if (id) {
+        actionToast(t("Occasion updated.", "अवसर अपडेट किया गया।"));
+      }
+    },
+    [actionToast, t],
+  );
+
+  const customOccasionToast = useRef("");
+  useEffect(() => {
+    if (occasionId !== OTHER_OCCASION_ID) {
+      customOccasionToast.current = "";
+      return;
+    }
+    const name = customOccasion.trim();
+    if (!name) return;
+    const handle = window.setTimeout(() => {
+      if (name === customOccasionToast.current) return;
+      customOccasionToast.current = name;
+      actionToast(t("Occasion updated.", "अवसर अपडेट किया गया।"));
+    }, 700);
+    return () => window.clearTimeout(handle);
+  }, [customOccasion, occasionId, actionToast, t]);
+
   // Prefill contact from the signed-in account / last booking.
   useEffect(() => {
     if (!sessionStatus) return;
@@ -729,8 +789,10 @@ export default function StallBookingWizard({
   }, [sessionStatus?.email, paidAmount, orderPlaced, bookingSalt]);
 
   const [couponsLoadFailed, setCouponsLoadFailed] = useState(false);
+  const [couponNonce, setCouponNonce] = useState(0);
   useEffect(() => {
     let active = true;
+    setCouponsLoadFailed(false);
     fetch("/api/coupons/public")
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
@@ -741,11 +803,18 @@ export default function StallBookingWizard({
       })
       // Remembered so a code that "doesn't look right" can say the offers
       // never loaded, rather than blaming the guest's typing.
-      .catch(() => active && setCouponsLoadFailed(true));
+      .catch(() => {
+        if (!active) return;
+        setCouponsLoadFailed(true);
+        showError(
+          couponsLoadFailureSpec({ t, retry: () => setCouponNonce((n) => n + 1) }),
+        );
+      });
     return () => {
       active = false;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponNonce]);
 
   // Dropping offline mid-booking is the commonest way a payment goes wrong —
   // tell them as it happens (and when it's back), before they tap Pay.
@@ -853,8 +922,16 @@ export default function StallBookingWizard({
   // Catalog listings (curated seeds + live vendors) — the only source that
   // knows which counters a vendor runs, so the stall-type grid counts against
   // them rather than the menu roster, which carries no offerings.
-  const { vendors: catalogVendors, loaded: vendorsLoaded } =
-    useAllVendorsStatus(0, initialVendors);
+  const [vendorsNonce, setVendorsNonce] = useState(0);
+  const { vendors: catalogVendors, loaded: vendorsLoaded, rosterFailed } =
+    useAllVendorsStatus(vendorsNonce, initialVendors);
+
+  useEffect(() => {
+    if (!rosterFailed || !vendorsLoaded) return;
+    showError(
+      vendorsRosterFailureSpec({ t, retry: () => setVendorsNonce((n) => n + 1) }),
+    );
+  }, [rosterFailed, vendorsLoaded, showError, t]);
 
   // A stall type hands off to the Brands catalog pre-filtered to that counter;
   // the catalog's "Book" then comes back here with `?vendor=`, and the guest's
@@ -1125,11 +1202,11 @@ export default function StallBookingWizard({
     const dish = course?.items.find((it) => it.id === itemId)?.name;
     if (dish) {
       const adding = !(categoryItems[catId] ?? []).includes(itemId);
-      toast(
-        lang === "hi"
-          ? `${dish} ${adding ? "जोड़ा गया" : "हटाया गया"}`
-          : `${dish} ${adding ? "added" : "removed"}`,
-        { tone: adding ? "success" : "default" },
+      actionToast(
+        adding
+          ? t(`${dish} added`, `${dish} जोड़ा गया`)
+          : t(`${dish} removed`, `${dish} हटाया गया`),
+        adding ? "success" : "default",
       );
     }
     setCategoryItems((m) => {
@@ -1150,11 +1227,11 @@ export default function StallBookingWizard({
     if (!course) return;
     const adding = !(categoryItems[catId] ?? []).length;
     const label = lang === "hi" ? course.nameHi : course.name;
-    toast(
-      lang === "hi"
-        ? `${label} ${adding ? "जोड़ा गया" : "हटाया गया"}`
-        : `${label} ${adding ? "added" : "removed"}`,
-      { tone: adding ? "success" : "default" },
+    actionToast(
+      adding
+        ? t(`${label} added`, `${label} जोड़ा गया`)
+        : t(`${label} removed`, `${label} हटाया गया`),
+      adding ? "success" : "default",
     );
     setCategoryItems((m) => ({
       ...m,
@@ -1269,11 +1346,11 @@ export default function StallBookingWizard({
     if (addOn) {
       const adding = !selectedAddOns.includes(id);
       const label = lang === "hi" ? addOn.nameHi : addOn.name;
-      toast(
-        lang === "hi"
-          ? `${label} ${adding ? "जोड़ा गया" : "हटाया गया"}`
-          : `${label} ${adding ? "added" : "removed"}`,
-        { tone: adding ? "success" : "default" },
+      actionToast(
+        adding
+          ? t(`${label} added`, `${label} जोड़ा गया`)
+          : t(`${label} removed`, `${label} हटाया गया`),
+        adding ? "success" : "default",
       );
     }
     if (selectedAddOns.includes(id)) {
@@ -1306,6 +1383,33 @@ export default function StallBookingWizard({
       type: referrerType as PartnerRole,
       phone: referrerPhone,
     });
+
+  const referralToastCode = useRef("");
+  useEffect(() => {
+    const code = referralCode.trim();
+    if (!code || selfReferral || !referrerName) return;
+    if (referralToastCode.current === code) return;
+    referralToastCode.current = code;
+    actionToast(t("Referral saved.", "रेफ़रल सेव किया गया।"));
+  }, [referralCode, referrerName, selfReferral, actionToast, t]);
+
+  const pickService = useCallback(
+    (id: string) => {
+      setServiceId(id);
+      if (!id) {
+        actionToast(
+          t("Service package removed.", "सर्विस पैकेज हटाया गया।"),
+          "default",
+        );
+        return;
+      }
+      const pkg = services.find((p) => p.id === id);
+      if (!pkg) return;
+      const name = lang === "hi" ? pkg.nameHi : pkg.name;
+      actionToast(t(`${name} selected`, `${name} चुना गया`));
+    },
+    [actionToast, lang, services, t],
+  );
 
   // The stall vendor's own GST is the only GST on the bill. The server
   // re-prices with the same rate.
@@ -1426,11 +1530,19 @@ export default function StallBookingWizard({
   // The stall vendor's calendar: days off and meal periods already booked.
   // Checked the moment a stall and date are both in hand — not at payment.
   const [availabilityNonce, setAvailabilityNonce] = useState(0);
-  const stallAvailability = useVendorAvailability(
-    rawStall?.id,
-    availabilityNonce,
-    bookingId,
-  );
+  const {
+    av: stallAvailability,
+    failed: stallAvailabilityFailed,
+    retry: retryStallAvailability,
+  } = useVendorAvailability(rawStall?.id, availabilityNonce, bookingId);
+
+  useEffect(() => {
+    if (!stallAvailabilityFailed || !rawStall) return;
+    showError(
+      availabilityLoadFailureSpec({ t, retry: () => retryStallAvailability() }),
+    );
+  }, [stallAvailabilityFailed, rawStall, retryStallAvailability, showError, t]);
+
   const slotReason = availabilityFor(stallAvailability, eventDate, mealTime);
   const availabilityWarning =
     slotReason && rawStall
@@ -1587,7 +1699,24 @@ export default function StallBookingWizard({
   }, [menuSettled, pendingVendorId, stallId, stall, step]);
 
   /* ─── Handlers ─────────────────────────────────────────────────────── */
-  const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
+  const openCartToast = useCallback(() => {
+    actionToast(t("Opening your cart.", "आपका कार्ट खुल रहा है।"), "default");
+  }, [actionToast, t]);
+
+  const goToStep = useCallback(
+    (next: number) => {
+      if (next === TOTAL_STEPS && step !== TOTAL_STEPS) openCartToast();
+      setStep(next);
+    },
+    [step, openCartToast],
+  );
+
+  const goNext = () =>
+    setStep((s) => {
+      const next = Math.min(TOTAL_STEPS, s + 1);
+      if (next === TOTAL_STEPS && s !== TOTAL_STEPS) openCartToast();
+      return next;
+    });
   // Continue never greys out: a tap with something still missing opens the
   // "Before you continue" popup instead of moving on.
   const [blockersOpen, setBlockersOpen] = useState(false);
@@ -2127,6 +2256,7 @@ export default function StallBookingWizard({
 
   // The pay-later (Connect) submit, or a retry once a payment is in.
   const handleConfirm = async () => {
+    actionToast(t("Confirming booking…", "बुकिंग की पुष्टि हो रही है…"));
     setConfirmError("");
     const problem = orderProblem();
     if (problem) {
@@ -2160,7 +2290,7 @@ export default function StallBookingWizard({
       lang={lang}
       t={t}
       occasionId={occasionId}
-      setOccasionId={setOccasionId}
+      setOccasionId={pickOccasionId}
       customOccasion={customOccasion}
       setCustomOccasion={setCustomOccasion}
       occasionList={occasionList}
@@ -2249,7 +2379,7 @@ export default function StallBookingWizard({
       t={t}
       step={step}
       labels={stepLabels}
-      onPick={(n) => (n === step + 1 ? tryNext() : setStep(n))}
+      onPick={(n) => (n === step + 1 ? tryNext() : goToStep(n))}
       onStartOver={startOver}
     />
   );
@@ -2346,6 +2476,7 @@ export default function StallBookingWizard({
                 pickedCount={pickedCount}
                 guests={guests}
                 brandsHref={brandsHref}
+                onBrandsNavigate={flashBrands}
                 nonVegGuests={nonVegGuests}
                 missingStallType={
                   missingStallType
@@ -2376,6 +2507,12 @@ export default function StallBookingWizard({
                   images={tileImages}
                   selectedId={counterType}
                   hrefFor={stallTypeHref}
+                  onTypeNavigate={(typeId) => {
+                    const st = stallTypeById(typeId);
+                    flashBrands(
+                      st ? (lang === "hi" ? st.nameHi : st.name) : undefined,
+                    );
+                  }}
                 />
               </>
             ) : (
@@ -2385,6 +2522,7 @@ export default function StallBookingWizard({
                   t={t}
                   missingBrand={missingBrand}
                   brandsHref={brandsHref}
+                  onBrowseBrands={() => flashBrands()}
                 />
               </>
             ))}
@@ -2400,7 +2538,7 @@ export default function StallBookingWizard({
               setAddOnVendor={setAddOnVendor}
               services={services}
               serviceId={serviceId}
-              setServiceId={setServiceId}
+              setServiceId={pickService}
               counterVendors={counterVendors}
               vendorsForCounter={vendorsForCounter}
               nonVegGuests={nonVegGuests}
@@ -2463,6 +2601,7 @@ export default function StallBookingWizard({
                 confirming={confirming}
                 confirmError={confirmError}
                 onConfirm={() => void handleConfirm()}
+                onBrandsNavigate={flashBrands}
                 onEditMenu={() => setStep(1)}
                 onEditExtras={() => setStep(2)}
                 onEditEvent={() => {
@@ -2905,10 +3044,12 @@ function StallHandoff({
   t,
   missingBrand,
   brandsHref,
+  onBrowseBrands,
 }: {
   t: (en: string, hi: string) => string;
   missingBrand: string;
   brandsHref: string;
+  onBrowseBrands?: () => void;
 }) {
   return (
     <div>
@@ -2942,6 +3083,7 @@ function StallHandoff({
         </p>
         <a
           href={brandsHref}
+          onClick={() => onBrowseBrands?.()}
           className="btn-sheen mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-maroon px-6 text-sm font-bold text-cream shadow-card transition hover:-translate-y-0.5 hover:shadow-pop active:scale-95"
         >
           {t("Browse all stalls", "सभी स्टॉल देखें")} →
@@ -2966,6 +3108,7 @@ function StepStallMenu({
   pickedCount,
   guests,
   brandsHref,
+  onBrandsNavigate,
   nonVegGuests,
   missingStallType,
   hiddenDishes,
@@ -2990,6 +3133,7 @@ function StepStallMenu({
   guests: number;
   /** Where a different stall is picked — the Brands page, not a step in here. */
   brandsHref: string;
+  onBrandsNavigate?: (detail?: string) => void;
   /** The craft-my-plate split, plus what its strict filter took off this
    *  stall's menu — surfaced so the guest knows WHY dishes are missing. */
   nonVegGuests: NonVegCount;
@@ -3041,6 +3185,7 @@ function StepStallMenu({
         />
         <a
           href={brandsHref}
+          onClick={() => onBrandsNavigate?.(missingStallType)}
           className="inline-flex items-center gap-2 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-soft transition hover:opacity-90"
         >
           {t(`See ${missingStallType} brands`, `${missingStallType} ब्रांड देखें`)}
@@ -3065,6 +3210,7 @@ function StepStallMenu({
         />
         <a
           href={`${brandsHref}&diet=Veg`}
+          onClick={() => onBrandsNavigate?.(t("veg-friendly", "वेज-फ्रेंडली"))}
           className="inline-flex items-center gap-2 rounded-full bg-maroon px-5 py-2.5 text-sm font-semibold text-cream shadow-soft transition hover:opacity-90"
         >
           {t("Browse veg-friendly brands", "वेज-फ्रेंडली ब्रांड देखें")}
@@ -3144,6 +3290,7 @@ function StepStallMenu({
         </div>
         <a
           href={brandsHref}
+          onClick={() => onBrandsNavigate?.()}
           aria-label={t("Change stall", "स्टॉल बदलें")}
           className="shrink-0 rounded-full border border-maroon px-2.5 py-1 text-[11px] font-semibold text-maroon transition hover:bg-maroon hover:text-cream sm:px-4 sm:py-1.5 sm:text-xs"
         >
@@ -3680,6 +3827,7 @@ function StepStallConfirm({
   onEditExtras,
   onEditEvent,
   brandsHref,
+  onBrandsNavigate,
   whatsappHref,
   blocker,
   summary,
@@ -3688,6 +3836,7 @@ function StepStallConfirm({
 }: {
   /** Opens the event brief (occasion, date, city) for editing. */
   onEditEvent: () => void;
+  onBrandsNavigate?: (detail?: string) => void;
   /** Verified "Sold by" details of the stall + counter vendors. */
   sellers: SellerDetails[];
   /** The expanded order breakdown, shown on the cart after the coupon. */
@@ -3764,6 +3913,9 @@ function StepStallConfirm({
   useHideChatFab();
   // "Powered by Razorpay" shows only once the pay box confirms the gateway.
   const [gatewayLive, setGatewayLive] = useState(false);
+  const { toast } = useToast();
+  const stallToast = (message: string, tone: "default" | "success" = "success") =>
+    toast(message, { tone, durationMs: STALL_ACTION_TOAST_MS });
   const goStage = (next: "cart" | "pay") => {
     setStage(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -3777,7 +3929,18 @@ function StepStallConfirm({
           label={t("Back to cart", "कार्ट पर वापस")}
           className="mb-1"
         />
-        <LoginGate onBack={() => goStage("cart")} />
+        <LoginGate
+          onBack={() => goStage("cart")}
+          onLoginSubmit={() =>
+            stallToast(t("Signing you in…", "आपको साइन इन किया जा रहा है…"))
+          }
+          onCreateAccountClick={() =>
+            stallToast(
+              t("Opening sign up…", "साइन अप खोला जा रहा है…"),
+              "default",
+            )
+          }
+        />
       </>
     );
   }
@@ -3866,6 +4029,7 @@ function StepStallConfirm({
         <div className="flex items-center gap-3 px-2.5 py-2">
           <a
             href={brandsHref}
+            onClick={() => onBrandsNavigate?.()}
             aria-label={t("Change stall", "स्टॉल बदलें")}
             className="relative block h-12 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-2"
           >
@@ -3910,7 +4074,12 @@ function StepStallConfirm({
               </span>
             )}
           </button>
-          <a href={brandsHref} aria-label={t("Change stall", "स्टॉल बदलें")} className="shrink-0 p-1">
+          <a
+            href={brandsHref}
+            onClick={() => onBrandsNavigate?.()}
+            aria-label={t("Change stall", "स्टॉल बदलें")}
+            className="shrink-0 p-1"
+          >
             <CartChevron />
           </a>
         </div>
@@ -4064,7 +4233,12 @@ function StepStallConfirm({
         blocker={blocker}
         stage={stage}
         afterCoupon={<div className="mt-1 xl:hidden">{summary}</div>}
-        onProceed={() => goStage("pay")}
+        onProceed={() => {
+          stallToast(
+            t("Proceeding to payment…", "भुगतान की ओर बढ़ रहे हैं…"),
+          );
+          goStage("pay");
+        }}
         paySummary={paySummary}
         onGateway={setGatewayLive}
         sellers={sellers}

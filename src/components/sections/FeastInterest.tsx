@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { packages } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { isValidEmail, isValidPhone } from "@/lib/validate";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field, Input, useErrorDialog } from "@/components/ui";
+import { feastInterestFailureSpec } from "@/lib/failureDialogs";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -28,6 +29,7 @@ export default function FeastInterestPopup({
   initialPackageId?: string;
 }) {
   const { lang, t } = useLang();
+  const { showError } = useErrorDialog();
   const titleId = useId();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -137,6 +139,16 @@ export default function FeastInterestPopup({
       const data = (await res.json()) as { ok?: boolean; error?: string };
 
       if (!res.ok || !data.ok) {
+        if (res.status >= 500) {
+          setStatus("idle");
+          showError(
+            feastInterestFailureSpec({
+              t,
+              retry: () => setStatus("idle"),
+            }),
+          );
+          return;
+        }
         setStatus("error");
         setMessage(
           data.error ??
@@ -150,12 +162,12 @@ export default function FeastInterestPopup({
 
       setStatus("success");
     } catch {
-      setStatus("error");
-      setMessage(
-        t(
-          "We couldn't connect — please try again.",
-          "कनेक्ट नहीं हो पाया — कृपया फिर कोशिश करें।",
-        ),
+      setStatus("idle");
+      showError(
+        feastInterestFailureSpec({
+          t,
+          retry: () => setStatus("idle"),
+        }),
       );
     }
   }

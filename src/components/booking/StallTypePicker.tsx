@@ -21,6 +21,7 @@ export default function StallTypePicker({
   images,
   selectedId = "",
   hrefFor,
+  onTypeNavigate,
 }: {
   t: (en: string, hi: string) => string;
   lang: string;
@@ -35,6 +36,8 @@ export default function StallTypePicker({
    *  stall lands them where they left off. */
   selectedId?: string;
   hrefFor: (typeId: string) => string;
+  /** Fired when a type tile is tapped (navigation proceeds via href). */
+  onTypeNavigate?: (typeId: string) => void;
 }) {
   const available = stallTypes.filter((s) => (counts[s.id] ?? 0) > 0);
 
@@ -82,6 +85,7 @@ export default function StallTypePicker({
               <a
                 key={s.id}
                 href={hrefFor(s.id)}
+                onClick={() => onTypeNavigate?.(s.id)}
                 aria-current={selected ? "true" : undefined}
                 className={
                   // Phones: a fixed-height card — photo on top, the name (up to two

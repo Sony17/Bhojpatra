@@ -28,6 +28,11 @@ import {
   type ReferralRates,
 } from "@/lib/referralRates";
 import LoginGate from "@/components/auth/LoginGate";
+import { useErrorDialog } from "@/components/ui";
+import {
+  couponsLoadFailureSpec,
+  menuLoadFailureSpec,
+} from "@/lib/failureDialogs";
 import PackageScrollCard from "@/components/packages/PackageScrollCard";
 import {
   useVendorRatings,
@@ -257,6 +262,7 @@ export default function BookingWizard() {
   const [bookingSalt] = useState(getBookingSalt);
   // Language is driven by the shared, site-wide context (Header toggle).
   const { lang, t } = useLang();
+  const { showError } = useErrorDialog();
   // The phone Continue dock — published so the chat launcher lifts clear of it.
   const dockRef = useBookingBarDock<HTMLDivElement>();
 
@@ -709,18 +715,28 @@ export default function BookingWizard() {
   // empty so codes switched off in admin never show or apply from the static
   // seed list.
   const [liveCoupons, setLiveCoupons] = useState<Coupon[]>([]);
+  const [couponNonce, setCouponNonce] = useState(0);
   useEffect(() => {
     let active = true;
     fetch("/api/coupons/public")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d: { coupons?: Coupon[] } | null) => {
         if (active && Array.isArray(d?.coupons)) setLiveCoupons(d.coupons);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!active) return;
+        showError(
+          couponsLoadFailureSpec({ t, retry: () => setCouponNonce((n) => n + 1) }),
+        );
+      });
     return () => {
       active = false;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponNonce]);
   const [confirming, setConfirming] = useState<boolean>(false);
   const [confirmError, setConfirmError] = useState<string>("");
   const [confirmed, setConfirmed] = useState<boolean>(false);
@@ -876,21 +892,31 @@ export default function BookingWizard() {
   // answer once the live data has had its turn — a brand published from a
   // vendor dashboard exists only in the API payload, not the fixture.
   const [menuSettled, setMenuSettled] = useState(false);
+  const [menuNonce, setMenuNonce] = useState(0);
   useEffect(() => {
     let live = true;
     fetch("/api/menu")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((d: { categories?: MenuCategory[] } | null) => {
         if (live && d?.categories?.length) setLiveMenuCategories(d.categories);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (live)
+          showError(
+            menuLoadFailureSpec({ t, retry: () => setMenuNonce((n) => n + 1) }),
+          );
+      })
       .finally(() => {
         if (live) setMenuSettled(true);
       });
     return () => {
       live = false;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuNonce]);
 
   // A `/book?vendor=ID` hand-off whose brand we could not resolve. Holds the
   // brand's display name (or the raw id) so the Menu step can say which one

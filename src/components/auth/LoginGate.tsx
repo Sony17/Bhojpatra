@@ -39,7 +39,16 @@ function LockIcon() {
  * `onBack`, when given, renders a link back to the previous (editable) step so
  * a guest who isn't ready to sign in isn't stranded.
  */
-export default function LoginGate({ onBack }: { onBack?: () => void }) {
+export default function LoginGate({
+  onBack,
+  onLoginSubmit,
+  onCreateAccountClick,
+}: {
+  onBack?: () => void;
+  /** Fired once when the guest submits valid credentials (before the request). */
+  onLoginSubmit?: () => void;
+  onCreateAccountClick?: () => void;
+}) {
   const { t } = useLang();
   const pathname = usePathname();
   const [returnPath, setReturnPath] = useState(pathname || "/book/stall");
@@ -67,6 +76,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
     setSubmitting(true);
     setError("");
     setCredError(false);
+    onLoginSubmit?.();
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -217,6 +227,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
             the gate, so a plain /signup still lands on the dashboard. */}
         <Link
           href={`/signup?next=${encodeURIComponent(returnPath)}`}
+          onClick={() => onCreateAccountClick?.()}
           className="font-semibold text-maroon hover:underline"
         >
           {t("Create an account", "अकाउंट बनाएं")}

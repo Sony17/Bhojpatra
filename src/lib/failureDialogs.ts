@@ -653,3 +653,70 @@ export function downloadFailureSpec(a: {
     ],
   };
 }
+
+export function availabilityLoadFailureSpec(a: {
+  t: T;
+  retry: () => void;
+}): ErrorDialogSpec {
+  const { t } = a;
+  return {
+    title: t("Couldn't load this stall's calendar", "इस स्टॉल का कैलेंडर लोड नहीं हो सका"),
+    message: t(
+      "We can't show which days and meal times are free right now. Try again to refresh the calendar — we'll still double-check availability when you confirm your order.",
+      "अभी हम नहीं दिखा पा रहे कि कौन-से दिन और भोजन समय खाली हैं। कैलेंडर ताज़ा करने के लिए फिर कोशिश करें — ऑर्डर कन्फर्म करते समय हम फिर भी उपलब्धता जाँचेंगे।",
+    ),
+    tone: "notice",
+    actions: [
+      { label: t("Try again", "फिर कोशिश करें"), onClick: a.retry },
+      { label: t("Continue without calendar", "कैलेंडर के बिना जारी रखें"), variant: "secondary" },
+    ],
+  };
+}
+
+export function vendorsRosterFailureSpec(a: { t: T; retry: () => void }): ErrorDialogSpec {
+  const { t } = a;
+  return {
+    title: t("Couldn't load the latest caterer list", "ताज़ा कैटरर सूची लोड नहीं हो सकी"),
+    message: t(
+      "Check your internet connection and try again. Until we reconnect, some pages may show only saved sample listings instead of live vendors.",
+      "अपना इंटरनेट जाँचें और फिर कोशिश करें। जब तक कनेक्शन नहीं बनता, कुछ पेज लाइव विक्रेताओं की जगह सेव की गई नमूना सूची दिखा सकते हैं।",
+    ),
+    tone: "notice",
+    actions: [{ label: t("Try again", "फिर कोशिश करें"), onClick: a.retry }],
+  };
+}
+
+export function couponsLoadFailureSpec(a: { t: T; retry: () => void }): ErrorDialogSpec {
+  const { t } = a;
+  return {
+    title: t("Couldn't load coupon offers", "कूपन ऑफ़र लोड नहीं हो सके"),
+    message: t(
+      "You can still finish your booking — type a code if you have one and we'll validate it at checkout. Try again to see the latest offers on this page.",
+      "आप अभी भी बुकिंग पूरी कर सकते हैं — अगर कोड है तो लिखें, चेकआउट पर हम उसे जाँचेंगे। इस पेज पर ताज़ा ऑफ़र देखने के लिए फिर कोशिश करें।",
+    ),
+    tone: "notice",
+    actions: [
+      { label: t("Try again", "फिर कोशिश करें"), onClick: a.retry },
+      { label: t("Continue without offers list", "ऑफ़र सूची के बिना जारी रखें"), variant: "secondary" },
+    ],
+  };
+}
+
+export function feastInterestFailureSpec(a: { t: T; retry?: () => void }): ErrorDialogSpec {
+  const { t } = a;
+  const retry = a.retry ?? (() => {});
+  const contact = {
+    label: t("Contact support", "सहायता से संपर्क करें"),
+    href: supportHref("Hi Bhojpatra, I tried to register Feast interest but the form didn't go through."),
+    newTab: true,
+    variant: "secondary" as const,
+  };
+  return {
+    title: t("Couldn't register your interest", "आपकी रुचि दर्ज नहीं हो सकी"),
+    message: t(
+      "We couldn't reach Bhojpatra just now — check your connection and try again. Your details stay filled in on this form.",
+      "अभी हम भोजपत्र तक नहीं पहुँच सके — कनेक्शन जाँचें और फिर कोशिश करें। आपकी भरी हुई जानकारी इसी फॉर्म पर रहेगी।",
+    ),
+    actions: [{ label: t("Try again", "फिर कोशिश करें"), onClick: retry }, contact],
+  };
+}

@@ -33,6 +33,8 @@ import {
 } from "@/lib/vendorAvailability";
 import { Sheet } from "@/components/vendor/portalUi";
 import { cn } from "@/components/ui/cn";
+import { useErrorDialog } from "@/components/ui";
+import { availabilityLoadFailureSpec } from "@/lib/failureDialogs";
 
 type T = (en: string, hi: string) => string;
 
@@ -61,23 +63,48 @@ export async function fetchVendorAvailability(
  *  Bump `refresh` to read it again (e.g. after checkout found the slot gone).
  *  `excludeOrderId` leaves the guest's own in-progress order out, so a checkout
  *  they opened and backed out of doesn't read as the vendor being booked. */
+export type VendorAvailabilityHook = {
+  av: VendorAvailability | null;
+  loading: boolean;
+  failed: boolean;
+  retry: () => void;
+};
+
 export function useVendorAvailability(
   vendorId: string | undefined,
   refresh = 0,
   excludeOrderId = "",
-) {
-  const [state, setState] = useState<{ id: string; av: VendorAvailability | null }>({
-    id: "",
-    av: null,
-  });
+): VendorAvailabilityHook {
+  const [state, setState] = useState<{
+    id: string;
+    av: VendorAvailability | null;
+    loading: boolean;
+    failed: boolean;
+  }>({ id: "", av: null, loading: false, failed: false });
+  const [retryNonce, setRetryNonce] = useState(0);
+  const retry = useCallback(() => setRetryNonce((n) => n + 1), []);
+
   useEffect(() => {
     if (!vendorId) return;
     let live = true;
-    const load = () =>
+    const load = () => {
+      setState((prev) =>
+        prev.id === vendorId
+          ? { ...prev, loading: true, failed: false }
+          : { id: vendorId, av: null, loading: true, failed: false },
+      );
       void fetchVendorAvailability(vendorId, excludeOrderId).then((av) => {
-        // A failed re-read keeps the last good calendar.
-        if (live) setState((prev) => (av || prev.id !== vendorId ? { id: vendorId, av } : prev));
+        if (!live) return;
+        setState((prev) => {
+          if (av) return { id: vendorId, av, loading: false, failed: false };
+          // A failed re-read keeps the last good calendar for this vendor.
+          if (prev.id === vendorId && prev.av) {
+            return { ...prev, loading: false, failed: false };
+          }
+          return { id: vendorId, av: null, loading: false, failed: true };
+        });
       });
+    };
     load();
     // The vendor can switch a day off while this page sits open (often in
     // another tab) — re-read whenever the guest comes back to it.
@@ -89,8 +116,15 @@ export function useVendorAvailability(
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", load);
     };
-  }, [vendorId, refresh, excludeOrderId]);
-  return vendorId && state.id === vendorId ? state.av : null;
+  }, [vendorId, refresh, excludeOrderId, retryNonce]);
+
+  const active = Boolean(vendorId && state.id === vendorId);
+  return {
+    av: active ? state.av : null,
+    loading: active ? state.loading : false,
+    failed: active ? state.failed : false,
+    retry,
+  };
 }
 
 /** The customer-facing sentence for an unavailable date / meal. */
@@ -327,7 +361,8 @@ export function VendorAvailabilitySheet({
   continueLabel?: string;
 }) {
   const { lang, t } = useLang();
-  const av = useVendorAvailability(open ? vendorId : undefined);
+  const { showError } = useErrorDialog();
+  const { av, loading, failed, retry } = useVendorAvailability(open ? vendorId : undefined);
   const [picked, setPicked] = useState<string>("");
   const [meal, setMeal] = useState<string>("");
   const day = picked || date || "";
@@ -341,6 +376,11 @@ export function VendorAvailabilitySheet({
     setMeal("");
     onClose();
   };
+
+  useEffect(() => {
+    if (!open || !failed) return;
+    showError(availabilityLoadFailureSpec({ t, retry }));
+  }, [open, failed, retry, showError, t]);
 
   return (
     <Sheet
@@ -362,7 +402,7 @@ export function VendorAvailabilitySheet({
             </button>
             <button
               type="button"
-              disabled={!av || !day || reason !== null}
+              disabled={(!av && !failed) || !day || reason !== null}
               onClick={() => onContinue(day, chosenMeal)}
               className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-maroon px-5 text-[13px] font-bold text-white disabled:opacity-50"
             >
@@ -372,11 +412,27 @@ export function VendorAvailabilitySheet({
         ) : undefined
       }
     >
-      {!av ? (
+      {loading && !av && !failed ? (
         <div className="flex min-h-[200px] items-center justify-center">
           <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-maroon border-t-transparent" />
         </div>
-      ) : (
+      ) : failed && !av ? (
+        <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 px-4 text-center">
+          <p className="text-sm font-medium text-ink/80">
+            {t(
+              "We couldn't load this calendar. Try again or continue — we'll check the date when you book.",
+              "कैलेंडर लोड नहीं हो सका। फिर कोशिश करें या आगे बढ़ें — बुक करते समय हम तारीख़ जाँचेंगे।",
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={retry}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-maroon px-5 text-[13px] font-bold text-white"
+          >
+            {t("Try again", "फिर कोशिश करें")}
+          </button>
+        </div>
+      ) : av ? (
         <>
           {day && reason && (
             <p role="alert" className="mb-3 rounded-control border border-maroon/40 bg-maroon/5 px-3 py-2.5 text-[13px] font-semibold text-maroon">
@@ -428,7 +484,7 @@ export function VendorAvailabilitySheet({
             </div>
           )}
         </>
-      )}
+      ) : null}
     </Sheet>
   );
 }

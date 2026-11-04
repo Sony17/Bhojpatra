@@ -24,7 +24,8 @@ import { useBookingBarState } from "@/lib/bookingBar";
 type Tone = "default" | "success" | "error";
 type ToastItem = { id: number; message: string; tone: Tone };
 
-type ToastApi = { toast: (message: string, opts?: { tone?: Tone }) => void };
+type ToastOpts = { tone?: Tone; /** Auto-dismiss; default 3600ms. */ durationMs?: number };
+type ToastApi = { toast: (message: string, opts?: ToastOpts) => void };
 
 const ToastCtx = createContext<ToastApi | null>(null);
 
@@ -46,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message, opts) => {
       const id = nextId.current++;
       setItems((list) => [...list, { id, message, tone: opts?.tone ?? "default" }]);
-      setTimeout(() => remove(id), 3600);
+      setTimeout(() => remove(id), opts?.durationMs ?? 3600);
     },
     [remove],
   );

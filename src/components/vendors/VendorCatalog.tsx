@@ -27,6 +27,7 @@ import {
 } from "@/lib/vendorRatings";
 import { useCompare } from "@/lib/compare";
 import { useAllVendorsStatus } from "@/lib/useAllVendors";
+import { vendorsRosterFailureSpec } from "@/lib/failureDialogs";
 import { ctaLabel, listingCta, type StallDishesBrief } from "@/lib/vendorStorefront";
 import { stallTypeById, stallTypes, toStallTypeId } from "@/lib/stallTypes";
 import { useLang } from "@/lib/i18n";
@@ -59,6 +60,7 @@ import {
   EmptyState,
   PullToRefresh,
   SkeletonList,
+  useErrorDialog,
 } from "@/components/ui";
 
 const ALL = "all";
@@ -475,12 +477,20 @@ export default function VendorCatalog({
 
   // Curated static listings + live dashboard-published vendors.
   const [refreshToken, setRefreshToken] = useState(0);
-  const { vendors: allVendors, loaded: vendorsLoaded } =
+  const { showError } = useErrorDialog();
+  const { vendors: allVendors, loaded: vendorsLoaded, rosterFailed } =
     useAllVendorsStatus(refreshToken);
   const onPullRefresh = useCallback(async () => {
     setRefreshToken((n) => n + 1);
     await new Promise((r) => setTimeout(r, 350));
   }, []);
+
+  useEffect(() => {
+    if (!rosterFailed || !vendorsLoaded) return;
+    showError(
+      vendorsRosterFailureSpec({ t, retry: () => setRefreshToken((n) => n + 1) }),
+    );
+  }, [rosterFailed, vendorsLoaded, showError, t]);
 
   const toggleMeal = (meal: string) =>
     setMeals((prev) =>
