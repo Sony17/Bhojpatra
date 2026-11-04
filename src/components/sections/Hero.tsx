@@ -10,8 +10,11 @@ import {
   occasions,
   cities,
   guestPresets,
+  packages,
   DEFAULT_VENDOR_LEAD_DAYS,
 } from "@/lib/data";
+import FeastInterestPopup from "@/components/sections/FeastInterest";
+import { FEAST_BOOKING_OPEN } from "@/lib/launchFlags";
 import { isoAfterDays } from "@/lib/bookingPricing";
 import { useLang } from "@/lib/i18n";
 import { useLocations, OTHER_LOCATION_ID } from "@/lib/locations";
@@ -75,6 +78,11 @@ export default function Hero() {
   const [customCity, setCustomCity] = useState("");
   const [date, setDate] = useState<Date | null>(null);
   const [guests, setGuests] = useState<string>(String(guestPresets[1]));
+  const [feastInterestOpen, setFeastInterestOpen] = useState(false);
+  const feastInterestDefaultPackage =
+    packages.find((p) => p.popular && p.id !== "custom")?.id ??
+    packages.find((p) => p.id !== "custom")?.id ??
+    "";
   // Seed from IP/GPS at most once. After the visitor picks a city (or edits
   // "Other"), never let a late detection response overwrite them.
   const locationTouched = useRef(false);
@@ -265,14 +273,26 @@ export default function Hero() {
       </div>
 
       <div className="relative z-0 col-span-3 m-1 grid shrink-0 grid-cols-2 gap-2 sm:m-0 sm:ml-1 sm:flex sm:self-stretch sm:items-stretch">
-        <a
-          href={bookHref}
-          aria-label={ctaLabel}
-          className="btn-sheen flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-maroon px-3 py-2.5 text-[12px] font-bold tracking-wide text-white shadow-brand transition-all duration-200 hover:shadow-pop active:scale-[0.97] sm:min-w-[7.5rem] sm:rounded-[0.9rem] sm:px-5 sm:text-[13px]"
-        >
-          <ChefHat className="h-3.5 w-3.5 shrink-0" />
-          <span className="whitespace-nowrap">{ctaLabel}</span>
-        </a>
+        {FEAST_BOOKING_OPEN ? (
+          <a
+            href={bookHref}
+            aria-label={ctaLabel}
+            className="btn-sheen flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-maroon px-3 py-2.5 text-[12px] font-bold tracking-wide text-white shadow-brand transition-all duration-200 hover:shadow-pop active:scale-[0.97] sm:min-w-[7.5rem] sm:rounded-[0.9rem] sm:px-5 sm:text-[13px]"
+          >
+            <ChefHat className="h-3.5 w-3.5 shrink-0" />
+            <span className="whitespace-nowrap">{ctaLabel}</span>
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setFeastInterestOpen(true)}
+            aria-label={ctaLabel}
+            className="btn-sheen flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-maroon px-3 py-2.5 text-[12px] font-bold tracking-wide text-white shadow-brand transition-all duration-200 hover:shadow-pop active:scale-[0.97] sm:min-w-[7.5rem] sm:rounded-[0.9rem] sm:px-5 sm:text-[13px]"
+          >
+            <ChefHat className="h-3.5 w-3.5 shrink-0" />
+            <span className="whitespace-nowrap">{ctaLabel}</span>
+          </button>
+        )}
         <a
           href={vendorsHref}
           aria-label={browseLabel}
@@ -298,6 +318,7 @@ export default function Hero() {
   );
 
   return (
+    <>
     <section
       id="home"
       className="relative isolate flex min-h-[100svh] flex-col overflow-x-hidden overflow-y-clip bg-white"
@@ -378,5 +399,13 @@ export default function Hero() {
         </ul>
       </div>
     </section>
+    {!FEAST_BOOKING_OPEN && (
+      <FeastInterestPopup
+        open={feastInterestOpen}
+        onClose={() => setFeastInterestOpen(false)}
+        initialPackageId={feastInterestDefaultPackage}
+      />
+    )}
+    </>
   );
 }

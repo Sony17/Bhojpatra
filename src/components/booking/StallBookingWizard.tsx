@@ -2407,12 +2407,7 @@ export default function StallBookingWizard({
             />
           )}
 
-          {step === TOTAL_STEPS &&
-            (sessionStatus === undefined ? (
-              <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
-            ) : sessionStatus === null ? (
-              <LoginGate onBack={goBack} />
-            ) : (
+          {step === TOTAL_STEPS && (
               <StepStallConfirm
                 t={t}
                 sellers={orderSellers}
@@ -2515,7 +2510,7 @@ export default function StallBookingWizard({
                   />
                 }
               />
-            ))}
+            )}
         </div>
 
         {/* Below xl the cart carries its own expanded copy, after the coupon. */}
@@ -3763,6 +3758,8 @@ function StepStallConfirm({
   // Cart first (order, coupon, details), then payment on its own screen. An
   // order that already took money reopens straight on payment.
   const [stage, setStage] = useState<"cart" | "pay">(paidAmount > 0 ? "pay" : "cart");
+  const sessionStatus = useSessionStatus();
+  const payReady = sessionStatus != null;
   // Checkout on phones: the floating support button would sit on the totals.
   useHideChatFab();
   // "Powered by Razorpay" shows only once the pay box confirms the gateway.
@@ -3771,6 +3768,19 @@ function StepStallConfirm({
     setStage(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  // LoginGate is its own <form> — must not sit inside the checkout form below.
+  if (stage === "pay" && sessionStatus === null) {
+    return (
+      <>
+        <BackLink
+          onClick={() => goStage("cart")}
+          label={t("Back to cart", "कार्ट पर वापस")}
+          className="mb-1"
+        />
+        <LoginGate onBack={() => goStage("cart")} />
+      </>
+    );
+  }
   return (
     // A form, like the tiered wizard's review: the shared checkout panel's
     // pay-later CTA is a submit button, so the confirm handler hangs here.
@@ -3786,6 +3796,9 @@ function StepStallConfirm({
           label={t("Back to cart", "कार्ट पर वापस")}
           className="mb-1"
         />
+      )}
+      {stage === "pay" && sessionStatus === undefined && (
+        <p className="text-sm text-ink-soft">{t("Loading…", "लोड हो रहा है…")}</p>
       )}
       {stage === "cart" && (
         <BackLink
@@ -3817,7 +3830,7 @@ function StepStallConfirm({
           </button>
         </div>
       )}
-      {stage === "pay" && (
+      {stage === "pay" && payReady && (
       <SectionHead
         compact
         phoneMinimal
@@ -4002,7 +4015,10 @@ function StepStallConfirm({
 
       {/* Coupon, contact + venue, referral, the total and how to pay — the
           tiered wizard's own checkout, shared verbatim so settling a Single
-          Stall order is the same screen as settling a feast. */}
+          Stall order is the same screen as settling a feast. Payment (and
+          login) only after "Proceed to payment"; the cart stage stays open
+          while signed out. */}
+      {(stage === "cart" || payReady) && (
       <CheckoutPanel
         t={t}
         venue={venue}
@@ -4053,6 +4069,7 @@ function StepStallConfirm({
         onGateway={setGatewayLive}
         sellers={sellers}
       />
+      )}
 
     </form>
   );

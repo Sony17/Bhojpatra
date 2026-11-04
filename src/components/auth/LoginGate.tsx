@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/lib/i18n";
@@ -42,6 +42,13 @@ function LockIcon() {
 export default function LoginGate({ onBack }: { onBack?: () => void }) {
   const { t } = useLang();
   const pathname = usePathname();
+  const [returnPath, setReturnPath] = useState(pathname || "/book/stall");
+  useEffect(() => {
+    const base = pathname || "/book/stall";
+    setReturnPath(
+      typeof window !== "undefined" ? base + window.location.search : base,
+    );
+  }, [pathname]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   // The last failure was the guest's credentials (vs. network / server) — the
@@ -209,7 +216,7 @@ export default function LoginGate({ onBack }: { onBack?: () => void }) {
             where the saved draft is picked back up — it's only carried from
             the gate, so a plain /signup still lands on the dashboard. */}
         <Link
-          href={`/signup?next=${encodeURIComponent(pathname || "/book/stall")}`}
+          href={`/signup?next=${encodeURIComponent(returnPath)}`}
           className="font-semibold text-maroon hover:underline"
         >
           {t("Create an account", "अकाउंट बनाएं")}
