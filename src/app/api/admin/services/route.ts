@@ -36,6 +36,15 @@ function toPrice(v: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
+/** A package photo: uploaded media path, or an https/http image link. */
+function toImage(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim();
+  if (!s || s.length > 2000) return undefined;
+  if (s.startsWith("/") || s.startsWith("https://") || s.startsWith("http://")) return s;
+  return undefined;
+}
+
 /** Keep only the non-empty trimmed strings from an incoming list field. */
 function toStrings(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -90,6 +99,7 @@ export async function POST(request: Request) {
     const priceMin = toPrice(row.priceMin);
     const priceMax = Math.max(priceMin, toPrice(row.priceMax));
     const guestTiers = normalizeGuestTiers(row.guestTiers);
+    const image = toImage(row.image);
 
     list.push({
       id,
@@ -99,6 +109,7 @@ export async function POST(request: Request) {
       subtitle: str(row.subtitle),
       subtitleHi: str(row.subtitleHi, str(row.subtitle)),
       icon: str(row.icon, "🍽️"),
+      ...(image ? { image } : {}),
       includes: toStrings(row.includes),
       notIncluded: toStrings(row.notIncluded),
       bestFor: toStrings(row.bestFor),

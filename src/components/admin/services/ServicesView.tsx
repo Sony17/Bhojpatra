@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/admin/shared/PageHeader";
 import WidgetCard from "@/components/admin/shared/WidgetCard";
+import ImageField from "@/components/admin/shared/ImageField";
 import { Field, Toggle, inputClass } from "@/components/admin/shared/FormControls";
 import { Button } from "@/components/ui";
-import type { ServicePackage } from "@/lib/data";
+import { servicePhoto, type ServicePackage } from "@/lib/data";
 
 /**
  * Admin editor for the feast-wide **service packages** the customer chooses in
@@ -36,6 +37,7 @@ interface Draft {
   subtitle: string;
   subtitleHi: string;
   icon: string;
+  image: string;
   includes: string;
   notIncluded: string;
   bestFor: string;
@@ -54,6 +56,7 @@ const toDraft = (s: ServicePackage): Draft => ({
   subtitle: s.subtitle,
   subtitleHi: s.subtitleHi,
   icon: s.icon,
+  image: s.image || servicePhoto(s) || "",
   includes: s.includes.join("\n"),
   notIncluded: s.notIncluded.join("\n"),
   bestFor: s.bestFor.join("\n"),
@@ -88,6 +91,7 @@ const toPayload = (d: Draft) => ({
   subtitle: d.subtitle.trim(),
   subtitleHi: d.subtitleHi.trim(),
   icon: d.icon.trim(),
+  image: d.image.trim(),
   includes: lines(d.includes),
   notIncluded: lines(d.notIncluded),
   bestFor: lines(d.bestFor),
@@ -112,6 +116,7 @@ const BLANK: Draft = {
   subtitle: "",
   subtitleHi: "",
   icon: "🍽️",
+  image: "",
   includes: "",
   notIncluded: "",
   bestFor: "",
@@ -180,6 +185,18 @@ export default function ServicesView() {
     setRows((rs) => rs.filter((_, idx) => idx !== i));
     setSaved(false);
   };
+  const moveRow = (i: number, dir: -1 | 1) => {
+    setRows((rs) => {
+      const j = i + dir;
+      if (j < 0 || j >= rs.length) return rs;
+      const next = [...rs];
+      const [row] = next.splice(i, 1);
+      next.splice(j, 0, row);
+      return next;
+    });
+    setSaved(false);
+    setError("");
+  };
 
   const save = async () => {
     setError("");
@@ -238,9 +255,27 @@ export default function ServicesView() {
               key={i}
               title={row.name.trim() || `Package ${i + 1}`}
               action={
-                <Button variant="secondary" size="sm" onClick={() => removeRow(i)}>
-                  Remove
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={i === 0}
+                    onClick={() => moveRow(i, -1)}
+                  >
+                    Move up
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={i === rows.length - 1}
+                    onClick={() => moveRow(i, 1)}
+                  >
+                    Move down
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => removeRow(i)}>
+                    Remove
+                  </Button>
+                </div>
               }
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -252,7 +287,7 @@ export default function ServicesView() {
                     onChange={(e) => update(i, "badge", e.target.value)}
                   />
                 </Field>
-                <Field label="Icon (emoji)">
+                <Field label="Icon (emoji)" hint="Shown when no photo is set.">
                   <input
                     className={inputClass}
                     value={row.icon}
@@ -260,6 +295,14 @@ export default function ServicesView() {
                     onChange={(e) => update(i, "icon", e.target.value)}
                   />
                 </Field>
+                <div className="sm:col-span-2">
+                  <ImageField
+                    label="Photo"
+                    value={row.image}
+                    hint="Card photo in the booking flow. The original four packages already have one; a new package stays blank until you add a photo."
+                    onChange={(v) => update(i, "image", v)}
+                  />
+                </div>
                 <Field label="Name (English)">
                   <input
                     className={inputClass}

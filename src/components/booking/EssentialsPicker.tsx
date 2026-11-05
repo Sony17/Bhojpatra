@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Image from "next/image";
 import { servicePhoto, type ServicePackage } from "@/lib/data";
+import { photoNeedsUnoptimized } from "@/lib/photoLinks";
 import { money } from "@/lib/money";
 import {
   serviceRate,
@@ -120,7 +121,14 @@ function Tile({
       )}
       {photo ? (
         <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-md bg-cream-2">
-          <Image src={photo} alt="" fill sizes="(min-width: 640px) 160px, 25vw" className="object-cover" />
+          <Image
+            src={photo}
+            alt=""
+            fill
+            sizes="(min-width: 640px) 160px, 25vw"
+            className="object-cover"
+            unoptimized={photoNeedsUnoptimized(photo)}
+          />
         </span>
       ) : (
         <span
@@ -318,7 +326,14 @@ function DetailCard({
       <div className="flex items-center gap-2.5">
         {photo ? (
           <span className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-full bg-cream-2 sm:h-12 sm:w-12">
-            <Image src={photo} alt="" fill sizes="48px" className="object-cover" />
+            <Image
+              src={photo}
+              alt=""
+              fill
+              sizes="48px"
+              className="object-cover"
+              unoptimized={photoNeedsUnoptimized(photo)}
+            />
           </span>
         ) : (
           <span

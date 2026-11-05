@@ -2359,7 +2359,7 @@ export default function StallBookingWizard({
   }
 
   // Only Review runs beside the order summary; every earlier step takes the
-  // full width (the sticky bar already carries the running estimate).
+  // full width. The running total is shown on Review, not on the sticky bar.
   const showSummary = step === TOTAL_STEPS;
   // The stall-type grid owns the whole screen: it carries its own way onward
   // (a tile), so the wizard's step nav —
@@ -2474,7 +2474,6 @@ export default function StallBookingWizard({
                 toggleCourse={toggleCourse}
                 perPlate={perPlate}
                 pickedCount={pickedCount}
-                guests={guests}
                 brandsHref={brandsHref}
                 onBrandsNavigate={flashBrands}
                 nonVegGuests={nonVegGuests}
@@ -2676,8 +2675,8 @@ export default function StallBookingWizard({
       </div>
       </div>
 
-      {/* Step nav — Back / Continue on desktop, and a sticky checkout bar on
-          phones carrying the running estimate. What still blocks Continue opens
+      {/* Step nav — Back / Continue on desktop and a sticky bar on phones.
+          The order total waits for Review. What still blocks Continue opens
           as a popup on tap. Review carries its own actions, so the nav stops
           before it. */}
       {step < TOTAL_STEPS && !showTypePicker && (
@@ -2738,20 +2737,10 @@ export default function StallBookingWizard({
               } · ${stepLabels[step]} →`}
             </Button>
           </div>
-          {/* Mobile sticky checkout chrome. The estimate only appears once the
-              guest has actually picked something — a stall and a headcount are
-              not an order, and pricing one they never assembled reads as a quote
-              they're on the hook for. */}
+          {/* Mobile sticky chrome is navigation only. The order total
+              waits for the review step, so nothing here quotes a price. */}
           <div ref={dockRef} className="app-sticky-cta md:hidden">
             <div className="mx-auto max-w-3xl rounded-2xl border border-maroon/10 bg-white/96 px-3 py-2.5 shadow-pop-up backdrop-blur-xl">
-              {pickedCount > 0 ? null : (
-                <div className="mb-2 hidden text-[11px] leading-tight text-ink-soft sm:block">
-                  {t(
-                    "Your total appears once you add courses — nothing is booked yet.",
-                    "कोर्स जोड़ते ही आपका कुल दिखेगा — अभी कुछ भी बुक नहीं हुआ है।",
-                  )}
-                </div>
-              )}
               {/* Why Continue is greyed — said up front instead of only after
                   a tap, so a faded button never reads as broken. */}
               {!canNext && nextBlockers[0] && (
@@ -2760,26 +2749,6 @@ export default function StallBookingWizard({
                 </p>
               )}
               <div className="flex items-center gap-2">
-                {/* One row: the running estimate beside the actions, so the
-                    bar costs one line of screen instead of two. The estimate
-                    takes the slack; the buttons keep a short label so they
-                    never squeeze it to "₹…". */}
-                {pickedCount > 0 && (
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] leading-tight text-ink/70">
-                      {t("Total", "कुल")}
-                    </span>
-                    <span className="block truncate text-[20px] font-bold leading-tight text-maroon">
-                      {money(grandTotal)}
-                    </span>
-                    <span className="block truncate text-[10.5px] leading-tight text-ink/70">
-                      {t(
-                        `${inr.format(guests)} guests · ${inr.format(pickedCount)} dishes`,
-                        `${inr.format(guests)} मेहमान · ${inr.format(pickedCount)} व्यंजन`,
-                      )}
-                    </span>
-                  </span>
-                )}
                 {step > 1 && (
                   <BackLink
                     iconOnly
@@ -2795,10 +2764,9 @@ export default function StallBookingWizard({
                       ? t("Skip", "छोड़ें")
                       : t("Continue", "आगे")
                   } · ${stepLabels[step]}`}
-                  fullWidth={pickedCount === 0}
+                  fullWidth
                   className={
-                    "min-h-12 shrink-0 rounded-xl px-4 text-[14px]" +
-                    (pickedCount === 0 ? " flex-1" : "") +
+                    "min-h-12 flex-1 shrink-0 rounded-xl px-4 text-[14px]" +
                     (canNext ? "" : " opacity-50")
                   }
                 >
@@ -3106,7 +3074,6 @@ function StepStallMenu({
   toggleCourse,
   perPlate,
   pickedCount,
-  guests,
   brandsHref,
   onBrandsNavigate,
   nonVegGuests,
@@ -3128,9 +3095,6 @@ function StepStallMenu({
   toggleCourse: (catId: string) => void;
   perPlate: number;
   pickedCount: number;
-  /** Headcount from the event brief — turns every per-plate figure on this step
-   *  into the total the guest actually pays. */
-  guests: number;
   /** Where a different stall is picked — the Brands page, not a step in here. */
   brandsHref: string;
   onBrandsNavigate?: (detail?: string) => void;
@@ -3478,24 +3442,18 @@ function StepStallMenu({
                   {displayDishName(it.name)}
                 </span>
                 {/* Only a varied course prices a dish, because only there does
-                    the guest buy one: the price is the vendor's own, and the
-                    headcount total trails it. A set menu sells the spread at a
-                    single rate — dividing that rate by the dish count would
-                    print a per-dish figure nobody is billed, and leave the last
-                    dish wearing the rounding remainder. The rate belongs to the
-                    course, so it is stated once, on the course. */}
+                    the guest buy one: the price is the vendor's own per-plate
+                    rate. The headcount total waits for review. A set menu sells
+                    the spread at a single rate — dividing that rate by the dish
+                    count would print a per-dish figure nobody is billed, and
+                    leave the last dish wearing the rounding remainder. The rate
+                    belongs to the course, so it is stated once, on the course. */}
                 {!course.fixed && (
                   <span className="mt-0.5 block text-xs text-ink-soft">
                     <span className="font-semibold text-ink">
                       {money(price)}
                     </span>{" "}
                     / {t("plate", "प्लेट")}
-                    {guests > 0 && (
-                      <span className="whitespace-nowrap">
-                        {" · "}
-                        {money(price * guests)}
-                      </span>
-                    )}
                   </span>
                 )}
               </span>
@@ -3618,27 +3576,11 @@ function StepStallMenu({
             ? t("dishes included", "व्यंजन शामिल")
             : t("dishes selected", "व्यंजन चुने गए")}
         </span>
-        <span className="text-right">
-          <span className="block text-lg font-semibold text-maroon">
-            {money(perPlate)}{" "}
-            <span className="text-sm font-normal text-ink-soft">
-              / {t("plate", "प्लेट")}
-            </span>
+        <span className="text-right text-lg font-semibold text-maroon">
+          {money(perPlate)}{" "}
+          <span className="text-sm font-normal text-ink-soft">
+            / {t("plate", "प्लेट")}
           </span>
-          {/* Per-plate is the number a Single Stall guest shops on; the menu
-              total trails it so the headcount arithmetic is still visible. */}
-          {guests > 0 && (
-            <span className="block text-xs text-ink-soft">
-              {money(perPlate * guests)} ·{" "}
-              {t(`${inr.format(guests)} guests`, `${inr.format(guests)} मेहमान`)}
-              {nonVegGuests !== null && (
-                <span className="whitespace-nowrap">
-                  {" "}
-                  ({splitSummary(nonVegGuests, guests, t)})
-                </span>
-              )}
-            </span>
-          )}
         </span>
       </div>
     </div>
