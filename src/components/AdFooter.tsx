@@ -72,19 +72,14 @@ function AppSection() {
               "कभी भी, कहीं भी अपने इवेंट बुक करें, मैनेज करें और प्लान करें।",
             )}
           </p>
-          {/* Phones: a cropped, smaller phone between the copy and the badges */}
-          <div className="mt-4 flex h-[150px] justify-center overflow-hidden sm:hidden" aria-hidden="true">
-            <div className="origin-top scale-[0.7]">
-              <Phone />
-            </div>
-          </div>
-          <div className="mt-1 grid w-full max-w-[16rem] gap-2.5 sm:mt-5 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
+          <div className="mt-5 grid w-full max-w-[16rem] gap-2.5 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
             <StoreBadge store="Google Play" icon={<PlayIcon />} />
             <StoreBadge store="App Store" icon={<AppleIcon />} />
           </div>
         </div>
-        <div className="hidden h-[300px] items-start pt-10 lg:flex">
-          <Phone />
+        {/* Desktop: scan to open the website (the app isn't live yet) */}
+        <div className="hidden lg:block">
+          <QrCard />
         </div>
       </div>
     </section>
@@ -103,34 +98,23 @@ function StoreBadge({ store, icon }: { store: string; icon: React.ReactNode }) {
   );
 }
 
-function Phone() {
+function QrCard() {
   const { t } = useLang();
-  const rows = [
-    { label: t("Book Caterers", "कैटरर बुक करें"), icon: <ChefIcon /> },
-    { label: t("Find Venues", "वेन्यू खोजें"), icon: <PinIcon className="h-4 w-4" /> },
-    { label: t("Manage Events", "इवेंट मैनेज करें"), icon: <CalendarIcon /> },
-  ];
   return (
-    <div className="h-[400px] w-[200px] rotate-[6deg] rounded-[2.25rem] bg-black p-1.5 shadow-[0_24px_48px_-20px_rgba(0,0,0,0.35)]">
-      <div className="relative h-full w-full overflow-hidden rounded-[1.9rem] bg-white">
-        <div className="absolute left-1/2 top-2.5 h-5 w-20 -translate-x-1/2 rounded-full bg-black" />
-        <div className="flex flex-col items-center px-4 pt-12 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bhojpatra-logo.png" alt="" width={894} height={226} className="h-auto w-32" />
-          <p className="mt-2 text-[10px] leading-snug text-black/60">
-            {t("Your celebrations, now in your pocket", "आपके उत्सव, अब आपकी जेब में")}
-          </p>
-          <div className="mt-5 w-full space-y-2">
-            {rows.map((r) => (
-              <div key={r.label} className="flex items-center gap-2.5 rounded-xl bg-maroon/5 px-3 py-2.5 text-[11px] font-semibold text-black">
-                <span className="text-maroon">{r.icon}</span>
-                {r.label}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <figure className="flex w-48 flex-col items-center rounded-2xl border border-cream bg-white p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/qr-website.svg"
+        alt={t("QR code for www.bhojpatra.co.in", "www.bhojpatra.co.in का QR कोड")}
+        width={160}
+        height={160}
+        className="h-40 w-40"
+      />
+      <figcaption className="mt-3 text-xs leading-snug text-black/70">
+        {t("Scan to visit", "स्कैन करें और देखें")}
+        <span className="block font-semibold text-maroon">www.bhojpatra.co.in</span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -344,21 +328,3 @@ function PinIcon({ className }: { className?: string }) {
   );
 }
 
-function ChefIcon() {
-  return (
-    <svg viewBox="0 0 24 24" {...ico} className="h-4 w-4" aria-hidden="true">
-      <path d="M7 13.5V19h10v-5.5" />
-      <path d="M7 13.5a4 4 0 0 1-.6-7.9A4.5 4.5 0 0 1 12 3a4.5 4.5 0 0 1 5.6 2.6 4 4 0 0 1-.6 7.9Z" />
-      <path d="M7 16.5h10" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" {...ico} className="h-4 w-4" aria-hidden="true">
-      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
-      <path d="M8 3v4M16 3v4M3.5 10h17" />
-    </svg>
-  );
-}
