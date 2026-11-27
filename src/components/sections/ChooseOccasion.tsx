@@ -29,8 +29,11 @@ export default function ChooseOccasion({
   tiles = false,
   title,
   subtitle,
+  eyebrow = true,
 }: {
   tiles?: boolean;
+  /** false hides the small "Occasions" label above the heading. */
+  eyebrow?: boolean;
   /** Replace the stored section heading / subtitle. */
   title?: { en: string; hi: string };
   subtitle?: { en: string; hi: string };
@@ -86,7 +89,7 @@ export default function ChooseOccasion({
       className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16"
     >
       <SectionIntro
-        eyebrow={t("Occasions", "अवसर")}
+        eyebrow={eyebrow ? t("Occasions", "अवसर") : undefined}
         title={title ? (lang === "hi" ? title.hi : title.en) : lang === "hi" ? occasions.headingHi : occasions.heading}
         subtitle={subtitle ? (lang === "hi" ? subtitle.hi : subtitle.en) : lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
       />

@@ -36,11 +36,9 @@ export default function HomeRecreate() {
       <PromoBanner />
       <ChooseOccasion
         tiles
+        eyebrow={false}
         title={{ en: "Every Occasion, Beautifully Served.", hi: "हर मौका, खूबसूरती से परोसा गया।" }}
-        subtitle={{
-          en: "From intimate family gatherings to grand celebrations, discover curated catering, live food stalls and memorable dining experiences.",
-          hi: "छोटी पारिवारिक महफ़िलों से भव्य उत्सवों तक, चुनी हुई कैटरिंग, लाइव फूड स्टॉल और यादगार खाने के अनुभव खोजें।",
-        }}
+        subtitle={{ en: "From festive home gatherings to grand wedding feasts.", hi: "त्योहारी घरेलू महफ़िलों से भव्य शादी के भोज तक।" }}
       />
       <div className="home-band-cream">
         <TopCategories tiles />
