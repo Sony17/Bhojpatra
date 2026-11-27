@@ -54,8 +54,15 @@ function toYmd(d: Date) {
 }
 
 /** `navRow`: the header shows a row of nav pills on phones, so the hero
- * starts lower there (used by /home-recreate). */
-export default function Hero({ navRow = false }: { navRow?: boolean }) {
+ * starts lower there. `trustBadges={false}` drops the four-badge strip under
+ * the booking bar. Both are used by /home-recreate. */
+export default function Hero({
+  navRow = false,
+  trustBadges = true,
+}: {
+  navRow?: boolean;
+  trustBadges?: boolean;
+}) {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();
 
@@ -374,31 +381,33 @@ export default function Hero({ navRow = false }: { navRow?: boolean }) {
           {bookingBar}
         </div>
 
-        <ul className="animate-rise delay-5 mt-6 grid grid-cols-4 gap-0 divide-x divide-maroon/10 border-t border-maroon/10 pt-4 sm:mt-12 sm:pt-7">
-          {hero.trustBadges.map((badge) => {
-            const Icon = TRUST_ICON[badge.icon] ?? ShieldCheck;
-            const title = lang === "hi" ? badge.titleHi : badge.title;
-            const sub = lang === "hi" ? badge.subHi : badge.sub;
-            return (
-              <li
-                key={badge.id}
-                className="flex min-w-0 flex-col items-center gap-1 px-1 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/85 text-maroon ring-1 ring-maroon/12 sm:mt-0.5 sm:h-9 sm:w-9">
-                  <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block min-h-[2.5em] text-[9px] font-semibold leading-tight -tracking-[0.02em] text-ink sm:min-h-0 sm:text-[13px] sm:tracking-wide">
-                    {title}
+        {trustBadges && (
+          <ul className="animate-rise delay-5 mt-6 grid grid-cols-4 gap-0 divide-x divide-maroon/10 border-t border-maroon/10 pt-4 sm:mt-12 sm:pt-7">
+            {hero.trustBadges.map((badge) => {
+              const Icon = TRUST_ICON[badge.icon] ?? ShieldCheck;
+              const title = lang === "hi" ? badge.titleHi : badge.title;
+              const sub = lang === "hi" ? badge.subHi : badge.sub;
+              return (
+                <li
+                  key={badge.id}
+                  className="flex min-w-0 flex-col items-center gap-1 px-1 text-center sm:flex-row sm:items-start sm:gap-3 sm:px-5 sm:text-left sm:first:pl-0 sm:last:pr-0"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/85 text-maroon ring-1 ring-maroon/12 sm:mt-0.5 sm:h-9 sm:w-9">
+                    <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </span>
-                  <span className="mt-0.5 block text-[8px] leading-tight text-ink/65 sm:mt-1 sm:text-xs sm:leading-snug">
-                    {sub}
+                  <span className="min-w-0">
+                    <span className="block min-h-[2.5em] text-[9px] font-semibold leading-tight -tracking-[0.02em] text-ink sm:min-h-0 sm:text-[13px] sm:tracking-wide">
+                      {title}
+                    </span>
+                    <span className="mt-0.5 block text-[8px] leading-tight text-ink/65 sm:mt-1 sm:text-xs sm:leading-snug">
+                      {sub}
+                    </span>
                   </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </section>
     {!FEAST_BOOKING_OPEN && (

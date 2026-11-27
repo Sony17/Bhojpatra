@@ -26,7 +26,7 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
 export default function HomeRecreate() {
   return (
     <PublicShell hero mobileNavPills>
-      <Hero navRow />
+      <Hero navRow trustBadges={false} />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
       <PromoBanner />
