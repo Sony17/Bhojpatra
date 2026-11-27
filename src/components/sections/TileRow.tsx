@@ -7,7 +7,7 @@ import { isUnoptimized } from "@/lib/homeContent";
 export type Tile = { id: string; name: string; image: string; href: string };
 
 /**
- * One row of wide photo tiles (name bottom-left, round arrow bottom-right)
+ * One row of wide, square-cornered photo tiles (name bottom-left, round arrow bottom-right)
  * with "View all" as the last tile in the same row. Desktop shows five tiles;
  * phones show about two and a half tiles and scroll the rest sideways.
  */
@@ -25,7 +25,7 @@ export default function TileRow({
         <li key={tile.id} className="w-[42vw] max-w-[190px] shrink-0 snap-start lg:w-auto lg:max-w-none">
           <Link
             href={tile.href}
-            className="group relative block aspect-[3/2] overflow-hidden rounded-2xl bg-maroon shadow-[0_2px_6px_rgba(0,0,0,0.06),0_14px_28px_-16px_rgba(0,0,0,0.4)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+            className="group relative block aspect-[3/2] overflow-hidden bg-maroon shadow-[0_2px_6px_rgba(0,0,0,0.06),0_14px_28px_-16px_rgba(0,0,0,0.4)] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
           >
             {tile.image && (
               <Image
@@ -53,7 +53,7 @@ export default function TileRow({
       <li className="shrink-0 snap-start">
         <Link
           href={viewAll.href}
-          className="group flex aspect-[3/2] h-full min-w-[6.5rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-maroon/30 px-4 text-center text-sm font-semibold text-maroon transition-colors hover:border-maroon hover:bg-maroon hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon lg:aspect-auto"
+          className="group flex aspect-[3/2] h-full min-w-[6.5rem] flex-col items-center justify-center gap-2 border-2 border-dashed border-maroon/30 px-4 text-center text-sm font-semibold text-maroon transition-colors hover:border-maroon hover:bg-maroon hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon lg:aspect-auto"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-maroon text-white transition-colors group-hover:bg-white group-hover:text-maroon">
             <Arrow />

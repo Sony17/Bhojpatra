@@ -28,10 +28,12 @@ const EVENT_GROUPS = [
 export default function ChooseOccasion({
   tiles = false,
   title,
+  subtitle,
 }: {
   tiles?: boolean;
-  /** Replaces the stored section heading. */
+  /** Replace the stored section heading / subtitle. */
   title?: { en: string; hi: string };
+  subtitle?: { en: string; hi: string };
 }) {
   const { lang, t } = useLang();
   const { occasions } = useHomeContent();
@@ -86,7 +88,7 @@ export default function ChooseOccasion({
       <SectionIntro
         eyebrow={t("Occasions", "अवसर")}
         title={title ? (lang === "hi" ? title.hi : title.en) : lang === "hi" ? occasions.headingHi : occasions.heading}
-        subtitle={lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
+        subtitle={subtitle ? (lang === "hi" ? subtitle.hi : subtitle.en) : lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
       />
 
       {tiles ? (
