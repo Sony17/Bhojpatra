@@ -75,7 +75,7 @@ export default function GalleryCoverflow() {
   const current = items[index];
 
   return (
-    <section className="relative overflow-hidden bg-white py-12 sm:py-16">
+    <section className="relative overflow-hidden bg-white py-10 sm:py-14">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[700px] max-w-[110vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(185,32,37,0.08),transparent_68%)] blur-3xl"
@@ -129,7 +129,7 @@ export default function GalleryCoverflow() {
             glideBy(steps, dx < 0 ? 1 : -1);
           }
         }}
-        className="relative mx-auto mt-8 h-[320px] max-w-6xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-maroon sm:mt-10 sm:h-[420px] lg:h-[500px]"
+        className="relative mx-auto mt-6 h-[290px] max-w-6xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-maroon sm:mt-8 sm:h-[390px] lg:h-[450px]"
       >
         {items.map((item, i) => {
           const off = offsetOf(i);
@@ -153,7 +153,7 @@ export default function GalleryCoverflow() {
               aria-current={off === 0 || undefined}
               tabIndex={off === 0 ? -1 : 0}
               className={
-                "absolute left-1/2 top-1/2 w-[64vw] max-w-[300px] bg-white p-2 pb-9 text-left shadow-[0_2px_6px_rgba(0,0,0,0.06),0_24px_44px_-18px_rgba(0,0,0,0.35)] ring-1 ring-cream transition-[transform,filter] duration-500 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none sm:max-w-none sm:w-[340px] sm:p-3 sm:pb-12 lg:w-[420px] " +
+                "absolute left-1/2 top-1/2 w-[74vw] max-w-[345px] bg-white p-2 pb-9 text-left shadow-[0_2px_6px_rgba(0,0,0,0.06),0_24px_44px_-18px_rgba(0,0,0,0.35)] ring-1 ring-cream transition-[transform,filter] duration-500 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none sm:max-w-none sm:w-[390px] sm:p-3 sm:pb-12 lg:w-[485px] " +
                 (dist >= 2 ? "hidden sm:block " : "") +
                 (off === 0 ? "cursor-default" : "cursor-pointer")
               }
@@ -169,14 +169,14 @@ export default function GalleryCoverflow() {
                   src={item.image}
                   alt={off === 0 ? title : ""}
                   fill
-                  sizes="(min-width:1024px) 420px, (min-width:640px) 340px, 64vw"
+                  sizes="(min-width:1024px) 485px, (min-width:640px) 390px, 74vw"
                   className="object-cover"
                   unoptimized={isUnoptimized(item.image)}
                   draggable={false}
                 />
-                {/* Same dark overlay as the occasion cards */}
-                <span aria-hidden="true" className="absolute inset-0 bg-black/45" />
-                <span aria-hidden="true" className="media-veil absolute inset-0" />
+                {/* Occasion-card overlay, 30% lighter */}
+                <span aria-hidden="true" className="absolute inset-0 bg-black/30" />
+                <span aria-hidden="true" className="media-veil absolute inset-0 opacity-70" />
                 {caption && (
                   <span className="absolute left-2 top-2 bg-black/70 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-cream sm:left-3 sm:top-3 sm:text-[10px]">
                     {caption}
@@ -194,15 +194,6 @@ export default function GalleryCoverflow() {
         <Arrow dir="next" onClick={() => go(1)} label={t("Next photo", "अगली फोटो")} />
       </div>
 
-      {/* Position dots */}
-      <div className="mt-6 flex justify-center gap-1.5 sm:mt-8" aria-hidden="true">
-        {items.map((it, i) => (
-          <span
-            key={it.id}
-            className={"h-1.5 rounded-full transition-all duration-300 " + (i === index ? "w-6 bg-maroon" : "w-1.5 bg-maroon/25")}
-          />
-        ))}
-      </div>
       <p className="sr-only" aria-live="polite">
         {lang === "hi" ? current.titleHi : current.title}
       </p>
