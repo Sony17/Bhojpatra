@@ -34,7 +34,10 @@ export default function HomeRecreate() {
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
       <PromoBanner />
-      <ChooseOccasion tiles />
+      <ChooseOccasion
+        tiles
+        title={{ en: "From Everyday Gatherings to Grand Celebrations", hi: "रोज़ की महफ़िलों से भव्य उत्सवों तक" }}
+      />
       <div className="home-band-cream">
         <TopCategories tiles />
       </div>

@@ -25,7 +25,14 @@ const EVENT_GROUPS = [
 
 /** `tiles`: one row of wide photo tiles with View all in the same row
  * (used by /home-recreate). Otherwise the original card rail. */
-export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
+export default function ChooseOccasion({
+  tiles = false,
+  title,
+}: {
+  tiles?: boolean;
+  /** Replaces the stored section heading. */
+  title?: { en: string; hi: string };
+}) {
   const { lang, t } = useLang();
   const { occasions } = useHomeContent();
   // Tile mode: put the occasions that bring in the most revenue first.
@@ -78,7 +85,7 @@ export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
     >
       <SectionIntro
         eyebrow={t("Occasions", "अवसर")}
-        title={lang === "hi" ? occasions.headingHi : occasions.heading}
+        title={title ? (lang === "hi" ? title.hi : title.en) : lang === "hi" ? occasions.headingHi : occasions.heading}
         subtitle={lang === "hi" ? occasions.subtitleHi : occasions.subtitle}
       />
 
