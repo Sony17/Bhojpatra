@@ -25,13 +25,22 @@ const SLOTS = [
   { x: 160, scale: 0.56, z: 5 },
 ];
 
+/** Real Bhojpatra event set-ups, shown first in the row. */
+const EVENT_PHOTOS: HomeGalleryItem[] = [
+  { id: "ev-1", title: "Fruit Bagiya Live Counters", titleHi: "फ्रूट बगिया लाइव काउंटर", caption: "Wedding · Night Setup", captionHi: "शादी · रात की सजावट", image: "/gallery/event-1.jpg" },
+  { id: "ev-2", title: "Fabulous Fruit Bagiya", titleHi: "फैबुलस फ्रूट बगिया", caption: "Fruit Stall", captionHi: "फ्रूट स्टॉल", image: "/gallery/event-2.jpg" },
+  { id: "ev-3", title: "Garden of Light Counters", titleHi: "रोशनी वाले काउंटर", caption: "Reception · Live Counters", captionHi: "रिसेप्शन · लाइव काउंटर", image: "/gallery/event-3.jpg" },
+  { id: "ev-4", title: "Evening Stall Promenade", titleHi: "शाम की स्टॉल गली", caption: "Wedding · Open Lawn", captionHi: "शादी · खुला लॉन", image: "/gallery/event-4.jpg" },
+  { id: "ev-5", title: "Royal Buffet Spread", titleHi: "शाही बुफे", caption: "Banquet · Buffet", captionHi: "बैंक्वेट · बुफे", image: "/gallery/event-5.jpg" },
+];
+
 export default function GalleryCoverflow() {
   const { lang, t } = useLang();
   const { gallery } = useHomeContent();
 
-  // One row: both stored rows, de-duplicated, photos only.
+  // One row: real event photos first, then both stored rows, de-duplicated.
   const seen = new Set<string>();
-  const items: HomeGalleryItem[] = [...gallery.rowOne, ...gallery.rowTwo].filter(
+  const items: HomeGalleryItem[] = [...EVENT_PHOTOS, ...gallery.rowOne, ...gallery.rowTwo].filter(
     (it) => it.image && !seen.has(it.id) && seen.add(it.id),
   );
   const n = items.length;
