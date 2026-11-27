@@ -13,9 +13,15 @@ import { serviceCategoryHref } from "@/lib/homeLinks";
  * Category rail under "Single stall, one Bhojpatra Experience…" —
  * large occasion-style portrait tiles in a continuous right→left marquee.
  */
-/** `tiles`: one row of wide photo tiles with View all in the same row
- * (used by /home-recreate). Otherwise the original card rail. */
-export default function TopCategories({ tiles = false }: { tiles?: boolean }) {
+/** `tiles`: wide photo tiles with View all in the row. `title` replaces the
+ * stored heading and drops the eyebrow and subtitle (used by /home-recreate). */
+export default function TopCategories({
+  tiles = false,
+  title,
+}: {
+  tiles?: boolean;
+  title?: { en: string; hi: string };
+}) {
   const { lang, t } = useLang();
   const { services } = useHomeContent();
 
@@ -47,9 +53,20 @@ export default function TopCategories({ tiles = false }: { tiles?: boolean }) {
       className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16"
     >
       <SectionIntro
-        eyebrow={t("What's on your mind?", "क्या मन है?")}
-        title={lang === "hi" ? services.headingHi : services.heading}
-        subtitle={lang === "hi" ? services.subtitleHi : services.subtitle}
+        eyebrow={title ? undefined : t("What's on your mind?", "क्या मन है?")}
+        title={
+          title ? (
+            // Kept on one line: centred on the section and sized to the screen.
+            <span className="relative left-1/2 inline-block -translate-x-1/2 whitespace-nowrap text-[clamp(1.05rem,4.6vw,2.6rem)]">
+              {lang === "hi" ? title.hi : title.en}
+            </span>
+          ) : lang === "hi" ? (
+            services.headingHi
+          ) : (
+            services.heading
+          )
+        }
+        subtitle={title ? undefined : lang === "hi" ? services.subtitleHi : services.subtitle}
       />
 
       {tiles ? (
