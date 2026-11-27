@@ -78,7 +78,7 @@ function AppSection() {
           </div>
         </div>
         {/* Desktop: scan to open the website (the app isn't live yet) */}
-        <div className="hidden lg:block">
+        <div className="hidden self-end lg:block">
           <QrCard />
         </div>
       </div>
@@ -98,23 +98,28 @@ function StoreBadge({ store, icon }: { store: string; icon: React.ReactNode }) {
   );
 }
 
+/** A phone frame whose screen holds the website QR, cropped at the section's bottom edge. */
 function QrCard() {
   const { t } = useLang();
   return (
-    <figure className="flex w-48 flex-col items-center rounded-2xl border border-cream bg-white p-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/qr-website.svg"
-        alt={t("QR code for www.bhojpatra.co.in", "www.bhojpatra.co.in का QR कोड")}
-        width={160}
-        height={160}
-        className="h-40 w-40"
-      />
-      <figcaption className="mt-3 text-xs leading-snug text-black/70">
-        {t("Scan to visit", "स्कैन करें और देखें")}
-        <span className="block font-semibold text-maroon">www.bhojpatra.co.in</span>
-      </figcaption>
-    </figure>
+    <div className="h-[330px] overflow-hidden pt-8">
+      <div className="h-[380px] w-[230px] rounded-[2.5rem] bg-black p-2 shadow-[0_24px_48px_-20px_rgba(0,0,0,0.35)]">
+        <div className="relative flex h-full w-full flex-col items-center rounded-[2.1rem] bg-white px-6 pt-12">
+          <span className="absolute left-1/2 top-3 h-6 w-24 -translate-x-1/2 rounded-full bg-black" aria-hidden="true" />
+          <span className="rounded-2xl border-2 border-black/10 bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/qr-website.svg"
+              alt={t("QR code for www.bhojpatra.co.in", "www.bhojpatra.co.in का QR कोड")}
+              width={140}
+              height={140}
+              className="h-[140px] w-[140px]"
+            />
+          </span>
+          <p className="mt-4 text-lg font-bold text-maroon">{t("Scan to explore", "स्कैन करें")}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
