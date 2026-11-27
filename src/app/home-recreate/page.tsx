@@ -25,8 +25,7 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  */
 export default function HomeRecreate() {
   return (
-    // static-ribbons: the image rows on this page stay still (no auto-scroll).
-    <PublicShell hero mobileNavPills className="static-ribbons">
+    <PublicShell hero mobileNavPills>
       <Hero navRow />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
