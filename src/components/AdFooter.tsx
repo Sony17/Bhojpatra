@@ -187,7 +187,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
         </div>
 
         {/* Phone */}
-        <div className="py-6 lg:hidden">
+        <div className="pb-2 pt-6 lg:hidden">
           <div className="flex items-center gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-12" />
@@ -199,7 +199,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
               </a>
             </div>
           </div>
-          <div className="mt-5 divide-y divide-white/15 border-y border-white/15">
+          <div className="mt-5 divide-y divide-white/15 border-t border-white/15">
             <Fold title={t("Explore", "एक्सप्लोर")}>
               <LinkList links={explore} />
             </Fold>
@@ -210,10 +210,22 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
           </div>
         </div>
 
-        <p className="pb-4 text-center text-xs text-white/60 lg:border-t lg:border-white/15 lg:pt-4">
-          © {year} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
-        </p>
       </div>
+
+      {/* Cream line-art skyline (brand cream on transparent) as the divider */}
+      <div aria-hidden="true" className="flex justify-end overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/footer-skyline.png"
+          alt=""
+          width={2000}
+          height={185}
+          className="h-auto w-full min-w-[720px] max-w-none opacity-70 lg:-mt-8"
+        />
+      </div>
+      <p className="px-4 py-3 text-center text-xs text-white/60">
+        © {year} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
+      </p>
     </footer>
   );
 }
