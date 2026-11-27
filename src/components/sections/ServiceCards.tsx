@@ -87,25 +87,25 @@ export default function ServiceCards() {
         </h2>
 
         {/* Phones: one horizontal row card per service */}
-        <ul className="mt-6 space-y-3 sm:hidden">
+        <ul className="mt-6 space-y-2.5 sm:hidden">
           {services.map((s) => (
             <li key={s.href}>
               <Link
                 href={s.href}
-                className="flex items-stretch overflow-hidden rounded-2xl bg-white shadow-[0_2px_6px_rgba(0,0,0,0.05),0_10px_24px_-16px_rgba(0,0,0,0.25)] ring-1 ring-cream"
+                className="flex min-h-[5.75rem] items-stretch overflow-hidden rounded-2xl bg-white shadow-[0_8px_20px_-16px_rgba(0,0,0,0.3)] ring-1 ring-cream/70 transition-transform active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
               >
-                <span className="relative w-[34%] shrink-0">
+                <span className="relative w-[34%] shrink-0 overflow-hidden rounded-l-2xl">
                   <Image src={s.img} alt={s.alt} fill sizes="34vw" className="object-cover" />
                 </span>
-                <span className="flex min-w-0 flex-1 items-center gap-2.5 py-3 pl-3 pr-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full bg-cream/50 text-maroon [&_svg]:h-[18px] [&_svg]:w-[18px]">
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 py-3 pl-2.5 pr-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-full bg-cream/45 text-maroon [&_svg]:h-4 [&_svg]:w-4">
                     {s.icon}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="font-display block text-lg leading-tight text-maroon">{s.title}</span>
-                    <span className="mt-0.5 block text-[12.5px] leading-snug text-black/70">{s.text}</span>
+                    <span className="font-display block truncate text-[17px] leading-tight text-maroon">{s.title}</span>
+                    <span className="mt-1 block line-clamp-2 text-[12.5px] leading-snug text-black/70">{s.text}</span>
                   </span>
-                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/50 text-maroon">
+                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/45 text-maroon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </span>
                 </span>
@@ -153,14 +153,14 @@ export default function ServiceCards() {
         </div>
 
         {/* Trust strip: one rounded bar, four promises */}
-        <div className="mt-6 rounded-2xl bg-cream/40 px-2 py-4 sm:mt-8 sm:px-6 sm:py-3.5">
-        <p className="mb-3 text-center text-[15px] font-semibold leading-tight text-black sm:hidden">
+        <div className="mt-6 rounded-2xl bg-cream/40 px-2 pb-5 pt-4 sm:mt-8 sm:px-6 sm:py-3.5">
+        <p className="mb-4 text-center text-base font-semibold leading-tight text-black sm:hidden">
           {t("Your celebration,", "आपका उत्सव,")}
-          <span className="font-display block text-xl font-normal text-maroon">{t("our responsibility.", "हमारी ज़िम्मेदारी।")}</span>
+          <span className="font-display mt-0.5 block text-[22px] font-normal text-maroon">{t("our responsibility.", "हमारी ज़िम्मेदारी।")}</span>
         </p>
         <ul className="grid grid-cols-4 [&>li+li]:border-l [&>li+li]:border-maroon/15 sm:flex sm:items-center sm:justify-around">
           {reasons.map((r) => (
-            <li key={r.label} className="flex flex-1 flex-col items-center justify-center gap-1.5 px-1 text-center text-[11px] font-semibold leading-tight text-black sm:flex-row sm:gap-2.5 sm:text-sm">
+            <li key={r.label} className="flex flex-1 flex-col items-center justify-start gap-2 px-1 text-center text-[11.5px] font-medium leading-tight text-black sm:flex-row sm:justify-center sm:gap-2.5 sm:text-sm sm:font-semibold">
               <span className="text-maroon [&_svg]:h-6 [&_svg]:w-6">{r.icon}</span>
               {r.label}
             </li>
