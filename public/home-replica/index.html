@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.ico">
+<title>Bhojpatra Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap">
+<style>
+/* Layout: split hero (copy left, photo right) over a floating search pill, then
+   centred section stack; one column on phones with a bottom tab bar.
+   Brand-locked: only the four Bhojpatra colours, alpha used for shadows/overlays only. */
+@font-face {
+  font-family: "Ananda Neptouch 2";
+  src: url("/ananda-neptouch-2.regular.ttf") format("truetype");
+  font-display: swap;
+}
+:root {
+  --red: #B92025;
+  --cream: #F0D09E;
+  --ink: #000000;
+  --white: #FFFFFF;
+  --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.12);
+  --shadow-pop: 0 2px 8px rgba(0,0,0,.05), 0 18px 40px -16px rgba(0,0,0,.22);
+  --shadow-red: 0 10px 26px -12px rgba(185,32,37,.55);
+  --font-brand: "Ananda Neptouch 2", "Open Sans", system-ui, sans-serif;
+  --font-body: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 16px;
+  --max: 1200px;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+body {
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-radius: 6px; }
+.wrap {
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 640px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+.brand { font-family: var(--font-brand); font-weight: 400; }
+.ph { background-size: cover; background-position: center; background-color: var(--cream); }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 0 26px; border-radius: 999px;
+  font: 600 15px/1 var(--font-body); cursor: pointer; border: 1.5px solid var(--red);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+}
+.btn-red { background: var(--red); color: var(--white); box-shadow: var(--shadow-red); }
+.btn-red:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+.btn-line { background: var(--white); color: var(--red); }
+.btn-line:hover { background: var(--red); color: var(--white); }
+.btn-sm { min-height: 38px; padding: 0 20px; font-size: 14px; }
+
+/* ── Header ── */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--white); box-shadow: 0 6px 24px -18px rgba(0,0,0,.35);
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--white); }
+.top .wrap { display: flex; align-items: center; gap: 24px; min-height: 72px; }
+.logo { display: flex; flex-direction: column; line-height: 1; }
+.logo img { height: 34px; width: auto; }
+.logo small { margin-top: 3px; padding-left: 46px; font-size: 10px; color: var(--ink); letter-spacing: .02em; }
+.nav { display: flex; gap: 26px; margin-left: auto; font-size: 14px; font-weight: 600; }
+.nav a { position: relative; padding: 6px 0; }
+.nav a:hover { color: var(--red); }
+.nav a[aria-current] { color: var(--red); }
+.nav a[aria-current]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; border-radius: 2px; background: var(--red); }
+.top .btn { margin-left: 8px; }
+.menu-btn { display: none; margin-left: auto; width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--cream); background: var(--white); color: var(--ink); align-items: center; justify-content: center; cursor: pointer; }
+@media (max-width: 900px) {
+  .nav, .top .btn { display: none; }
+  .menu-btn { display: inline-flex; }
+  .top.open .nav { display: flex; flex-direction: column; gap: 0; position: absolute; left: 0; right: 0; top: 100%; background: var(--white); padding: 8px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); box-shadow: var(--shadow-pop); }
+  .top.open .nav a { padding: 12px 0; border-bottom: 1px solid var(--cream); }
+  .top.open .nav a[aria-current]::after { display: none; }
+}
+
+/* ── Hero ── */
+.hero .wrap { padding-block: 40px 0; }
+.hero-grid { display: grid; gap: 20px; align-items: center; }
+@media (min-width: 1000px) { .hero-grid { grid-template-columns: 1fr 1.1fr; gap: 8px; } }
+.eyebrow-dots { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.hero h1 { margin: 16px 0 0; font-size: clamp(2.4rem, 1.6rem + 3.4vw, 4.1rem); line-height: 1.04; text-wrap: balance; }
+.hero h1 em { font-style: normal; color: var(--red); }
+.hero p.lede { margin: 16px 0 0; max-width: 28rem; font-size: 16px; }
+.hero .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.hero-photo {
+  aspect-ratio: 5 / 4; max-width: 100%; border-radius: 0;
+  -webkit-mask-image: radial-gradient(ellipse at 62% 46%, #000 52%, transparent 78%);
+          mask-image: radial-gradient(ellipse at 62% 46%, #000 52%, transparent 78%);
+}
+@media (max-width: 999px) { .hero-photo { aspect-ratio: 16 / 10; margin-inline: -16px; } }
+
+/* ── Search pill ── */
+.search { position: relative; z-index: 2; margin-top: 8px; }
+@media (min-width: 1000px) { .search { margin-top: -44px; max-width: 980px; } }
+.search form {
+  display: flex; align-items: stretch; gap: 4px;
+  background: var(--white); border: 1px solid var(--cream); border-radius: 999px;
+  padding: 6px; box-shadow: var(--shadow-pop);
+}
+.field { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 0 14px; position: relative; }
+.field + .field::before { content: ""; position: absolute; left: -2px; top: 10px; bottom: 10px; width: 1px; background: var(--cream); }
+.field svg.i { color: var(--ink); }
+.field select, .field input {
+  width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink);
+  font: 600 14px var(--font-body); padding: 12px 0; outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.field .chev { position: absolute; right: 12px; pointer-events: none; width: 14px; height: 14px; }
+.field:focus-within { border-radius: 999px; box-shadow: inset 0 0 0 2px var(--cream); }
+.search .go { flex-shrink: 0; padding: 0 26px; min-height: 48px; border: 0; }
+@media (max-width: 999px) {
+  .field.desk { display: none; }
+  .search .go span { display: none; }
+  .search .go { padding: 0; width: 48px; border-radius: 999px; }
+}
+
+/* ── Section heads ── */
+section.block .wrap { padding-block: 72px 0; }
+@media (max-width: 640px) { section.block .wrap { padding-block: 48px 0; } }
+.kicker { text-align: center; color: var(--red); font-size: 13px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; margin: 0; }
+.title { text-align: center; margin: 8px 0 0; font-size: clamp(1.8rem, 1.3rem + 2vw, 2.6rem); line-height: 1.1; text-wrap: balance; }
+.sub { text-align: center; margin: 12px auto 0; max-width: 34rem; }
+
+/* ── Service cards ── */
+.svc { display: grid; gap: 24px; margin-top: 40px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.svc-card {
+  display: flex; flex-direction: column; background: var(--white);
+  border: 2px solid var(--cream); border-radius: var(--radius); padding: 8px;
+  box-shadow: var(--shadow-card); transition: transform .25s ease, box-shadow .25s ease;
+}
+.svc-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-pop); }
+.svc-card .ph { aspect-ratio: 4 / 3; max-width: 100%; border-radius: 12px; }
+.badge-ic {
+  width: 64px; height: 64px; margin: -32px auto 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--white); border: 2px solid var(--cream); color: var(--red); box-shadow: var(--shadow-card);
+}
+.badge-ic svg.i { width: 28px; height: 28px; stroke-width: 1.6; }
+.svc-card .body { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 16px 20px; flex: 1; }
+.svc-card h3 { margin: 0; font-size: 26px; color: var(--red); line-height: 1.15; }
+.svc-card p { margin: 8px 0 20px; font-size: 14px; flex: 1; }
+.svc-card .btn-line { pointer-events: none; }
+.svc-card:hover .btn-line { background: var(--red); color: var(--white); }
+.svc-rows { display: none; gap: 12px; margin-top: 24px; }
+.svc-row { display: flex; align-items: center; gap: 12px; padding-right: 16px; border: 1px solid var(--cream); border-radius: var(--radius); overflow: hidden; background: var(--white); box-shadow: var(--shadow-card); }
+.svc-row .ph { width: 96px; height: 66px; flex-shrink: 0; }
+.svc-row .badge-ic { width: 40px; height: 40px; margin: 0 0 0 -30px; border-width: 1px; }
+.svc-row .badge-ic svg.i { width: 20px; height: 20px; }
+.svc-row b { flex: 1; color: var(--red); font-size: 15px; font-weight: 600; }
+.svc-row > svg.i { color: var(--red); }
+@media (max-width: 640px) { .svc { display: none; } .svc-rows { display: grid; } }
+
+/* ── Why ── */
+.why { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 24px; background: var(--cream); border-radius: var(--radius); padding: 26px 40px; }
+.why h2 { margin: 0; font-size: 26px; line-height: 1.1; padding-right: 40px; border-right: 1.5px solid var(--red); }
+.why h2 span { display: block; font-size: 32px; color: var(--red); }
+.why ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.why li { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-size: 14px; font-weight: 600; }
+.why li svg.i { width: 28px; height: 28px; color: var(--red); }
+@media (max-width: 640px) {
+  .why { grid-template-columns: 1fr; padding: 24px 16px; text-align: center; }
+  .why h2 { border-right: 0; padding-right: 0; }
+  .why li { font-size: 12px; }
+}
+
+/* ── Occasions ── */
+.occ { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+.occ a { position: relative; display: block; aspect-ratio: 3 / 2; max-width: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); transition: transform .25s ease; }
+.occ a:hover { transform: translateY(-3px); }
+.occ .ph { position: absolute; inset: 0; transition: transform .4s ease; }
+.occ a:hover .ph { transform: scale(1.06); }
+.occ a::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.08) 55%, rgba(0,0,0,0)); }
+.occ .lbl { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--white); font-size: 20px; }
+.occ .lbl i { display: flex; width: 28px; height: 28px; border-radius: 50%; background: var(--white); color: var(--red); align-items: center; justify-content: center; }
+.occ .lbl i svg.i { width: 14px; height: 14px; stroke-width: 2.2; }
+@media (max-width: 640px) {
+  .occ { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .occ a { aspect-ratio: 4 / 5; }
+  .occ a:nth-child(n+4) { display: none; }
+  .occ .lbl { font-size: 15px; } .occ .lbl i { display: none; }
+}
+
+/* ── Trending ── */
+.trend-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.trend-head h2 { margin: 0; font-size: clamp(1.5rem, 1.2rem + 1vw, 1.8rem); line-height: 1.15; }
+.trend-head a { display: inline-flex; align-items: center; gap: 4px; color: var(--red); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.trend-head a:hover { text-decoration: underline; }
+.trend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.vcard { display: block; background: var(--white); border: 1px solid var(--cream); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); transition: transform .25s ease, box-shadow .25s ease; }
+.vcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+.vcard .ph { aspect-ratio: 16 / 9; max-width: 100%; position: relative; }
+.vcard .tag { position: absolute; top: 8px; left: 8px; background: var(--cream); color: var(--red); font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.vcard .meta { padding: 12px 14px 14px; }
+.vcard b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vcard .rate { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.vcard .rate svg { width: 14px; height: 14px; fill: var(--red); stroke: none; flex-shrink: 0; }
+.vcard .rate span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.vcard .price { display: block; margin-top: 8px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 1000px) { .trend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .trend { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; margin-inline: -16px; padding: 0 16px 8px; scrollbar-width: none; }
+  .trend::-webkit-scrollbar { display: none; }
+  .vcard { flex: 0 0 15rem; scroll-snap-align: start; }
+}
+
+/* ── Offer band ── */
+.offer { display: flex; align-items: center; gap: 24px; border: 1px solid var(--cream); border-radius: var(--radius); padding: 28px 40px; box-shadow: var(--shadow-card); background: var(--white); }
+.offer .mark { width: 64px; height: 64px; flex-shrink: 0; border-radius: 50%; background: var(--red); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-red); }
+.offer .mark img { width: 40px; height: 40px; object-fit: contain; }
+.offer h2 { margin: 0; font-size: 28px; line-height: 1.1; color: var(--red); padding-right: 32px; border-right: 1px solid var(--cream); }
+.offer p { margin: 0; flex: 1; min-width: 0; font-size: 14px; }
+@media (max-width: 760px) {
+  .offer { flex-direction: column; text-align: center; padding: 28px 20px; }
+  .offer h2 { border-right: 0; padding-right: 0; }
+}
+
+/* ── Footer ── */
+footer { margin-top: 72px; background: var(--red); color: var(--white); }
+footer .wrap { padding-block: 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
+footer .fbrand { font-size: 30px; color: var(--cream); line-height: 1; }
+footer .fbrand small { display: block; margin-top: 6px; font-family: var(--font-body); font-size: 12px; color: var(--white); }
+footer nav { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; }
+footer nav a:hover { color: var(--cream); }
+footer .fine { flex-basis: 100%; font-size: 12px; color: var(--cream); border-top: 1px solid rgba(240,208,158,.4); padding-top: 16px; }
+
+/* ── Phone tab bar ── */
+.tabs { display: none; }
+@media (max-width: 640px) {
+  .tabs {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: var(--white); box-shadow: 0 -8px 28px -14px rgba(0,0,0,.25);
+    padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+  }
+  .tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--ink); }
+  .tabs a[aria-current] { color: var(--red); font-weight: 700; }
+  .tabs svg.i { width: 22px; height: 22px; }
+  footer { padding-bottom: 72px; }
+}
+.img-hero{background-image:url("/home-replica/photos/hero.jpg")}
+.img-baina{background-image:url("/home-replica/photos/baina.jpg")}
+.img-catering{background-image:url("/home-replica/photos/catering.jpg")}
+.img-venue{background-image:url("/home-replica/photos/venue.jpg")}
+.img-engagement{background-image:url("/home-replica/photos/engagement.jpg")}
+.img-tilak{background-image:url("/home-replica/photos/tilak.jpg")}
+.img-haldi{background-image:url("/home-replica/photos/haldi.jpg")}
+.img-mehndi{background-image:url("/home-replica/photos/mehndi.jpg")}
+.img-v1{background-image:url("/home-replica/photos/v1.jpg")}
+.img-v2{background-image:url("/home-replica/photos/v2.jpg")}
+.img-v3{background-image:url("/home-replica/photos/v3.jpg")}
+.img-v4{background-image:url("/home-replica/photos/v4.jpg")}
+</style>
+
+</head>
+<body>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="Bhojpatra home">
+      <img src="/bhojpatra-logo.png" alt="Bhojpatra" width="134" height="34">
+      <small>Celebrations Rooted in Tradition</small>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#top" aria-current="page">Home</a>
+      <a href="/baina-box">Baina &amp; Gifts</a>
+      <a href="/book/stall">Catering</a>
+      <a href="/venues">Venues</a>
+      <a href="/service-packages">Packages</a>
+    </nav>
+    <a class="btn btn-red btn-sm" href="/login">Login / Sign Up</a>
+    <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="top" aria-label="Open menu">
+      <svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow-dots">Weddings · Events · Corporate · Social</p>
+          <h1 class="brand">Plan, Book &amp; Celebrate<br>with <em>Bhojpatra</em></h1>
+          <p class="lede">Discover trusted vendors for Baina &amp; Gift Boxes, Catering, and Venues, all in one place.</p>
+          <div class="ctas">
+            <a class="btn btn-red" href="#services">Explore Services
+              <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+            <a class="btn btn-line" href="/contact">Get a Quote</a>
+          </div>
+        </div>
+        <div class="hero-photo ph img-hero" role="img" aria-label="A wedding feast of sweets laid out in brass platters"></div>
+      </div>
+
+      <div class="search">
+        <form id="search" autocomplete="off">
+          <label class="field">
+            <svg class="i" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+            <span hidden>City</span>
+            <select id="city" aria-label="Select city">
+              <option value="">Select City</option>
+              <option value="lucknow">Lucknow</option>
+              <option value="delhi">Delhi</option>
+              <option value="mumbai">Mumbai</option>
+              <option value="bengaluru">Bengaluru</option>
+              <option value="kolkata">Kolkata</option>
+              <option value="hyderabad">Hyderabad</option>
+              <option value="jaipur">Jaipur</option>
+              <option value="pune">Pune</option>
+            </select>
+            <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </label>
+          <label class="field desk">
+            <svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+            <select id="service" aria-label="Choose a service">
+              <option value="all">All Services</option>
+              <option value="baina">Baina &amp; Gift Boxes</option>
+              <option value="catering">Catering</option>
+              <option value="venues">Venues</option>
+            </select>
+            <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </label>
+          <label class="field desk">
+            <svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
+            <input id="date" type="date" aria-label="Event date">
+          </label>
+          <label class="field desk">
+            <svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg>
+            <select id="guests" aria-label="Guest count">
+              <option value="">Guest Count</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+              <option value="500">500</option>
+              <option value="1000">1,000</option>
+              <option value="2500">2,500</option>
+              <option value="5000">5,000</option>
+            </select>
+            <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </label>
+          <button class="btn btn-red go" type="submit" aria-label="Search vendors">
+            <svg class="i" viewBox="0 0 24 24" style="stroke-width:2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <span>Search Vendors</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="services">
+    <div class="wrap">
+      <p class="kicker">Our Services</p>
+      <h2 class="title brand">Plan Your Perfect Celebration</h2>
+      <p class="sub">Everything you need for your special occasion: curated, trusted, and personalised.</p>
+
+      <div class="svc">
+        <a class="svc-card" href="/baina-box">
+          <div class="ph img-baina" role="img" aria-label="An open Baina box of dry fruits and sweets"></div>
+          <span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-1.5-3-5-3.5-5-1.2C7 8 9 8 12 8Zm0 0c1.5-3 5-3.5 5-1.2C17 8 15 8 12 8Z"/></svg></span>
+          <div class="body">
+            <h3 class="brand">Baina &amp; Gift Boxes</h3>
+            <p>Traditional and modern wedding favours, Baina, and curated gifts.</p>
+            <span class="btn btn-line btn-sm">Explore <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          </div>
+        </a>
+        <a class="svc-card" href="/book/stall">
+          <div class="ph img-catering" role="img" aria-label="A lit catering stall set up at an evening event"></div>
+          <span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 18h18M5 18a7 7 0 0 1 14 0M12 8V6M10 6h4"/></svg></span>
+          <div class="body">
+            <h3 class="brand">Catering</h3>
+            <p>Customisable menus for weddings, parties, and events.</p>
+            <span class="btn btn-line btn-sm">Explore <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          </div>
+        </a>
+        <a class="svc-card" href="/venues">
+          <div class="ph img-venue" role="img" aria-label="A wedding party celebrating at a venue"></div>
+          <span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12M4 21h16M9 21v-5h6v5M8 11h.01M12 11h.01M16 11h.01"/></svg></span>
+          <div class="body">
+            <h3 class="brand">Venues</h3>
+            <p>Banquet halls, lawns, resorts, and unique venues across India.</p>
+            <span class="btn btn-line btn-sm">Explore <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          </div>
+        </a>
+      </div>
+
+      <div class="svc-rows">
+        <a class="svc-row" href="/baina-box"><span class="ph img-baina"></span><span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-1.5-3-5-3.5-5-1.2C7 8 9 8 12 8Zm0 0c1.5-3 5-3.5 5-1.2C17 8 15 8 12 8Z"/></svg></span><b>Baina &amp; Gift Boxes</b><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="svc-row" href="/book/stall"><span class="ph img-catering"></span><span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 18h18M5 18a7 7 0 0 1 14 0M12 8V6M10 6h4"/></svg></span><b>Catering</b><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="svc-row" href="/venues"><span class="ph img-venue"></span><span class="badge-ic"><svg class="i" viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12M4 21h16M9 21v-5h6v5M8 11h.01M12 11h.01M16 11h.01"/></svg></span><b>Venues</b><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="why">
+        <h2 class="brand">Why Choose <span>Bhojpatra?</span></h2>
+        <ul>
+          <li><svg class="i" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg>Verified Vendors</li>
+          <li><svg class="i" viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg>Compare &amp; Book Easily</li>
+          <li><svg class="i" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg>Dedicated Support</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <p class="kicker">Curated Collections</p>
+      <h2 class="title brand">Explore by Occasion</h2>
+      <div class="occ">
+        <a href="/book?occasion=wedding"><span class="ph img-venue"></span><span class="lbl brand">Wedding<i><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></span></a>
+        <a href="/book?occasion=engagement"><span class="ph img-engagement"></span><span class="lbl brand">Engagement<i><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></span></a>
+        <a href="/book?occasion=tilak"><span class="ph img-tilak"></span><span class="lbl brand">Tilak<i><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></span></a>
+        <a href="/book?occasion=haldi"><span class="ph img-haldi"></span><span class="lbl brand">Haldi<i><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></span></a>
+        <a href="/book?occasion=mehndi"><span class="ph img-mehndi"></span><span class="lbl brand">Mehndi<i><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="trend-head">
+        <h2 class="brand">Trending Vendors Near You</h2>
+        <a href="/vendors">View All <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+      <div class="trend">
+        <a class="vcard" href="/vendors?q=Banarasia%20Buffet%20Art">
+          <div class="ph img-v1"><span class="tag">Best Seller</span></div>
+          <div class="meta"><b>Banarasia Buffet Art</b>
+            <span class="rate"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg><strong>4.9</strong> (50) · <span>North Indian food</span></span>
+            <span class="price">₹99 onwards</span></div>
+        </a>
+        <a class="vcard" href="/vendors?q=Thaligram">
+          <div class="ph img-v2"></div>
+          <div class="meta"><b>Thaligram</b>
+            <span class="rate"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg><strong>4.5</strong> (100) · <span>Caterers</span></span>
+            <span class="price">₹499 onwards</span></div>
+        </a>
+        <a class="vcard" href="/vendors?q=Village%20cafe">
+          <div class="ph img-v3"></div>
+          <div class="meta"><b>Village cafe</b>
+            <span class="rate"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg><strong>4.7</strong> (189) · <span>Cafeteria &amp; Mocktails</span></span>
+            <span class="price">₹100 onwards</span></div>
+        </a>
+        <a class="vcard" href="/vendors?q=TTF">
+          <div class="ph img-v4"></div>
+          <div class="meta"><b>TTF</b>
+            <span class="rate"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg><strong>4.6</strong> (98) · <span>Cafeteria &amp; Mocktails</span></span>
+            <span class="price">₹100 onwards</span></div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="offer">
+        <span class="mark"><img src="/bhojpatra-icon.png" alt="" width="40" height="40"></span>
+        <h2 class="brand">Save More on<br>Celebrations</h2>
+        <p>Get exclusive deals on Baina, Catering, and Venues. Book early and save big!</p>
+        <a class="btn btn-red" href="/service-packages">Explore Offers <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="fbrand brand">bhojpatra<small>Celebrations Rooted in Tradition</small></div>
+    <nav aria-label="Footer">
+      <a href="/about">About</a>
+      <a href="/vendors">Caterers</a>
+      <a href="/venues">Venues</a>
+      <a href="/contact">Contact</a>
+      <a href="/terms">Terms</a>
+    </nav>
+    <p class="fine">© Bhojpatra. Design preview of the new home page.</p>
+  </div>
+</footer>
+
+<nav class="tabs" aria-label="App">
+  <a href="#top" aria-current="page"><svg class="i" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>Home</a>
+  <a href="/bookings"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Bookings</a>
+  <a href="/service-packages"><svg class="i" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8L3 12Z"/><circle cx="7.5" cy="8" r="1.2"/></svg>Offers</a>
+  <a href="/account"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Account</a>
+</nav>
+
+<script>
+(function () {
+  var SITE = "";
+  var top = document.getElementById("top");
+  var btn = document.getElementById("menu-btn");
+  btn.addEventListener("click", function () {
+    var open = top.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  // Earliest pickable date = tomorrow (matches the live booking bar).
+  var d = new Date(); d.setDate(d.getDate() + 1);
+  var ymd = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  document.getElementById("date").min = ymd;
+
+  document.getElementById("search").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var city = document.getElementById("city").value;
+    var service = document.getElementById("service").value;
+    var date = document.getElementById("date").value;
+    var guests = document.getElementById("guests").value;
+    var qs = new URLSearchParams();
+    if (city) qs.set("city", city);
+    var path = "/vendors";
+    if (service === "baina") path = "/baina-box";
+    else if (service === "venues") path = "/venues";
+    else if (service === "catering") {
+      path = "/book/stall";
+      if (date) qs.set("date", date);
+      if (guests) qs.set("guests", guests);
+    }
+    var q = qs.toString();
+    var a = document.createElement("a");
+    a.href = SITE + path + (q ? "?" + q : "");
+    a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+})();
+</script>
+</body>
+</html>

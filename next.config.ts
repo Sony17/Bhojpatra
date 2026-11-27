@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
   // Handled at the routing layer (checked before the filesystem) so no page
   // component renders just to throw `redirect()`. `permanent: false` keeps the
   // 307 status that `redirect()` was already issuing.
+  // Static one-page replica of the new home design (public/home-replica/).
+  async rewrites() {
+    return [{ source: "/home-replica", destination: "/home-replica/index.html" }];
+  },
   async redirects() {
     return [
       // `/admin` has no page of its own — send visitors to the dashboard.
