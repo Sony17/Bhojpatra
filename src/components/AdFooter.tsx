@@ -161,14 +161,21 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
   );
 
   return (
+    // Background art (brand red + cream line skyline): a tall phone version and
+    // a wide desktop version, pinned to the bottom so the skyline sits just
+    // above the copyright. The spacer and copyright heights below follow the
+    // art's proportions (skyline ≈ 13.4% / 7.2% of width, band under it
+    // ≈ 14.5% / 2.85%).
     <footer
-      className={`bg-maroon text-white ${
-        tabBarPad ? "pb-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] lg:pb-0" : ""
+      className={`bg-maroon bg-[url('/footer-bg-mobile.webp')] bg-[length:100%_auto] bg-no-repeat text-white lg:bg-[url('/footer-bg-desktop.webp')] lg:bg-bottom ${
+        tabBarPad
+          ? "pb-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] [background-position:center_bottom_calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] lg:pb-0"
+          : "bg-bottom"
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         {/* Desktop */}
-        <div className="hidden grid-cols-[1.3fr_1fr_1fr_1.4fr] gap-10 py-8 lg:grid">
+        <div className="hidden grid-cols-[1.3fr_1fr_1fr_1.4fr] gap-10 pt-8 lg:grid">
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-[72px]" />
@@ -187,7 +194,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
         </div>
 
         {/* Phone */}
-        <div className="pb-2 pt-6 lg:hidden">
+        <div className="pt-6 lg:hidden">
           <div className="flex items-center gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-12" />
@@ -212,18 +219,8 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
 
       </div>
 
-      {/* Cream line-art skyline (brand cream on transparent) as the divider */}
-      <div aria-hidden="true" className="flex justify-end overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/footer-skyline.png"
-          alt=""
-          width={2000}
-          height={185}
-          className="h-auto w-full min-w-[720px] max-w-none opacity-70 lg:-mt-8"
-        />
-      </div>
-      <p className="px-4 py-3 text-center text-xs text-white/60">
+      <div aria-hidden="true" className="h-[14vw] lg:h-[6.4vw]" />
+      <p className="flex h-[14.5vw] items-center justify-center px-4 text-center text-xs text-white/70 lg:h-[2.85vw] lg:min-h-9">
         © {year} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
       </p>
     </footer>

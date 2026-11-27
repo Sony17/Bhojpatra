@@ -3,15 +3,6 @@ import AdFooter from "@/components/AdFooter";
 import Footer from "@/components/Footer";
 import { navLinks } from "@/lib/data";
 
-// Full header nav for this page: every main section, in booking order.
-const partner = navLinks.find((l) => l.href === "/partner")!;
-const headerLinks = [
-  { label: "Feast Booking", labelHi: "भोज बुकिंग", href: "/book" },
-  { label: "Caterers", labelHi: "कैटरर", href: "/vendors" },
-  { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
-  { label: "Baina", labelHi: "बैना", href: "/baina-box" },
-  partner,
-];
 import CampaignPopup from "@/components/CampaignPopup";
 import Hero from "@/components/sections/Hero";
 import PromoBanner from "@/components/sections/PromoBanner";
@@ -23,6 +14,26 @@ import Gallery from "@/components/sections/Gallery";
 import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
 import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
+
+
+// Full header nav for this page: every main section.
+const partner = navLinks.find((l) => l.href === "/partner")!;
+const headerLinks = [
+  { label: "Feast Booking", labelHi: "भोज बुकिंग", href: "/book" },
+  { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
+  { label: "Baina", labelHi: "बैना", href: "/baina-box" },
+  // Partner menu: Caterers first, then short, plain role names.
+  {
+    ...partner,
+    items: [
+      { title: "Explore Caterers", titleHi: "कैटरर देखें", subtitle: "Browse and book", subtitleHi: "देखें और बुक करें", href: "/vendors", iconKey: "caterers" },
+      { title: "Catering Vendor", titleHi: "कैटरिंग वेंडर", subtitle: "List your catering", subtitleHi: "अपनी कैटरिंग लिस्ट करें", href: "/vendor/register", iconKey: "vendor" },
+      { title: "Venue Vendor", titleHi: "वेन्यू वेंडर", subtitle: "List your venue", subtitleHi: "अपना वेन्यू लिस्ट करें", href: "/signup?type=partner&role=venue", iconKey: "venue" },
+      { title: "Event Planner", titleHi: "इवेंट प्लानर", subtitle: "Refer clients, earn", subtitleHi: "क्लाइंट रेफर करें, कमाएं", href: "/signup?type=partner&role=planner", iconKey: "planner" },
+      { title: "Individual", titleHi: "व्यक्तिगत", subtitle: "Refer friends, earn", subtitleHi: "दोस्तों को रेफर करें, कमाएं", href: "/signup?type=partner&role=individual", iconKey: "individual" },
+    ],
+  },
+];
 
 /**
  * Conversion-first home funnel:

@@ -353,7 +353,7 @@ export default function Header({ links }: { links?: NavLink[] }) {
 
                   {link.items && (
                     <div className="invisible absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 translate-y-2 pt-5 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                      <PartnerMenuPanel />
+                      <PartnerMenuPanel items={link.items} />
                     </div>
                   )}
                 </div>

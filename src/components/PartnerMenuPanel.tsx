@@ -1,10 +1,16 @@
 "use client";
 
-import { partnerOptions } from "@/lib/data";
+import { partnerOptions, type DropdownItem } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 
 /** Role icons for the "Partner With Us" options — drawn to match each option. */
 const partnerIcons: Record<string, React.ReactNode> = {
+  caterers: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.4-4.4M8.5 11h5M11 8.5v5" />
+    </>
+  ),
   vendor: (
     <path d="M7 14v4.5h10V14m-9 0a3.5 3.5 0 0 1-1-6.86A3.5 3.5 0 0 1 12 4a3.5 3.5 0 0 1 5 3.14A3.5 3.5 0 0 1 16 14H8Z" />
   ),
@@ -36,12 +42,19 @@ const partnerIcons: Record<string, React.ReactNode> = {
  * `onClose` is invoked when an option is chosen so the caller can dismiss the
  * popup (the desktop hover dropdown simply omits it).
  */
-export default function PartnerMenuPanel({ onClose }: { onClose?: () => void }) {
+export default function PartnerMenuPanel({
+  onClose,
+  items = partnerOptions,
+}: {
+  onClose?: () => void;
+  /** Options to list; defaults to the partner sign-up options. */
+  items?: DropdownItem[];
+}) {
   const { lang } = useLang();
 
   return (
     <ul className="overflow-hidden rounded-card border border-maroon/10 bg-white shadow-pop">
-      {partnerOptions.map((item) => (
+      {items.map((item) => (
         <li key={item.title} className="border-b border-maroon/8 last:border-b-0">
           <a
             href={item.href}
