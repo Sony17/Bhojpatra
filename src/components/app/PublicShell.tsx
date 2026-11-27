@@ -15,6 +15,7 @@ export default function PublicShell({
   detail = false,
   chat = true,
   footer = true,
+  footerNode,
   className,
   mainClassName,
 }: {
@@ -25,6 +26,8 @@ export default function PublicShell({
   detail?: boolean;
   chat?: boolean;
   footer?: boolean;
+  /** Replaces the standard Footer (e.g. the new ad footer on /home-recreate). */
+  footerNode?: ReactNode;
   className?: string;
   mainClassName?: string;
 }) {
@@ -44,7 +47,7 @@ export default function PublicShell({
       >
         {children}
       </main>
-      {footer && <Footer />}
+      {footer && (footerNode ?? <Footer />)}
       {chat && <FloatingChat />}
     </div>
   );

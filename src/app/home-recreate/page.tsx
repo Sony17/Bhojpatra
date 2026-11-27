@@ -1,4 +1,5 @@
 import PublicShell from "@/components/app/PublicShell";
+import AdFooter from "@/components/AdFooter";
 import CampaignPopup from "@/components/CampaignPopup";
 import Hero from "@/components/sections/Hero";
 import PromoBanner from "@/components/sections/PromoBanner";
@@ -24,7 +25,7 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  */
 export default function HomeRecreate() {
   return (
-    <PublicShell hero>
+    <PublicShell hero footerNode={<AdFooter tabBarPad />}>
       <Hero />
       <BainaBoxes />
       <PromoBanner />
