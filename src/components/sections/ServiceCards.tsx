@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 
 /**
  * "Our Services" block: three service cards (Baina, Catering, Venues) and a
- * "Why choose Bhojpatra?" strip. Brand colours only; Ananda Neptouch 2 for
+ * "Your Celebration, Our Responsibility." strip. Brand colours only; Ananda Neptouch 2 for
  * the section title and card names, Open Sans for the rest.
  */
 export default function ServiceCards() {
@@ -108,8 +108,8 @@ export default function ServiceCards() {
 
         <div className="mt-6 grid items-center gap-4 rounded-2xl bg-cream/30 px-5 py-5 sm:mt-8 sm:grid-cols-[auto_1fr] sm:gap-8 sm:px-10 sm:py-6">
           <h3 className="text-center text-lg font-semibold leading-tight text-black sm:border-r sm:border-maroon/40 sm:pr-10 sm:text-left sm:text-xl">
-            {t("Why choose", "क्यों चुनें")}
-            <span className="font-display block text-2xl font-normal text-maroon sm:text-3xl">{t("Bhojpatra?", "भोजपत्र?")}</span>
+            {t("Your Celebration,", "आपका उत्सव,")}
+            <span className="font-display block text-2xl font-normal text-maroon sm:text-3xl">{t("Our Responsibility.", "हमारी ज़िम्मेदारी।")}</span>
           </h3>
           <ul className="grid grid-cols-3 gap-2 sm:divide-x sm:divide-maroon/30">
             {reasons.map((r) => (
