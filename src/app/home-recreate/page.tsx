@@ -6,6 +6,7 @@ import PromoBanner from "@/components/sections/PromoBanner";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import ServiceCards from "@/components/sections/ServiceCards";
+import CateringOptions from "@/components/sections/CateringOptions";
 import Packages from "@/components/sections/Packages";
 import GalleryCoverflow from "@/components/sections/GalleryCoverflow";
 import BrandRibbon from "@/components/sections/BrandRibbon";
@@ -33,6 +34,7 @@ export default function HomeRecreate() {
       <Hero trustBadges={false} cta={{ en: "Plan your feast", hi: "अपना भोज प्लान करें" }} />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
+      <CateringOptions />
       <PromoBanner />
       <ChooseOccasion
         tiles
