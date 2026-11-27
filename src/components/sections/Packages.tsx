@@ -14,7 +14,14 @@ import { FEAST_BOOKING_OPEN } from "@/lib/launchFlags";
 
 /** `compactSubtitle`: the subtitle in small body text across a wider line
  * instead of the large script face (used by /home-recreate). */
-export default function Packages({ compactSubtitle = false }: { compactSubtitle?: boolean }) {
+export default function Packages({
+  compactSubtitle = false,
+  singleStallBanner = true,
+}: {
+  compactSubtitle?: boolean;
+  /** false hides the Single Stall banner under the tiers (used by /home-recreate). */
+  singleStallBanner?: boolean;
+}) {
   const { lang, t } = useLang();
   const { packages: homePackages } = useHomeContent();
   const [interestOpen, setInterestOpen] = useState(false);
@@ -178,7 +185,7 @@ export default function Packages({ compactSubtitle = false }: { compactSubtitle?
             hairline frame on a warm cream-washed surface with an ornament
             flourish — so it reads elevated and bespoke without a heavy colour
             block. ── */}
-        {singleStall && (
+        {singleStallBanner && singleStall && (
           <Reveal className="mx-auto mt-12 max-w-5xl sm:mt-14">
             <div className="relative overflow-hidden rounded-card bg-gradient-to-br from-cream/40 via-white to-cream/30 shadow-card ring-1 ring-maroon/15">
               {/* Inset hairline frame — the "engraved" premium cue. */}

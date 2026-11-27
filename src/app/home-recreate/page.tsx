@@ -35,7 +35,7 @@ export default function HomeRecreate() {
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
       {/* Packages stay hidden until Multi-Brand Feast Booking is tapped */}
-      <CateringOptions multiBrandPackages={<Packages compactSubtitle />} />
+      <CateringOptions multiBrandPackages={<Packages compactSubtitle singleStallBanner={false} />} />
       <PromoBanner />
       <ChooseOccasion
         tiles
