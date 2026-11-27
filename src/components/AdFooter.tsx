@@ -134,7 +134,6 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
   const explore = navLinks.map((l) => ({ href: l.href, label: lang === "hi" ? l.labelHi : l.label }));
   const company = [
     { href: "/about", label: t("About Us", "हमारे बारे में") },
-    { href: "/careers", label: t("Careers", "करियर") },
     { href: "/contact", label: t("Contact", "संपर्क") },
     { href: "/terms", label: t("Terms & Privacy", "नियम और गोपनीयता") },
     { href: "/refund", label: t("Refund Policy", "रिफंड नीति") },
