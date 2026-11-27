@@ -208,7 +208,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
               </a>
             </div>
           </div>
-          {/* Links shown open: Explore and Company side by side, contact below */}
+          {/* Links shown open: Explore and Company side by side, contact centred below */}
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/15 pt-4">
             <div>
               <Heading>{t("Explore", "एक्सप्लोर")}</Heading>
@@ -218,7 +218,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
               <Heading>{t("Company", "कंपनी")}</Heading>
               <LinkList links={company} />
             </div>
-            <div className="col-span-2 border-t border-white/15 pt-4">
+            <div className="col-span-2 flex flex-col items-center border-t border-white/15 pt-4 text-center">
               <Heading>{t("Get in touch", "संपर्क करें")}</Heading>
               {touch}
             </div>

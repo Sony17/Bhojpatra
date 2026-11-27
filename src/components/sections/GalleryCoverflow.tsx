@@ -9,7 +9,8 @@ import { useHomeContent, isUnoptimized, type HomeGalleryItem } from "@/lib/homeC
  * Event gallery as one row of photo prints: the selected print sits large in
  * the centre, neighbours fan out smaller and dimmer on each side. Arrows,
  * keyboard, swipe and tapping a side print move the row; nothing auto-plays.
- * Brand only: black ground, white print frames, cream/red accents.
+ * Brand only: the light section ground the gallery always had (white with a
+ * soft red glow), white print frames, red/cream accents.
  */
 
 // Position of a print by distance from the centre: shift (in % of the print's
@@ -48,16 +49,20 @@ export default function GalleryCoverflow() {
   const current = items[index];
 
   return (
-    <section className="overflow-hidden bg-black py-12 text-white sm:py-16">
-      <div className="mx-auto max-w-6xl px-4 text-center sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cream">
+    <section className="relative overflow-hidden bg-white py-12 sm:py-16">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[700px] max-w-[110vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(185,32,37,0.08),transparent_68%)] blur-3xl"
+      />
+      <div className="relative mx-auto max-w-6xl px-4 text-center sm:px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-maroon">
           {lang === "hi" ? gallery.eyebrowHi : gallery.eyebrow}
         </p>
-        <h2 className="font-display mt-2 text-3xl leading-tight text-white sm:text-5xl">
+        <h2 className="font-display mt-2 text-3xl leading-tight text-black sm:text-5xl">
           {lang === "hi" ? gallery.headingHi : gallery.heading}{" "}
-          <span className="text-cream">{lang === "hi" ? gallery.headingEmHi : gallery.headingEm}</span>
+          <span className="text-maroon">{lang === "hi" ? gallery.headingEmHi : gallery.headingEm}</span>
         </h2>
-        <p className="mx-auto mt-2 max-w-xl text-[15px] text-white/70 sm:mt-3 sm:text-base">
+        <p className="mx-auto mt-2 max-w-xl text-[15px] text-black/70 sm:mt-3 sm:text-base">
           {lang === "hi" ? gallery.subtitleHi : gallery.subtitle}
         </p>
       </div>
@@ -78,7 +83,7 @@ export default function GalleryCoverflow() {
           startX.current = null;
           if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
         }}
-        className="relative mx-auto mt-8 h-[320px] max-w-6xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-cream sm:mt-10 sm:h-[420px] lg:h-[500px]"
+        className="relative mx-auto mt-8 h-[320px] max-w-6xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-maroon sm:mt-10 sm:h-[420px] lg:h-[500px]"
       >
         {items.map((item, i) => {
           const off = offsetOf(i);
@@ -97,14 +102,14 @@ export default function GalleryCoverflow() {
               aria-current={off === 0 || undefined}
               tabIndex={off === 0 ? -1 : 0}
               className={
-                "absolute left-1/2 top-1/2 w-[64vw] max-w-[300px] bg-white p-2 pb-9 text-left shadow-[0_24px_48px_-16px_rgba(0,0,0,0.8)] transition-[transform,filter] duration-500 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none sm:max-w-none sm:w-[340px] sm:p-3 sm:pb-12 lg:w-[420px] " +
+                "absolute left-1/2 top-1/2 w-[64vw] max-w-[300px] bg-white p-2 pb-9 text-left shadow-[0_2px_6px_rgba(0,0,0,0.06),0_24px_44px_-18px_rgba(0,0,0,0.35)] ring-1 ring-cream transition-[transform,filter] duration-500 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none sm:max-w-none sm:w-[340px] sm:p-3 sm:pb-12 lg:w-[420px] " +
                 (dist >= 2 ? "hidden sm:block " : "") +
                 (off === 0 ? "cursor-default" : "cursor-pointer")
               }
               style={{
                 transform: `translate(-50%, -50%) translateX(${Math.sign(off) * slot.x}%) scale(${slot.scale})`,
                 zIndex: slot.z,
-                filter: off === 0 ? "none" : `brightness(${dist === 1 ? 0.55 : 0.4})`,
+                filter: off === 0 ? "none" : `brightness(${dist === 1 ? 0.8 : 0.68})`,
               }}
             >
               <span className="relative block aspect-[4/3] w-full overflow-hidden bg-cream">
@@ -139,7 +144,7 @@ export default function GalleryCoverflow() {
         {items.map((it, i) => (
           <span
             key={it.id}
-            className={"h-1.5 rounded-full transition-all duration-300 " + (i === index ? "w-6 bg-cream" : "w-1.5 bg-white/30")}
+            className={"h-1.5 rounded-full transition-all duration-300 " + (i === index ? "w-6 bg-maroon" : "w-1.5 bg-maroon/25")}
           />
         ))}
       </div>
@@ -157,7 +162,7 @@ function Arrow({ dir, onClick, label }: { dir: "prev" | "next"; onClick: () => v
       onClick={onClick}
       aria-label={label}
       className={
-        "absolute top-1/2 z-40 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-cream/50 bg-black/60 text-cream transition-colors hover:bg-cream hover:text-black focus-visible:outline-2 focus-visible:outline-cream sm:h-12 sm:w-12 " +
+        "absolute top-1/2 z-40 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(0,0,0,0.3)] transition-colors hover:bg-maroon hover:text-white focus-visible:outline-2 focus-visible:outline-maroon sm:h-12 sm:w-12 " +
         (dir === "prev" ? "left-2 sm:left-4" : "right-2 sm:right-4")
       }
     >
