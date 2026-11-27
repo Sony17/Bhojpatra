@@ -34,7 +34,8 @@ export default function HomeRecreate() {
       <Hero trustBadges={false} cta={{ en: "Plan your feast", hi: "अपना भोज प्लान करें" }} />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
-      <CateringOptions />
+      {/* Packages stay hidden until Multi-Brand Feast Booking is tapped */}
+      <CateringOptions multiBrandPackages={<Packages compactSubtitle />} />
       <PromoBanner />
       <ChooseOccasion
         tiles
@@ -45,7 +46,6 @@ export default function HomeRecreate() {
       <div className="home-band-cream">
         <TopCategories tiles title={{ en: "From Everyday Gatherings to Grand Celebrations", hi: "रोज़ की महफ़िलों से भव्य उत्सवों तक" }} />
       </div>
-      <Packages compactSubtitle />
       <GalleryCoverflow />
       {SHOW_BRANDS_AND_REVIEWS && <BrandRibbon />}
       {SHOW_BRANDS_AND_REVIEWS && <Testimonials compact />}
