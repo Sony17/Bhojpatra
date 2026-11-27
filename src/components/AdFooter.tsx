@@ -72,7 +72,13 @@ function AppSection() {
               "कभी भी, कहीं भी अपने इवेंट बुक करें, मैनेज करें और प्लान करें।",
             )}
           </p>
-          <div className="mt-5 grid w-full max-w-[16rem] gap-2.5 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
+          {/* Phones: the same QR phone, smaller and cropped, above the badges */}
+          <div className="mt-5 flex h-[205px] justify-center overflow-hidden lg:hidden">
+            <div className="origin-top scale-[0.62]">
+              <QrCard />
+            </div>
+          </div>
+          <div className="mt-3 grid w-full max-w-[16rem] gap-2.5 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
             <StoreBadge store="Google Play" icon={<PlayIcon />} />
             <StoreBadge store="App Store" icon={<AppleIcon />} />
           </div>
@@ -132,6 +138,10 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
   const year = new Date().getFullYear();
 
   const explore = navLinks.map((l) => ({ href: l.href, label: lang === "hi" ? l.labelHi : l.label }));
+  // Phones: name the caterers link the way the header menu does.
+  const exploreMobile = explore.map((l) =>
+    l.href === "/vendors" ? { ...l, label: t("Explore Caterers", "कैटरर देखें") } : l,
+  );
   const company = [
     { href: "/about", label: t("About Us", "हमारे बारे में") },
     { href: "/contact", label: t("Contact", "संपर्क") },
@@ -200,7 +210,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
           </div>
           <div className="mt-3 divide-y divide-white/15 border-t border-white/15">
             <Fold title={t("Explore", "एक्सप्लोर")}>
-              <LinkList links={explore} />
+              <LinkList links={exploreMobile} />
             </Fold>
             <Fold title={t("Company", "कंपनी")}>
               <LinkList links={company} />

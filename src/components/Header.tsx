@@ -156,17 +156,10 @@ function ProfileMenu({ onLight = false }: { onLight?: boolean }) {
 export type NavLink = (typeof navLinks)[number];
 
 /**
- * `links` overrides the desktop nav (headerNavLinks by default). With
- * `mobilePills`, phones get the same links as a scrollable row of pills.
+ * `links` overrides the desktop nav (headerNavLinks by default). Phones use
+ * the bottom tab bar, which carries the same sections.
  */
-export default function Header({
-  links,
-  mobilePills = false,
-}: {
-  links?: NavLink[];
-  /** Also show the nav as a row of pills under the phone app bar. */
-  mobilePills?: boolean;
-}) {
+export default function Header({ links }: { links?: NavLink[] }) {
   const nav = links ?? headerNavLinks;
   const { lang } = useLang();
   const pathname = usePathname();
@@ -288,33 +281,6 @@ export default function Header({
               />
             </div>
           </div>
-        )}
-
-        {/* Optional full nav on phones: one scrollable row of pill links */}
-        {mobilePills && !isDetail && (
-          <nav
-            aria-label="Main"
-            className="mx-4 mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
-          >
-            {nav.map((link) => {
-              const active = isNavActive(link.href);
-              return (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold backdrop-blur-[20px] transition-colors " +
-                    (active
-                      ? "border-maroon bg-maroon text-white"
-                      : "border-white/60 bg-white/80 text-ink hover:text-maroon")
-                  }
-                >
-                  {lang === "hi" ? link.labelHi : link.label}
-                </Link>
-              );
-            })}
-          </nav>
         )}
 
         {/* Desktop nav bar */}

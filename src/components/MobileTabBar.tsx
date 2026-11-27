@@ -7,9 +7,13 @@ import { useLang } from "@/lib/i18n";
 import { setAccountMenuState } from "@/lib/accountMenu";
 import AccountMenuPanel from "./AccountMenuPanel";
 import PartnerMenuPanel from "./PartnerMenuPanel";
+import { headerNavLinks } from "@/lib/data";
+
+/** Same Partner menu as the header (Explore Caterers first). */
+const partnerItems = headerNavLinks.find((l) => l.href === "/partner")?.items;
 
 /** App-style bottom tabs — always visible, active state highlighted.
- *  Same destinations; finish matches Zomato/Swiggy chrome. */
+ *  Same sections as the header nav (Caterers lives in the Partner menu). */
 const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNode }[] = [
   {
     label: "Home",
@@ -18,13 +22,14 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
     icon: <path d="M4 11.5 12 4l8 7.5M6 10v9h12v-9M9.5 19v-5h5v5" />,
   },
   {
-    label: "Caterers",
-    labelHi: "कैटरर",
-    href: "/vendors",
+    label: "Feast",
+    labelHi: "भोज",
+    href: "/book",
     icon: (
       <>
-        <path d="M4 9.5 5 5h14l1 4.5M4 9.5h16M4 9.5a2.2 2.2 0 0 0 4 1 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4 0 2.2 2.2 0 0 0 4-1" />
-        <path d="M5.5 11v8h13v-8" />
+        <path d="M5 3v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3" />
+        <path d="M7 11v10" />
+        <path d="M19 14V3a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h2Zm0 0v7" />
       </>
     ),
   },
@@ -40,14 +45,13 @@ const tabs: { label: string; labelHi: string; href: string; icon: React.ReactNod
     ),
   },
   {
-    label: "Book",
-    labelHi: "बुक",
-    href: "/book",
+    label: "Baina",
+    labelHi: "बैना",
+    href: "/baina-box",
     icon: (
       <>
-        <path d="M5 3v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3" />
-        <path d="M7 11v10" />
-        <path d="M19 14V3a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h2Zm0 0v7" />
+        <rect x="3.5" y="8" width="17" height="4" rx="1" />
+        <path d="M5 12v8.5h14V12M12 8v12.5M12 8c-1.5-3-5-3.5-5-1.2C7 8 9 8 12 8Zm0 0c1.5-3 5-3.5 5-1.2C17 8 15 8 12 8Z" />
       </>
     ),
   },
@@ -105,7 +109,7 @@ export default function MobileTabBar() {
           ref={popupRef}
           className="absolute bottom-full right-3 z-50 mb-2 w-80 max-w-[calc(100vw-1.5rem)]"
         >
-          <PartnerMenuPanel onClose={() => setOpenMenu(null)} />
+          <PartnerMenuPanel items={partnerItems} onClose={() => setOpenMenu(null)} />
         </div>
       )}
 
