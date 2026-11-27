@@ -1,5 +1,5 @@
-import type { ComponentProps, ReactNode } from "react";
-import Header from "@/components/Header";
+import type { ReactNode } from "react";
+import Header, { type NavLink } from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingChat from "@/components/FloatingChat";
 import { cn } from "@/components/ui";
@@ -30,7 +30,7 @@ export default function PublicShell({
   /** Replaces the standard Footer (e.g. the new ad footer on /home-recreate). */
   footerNode?: ReactNode;
   /** Overrides the header's nav links (see Header `links`). */
-  navLinks?: ComponentProps<typeof Header>["links"];
+  navLinks?: NavLink[];
   className?: string;
   mainClassName?: string;
 }) {

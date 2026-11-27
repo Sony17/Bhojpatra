@@ -153,13 +153,13 @@ function ProfileMenu({ onLight = false }: { onLight?: boolean }) {
  * On home the bar overlays the hero (transparent + soft scrim) so the first
  * viewport is one continuous composition — no solid white slab.
  */
-type NavLink = (typeof navLinks)[number];
+export type NavLink = (typeof navLinks)[number];
 
 /**
  * `links` overrides the default nav (e.g. /home-recreate shows the full list);
  * when given, phones also get a scrollable row of the same links.
  */
-export default function Header({ links }: { links?: NavLink[] } = {}) {
+export default function Header({ links }: { links?: NavLink[] }) {
   const nav = links ?? navLinks;
   const { lang } = useLang();
   const pathname = usePathname();
