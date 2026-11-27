@@ -7,7 +7,7 @@ import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
 import ServiceCards from "@/components/sections/ServiceCards";
 import Packages from "@/components/sections/Packages";
-import Gallery from "@/components/sections/Gallery";
+import GalleryCoverflow from "@/components/sections/GalleryCoverflow";
 import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
 import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
@@ -35,11 +35,9 @@ export default function HomeRecreate() {
         <TopCategories />
       </div>
       <Packages />
-      <div className="home-band-cream">
-        <Gallery />
-      </div>
+      <GalleryCoverflow />
       <BrandRibbon />
-      <Testimonials />
+      <Testimonials compact />
       <PromoLeadCapture />
       <CampaignPopup />
     </PublicShell>

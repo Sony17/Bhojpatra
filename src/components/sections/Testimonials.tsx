@@ -64,7 +64,11 @@ function Stars({ rating, label }: { rating: number; label: string }) {
   );
 }
 
-export default function Testimonials() {
+/**
+ * `compact`: three reviews in one still row with arrows to page through the
+ * rest (used by /home-recreate). Otherwise the long scrolling ribbon.
+ */
+export default function Testimonials({ compact = false }: { compact?: boolean }) {
   const { lang, t: tr } = useLang();
   const { testimonials, gallery } = useHomeContent();
   const [reviews, setReviews] = useState<HomeTestimonial[]>([]);
@@ -90,6 +94,10 @@ export default function Testimonials() {
   }, []);
 
   const items = [...reviews, ...testimonials.items];
+  const PAGE = 3;
+  const pages = Math.max(1, Math.ceil(items.length / PAGE));
+  const [page, setPage] = useState(0);
+  const shown = items.slice(page * PAGE, page * PAGE + PAGE);
 
   const renderCard = (t: HomeTestimonial, copy: number) => (
     <li
@@ -150,7 +158,7 @@ export default function Testimonials() {
   );
 
   return (
-    <section id="testimonials" className="relative overflow-hidden bg-white py-16 sm:py-20">
+    <section id="testimonials" className={"relative overflow-hidden bg-white " + (compact ? "py-10 sm:py-14" : "py-16 sm:py-20")}>
       {atmosphere ? (
         <div
           aria-hidden
@@ -180,6 +188,24 @@ export default function Testimonials() {
         </Reveal>
       </div>
 
+      {compact ? (
+        <div className="relative mx-auto mt-8 max-w-6xl px-4 sm:mt-10 sm:px-6">
+          <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+            {shown.map((item) => (
+              <CompactCard key={item.id} item={item} />
+            ))}
+          </ul>
+          {pages > 1 && (
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <PageArrow dir="prev" disabled={page === 0} onClick={() => setPage((p) => p - 1)} label={tr("Previous reviews", "पिछले रिव्यू")} />
+              <span className="min-w-[3.5rem] text-center text-sm font-semibold tabular-nums text-ink/70" aria-live="polite">
+                {page + 1} / {pages}
+              </span>
+              <PageArrow dir="next" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)} label={tr("More reviews", "और रिव्यू")} />
+            </div>
+          )}
+        </div>
+      ) : (
       <Reveal variant="up" className="relative mt-10 sm:mt-12">
         <div className="marquee-pause overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
           <ul className="animate-marquee-slow flex w-max gap-3.5 px-5 py-2 sm:gap-4 sm:px-8">
@@ -187,6 +213,56 @@ export default function Testimonials() {
           </ul>
         </div>
       </Reveal>
+      )}
     </section>
+  );
+}
+
+/** Food-app style review card: rating chip, name and occasion, then the quote. */
+function CompactCard({ item }: { item: HomeTestimonial }) {
+  const { lang, t } = useLang();
+  return (
+    <li className="flex w-[82vw] max-w-[320px] shrink-0 snap-start flex-col rounded-2xl border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] sm:w-auto sm:max-w-none">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-maroon text-xs font-semibold text-cream"
+        >
+          {item.avatar ? (
+            <Image src={item.avatar} alt="" fill sizes="40px" className="object-cover" unoptimized={isUnoptimized(item.avatar)} />
+          ) : (
+            initials(item.name)
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-ink">{item.name}</span>
+          <span className="block truncate text-xs text-ink/55">{lang === "hi" ? item.roleHi : item.role}</span>
+        </span>
+        <span
+          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-maroon px-2 py-1 text-xs font-bold text-white"
+          aria-label={t(`${item.rating} out of 5 stars`, `5 में से ${item.rating} स्टार`)}
+        >
+          {item.rating}
+          <span aria-hidden="true">★</span>
+        </span>
+      </div>
+      <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-ink/75">{lang === "hi" ? item.quoteHi : item.quote}</p>
+    </li>
+  );
+}
+
+function PageArrow({ dir, disabled, onClick, label }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-maroon/30 bg-white text-maroon transition-colors hover:bg-maroon hover:text-white disabled:pointer-events-none disabled:opacity-30"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5" aria-hidden="true">
+        <path d={dir === "prev" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7"} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
   );
 }
