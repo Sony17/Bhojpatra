@@ -1,14 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized, type HomeGalleryItem } from "@/lib/homeContent";
 
 /**
  * Event gallery as one row of photo prints: the selected print sits large in
  * the centre, neighbours fan out smaller and dimmer on each side. Arrows,
- * keyboard, swipe and tapping a side print move the row; nothing auto-plays.
+ * keyboard, swipe and tapping a side print move the row. The row follows the
+ * finger while dragging, and a flick keeps it gliding through several prints
+ * one after another (a longer or faster swipe goes further). It never moves
+ * on its own otherwise.
  * Brand only: the light section ground the gallery always had (white with a
  * soft red glow), white print frames, red/cream accents.
  */
@@ -34,9 +37,32 @@ export default function GalleryCoverflow() {
   const n = items.length;
   const [index, setIndex] = useState(0);
   const startX = useRef<number | null>(null);
+  const startT = useRef(0);
+  const moved = useRef(false);
+  const [drag, setDrag] = useState(0);
+  const glide = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopGlide = () => {
+    if (glide.current) clearInterval(glide.current);
+    glide.current = null;
+  };
+  useEffect(() => stopGlide, []);
 
   if (n === 0) return null;
   const go = (step: number) => setIndex((i) => (i + step + n) % n);
+
+  // Step through `count` prints one at a time so a flick reads as a glide.
+  const glideBy = (count: number, dir: 1 | -1) => {
+    stopGlide();
+    go(dir);
+    let left = count - 1;
+    if (left <= 0) return;
+    glide.current = setInterval(() => {
+      go(dir);
+      left -= 1;
+      if (left <= 0) stopGlide();
+    }, 190);
+  };
 
   // Signed shortest distance from the centre print (the row wraps around).
   const offsetOf = (i: number) => {
@@ -76,12 +102,32 @@ export default function GalleryCoverflow() {
           if (e.key === "ArrowLeft") go(-1);
           if (e.key === "ArrowRight") go(1);
         }}
-        onPointerDown={(e) => (startX.current = e.clientX)}
+        onPointerDown={(e) => {
+          stopGlide();
+          startX.current = e.clientX;
+          startT.current = performance.now();
+          moved.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (startX.current === null) return;
+          const dx = e.clientX - startX.current;
+          if (Math.abs(dx) > 8) moved.current = true;
+          setDrag(dx);
+        }}
+        onPointerCancel={() => {
+          startX.current = null;
+          setDrag(0);
+        }}
         onPointerUp={(e) => {
           if (startX.current === null) return;
           const dx = e.clientX - startX.current;
+          const speed = Math.abs(dx) / Math.max(1, performance.now() - startT.current); // px per ms
           startX.current = null;
-          if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+          setDrag(0);
+          if (Math.abs(dx) > 40) {
+            const steps = Math.min(5, Math.max(1, Math.round(Math.abs(dx) / 150 + speed * 1.5)));
+            glideBy(steps, dx < 0 ? 1 : -1);
+          }
         }}
         className="relative mx-auto mt-8 h-[320px] max-w-6xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-maroon sm:mt-10 sm:h-[420px] lg:h-[500px]"
       >
@@ -97,7 +143,12 @@ export default function GalleryCoverflow() {
             <button
               key={item.id}
               type="button"
-              onClick={() => (off === 0 ? undefined : setIndex(i))}
+              onClick={() => {
+                // A drag ends in a click on the print under the finger; ignore it.
+                if (moved.current || off === 0) return;
+                stopGlide();
+                setIndex(i);
+              }}
               aria-label={off === 0 ? title : t(`Show ${title}`, `${title} दिखाएं`)}
               aria-current={off === 0 || undefined}
               tabIndex={off === 0 ? -1 : 0}
@@ -107,7 +158,8 @@ export default function GalleryCoverflow() {
                 (off === 0 ? "cursor-default" : "cursor-pointer")
               }
               style={{
-                transform: `translate(-50%, -50%) translateX(${Math.sign(off) * slot.x}%) scale(${slot.scale})`,
+                transform: `translate(-50%, -50%) translateX(calc(${Math.sign(off) * slot.x}% + ${drag * 0.6}px)) scale(${slot.scale})`,
+                transitionDuration: drag ? "0ms" : undefined,
                 zIndex: slot.z,
                 filter: off === 0 ? "none" : `brightness(${dist === 1 ? 0.8 : 0.68})`,
               }}
