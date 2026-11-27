@@ -85,7 +85,7 @@ export default function GalleryCoverflow() {
   const current = items[index];
 
   return (
-    <section className="relative overflow-hidden bg-white py-10 sm:py-14">
+    <section className="relative overflow-hidden py-10 sm:py-14">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[700px] max-w-[110vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(185,32,37,0.08),transparent_68%)] blur-3xl"

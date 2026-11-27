@@ -30,7 +30,7 @@ const SHOW_BRANDS_AND_REVIEWS = false;
  */
 export default function HomeRecreate() {
   return (
-    <PublicShell hero>
+    <PublicShell hero className="chandan-page">
       <Hero trustBadges={false} cta={{ en: "Plan your feast", hi: "अपना भोज प्लान करें" }} />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
