@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useLang } from "@/lib/i18n";
 
 /**
- * "Our Services" block: three service cards (Baina, Catering, Venues) and a
+ * "Our Services" block: four service cards (Baina, Catering, Venues, Event Essentials) and a
  * "Your Celebration, Our Responsibility." strip. Brand colours only; Ananda Neptouch 2 for
  * the section title and card names, Open Sans for the rest.
  */
@@ -54,6 +54,17 @@ export default function ServiceCards() {
       ),
       icon: <BuildingIcon />,
     },
+    {
+      href: "/categories",
+      img: "/gallery/event-3.jpg",
+      alt: t("Lit buffet counters with decor at an evening event", "शाम के इवेंट में सजे हुए बुफे काउंटर"),
+      title: t("Event Essentials", "इवेंट ज़रूरतें"),
+      text: t(
+        "Decor, tents, lighting and crockery for every event.",
+        "हर इवेंट के लिए सजावट, टेंट, लाइटिंग और क्रॉकरी।",
+      ),
+      icon: <SparkleIcon />,
+    },
   ];
 
   const reasons = [
@@ -72,7 +83,7 @@ export default function ServiceCards() {
           {t("Plan your perfect celebration", "अपना परफेक्ट जश्न प्लान करें")}
         </h2>
 
-        <div className="mt-6 grid gap-3 sm:mt-10 sm:grid-cols-3 sm:gap-6">
+        <div className="mt-6 grid gap-3 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
           {services.map((s) => (
             <Link
               key={s.href}
@@ -93,7 +104,7 @@ export default function ServiceCards() {
                 {s.icon}
               </span>
               <div className="flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left sm:items-center sm:px-4 sm:pb-3 sm:pt-1 sm:text-center">
-                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[26px]">{s.title}</h3>
+                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[24px] lg:text-[22px]">{s.title}</h3>
                 <p className="mt-1 flex-1 text-[13px] leading-snug text-black/70 sm:mt-1 sm:line-clamp-2 sm:max-w-[17rem] sm:text-[13px] sm:leading-snug sm:text-black/75">{s.text}</p>
                 <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-maroon sm:mt-3 sm:h-9 sm:gap-1.5 sm:rounded-full sm:border sm:border-maroon/40 sm:bg-white sm:px-7 sm:text-sm sm:shadow-[0_2px_8px_-4px_rgba(185,32,37,0.3)] transition-colors sm:group-hover:border-maroon sm:group-hover:bg-maroon sm:group-hover:text-white">
                   {t("Explore", "देखें")}
@@ -177,6 +188,14 @@ function BuildingIcon() {
   return (
     <svg {...ico} className="h-6 w-6">
       <path d="M4 21V8h7v13M11 21V4h9v17M2.5 21h19M7 11h1M7 14h1M7 17h1M14 7h2M14 10h2M14 13h2M14 16h2" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg {...ico} className="h-6 w-6">
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" />
     </svg>
   );
 }
