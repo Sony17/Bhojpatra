@@ -6,13 +6,16 @@ import SectionIntro from "@/components/SectionIntro";
 import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
+import TileRow from "@/components/sections/TileRow";
 import { serviceCategoryHref } from "@/lib/homeLinks";
 
 /**
  * Category rail under "Single stall, one Bhojpatra Experience…" —
  * large occasion-style portrait tiles in a continuous right→left marquee.
  */
-export default function TopCategories() {
+/** `tiles`: one row of wide photo tiles with View all in the same row
+ * (used by /home-recreate). Otherwise the original card rail. */
+export default function TopCategories({ tiles = false }: { tiles?: boolean }) {
   const { lang, t } = useLang();
   const { services } = useHomeContent();
 
@@ -49,6 +52,13 @@ export default function TopCategories() {
         subtitle={lang === "hi" ? services.subtitleHi : services.subtitle}
       />
 
+      {tiles ? (
+        <TileRow
+          tiles={cards}
+          viewAll={{ href: "/categories", label: t("View all", "सभी देखें") }}
+        />
+      ) : (
+        <>
       <div className="marquee-pause relative -mx-5 mt-8 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_6%,#000_94%,transparent)] sm:-mx-8 sm:mt-10">
         <div className="animate-marquee flex w-max gap-3 px-5 py-1 motion-reduce:!animate-none sm:gap-4 sm:px-8">
           {[0, 1].map((copy) =>
@@ -119,6 +129,8 @@ export default function TopCategories() {
           {lang === "hi" ? services.ctaHi : services.cta}
         </Button>
       </div>
+        </>
+      )}
     </section>
   );
 }

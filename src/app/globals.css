@@ -1255,32 +1255,3 @@ html.header-hidden .app-sticky-chrome {
 .marquee-pause > * > [aria-hidden="true"] {
   display: none;
 }
-
-/* Card rows trimmed to a clean grid (/home-recreate occasions and
-   categories): 3 cards on phones, 5 from desktop width, no side scroll. */
-.card-row-limit .marquee-pause {
-  overflow: visible;
-  margin-inline: 0;
-}
-.card-row-limit .marquee-pause > * {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.625rem;
-  width: auto;
-  padding-inline: 0;
-}
-.card-row-limit .marquee-pause > * > * {
-  width: auto;
-}
-.card-row-limit .marquee-pause > * > :nth-child(n + 4) {
-  display: none;
-}
-@media (min-width: 1024px) {
-  .card-row-limit .marquee-pause > * {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 1rem;
-  }
-  .card-row-limit .marquee-pause > * > :nth-child(n + 4):nth-child(-n + 5) {
-    display: block;
-  }
-}

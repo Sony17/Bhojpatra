@@ -25,7 +25,7 @@ const SLOTS = [
   { x: 160, scale: 0.56, z: 5 },
 ];
 
-/** Real Bhojpatra event set-ups, shown first in the row. */
+/** Real Bhojpatra event set-ups: the only photos in the row. */
 const EVENT_PHOTOS: HomeGalleryItem[] = [
   { id: "ev-1", title: "Fruit Bagiya Live Counters", titleHi: "फ्रूट बगिया लाइव काउंटर", caption: "Wedding · Night Setup", captionHi: "शादी · रात की सजावट", image: "/gallery/event-1.jpg" },
   { id: "ev-2", title: "Fabulous Fruit Bagiya", titleHi: "फैबुलस फ्रूट बगिया", caption: "Fruit Stall", captionHi: "फ्रूट स्टॉल", image: "/gallery/event-2.jpg" },
@@ -38,9 +38,10 @@ export default function GalleryCoverflow() {
   const { lang, t } = useLang();
   const { gallery } = useHomeContent();
 
-  // One row: real event photos first, then both stored rows, de-duplicated.
+  // One row of real Bhojpatra event photos only (stored gallery photos are
+  // the fallback if that list is ever emptied).
   const seen = new Set<string>();
-  const items: HomeGalleryItem[] = [...EVENT_PHOTOS, ...gallery.rowOne, ...gallery.rowTwo].filter(
+  const items: HomeGalleryItem[] = (EVENT_PHOTOS.length ? EVENT_PHOTOS : [...gallery.rowOne, ...gallery.rowTwo]).filter(
     (it) => it.image && !seen.has(it.id) && seen.add(it.id),
   );
   const n = items.length;

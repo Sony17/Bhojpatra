@@ -34,11 +34,9 @@ export default function HomeRecreate() {
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
       <PromoBanner />
-      <div className="card-row-limit">
-        <ChooseOccasion />
-      </div>
-      <div className="home-band-cream card-row-limit">
-        <TopCategories />
+      <ChooseOccasion tiles />
+      <div className="home-band-cream">
+        <TopCategories tiles />
       </div>
       <Packages compactSubtitle />
       <GalleryCoverflow />
