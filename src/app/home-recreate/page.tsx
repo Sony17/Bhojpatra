@@ -1,6 +1,5 @@
 import PublicShell from "@/components/app/PublicShell";
 import AdFooter from "@/components/AdFooter";
-import Footer from "@/components/Footer";
 import { navLinks } from "@/lib/data";
 
 import CampaignPopup from "@/components/CampaignPopup";
@@ -48,14 +47,7 @@ const headerLinks = [
  */
 export default function HomeRecreate() {
   return (
-    <PublicShell hero navLinks={headerLinks} footerNode={
-        // Both footers for side-by-side review: new compact one first, then
-        // the current site footer (it carries the phone tab-bar padding).
-        <>
-          <AdFooter />
-          <Footer />
-        </>
-      }>
+    <PublicShell hero navLinks={headerLinks} footerNode={<AdFooter tabBarPad />}>
       <Hero navRow />
       {/* Baina strip hidden here; three service cards take its place. */}
       <ServiceCards />
