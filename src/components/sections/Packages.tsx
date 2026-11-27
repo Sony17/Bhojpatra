@@ -14,7 +14,9 @@ import { isValidPhone } from "@/lib/validate";
 import FeastInterestPopup from "@/components/sections/FeastInterest";
 import { FEAST_BOOKING_OPEN } from "@/lib/launchFlags";
 
-export default function Packages() {
+/** `compactSubtitle`: the subtitle in small body text across a wider line
+ * instead of the large script face (used by /home-recreate). */
+export default function Packages({ compactSubtitle = false }: { compactSubtitle?: boolean }) {
   const { lang, t } = useLang();
   const { contact } = useSiteContent();
   const { packages: homePackages } = useHomeContent();
@@ -172,11 +174,17 @@ export default function Packages() {
       className="relative overflow-hidden py-20 sm:py-24"
     >
       <div className="relative w-full px-5 sm:px-8 lg:px-12">
-        <Reveal className="mx-auto max-w-2xl text-center">
+        <Reveal className={"mx-auto text-center " + (compactSubtitle ? "max-w-6xl" : "max-w-2xl")}>
           <h2 className="font-display text-3xl text-maroon sm:text-4xl">
             {lang === "hi" ? homePackages.headingHi : homePackages.heading}
           </h2>
-          <p className="font-script mt-4 text-xl text-ink-soft sm:text-2xl">
+          <p
+            className={
+              compactSubtitle
+                ? "mx-auto mt-2 text-[13px] leading-snug text-ink/70 sm:text-sm"
+                : "font-script mt-4 text-xl text-ink-soft sm:text-2xl"
+            }
+          >
             {lang === "hi" ? homePackages.subtitleHi : homePackages.subtitle}
           </p>
           <Ornament className="mx-auto mt-6 text-maroon/50" />

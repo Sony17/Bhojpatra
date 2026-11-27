@@ -40,7 +40,7 @@ export default function HomeRecreate() {
       <div className="home-band-cream card-row-limit">
         <TopCategories />
       </div>
-      <Packages />
+      <Packages compactSubtitle />
       <GalleryCoverflow />
       {SHOW_BRANDS_AND_REVIEWS && <BrandRibbon />}
       {SHOW_BRANDS_AND_REVIEWS && <Testimonials compact />}
