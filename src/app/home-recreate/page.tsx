@@ -1,5 +1,6 @@
 import PublicShell from "@/components/app/PublicShell";
 import AdFooter from "@/components/AdFooter";
+import Footer from "@/components/Footer";
 import CampaignPopup from "@/components/CampaignPopup";
 import Hero from "@/components/sections/Hero";
 import PromoBanner from "@/components/sections/PromoBanner";
@@ -25,7 +26,14 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  */
 export default function HomeRecreate() {
   return (
-    <PublicShell hero footerNode={<AdFooter tabBarPad />}>
+    <PublicShell hero footerNode={
+        // Both footers for side-by-side review: new compact one first, then
+        // the current site footer (it carries the phone tab-bar padding).
+        <>
+          <AdFooter />
+          <Footer />
+        </>
+      }>
       <Hero />
       <BainaBoxes />
       <PromoBanner />

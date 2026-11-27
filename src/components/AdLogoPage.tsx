@@ -1,15 +1,16 @@
 import Image from "next/image";
+import PublicShell from "@/components/app/PublicShell";
 import AdFooter from "@/components/AdFooter";
 
 /**
- * Ad landing page shell: the Bhojpatra logo, then the ad footer.
+ * Ad landing page shell: site header, the Bhojpatra logo, then the ad footer.
  * Shared by /baina-ad, /vendor-ad, /venue-ad and /catering-ad until each
  * page gets its own content.
  */
 export default function AdLogoPage() {
   return (
-    <>
-      <main className="flex items-center justify-center bg-white px-4 py-20 lg:py-28">
+    <PublicShell footerNode={<AdFooter tabBarPad />}>
+      <div className="flex items-center justify-center px-4 py-16 lg:py-24">
         <Image
           src="/bhojpatra-logo.png"
           alt="Bhojpatra"
@@ -18,8 +19,7 @@ export default function AdLogoPage() {
           priority
           className="h-auto w-[min(80vw,360px)]"
         />
-      </main>
-      <AdFooter />
-    </>
+      </div>
+    </PublicShell>
   );
 }
