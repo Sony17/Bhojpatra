@@ -12,6 +12,10 @@ import BrandRibbon from "@/components/sections/BrandRibbon";
 import Testimonials from "@/components/sections/Testimonials";
 import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
 
+// Featured brands and reviews are hidden for now (not removed): flip to true
+// to bring both back.
+const SHOW_BRANDS_AND_REVIEWS = false;
+
 /**
  * Conversion-first home funnel:
  * 1. Hero — location + book / find caterers
@@ -36,8 +40,8 @@ export default function HomeRecreate() {
       </div>
       <Packages />
       <GalleryCoverflow />
-      <BrandRibbon />
-      <Testimonials compact />
+      {SHOW_BRANDS_AND_REVIEWS && <BrandRibbon />}
+      {SHOW_BRANDS_AND_REVIEWS && <Testimonials compact />}
       <PromoLeadCapture />
       <CampaignPopup />
     </PublicShell>
