@@ -1,12 +1,23 @@
 import PublicShell from "@/components/app/PublicShell";
 import AdFooter from "@/components/AdFooter";
 import Footer from "@/components/Footer";
+import { navLinks } from "@/lib/data";
+
+// Full header nav for this page: every main section, in booking order.
+const partner = navLinks.find((l) => l.href === "/partner")!;
+const headerLinks = [
+  { label: "Feast Booking", labelHi: "भोज बुकिंग", href: "/book" },
+  { label: "Caterers", labelHi: "कैटरर", href: "/vendors" },
+  { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
+  { label: "Baina", labelHi: "बैना", href: "/baina-box" },
+  partner,
+];
 import CampaignPopup from "@/components/CampaignPopup";
 import Hero from "@/components/sections/Hero";
 import PromoBanner from "@/components/sections/PromoBanner";
 import ChooseOccasion from "@/components/sections/ChooseOccasion";
 import TopCategories from "@/components/sections/TopCategories";
-import BainaBoxes from "@/components/sections/BainaBoxes";
+import ServiceCards from "@/components/sections/ServiceCards";
 import Packages from "@/components/sections/Packages";
 import Gallery from "@/components/sections/Gallery";
 import BrandRibbon from "@/components/sections/BrandRibbon";
@@ -26,7 +37,7 @@ import PromoLeadCapture from "@/components/sections/PromoLeadCapture";
  */
 export default function HomeRecreate() {
   return (
-    <PublicShell hero footerNode={
+    <PublicShell hero navLinks={headerLinks} footerNode={
         // Both footers for side-by-side review: new compact one first, then
         // the current site footer (it carries the phone tab-bar padding).
         <>
@@ -34,8 +45,9 @@ export default function HomeRecreate() {
           <Footer />
         </>
       }>
-      <Hero />
-      <BainaBoxes />
+      <Hero navRow />
+      {/* Baina strip hidden here; three service cards take its place. */}
+      <ServiceCards />
       <PromoBanner />
       <ChooseOccasion />
       <div className="home-band-cream">

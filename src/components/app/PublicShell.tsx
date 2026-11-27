@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingChat from "@/components/FloatingChat";
@@ -16,6 +16,7 @@ export default function PublicShell({
   chat = true,
   footer = true,
   footerNode,
+  navLinks,
   className,
   mainClassName,
 }: {
@@ -28,12 +29,14 @@ export default function PublicShell({
   footer?: boolean;
   /** Replaces the standard Footer (e.g. the new ad footer on /home-recreate). */
   footerNode?: ReactNode;
+  /** Overrides the header's nav links (see Header `links`). */
+  navLinks?: ComponentProps<typeof Header>["links"];
   className?: string;
   mainClassName?: string;
 }) {
   return (
     <div className={cn("flex min-h-full flex-1 flex-col w-full min-w-0 max-w-full overflow-x-clip", className)}>
-      <Header />
+      <Header links={navLinks} />
       <main
         className={cn(
           "app-shell-main flex-1 w-full min-w-0 max-w-full",

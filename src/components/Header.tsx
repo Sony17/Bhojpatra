@@ -153,10 +153,17 @@ function ProfileMenu({ onLight = false }: { onLight?: boolean }) {
  * On home the bar overlays the hero (transparent + soft scrim) so the first
  * viewport is one continuous composition — no solid white slab.
  */
-export default function Header() {
+type NavLink = (typeof navLinks)[number];
+
+/**
+ * `links` overrides the default nav (e.g. /home-recreate shows the full list);
+ * when given, phones also get a scrollable row of the same links.
+ */
+export default function Header({ links }: { links?: NavLink[] } = {}) {
+  const nav = links ?? navLinks;
   const { lang } = useLang();
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  const isHome = pathname === "/" || pathname === "/home-recreate";
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
   const prevScrollY = useRef(0);
@@ -276,6 +283,33 @@ export default function Header() {
           </div>
         )}
 
+        {/* Optional full nav on phones: one scrollable row of pill links */}
+        {links && !isDetail && (
+          <nav
+            aria-label="Main"
+            className="mx-4 mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
+          >
+            {links.map((link) => {
+              const active = isNavActive(link.href);
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold backdrop-blur-[20px] transition-colors " +
+                    (active
+                      ? "border-maroon bg-maroon text-white"
+                      : "border-white/60 bg-white/80 text-ink hover:text-maroon")
+                  }
+                >
+                  {lang === "hi" ? link.labelHi : link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
+
         {/* Desktop nav bar */}
         <div
           className={
@@ -287,8 +321,8 @@ export default function Header() {
             <LogoMark />
           </div>
 
-          <nav className="flex flex-1 items-center justify-center gap-10">
-            {navLinks.map((link) => {
+          <nav className={"flex flex-1 items-center justify-center " + (links ? "gap-6" : "gap-10")}>
+            {nav.map((link) => {
               const active = isNavActive(link.href);
               return (
                 <div key={link.label} className="group relative">
@@ -296,7 +330,7 @@ export default function Header() {
                     href={link.href}
                     aria-current={active ? "page" : undefined}
                     className={
-                      "relative flex items-center gap-1.5 py-2 text-[15px] font-medium tracking-[0.3px] transition-colors duration-200 after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:transition-transform after:duration-200 " +
+                      "relative flex items-center gap-1.5 whitespace-nowrap py-2 text-[15px] font-medium tracking-[0.3px] transition-colors duration-200 after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:transition-transform after:duration-200 " +
                       (active
                         ? "text-maroon after:scale-x-100 after:bg-maroon"
                         : "text-ink after:scale-x-0 after:bg-maroon hover:text-maroon hover:after:scale-x-100")

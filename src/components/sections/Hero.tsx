@@ -53,7 +53,9 @@ function toYmd(d: Date) {
   ).padStart(2, "0")}`;
 }
 
-export default function Hero() {
+/** `navRow`: the header shows an extra row of nav pills on phones, so the
+ * hero starts lower there (used by /home-recreate). */
+export default function Hero({ navRow = false }: { navRow?: boolean } = {}) {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();
 
@@ -352,7 +354,7 @@ export default function Hero() {
         className="hero-scrim-readability absolute inset-0 -z-10"
       />
 
-      <div className="relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col justify-end px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] pt-[calc(5.75rem+var(--safe-top))] sm:px-8 sm:pb-10 sm:pt-[calc(6.5rem+var(--safe-top))] lg:px-6 lg:pb-12 lg:pt-[calc(7.5rem+var(--safe-top))]">
+      <div className={"relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col justify-end px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] " + (navRow ? "pt-[calc(8.75rem+var(--safe-top))]" : "pt-[calc(5.75rem+var(--safe-top))]") + " sm:px-8 sm:pb-10 sm:pt-[calc(6.5rem+var(--safe-top))] lg:px-6 lg:pb-12 lg:pt-[calc(7.5rem+var(--safe-top))]"}>
         <div className="max-w-3xl">
           <h1 className="text-hero text-ink">
             <span className="animate-rise delay-1 block max-w-2xl font-sans text-[13px] font-bold uppercase leading-relaxed tracking-[0.12em] text-ink sm:text-base lg:text-lg">
