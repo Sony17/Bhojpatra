@@ -140,7 +140,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
     { href: "/refund", label: t("Refund Policy", "रिफंड नीति") },
   ];
   const touch = (
-    <ul className="space-y-2.5 text-sm text-white/80">
+    <ul className="space-y-1.5 text-sm text-white/80">
       <li>
         <a href={`mailto:${contact.email}`} className="flex items-center gap-2.5 transition-colors hover:text-white">
           <MailIcon />
@@ -161,25 +161,18 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
   );
 
   return (
-    // Background art (brand red + cream line skyline): a tall phone version and
-    // a wide desktop version, pinned to the bottom so the skyline sits just
-    // above the copyright. The spacer and copyright heights below follow the
-    // art's proportions (skyline ≈ 13.4% / 7.2% of width, band under it
-    // ≈ 14.5% / 2.85%).
     <footer
-      className={`bg-maroon bg-[url('/footer-bg-mobile.webp')] bg-[length:100%_auto] bg-no-repeat text-white lg:bg-[url('/footer-bg-desktop.webp')] lg:bg-bottom ${
-        tabBarPad
-          ? "pb-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] [background-position:center_bottom_calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] lg:pb-0"
-          : "bg-bottom"
+      className={`bg-maroon text-white ${
+        tabBarPad ? "pb-[calc(var(--tab-bar-h)+var(--safe-bottom)+var(--booking-bar-h,0px))] lg:pb-0" : ""
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         {/* Desktop */}
-        <div className="hidden grid-cols-[1.3fr_1fr_1fr_1.4fr] gap-10 pt-8 lg:grid">
+        <div className="hidden grid-cols-[1.3fr_1fr_1fr_1.4fr] gap-10 pt-5 lg:grid">
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-[72px]" />
-            <p className="mt-3 text-sm text-white/80">{t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}</p>
+            <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-14" />
+            <p className="mt-2 text-sm text-white/80">{t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}</p>
             <a href={insta} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 text-sm text-white/80 transition-colors hover:text-white">
               <InstaIcon />
               {contact.instagram}
@@ -194,10 +187,10 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
         </div>
 
         {/* Phone */}
-        <div className="pt-6 lg:hidden">
+        <div className="pt-4 lg:hidden">
           <div className="flex items-center gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-12" />
+            <img src="/bhojpatra-logo1.png" alt="bhojpatra" width={460} height={543} className="h-auto w-10" />
             <div className="min-w-0">
               <p className="text-sm">{t("Feast Booking Platform", "भोज बुकिंग प्लेटफॉर्म")}</p>
               <a href={insta} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-white/80">
@@ -206,7 +199,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
               </a>
             </div>
           </div>
-          <div className="mt-5 divide-y divide-white/15 border-t border-white/15">
+          <div className="mt-3 divide-y divide-white/15 border-t border-white/15">
             <Fold title={t("Explore", "एक्सप्लोर")}>
               <LinkList links={explore} />
             </Fold>
@@ -219,8 +212,12 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
 
       </div>
 
-      <div aria-hidden="true" className="h-[14vw] lg:h-[6.4vw]" />
-      <p className="flex h-[14.5vw] items-center justify-center px-4 text-center text-xs text-white/70 lg:h-[2.85vw] lg:min-h-9">
+      {/* Cream line-art skyline at half tone, from the supplied footer art */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/footer-skyline-mobile.png" alt="" aria-hidden="true" width={887} height={60} className="mt-3 block h-auto w-full lg:hidden" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/footer-skyline-desktop.png" alt="" aria-hidden="true" width={2000} height={72} className="-mt-6 hidden h-auto w-full lg:block" />
+      <p className="px-4 py-2.5 text-center text-[11px] text-white/70 lg:text-xs">
         © {year} Bhojpatra · Norion India Pvt Ltd. {t("All rights reserved.", "सर्वाधिकार सुरक्षित।")}
       </p>
     </footer>
@@ -230,7 +227,7 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
 type FooterLink = { href: string; label: string };
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-cream">{children}</p>;
+  return <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-cream">{children}</p>;
 }
 
 function Column({ title, links }: { title: string; links: FooterLink[] }) {
@@ -244,7 +241,7 @@ function Column({ title, links }: { title: string; links: FooterLink[] }) {
 
 function LinkList({ links }: { links: FooterLink[] }) {
   return (
-    <ul className="space-y-2 text-sm text-white/80">
+    <ul className="space-y-1.5 text-sm text-white/80 lg:space-y-1">
       {links.map((l) => (
         <li key={l.href}>
           <Link href={l.href} className="transition-colors hover:text-white">
@@ -259,13 +256,13 @@ function LinkList({ links }: { links: FooterLink[] }) {
 function Fold({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details className="group">
-      <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-xs font-semibold uppercase tracking-[0.12em] text-cream [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-cream [&::-webkit-details-marker]:hidden">
         {title}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true">
           <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </summary>
-      <div className="pb-4">{children}</div>
+      <div className="pb-3">{children}</div>
     </details>
   );
 }
