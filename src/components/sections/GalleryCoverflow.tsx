@@ -161,7 +161,7 @@ export default function GalleryCoverflow() {
                 transform: `translate(-50%, -50%) translateX(calc(${Math.sign(off) * slot.x}% + ${drag * 0.6}px)) scale(${slot.scale})`,
                 transitionDuration: drag ? "0ms" : undefined,
                 zIndex: slot.z,
-                filter: off === 0 ? "none" : `brightness(${dist === 1 ? 0.8 : 0.68})`,
+                filter: off === 0 ? "none" : `brightness(${dist === 1 ? 0.9 : 0.8})`,
               }}
             >
               <span className="relative block aspect-[4/3] w-full overflow-hidden bg-cream">
@@ -174,6 +174,9 @@ export default function GalleryCoverflow() {
                   unoptimized={isUnoptimized(item.image)}
                   draggable={false}
                 />
+                {/* Same dark overlay as the occasion cards */}
+                <span aria-hidden="true" className="absolute inset-0 bg-black/45" />
+                <span aria-hidden="true" className="media-veil absolute inset-0" />
                 {caption && (
                   <span className="absolute left-2 top-2 bg-black/70 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-cream sm:left-3 sm:top-3 sm:text-[10px]">
                     {caption}

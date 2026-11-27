@@ -83,10 +83,10 @@ export default function ServiceCards() {
             <Link
               key={s.href}
               href={s.href}
-              className="group relative flex overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] sm:flex-col sm:border-2 sm:bg-gradient-to-b sm:from-white sm:to-cream/25 sm:p-2.5 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_6px_rgba(0,0,0,0.05),0_16px_32px_-16px_rgba(0,0,0,0.22)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+              className="group relative flex overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_40px_-18px_rgba(185,32,37,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col sm:rounded-[1.75rem] sm:border-2 sm:bg-gradient-to-b sm:from-white sm:to-cream/30 sm:p-3"
             >
               <Corners />
-              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-[16/10] sm:w-full sm:rounded-xl">
+              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-square sm:w-full sm:rounded-[1.25rem] sm:ring-1 sm:ring-cream">
                 <Image
                   src={s.img}
                   alt={s.alt}
@@ -95,13 +95,13 @@ export default function ServiceCards() {
                   className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                 />
               </div>
-              <span className="relative z-10 mx-auto -mt-8 hidden h-16 w-16 items-center justify-center rounded-full border-2 border-cream bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(0,0,0,0.25)] sm:flex">
+              <span className="relative z-10 mx-auto -mt-7 hidden h-14 w-14 items-center justify-center rounded-full border-2 border-cream bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(0,0,0,0.25)] sm:flex">
                 {s.icon}
               </span>
-              <div className="flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left sm:items-center sm:px-5 sm:pb-5 sm:pt-2 sm:text-center">
-                <h3 className="font-display text-xl leading-tight text-maroon sm:mt-1 sm:text-3xl">{s.title}</h3>
-                <p className="mt-1 flex-1 text-[13px] leading-snug text-black/70 sm:mt-2 sm:max-w-[16rem] sm:text-sm sm:leading-relaxed sm:text-black/80">{s.text}</p>
-                <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-maroon sm:mb-1 sm:mt-5 sm:h-10 sm:gap-1.5 sm:rounded-full sm:border sm:border-maroon/40 sm:bg-white sm:px-7 sm:text-sm sm:shadow-[0_2px_8px_-4px_rgba(185,32,37,0.3)] transition-colors sm:group-hover:border-maroon sm:group-hover:bg-maroon sm:group-hover:text-white">
+              <div className="flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left sm:items-center sm:px-4 sm:pb-3 sm:pt-1 sm:text-center">
+                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[26px]">{s.title}</h3>
+                <p className="mt-1 flex-1 text-[13px] leading-snug text-black/70 sm:mt-1 sm:line-clamp-2 sm:max-w-[17rem] sm:text-[13px] sm:leading-snug sm:text-black/75">{s.text}</p>
+                <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-maroon sm:mt-3 sm:h-9 sm:gap-1.5 sm:rounded-full sm:border sm:border-maroon/40 sm:bg-white sm:px-7 sm:text-sm sm:shadow-[0_2px_8px_-4px_rgba(185,32,37,0.3)] transition-colors sm:group-hover:border-maroon sm:group-hover:bg-maroon sm:group-hover:text-white">
                   {t("Explore", "देखें")}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
                     <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -140,11 +140,11 @@ function Corners() {
       <circle cx="9" cy="9" r="2" fill="#F0D09E" stroke="none" />
     </svg>
   );
-  const pos = ["left-1 top-1", "right-1 top-1 rotate-90", "bottom-1 right-1 rotate-180", "bottom-1 left-1 -rotate-90"];
+  const pos = ["left-0.5 top-0.5", "right-0.5 top-0.5 rotate-90", "bottom-0.5 right-0.5 rotate-180", "bottom-0.5 left-0.5 -rotate-90"];
   return (
     <>
       {pos.map((p) => (
-        <span key={p} aria-hidden="true" className={`pointer-events-none absolute z-20 hidden h-7 w-7 sm:block ${p}`}>
+        <span key={p} aria-hidden="true" className={`pointer-events-none absolute z-20 hidden h-8 w-8 sm:block ${p}`}>
           {corner}
         </span>
       ))}
