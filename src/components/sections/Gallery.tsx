@@ -49,6 +49,7 @@ export default function Gallery() {
               {[...row, ...row].map((item: HomeGalleryItem, i: number) => (
                 <div
                   key={`${item.id}-${i}`}
+                  aria-hidden={i >= row.length || undefined}
                   className="group relative aspect-[4/5] w-[7.15rem] shrink-0 overflow-hidden rounded-card shadow-card ring-1 ring-maroon/10 mr-2 sm:mr-2.5 sm:w-[8.8rem] lg:w-[11rem]"
                 >
                   {item.image && (

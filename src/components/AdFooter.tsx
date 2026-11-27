@@ -13,7 +13,9 @@ import { useSiteContent } from "@/lib/sitePages";
  */
 export default function AdFooter({ tabBarPad = false }: { tabBarPad?: boolean }) {
   return (
-    <div className="w-full">
+    // site-footer-mobile: pages that end on their own content (mobileChrome.ts)
+    // hide the footer on phones through html.hide-mobile-footer.
+    <div className="site-footer-mobile w-full lg:block">
       <TaglineStrip />
       <AppSection />
       <LinkFooter tabBarPad={tabBarPad} />
@@ -34,7 +36,8 @@ function TaglineStrip() {
         <p className="font-display text-[15px] leading-snug text-cream sm:text-2xl">
           {t("Har Celebration Khaas Hai,", "हर सेलिब्रेशन खास है,")}
           <br />
-          {t("Bhojpatra Ke Saath Aur Bhi Yaadgaar Hai.", "भोजपत्र के साथ और भी यादगार है।")}
+          {t("Bhojpatra Ke Saath", "भोजपत्र के साथ")}
+          <br className="sm:hidden" /> {t("Aur Bhi Yaadgaar Hai.", "और भी यादगार है।")}
         </p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/bhoj7.png" alt="" width={424} height={538} className="h-10 w-auto shrink-0 sm:h-16" />
@@ -49,7 +52,7 @@ function AppSection() {
   const { t } = useLang();
   return (
     <section className="overflow-hidden border-b border-black/5 bg-white">
-      <div className="mx-auto grid max-w-4xl items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:gap-16 lg:py-0">
+      <div className="mx-auto grid max-w-4xl items-center gap-8 px-4 pb-6 pt-7 sm:px-6 sm:py-8 lg:grid-cols-[1fr_auto] lg:gap-16 lg:py-0">
         <div className="flex flex-col items-center text-center lg:items-start lg:py-10 lg:text-left">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-cream px-3 py-1 text-xs font-semibold text-maroon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden="true">
@@ -69,7 +72,13 @@ function AppSection() {
               "कभी भी, कहीं भी अपने इवेंट बुक करें, मैनेज करें और प्लान करें।",
             )}
           </p>
-          <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
+          {/* Phones: a cropped, smaller phone between the copy and the badges */}
+          <div className="mt-4 flex h-[150px] justify-center overflow-hidden sm:hidden" aria-hidden="true">
+            <div className="origin-top scale-[0.7]">
+              <Phone />
+            </div>
+          </div>
+          <div className="mt-1 grid w-full max-w-[16rem] gap-2.5 sm:mt-5 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
             <StoreBadge store="Google Play" icon={<PlayIcon />} />
             <StoreBadge store="App Store" icon={<AppleIcon />} />
           </div>
@@ -84,7 +93,7 @@ function AppSection() {
 
 function StoreBadge({ store, icon }: { store: string; icon: React.ReactNode }) {
   return (
-    <span className="inline-flex h-12 items-center gap-3 rounded-xl bg-black px-4 text-white sm:h-[52px] sm:px-5">
+    <span className="inline-flex h-12 items-center justify-center gap-3 rounded-xl bg-black px-4 text-white sm:h-[52px] sm:justify-start sm:px-5">
       {icon}
       <span className="text-left leading-none">
         <span className="block text-[10px] font-semibold uppercase tracking-wide sm:text-[11px]">Coming soon on</span>

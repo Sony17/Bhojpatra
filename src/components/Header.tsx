@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { navLinks } from "@/lib/data";
+import { headerNavLinks, navLinks } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import AccountMenuPanel from "./AccountMenuPanel";
@@ -156,11 +156,18 @@ function ProfileMenu({ onLight = false }: { onLight?: boolean }) {
 export type NavLink = (typeof navLinks)[number];
 
 /**
- * `links` overrides the default nav (e.g. /home-recreate shows the full list);
- * when given, phones also get a scrollable row of the same links.
+ * `links` overrides the desktop nav (headerNavLinks by default). With
+ * `mobilePills`, phones get the same links as a scrollable row of pills.
  */
-export default function Header({ links }: { links?: NavLink[] }) {
-  const nav = links ?? navLinks;
+export default function Header({
+  links,
+  mobilePills = false,
+}: {
+  links?: NavLink[];
+  /** Also show the nav as a row of pills under the phone app bar. */
+  mobilePills?: boolean;
+}) {
+  const nav = links ?? headerNavLinks;
   const { lang } = useLang();
   const pathname = usePathname();
   const isHome = pathname === "/" || pathname === "/home-recreate";
@@ -284,12 +291,12 @@ export default function Header({ links }: { links?: NavLink[] }) {
         )}
 
         {/* Optional full nav on phones: one scrollable row of pill links */}
-        {links && !isDetail && (
+        {mobilePills && !isDetail && (
           <nav
             aria-label="Main"
             className="mx-4 mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
           >
-            {links.map((link) => {
+            {nav.map((link) => {
               const active = isNavActive(link.href);
               return (
                 <Link
@@ -321,7 +328,7 @@ export default function Header({ links }: { links?: NavLink[] }) {
             <LogoMark />
           </div>
 
-          <nav className={"flex flex-1 items-center justify-center " + (links ? "gap-6" : "gap-10")}>
+          <nav className="flex flex-1 items-center justify-center gap-6">
             {nav.map((link) => {
               const active = isNavActive(link.href);
               return (

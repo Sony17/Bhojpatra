@@ -53,8 +53,8 @@ function toYmd(d: Date) {
   ).padStart(2, "0")}`;
 }
 
-/** `navRow`: the header shows an extra row of nav pills on phones, so the
- * hero starts lower there (used by /home-recreate). */
+/** `navRow`: the header shows a row of nav pills on phones, so the hero
+ * starts lower there (used by /home-recreate). */
 export default function Hero({ navRow = false }: { navRow?: boolean }) {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();

@@ -964,6 +964,24 @@ html.header-hidden .app-sticky-chrome {
       animation: none;
     }
   }
+  /* Static ribbons (/home-recreate): no auto-scroll. The doubled copy that
+     made the loop seamless is hidden and the row scrolls by hand instead. */
+  .static-ribbons .marquee-pause {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .static-ribbons .marquee-pause::-webkit-scrollbar {
+    display: none;
+  }
+  .static-ribbons .marquee-pause > * {
+    animation: none !important;
+    transform: none !important;
+  }
+  .static-ribbons .marquee-pause > * > [aria-hidden="true"] {
+    display: none;
+  }
 
   /* Continuous diagonal shimmer sweeping across the Platinum scroll — marks it
      as the premium tier. A white light band pans left→right forever. Applied

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Header, { type NavLink } from "@/components/Header";
-import Footer from "@/components/Footer";
+import AdFooter from "@/components/AdFooter";
 import FloatingChat from "@/components/FloatingChat";
 import { cn } from "@/components/ui";
 
@@ -17,6 +17,7 @@ export default function PublicShell({
   footer = true,
   footerNode,
   navLinks,
+  mobileNavPills = false,
   className,
   mainClassName,
 }: {
@@ -27,16 +28,18 @@ export default function PublicShell({
   detail?: boolean;
   chat?: boolean;
   footer?: boolean;
-  /** Replaces the standard Footer (e.g. the new ad footer on /home-recreate). */
+  /** Replaces the standard site footer. */
   footerNode?: ReactNode;
   /** Overrides the header's nav links (see Header `links`). */
   navLinks?: NavLink[];
+  /** Show the nav as pills under the phone app bar (see Header). */
+  mobileNavPills?: boolean;
   className?: string;
   mainClassName?: string;
 }) {
   return (
     <div className={cn("flex min-h-full flex-1 flex-col w-full min-w-0 max-w-full overflow-x-clip", className)}>
-      <Header links={navLinks} />
+      <Header links={navLinks} mobilePills={mobileNavPills} />
       <main
         className={cn(
           "app-shell-main flex-1 w-full min-w-0 max-w-full",
@@ -50,7 +53,7 @@ export default function PublicShell({
       >
         {children}
       </main>
-      {footer && (footerNode ?? <Footer />)}
+      {footer && (footerNode ?? <AdFooter tabBarPad />)}
       {chat && <FloatingChat />}
     </div>
   );

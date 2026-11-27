@@ -1,6 +1,5 @@
 import Image from "next/image";
 import PublicShell from "@/components/app/PublicShell";
-import AdFooter from "@/components/AdFooter";
 
 /**
  * Ad landing page shell: site header, the Bhojpatra logo, then the ad footer.
@@ -9,7 +8,7 @@ import AdFooter from "@/components/AdFooter";
  */
 export default function AdLogoPage() {
   return (
-    <PublicShell footerNode={<AdFooter tabBarPad />}>
+    <PublicShell>
       <div className="flex items-center justify-center px-4 py-16 lg:py-24">
         <Image
           src="/bhojpatra-logo.png"

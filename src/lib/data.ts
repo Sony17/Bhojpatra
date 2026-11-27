@@ -938,6 +938,30 @@ export const navLinks: {
   { label: "Partner With Us", labelHi: "हमारे साथ जुड़ें", href: "/partner", hasDropdown: true, items: partnerOptions },
 ];
 
+/**
+ * Header nav: every main service, so visitors see what Bhojpatra offers.
+ * Caterers sits first in the Partner With Us menu, with short role names.
+ */
+export const headerNavLinks: typeof navLinks = [
+  { label: "Feast Booking", labelHi: "भोज बुकिंग", href: "/book" },
+  { label: "Venues", labelHi: "वेन्यू", href: "/venues" },
+  { label: "Baina", labelHi: "बैना", href: "/baina-box" },
+  // Partner menu: Caterers first, then short, plain role names.
+  {
+    label: "Partner With Us",
+    labelHi: "हमारे साथ जुड़ें",
+    href: "/partner",
+    hasDropdown: true,
+    items: [
+      { title: "Explore Caterers", titleHi: "कैटरर देखें", subtitle: "Browse and book", subtitleHi: "देखें और बुक करें", href: "/vendors", iconKey: "caterers" },
+      { title: "Catering Vendor", titleHi: "कैटरिंग वेंडर", subtitle: "List your catering", subtitleHi: "अपनी कैटरिंग लिस्ट करें", href: "/vendor/register", iconKey: "vendor" },
+      { title: "Venue Vendor", titleHi: "वेन्यू वेंडर", subtitle: "List your venue", subtitleHi: "अपना वेन्यू लिस्ट करें", href: "/signup?type=partner&role=venue", iconKey: "venue" },
+      { title: "Event Planner", titleHi: "इवेंट प्लानर", subtitle: "Refer clients, earn", subtitleHi: "क्लाइंट रेफर करें, कमाएं", href: "/signup?type=partner&role=planner", iconKey: "planner" },
+      { title: "Individual", titleHi: "व्यक्तिगत", subtitle: "Refer friends, earn", subtitleHi: "दोस्तों को रेफर करें, कमाएं", href: "/signup?type=partner&role=individual", iconKey: "individual" },
+    ],
+  },
+];
+
 /* ───────────────────────────────────────────────────────────────────────
    BOOKING FLOW DATA — cuisines, course-wise dishes, add-on counters,
    vendor comparison set, coupons. Powers the /book wizard & /vendors catalog.
