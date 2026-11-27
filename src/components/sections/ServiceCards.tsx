@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 
 /**
  * "Our Services" block: four service cards (Baina, Catering, Venues, Event Essentials) and a
- * "Your Celebration, Our Responsibility." strip. Brand colours only; Ananda Neptouch 2 for
+ * one-bar trust strip. Brand colours only; Ananda Neptouch 2 for
  * the section title and card names, Open Sans for the rest.
  */
 export default function ServiceCards() {
@@ -68,8 +68,8 @@ export default function ServiceCards() {
   ];
 
   const reasons = [
-    { label: t("Verified Vendors", "सत्यापित वेंडर"), icon: <ShieldIcon /> },
-    { label: t("Compare & Book Easily", "आसानी से तुलना और बुकिंग"), icon: <BoltIcon /> },
+    { label: t("Verified Vendors", "सत्यापित वेंडर"), icon: <LaurelIcon /> },
+    { label: t("Quality Assured", "गुणवत्ता की गारंटी"), icon: <ShieldIcon /> },
     { label: t("Transparent Pricing", "पारदर्शी कीमत"), icon: <RupeeIcon /> },
     { label: t("Dedicated Support", "समर्पित सहायता"), icon: <HeadsetIcon /> },
   ];
@@ -106,7 +106,7 @@ export default function ServiceCards() {
             <Link
               key={s.href}
               href={s.href}
-              className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_6px_rgba(0,0,0,0.05),0_14px_32px_-16px_rgba(0,0,0,0.22)] ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_44px_-20px_rgba(185,32,37,0.4)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+              className="group flex flex-col overflow-hidden rounded-2xl bg-cream/35 shadow-[0_2px_6px_rgba(0,0,0,0.05),0_14px_32px_-16px_rgba(0,0,0,0.22)] ring-1 ring-cream transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_44px_-20px_rgba(185,32,37,0.4)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
             >
               <div className="relative aspect-[16/10] w-full overflow-hidden">
                 <Image
@@ -138,21 +138,15 @@ export default function ServiceCards() {
           ))}
         </div>
 
-        {/* Trust strip */}
-        <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-cream bg-cream/30 px-4 py-4 sm:mt-8 lg:flex-row lg:gap-8 lg:px-8">
-          <p className="shrink-0 text-center text-sm font-semibold leading-tight text-black lg:border-r lg:border-maroon/30 lg:pr-8 lg:text-left">
-            {t("Your Celebration,", "आपका उत्सव,")}{" "}
-            <span className="font-display text-lg font-normal text-maroon">{t("Our Responsibility.", "हमारी ज़िम्मेदारी।")}</span>
-          </p>
-          <ul className="grid w-full grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-4 lg:flex-1">
-            {reasons.map((r) => (
-              <li key={r.label} className="flex items-center justify-center gap-2 text-xs font-semibold text-black sm:text-[13px]">
-                <span className="text-maroon [&_svg]:h-5 [&_svg]:w-5">{r.icon}</span>
-                {r.label}
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Trust strip: one rounded bar, four promises */}
+        <ul className="mt-6 grid grid-cols-2 gap-y-3 rounded-2xl bg-cream/40 px-3 py-4 sm:mt-8 sm:flex sm:items-center sm:justify-around sm:px-6 sm:py-3.5 sm:[&>li+li]:border-l sm:[&>li+li]:border-maroon/15">
+          {reasons.map((r) => (
+            <li key={r.label} className="flex flex-1 items-center justify-center gap-2.5 text-[13px] font-semibold text-black sm:text-sm">
+              <span className="text-maroon [&_svg]:h-6 [&_svg]:w-6">{r.icon}</span>
+              {r.label}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -209,19 +203,20 @@ function RupeeIcon() {
   );
 }
 
+function LaurelIcon() {
+  return (
+    <svg {...ico} className="h-6 w-6">
+      <path d="M8 20c-3-2-4.5-5-4.5-8.5S5 5.5 7.5 4M16 20c3-2 4.5-5 4.5-8.5S19 5.5 16.5 4" />
+      <path d="M4 9.5c1.2.2 2.2.9 2.6 2M3.8 13.5c1.3 0 2.4.6 3 1.7M5.5 17c1.2-.3 2.4 0 3.2.9M20 9.5c-1.2.2-2.2.9-2.6 2M20.2 13.5c-1.3 0-2.4.6-3 1.7M18.5 17c-1.2-.3-2.4 0-3.2.9M12 9.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3Z" />
+    </svg>
+  );
+}
+
 function ShieldIcon() {
   return (
     <svg {...ico} className="h-6 w-6">
       <path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3Z" />
       <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
-
-function BoltIcon() {
-  return (
-    <svg {...ico} className="h-6 w-6">
-      <path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z" />
     </svg>
   );
 }
