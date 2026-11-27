@@ -53,9 +53,15 @@ function toYmd(d: Date) {
   ).padStart(2, "0")}`;
 }
 
-/** `trustBadges={false}` drops the four-badge strip under the booking bar
- * (used by /home-recreate). */
-export default function Hero({ trustBadges = true }: { trustBadges?: boolean }) {
+/** `trustBadges={false}` drops the four-badge strip under the booking bar;
+ * `headline` replaces the big red headline line. Both used by /home-recreate. */
+export default function Hero({
+  trustBadges = true,
+  headline,
+}: {
+  trustBadges?: boolean;
+  headline?: { en: string; hi: string };
+}) {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();
 
@@ -361,7 +367,13 @@ export default function Hero({ trustBadges = true }: { trustBadges?: boolean }) 
               {lang === "hi" ? hero.headlineTopHi : hero.headlineTop}
             </span>
             <span className="animate-rise delay-2 mt-2 block max-w-3xl font-display text-[2.25rem] font-normal leading-[1.05] text-maroon sm:mt-3 sm:text-[clamp(2.75rem,2rem+3.2vw,4.75rem)]">
-              {lang === "hi" ? hero.headlineBottomHi : hero.headlineBottom}
+              {headline
+                ? lang === "hi"
+                  ? headline.hi
+                  : headline.en
+                : lang === "hi"
+                  ? hero.headlineBottomHi
+                  : hero.headlineBottom}
             </span>
           </h1>
 
