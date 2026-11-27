@@ -97,7 +97,7 @@ export default function ChooseOccasion({
       {tiles ? (
         <TileRow
           tiles={groups}
-          viewAll={{ href: "/occasions", label: t("View all", "सभी देखें") }}
+          viewAll={{ href: "/occasions", label: t("View all occasions", "सभी अवसर") }}
         />
       ) : (
         <>

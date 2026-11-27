@@ -71,8 +71,12 @@ export default function TopCategories({
 
       {tiles ? (
         <TileRow
-          tiles={cards}
-          viewAll={{ href: "/categories", label: t("View all", "सभी देखें") }}
+          variant="caption"
+          tiles={cards.map((c) => ({
+            ...c,
+            sub: showPrices && c.priceFrom ? (lang === "hi" ? `${c.priceFrom} से` : `From ${c.priceFrom}`) : undefined,
+          }))}
+          viewAll={{ href: "/categories", label: t("View all brands", "सभी ब्रांड") }}
         />
       ) : (
         <>

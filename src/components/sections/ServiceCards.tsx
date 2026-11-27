@@ -70,45 +70,66 @@ export default function ServiceCards() {
   const reasons = [
     { label: t("Verified Vendors", "सत्यापित वेंडर"), icon: <ShieldIcon /> },
     { label: t("Compare & Book Easily", "आसानी से तुलना और बुकिंग"), icon: <BoltIcon /> },
+    { label: t("Transparent Pricing", "पारदर्शी कीमत"), icon: <RupeeIcon /> },
     { label: t("Dedicated Support", "समर्पित सहायता"), icon: <HeadsetIcon /> },
   ];
 
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-16">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-maroon">
-          {t("Our Services", "हमारी सेवाएं")}
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
+        <p className="flex items-center justify-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-maroon">
+          <span aria-hidden="true" className="h-px w-8 bg-maroon/40" />
+          {t("Explore our services", "हमारी सेवाएं देखें")}
+          <span aria-hidden="true" className="h-px w-8 bg-maroon/40" />
         </p>
-        <h2 className="font-display mt-2 text-center text-3xl leading-tight text-maroon sm:text-5xl">
+        <h2 className="font-display mt-2 text-center text-3xl leading-tight text-maroon sm:text-[42px]">
           {t("Plan your perfect celebration", "अपना परफेक्ट जश्न प्लान करें")}
         </h2>
 
-        <div className="mt-6 grid gap-3 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+        {/* Phones: one row of four icon shortcuts */}
+        <ul className="mt-6 grid grid-cols-4 gap-2 sm:hidden">
+          {services.map((s) => (
+            <li key={s.href}>
+              <Link href={s.href} className="flex flex-col items-center gap-1.5 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-cream bg-cream/30 text-maroon [&_svg]:h-6 [&_svg]:w-6">
+                  {s.icon}
+                </span>
+                <span className="text-[11px] font-semibold leading-tight text-black">{s.title}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        {/* Tablet and up: photo cards */}
+        <div className="mt-8 hidden gap-4 sm:grid sm:grid-cols-2 lg:mt-10 lg:grid-cols-4 lg:gap-5">
           {services.map((s) => (
             <Link
               key={s.href}
               href={s.href}
-              className="group flex overflow-hidden border border-black/10 bg-white transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-cream hover:shadow-[0_24px_40px_-24px_rgba(185,32,37,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col"
+              className="group flex flex-col border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_28px_-18px_rgba(0,0,0,0.25)] transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_24px_40px_-22px_rgba(185,32,37,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
             >
-              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-[4/5] sm:w-full">
+              <div className="relative aspect-[16/11] w-full overflow-hidden">
                 <Image
                   src={s.img}
                   alt={s.alt}
                   fill
-                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 112px"
+                  sizes="(min-width: 1024px) 25vw, 50vw"
                   className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
                 />
-                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 hidden h-1/3 bg-gradient-to-t from-black/45 to-transparent sm:block" />
-                <span className="absolute bottom-3 left-3 hidden h-9 w-9 items-center justify-center rounded-full bg-white/95 text-maroon sm:flex [&_svg]:h-[18px] [&_svg]:w-[18px]">
-                  {s.icon}
-                </span>
               </div>
-              <div className="flex min-w-0 flex-1 flex-col px-4 py-3 sm:px-5 sm:pb-5 sm:pt-4">
-                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[22px]">{s.title}</h3>
-                <p className="mt-1 flex-1 text-[13px] leading-snug text-black/65 sm:line-clamp-2">{s.text}</p>
-                <span className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-maroon sm:mt-4 sm:border-t sm:border-black/10 sm:pt-3 sm:text-xs sm:uppercase sm:tracking-[0.16em]">
-                  {t("Explore", "देखें")}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">
+              <span className="relative z-10 -mt-6 ml-4 flex h-12 w-12 items-center justify-center rounded-full border border-cream bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(0,0,0,0.3)] [&_svg]:h-[22px] [&_svg]:w-[22px]">
+                {s.icon}
+              </span>
+              <div className="flex flex-1 items-end gap-3 px-4 pb-4 pt-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display text-[22px] leading-tight text-maroon">{s.title}</h3>
+                  <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-black/65">{s.text}</p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-maroon/40 text-maroon transition-colors group-hover:border-maroon group-hover:bg-maroon group-hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
                     <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
@@ -117,15 +138,16 @@ export default function ServiceCards() {
           ))}
         </div>
 
-        <div className="mt-6 grid items-center gap-4 bg-cream/30 px-5 py-5 sm:mt-8 sm:grid-cols-[auto_1fr] sm:gap-8 sm:px-10 sm:py-6">
-          <h3 className="text-center text-lg font-semibold leading-tight text-black sm:border-r sm:border-maroon/40 sm:pr-10 sm:text-left sm:text-xl">
-            {t("Your Celebration,", "आपका उत्सव,")}
-            <span className="font-display block text-2xl font-normal text-maroon sm:text-3xl">{t("Our Responsibility.", "हमारी ज़िम्मेदारी।")}</span>
-          </h3>
-          <ul className="grid grid-cols-3 gap-2 sm:divide-x sm:divide-maroon/30">
+        {/* Trust strip */}
+        <div className="mt-6 flex flex-col items-center gap-3 border border-cream bg-cream/30 px-4 py-4 sm:mt-8 lg:flex-row lg:gap-8 lg:px-8">
+          <p className="shrink-0 text-center text-sm font-semibold leading-tight text-black lg:border-r lg:border-maroon/30 lg:pr-8 lg:text-left">
+            {t("Your Celebration,", "आपका उत्सव,")}{" "}
+            <span className="font-display text-lg font-normal text-maroon">{t("Our Responsibility.", "हमारी ज़िम्मेदारी।")}</span>
+          </p>
+          <ul className="grid w-full grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-4 lg:flex-1">
             {reasons.map((r) => (
-              <li key={r.label} className="flex flex-col items-center gap-1.5 text-center text-xs font-semibold text-black sm:text-sm">
-                <span className="text-maroon">{r.icon}</span>
+              <li key={r.label} className="flex items-center justify-center gap-2 text-xs font-semibold text-black sm:text-[13px]">
+                <span className="text-maroon [&_svg]:h-5 [&_svg]:w-5">{r.icon}</span>
                 {r.label}
               </li>
             ))}
@@ -175,6 +197,14 @@ function SparkleIcon() {
   return (
     <svg {...ico} className="h-6 w-6">
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" />
+    </svg>
+  );
+}
+
+function RupeeIcon() {
+  return (
+    <svg {...ico} className="h-6 w-6">
+      <path d="M7 5h10M7 9h10M10 5c3 0 5 1.5 5 4s-2 4-5 4H7l7 7" />
     </svg>
   );
 }
