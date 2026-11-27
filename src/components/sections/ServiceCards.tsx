@@ -35,7 +35,7 @@ export default function ServiceCards() {
     {
       href: "/vendors",
       img: "/services/catering.jpg",
-      alt: t("A catering stall at an evening event", "शाम के इवेंट में कैटरिंग स्टॉल"),
+      alt: t("A lit buffet counter in front of a decorated mandap", "सजे मंडप के सामने रोशन बुफे काउंटर"),
       title: t("Catering", "कैटरिंग"),
       text: t(
         "Customisable menus for weddings, parties, and events.",
@@ -45,8 +45,8 @@ export default function ServiceCards() {
     },
     {
       href: "/venues",
-      img: "/services/venue.jpg",
-      alt: t("A wedding celebration at a venue", "वेन्यू पर शादी का जश्न"),
+      img: "/services/venue-peepals-retreat.jpg",
+      alt: t("The Peepal's Retreat venue lit up for an evening event", "शाम के इवेंट के लिए सजा द पीपल्स रिट्रीट वेन्यू"),
       title: t("Venues", "वेन्यू"),
       text: t(
         "Banquet halls, lawns, resorts, and unique venues across India.",
