@@ -74,7 +74,7 @@ export default function ServiceCards() {
   ];
 
   return (
-    <section className="bg-gradient-to-b from-white via-cream/15 to-white">
+    <section className="bg-white">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-16">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-maroon">
           {t("Our Services", "हमारी सेवाएं")}
@@ -88,27 +88,27 @@ export default function ServiceCards() {
             <Link
               key={s.href}
               href={s.href}
-              className="group relative flex overflow-hidden border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_40px_-18px_rgba(185,32,37,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col sm:border-2 sm:bg-gradient-to-b sm:from-white sm:to-cream/30 sm:p-3"
+              className="group flex overflow-hidden border border-black/10 bg-white transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-cream hover:shadow-[0_24px_40px_-24px_rgba(185,32,37,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col"
             >
-              <Corners />
-              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-square sm:w-full sm:ring-1 sm:ring-cream">
+              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-[4/5] sm:w-full">
                 <Image
                   src={s.img}
                   alt={s.alt}
                   fill
-                  sizes="(min-width: 640px) 33vw, 112px"
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 112px"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
                 />
+                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 hidden h-1/3 bg-gradient-to-t from-black/45 to-transparent sm:block" />
+                <span className="absolute bottom-3 left-3 hidden h-9 w-9 items-center justify-center rounded-full bg-white/95 text-maroon sm:flex [&_svg]:h-[18px] [&_svg]:w-[18px]">
+                  {s.icon}
+                </span>
               </div>
-              <span className="relative z-10 mx-auto -mt-7 hidden h-14 w-14 items-center justify-center rounded-full border-2 border-cream bg-white text-maroon shadow-[0_4px_12px_-6px_rgba(0,0,0,0.25)] sm:flex">
-                {s.icon}
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col items-start px-4 py-3 text-left sm:items-center sm:px-4 sm:pb-3 sm:pt-1 sm:text-center">
-                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[24px] lg:text-[22px]">{s.title}</h3>
-                <p className="mt-1 flex-1 text-[13px] leading-snug text-black/70 sm:mt-1 sm:line-clamp-2 sm:max-w-[17rem] sm:text-[13px] sm:leading-snug sm:text-black/75">{s.text}</p>
-                <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-maroon sm:mt-3 sm:h-9 sm:gap-1.5 sm:rounded-full sm:border sm:border-maroon/40 sm:bg-white sm:px-7 sm:text-sm sm:shadow-[0_2px_8px_-4px_rgba(185,32,37,0.3)] transition-colors sm:group-hover:border-maroon sm:group-hover:bg-maroon sm:group-hover:text-white">
+              <div className="flex min-w-0 flex-1 flex-col px-4 py-3 sm:px-5 sm:pb-5 sm:pt-4">
+                <h3 className="font-display text-xl leading-tight text-maroon sm:text-[22px]">{s.title}</h3>
+                <p className="mt-1 flex-1 text-[13px] leading-snug text-black/65 sm:line-clamp-2">{s.text}</p>
+                <span className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-maroon sm:mt-4 sm:border-t sm:border-black/10 sm:pt-3 sm:text-xs sm:uppercase sm:tracking-[0.16em]">
                   {t("Explore", "देखें")}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">
                     <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
@@ -117,7 +117,7 @@ export default function ServiceCards() {
           ))}
         </div>
 
-        <div className="mt-6 grid items-center gap-4 rounded-2xl bg-cream/30 px-5 py-5 sm:mt-8 sm:grid-cols-[auto_1fr] sm:gap-8 sm:px-10 sm:py-6">
+        <div className="mt-6 grid items-center gap-4 bg-cream/30 px-5 py-5 sm:mt-8 sm:grid-cols-[auto_1fr] sm:gap-8 sm:px-10 sm:py-6">
           <h3 className="text-center text-lg font-semibold leading-tight text-black sm:border-r sm:border-maroon/40 sm:pr-10 sm:text-left sm:text-xl">
             {t("Your Celebration,", "आपका उत्सव,")}
             <span className="font-display block text-2xl font-normal text-maroon sm:text-3xl">{t("Our Responsibility.", "हमारी ज़िम्मेदारी।")}</span>
@@ -133,27 +133,6 @@ export default function ServiceCards() {
         </div>
       </div>
     </section>
-  );
-}
-
-/** Cream corner scrolls on the card frame (tablet and up), like the design. */
-function Corners() {
-  const corner = (
-    <svg viewBox="0 0 32 32" fill="none" stroke="#F0D09E" strokeWidth={1.6} strokeLinecap="round" className="h-full w-full">
-      <path d="M3 26V9a6 6 0 0 1 6-6h17" />
-      <path d="M8 18c0-6 4-10 10-10" />
-      <circle cx="9" cy="9" r="2" fill="#F0D09E" stroke="none" />
-    </svg>
-  );
-  const pos = ["left-0.5 top-0.5", "right-0.5 top-0.5 rotate-90", "bottom-0.5 right-0.5 rotate-180", "bottom-0.5 left-0.5 -rotate-90"];
-  return (
-    <>
-      {pos.map((p) => (
-        <span key={p} aria-hidden="true" className={`pointer-events-none absolute z-20 hidden h-8 w-8 sm:block ${p}`}>
-          {corner}
-        </span>
-      ))}
-    </>
   );
 }
 

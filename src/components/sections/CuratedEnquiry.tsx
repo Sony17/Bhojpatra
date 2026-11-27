@@ -229,7 +229,7 @@ export function CuratedEnquiryPopup({ open, onClose }: { open: boolean; onClose:
         role="dialog"
         aria-modal="true"
         aria-label={t("Contact Bhojpatra for a curated package", "खास पैकेज के लिए भोजपत्र से संपर्क करें")}
-        className="relative z-10 w-full max-w-xl overflow-hidden rounded-t-sheet bg-white p-3 pb-[calc(0.75rem+var(--safe-bottom))] shadow-modal sm:rounded-card sm:p-4"
+        className="relative z-10 w-full max-w-xl overflow-hidden rounded-t-sheet bg-white p-3 pb-[calc(0.75rem+var(--safe-bottom))] shadow-modal sm:rounded-card sm:p-4 pt-12 sm:pt-12"
       >
         <button
           type="button"

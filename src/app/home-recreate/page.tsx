@@ -44,7 +44,7 @@ export default function HomeRecreate() {
         subtitle={{ en: "From festive home gatherings to grand wedding feasts.", hi: "त्योहारी घरेलू महफ़िलों से भव्य शादी के भोज तक।" }}
       />
       <div className="home-band-cream">
-        <TopCategories tiles title={{ en: "From Everyday Gatherings to Grand Celebrations", hi: "रोज़ की महफ़िलों से भव्य उत्सवों तक" }} />
+        <TopCategories tiles title={{ en: "Explore. Prefer & Book Top Brands", hi: "देखें, चुनें और टॉप ब्रांड बुक करें" }} />
       </div>
       <GalleryCoverflow />
       {SHOW_BRANDS_AND_REVIEWS && <BrandRibbon />}
