@@ -54,13 +54,13 @@ function toYmd(d: Date) {
 }
 
 /** `trustBadges={false}` drops the four-badge strip under the booking bar;
- * `headline` replaces the big red headline line. Both used by /home-recreate. */
+ * `cta` replaces the booking button label. Both used by /home-recreate. */
 export default function Hero({
   trustBadges = true,
-  headline,
+  cta,
 }: {
   trustBadges?: boolean;
-  headline?: { en: string; hi: string };
+  cta?: { en: string; hi: string };
 }) {
   const { lang, t } = useLang();
   const { hero, occasions: homeOccasions } = useHomeContent();
@@ -167,7 +167,7 @@ export default function Hero({
   stallParams.set("guests", guests);
   const vendorsHref = `/book/stall?${stallParams.toString()}`;
 
-  const ctaLabel = lang === "hi" ? hero.ctaHi : hero.cta;
+  const ctaLabel = cta ? (lang === "hi" ? cta.hi : cta.en) : lang === "hi" ? hero.ctaHi : hero.cta;
   const browseLabel = t("Explore food stalls", "फूड स्टॉल देखें");
 
   const fieldLabel =
@@ -367,13 +367,7 @@ export default function Hero({
               {lang === "hi" ? hero.headlineTopHi : hero.headlineTop}
             </span>
             <span className="animate-rise delay-2 mt-2 block max-w-3xl font-display text-[2.25rem] font-normal leading-[1.05] text-maroon sm:mt-3 sm:text-[clamp(2.75rem,2rem+3.2vw,4.75rem)]">
-              {headline
-                ? lang === "hi"
-                  ? headline.hi
-                  : headline.en
-                : lang === "hi"
-                  ? hero.headlineBottomHi
-                  : hero.headlineBottom}
+              {lang === "hi" ? hero.headlineBottomHi : hero.headlineBottom}
             </span>
           </h1>
 
