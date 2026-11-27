@@ -208,14 +208,20 @@ function LinkFooter({ tabBarPad }: { tabBarPad: boolean }) {
               </a>
             </div>
           </div>
-          <div className="mt-3 divide-y divide-white/15 border-t border-white/15">
-            <Fold title={t("Explore", "एक्सप्लोर")}>
+          {/* Links shown open: Explore and Company side by side, contact below */}
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/15 pt-4">
+            <div>
+              <Heading>{t("Explore", "एक्सप्लोर")}</Heading>
               <LinkList links={exploreMobile} />
-            </Fold>
-            <Fold title={t("Company", "कंपनी")}>
+            </div>
+            <div>
+              <Heading>{t("Company", "कंपनी")}</Heading>
               <LinkList links={company} />
-            </Fold>
-            <Fold title={t("Get in touch", "संपर्क करें")}>{touch}</Fold>
+            </div>
+            <div className="col-span-2 border-t border-white/15 pt-4">
+              <Heading>{t("Get in touch", "संपर्क करें")}</Heading>
+              {touch}
+            </div>
           </div>
         </div>
 
@@ -259,20 +265,6 @@ function LinkList({ links }: { links: FooterLink[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Fold({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <details className="group">
-      <summary className="flex cursor-pointer list-none items-center justify-between py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-cream [&::-webkit-details-marker]:hidden">
-        {title}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true">
-          <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </summary>
-      <div className="pb-3">{children}</div>
-    </details>
   );
 }
 
