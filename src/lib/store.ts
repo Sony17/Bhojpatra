@@ -227,3 +227,23 @@ export async function writeSingleton<T>(key: string, value: T): Promise<void> {
 export async function deleteSingleton(key: string): Promise<void> {
   await runQuery(`delete from settings where key = $1`, [key]);
 }
+
+/**
+ * Occasion names ranked by booked revenue (sum of `amount` on orders that
+ * aren't cancelled), highest first. Aggregated in SQL so only the names and
+ * totals cross the wire, not every booking row. Totals stay server-side.
+ */
+export async function topBookingOccasions(limit = 10): Promise<string[]> {
+  const rows = await runQuery(
+    `select lower(trim(data->>'occasion')) as occasion,
+            sum(coalesce((data->>'amount')::numeric, 0)) as revenue
+       from bookings
+      where coalesce(data->>'status', '') <> 'Cancelled'
+        and coalesce(trim(data->>'occasion'), '') <> ''
+      group by 1
+      order by revenue desc
+      limit $1`,
+    [limit],
+  );
+  return rows.map((r) => String((r as { occasion: string }).occasion));
+}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useHomeContent, isUnoptimized } from "@/lib/homeContent";
 import TileRow from "@/components/sections/TileRow";
+import { useEffect, useState } from "react";
 
 /**
  * First section under the hero — no scroll-reveal so the handoff feels
@@ -17,6 +18,27 @@ import TileRow from "@/components/sections/TileRow";
 export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
   const { lang, t } = useLang();
   const { occasions } = useHomeContent();
+  // Tile mode: put the occasions that bring in the most revenue first.
+  const [ranking, setRanking] = useState<string[]>([]);
+  useEffect(() => {
+    if (!tiles) return;
+    let live = true;
+    fetch("/api/content/top-occasions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { occasions?: string[] } | null) => {
+        if (live && d?.occasions?.length) setRanking(d.occasions);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [tiles]);
+  const rank = (name: string) => {
+    const i = ranking.indexOf(name.trim().toLowerCase());
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  // Stable sort: ranked occasions first, the rest keep their curated order.
+  const byRevenue = [...occasions.items].sort((a, b) => rank(a.name) - rank(b.name));
 
   return (
     <section
@@ -31,7 +53,7 @@ export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
 
       {tiles ? (
         <TileRow
-          tiles={occasions.items.map((o) => ({ id: o.id, name: lang === "hi" ? o.nameHi : o.name, image: o.image, href: `/book?occasion=${o.id}` }))}
+          tiles={byRevenue.map((o) => ({ id: o.id, name: lang === "hi" ? o.nameHi : o.name, image: o.image, href: `/book?occasion=${o.id}` }))}
           viewAll={{ href: "/occasions", label: t("View all", "सभी देखें") }}
         />
       ) : (
