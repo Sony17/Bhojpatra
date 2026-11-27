@@ -88,10 +88,10 @@ export default function ServiceCards() {
             <Link
               key={s.href}
               href={s.href}
-              className="group relative flex overflow-hidden rounded-2xl border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_40px_-18px_rgba(185,32,37,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col sm:rounded-[1.75rem] sm:border-2 sm:bg-gradient-to-b sm:from-white sm:to-cream/30 sm:p-3"
+              className="group relative flex overflow-hidden border border-cream bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.18)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_40px_-18px_rgba(185,32,37,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon sm:flex-col sm:border-2 sm:bg-gradient-to-b sm:from-white sm:to-cream/30 sm:p-3"
             >
               <Corners />
-              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-square sm:w-full sm:rounded-[1.25rem] sm:ring-1 sm:ring-cream">
+              <div className="relative w-28 shrink-0 overflow-hidden sm:aspect-square sm:w-full sm:ring-1 sm:ring-cream">
                 <Image
                   src={s.img}
                   alt={s.alt}
