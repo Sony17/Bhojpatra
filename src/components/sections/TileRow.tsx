@@ -38,8 +38,8 @@ export default function TileRow({
               />
             )}
             <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            <span className="absolute inset-x-2.5 bottom-2.5 flex lg:inset-x-3 lg:bottom-3 items-center justify-between gap-2">
-              <span className="truncate text-sm font-bold leading-tight text-white drop-shadow-sm lg:text-lg">{tile.name}</span>
+            <span className="absolute inset-x-2.5 bottom-2.5 flex items-end justify-between gap-2 lg:inset-x-3 lg:bottom-3">
+              <span className="line-clamp-2 min-w-0 text-sm font-bold leading-tight text-white drop-shadow-sm lg:text-base">{tile.name}</span>
               <span
                 aria-hidden="true"
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-maroon lg:h-8 lg:w-8 shadow-sm transition-transform duration-200 group-hover:translate-x-0.5"

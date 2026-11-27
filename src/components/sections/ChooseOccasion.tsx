@@ -13,6 +13,16 @@ import { useEffect, useState } from "react";
  * First section under the hero — no scroll-reveal so the handoff feels
  * instant while scrolling (food-app velocity).
  */
+/** Event types shown as tiles on /home-recreate; `match` picks the stored
+ * occasions each one covers. */
+const EVENT_GROUPS = [
+  { id: "wedding-events", name: "Wedding Events", nameHi: "शादी के कार्यक्रम", match: ["wedding", "engagement", "mehndi", "haldi", "tilak", "reception", "sangeet"], fallbackImage: "/gallery/event-1.jpg" },
+  { id: "corporate-events", name: "Corporate Events", nameHi: "कॉर्पोरेट इवेंट", match: ["corporate", "office", "conference"], fallbackImage: "/gallery/event-5.jpg" },
+  { id: "house-party", name: "House Party", nameHi: "हाउस पार्टी", match: ["birthday", "house", "anniversary", "kitty"], fallbackImage: "/gallery/event-2.jpg" },
+  { id: "society-events", name: "Society Events", nameHi: "सोसाइटी इवेंट", match: ["society", "community", "get-together", "gathering"], fallbackImage: "/gallery/event-4.jpg" },
+  { id: "puja-festivals", name: "Puja & Festivals", nameHi: "पूजा और त्योहार", match: ["puja", "pooja", "festival", "diwali", "griha", "religious"], fallbackImage: "/gallery/event-3.jpg" },
+];
+
 /** `tiles`: one row of wide photo tiles with View all in the same row
  * (used by /home-recreate). Otherwise the original card rail. */
 export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
@@ -37,8 +47,29 @@ export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
     const i = ranking.indexOf(name.trim().toLowerCase());
     return i === -1 ? Number.MAX_SAFE_INTEGER : i;
   };
-  // Stable sort: ranked occasions first, the rest keep their curated order.
-  const byRevenue = [...occasions.items].sort((a, b) => rank(a.name) - rank(b.name));
+
+  // Tile mode groups the stored occasions into the event types people book
+  // most. Each group borrows the photo and booking link of its first stored
+  // occasion that matches (falling back to a real event photo), and ranks by
+  // its best-earning member occasion.
+  const findOccasion = (words: string[]) =>
+    occasions.items.find((o) => words.some((w) => o.name.toLowerCase().includes(w)));
+  const groups = EVENT_GROUPS.map((g) => {
+    const match = findOccasion(g.match);
+    const best = Math.min(
+      ...occasions.items
+        .filter((o) => g.match.some((w) => o.name.toLowerCase().includes(w)))
+        .map((o) => rank(o.name)),
+      Number.MAX_SAFE_INTEGER,
+    );
+    return {
+      id: g.id,
+      name: lang === "hi" ? g.nameHi : g.name,
+      image: match?.image || g.fallbackImage,
+      href: match ? `/book?occasion=${match.id}` : "/book",
+      best,
+    };
+  }).sort((a, b) => a.best - b.best);
 
   return (
     <section
@@ -53,7 +84,7 @@ export default function ChooseOccasion({ tiles = false }: { tiles?: boolean }) {
 
       {tiles ? (
         <TileRow
-          tiles={byRevenue.map((o) => ({ id: o.id, name: lang === "hi" ? o.nameHi : o.name, image: o.image, href: `/book?occasion=${o.id}` }))}
+          tiles={groups}
           viewAll={{ href: "/occasions", label: t("View all", "सभी देखें") }}
         />
       ) : (
