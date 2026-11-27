@@ -71,12 +71,6 @@ export default function ServiceCards() {
         <h2 className="font-display mt-2 text-center text-3xl leading-tight text-maroon sm:text-5xl">
           {t("Plan your perfect celebration", "अपना परफेक्ट जश्न प्लान करें")}
         </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-[15px] text-black/80 sm:mt-3 sm:text-base">
-          {t(
-            "Everything you need for your special occasion: curated, trusted, and personalised.",
-            "आपके खास मौके के लिए सब कुछ: चुना हुआ, भरोसेमंद और आपके हिसाब से।",
-          )}
-        </p>
 
         <div className="mt-6 grid gap-3 sm:mt-10 sm:grid-cols-3 sm:gap-6">
           {services.map((s) => (
