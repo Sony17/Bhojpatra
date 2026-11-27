@@ -1256,14 +1256,13 @@ html.header-hidden .app-sticky-chrome {
   display: none;
 }
 
-/* Chandan page ground for redesigned pages: soft brand-cream base with warm
-   cream glows, under every section (sections keep their own gradients). */
+/* Chandan page ground for redesigned pages: an almost flat warm off-white
+   (brand cream at low alpha over white) with one faint top glow, so cards
+   read as white surfaces lifted off a calm ground. */
 .chandan-page {
   background:
-    radial-gradient(60% 40% at 0% 0%, rgba(240, 208, 158, 0.45), transparent 70%),
-    radial-gradient(60% 40% at 100% 30%, rgba(240, 208, 158, 0.35), transparent 70%),
-    radial-gradient(70% 40% at 0% 70%, rgba(240, 208, 158, 0.3), transparent 70%),
-    rgba(240, 208, 158, 0.16);
+    radial-gradient(80% 30% at 50% 0%, rgba(240, 208, 158, 0.18), transparent 75%),
+    rgba(240, 208, 158, 0.1);
 }
 .chandan-page .home-band-cream {
   background: radial-gradient(90% 70% at 50% 0%, rgba(240, 208, 158, 0.55), transparent 70%);

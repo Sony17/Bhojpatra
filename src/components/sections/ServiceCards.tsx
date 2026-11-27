@@ -78,11 +78,17 @@ export default function ServiceCards() {
     <section>
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
         <p className="flex items-center justify-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-maroon">
-          <span aria-hidden="true" className="h-px w-8 bg-maroon/40" />
+          <span aria-hidden="true" className="flex items-center">
+            <span className="h-px w-10 bg-maroon/35" />
+            <span className="h-1.5 w-1.5 rotate-45 bg-maroon/60" />
+          </span>
           {t("Explore our services", "हमारी सेवाएं देखें")}
-          <span aria-hidden="true" className="h-px w-8 bg-maroon/40" />
+          <span aria-hidden="true" className="flex items-center">
+            <span className="h-1.5 w-1.5 rotate-45 bg-maroon/60" />
+            <span className="h-px w-10 bg-maroon/35" />
+          </span>
         </p>
-        <h2 className="font-display mt-2 text-center text-3xl leading-tight text-maroon sm:text-[42px]">
+        <h2 className="font-display mt-2 text-center text-3xl leading-tight text-maroon sm:text-[46px]">
           {t("Plan your perfect celebration", "अपना परफेक्ट जश्न प्लान करें")}
         </h2>
 
@@ -120,7 +126,7 @@ export default function ServiceCards() {
             <Link
               key={s.href}
               href={s.href}
-              className="group flex flex-col overflow-hidden rounded-2xl bg-cream/35 shadow-[0_2px_6px_rgba(0,0,0,0.05),0_14px_32px_-16px_rgba(0,0,0,0.22)] ring-1 ring-cream transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_4px_10px_rgba(0,0,0,0.06),0_24px_44px_-20px_rgba(185,32,37,0.4)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
+              className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_18px_40px_-22px_rgba(0,0,0,0.28)] transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_2px_6px_rgba(0,0,0,0.05),0_26px_48px_-22px_rgba(0,0,0,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-maroon"
             >
               <div className="relative aspect-[16/10] w-full overflow-hidden">
                 <Image
@@ -131,12 +137,12 @@ export default function ServiceCards() {
                   className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
                 />
               </div>
-              <span className="relative z-10 -mt-7 ml-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-maroon shadow-[0_6px_16px_-6px_rgba(0,0,0,0.3)] [&_svg]:h-6 [&_svg]:w-6">
+              <span className="relative z-10 -mt-7 ml-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-maroon shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)] ring-1 ring-cream/60 [&_svg]:h-6 [&_svg]:w-6">
                 {s.icon}
               </span>
               <div className="flex flex-1 items-end gap-3 px-5 pb-5 pt-2">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-display whitespace-nowrap text-[21px] leading-tight text-black">{s.title}</h3>
+                  <h3 className="font-display whitespace-nowrap text-[22px] leading-tight text-black">{s.title}</h3>
                   <p className="mt-1 line-clamp-2 text-sm leading-snug text-black/80">{s.text}</p>
                 </div>
                 <span
@@ -153,15 +159,15 @@ export default function ServiceCards() {
         </div>
 
         {/* Trust strip: one rounded bar, four promises */}
-        <div className="mt-6 rounded-2xl bg-cream/40 px-2 pb-5 pt-4 sm:mt-8 sm:px-6 sm:py-3.5">
+        <div className="mt-6 rounded-2xl bg-cream/40 px-2 pb-5 pt-4 sm:mt-8 sm:bg-cream/30 sm:px-8 sm:py-4">
         <p className="mb-4 text-center text-base font-semibold leading-tight text-black sm:hidden">
           {t("Your celebration,", "आपका उत्सव,")}
           <span className="font-display mt-0.5 block text-[22px] font-normal text-maroon">{t("our responsibility.", "हमारी ज़िम्मेदारी।")}</span>
         </p>
         <ul className="grid grid-cols-4 [&>li+li]:border-l [&>li+li]:border-maroon/15 sm:flex sm:items-center sm:justify-around">
           {reasons.map((r) => (
-            <li key={r.label} className="flex flex-1 flex-col items-center justify-start gap-2 px-1 text-center text-[11.5px] font-medium leading-tight text-black sm:flex-row sm:justify-center sm:gap-2.5 sm:text-sm sm:font-semibold">
-              <span className="text-maroon [&_svg]:h-6 [&_svg]:w-6">{r.icon}</span>
+            <li key={r.label} className="flex flex-1 flex-col items-center justify-start gap-2 px-1 text-center text-[11.5px] font-medium leading-tight text-black sm:flex-row sm:justify-center sm:gap-3 sm:text-[15px] sm:font-semibold">
+              <span className="text-maroon [&_svg]:h-6 [&_svg]:w-6 sm:[&_svg]:h-7 sm:[&_svg]:w-7">{r.icon}</span>
               {r.label}
             </li>
           ))}
